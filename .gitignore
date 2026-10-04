@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Office lock / temp files
+~$*
+*.tmp
+
+# Editors
+.idea/
+.vscode/
+
+# Build outputs (reserved for code)
+target/
+node_modules/
+dist/
+
+# Local secrets
+.env
+.env.*
+!.env.example
