@@ -30,7 +30,7 @@ public class AuthService {
 
   public LoginResult login(String username, String password) {
     failures.check(username);
-    SysUser user = users.selectOne(new QueryWrapper<SysUser>().eq("username", username));
+    SysUser user = users.selectOne(new QueryWrapper<SysUser>().apply("lower(username) = lower({0})", username));
     if (user == null
         || !Integer.valueOf(1).equals(user.status)
         || !passwords.matches(password, user.passwordHash)) {

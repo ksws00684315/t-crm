@@ -21,5 +21,5 @@ public abstract class BaseEntity {
   @TableField(fill = FieldFill.INSERT_UPDATE)
   public Instant updateTime;
 
-  @TableLogic public Integer delFlag;
+  @TableLogic @TableField("is_deleted") public Boolean deleted;
 }

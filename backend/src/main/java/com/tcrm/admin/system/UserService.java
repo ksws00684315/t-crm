@@ -25,7 +25,7 @@ public class UserService {
       long page, long size, String username, Role role, Integer status) {
     var query =
         new QueryWrapper<SysUser>()
-            .like(username != null && !username.isBlank(), "username", username)
+            .apply(username != null && !username.isBlank(), "username ILIKE {0}", "%" + username + "%")
             .eq(role != null, "role", role)
             .eq(status != null, "status", status)
             .orderByDesc("create_time", "id");
@@ -44,7 +44,7 @@ public class UserService {
     user.role = r.role();
     user.dataScope = r.dataScope();
     user.status = 1;
-    user.delFlag = 0;
+    user.deleted = false;
     users.insert(user);
     return UserInfo.from(user);
   }

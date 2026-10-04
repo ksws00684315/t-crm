@@ -45,7 +45,7 @@ public class BootstrapAdmin implements ApplicationRunner {
     user.role = Role.SUPER_ADMIN;
     user.dataScope = DataScope.ALL;
     user.status = 1;
-    user.delFlag = 0;
+    user.deleted = false;
     users.insert(user);
     LOG.info("Bootstrap administrator created");
   }
