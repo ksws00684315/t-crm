@@ -111,3 +111,10 @@ version = "6.0.3"
 ecosystem = "Maven"
 license.override = ["EPL-2.0"]
 reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.checkerframework:checker-qual"
+version = "3.55.1"
+ecosystem = "Maven"
+license.override = ["MIT"]
+reason = "Packaged META-INF/LICENSE.txt grants MIT; normalize POM license name. Official original: https://github.com/typetools/checker-framework/blob/checker-framework-3.55.1/LICENSE.txt"
