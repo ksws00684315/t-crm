@@ -35,13 +35,16 @@ public class BootstrapAdmin implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     if (users.selectCount(
-            new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getRole, Role.SUPER_ADMIN))
+            new LambdaQueryWrapper<SysUserDO>()
+                .eq(SysUserDO::getRole, Role.SUPER_ADMIN)
+                .eq(SysUserDO::getStatus, 1))
         > 0) {
       return;
     }
     if (username.isBlank() || password.isBlank()) {
-      LOG.warn("Bootstrap administrator environment variables are missing; no account created");
-      return;
+      throw new IllegalStateException(
+          "No enabled super administrator exists; set TCRM_BOOTSTRAP_ADMIN_USERNAME and"
+              + " TCRM_BOOTSTRAP_ADMIN_PASSWORD before starting the application");
     }
     if (!username.matches("[A-Za-z0-9_.-]{3,64}") || !password.matches("[\\x20-\\x7E]{10,72}")) {
       throw new IllegalStateException(

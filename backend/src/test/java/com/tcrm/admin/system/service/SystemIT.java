@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -104,6 +106,20 @@ class SystemIT {
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN'", Integer.class))
         .isEqualTo(1);
+  }
+
+  @Test
+  void shouldFailBootstrap_whenOnlyDisabledSuperAdministratorExists() {
+    jdbc.update("UPDATE sys_user SET status=0 WHERE username='bootstrap'");
+    try {
+      assertThatThrownBy(
+              () -> new BootstrapAdmin(users, new BCryptPasswordEncoder(12), "", "").run(null))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_USERNAME")
+          .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_PASSWORD");
+    } finally {
+      jdbc.update("UPDATE sys_user SET status=1 WHERE username='bootstrap'");
+    }
   }
 
   @Test

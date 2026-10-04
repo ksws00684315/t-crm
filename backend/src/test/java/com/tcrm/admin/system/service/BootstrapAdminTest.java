@@ -19,10 +19,32 @@ class BootstrapAdminTest {
   private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder(12);
 
   @Test
-  void shouldAvoidDefaultAccount_whenCredentialsAreMissing() {
+  void shouldFailStartup_whenBothBootstrapCredentialsAreMissing() {
     when(users.selectCount(any())).thenReturn(0L);
-    new BootstrapAdmin(users, passwords, "", "").run(null);
-    new BootstrapAdmin(users, passwords, "test-admin", "").run(null);
+    assertThatThrownBy(() -> new BootstrapAdmin(users, passwords, "", "").run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_USERNAME")
+        .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_PASSWORD");
+    verify(users, never()).insert(any(SysUserDO.class));
+  }
+
+  @Test
+  void shouldFailStartup_whenBootstrapUsernameIsBlank() {
+    when(users.selectCount(any())).thenReturn(0L);
+    assertThatThrownBy(
+            () -> new BootstrapAdmin(users, passwords, "  ", "unit-test-password").run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_USERNAME")
+        .satisfies(error -> assertThat(error.getMessage()).doesNotContain("unit-test-password"));
+    verify(users, never()).insert(any(SysUserDO.class));
+  }
+
+  @Test
+  void shouldFailStartup_whenBootstrapPasswordIsBlank() {
+    when(users.selectCount(any())).thenReturn(0L);
+    assertThatThrownBy(() -> new BootstrapAdmin(users, passwords, "test-admin", "  ").run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_PASSWORD");
     verify(users, never()).insert(any(SysUserDO.class));
   }
 
