@@ -78,5 +78,5 @@ for filename in sorted(classpath, key=lambda x: Path(x).name):
         seen.add(digest)
         parts.append(f'\n--- {name} ---\n{content}\n')
 output = engine / 'THIRD-PARTY-NOTICES'
-output.write_text('\n'.join(parts), encoding='utf-8')
+output.write_text('\n'.join(parts).replace('\r\n', '\n').replace('\r', '\n'), encoding='utf-8')
 print(f'{engine.name}: {len(coordinates)} runtime dependencies; {output.stat().st_size} bytes')
