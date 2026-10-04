@@ -2,7 +2,7 @@
 
 自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准。当前后台包含管理员登录、用户管理、操作审计；独立跳转服务提供 302 跳转与 Redis 点击事件写入。其他业务模块目前仅占位。
 
-任务 02 当前为部分完成：Java 构建及 Docker 集成 CI 已通过，但 Checkstyle 引擎的 LGPL 许可与规范 07 白名单冲突，OSV 还有 ArchUnit 许可元数据告警。按任务停止条件保留 [Draft PR #2](https://github.com/ksws00684315/t-crm/pull/2)，详情见 [执行报告第 10 节](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md#10-第三次续做记录2026-10-05)。
+任务 02 已按第四次续做要求完成代码整改，本地验证通过，等待 PR #2 的 Java / Docker / OSV 检查。Checkstyle 按 ADR-007 保留，ArchUnit 完整组合许可已声明。当前结果见 [执行报告第 11 节](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md#11-第四次续做记录2026-10-05)。
 
 ## 目录
 
@@ -26,7 +26,7 @@
 | PostgreSQL / JDBC / Flyway | PostgreSQL 17；JDBC 42.7.13；Flyway 12.4.0（后台） |
 | Tomcat / Jackson BOM | 11.0.26 / 3.1.7（按安全修复例外覆盖） |
 | Spotless / google-java-format | 3.10.3 / 1.28.0 |
-| Maven Checkstyle / Checkstyle 引擎 | 3.6.0 / 14.3.0（引擎许可证待负责人裁定） |
+| Maven Checkstyle / Checkstyle 引擎 | 3.6.0 / 14.3.0（构建工具，见 ADR-007） |
 | JaCoCo / ArchUnit | 0.8.15 / 1.5.1 |
 | license-maven-plugin / Surefire / Failsafe | 2.7.1 / 3.5.5 / 3.5.5 |
 | Testcontainers / 测试镜像 | 2.0.5；`postgres:17.11`、`redis:7.4.5` |
@@ -35,7 +35,7 @@
 
 ## 本地开发
 
-安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `.env.example` 到 `.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；已有超管时不会重复创建。
+安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `.env.example` 到 `.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
 
 在所选工程目录运行：
 
@@ -45,7 +45,7 @@ mvn verify
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-`verify` 校验格式、导入及输出规则、单元测试、ArchUnit、覆盖率。后台整体行/分支门槛为 70% / 60%，security 及未来 commission、order、stats 为 85% / 80%；跳转为 80% / 70%。`dev` 使用同一环境变量配置；当前没有引入 springdoc，原因见报告，不提供 OpenAPI 页面。
+`verify` 校验格式、导入、输出、大括号、单行语句、变量声明、空 catch、switch 分支等规则，以及单元测试、ArchUnit、覆盖率。后台整体行/分支门槛为 70% / 60%，security 及未来 commission、order、stats 为 85% / 80%；跳转为 80% / 70%。`dev` 使用同一环境变量配置；当前没有引入 springdoc，原因见报告，不提供 OpenAPI 页面。
 
 具备 Docker 的机器运行：
 
@@ -63,7 +63,7 @@ python3 ../scripts/generate-notices.py .
 git diff -- THIRD-PARTY-NOTICES
 ```
 
-运行时通知包含完整依赖列表、许可证原文、版权与致谢，随 JAR 放入 `META-INF/THIRD-PARTY-NOTICES`；CI 重生成后比较已提交文件，不一致即失败。原文来源见 [许可说明](config/licenses/README.md)。镜像交付待任务 03 补充。
+运行时通知包含完整依赖列表和来源、共享原文索引与文本块；通过编号在文件内还原完整许可证、版权与致谢，相同内容只存一份。通知随 JAR 放入 `META-INF/THIRD-PARTY-NOTICES`；CI 先验证 5 项离线去重回归用例，重生成时逐份核对原文可还原性，再比较已提交文件，不一致即失败。原文来源见 [许可说明](config/licenses/README.md)。镜像交付待任务 03 补充。
 
 ## 接口与规范
 
