@@ -1,0 +1,113 @@
+# License metadata corrections verified against packaged originals; no vulnerability exemptions.
+
+[[PackageOverrides]]
+name = "ch.qos.logback:logback-classic"
+version = "1.5.38"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Original grants EPL-2.0 OR LGPL-2.1; select EPL-2.0. Official original: https://logback.qos.ch/license.html"
+
+[[PackageOverrides]]
+name = "ch.qos.logback:logback-core"
+version = "1.5.38"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Original grants EPL-2.0 OR LGPL-2.1; select EPL-2.0. Official original: https://logback.qos.ch/license.html"
+
+[[PackageOverrides]]
+name = "com.github.jsqlparser:jsqlparser"
+version = "5.2"
+ecosystem = "Maven"
+license.override = ["Apache-2.0"]
+reason = "Upstream offers Apache-2.0 OR LGPL-2.1; select Apache-2.0. JAR has no license text; use exact upstream tag. Official original: https://github.com/JSQLParser/JSqlParser/blob/jsqlparser-5.2/LICENSE_APACHEV2"
+
+[[PackageOverrides]]
+name = "jakarta.activation:jakarta.activation-api"
+version = "2.1.4"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Packaged LICENSE.md is EDL 1.0 (BSD-3-Clause); NOTICE offers this alternative. Official original: https://github.com/jakartaee/jaf-api/blob/2.1.4/LICENSE.md"
+
+[[PackageOverrides]]
+name = "jakarta.annotation:jakarta.annotation-api"
+version = "3.0.0"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md and NOTICE offer EPL-2.0 OR GPL-2.0 with Classpath exception; select EPL-2.0. Official original: https://github.com/jakartaee/common-annotations-api/blob/3.0.0/LICENSE.md"
+
+[[PackageOverrides]]
+name = "jakarta.servlet:jakarta.servlet-api"
+version = "6.1.0"
+ecosystem = "Maven"
+license.override = ["EPL-2.0", "Apache-2.0"]
+reason = "Packaged NOTICE requires (EPL-2.0 OR GPL-2.0 WITH Classpath exception) AND Apache-2.0; retain both selected components. Official original: https://github.com/jakartaee/servlet/blob/6.1.0-RELEASE/NOTICE.md"
+
+[[PackageOverrides]]
+name = "jakarta.xml.bind:jakarta.xml.bind-api"
+version = "4.0.5"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Packaged LICENSE.md and NOTICE.md grant BSD-3-Clause (EDL 1.0). Official original: https://github.com/jakartaee/jaxb-api/blob/4.0.5/LICENSE.md"
+
+[[PackageOverrides]]
+name = "net.java.dev.jna:jna"
+version = "5.18.1"
+ecosystem = "Maven"
+license.override = ["Apache-2.0"]
+reason = "Packaged META-INF/LICENSE grants Apache-2.0 OR LGPL-2.1-or-later; select Apache-2.0. Official original: https://github.com/java-native-access/jna/blob/5.18.1/LICENSE"
+
+[[PackageOverrides]]
+name = "org.aspectj:aspectjweaver"
+version = "1.9.25.1"
+ecosystem = "Maven"
+license.override = ["EPL-2.0", "BSD-3-Clause", "Apache-1.1"]
+reason = "Packaged LICENSE-AspectJ.adoc is EPL-2.0 AND BSD-3-Clause AND Apache-1.1, including shaded BCEL. Retain the full combination (ADR-006). Official original: https://github.com/eclipse-aspectj/aspectj/blob/V1_9_25_1/docs/LICENSE-AspectJ.adoc"
+
+[[PackageOverrides]]
+name = "org.hdrhistogram:HdrHistogram"
+version = "2.2.2"
+ecosystem = "Maven"
+license.override = ["BSD-2-Clause"]
+reason = "Packaged META-INF/LICENSE.txt offers CC0 OR BSD-2-Clause; select BSD-2-Clause. Official original: https://github.com/HdrHistogram/HdrHistogram/blob/HdrHistogram-2.2.2/COPYING.txt"
+
+[[PackageOverrides]]
+name = "org.junit.jupiter:junit-jupiter"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.junit.jupiter:junit-jupiter-api"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.junit.jupiter:junit-jupiter-engine"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.junit.jupiter:junit-jupiter-params"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.junit.platform:junit-platform-commons"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.junit.platform:junit-platform-engine"
+version = "6.0.3"
+ecosystem = "Maven"
+license.override = ["EPL-2.0"]
+reason = "Packaged LICENSE.md is EPL-2.0; normalize non-SPDX POM license name. Official original: https://github.com/junit-team/junit-framework/blob/r6.0.3/LICENSE.md"
