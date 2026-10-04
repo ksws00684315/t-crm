@@ -50,6 +50,32 @@
 
 续做要求同前两次：合并最新 `main`，继续使用 PR #2，执行报告新增"第三次续做记录"。顺序：PostgreSQL 迁移 → 漏洞修复与许可证声明 → OSV-Scanner 通过 → 其余整改 → 全部 CI 通过 → PR 转为可审查。
 
+### 第四次续做（2026-10-05 更新）
+
+第三次续做的整改主体已完成，后台与跳转服务的 CI（含 Docker 集成测试）通过。项目负责人审查后的决定与修改要求如下：
+
+**阻塞点处理**
+
+| 编号 | 内容 | 决定 |
+|---|---|---|
+| B1 | Checkstyle 引擎为 LGPL-2.1-or-later | 规范 07 新增"构建与测试工具"规则（ADR-007），保留 Checkstyle；在 PR 中按规则列出该工具 |
+| B2 | ArchUnit core 1.5.1 的许可证元数据不规范 | 按包内原文在 `osv-scanner.toml` 声明 `Apache-2.0 AND BSD-3-Clause`，附原文链接（报告第 10.5 节已核实） |
+
+**审查问题修复**
+
+| 编号 | 问题 | 要求 |
+|---|---|---|
+| F1 | 约 17 处 `if` / `for` / `while` / `else` 未使用大括号，违反 Google Java Style；Checkstyle 只配置了 3 条规则 | Checkstyle 增加以下规则（只选与 google-java-format 不冲突的）：`NeedBraces`、`OneStatementPerLine`、`MultipleVariableDeclarations`、`EmptyCatchBlock`、`MissingSwitchDefault`、`FallThrough`、`OneTopLevelClass`；修复两个工程中所有违规（含测试代码） |
+| F2 | `THIRD-PARTY-NOTICES` 中 Apache-2.0 全文重复 134 次，后台文件 2.2MB | 改为：依赖清单（名称、版本、许可证、来源）+ 每种许可证原文**只保留一份** + 各依赖要求随附的 NOTICE 与版权声明（相同内容去重）。去重后仍须满足 ADR-006 的随附要求（含 AspectJ 的 Apache-1.1 致谢）；CI 一致性校验保留 |
+| F3 | 系统中没有超级管理员、也未配置初始化变量时，后台只打印警告 | 按规范 06 改为启动失败并提示需要设置的变量；已有超级管理员时不受影响；补充对应测试 |
+
+**其他说明**
+
+- 审计日志保存原始 IP：规范 06 已明确管理员审计日志可以保存原始 IP，**本任务无需修改代码**；180 天清理任务留待后续业务任务实现，在报告中登记为遗留项。
+- springdoc（I6）：接受跳过，登记为遗留项，待出现明确支持 Spring Boot 4.1 的稳定版后补充。
+
+**续做要求**：同前几次——合并最新 `main`，继续使用 PR #2，执行报告新增"第四次续做记录"。全部修复完成、CI（Java、OSV）全部通过后，执行 `gh pr ready 2` 并去掉标题中的 `[WIP]`，交项目负责人审查合并。
+
 ## 1. 背景
 
 项目已制定工程规范（`docs/05-工程规范/`）和 AI 代理规则（仓库根目录 `AGENTS.md`）。现有的 `backend/`、`redirect/` 是在规范制定前写的，与规范存在差距，差距逐项列在 `docs/05-工程规范/09-现状差距与整改清单.md`。
