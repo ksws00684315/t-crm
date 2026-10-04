@@ -63,7 +63,10 @@
 | admin-ui / kol-portal | `pnpm install --frozen-lockfile`、ESLint、Prettier 校验、类型检查、Vitest、构建、`pnpm audit` |
 | deploy | `docker compose config` 语法校验 |
 
+| 全仓库 | OSV-Scanner 依赖漏洞与许可证扫描（见规范 06 第 6 节） |
+
 【强制】CI 失败的 PR 不得合并；不得为了通过而关闭检查或降低门槛（调整门槛须修改本规范）。
+【强制】工作流中引用的第三方 Action 必须固定到**完整的 40 位提交 SHA**，并在同一行注释标明对应版本号（如 `uses: actions/checkout@<sha> # v5.0.0`）；禁止只写版本标签或分支名。理由：标签可以被强行改指向，2026 年 3 月 trivy-action 的 76 个版本标签即被篡改为窃取 CI 密钥的恶意代码（见 ADR-004）。Dependabot 负责提示更新。
 
 ## 5. 完成标准（Definition of Done）
 
