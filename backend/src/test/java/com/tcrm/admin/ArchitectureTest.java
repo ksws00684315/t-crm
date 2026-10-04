@@ -70,9 +70,12 @@ class ArchitectureTest {
                     boolean valid =
                         !own.equals("shared")
                             && (other.equals("shared")
-                                || target
-                                    .getPackageName()
-                                    .startsWith("com.tcrm.admin." + other + ".api"));
+                                || (target
+                                        .getPackageName()
+                                        .equals("com.tcrm.admin." + other + ".api")
+                                    || target
+                                        .getPackageName()
+                                        .startsWith("com.tcrm.admin." + other + ".api.")));
                     events.add(
                         new SimpleConditionEvent(dependency, valid, dependency.getDescription()));
                   }
