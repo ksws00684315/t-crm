@@ -11,6 +11,7 @@
 
 # Build outputs (reserved for code)
 target/
+__pycache__/
 node_modules/
 dist/
 
