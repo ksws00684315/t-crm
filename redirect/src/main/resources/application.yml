@@ -1,0 +1,17 @@
+server:
+  port: ${TCRM_REDIRECT_PORT:8081}
+spring:
+  application:
+    name: crm-redirect
+  data:
+    redis:
+      host: ${TCRM_REDIS_HOST:localhost}
+      port: ${TCRM_REDIS_PORT:6379}
+      password: ${TCRM_REDIS_PASSWORD:}
+      database: 0
+      connect-timeout: 1s
+      timeout: 1s
+crm:
+  redirect:
+    fallback-url: ${TCRM_REDIRECT_FALLBACK_URL}
+    ip-hash-salt: ${TCRM_IP_HASH_SALT}
