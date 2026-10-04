@@ -146,9 +146,17 @@ class BackendDockerTest {
   @Test
   void shouldRoundTripUtcInstant_whenSavingUser() {
     java.time.Instant instant = java.time.Instant.parse("2026-10-04T04:30:12.123Z");
-    Long id = jdbc.queryForObject("SELECT id FROM sys_user WHERE username = 'bootstrap'", Long.class);
-    jdbc.update("UPDATE sys_user SET last_login_time = ? WHERE id = ?", java.sql.Timestamp.from(instant), id);
-    assertEquals(instant, jdbc.queryForObject("SELECT last_login_time FROM sys_user WHERE id = ?", java.sql.Timestamp.class, id).toInstant());
+    Long id =
+        jdbc.queryForObject("SELECT id FROM sys_user WHERE username = 'bootstrap'", Long.class);
+    jdbc.update(
+        "UPDATE sys_user SET last_login_time = ? WHERE id = ?",
+        java.sql.Timestamp.from(instant),
+        id);
+    assertEquals(
+        instant,
+        jdbc.queryForObject(
+                "SELECT last_login_time FROM sys_user WHERE id = ?", java.sql.Timestamp.class, id)
+            .toInstant());
     assertEquals("UTC", jdbc.queryForObject("SHOW TIME ZONE", String.class));
   }
 
@@ -167,16 +175,31 @@ class BackendDockerTest {
     userMapper.insert(user);
     assertEquals(1, userMapper.deleteById(user.id));
     assertNull(userMapper.selectById(user.id));
-    assertTrue(jdbc.queryForObject("SELECT is_deleted FROM sys_user WHERE id = ?", Boolean.class, user.id));
+    assertTrue(
+        jdbc.queryForObject(
+            "SELECT is_deleted FROM sys_user WHERE id = ?", Boolean.class, user.id));
   }
 
   @Test
   void shouldReturnConflict_whenCreatingCaseInsensitiveDuplicate() throws Exception {
     String admin = login("BOOTSTRAP", PASSWORD);
-    mvc.perform(post("/admin-api/system/user").header("X-Admin-Token", admin)
-        .contentType("application/json").content(json.writeValueAsString(java.util.Map.of(
-            "username", "BOOTSTRAP", "password", PASSWORD, "nickname", "Duplicate",
-            "role", "OPERATOR", "dataScope", "OWN"))))
+    mvc.perform(
+            post("/admin-api/system/user")
+                .header("X-Admin-Token", admin)
+                .contentType("application/json")
+                .content(
+                    json.writeValueAsString(
+                        java.util.Map.of(
+                            "username",
+                            "BOOTSTRAP",
+                            "password",
+                            PASSWORD,
+                            "nickname",
+                            "Duplicate",
+                            "role",
+                            "OPERATOR",
+                            "dataScope",
+                            "OWN"))))
         .andExpect(status().isConflict());
   }
 

@@ -25,7 +25,8 @@ public class UserService {
       long page, long size, String username, Role role, Integer status) {
     var query =
         new QueryWrapper<SysUser>()
-            .apply(username != null && !username.isBlank(), "username ILIKE {0}", "%" + username + "%")
+            .apply(
+                username != null && !username.isBlank(), "username ILIKE {0}", "%" + username + "%")
             .eq(role != null, "role", role)
             .eq(status != null, "status", status)
             .orderByDesc("create_time", "id");
