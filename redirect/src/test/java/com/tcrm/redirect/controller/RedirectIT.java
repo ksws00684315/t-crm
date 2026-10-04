@@ -1,11 +1,14 @@
-package com.tcrm.redirect;
+package com.tcrm.redirect.controller;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -22,7 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
-class RedirectDockerTest {
+class RedirectIT {
   @Container
   static final GenericContainer<?> REDIS =
       new GenericContainer<>("redis:7.4.5").withExposedPorts(6379);
@@ -36,8 +39,14 @@ class RedirectDockerTest {
     r.add("crm.redirect.ip-hash-salt", () -> "integration-test-salt");
   }
 
-  @Autowired MockMvc mvc;
-  @Autowired StringRedisTemplate redis;
+  private final MockMvc mvc;
+  private final StringRedisTemplate redis;
+
+  @Autowired
+  RedirectIT(MockMvc mvc, StringRedisTemplate redis) {
+    this.mvc = mvc;
+    this.redis = redis;
+  }
 
   @BeforeEach
   void clear() {
@@ -45,50 +54,50 @@ class RedirectDockerTest {
   }
 
   @Test
-  void validLinkWritesRealStream() throws Exception {
+  void shouldValidLinkWritesRealStream_whenRequested() throws Exception {
     link("1");
     target();
-    assertEquals(1L, redis.opsForStream().size("stream:click"));
+    assertThat(redis.opsForStream().size("stream:click")).isEqualTo(1L);
     var event =
         redis
             .opsForStream()
             .range("stream:click", org.springframework.data.domain.Range.unbounded())
             .getFirst()
             .getValue();
-    assertEquals("KOL0001", event.get("kolCode"));
-    assertEquals(64, event.get("ipHash").toString().length());
+    assertThat(event.get("kolCode")).isEqualTo("KOL0001");
+    assertThat(event.get("ipHash").toString().length()).isEqualTo(64);
   }
 
   @Test
-  void missUsesFallback() throws Exception {
+  void shouldMissUsesFallback_whenRequested() throws Exception {
     fallback();
   }
 
   @Test
-  void inactiveUsesFallback() throws Exception {
+  void shouldInactiveUsesFallback_whenRequested() throws Exception {
     link("0");
     fallback();
   }
 
   @Test
-  void invalidPathReturns404() throws Exception {
+  void shouldInvalidPathReturns404_whenRequested() throws Exception {
     mvc.perform(get("/t/BAD/P000001")).andExpect(status().isNotFound());
   }
 
   @Test
-  void streamCommandDeniedStillRedirects() throws Exception {
+  void shouldStreamCommandDeniedStillRedirects_whenRequested() throws Exception {
     link("1");
     acl("-xadd");
     try {
       target();
-      assertFalse(Boolean.TRUE.equals(redis.hasKey("stream:click")));
+      assertThat(Boolean.TRUE.equals(redis.hasKey("stream:click"))).isFalse();
     } finally {
       acl("+xadd");
     }
   }
 
   @Test
-  void healthIs200() throws Exception {
+  void shouldHealthIs200_whenRequested() throws Exception {
     mvc.perform(get("/healthz")).andExpect(status().isOk());
   }
 

@@ -1,4 +1,4 @@
-package com.tcrm.redirect;
+package com.tcrm.redirect.service;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -11,16 +11,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.stereotype.Service;
 
-@RestController
-public class RedirectController {
-  private static final Logger LOG = LoggerFactory.getLogger(RedirectController.class);
+@Service
+public class RedirectService {
+  private static final Logger LOG = LoggerFactory.getLogger(RedirectService.class);
   private final ClickRedis redis;
   private final URI fallback;
   private final String salt;
 
-  public RedirectController(
+  public RedirectService(
       ClickRedis redis,
       @Value("${crm.redirect.fallback-url}") String fallback,
       @Value("${crm.redirect.ip-hash-salt}") String salt) {
@@ -32,9 +32,8 @@ public class RedirectController {
           "An HTTP(S) fallback URL and nonempty IP hash salt are required");
   }
 
-  @GetMapping("/t/{kolCode}/{productCode}")
   public ResponseEntity<Void> redirect(
-      @PathVariable String kolCode, @PathVariable String productCode, HttpServletRequest request) {
+      String kolCode, String productCode, HttpServletRequest request) {
     if (!kolCode.matches("^KOL\\d{4,8}$") || !productCode.matches("^[A-Za-z0-9_-]{1,32}$"))
       return ResponseEntity.notFound().build();
     String value;
@@ -44,7 +43,7 @@ public class RedirectController {
       LOG.error("Link lookup failed", e);
       return redirectTo(fallback);
     }
-    // TODO: Fetch missing indexes from the admin service when the internal API exists.
+    // TODO(task-01): Fetch missing indexes once the planned internal link API exists.
     if (value == null) return redirectTo(fallback);
     String[] parts = value.split("\\|", -1);
     if (parts.length != 3 || !parts[0].matches("[1-9][0-9]{0,18}") || !parts[2].equals("1"))
@@ -77,7 +76,6 @@ public class RedirectController {
     return redirectTo(target);
   }
 
-  @GetMapping("/healthz")
   public ResponseEntity<Void> health() {
     try {
       return ResponseEntity.status(redis.healthy() ? 200 : 503).build();

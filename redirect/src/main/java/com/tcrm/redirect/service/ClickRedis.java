@@ -1,4 +1,4 @@
-package com.tcrm.redirect;
+package com.tcrm.redirect.service;
 
 import java.util.Map;
 import org.springframework.data.redis.connection.stream.MapRecord;
