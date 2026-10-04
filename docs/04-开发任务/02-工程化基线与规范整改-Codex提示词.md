@@ -4,6 +4,17 @@
 
 ---
 
+## 0. 续做说明（2026-10-04 更新）
+
+本任务第一次执行时，在第 7 步因 GitHub 依赖审查不支持私有仓库而按停止条件中止（见 PR #2 与执行报告）。该问题已由项目负责人决定解决：改用 OSV-Scanner（见 ADR-004，规范 06 第 6 节、08 第 4 节已更新）。
+
+续做要求：
+
+1. 先 `git pull origin main` 获取更新后的规范与本提示词，再切到已有分支 `task/02-engineering-baseline` 并合并最新 `main`（使用 merge，不要 rebase，不改写已推送历史）。
+2. 在**原分支与原 PR #2** 上继续，不新建分支或 PR；删除不可用的 `dependency-review.yml`。
+3. 执行报告在原文件上续写，新增"续做记录"一节，保留第一次执行的内容。
+4. 第 1～8 步全部完成、CI 全部通过后，把 PR #2 从草稿改为可审查（`gh pr ready 2`），标题去掉 `[WIP]`。
+
 ## 1. 背景
 
 项目已制定工程规范（`docs/05-工程规范/`）和 AI 代理规则（仓库根目录 `AGENTS.md`）。现有的 `backend/`、`redirect/` 是在规范制定前写的，与规范存在差距，差距逐项列在 `docs/05-工程规范/09-现状差距与整改清单.md`。
@@ -105,10 +116,15 @@
 
 1. `.github/workflows/backend.yml`：在 `backend/**`、`config/**` 或工作流本身变更时运行；步骤为 JDK 21、Maven 缓存、`mvn -B verify`、`mvn -B verify -Pdocker-it`，上传 JaCoCo 报告为构建产物。
 2. `.github/workflows/redirect.yml`：同上，作用于 `redirect/**`。
-3. `.github/workflows/dependency-review.yml`：PR 时运行 GitHub 官方 `actions/dependency-review-action`，高危漏洞与禁用许可证（GPL、AGPL、SSPL）阻断。
+3. `.github/workflows/osv-scanner.yml`：在 PR、合并到 `main`、每周定时三种情况下运行 OSV-Scanner，扫描全仓库（递归，包含两个 `pom.xml`，以及以后的 `pnpm-lock.yaml`）：
+   - 直接使用 `google/osv-scanner-action` 提供的 Action 运行扫描命令，**不要使用会上传 SARIF 到代码扫描的可复用工作流**，或者显式关闭 SARIF 上传（私有仓库没有 Advanced Security，上传会失败）；扫描结果以表格输出到日志，并作为构建产物上传；
+   - 开启许可证检查，白名单为规范 07 第 3 节列出的许可证（SPDX 标识：`MIT`、`Apache-2.0`、`BSD-2-Clause`、`BSD-3-Clause`、`ISC`、`EPL-2.0`，以及实际扫描中出现、确属宽松许可证的同类标识——每新增一个标识须在报告中说明）；
+   - 发现漏洞或许可证违规即失败；
+   - 现有依赖若已有漏洞：优先升级到修复后的稳定版；无法升级的，在根目录 `osv-scanner.toml` 登记豁免并写明 `reason` 与 `ignoreUntil`（不超过 90 天），并在报告中逐项列出；
+   - 先确认 OSV-Scanner 对 Maven 依赖能扫描到**传递依赖**（例如报告中已知的 `redis-authx-core`），在报告中给出证据；若只能扫描直接依赖，停止并报告。
 4. `.github/dependabot.yml`：Maven（两个工程）与 GitHub Actions 每周检查一次。
 5. `.github/pull_request_template.md`：包含规范 08 第 3 节要求的全部栏目，以及规范 08 第 5 节完成标准的勾选清单。
-6. 工作流中使用的 Actions 固定到正式版本号。
+6. 工作流中引用的所有 Action 固定到完整 40 位提交 SHA，并在行尾注释标明版本号（规范 08 第 4 节）；SHA 须取自该 Action 官方仓库正式发布版本对应的提交。
 
 **验证**：PR 上所有检查通过，包括 `docker-it` 集成测试。
 
