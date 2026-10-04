@@ -1,6 +1,13 @@
 # License metadata corrections verified against packaged originals; no vulnerability exemptions.
 
 [[PackageOverrides]]
+name = "com.tngtech.archunit:archunit"
+version = "1.5.1"
+ecosystem = "Maven"
+license.override = ["Apache-2.0", "BSD-3-Clause"]
+reason = "Published core JAR includes Apache-2.0 and the embedded ASM BSD-3-Clause original at com/tngtech/archunit/thirdparty/org/objectweb/asm/asm.license; retain both, correcting non-standard metadata. Official original JAR: https://repo.maven.apache.org/maven2/com/tngtech/archunit/archunit/1.5.1/archunit-1.5.1.jar"
+
+[[PackageOverrides]]
 name = "ch.qos.logback:logback-classic"
 version = "1.5.38"
 ecosystem = "Maven"
