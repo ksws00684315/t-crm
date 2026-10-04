@@ -74,6 +74,7 @@
 1. `.github/workflows/admin-ui.yml`、`kol-portal.yml`：对应目录变更时运行；Node LTS、pnpm 缓存、`pnpm install --frozen-lockfile`、lint、typecheck、test、build、`pnpm audit --audit-level high`。
 2. `.github/workflows/deploy.yml`：`deploy/**` 变更时用 `.env.example` 执行两个 compose 文件的 `docker compose config -q`，并构建两个 `Dockerfile`。
 3. `.github/dependabot.yml` 增加两个前端工程的 npm 检查。
+4. 确认任务 02 建立的 OSV-Scanner 工作流已扫描到两个前端的 `pnpm-lock.yaml`；新工作流中的 Action 同样固定到完整提交 SHA。
 
 ### 第 5 步：文档与报告
 
