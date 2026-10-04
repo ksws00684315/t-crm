@@ -59,11 +59,25 @@ class SystemIT {
     r.add("crm.bootstrap.password", () -> PASSWORD);
   }
 
-  @Autowired MockMvc mvc;
-  @Autowired JdbcTemplate jdbc;
-  @Autowired ObjectMapper json;
-  @Autowired SysUserMapper users;
-  @Autowired StringRedisTemplate redis;
+  private final MockMvc mvc;
+  private final JdbcTemplate jdbc;
+  private final ObjectMapper json;
+  private final SysUserMapper users;
+  private final StringRedisTemplate redis;
+
+  @Autowired
+  SystemIT(
+      MockMvc mvc,
+      JdbcTemplate jdbc,
+      ObjectMapper json,
+      SysUserMapper users,
+      StringRedisTemplate redis) {
+    this.mvc = mvc;
+    this.jdbc = jdbc;
+    this.json = json;
+    this.users = users;
+    this.redis = redis;
+  }
 
   @BeforeEach
   void prepareIndependentData() {
