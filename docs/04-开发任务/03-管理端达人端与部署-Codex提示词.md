@@ -76,6 +76,8 @@
 3. `.github/dependabot.yml` 增加两个前端工程的 npm 检查。
 4. 确认任务 02 建立的 OSV-Scanner 工作流已扫描到两个前端的 `pnpm-lock.yaml`；新工作流中的 Action 同样固定到完整提交 SHA。
 
+5. **前端第三方许可声明**（规范 07 第 3 节、ADR-006）：为 admin-ui、kol-portal 生成各自根目录的 `THIRD-PARTY-NOTICES`（列出打包进产物的全部依赖及许可证，附需随附的声明与原文；工具须为正式稳定版并在报告中说明），提交到仓库，CI 校验与已提交文件一致；Dockerfile 与 Nginx 静态资源目录中包含 backend、redirect 及两个前端的声明文件。
+
 ### 第 5 步：文档与报告
 
 1. 根 `README.md`：补充前端与部署部分（本地启动顺序：数据库 → 后台 → 跳转服务 → 两个前端；端口冲突时修改 `TCRM_DB_PORT`）。
