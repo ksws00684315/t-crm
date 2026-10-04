@@ -1,0 +1,49 @@
+name: Backend
+on:
+  pull_request:
+    branches: [main]
+    paths: ['backend/**', 'config/**', 'scripts/generate-notices.py', '.github/workflows/backend.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**', 'config/**', 'scripts/generate-notices.py', '.github/workflows/backend.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Backend verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: JDK 21 and Maven cache
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Regenerate third-party notices
+        run: |
+          mvn -B generate-resources dependency:build-classpath -DincludeScope=runtime -Dmdep.outputFile=target/runtime-classpath.txt
+          python3 ../scripts/generate-notices.py .
+          git diff --exit-code -- THIRD-PARTY-NOTICES
+      - name: Unit tests, architecture and build gates
+        run: mvn -B verify
+      - name: Docker integration tests
+        run: mvn -B verify -Pdocker-it
+      - name: Upload coverage and test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-verification
+          path: |
+            backend/target/site/jacoco/
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+          if-no-files-found: error
