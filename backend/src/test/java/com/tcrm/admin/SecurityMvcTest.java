@@ -111,6 +111,13 @@ class SecurityMvcTest {
   }
 
   @Test
+  void unknownPathReturnsNotFoundInsteadOfServerError() throws Exception {
+    mvc.perform(get("/actuator/env"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value(404));
+  }
+
+  @Test
   void longIdsDecimalAndTimeHaveSafeJsonRepresentation() throws Exception {
     mvc.perform(get("/test/json").header("X-Admin-Token", token))
         .andExpect(status().isOk())

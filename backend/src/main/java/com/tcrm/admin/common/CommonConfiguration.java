@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import java.math.BigDecimal;
+import org.redisson.spring.starter.RedissonAutoConfigurationCustomizer;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +29,22 @@ public class CommonConfiguration {
     var interceptor = new MybatisPlusInterceptor();
     interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
     return interceptor;
+  }
+
+  /** An empty TCRM_REDIS_PASSWORD must mean "no AUTH", not AUTH with an empty password. */
+  @Bean
+  public RedissonAutoConfigurationCustomizer redissonBlankPasswordCustomizer() {
+    return config -> {
+      if (config.getPassword() != null && config.getPassword().isBlank()) {
+        config.setPassword(null);
+      }
+      if (config.isSingleConfig()) {
+        var single = config.useSingleServer();
+        if (single.getPassword() != null && single.getPassword().isBlank()) {
+          single.setPassword(null);
+        }
+      }
+    };
   }
 
   @Bean

@@ -43,7 +43,12 @@ class BackendDockerTest {
   static void properties(DynamicPropertyRegistry r) {
     r.add(
         "spring.datasource.url",
-        () -> MYSQL.getJdbcUrl() + "&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true");
+        () -> {
+          String url = MYSQL.getJdbcUrl();
+          return url
+              + (url.contains("?") ? "&" : "?")
+              + "connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true";
+        });
     r.add("spring.datasource.username", MYSQL::getUsername);
     r.add("spring.datasource.password", MYSQL::getPassword);
     r.add("spring.data.redis.host", REDIS::getHost);
