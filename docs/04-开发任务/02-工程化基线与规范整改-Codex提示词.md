@@ -15,6 +15,22 @@
 3. 执行报告在原文件上续写，新增"续做记录"一节，保留第一次执行的内容。
 4. 第 1～8 步全部完成、CI 全部通过后，把 PR #2 从草稿改为可审查（`gh pr ready 2`），标题去掉 `[WIP]`。
 
+### 第二次续做（2026-10-05 更新）
+
+第二次执行时，OSV-Scanner 已正常运行，扫描发现以下问题并按停止条件中止。项目负责人已决定：
+
+| 发现 | 决定 | 依据 |
+|---|---|---|
+| `mysql-connector-j` 为 GPLv2（附 Universal FOSS Exception），与规范 07 冲突 | **数据库改为 PostgreSQL 17**，驱动 `org.postgresql:postgresql`（BSD-2-Clause） | ADR-005；规范 04 已按 PostgreSQL 重写；第 4 步已更新 |
+| Tomcat 11.0.24、Jackson 3.1.5 存在漏洞，Spring Boot 4.1.1 尚无修复版本 | 按规范 07"安全修复例外"覆盖 `tomcat.version`、`jackson-bom.version` 到修复后的同次版本补丁（如 Tomcat 11.0.26、Jackson 3.1.7），属性旁注释漏洞编号 | 规范 07 第 1 节 |
+| logback、jsqlparser、jna、HdrHistogram、jakarta.*、aspectj、JUnit、reactive-streams 的许可证告警 | 白名单已增加 `MIT-0`、`EPL-1.0`、`CC0-1.0`；双重许可与元数据不规范的包，在 `osv-scanner.toml` 中按规范 07 第 3 节逐条声明（所选许可证、理由、官方许可证链接） | 规范 07 第 3 节 |
+
+续做要求：
+
+1. 同上：拉取 `main`，在原分支合并最新 `main`（merge），继续使用 PR #2，续写执行报告（新增"第二次续做记录"）。
+2. 先完成第 4 步的 PostgreSQL 迁移与上述漏洞、许可证处理，让 OSV-Scanner 通过，再按顺序完成第 1～8 步其余内容。
+3. 声明许可证时，逐个核对官方许可证原文；**若某个依赖的许可证确实不在白名单内**（而不只是元数据问题），停止并报告，不要声明。
+
 ## 1. 背景
 
 项目已制定工程规范（`docs/05-工程规范/`）和 AI 代理规则（仓库根目录 `AGENTS.md`）。现有的 `backend/`、`redirect/` 是在规范制定前写的，与规范存在差距，差距逐项列在 `docs/05-工程规范/09-现状差距与整改清单.md`。
@@ -89,13 +105,19 @@
 5. 安全响应头（`X-Content-Type-Options`、`Referrer-Policy`）与跨域白名单（来源域名来自环境变量 `TCRM_CORS_ALLOWED_ORIGINS`，逗号分隔，默认不允许任何跨域）。
 6. 新增 springdoc OpenAPI：**仅当存在明确支持 Spring Boot 4.1 的正式稳定版时**引入；`dev`、`test` 环境开放，`prod` 关闭；为现有接口补充说明、所需角色和可能的 `errorCode`。若无合格版本，跳过并在报告中说明。
 
-### 第 4 步：数据库整改（清单 D1～D5）
+### 第 4 步：数据库迁移到 PostgreSQL 并整改（清单 D1～D5，ADR-005）
 
 项目尚未上线、没有生产数据，本次允许一次性改写初始迁移脚本（规范 09 D1 的例外，**仅此一次**）：
 
-1. `V1__init_system.sql` 重命名为 `V202610041200__init_system.sql`。
-2. 主键与人员字段改为 `BIGINT UNSIGNED`；`del_flag` 改为 `is_deleted`（Java 字段 `deleted`）；所有表与字段补 `COMMENT`，枚举字段注释列出全部取值；`sys_oper_log` 在表注释中说明其为只追加表。
-3. 同步修改实体映射与相关代码。
+1. **依赖**：移除 `mysql-connector-j`、`flyway-mysql`、`testcontainers-mysql`；改用 `org.postgresql:postgresql`、`flyway-database-postgresql`、`testcontainers-postgresql`（版本使用 Spring Boot 4.1.1 父 POM 管理的版本；不受管理的须为正式稳定版并写明依据）。
+2. **配置**：JDBC URL 改为 `jdbc:postgresql://${TCRM_DB_HOST:localhost}:${TCRM_DB_PORT:5432}/${TCRM_DB_NAME:tcrm}`，环境变量名保持不变，端口默认值改为 5432；会话时区设为 UTC；MyBatis-Plus 分页方言改为 PostgreSQL。
+3. **迁移脚本**：`V1__init_system.sql` 重写并重命名为 `V202610041200__init_system.sql`，严格按规范 04：
+   - 类型：`BIGINT` 主键（`CHECK (id > 0)`）、`TIMESTAMPTZ(3)`、`BOOLEAN is_deleted`、`VARCHAR + CHECK` 表示枚举；
+   - 约束与索引命名：`pk_` / `uk_` / `idx_` / `ck_`；
+   - `COMMENT ON TABLE` / `COMMENT ON COLUMN` 覆盖全部表和字段，枚举字段列出全部取值；`sys_oper_log` 在表注释中说明其为只追加表。
+4. **代码**：实体映射同步（`deleted` 字段对应 `is_deleted`，时间字段 `Instant` 与 `TIMESTAMPTZ` 映射正确）；检查所有 SQL 与查询构造在 PostgreSQL 下的行为（大小写敏感的 `LIKE` 改为 `ILIKE` 是否符合原意等，在报告中说明）。
+5. **测试**：集成测试改用 Testcontainers PostgreSQL 17（固定镜像标签，如 `postgres:17.x`）；验证 Flyway 迁移、时间往返无时区偏移、逻辑删除、唯一约束冲突返回 409。
+6. 同步更新执行报告第 5 节中给验证机的说明（环境变量、端口 5432）。
 
 ### 第 5 步：测试整改（清单 T1～T5）
 
