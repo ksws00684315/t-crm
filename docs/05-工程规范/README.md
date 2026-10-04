@@ -1,0 +1,45 @@
+# 工程规范
+
+> 版本：V1.0（2026-10-04）　｜　适用：`t-crm` 全部工程（backend、redirect、admin-ui、kol-portal、deploy）
+> 本规范**先于代码**：现有代码与规范不一致时，改代码，不改规范。修改规范须走 PR，并在 `docs/06-架构决策/` 记录原因。
+
+## 规范清单
+
+| 文件 | 内容 |
+|---|---|
+| [01-架构与工程结构](01-架构与工程结构.md) | 模块划分、分层、依赖方向、对象模型 |
+| [02-编码规范](02-编码规范.md) | Java、前端、日志、异常、注释 |
+| [03-接口规范](03-接口规范.md) | 路径、方法、响应格式、错误码、分页、序列化 |
+| [04-数据库规范](04-数据库规范.md) | 建表、字段、索引、迁移脚本 |
+| [05-测试规范](05-测试规范.md) | 测试分层、命名、覆盖率门槛、必测清单 |
+| [06-安全与配置规范](06-安全与配置规范.md) | 认证鉴权、输入输出、敏感数据、配置与密钥 |
+| [07-依赖规范](07-依赖规范.md) | 版本、许可证、新增依赖流程 |
+| [08-Git与交付流程](08-Git与交付流程.md) | 分支、提交、PR、CI、完成标准、任务报告、架构决策记录 |
+| [09-现状差距与整改清单](09-现状差距与整改清单.md) | 现有代码与本规范的差距 |
+
+## 约束等级
+
+| 等级 | 含义 |
+|---|---|
+| **【强制】** | 必须遵守；能自动检查的由 CI 拦截，不能自动检查的在 PR 审查中拦截 |
+| **【推荐】** | 默认遵守；不遵守须在 PR 描述中说明理由 |
+
+## 规范依据
+
+本规范不是凭空制定，而是从以下业界规范中选取适合本项目（单人 + AI 开发、模块化单体、中小规模 B 端系统）的部分：
+
+| 领域 | 依据 |
+|---|---|
+| Java 编码、分层、建表 | [阿里巴巴 Java 开发手册（黄山版）](https://developer.aliyun.com/article/1061041)、[Google Java Style Guide](https://google.github.io/styleguide/javaguide.html) |
+| 模块化架构 | [Spring Modulith 模块约定](https://docs.spring.io/spring-modulith/reference/1.1/fundamentals.html)、[ArchUnit](https://www.baeldung.com/java-archunit-intro) |
+| 接口设计 | [Zalando RESTful API Guidelines](https://opensource.zalando.com/restful-api-guidelines/)、[RFC 9457](https://rfc-editor.org/rfc/rfc9457.html) |
+| 前端 | [Vue 官方风格指南](https://it.vuejs.org/style-guide/)（必要级规则）、Vue 3 组合式 API + TypeScript 严格模式 |
+| 安全 | [OWASP ASVS 5.0](https://softwaremill.com/whats-new-in-asvs-5-0/) 第 2 级（适用于处理个人数据与资金数据的应用） |
+| 提交与版本 | Conventional Commits 1.0.0、语义化版本 2.0.0 |
+| AI 协作 | [AGENTS.md 开放标准](https://agentic-ai.readthedocs.io/en/latest/Standards/agents-md/)（仓库根目录 `AGENTS.md`） |
+
+## 如何落地
+
+1. **AI 编码代理**：仓库根目录 `AGENTS.md` 是规范摘要，Codex、Claude Code 等工具启动时自动读取；细则以本目录为准。
+2. **自动检查**：格式、静态检查、架构约束、覆盖率、构建和测试全部进入 CI（见 08），不达标不能合并。
+3. **人工审查**：自动检查覆盖不到的条款（命名语义、分层是否合理、测试是否有效），在 PR 审查时对照本规范。
