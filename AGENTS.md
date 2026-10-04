@@ -8,7 +8,7 @@
 
 | 工程 | 技术 | 说明 |
 |---|---|---|
-| `backend/` | Java 21、Spring Boot 4.1、Sa-Token、MyBatis-Plus、Flyway、Redisson | 后台 crm-admin，模块化单体 |
+| `backend/` | Java 21、Spring Boot 4.1、Sa-Token、MyBatis-Plus、Flyway、Redisson、PostgreSQL 17 | 后台 crm-admin，模块化单体 |
 | `redirect/` | Java 21、Spring Boot 4.1、Redis | 跳转服务，独立进程，保持极简 |
 | `admin-ui/` | Vue 3、TypeScript、Element Plus（基于 pure-admin-thin） | 管理端，中文 |
 | `kol-portal/` | Vue 3、TypeScript、Element Plus | 达人端，英文 |

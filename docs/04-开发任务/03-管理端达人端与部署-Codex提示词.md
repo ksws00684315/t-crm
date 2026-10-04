@@ -63,8 +63,8 @@
 
 ### 第 3 步：部署模板 deploy
 
-1. `docker-compose.dev.yml`：MySQL 8.4、Redis 7；数据卷；健康检查；不挂载初始化 SQL（Flyway 建表）；库 `tcrm` 与应用账号通过 MySQL 镜像环境变量创建；**宿主机端口用环境变量**（`${TCRM_DB_PORT:-3306}`、`${TCRM_REDIS_PORT:-6379}`），后台连接使用同名变量。
-2. `docker-compose.prod.yml`（模板）：nginx、crm-admin、crm-redirect、mysql、redis；资源限制参考设计说明书 §10；MySQL、Redis 不映射到公网端口。
+1. `docker-compose.dev.yml`：PostgreSQL 17、Redis 7（固定镜像补丁版本标签）；数据卷；健康检查（`pg_isready`）；不挂载初始化 SQL（Flyway 建表）；库 `tcrm` 与应用账号通过 PostgreSQL 镜像环境变量创建；**宿主机端口用环境变量**（`${TCRM_DB_PORT:-5432}`、`${TCRM_REDIS_PORT:-6379}`），后台连接使用同名变量。
+2. `docker-compose.prod.yml`（模板）：nginx、crm-admin、crm-redirect、postgres、redis；资源限制参考设计说明书 §10；PostgreSQL、Redis 不映射到公网端口；提供基于 `pg_dump` 的每日备份脚本模板（设计说明书 §9）。
 3. `nginx/`：`t.域名` → crm-redirect；`kol.域名` → kol-portal 静态资源 + `/kol-api` 转发后台；`admin.域名` → admin-ui 静态资源 + `/admin-api` 转发后台。按规范 06 配置安全响应头与 HSTS；域名用占位变量。
 4. 为 backend、redirect 提供 `Dockerfile`（多阶段构建，运行镜像使用 JDK 21 JRE，以非 root 用户运行）。
 5. `.env.example`：列全所有变量，名称与各工程实际使用的一致（以任务 02 执行报告为准），值留空或为示例。
