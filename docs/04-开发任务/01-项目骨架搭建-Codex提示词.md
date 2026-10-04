@@ -11,7 +11,9 @@
 - `docs/03-设计/系统详细设计说明书.md`：重点读 §0.2（技术决策）、§2（总体架构）、§4.5（点击跳转）、§7.4（Redis 链接索引）、§10（非功能）、§12（部署与配置）
 - `docs/README.md`：文档索引
 
-本任务只搭**可编译、可运行、可测试的工程骨架**，不实现业务功能（达人、商品、订单、佣金、看板等都不做），唯一例外是第 6 步的跳转服务最小实现。
+**执行环境说明**：执行本任务的机器资源有限，**不能运行 Docker**（也不要尝试安装或启动 Docker）。凡是需要 MySQL、Redis 容器或 Testcontainers 的运行验证，都不在本机执行，而是推送后由另一台机器按 `docs/04-开发任务/01-项目骨架搭建-本机验证清单.md` 验证。因此你要保证：不依赖 Docker 的验证（编译、单元测试、前端构建、静态检查）全部在本机通过；依赖 Docker 的验证代码和配置写好、可以直接运行。
+
+本任务只搭**可编译、可测试的工程骨架**，不实现业务功能（达人、商品、订单、佣金、看板等都不做），唯一例外是第 6 步的跳转服务最小实现。
 
 ## 2. 已确定的技术决策（不要更改）
 
@@ -48,7 +50,7 @@ t-crm/
 
 ### 第 1 步：环境检查
 
-- 检查 JDK 21、Maven、Node（LTS）、pnpm、Docker 与 Docker Compose 是否可用，记录版本。
+- 检查 JDK 21、Maven、Node（LTS）、pnpm 是否可用，记录版本。Docker 不是必需工具，不要安装或启动。
 - 检查能否访问 GitHub 或 Gitee（拉取脚手架用）和 Maven / npm 仓库。
 
 **验证**：报告中列出各工具版本；缺失项按停止条件处理。
@@ -88,7 +90,7 @@ t-crm/
 - 在 `ruoyi-crm` 中新增一个配置类，启用 Spring 定时任务（`@EnableScheduling`）；并确认 Redisson 可用于分布式锁（脚手架已集成则直接复用，不要重复引入）。
 - 本任务**不建任何业务表**，不引入 Flyway（后续任务处理）。
 
-**验证**：`mvn -q -DskipTests package` 成功；管理端应用能在本地启动（见第 8 步）。
+**验证**：`mvn -q -DskipTests package` 成功。管理端应用的启动验证在验证机进行（需要 MySQL、Redis），本机不启动。
 
 ### 第 5 步：引入管理端前端
 
@@ -115,7 +117,11 @@ t-crm/
      - 写 Stream 失败**不能影响跳转**：记录错误日志后照常返回 302。
 2. `GET /healthz`：Redis 可连接返回 200，否则返回 503。
 3. 不连接 MySQL；Redis 未命中时回源后台的功能**本任务不做**，在代码中用 `// TODO` 注明。
-4. 单元测试与集成测试（JUnit 5 + Testcontainers Redis）至少覆盖：
+4. 测试分两类，**两类都要写**，下列 6 个场景两类都要覆盖：
+   - **单元测试**（不依赖 Docker）：用 MockMvc + 模拟的 Redis 操作对象，默认 `mvn test` 执行；
+   - **集成测试**（JUnit 5 + Testcontainers Redis，需要 Docker）：类上标注 `@Tag("docker")`；在 `pom.xml` 中让默认构建通过 surefire 的 `excludedGroups=docker` 排除它们，并新增 Maven profile，id 固定为 **`docker-it`**，启用后只运行带 `docker` 标签的测试（命令：`mvn verify -Pdocker-it`）。本机不运行集成测试，但必须能编译通过。
+
+   覆盖场景：
    - 命中有效链接 → 302 到目标地址，并写入一条 Stream 记录
    - 未命中 → 302 到 fallback
    - `status != 1` → 302 到 fallback
@@ -123,7 +129,7 @@ t-crm/
    - Stream 写入失败 → 仍然 302 到目标地址
    - `/healthz` 正常 → 200
 
-**验证**：`cd redirect && mvn -q test` 全部通过；`mvn -q -DskipTests package` 生成可运行 jar。
+**验证**：`cd redirect && mvn -q test` 在没有 Docker 的情况下全部通过（集成测试被排除，但已编译）；`mvn -q -DskipTests package` 生成可运行 jar。
 
 ### 第 7 步：达人端 kol-portal
 
@@ -147,12 +153,14 @@ t-crm/
 - `nginx/` 下提供三个站点的配置模板：`t.域名`（转发 crm-redirect）、`kol.域名`（kol-portal 静态资源 + `/kol-api` 转发后端）、`admin.域名`（admin-ui 静态资源 + 后端 API 转发）。域名用占位变量。
 - `.env.example`：列出所有需要的环境变量（数据库、Redis、IP 哈希盐值、fallback 地址等），值留空或给示例。
 
-**验证**：
+文件命名固定为：`deploy/docker-compose.dev.yml`、`deploy/docker-compose.prod.yml`、`deploy/.env.example`、`deploy/nginx/`。后端和跳转服务的本地配置要能直接连接 dev 编排中的 MySQL（`localhost:3306`）与 Redis（`localhost:6379`），账号密码从环境变量读取，变量名与 `.env.example` 一致。
 
-1. `docker compose -f deploy/docker-compose.dev.yml up -d` 后 MySQL 与 Redis 健康；
-2. 启动后端管理端应用，能用脚手架默认管理员账号调用登录接口成功（记录使用的请求与返回状态，不要把密码写进报告以外的任何文件）；
-3. 启动 `crm-redirect`，用 `redis-cli` 写入一条测试数据后 `curl -i` 访问中转链接，得到 302 和正确的 `Location`；
-4. 完成后 `docker compose ... down`。
+**验证**（本机不启动任何容器）：
+
+1. 若本机装有 Docker CLI，执行 `docker compose -f deploy/docker-compose.dev.yml config -q` 和 `docker compose -f deploy/docker-compose.prod.yml config -q` 检查语法；没有则跳过，并在报告中注明；
+2. 在报告中写明：dev 编排导入了哪些 SQL 脚本、后端连接 MySQL/Redis 用到的配置文件与环境变量、默认管理员账号名（不要写密码）及登录接口路径，供验证机使用。
+
+容器启动、后端登录、跳转 302 等运行验证，由验证机按《本机验证清单》执行。
 
 ### 第 9 步：文档与提交
 
@@ -174,7 +182,7 @@ t-crm/
   Co-Authored-By: Codex <noreply@openai.com>
   ```
 
-- 全部步骤完成且验证通过后，执行 `git push origin main` 推送到已配置的远程仓库（私有仓库 `ksws00684315/t-crm`）。**不要新增或修改远程仓库配置，不要推送到其他分支或远程。** 若任务按停止条件中止，已完成的提交仍推送，并在报告中注明中止位置。
+- 全部步骤完成且本机可执行的验证全部通过后，执行 `git push origin main` 推送到已配置的远程仓库（私有仓库 `ksws00684315/t-crm`）。**不要新增或修改远程仓库配置，不要推送到其他分支或远程。** 若任务按停止条件中止，已完成的提交仍推送，并在报告中注明中止位置。
 
 ## 5. 禁止事项
 
@@ -191,7 +199,7 @@ t-crm/
 
 - 找不到 RuoYi-Vue-Plus 6.0.x 的正式稳定 tag，或其 Spring Boot / JDK 版本与 D1 不一致；
 - 网络无法访问代码仓库或依赖仓库；
-- 本机缺少 JDK 21、Docker 等必需工具且无法安装；
+- 本机缺少 JDK 21、Maven、Node、pnpm 等必需工具且无法安装（Docker 不在此列）；
 - 裁剪某个模块需要改动脚手架核心机制（权限、登录、数据权限、日志）；
 - 任一验证步骤在合理排查后仍失败。
 
@@ -203,5 +211,6 @@ t-crm/
 2. **环境与版本**：工具版本；脚手架仓库、tag、获取日期；Spring Boot、JDK、Vue、Element Plus 等关键版本。
 3. **步骤结果**：每一步做了什么、验证命令及结果（通过 / 失败 + 关键输出）。
 4. **脚手架裁剪清单**：模块 → 已移除 / 已关闭 / 保留，及原因。
-5. **偏离与待办**：与本提示词不一致之处及原因；EasyExcel 情况（D5）；代码中的 `TODO`；需要人工决定的事项。
-6. **提交列表**：`git log --oneline` 输出。
+5. **待验证机执行的项目**：列出本机因无 Docker 未执行的验证，以及验证机需要的信息（SQL 脚本、配置文件、环境变量、管理员账号名、登录接口路径、端口）。
+6. **偏离与待办**：与本提示词不一致之处及原因；EasyExcel 情况（D5）；代码中的 `TODO`；需要人工决定的事项。
+7. **提交列表**：`git log --oneline` 输出。
