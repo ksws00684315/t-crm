@@ -31,6 +31,25 @@
 2. 先完成第 4 步的 PostgreSQL 迁移与上述漏洞、许可证处理，让 OSV-Scanner 通过，再按顺序完成第 1～8 步其余内容。
 3. 声明许可证时，逐个核对官方许可证原文；**若某个依赖的许可证确实不在白名单内**（而不只是元数据问题），停止并报告，不要声明。
 
+### 第三次续做（2026-10-05 更新）
+
+第三次执行时，Codex 发现 `aspectjweaver:1.9.25.1` 的实际许可证为 `EPL-2.0 AND BSD-3-Clause AND Apache-1.1`，按停止条件中止。项目负责人已决定（ADR-006，规范 07 已更新）：
+
+- 白名单增加 `Apache-1.1`；AspectJ 在 `osv-scanner.toml` 中**按完整组合**声明三项许可证，附官方原文链接（报告第 9.2 节已核实的链接可直接使用）。
+- 新增交付要求：生成并提交 `THIRD-PARTY-NOTICES`（见第 7 步新增的第 7 项）。
+
+项目负责人已用 `license-maven-plugin` 对后台与跳转服务的全部依赖（含 PostgreSQL 替换后的依赖）做过一次 POM 元数据普查，供参考：
+
+| 结论 | 说明 |
+|---|---|
+| PostgreSQL 相关依赖均合规 | `postgresql:42.7.13` BSD-2-Clause；其传递依赖 `checker-qual` MIT；`flyway-database-postgresql` Apache-2.0；`testcontainers-postgresql` MIT |
+| 含 GPL/LGPL 字样的依赖均为"任选其一" | logback（EPL-2.0）、jna（Apache-2.0）、jsqlparser（Apache-2.0）、jakarta.annotation-api 与 jakarta.servlet-api（EPL-2.0；servlet 另含 Apache-2.0 组件，按 AND 声明） |
+| 元数据不规范的依赖可对应到白名单 | HdrHistogram（BSD-2-Clause）、jakarta.xml.bind-api 与 jakarta.activation-api（EDL 1.0，即 BSD-3-Clause）、JUnit、AspectJ 等 |
+
+普查只基于元数据，**仍须按规范 07 以包内原文为准逐包核对**；若发现普查之外、确实不在白名单内的许可证，照旧停止并报告。
+
+续做要求同前两次：合并最新 `main`，继续使用 PR #2，执行报告新增"第三次续做记录"。顺序：PostgreSQL 迁移 → 漏洞修复与许可证声明 → OSV-Scanner 通过 → 其余整改 → 全部 CI 通过 → PR 转为可审查。
+
 ## 1. 背景
 
 项目已制定工程规范（`docs/05-工程规范/`）和 AI 代理规则（仓库根目录 `AGENTS.md`）。现有的 `backend/`、`redirect/` 是在规范制定前写的，与规范存在差距，差距逐项列在 `docs/05-工程规范/09-现状差距与整改清单.md`。
@@ -149,6 +168,8 @@
 6. 工作流中引用的所有 Action 固定到完整 40 位提交 SHA，并在行尾注释标明版本号（规范 08 第 4 节）；SHA 须取自该 Action 官方仓库正式发布版本对应的提交。
 
 **验证**：PR 上所有检查通过，包括 `docker-it` 集成测试。
+
+7. **第三方许可声明**（规范 07 第 3 节、ADR-006）：在 backend、redirect 中配置 `license-maven-plugin`（正式稳定版，如 2.7.1），生成各工程根目录的 `THIRD-PARTY-NOTICES`：列出全部运行时依赖（不含测试依赖）的名称、版本、许可证，并附 Apache-1.1 等许可证要求随附的版权与致谢声明及许可证原文。生成的文件提交到仓库；CI 中重新生成并与已提交文件比较，不一致即失败；后续任务 03 的 Dockerfile 会把它打进镜像。
 
 ### 第 8 步：文档与报告
 
