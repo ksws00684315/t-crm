@@ -53,8 +53,9 @@ public class AuthService {
 
   public void password(String oldPassword, String newPassword) {
     AccountDTO user = current.user();
-    if (!passwords.matches(oldPassword, user.passwordHash()))
+    if (!passwords.matches(oldPassword, user.passwordHash())) {
       throw new BusinessException(ErrorCode.AUTH_OLD_PASSWORD_INCORRECT);
+    }
     users.updatePassword(user.id(), passwords.encode(newPassword));
     StpUtil.logout(user.id());
   }

@@ -48,8 +48,11 @@ public class AuditAspect {
         sanitizer.sanitize(
             Map.of("arguments", point.getArgs(), "query", request.getParameterMap())));
     captureActor(event);
-    for (Object arg : point.getArgs())
-      if (arg instanceof LoginSubject login) event.setUsername(login.username());
+    for (Object arg : point.getArgs()) {
+      if (arg instanceof LoginSubject login) {
+        event.setUsername(login.username());
+      }
+    }
     try {
       Object result = point.proceed();
       event.setResult("SUCCESS");
@@ -78,7 +81,8 @@ public class AuditAspect {
       event.setUserId(actor.id());
       event.setUsername(actor.username());
     } catch (RuntimeException e) {
-      /* Anonymous login and completed logout have no current actor. */
+      // Anonymous login keeps its submitted username; logout retains its previously captured actor.
+      return;
     }
   }
 }

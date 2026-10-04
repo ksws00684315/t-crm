@@ -40,8 +40,9 @@ public class LoginFailures {
   }
 
   public void check(String username) {
-    if (Boolean.TRUE.equals(redis.hasKey(key(username) + ":lock")))
+    if (Boolean.TRUE.equals(redis.hasKey(key(username) + ":lock"))) {
       throw new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED);
+    }
   }
 
   public void fail(String username) {
@@ -53,7 +54,9 @@ public class LoginFailures {
             Long.toString(System.currentTimeMillis()),
             Long.toString(WINDOW_MS),
             UUID.randomUUID().toString());
-    if (count != null && count >= 5) throw new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED);
+    if (count != null && count >= 5) {
+      throw new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED);
+    }
   }
 
   public void clear(String username) {

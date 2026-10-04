@@ -4,5 +4,16 @@
  <property name="charset" value="UTF-8"/>
  <module name="TreeWalker">
  <module name="RegexpSinglelineJava"><property name="format" value="System\.(out|err)\b|\.printStackTrace\s*\("/><property name="ignoreComments" value="true"/><property name="message" value="Use the project logger; never write to standard output or printStackTrace."/></module>
- <module name="AvoidStarImport"/><module name="UnusedImports"/></module>
+ <module name="AvoidStarImport"/>
+ <module name="UnusedImports"/>
+ <module name="NeedBraces"/>
+ <module name="OneStatementPerLine"/>
+ <module name="MultipleVariableDeclarations"/>
+ <module name="EmptyCatchBlock">
+  <property name="commentFormat" value="(?!)"/>
+ </module>
+ <module name="MissingSwitchDefault"/>
+ <module name="FallThrough"/>
+ <module name="OneTopLevelClass"/>
+ </module>
 </module>

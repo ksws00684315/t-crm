@@ -23,8 +23,9 @@ class LoginFailuresTest {
     var failures = new LoginFailures(redis);
     when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class)))
         .thenReturn(1L, 2L, 3L, 4L, 5L);
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 4; i++) {
       assertThatCode(() -> failures.fail("operator")).doesNotThrowAnyException();
+    }
     assertThat(
             catchThrowableOfType(() -> failures.fail("operator"), BusinessException.class)
                 .getCode())

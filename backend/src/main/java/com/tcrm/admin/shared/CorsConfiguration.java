@@ -17,9 +17,10 @@ public class CorsConfiguration implements WebMvcConfigurer {
             .map(String::trim)
             .filter(s -> !s.isEmpty())
             .toArray(String[]::new);
-    if (Arrays.stream(this.origins).anyMatch(origin -> !validOrigin(origin)))
+    if (Arrays.stream(this.origins).anyMatch(origin -> !validOrigin(origin))) {
       throw new IllegalArgumentException(
           "CORS origins must be explicit HTTP(S) origins without paths or wildcards");
+    }
   }
 
   private static boolean validOrigin(String value) {
@@ -38,12 +39,13 @@ public class CorsConfiguration implements WebMvcConfigurer {
 
   @Override
   public void addCorsMappings(CorsRegistry registry) {
-    if (origins.length > 0)
+    if (origins.length > 0) {
       registry
           .addMapping("/admin-api/**")
           .allowedOrigins(origins)
           .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
           .allowedHeaders("Content-Type", "X-Admin-Token")
           .exposedHeaders("X-Trace-Id");
+    }
   }
 }

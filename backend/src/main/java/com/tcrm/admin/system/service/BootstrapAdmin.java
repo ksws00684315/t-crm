@@ -36,14 +36,17 @@ public class BootstrapAdmin implements ApplicationRunner {
   public void run(ApplicationArguments args) {
     if (users.selectCount(
             new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getRole, Role.SUPER_ADMIN))
-        > 0) return;
+        > 0) {
+      return;
+    }
     if (username.isBlank() || password.isBlank()) {
       LOG.warn("Bootstrap administrator environment variables are missing; no account created");
       return;
     }
-    if (!username.matches("[A-Za-z0-9_.-]{3,64}") || !password.matches("[\\x20-\\x7E]{10,72}"))
+    if (!username.matches("[A-Za-z0-9_.-]{3,64}") || !password.matches("[\\x20-\\x7E]{10,72}")) {
       throw new IllegalStateException(
           "Bootstrap credentials do not meet username/password validation requirements");
+    }
     SysUserDO user = new SysUserDO();
     user.setUsername(username);
     user.setPasswordHash(passwords.encode(password));

@@ -24,9 +24,10 @@ class RedirectServiceTest {
     for (String url :
         new String[] {
           "bad", "https:///missing-host", "ftp://example.com", "https://user:credential@example.com"
-        })
+        }) {
       assertThatThrownBy(() -> new RedirectService(redis, url, "unit-salt"))
           .isInstanceOf(IllegalArgumentException.class);
+    }
     assertThatThrownBy(() -> new RedirectService(redis, "https://example.com", ""))
         .isInstanceOf(IllegalArgumentException.class);
   }
@@ -55,7 +56,9 @@ class RedirectServiceTest {
     for (boolean forwarded : new boolean[] {true, false}) {
       var request = new MockHttpServletRequest();
       request.setRemoteAddr("203.0.113.2");
-      if (forwarded) request.addHeader("X-Forwarded-For", " 198.51.100.1 , 198.51.100.2");
+      if (forwarded) {
+        request.addHeader("X-Forwarded-For", " 198.51.100.1 , 198.51.100.2");
+      }
       request.addHeader("User-Agent", "a".repeat(600));
       request.addHeader("CF-IPCountry", "X".repeat(20));
       service.redirect("KOL0001", "product", request);

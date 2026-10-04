@@ -82,8 +82,9 @@ class RedirectControllerTest {
   @Test
   void shouldInvalidPathsAre404WithoutRedisLookup_whenRequested() throws Exception {
     for (String path :
-        new String[] {"/t/BAD/P000001", "/t/KOL0001/a.b", "/t/KOL0001/" + "a".repeat(33)})
+        new String[] {"/t/BAD/P000001", "/t/KOL0001/a.b", "/t/KOL0001/" + "a".repeat(33)}) {
       mvc.perform(get(path)).andExpect(status().isNotFound());
+    }
     verifyNoInteractions(redis);
   }
 

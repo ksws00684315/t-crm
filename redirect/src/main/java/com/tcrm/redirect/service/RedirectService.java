@@ -27,15 +27,17 @@ public class RedirectService {
     this.redis = redis;
     this.fallback = httpUri(fallback);
     this.salt = salt;
-    if (this.fallback == null || salt.isBlank())
+    if (this.fallback == null || salt.isBlank()) {
       throw new IllegalArgumentException(
           "An HTTP(S) fallback URL and nonempty IP hash salt are required");
+    }
   }
 
   public ResponseEntity<Void> redirect(
       String kolCode, String productCode, HttpServletRequest request) {
-    if (!kolCode.matches("^KOL\\d{4,8}$") || !productCode.matches("^[A-Za-z0-9_-]{1,32}$"))
+    if (!kolCode.matches("^KOL\\d{4,8}$") || !productCode.matches("^[A-Za-z0-9_-]{1,32}$")) {
       return ResponseEntity.notFound().build();
+    }
     String value;
     try {
       value = redis.lookup(kolCode, productCode);
@@ -44,12 +46,17 @@ public class RedirectService {
       return redirectTo(fallback);
     }
     // TODO(task-01): Fetch missing indexes once the planned internal link API exists.
-    if (value == null) return redirectTo(fallback);
-    String[] parts = value.split("\\|", -1);
-    if (parts.length != 3 || !parts[0].matches("[1-9][0-9]{0,18}") || !parts[2].equals("1"))
+    if (value == null) {
       return redirectTo(fallback);
+    }
+    String[] parts = value.split("\\|", -1);
+    if (parts.length != 3 || !parts[0].matches("[1-9][0-9]{0,18}") || !parts[2].equals("1")) {
+      return redirectTo(fallback);
+    }
     URI target = httpUri(parts[1]);
-    if (target == null) return redirectTo(fallback);
+    if (target == null) {
+      return redirectTo(fallback);
+    }
     var event =
         Map.of(
             "kolItemId",
@@ -90,9 +97,13 @@ public class RedirectService {
 
   private String clientIp(HttpServletRequest request) {
     String ip = header(request, "CF-Connecting-IP", 128).trim();
-    if (!ip.isEmpty()) return ip;
+    if (!ip.isEmpty()) {
+      return ip;
+    }
     ip = header(request, "X-Forwarded-For", 1024);
-    if (!ip.isBlank()) return ip.split(",", 2)[0].trim();
+    if (!ip.isBlank()) {
+      return ip.split(",", 2)[0].trim();
+    }
     return request.getRemoteAddr();
   }
 

@@ -62,8 +62,9 @@ public class UserService {
   public void update(Long id, EditUserCommand r) {
     validateScope(r.role(), r.dataScope());
     SysUserDO user = require(id);
-    if (id.equals(current.id()) && r.role() != Role.SUPER_ADMIN)
+    if (id.equals(current.id()) && r.role() != Role.SUPER_ADMIN) {
       throw new BusinessException(ErrorCode.USER_CANNOT_REMOVE_SELF_ROLE);
+    }
     user.setNickname(r.nickname());
     user.setEmail(r.email());
     user.setRole(r.role());
@@ -72,12 +73,15 @@ public class UserService {
   }
 
   public void updateStatus(Long id, int status) {
-    if (id.equals(current.id()) && status == 0)
+    if (id.equals(current.id()) && status == 0) {
       throw new BusinessException(ErrorCode.USER_CANNOT_DISABLE_SELF);
+    }
     SysUserDO user = require(id);
     user.setStatus(status);
     users.updateById(user);
-    if (status == 0) StpUtil.kickout(id);
+    if (status == 0) {
+      StpUtil.kickout(id);
+    }
   }
 
   public void updatePassword(Long id, String password) {
@@ -89,12 +93,15 @@ public class UserService {
 
   private SysUserDO require(Long id) {
     SysUserDO user = users.selectById(id);
-    if (user == null) throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    if (user == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
     return user;
   }
 
   private void validateScope(Role role, DataScope scope) {
-    if (scope == DataScope.OWN && role != Role.OPERATOR)
+    if (scope == DataScope.OWN && role != Role.OPERATOR) {
       throw new BusinessException(ErrorCode.USER_INVALID_DATA_SCOPE);
+    }
   }
 }

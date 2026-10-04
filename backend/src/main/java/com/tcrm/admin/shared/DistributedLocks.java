@@ -15,12 +15,16 @@ public class DistributedLocks {
   public boolean run(String name, long waitSeconds, long leaseSeconds, Runnable action)
       throws InterruptedException {
     var lock = redis.getLock(name);
-    if (!lock.tryLock(waitSeconds, leaseSeconds, TimeUnit.SECONDS)) return false;
+    if (!lock.tryLock(waitSeconds, leaseSeconds, TimeUnit.SECONDS)) {
+      return false;
+    }
     try {
       action.run();
       return true;
     } finally {
-      if (lock.isHeldByCurrentThread()) lock.unlock();
+      if (lock.isHeldByCurrentThread()) {
+        lock.unlock();
+      }
     }
   }
 }

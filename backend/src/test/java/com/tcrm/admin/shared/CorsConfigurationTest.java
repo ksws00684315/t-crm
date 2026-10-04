@@ -82,8 +82,9 @@ class CorsConfigurationTest {
           "https://user:credential@example.com",
           "not-an-origin",
           "https://[bad"
-        })
+        }) {
       assertThatThrownBy(() -> new CorsConfiguration(value))
           .isInstanceOf(IllegalArgumentException.class);
+    }
   }
 }

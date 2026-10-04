@@ -49,10 +49,11 @@ class AuthServiceTest {
   @Test
   void shouldRejectCredentials_whenUnknownOrDisabled() {
     when(accounts.getByUsername("operator")).thenReturn(null, account(0), account(null));
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 3; i++) {
       assertThatThrownBy(() -> auth.login("operator", "test-input"))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
+    }
     verify(failures, times(3)).fail("operator");
     verifyNoInteractions(passwords);
   }

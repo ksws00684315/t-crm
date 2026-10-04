@@ -103,7 +103,9 @@ class ArchitectureTest {
               public void check(JavaClass type, ConditionEvents events) {
                 for (var method : type.getMethods()) {
                   if (!method.isMetaAnnotatedWith(RequestMapping.class)
-                      && !method.isAnnotatedWith(RequestMapping.class)) continue;
+                      && !method.isAnnotatedWith(RequestMapping.class)) {
+                    continue;
+                  }
                   boolean declared =
                       type.isAnnotatedWith(SaCheckRole.class)
                           || type.isAnnotatedWith(PublicEndpoint.class)

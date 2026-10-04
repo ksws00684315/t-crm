@@ -58,10 +58,11 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       var current = new CurrentUserContext(accounts);
-      for (int i = 0; i < 2; i++)
+      for (int i = 0; i < 2; i++) {
         assertThatThrownBy(current::user)
             .isInstanceOf(BusinessException.class)
             .hasMessage(ErrorCode.AUTH_ACCOUNT_DISABLED.message());
+      }
       stp.verify(() -> StpUtil.kickout(7L), org.mockito.Mockito.times(2));
     }
   }

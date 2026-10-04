@@ -33,8 +33,11 @@ public class AuditSanitizer {
             || lower.contains("token")
             || lower.contains("secret")
             || lower.contains("authorization")
-            || lower.contains("credential")) obj.put(key, "[REDACTED]");
-        else redact(obj.get(key));
+            || lower.contains("credential")) {
+          obj.put(key, "[REDACTED]");
+        } else {
+          redact(obj.get(key));
+        }
       }
     } else if (node.isArray()) {
       node.forEach(this::redact);

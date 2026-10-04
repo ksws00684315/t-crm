@@ -108,7 +108,9 @@ class SystemIT {
 
   @Test
   void shouldLockCaseInsensitiveAccount_whenFiveFailuresOccur() throws Exception {
-    for (int i = 0; i < 4; i++) requestLogin("locked-user", UUID.randomUUID().toString(), 401);
+    for (int i = 0; i < 4; i++) {
+      requestLogin("locked-user", UUID.randomUUID().toString(), 401);
+    }
     requestLogin("locked-user", UUID.randomUUID().toString(), 429);
     requestLogin("LOCKED-USER", PASSWORD, 429);
   }
@@ -120,16 +122,18 @@ class SystemIT {
       String username = randomName();
       create(admin, username, role);
       String token = login(username, PASSWORD);
-      for (var path : java.util.List.of("/admin-api/system/users", "/admin-api/system/oper-logs"))
+      for (var path : java.util.List.of("/admin-api/system/users", "/admin-api/system/oper-logs")) {
         mvc.perform(get(path).header("X-Admin-Token", token))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+      }
     }
   }
 
   @Test
   void shouldInvalidateTokens_whenAccountIsDisabled() throws Exception {
-    String admin = login("bootstrap", PASSWORD), username = randomName();
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String token = login(username, PASSWORD);
     mvc.perform(
@@ -145,7 +149,8 @@ class SystemIT {
 
   @Test
   void shouldInvalidateAllTokens_whenAdministratorResetsPassword() throws Exception {
-    String admin = login("bootstrap", PASSWORD), username = randomName();
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String token = login(username, PASSWORD);
     mvc.perform(
@@ -173,7 +178,8 @@ class SystemIT {
 
   @Test
   void shouldPreserveInstant_whenOrmRoundTripsUtcTimestamp() throws Exception {
-    String admin = login("bootstrap", PASSWORD), username = randomName();
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
     Long id = Long.valueOf(create(admin, username, Role.OPERATOR));
     Instant instant = Instant.parse("2026-10-04T04:30:12.123Z");
     var user = users.selectById(id);
@@ -195,7 +201,8 @@ class SystemIT {
 
   @Test
   void shouldFindUppercaseSearchAndPagingMetadata_whenListingUsers() throws Exception {
-    String admin = login("bootstrap", PASSWORD), username = randomName();
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     mvc.perform(
             get("/admin-api/system/users")
@@ -212,7 +219,8 @@ class SystemIT {
 
   @Test
   void shouldRedactPasswordInAudit_whenCreatingUser() throws Exception {
-    String admin = login("bootstrap", PASSWORD), username = randomName();
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
     create(admin, username, Role.OPERATOR);
     org.awaitility.Awaitility.await()
         .atMost(java.time.Duration.ofSeconds(5))

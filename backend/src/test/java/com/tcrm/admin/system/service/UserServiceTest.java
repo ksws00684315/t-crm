@@ -66,13 +66,14 @@ class UserServiceTest {
 
   @Test
   void shouldRejectOwnScope_whenRoleIsNotOperator() {
-    for (var role : List.of(Role.SUPER_ADMIN, Role.FINANCE))
+    for (var role : List.of(Role.SUPER_ADMIN, Role.FINANCE)) {
       assertThatThrownBy(
               () ->
                   service.create(
                       new CreateUserCommand(
                           "test-user", "test-input", "Test", null, role, DataScope.OWN)))
           .hasMessage(ErrorCode.USER_INVALID_DATA_SCOPE.message());
+    }
     verifyNoInteractions(users, passwords);
   }
 

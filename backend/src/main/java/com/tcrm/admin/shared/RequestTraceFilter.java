@@ -25,8 +25,11 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     try {
       chain.doFilter(request, response);
     } finally {
-      if (previous == null) MDC.remove("traceId");
-      else MDC.put("traceId", previous);
+      if (previous == null) {
+        MDC.remove("traceId");
+      } else {
+        MDC.put("traceId", previous);
+      }
     }
   }
 }
