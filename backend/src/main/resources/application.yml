@@ -1,0 +1,51 @@
+server:
+  port: ${TCRM_ADMIN_PORT:8080}
+spring:
+  application:
+    name: crm-admin
+  datasource:
+    url: jdbc:mysql://${TCRM_DB_HOST:localhost}:${TCRM_DB_PORT:3306}/${TCRM_DB_NAME:tcrm}?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+    username: ${TCRM_DB_USERNAME}
+    password: ${TCRM_DB_PASSWORD}
+  data:
+    redis:
+      host: ${TCRM_REDIS_HOST:localhost}
+      port: ${TCRM_REDIS_PORT:6379}
+      password: ${TCRM_REDIS_PASSWORD:}
+      database: 0
+  flyway:
+    locations: classpath:db/migration
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 200
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+sa-token:
+  token-name: X-Admin-Token
+  timeout: 28800
+  is-read-cookie: false
+  is-read-body: false
+  is-read-header: true
+  is-log: false
+crm:
+  bootstrap:
+    username: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:}
+    password: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:}
