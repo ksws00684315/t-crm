@@ -154,3 +154,23 @@ export interface KolItemVO {
   validFrom: string;
   validTo: string | null;
 }
+
+/** Why a tracking link is unusable (task 06 §4.3). */
+export type LinkUnavailableReason = "KOL_DISABLED" | "PRODUCT_OFF_SHELF" | "SHOP_DISABLED";
+
+/**
+ * `LinkVO`: one tracking link of a KOL. Click counts cover the last 30 days (strings, 64-bit);
+ * valid clicks exclude bots and duplicates.
+ */
+export interface LinkVO {
+  kolItemId: string;
+  productCode: string;
+  productName: string;
+  weidianItemId: string;
+  linkUrl: string;
+  targetUrl: string;
+  available: boolean;
+  unavailableReasons: LinkUnavailableReason[];
+  clicks30d: string;
+  validClicks30d: string;
+}

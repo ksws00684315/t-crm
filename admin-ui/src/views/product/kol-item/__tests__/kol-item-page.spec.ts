@@ -1,13 +1,15 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import ElementPlus, { ElMessage } from "element-plus";
+import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as linkApi from "@/api/link/link";
 import * as kolItemApi from "@/api/product/kol-item";
 import * as shopApi from "@/api/product/shop";
 import type { DataScope, KolItemVO, Role } from "@/api/types";
 import { useUserStore } from "@/stores/user";
 import KolItemPage from "../index.vue";
 
+vi.mock("@/api/link/link");
 vi.mock("@/api/product/kol-item");
 vi.mock("@/api/product/shop");
 
@@ -121,5 +123,37 @@ describe("Kol item mapping page", () => {
     await flushPromises();
     expect(kolItemApi.listKolItems).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
+  });
+
+  it.each([
+    ["SUPER_ADMIN", "ALL", true],
+    ["OPERATOR", "ALL", false],
+    ["FINANCE", "ALL", false]
+  ] as const)("%s + %s: rebuild link index button %s", async (role, scope, visible) => {
+    signIn(role, scope);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="rebuild-index"]').exists()).toBe(visible);
+  });
+
+  it("starts a rebuild after confirmation", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
+    vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+    vi.mocked(linkApi.rebuildLinkIndex).mockResolvedValue(null);
+    const wrapper = await mountPage();
+    await wrapper.find('[data-test="rebuild-index"]').trigger("click");
+    await flushPromises();
+    expect(linkApi.rebuildLinkIndex).toHaveBeenCalledTimes(1);
+    expect(ElMessage.success).toHaveBeenCalledWith("已开始重建");
+  });
+
+  it("does not rebuild when the confirmation is cancelled", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.mocked(linkApi.rebuildLinkIndex).mockClear();
+    vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
+    const wrapper = await mountPage();
+    await wrapper.find('[data-test="rebuild-index"]').trigger("click");
+    await flushPromises();
+    expect(linkApi.rebuildLinkIndex).not.toHaveBeenCalled();
   });
 });

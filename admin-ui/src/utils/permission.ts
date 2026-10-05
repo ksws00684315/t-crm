@@ -145,3 +145,18 @@ export function productAbilities(
     canImportMapping: user.role === "SUPER_ADMIN" || allOp
   };
 }
+
+/** Tracking link visibility (task 06 §4.7). Backend enforces the same, including the BD scope. */
+export interface LinkAbilities {
+  /** Link list of a KOL: every role; a BD only reaches their own KOLs. */
+  canViewLinks: boolean;
+  /** Full link index rebuild: SUPER_ADMIN only. */
+  canRebuildIndex: boolean;
+}
+
+export function linkAbilities(
+  user: { role: Role; dataScope: "ALL" | "OWN" } | null | undefined
+): LinkAbilities {
+  if (!user) return { canViewLinks: false, canRebuildIndex: false };
+  return { canViewLinks: true, canRebuildIndex: user.role === "SUPER_ADMIN" };
+}

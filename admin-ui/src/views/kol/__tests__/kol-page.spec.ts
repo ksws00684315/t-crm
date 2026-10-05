@@ -9,6 +9,7 @@ import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
+vi.mock("@/api/link/link");
 vi.mock("@/api/system/bd-user");
 
 const row: KolVO = {
@@ -89,6 +90,8 @@ describe("KOL list page", () => {
       expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(canManageBd);
       expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(canManageBd);
       expect(wrapper.text()).toContain("详情");
+      // Links: every role; a BD only lists their own KOLs anyway (task 06 §4.7).
+      expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
       if (canManageBd) {
         expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
       } else {
