@@ -84,7 +84,7 @@ git diff -- THIRD-PARTY-NOTICES
 
 **客户端 IP 与登录限流**：只有当 TCP 对端属于 `TCRM_TRUSTED_PROXIES`（逗号分隔的 IP/CIDR，默认空 = 不信任任何代理）时，才会读取 `CF-Connecting-IP`、`X-Forwarded-For`（可用 `TCRM_CLIENT_IP_HEADERS` 调整），详见 [ADR-009](docs/06-架构决策/ADR-009-可信代理与客户端IP解析.md)。登录失败在 15 分钟窗口内按“用户名+IP 5 次 / IP 20 次 / 用户名全部 IP 50 次”三层锁定 15 分钟（429），详见 [ADR-008](docs/06-架构决策/ADR-008-登录失败限流按用户名与来源IP分层.md)。未配置可信代理而部署在代理之后时，所有请求会被视为同一个 IP，20 次失败即全站锁定，生产环境必须配置。
 
-跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。其链接缓存初始化仍是任务 01 登记的 TODO，后续业务任务负责。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000）。
+跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。它只读 Redis、不回源后台（[ADR-012](docs/06-架构决策/ADR-012-跳转服务不回源后台.md)），链接索引由后台维护（任务 06）。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000）。
 
 ## 遗留清单
 
