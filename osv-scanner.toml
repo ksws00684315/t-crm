@@ -140,88 +140,88 @@ name = "argparse"
 version = "2.0.1"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): Python-2.0 is OSI-approved but outside the runtime allowlist. Reached only through ESLint (via js-yaml) in both front ends; not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: Python-2.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): eslint > @eslint/eslintrc > js-yaml > argparse (also via eslint-plugin-vue, typescript-eslint, eslint-config-prettier, eslint-plugin-prettier, vue-eslint-parser), and generate-license-file > cosmiconfig > js-yaml > argparse. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "chownr"
 version = "3.0.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist -> tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > pacote > tar > chownr. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "common-ancestor-path"
 version = "2.0.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > common-ancestor-path. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "glob"
 version = "13.0.6"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > glob, and @vue/test-utils > js-beautify > glob. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "isexe"
 version = "4.0.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > @npmcli/package-json > @npmcli/git > which > isexe. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "lru-cache"
 version = "11.5.3"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > lru-cache, jsdom > lru-cache (also via vitest > jsdom), and @vue/test-utils > js-beautify > glob > path-scurry > lru-cache. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "minimatch"
 version = "10.2.6"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via glob); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > minimatch, typescript-eslint > @typescript-eslint/typescript-estree > minimatch (also via eslint-plugin-vue > @typescript-eslint/parser), and @vue/test-utils > js-beautify > editorconfig > minimatch. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "minipass"
 version = "7.1.3"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > glob > minipass, and @vue/test-utils > js-beautify > glob > minipass. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "minipass-flush"
 version = "1.0.7"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > cacache > minipass-flush. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "path-scurry"
 version = "2.0.2"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via glob); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > glob > path-scurry, and @vue/test-utils > js-beautify > glob > path-scurry. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "spdx-exceptions"
 version = "2.5.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): CC-BY-3.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist -> validate-npm-package-license); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: CC-BY-3.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > @npmcli/package-json > spdx-expression-parse > spdx-exceptions. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 data-file exception for build/test tools (ADR-010); it is a list of SPDX exception identifiers, not program code."
 
 [[PackageOverrides]]
 name = "tar"
 version = "7.5.22"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > pacote > tar. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "yallist"
 version = "5.0.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > pacote > tar > yallist. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
