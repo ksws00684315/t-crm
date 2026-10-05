@@ -4,6 +4,7 @@ import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
 import jakarta.validation.ConstraintViolationException;
+import java.util.Comparator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -20,6 +21,11 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+  /** Field errors come from hash sets and reflection, so fix their order for stable responses. */
+  private static final Comparator<FieldErrorVO> FIELD_ORDER =
+      Comparator.comparing(FieldErrorVO::field, Comparator.nullsFirst(Comparator.naturalOrder()))
+          .thenComparing(FieldErrorVO::message, Comparator.nullsFirst(Comparator.naturalOrder()));
+
   private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   @ExceptionHandler(BusinessException.class)
@@ -45,6 +51,7 @@ public class GlobalExceptionHandler {
                 ErrorCode.COMMON_VALIDATION_FAILED,
                 e.getBindingResult().getFieldErrors().stream()
                     .map(f -> new FieldErrorVO(f.getField(), f.getDefaultMessage()))
+                    .sorted(FIELD_ORDER)
                     .toList()));
   }
 
@@ -64,6 +71,7 @@ public class GlobalExceptionHandler {
                 ErrorCode.COMMON_VALIDATION_FAILED,
                 e.getConstraintViolations().stream()
                     .map(v -> new FieldErrorVO(v.getPropertyPath().toString(), v.getMessage()))
+                    .sorted(FIELD_ORDER)
                     .toList()));
   }
 
@@ -82,6 +90,7 @@ public class GlobalExceptionHandler {
                                         new FieldErrorVO(
                                             r.getMethodParameter().getParameterName(),
                                             error.getDefaultMessage())))
+                    .sorted(FIELD_ORDER)
                     .toList()));
   }
 
