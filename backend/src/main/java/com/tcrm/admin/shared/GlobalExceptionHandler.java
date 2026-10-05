@@ -87,7 +87,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(DuplicateKeyException.class)
   public ResponseEntity<R<?>> duplicate(DuplicateKeyException e) {
-    return response(ErrorCode.USER_USERNAME_EXISTS);
+    return response(ErrorCode.COMMON_CONFLICT);
   }
 
   @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})

@@ -5,6 +5,7 @@ public enum ErrorCode {
   COMMON_VALIDATION_FAILED(400, "Invalid request"),
   COMMON_NOT_FOUND(404, "Not found"),
   COMMON_METHOD_NOT_ALLOWED(405, "Method not allowed"),
+  COMMON_CONFLICT(409, "Conflicts with existing data"),
   COMMON_INTERNAL_ERROR(500, "Internal server error"),
   AUTH_UNAUTHORIZED(401, "Authentication required"),
   AUTH_FORBIDDEN(403, "Access denied"),

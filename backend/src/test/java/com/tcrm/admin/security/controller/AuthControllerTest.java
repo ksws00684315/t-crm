@@ -245,6 +245,14 @@ class AuthControllerTest {
   }
 
   @Test
+  void shouldReportGenericConflict_whenAnyUniqueKeyIsViolated() throws Exception {
+    mvc.perform(get("/test/duplicate").header("X-Admin-Token", token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_CONFLICT"))
+        .andExpect(jsonPath("$.msg").value("Conflicts with existing data"));
+  }
+
+  @Test
   void shouldRejectPageBeyondLimit_whenListingUsers() throws Exception {
     when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
     mvc.perform(get("/admin-api/system/users?page=10001").header("X-Admin-Token", token))
@@ -267,6 +275,11 @@ class AuthControllerTest {
     @GetMapping("/test/error")
     public R<Void> fail() {
       throw new IllegalStateException("private-internal-detail");
+    }
+
+    @GetMapping("/test/duplicate")
+    public R<Void> duplicate() {
+      throw new org.springframework.dao.DuplicateKeyException("private-index-name");
     }
 
     @GetMapping("/test/json")
