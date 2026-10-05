@@ -1,6 +1,6 @@
 # 海外达人分销 CRM
 
-自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准。当前后台包含管理员登录、用户管理、操作审计；独立跳转服务提供 302 跳转与 Redis 点击事件写入。其他业务模块目前仅占位。
+自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准。当前后台包含管理员登录、用户管理、操作审计；独立跳转服务提供 302 跳转与 Redis 点击事件写入；管理端 `admin-ui` 提供登录、用户管理、操作日志、修改密码；达人端 `kol-portal` 仅有骨架（登录页占位）；`deploy/` 提供部署模板。其他业务模块目前仅占位。
 
 任务 02 已按第四次续做要求完成整改，本地验证及 Java / Docker / OSV CI 均通过，交 [PR #2](https://github.com/ksws00684315/t-crm/pull/2) 由负责人审查。Checkstyle 按 ADR-007 保留，ArchUnit 完整组合许可已声明。当前结果见 [执行报告第 11 节](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md#11-第四次续做记录2026-10-05)。
 
@@ -14,8 +14,9 @@
 | `scripts/` | 第三方通知生成脚本，仅使用 Python 标准库 |
 | `.github/` | Java / Docker / OSV 门禁、Dependabot、PR 模板 |
 | `docs/` | 合同、设计、开发任务、工程规范、ADR |
-| `admin-ui/`、`kol-portal/` | 待任务 03 补充 |
-| `deploy/` | 待任务 03 补充 |
+| `admin-ui/` | 管理端（Vue 3 + TypeScript + Element Plus），源自 pure-admin-thin v6.2.0 的工具链与约定，见 `admin-ui/README.md` |
+| `kol-portal/` | 达人端骨架（英文界面，手机宽度适配），登录接口待后续任务 |
+| `deploy/` | 环境变量示例、开发依赖与生产 compose、Nginx、备份脚本，见 `deploy/README.md`；两个 Dockerfile 在 `backend/`、`redirect/` |
 
 ## 版本
 
@@ -30,12 +31,24 @@
 | JaCoCo / ArchUnit | 0.8.15 / 1.5.1 |
 | license-maven-plugin / Surefire / Failsafe | 2.7.1 / 3.5.5 / 3.5.5 |
 | Testcontainers / 测试镜像 | 2.0.5；`postgres:17.11`、`redis:7.4.5` |
+| 前端工具链 | Node.js 24 LTS（`^22.13 \|\| >=24`）；pnpm 10.33.4；Vite 7.3.6；Vue 3.5.43；Element Plus 2.14.7；Vitest 5.0.3；TypeScript 5.9.3 |
+| 部署镜像 | `nginx:1.30.5-alpine`；运行镜像 `eclipse-temurin:21.0.12.1_1-jre` |
 
 实际依赖以各工程 `pom.xml` 为准；新增版本、原文及兼容依据见执行报告。Redis 运行环境采用 7.x。
 
-## 本地开发
+## 本地启动顺序
 
-安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `.env.example` 到 `.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
+1. 数据库：`cp deploy/.env.example deploy/.env` 并填写，然后 `docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env up -d`（PostgreSQL 17、Redis 7）。宿主机 5432 / 6379 已被占用时，修改 `deploy/.env` 的 `TCRM_DB_PORT`、`TCRM_REDIS_PORT`，后台与跳转服务读取同名变量。
+2. 后台：导入 `deploy/.env` 的变量后在 `backend/` 运行 `mvn spring-boot:run -Dspring-boot.run.profiles=dev`（默认 8080；Flyway 自动建表）。
+3. 跳转服务：同样导入变量后在 `redirect/` 运行（默认 8081）。
+4. 管理端：`cd admin-ui && pnpm install --frozen-lockfile && pnpm dev`，`/admin-api` 代理到 `http://localhost:8080`（`VITE_ADMIN_API_TARGET` 可改）。
+5. 达人端：`cd kol-portal && pnpm install --frozen-lockfile && pnpm dev`。
+
+前端校验命令（两个前端相同）：`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；依赖变化后运行 `pnpm notices` 重新生成 `THIRD-PARTY-NOTICES`，`pnpm notices:check` 校验与已提交文件一致。逐项验证见 [本机验证清单](docs/04-开发任务/01-项目骨架搭建-本机验证清单.md)。
+
+## 本地开发（后端工程）
+
+安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `deploy/.env.example` 到 `deploy/.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
 
 在所选工程目录运行：
 
@@ -63,7 +76,7 @@ python3 ../scripts/generate-notices.py .
 git diff -- THIRD-PARTY-NOTICES
 ```
 
-运行时通知包含完整依赖列表和来源、共享原文索引与文本块；通过编号在文件内还原完整许可证、版权与致谢，相同内容只存一份。通知随 JAR 放入 `META-INF/THIRD-PARTY-NOTICES`；CI 先验证 5 项离线去重回归用例，重生成时逐份核对原文可还原性，再比较已提交文件，不一致即失败。原文来源见 [许可说明](config/licenses/README.md)。镜像交付待任务 03 补充。
+运行时通知包含完整依赖列表和来源、共享原文索引与文本块；通过编号在文件内还原完整许可证、版权与致谢，相同内容只存一份。通知随 JAR 放入 `META-INF/THIRD-PARTY-NOTICES`；CI 先验证 5 项离线去重回归用例，重生成时逐份核对原文可还原性，再比较已提交文件，不一致即失败。原文来源见 [许可说明](config/licenses/README.md)。镜像：`backend/Dockerfile`、`redirect/Dockerfile` 以仓库根目录为构建上下文，镜像内 `/licenses/` 含 backend、redirect、admin-ui、kol-portal 四份第三方许可声明；静态资源由 `deploy/scripts/build-static.sh` 生成同样的声明。部署说明见 [deploy/README.md](deploy/README.md)。
 
 ## 接口与规范
 
