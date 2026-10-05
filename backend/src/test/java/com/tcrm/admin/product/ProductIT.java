@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -92,16 +93,18 @@ class ProductIT {
   void login() throws Exception {
     MvcResult result =
         mvc.perform(
-                post("/admin-api/security/login")
+                post("/admin-api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"bootstrap\",\"password\":\"" + PASSWORD + "\"}"))
+                    .content(
+                        json.writeValueAsString(
+                            Map.of("username", "bootstrap", "password", PASSWORD))))
             .andExpect(status().isOk())
             .andReturn();
     adminToken =
         json.readTree(result.getResponse().getContentAsString())
             .path("data")
             .path("token")
-            .asString();
+            .asText();
   }
 
   @Test

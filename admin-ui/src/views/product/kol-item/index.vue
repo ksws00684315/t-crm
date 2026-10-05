@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import {
-  downloadKolItemTemplate,
-  listKolItems,
-  uploadKolItemImport
-} from "@/api/product/kol-item";
+import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
 import type { KolItemVO, ShopVO } from "@/api/types";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -134,11 +130,7 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="失效时间" width="170">
         <template #default="{ row }">
-          {{
-            (row as KolItemVO).validTo
-              ? formatInstant((row as KolItemVO).validTo)
-              : "当前有效"
-          }}
+          {{ (row as KolItemVO).validTo ? formatInstant((row as KolItemVO).validTo) : "当前有效" }}
         </template>
       </el-table-column>
     </el-table>

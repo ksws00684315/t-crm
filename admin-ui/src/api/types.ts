@@ -109,7 +109,6 @@ export interface TaskVO {
   finishedAt: string | null;
 }
 
-
 /** `ShopVO`. */
 export interface ShopVO {
   id: string;

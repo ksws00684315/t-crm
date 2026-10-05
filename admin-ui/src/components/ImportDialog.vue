@@ -127,7 +127,7 @@ function checkFile(selected: File): string | null {
   return null;
 }
 
-async function upload() {
+async function submitUpload() {
   if (!file.value) {
     ElMessage.warning("请先选择文件");
     return;
@@ -161,7 +161,7 @@ async function upload() {
   }
 }
 
-async function downloadTemplate() {
+async function onDownloadTemplate() {
   try {
     const result = await props.downloadTemplate();
     saveBlob(result.blob, result.fileName ?? props.templateFileName);
@@ -200,7 +200,7 @@ function close() {
     <ol class="steps">
       <li>
         下载模板并按列填写（{{ limitHint }}）。
-        <el-button link type="primary" @click="downloadTemplate">下载导入模板</el-button>
+        <el-button link type="primary" @click="onDownloadTemplate">下载导入模板</el-button>
       </li>
       <li>选择填好的 .xlsx 文件并上传，导入在后台进行。</li>
     </ol>
@@ -247,7 +247,7 @@ function close() {
         type="primary"
         :loading="uploading"
         data-test="upload"
-        @click="upload"
+        @click="submitUpload"
       >
         上传并导入
       </el-button>

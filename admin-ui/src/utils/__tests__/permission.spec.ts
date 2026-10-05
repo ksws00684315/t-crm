@@ -51,13 +51,7 @@ describe("buildMenu", () => {
   });
 
   it("hides mapping menu for an OWN operator", () => {
-    expect(titles(["OPERATOR"], "OWN")).toEqual([
-      "首页",
-      "达人管理",
-      "商品",
-      "店铺管理",
-      "原商品"
-    ]);
+    expect(titles(["OPERATOR"], "OWN")).toEqual(["首页", "达人管理", "商品", "店铺管理", "原商品"]);
   });
 
   it("builds absolute paths and hides the login, password and error pages", () => {

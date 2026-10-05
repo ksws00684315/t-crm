@@ -163,12 +163,7 @@ onMounted(() => {
       </el-form-item>
       <el-form-item label="店铺">
         <el-select v-model="query.shopId" clearable placeholder="全部" style="width: 160px">
-          <el-option
-            v-for="s in shops"
-            :key="s.id"
-            :label="s.shopName"
-            :value="s.id"
-          />
+          <el-option v-for="s in shops" :key="s.id" :label="s.shopName" :value="s.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -244,12 +239,7 @@ onMounted(() => {
       @size-change="search"
     />
 
-    <el-dialog
-      v-model="formVisible"
-      title="编辑原商品"
-      width="520px"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-model="formVisible" title="编辑原商品" width="520px" :close-on-click-modal="false">
       <el-form label-width="120px" @submit.prevent>
         <el-form-item label="原商品编码">
           <el-input :model-value="editing?.productCode" disabled />
