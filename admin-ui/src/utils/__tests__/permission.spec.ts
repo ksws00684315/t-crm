@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { routes } from "@/router/routes";
-import { buildMenu, hasAnyRole } from "../permission";
+import { buildMenu, hasAnyRole, kolAbilities } from "../permission";
 
 describe("hasAnyRole", () => {
   it("allows everyone when no roles are required", () => {
@@ -20,13 +20,46 @@ describe("buildMenu", () => {
     buildMenu(routes, roles).map(item => item.title);
 
   it("shows user management and the audit log only to the super administrator", () => {
-    expect(titles(["SUPER_ADMIN"])).toEqual(["首页", "用户管理", "操作日志"]);
-    expect(titles(["OPERATOR"])).toEqual(["首页"]);
-    expect(titles(["FINANCE"])).toEqual(["首页"]);
+    expect(titles(["SUPER_ADMIN"])).toEqual(["首页", "达人管理", "用户管理", "操作日志"]);
+    expect(titles(["OPERATOR"])).toEqual(["首页", "达人管理"]);
+    expect(titles(["FINANCE"])).toEqual(["首页", "达人管理"]);
   });
 
   it("builds absolute paths and hides the login, password and error pages", () => {
     const items = buildMenu(routes, ["SUPER_ADMIN"]);
-    expect(items.map(item => item.path)).toEqual(["/home", "/system/users", "/system/oper-logs"]);
+    expect(items.map(item => item.path)).toEqual([
+      "/home",
+      "/kol/kols",
+      "/system/users",
+      "/system/oper-logs"
+    ]);
+  });
+});
+
+describe("kolAbilities", () => {
+  it("lets FINANCE only read and keeps BD management from a BD", () => {
+    expect(kolAbilities({ role: "SUPER_ADMIN", dataScope: "ALL" })).toEqual({
+      canWrite: true,
+      canManageBd: true
+    });
+    expect(kolAbilities({ role: "OPERATOR", dataScope: "ALL" })).toEqual({
+      canWrite: true,
+      canManageBd: true
+    });
+    expect(kolAbilities({ role: "OPERATOR", dataScope: "OWN" })).toEqual({
+      canWrite: true,
+      canManageBd: false
+    });
+    expect(kolAbilities({ role: "FINANCE", dataScope: "ALL" })).toEqual({
+      canWrite: false,
+      canManageBd: false
+    });
+    expect(kolAbilities(null)).toEqual({ canWrite: false, canManageBd: false });
+  });
+
+  it("shows the KOL menu to every role", () => {
+    for (const role of ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const) {
+      expect(buildMenu(routes, [role]).map(item => item.title)).toContain("达人管理");
+    }
   });
 });

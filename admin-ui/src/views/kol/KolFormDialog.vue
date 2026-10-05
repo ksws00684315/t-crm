@@ -1,0 +1,228 @@
+<script setup lang="ts">
+import { ElMessage } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
+import { computed, reactive, ref, watch } from "vue";
+import { createKol, editKol } from "@/api/kol/kol";
+import type { BdUserVO, KolVO } from "@/api/types";
+import {
+  type SocialAccountInput,
+  validateCountry,
+  validateKolEmail,
+  validateKolName,
+  validateRemark,
+  validateSocialAccount
+} from "@/utils/kol-validation";
+import { notifyError } from "@/utils/notify";
+import { percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
+import { rule, serverFieldErrors } from "@/utils/validation";
+
+defineOptions({ name: "KolFormDialog" });
+
+const MAX_SOCIAL_ACCOUNTS = 10;
+
+const props = defineProps<{
+  modelValue: boolean;
+  /** The KOL being edited; null creates a new one. */
+  kol: KolVO | null;
+  /** Show the BD picker (SUPER_ADMIN and OPERATOR + ALL, create only). */
+  canPickBd: boolean;
+  bdUsers: BdUserVO[];
+}>();
+const emit = defineEmits<{
+  (event: "update:modelValue", value: boolean): void;
+  (event: "saved"): void;
+}>();
+
+const editing = computed(() => props.kol !== null);
+const formRef = ref<FormInstance>();
+const saving = ref(false);
+const serverErrors = ref<Record<string, string>>({});
+const socialError = ref("");
+const form = reactive({
+  name: "",
+  email: "",
+  country: "",
+  bdUserId: null as string | null,
+  percent: "",
+  remark: "",
+  socialAccounts: [] as SocialAccountInput[]
+});
+
+const rules: FormRules = {
+  name: [rule(validateKolName)],
+  email: [rule(validateKolEmail)],
+  country: [rule(validateCountry)],
+  percent: [rule(validatePercent)],
+  remark: [rule(validateRemark)]
+};
+
+watch(
+  () => props.modelValue,
+  open => {
+    if (!open) return;
+    serverErrors.value = {};
+    socialError.value = "";
+    const current = props.kol;
+    form.name = current?.name ?? "";
+    form.email = current?.email ?? "";
+    form.country = current?.country ?? "";
+    form.bdUserId = null;
+    form.percent = rateToPercent(current?.defaultRate);
+    form.remark = current?.remark ?? "";
+    form.socialAccounts = (current?.socialAccounts ?? []).map(account => ({
+      platform: account.platform,
+      handle: account.handle,
+      url: account.url ?? "",
+      followers: account.followers ?? ""
+    }));
+    formRef.value?.clearValidate();
+  }
+);
+
+function addSocialAccount() {
+  form.socialAccounts.push({ platform: "", handle: "", url: "", followers: "" });
+}
+
+function removeSocialAccount(index: number) {
+  form.socialAccounts.splice(index, 1);
+}
+
+function close() {
+  emit("update:modelValue", false);
+}
+
+function checkSocialAccounts(): boolean {
+  for (const [index, account] of form.socialAccounts.entries()) {
+    const message = validateSocialAccount(account);
+    if (message) {
+      socialError.value = `第 ${index + 1} 个社媒账号：${message}`;
+      return false;
+    }
+  }
+  socialError.value = "";
+  return true;
+}
+
+async function submit() {
+  serverErrors.value = {};
+  const valid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
+  if (!checkSocialAccounts() || !valid) return;
+  saving.value = true;
+  const body = {
+    name: form.name.trim(),
+    email: form.email.trim(),
+    country: form.country.trim().toUpperCase(),
+    socialAccounts: form.socialAccounts.map(account => ({
+      platform: account.platform.trim(),
+      handle: account.handle.trim(),
+      url: account.url.trim() || null,
+      followers: account.followers.trim() || null
+    })),
+    defaultRate: percentToRate(form.percent),
+    remark: form.remark.trim() || null
+  };
+  try {
+    if (props.kol) {
+      await editKol(props.kol.id, body);
+    } else {
+      await createKol({ ...body, bdUserId: props.canPickBd ? form.bdUserId : null });
+    }
+    ElMessage.success(props.kol ? "达人已保存" : "达人已创建");
+    emit("saved");
+    close();
+  } catch (error) {
+    serverErrors.value = serverFieldErrors(error, [
+      "name",
+      "email",
+      "country",
+      "bdUserId",
+      "defaultRate",
+      "remark"
+    ]);
+    if (serverErrors.value.defaultRate) serverErrors.value.percent = serverErrors.value.defaultRate;
+    notifyError(error);
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <el-dialog
+    :model-value="modelValue"
+    :title="editing ? `编辑达人 ${kol?.kolCode ?? ''}` : '新增达人'"
+    width="720px"
+    @update:model-value="emit('update:modelValue', $event)"
+  >
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent>
+      <el-form-item label="姓名" prop="name" :error="serverErrors.name">
+        <el-input v-model="form.name" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="邮箱" prop="email" :error="serverErrors.email">
+        <el-input v-model="form.email" maxlength="128" />
+      </el-form-item>
+      <el-form-item label="国家" prop="country" :error="serverErrors.country">
+        <el-input v-model="form.country" maxlength="2" placeholder="ISO 两位字母代码，如 US" />
+      </el-form-item>
+      <el-form-item
+        v-if="!editing && canPickBd"
+        label="负责商务"
+        prop="bdUserId"
+        :error="serverErrors.bdUserId"
+      >
+        <el-select v-model="form.bdUserId" clearable filterable placeholder="未分配">
+          <el-option
+            v-for="bd in bdUsers"
+            :key="bd.id"
+            :label="`${bd.nickname}（${bd.username}）`"
+            :value="bd.id"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="默认佣金比例" prop="percent" :error="serverErrors.percent">
+        <el-input v-model="form.percent" placeholder="0～100，可留空" style="width: 200px">
+          <template #append>%</template>
+        </el-input>
+      </el-form-item>
+      <el-form-item label="社媒账号" :error="socialError">
+        <div class="social">
+          <div v-for="(account, index) in form.socialAccounts" :key="index" class="social__row">
+            <el-input v-model="account.platform" placeholder="平台" maxlength="32" />
+            <el-input v-model="account.handle" placeholder="账号" maxlength="128" />
+            <el-input v-model="account.url" placeholder="主页链接（https，可选）" maxlength="512" />
+            <el-input v-model="account.followers" placeholder="粉丝数（可选）" maxlength="15" />
+            <el-button link type="danger" @click="removeSocialAccount(index)">删除</el-button>
+          </div>
+          <el-button
+            :disabled="form.socialAccounts.length >= MAX_SOCIAL_ACCOUNTS"
+            @click="addSocialAccount"
+          >
+            添加社媒账号（最多 {{ MAX_SOCIAL_ACCOUNTS }} 个）
+          </el-button>
+        </div>
+      </el-form-item>
+      <el-form-item label="备注" prop="remark" :error="serverErrors.remark">
+        <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="close">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<style scoped>
+.social {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.social__row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.6fr 1fr auto;
+  gap: 8px;
+}
+</style>

@@ -72,12 +72,13 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
-  it("restricts exactly the two system pages to SUPER_ADMIN", () => {
+  it("restricts the system pages to SUPER_ADMIN and opens KOL management to every role", () => {
     const layout = routes.find(route => route.path === "/");
     const restricted = (layout?.children ?? [])
       .filter(route => route.meta?.roles?.length)
       .map(route => [route.path, route.meta?.roles]);
     expect(restricted).toEqual([
+      ["kol/kols", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
       ["system/users", ["SUPER_ADMIN"]],
       ["system/oper-logs", ["SUPER_ADMIN"]]
     ]);

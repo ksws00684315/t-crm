@@ -40,3 +40,69 @@ export interface UserVO {
   lastLoginTime: string | null;
   createTime: string;
 }
+
+/** `SocialAccountVO`; `followers` is a string (backend Long). */
+export interface SocialAccountVO {
+  platform: string;
+  handle: string;
+  url: string | null;
+  followers: string | null;
+}
+
+/** `KolVO`. `defaultRate` is a fraction with 4 decimals ("0.1550" = 15.5%), null when not set. */
+export interface KolVO {
+  id: string;
+  kolCode: string;
+  name: string;
+  email: string;
+  /** ISO 3166-1 alpha-2, upper case. */
+  country: string;
+  socialAccounts: SocialAccountVO[];
+  /** Null means "no BD assigned". */
+  bdUserId: string | null;
+  bdUserName: string | null;
+  defaultRate: string | null;
+  /** 1 = enabled, 0 = disabled. */
+  status: 0 | 1;
+  remark: string | null;
+  createTime: string;
+  updateTime: string;
+}
+
+/** `BdHistoryVO`: one ownership period; null `bdUserId` = unassigned, null `endTime` = current. */
+export interface BdHistoryVO {
+  bdUserId: string | null;
+  bdUserName: string | null;
+  startTime: string;
+  endTime: string | null;
+}
+
+/** `KolDetailVO`: the KOL fields plus the ownership history, newest first. */
+export interface KolDetailVO extends KolVO {
+  bdHistory: BdHistoryVO[];
+}
+
+/** `BdUserVO`: a selectable BD (enabled OPERATOR with OWN data scope). */
+export interface BdUserVO {
+  id: string;
+  username: string;
+  nickname: string;
+}
+
+export type TaskStatus = "WAITING" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
+
+/** `TaskVO`: progress of a batch task. `done` counts processed rows, failed ones included. */
+export interface TaskVO {
+  id: string;
+  taskType: "KOL_IMPORT";
+  status: TaskStatus;
+  total: number;
+  done: number;
+  failed: number;
+  /** English reason when the task failed as a whole; not shown to users verbatim. */
+  message: string | null;
+  hasErrorFile: boolean;
+  createTime: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
