@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
 @Aspect
 @Component
@@ -85,10 +86,17 @@ public class AuditAspect {
     }
   }
 
-  /** Servlet request and response objects are not request data and must never be serialized. */
+  /**
+   * Servlet request and response objects are not request data and must never be serialized;
+   * uploaded files are skipped too, since serializing them would read and log file content.
+   */
   private static Object[] loggableArguments(ProceedingJoinPoint point) {
     return Arrays.stream(point.getArgs())
-        .filter(arg -> !(arg instanceof ServletRequest) && !(arg instanceof ServletResponse))
+        .filter(
+            arg ->
+                !(arg instanceof ServletRequest)
+                    && !(arg instanceof ServletResponse)
+                    && !(arg instanceof MultipartFile))
         .toArray();
   }
 

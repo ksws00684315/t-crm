@@ -142,4 +142,18 @@ class AuditAspectTest {
     var arguments = (Object[]) ((java.util.Map<?, ?>) captured.getValue()).get("arguments");
     assertThat(arguments).containsExactly("body");
   }
+
+  @Test
+  void shouldNotSerializeUploadedFiles_whenControllerReceivesMultipart() throws Throwable {
+    var file =
+        new org.springframework.mock.web.MockMultipartFile(
+            "file", "kols.xlsx", "application/octet-stream", new byte[] {1, 2, 3});
+    when(point.getArgs()).thenReturn(new Object[] {file, 5L});
+    when(point.proceed()).thenReturn("result");
+    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    var captured = org.mockito.ArgumentCaptor.forClass(Object.class);
+    verify(sanitizer).sanitize(captured.capture());
+    var arguments = (Object[]) ((java.util.Map<?, ?>) captured.getValue()).get("arguments");
+    assertThat(arguments).containsExactly(5L);
+  }
 }
