@@ -1,0 +1,67 @@
+name: OSV Scanner
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Vulnerabilities and licenses
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan vulnerabilities and license allowlist
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: |-
+            --recursive
+            --config=./osv-scanner.toml
+            --licenses=MIT,MIT-0,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,EPL-1.0,EPL-2.0,CC0-1.0,Apache-1.1
+            --format=table
+            ./
+      - name: Save full package inventory
+        if: ${{ always() }}
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: |-
+            --recursive
+            --config=./osv-scanner.toml
+            --licenses=MIT,MIT-0,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,EPL-1.0,EPL-2.0,CC0-1.0,Apache-1.1
+            --all-packages
+            --format=json
+            --output-file=osv-results.json
+            ./
+      - name: Show Maven transitive dependency evidence
+        if: ${{ always() && hashFiles('osv-results.json') != '' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('osv-results.json').read_text())
+          for result in data.get('results', []):
+              path = result['source']['path']
+              packages = result.get('packages', [])
+              print(f"{path}: {len(packages)} resolved packages")
+              for entry in packages:
+                  package = entry['package']
+                  if package['name'] == 'redis.clients.authentication:redis-authx-core':
+                      print(f"Transitive evidence: {path} -> {package['name']}@{package['version']}")
+          PY
+      - name: Upload scan results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osv-results
+          path: osv-results.json
+          if-no-files-found: error
