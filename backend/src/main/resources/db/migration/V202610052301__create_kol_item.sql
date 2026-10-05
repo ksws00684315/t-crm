@@ -26,8 +26,6 @@ CREATE INDEX idx_crm_kol_item_item_shop_from ON crm_kol_item (weidian_item_id, s
 -- List/filter by kol or product, ordered by valid_from DESC, id DESC.
 CREATE INDEX idx_crm_kol_item_kol ON crm_kol_item (kol_id, valid_from DESC, id DESC);
 CREATE INDEX idx_crm_kol_item_product ON crm_kol_item (product_id, valid_from DESC, id DESC);
--- Default current-only list without other filters (kept for order-attribution / internal use).
-CREATE INDEX idx_crm_kol_item_current ON crm_kol_item (valid_from DESC, id DESC) WHERE valid_to IS NULL;
 COMMENT ON TABLE crm_kol_item IS '专属商品对应关系；只会被置失效，永不删除（无 is_deleted）；不含 target_url/track_id（任务 06）与 source（任务 09）；雪花 ID';
 COMMENT ON COLUMN crm_kol_item.id IS '正数雪花主键';
 COMMENT ON COLUMN crm_kol_item.kol_id IS '达人 crm_kol.id';
