@@ -12,7 +12,10 @@ function backendErrorCodes(): string[] {
   );
   const source = readFileSync(file, "utf8");
   const start = source.indexOf("enum ErrorCode");
-  const body = source.slice(source.indexOf("{", start) + 1, source.indexOf(";", start));
+  // Constants end at the first `);` that closes a line; messages may themselves contain `;`.
+  const open = source.indexOf("{", start) + 1;
+  const end = source.slice(open).search(/\);\s*$/m);
+  const body = source.slice(open, open + end + 1);
   return [...body.matchAll(/^\s*([A-Z][A-Z0-9_]+)\(\d{3},/gm)].map(match => match[1]);
 }
 
