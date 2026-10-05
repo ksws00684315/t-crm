@@ -16,7 +16,13 @@ public enum ErrorCode {
   USER_USERNAME_EXISTS(409, "Username already exists"),
   USER_CANNOT_DISABLE_SELF(422, "Cannot disable yourself"),
   USER_CANNOT_REMOVE_SELF_ROLE(422, "Cannot remove your own super administrator role"),
-  USER_INVALID_DATA_SCOPE(422, "OWN data scope requires OPERATOR role");
+  USER_INVALID_DATA_SCOPE(422, "OWN data scope requires OPERATOR role"),
+  TASK_QUEUE_FULL(429, "Too many tasks waiting; try again later"),
+  TASK_FILE_INVALID(400, "Import file must be a valid .xlsx workbook"),
+  TASK_FILE_TOO_LARGE(400, "Import file exceeds 20 MB"),
+  TASK_FILE_TOO_MANY_ROWS(400, "Import file exceeds the row limit"),
+  TASK_FILE_HEADER_MISMATCH(400, "Import file header does not match the template"),
+  TASK_FILE_EMPTY(400, "Import file contains no data rows");
   private final int status;
   private final String message;
 

@@ -17,7 +17,13 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   USER_USERNAME_EXISTS: "用户名已存在",
   USER_CANNOT_DISABLE_SELF: "不能停用自己的账号",
   USER_CANNOT_REMOVE_SELF_ROLE: "不能取消自己的超级管理员角色",
-  USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于运营角色"
+  USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于运营角色",
+  TASK_QUEUE_FULL: "当前排队的任务过多，请稍后再试",
+  TASK_FILE_INVALID: "文件格式不正确，请上传 .xlsx 格式的 Excel 文件",
+  TASK_FILE_TOO_LARGE: "文件超过 20MB，请拆分后再上传",
+  TASK_FILE_TOO_MANY_ROWS: "数据行数超过上限（2000 行），请拆分后再上传",
+  TASK_FILE_HEADER_MISMATCH: "表头与模板不一致，请下载最新模板后填写",
+  TASK_FILE_EMPTY: "文件中没有数据行"
 };
 
 export const GENERIC_ERROR_MESSAGE = "操作失败，请稍后重试";
