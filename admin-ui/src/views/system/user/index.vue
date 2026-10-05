@@ -44,7 +44,7 @@ async function load() {
       status: query.status
     });
     rows.value = page.items;
-    total.value = page.total;
+    total.value = Number(page.total);
   } catch (error) {
     notifyError(error);
   } finally {

@@ -35,14 +35,16 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 - `t.<域名>` 只转发 `/t/…` 与 `/healthz` 到 crm-redirect，其余返回 404。
 - `kol.<域名>` / `admin.<域名>`：静态资源 + 单页应用回退；`/kol-api/`、`/admin-api/` 转发到 crm-admin；登录接口有 10 次/分钟（突发 5）的频率限制。
 - 响应头（规范 06）：`X-Content-Type-Options`、`Referrer-Policy`、HSTS（一年）、`X-Frame-Options`，两个前端另加 `Content-Security-Policy`。
-- 客户端 IP：Nginx **必须**只接受 Cloudflare 回源（或按站点覆盖/清洗转发头），否则 ADR-009 前提不成立。本模板仅当对端属于 Cloudflare 回源 IP 段（`nginx/snippets/cloudflare-real-ip.conf`，需随 Cloudflare 公告更新）时才采用 `CF-Connecting-IP`；转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` 一律由 Nginx 重写为解析后的地址，客户端自带的值不会到达应用。compose 网络使用固定网段 `172.30.0.0/24`，生产环境中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已设为该网段。
+- 客户端 IP：本模板用 `proxy.conf` 把转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` **一律重写为 `$remote_addr`**，客户端自带的转发头到不了应用（这是防伪造的实际手段）。`cloudflare-real-ip.conf` 的 `set_real_ip_from` 只决定对哪些对端采用 `CF-Connecting-IP` 来解析 `$remote_addr`，**并不限制谁可以连上 Nginx**。compose 网络固定 `172.30.0.0/24`，生产中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已写死为该网段。
 - `${TCRM_DOMAIN}` 由 nginx 镜像在启动时替换（`NGINX_ENVSUBST_FILTER=^TCRM_`）。
 
 ## 可信代理（ADR-009）
 
-生产 compose 已为 `crm-admin`、`crm-redirect` 固定设置 `TCRM_TRUSTED_PROXIES=172.30.0.0/24`，与上方 compose 网络网段一致；应用因此只信任来自 Nginx 的转发头。
+生产 compose 已为 `crm-admin`、`crm-redirect` **写死** `TCRM_TRUSTED_PROXIES=172.30.0.0/24`（与 compose 网络网段一致，不读 `.env` 里的同名变量）；应用因此只信任来自 Nginx 的转发头。`TCRM_CLIENT_IP_HEADERS`、`TCRM_CLICK_STREAM_MAXLEN` 会从 `.env` 传入容器；空的 headers 在应用内回退到默认值 `CF-Connecting-IP,X-Forwarded-For`。
 
-**前提**：Nginx 必须只接受 Cloudflare 回源连接（本模板通过 `nginx/snippets/cloudflare-real-ip.conf` 的 `set_real_ip_from` 实现），或按站点覆盖/清洗转发头（本模板在 `proxy.conf` 中重写 `X-Forwarded-For` / `CF-Connecting-IP` / `X-Real-IP`）。若 Nginx 对任意来源照单全收客户端自带的转发头，ADR-009「不可信对端不读转发头」的前提不成立，点击去重与登录限流可被伪造。
+**防伪造怎么做的**：本模板在 `proxy.conf` 里用 `$remote_addr` 覆盖转发给应用的转发头，所以客户端自带的 `CF-Connecting-IP` / `X-Forwarded-For` / `X-Real-IP` 不会到达应用。`set_real_ip_from`（`cloudflare-real-ip.conf`）只影响 Nginx 如何解析 `$remote_addr`，**不会**挡住非 Cloudflare 来源的连接。
+
+**部署建议**：若要真正只接受 Cloudflare 回源，请在防火墙或安全组上限制 80/443 的来源 IP（Cloudflare 公布的回源段），并随 Cloudflare 公告更新；这超出本模板的能力范围。若 Nginx 对任意来源照单全收客户端自带的转发头且不重写，ADR-009「不可信对端不读转发头」的前提不成立，点击去重与登录限流可被伪造。
 
 ## 第三方许可声明
 

@@ -16,7 +16,7 @@ async function load() {
   try {
     const page = await listOperLogs(paging.page, paging.size);
     rows.value = page.items;
-    total.value = page.total;
+    total.value = Number(page.total);
   } catch (error) {
     notifyError(error);
   } finally {

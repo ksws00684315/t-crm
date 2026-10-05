@@ -12,7 +12,8 @@ export interface Envelope<T> {
 /** `PageResult<T>`; page numbers start at 1. */
 export interface PageResult<T> {
   items: T[];
-  total: number;
+  /** Serialized as a string (spec 03); convert with Number() before el-pagination. */
+  total: string;
   page: number;
   size: number;
 }

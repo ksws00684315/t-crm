@@ -22,6 +22,8 @@ jobs:
         run: |
           docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env.example config -q
           docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.example config -q
+      - name: Assert healthchecks use bash (not dash CMD-SHELL)
+        run: python3 deploy/scripts/check-healthchecks.py
       - name: Backup retention rule
         run: bash deploy/backup/test-retention.sh
       - name: Set up Docker Buildx
