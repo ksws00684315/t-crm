@@ -12,7 +12,7 @@
 | `redirect/` | 独立跳转服务 `crm-redirect`，默认端口 8081 |
 | `config/` | 两工程共用的 Checkstyle 规则及第三方许可证原文、声明 |
 | `scripts/` | 第三方通知生成脚本，仅使用 Python 标准库 |
-| `.github/` | Java / Docker / OSV 门禁、Dependabot、PR 模板 |
+| `.github/` | Java / Docker / OSV 门禁，管理端、达人端、部署模板工作流，Dependabot、PR 模板 |
 | `docs/` | 合同、设计、开发任务、工程规范、ADR |
 | `admin-ui/` | 管理端（Vue 3 + TypeScript + Element Plus），源自 pure-admin-thin v6.2.0 的工具链与约定，见 `admin-ui/README.md` |
 | `kol-portal/` | 达人端骨架（英文界面，手机宽度适配），登录接口待后续任务 |
