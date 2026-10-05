@@ -13,7 +13,6 @@ import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,7 +89,15 @@ class ProductIT {
   private String adminToken;
 
   @BeforeEach
-  void login() throws Exception {
+  void prepareIndependentData() throws Exception {
+    jdbc.update("DELETE FROM crm_kol_item");
+    jdbc.update("DELETE FROM crm_product");
+    jdbc.update("DELETE FROM crm_shop");
+    jdbc.update("DELETE FROM crm_kol_bd_history");
+    jdbc.update("DELETE FROM crm_kol");
+    jdbc.update("DELETE FROM crm_task_file");
+    jdbc.update("DELETE FROM crm_task");
+    jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
     MvcResult result =
         mvc.perform(
                 post("/admin-api/auth/login")
@@ -212,7 +219,7 @@ class ProductIT {
         json.readTree(submit.getResponse().getContentAsString())
             .path("data")
             .path("taskId")
-            .asString();
+            .asText();
     awaitTask(taskId);
     mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, adminToken))
         .andExpect(status().isOk())
@@ -239,13 +246,9 @@ class ProductIT {
         json.readTree(submit.getResponse().getContentAsString())
             .path("data")
             .path("taskId")
-            .asString();
+            .asText();
     awaitTask(taskId);
-    // Age the error file past retention and delete it as the job would.
-    jdbc.update(
-        "UPDATE crm_task_file SET create_time = ? WHERE task_id = ? AND kind = 'ERROR'",
-        Instant.now().minus(31, ChronoUnit.DAYS),
-        Long.valueOf(taskId));
+    // Simulate 30-day retention cleanup: remove the ERROR file row (same as TaskFileRetentionJob).
     jdbc.update(
         "DELETE FROM crm_task_file WHERE task_id = ? AND kind = 'ERROR'", Long.valueOf(taskId));
     mvc.perform(get("/admin-api/task/tasks/" + taskId + "/error-file").header(TOKEN, adminToken))
@@ -264,10 +267,7 @@ class ProductIT {
             .andExpect(status().isOk())
             .andReturn();
     return Long.parseLong(
-        json.readTree(result.getResponse().getContentAsString())
-            .path("data")
-            .path("id")
-            .asString());
+        json.readTree(result.getResponse().getContentAsString()).path("data").path("id").asText());
   }
 
   private String createKol(String name, String email) throws Exception {
@@ -287,7 +287,7 @@ class ProductIT {
     return json.readTree(result.getResponse().getContentAsString())
         .path("data")
         .path("kolCode")
-        .asString();
+        .asText();
   }
 
   private String importProduct(long shopId, String itemId, String name) throws Exception {
@@ -309,7 +309,7 @@ class ProductIT {
         json.readTree(submit.getResponse().getContentAsString())
             .path("data")
             .path("taskId")
-            .asString();
+            .asText();
     awaitTask(taskId);
     return jdbc.queryForObject(
         "SELECT product_code FROM crm_product WHERE weidian_item_id = ?", String.class, itemId);
@@ -335,9 +335,9 @@ class ProductIT {
         json.readTree(submit.getResponse().getContentAsString())
             .path("data")
             .path("taskId")
-            .asString();
+            .asText();
     JsonNode task = awaitTask(taskId);
-    return "SUCCESS".equals(task.path("status").asString());
+    return "SUCCESS".equals(task.path("status").asText());
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {
@@ -347,7 +347,7 @@ class ProductIT {
               .andExpect(status().isOk())
               .andReturn();
       JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
-      String status = data.path("status").asString();
+      String status = data.path("status").asText();
       if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
         return data;
       }
