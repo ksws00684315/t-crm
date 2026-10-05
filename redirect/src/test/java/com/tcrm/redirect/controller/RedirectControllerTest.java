@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tcrm.redirect.config.ClientIpResolver;
 import com.tcrm.redirect.service.ClickRedis;
 import com.tcrm.redirect.service.RedirectService;
 import java.util.Map;
@@ -23,6 +24,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class RedirectControllerTest {
+  private static final String ITEM =
+      "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}";
+
   private ClickRedis redis;
   private MockMvc mvc;
 
@@ -33,13 +37,16 @@ class RedirectControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new RedirectController(
                     new RedirectService(
-                        redis, "https://example.com/unavailable", "unit-test-salt")))
+                        redis,
+                        new ClientIpResolver("127.0.0.1", "CF-Connecting-IP,X-Forwarded-For"),
+                        "https://example.com/unavailable",
+                        "unit-test-salt")))
             .build();
   }
 
   @Test
   void shouldValidLinkRedirectsAndAppendsHashedEvent_whenRequested() throws Exception {
-    when(redis.lookup("KOL0001", "P000001")).thenReturn("1|https://example.com/item|1");
+    when(redis.lookup("KOL0001", "P000001")).thenReturn(ITEM);
     mvc.perform(
             get("/t/KOL0001/P000001")
                 .header("CF-Connecting-IP", "203.0.113.1")
@@ -75,7 +82,9 @@ class RedirectControllerTest {
 
   @Test
   void shouldInactiveUsesFallback_whenRequested() throws Exception {
-    when(redis.lookup(anyString(), anyString())).thenReturn("1|https://example.com/item|0");
+    when(redis.lookup(anyString(), anyString()))
+        .thenReturn(
+            "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":0}");
     fallback();
   }
 
@@ -90,7 +99,7 @@ class RedirectControllerTest {
 
   @Test
   void shouldStreamFailureStillRedirectsToTarget_whenRequested() throws Exception {
-    when(redis.lookup(anyString(), anyString())).thenReturn("1|https://example.com/item|1");
+    when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
     doThrow(new IllegalStateException("simulated failure")).when(redis).append(anyMap());
     mvc.perform(get("/t/KOL0001/P000001"))
         .andExpect(status().isFound())
@@ -114,9 +123,9 @@ class RedirectControllerTest {
     for (String value :
         new String[] {
           "bad",
-          "1|javascript:alert(1)|1",
-          "1|https://example.com|1|extra",
-          "|https://example.com|1"
+          "{\"kolItemId\":\"1\",\"targetUrl\":\"javascript:alert(1)\",\"status\":1}",
+          "{\"kolItemId\":\"\",\"targetUrl\":\"https://example.com\",\"status\":1}",
+          "1|https://example.com/item|1"
         }) {
       when(redis.lookup(anyString(), anyString())).thenReturn(value);
       fallback();

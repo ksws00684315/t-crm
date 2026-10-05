@@ -22,6 +22,7 @@ import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class UserServiceTest {
@@ -39,6 +40,19 @@ class UserServiceTest {
     u.setDataScope(DataScope.OWN);
     u.setStatus(1);
     return u;
+  }
+
+  @Test
+  void shouldReportUsernameExists_whenInsertViolatesUniqueKey() {
+    when(passwords.encode("test-input")).thenReturn("test-hash");
+    when(users.insert(any(SysUserDO.class))).thenThrow(new DuplicateKeyException("unit-duplicate"));
+    assertThatThrownBy(
+            () ->
+                service.create(
+                    new CreateUserCommand(
+                        "operator", "test-input", "Operator", null, Role.OPERATOR, DataScope.OWN)))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.USER_USERNAME_EXISTS.message());
   }
 
   @Test

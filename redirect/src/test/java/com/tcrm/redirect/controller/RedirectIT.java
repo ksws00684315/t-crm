@@ -102,7 +102,14 @@ class RedirectIT {
   }
 
   private void link(String status) {
-    redis.opsForHash().put("link:KOL0001", "P000001", "1|https://example.com/item|" + status);
+    redis
+        .opsForHash()
+        .put(
+            "link:KOL0001",
+            "P000001",
+            "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":"
+                + status
+                + "}");
   }
 
   private void target() throws Exception {

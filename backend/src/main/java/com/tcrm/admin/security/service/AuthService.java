@@ -7,6 +7,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,8 @@ public class AuthService {
   private final BCryptPasswordEncoder passwords;
   private final LoginFailures failures;
   private final CurrentUserContext current;
+  // Verified for unknown or disabled accounts so every attempt pays one BCrypt comparison.
+  private final String timingHash;
 
   public AuthService(
       AccountStore users,
@@ -26,20 +29,21 @@ public class AuthService {
     this.passwords = passwords;
     this.failures = failures;
     this.current = current;
+    this.timingHash = passwords.encode(UUID.randomUUID().toString());
   }
 
   public record LoginResult(String tokenName, String token, long expiresIn, AccountDTO user) {}
 
-  public LoginResult login(String username, String password) {
-    failures.check(username);
+  public LoginResult login(String username, String password, String clientIp) {
+    failures.check(username, clientIp);
     AccountDTO user = users.getByUsername(username);
-    if (user == null
-        || !Integer.valueOf(1).equals(user.status())
-        || !passwords.matches(password, user.passwordHash())) {
-      failures.fail(username);
+    boolean passwordMatches =
+        passwords.matches(password, user == null ? timingHash : user.passwordHash());
+    if (user == null || !Integer.valueOf(1).equals(user.status()) || !passwordMatches) {
+      failures.fail(username, clientIp);
       throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
-    failures.clear(username);
+    failures.clear(username, clientIp);
     user = user.withLastLoginTime(Instant.now());
     users.updateLastLoginTime(user.id(), user.lastLoginTime());
     StpUtil.login(user.id());

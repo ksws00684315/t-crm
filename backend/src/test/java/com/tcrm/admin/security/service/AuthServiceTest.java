@@ -50,29 +50,55 @@ class AuthServiceTest {
   void shouldRejectCredentials_whenUnknownOrDisabled() {
     when(accounts.getByUsername("operator")).thenReturn(null, account(0), account(null));
     for (int i = 0; i < 3; i++) {
-      assertThatThrownBy(() -> auth.login("operator", "test-input"))
+      assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
     }
-    verify(failures, times(3)).fail("operator");
-    verifyNoInteractions(passwords);
+    verify(failures, times(3)).fail("operator", "198.51.100.8");
+  }
+
+  @Test
+  void shouldVerifyPasswordHash_whenAccountIsUnknownOrDisabled() {
+    when(passwords.encode(any())).thenReturn("timing-hash");
+    var timed = new AuthService(accounts, passwords, failures, current);
+    when(accounts.getByUsername("operator")).thenReturn(null, account(0));
+    for (int i = 0; i < 2; i++) {
+      assertThatThrownBy(() -> timed.login("operator", "test-input", "198.51.100.8"))
+          .isInstanceOf(BusinessException.class);
+    }
+    // One comparison per attempt: unknown users use the startup-generated hash, disabled users
+    // their own.
+    verify(passwords).matches("test-input", "timing-hash");
+    verify(passwords).matches("test-input", "test-hash");
+  }
+
+  @Test
+  void shouldRejectDisabledAccount_whenPasswordIsCorrect() {
+    when(accounts.getByUsername("operator")).thenReturn(account(0));
+    when(passwords.matches("test-input", "test-hash")).thenReturn(true);
+    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+        .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
+    verify(failures).fail("operator", "198.51.100.8");
   }
 
   @Test
   void shouldCountFailure_whenPasswordIsWrong() {
     when(accounts.getByUsername("operator")).thenReturn(account(1));
-    assertThatThrownBy(() -> auth.login("operator", "incorrect"))
+    assertThatThrownBy(() -> auth.login("operator", "incorrect", "198.51.100.8"))
         .isInstanceOf(BusinessException.class);
-    verify(failures).fail("operator");
+    verify(failures).fail("operator", "198.51.100.8");
     verify(accounts, never()).updateLastLoginTime(any(), any());
   }
 
   @Test
   void shouldAvoidAuthentication_whenAccountIsLocked() {
-    doThrow(new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED)).when(failures).check("operator");
-    assertThatThrownBy(() -> auth.login("operator", "test-input"))
+    doThrow(new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED))
+        .when(failures)
+        .check("operator", "198.51.100.8");
+    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
         .hasMessage(ErrorCode.AUTH_ACCOUNT_LOCKED.message());
-    verifyNoInteractions(accounts, passwords);
+    verifyNoInteractions(accounts);
+    verify(passwords, never()).matches(any(), any());
   }
 
   @Test
@@ -84,7 +110,7 @@ class AuthServiceTest {
       stp.when(StpUtil::getTokenName).thenReturn("X-Admin-Token");
       stp.when(StpUtil::getTokenValue).thenReturn("unit-token");
       stp.when(StpUtil::getTokenTimeout).thenReturn(28800L);
-      var result = auth.login("operator", "test-input");
+      var result = auth.login("operator", "test-input", "198.51.100.8");
       assertThat(result.user().username()).isEqualTo(account.username());
       assertThat(result.user().lastLoginTime())
           .isBetween(Instant.now().minusSeconds(5), Instant.now());
@@ -92,7 +118,7 @@ class AuthServiceTest {
       assertThat(result.tokenName()).isEqualTo("X-Admin-Token");
       assertThat(result.expiresIn()).isEqualTo(28800);
       stp.verify(() -> StpUtil.login(7L));
-      verify(failures).clear("operator");
+      verify(failures).clear("operator", "198.51.100.8");
       verify(accounts).updateLastLoginTime(eq(7L), any(Instant.class));
     }
   }

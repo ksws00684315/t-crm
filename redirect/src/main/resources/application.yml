@@ -15,3 +15,9 @@ crm:
   redirect:
     fallback-url: ${TCRM_REDIRECT_FALLBACK_URL}
     ip-hash-salt: ${TCRM_IP_HASH_SALT}
+    # Approximate XADD MAXLEN for stream:click; the oldest clicks are dropped beyond it.
+    click-stream-max-len: ${TCRM_CLICK_STREAM_MAXLEN:1000000}
+  http:
+    # Forwarding headers are honoured only when the direct peer matches trusted-proxies (CIDR list).
+    trusted-proxies: ${TCRM_TRUSTED_PROXIES:}
+    client-ip-headers: ${TCRM_CLIENT_IP_HEADERS:CF-Connecting-IP,X-Forwarded-For}
