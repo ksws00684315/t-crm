@@ -42,4 +42,18 @@ class KolLookupServiceTest {
     when(kols.selectList(any())).thenReturn(List.of());
     assertThat(new KolLookupService(kols).listByIds(List.of(1L, 2L))).isEmpty();
   }
+
+  @Test
+  void shouldExposeBdUser_whenListingAllKols() {
+    KolMapper kols = mock(KolMapper.class);
+    KolDO kol = new KolDO();
+    kol.setId(1L);
+    kol.setKolCode("KOL0001");
+    kol.setName("A");
+    kol.setStatus(0);
+    kol.setBdUserId(5L);
+    when(kols.selectList(any())).thenReturn(List.of(kol));
+    List<KolRefDTO> all = new KolLookupService(kols).listAll();
+    assertThat(all).containsExactly(new KolRefDTO(1L, "KOL0001", "A", false, 5L));
+  }
 }

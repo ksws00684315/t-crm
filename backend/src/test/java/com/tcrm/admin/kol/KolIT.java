@@ -78,6 +78,7 @@ class KolIT {
     r.add("spring.data.redis.password", () -> "");
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
+    r.add("crm.link.base-url", () -> "https://t.example.com");
   }
 
   private final MockMvc mvc;

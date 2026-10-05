@@ -8,6 +8,7 @@ import static com.tcrm.admin.product.service.MappingImportColumn.WEIDIAN_ITEM_ID
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.product.api.KolItemChangedEvent;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
@@ -20,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,6 +52,7 @@ class MappingImportProcessor implements ImportRowProcessor {
   private final ProductMapper productMapper;
   private final KolApi kols;
   private final TransactionTemplate tx;
+  private final ApplicationEventPublisher events;
   private final Set<String> seenExclusive = new HashSet<>();
   private final Set<String> seenPairs = new HashSet<>();
 
@@ -60,7 +63,8 @@ class MappingImportProcessor implements ImportRowProcessor {
       KolItemMapper items,
       ProductMapper productMapper,
       KolApi kols,
-      TransactionTemplate tx) {
+      TransactionTemplate tx,
+      ApplicationEventPublisher events) {
     this.actorId = actorId;
     this.shops = shops;
     this.products = products;
@@ -68,6 +72,7 @@ class MappingImportProcessor implements ImportRowProcessor {
     this.productMapper = productMapper;
     this.kols = kols;
     this.tx = tx;
+    this.events = events;
   }
 
   @Override
@@ -171,6 +176,8 @@ class MappingImportProcessor implements ImportRowProcessor {
           neu.setCreateBy(actorId);
           neu.setUpdateBy(actorId);
           items.insert(neu);
+          // The link index is updated after commit (task 06 §4.3).
+          events.publishEvent(new KolItemChangedEvent(kol.id(), product.getId()));
         });
     return List.of();
   }

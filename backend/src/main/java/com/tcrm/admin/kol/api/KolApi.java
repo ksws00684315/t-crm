@@ -18,4 +18,10 @@ public interface KolApi {
    * skipped. An empty collection returns an empty list without querying.
    */
   List<KolRefDTO> listByIds(Collection<Long> ids);
+
+  /**
+   * Returns every undeleted KOL, enabled or not, ordered by ID (task 06 link index rebuild). The
+   * design capacity is a few hundred KOLs.
+   */
+  List<KolRefDTO> listAll();
 }

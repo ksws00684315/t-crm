@@ -59,4 +59,13 @@ class DistributedLocksTest {
     verify(action).run();
     verify(lock, never()).unlock();
   }
+
+  @Test
+  void shouldReportLockState_whenAskedIfLocked() {
+    var redis = mock(RedissonClient.class);
+    var lock = mock(RLock.class);
+    when(redis.getLock("job")).thenReturn(lock);
+    when(lock.isLocked()).thenReturn(true);
+    assertThat(new DistributedLocks(redis).isLocked("job")).isTrue();
+  }
 }

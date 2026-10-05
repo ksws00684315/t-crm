@@ -12,6 +12,10 @@ public class DistributedLocks {
     this.redis = redis;
   }
 
+  /**
+   * Runs {@code action} while holding the named lock. A non-positive {@code leaseSeconds} keeps the
+   * lock alive with Redisson's watchdog until the action returns (for long-running work).
+   */
   public boolean run(String name, long waitSeconds, long leaseSeconds, Runnable action)
       throws InterruptedException {
     var lock = redis.getLock(name);
@@ -26,5 +30,10 @@ public class DistributedLocks {
         lock.unlock();
       }
     }
+  }
+
+  /** True when any thread or instance currently holds the named lock. */
+  public boolean isLocked(String name) {
+    return redis.getLock(name).isLocked();
   }
 }

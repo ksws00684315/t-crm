@@ -84,7 +84,8 @@ class KolItemServiceTest {
               return page;
             });
     if (kolCode != null && !kolCode.isBlank()) {
-      when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(11L, "KOL0001", "Alice", true));
+      when(kols.getByCode("KOL0001"))
+          .thenReturn(new KolRefDTO(11L, "KOL0001", "Alice", true, null));
     }
     if (productCode != null && !productCode.isBlank()) {
       ProductDO product = new ProductDO();
