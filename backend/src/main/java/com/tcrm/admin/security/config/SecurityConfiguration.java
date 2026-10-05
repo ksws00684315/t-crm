@@ -44,7 +44,7 @@ public class SecurityConfiguration implements WebMvcConfigurer {
 
       @Override
       public List<String> getRoleList(Object id, String type) {
-        return "admin".equals(type) ? List.of(current.role().name()) : List.of();
+        return "admin".equals(type) ? current.roleNames(id) : List.of();
       }
     };
   }

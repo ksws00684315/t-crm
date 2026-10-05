@@ -78,7 +78,7 @@ class AuthControllerTest {
             null,
             null);
     when(current.user()).thenReturn(actor);
-    when(current.role()).thenReturn(Role.OPERATOR);
+    when(current.roleNames(any())).thenReturn(List.of("OPERATOR"));
     var security = new SecurityConfiguration(current);
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
@@ -113,7 +113,7 @@ class AuthControllerTest {
 
   @Test
   void shouldListUsers_whenRoleIsSuperAdministrator() throws Exception {
-    when(current.role()).thenReturn(Role.SUPER_ADMIN);
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
     when(users.page(anyLong(), anyLong(), any(), any(), any()))
         .thenReturn(new PageResult<>(List.of(), 0, 1, 20));
     mvc.perform(get("/admin-api/system/users").header("X-Admin-Token", token))
@@ -227,7 +227,7 @@ class AuthControllerTest {
 
   @Test
   void shouldReturnAllInvalidFieldsAndTraceHeader_whenCreateRequestIsInvalid() throws Exception {
-    when(current.role()).thenReturn(Role.SUPER_ADMIN);
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
     var result =
         mvc.perform(
                 post("/admin-api/system/users")
