@@ -22,3 +22,8 @@ dist/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Deployment working directories (certificates, built static files, backups)
+deploy/certs/
+deploy/www/
+deploy/backups/

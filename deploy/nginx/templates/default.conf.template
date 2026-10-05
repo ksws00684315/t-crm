@@ -1,0 +1,116 @@
+# Rendered by the nginx image: ${TCRM_DOMAIN} is substituted at container start (NGINX_ENVSUBST_FILTER=^TCRM_).
+# Sites:  t.<domain> redirect service | kol.<domain> creator portal | admin.<domain> admin console
+
+server_tokens off;
+
+# Login endpoint rate limit (Cloudflare rules are the first line; this protects the origin).
+limit_req_zone $binary_remote_addr zone=tcrm_login:10m rate=10r/m;
+
+include /etc/nginx/snippets/cloudflare-real-ip.conf;
+
+# Plain HTTP only redirects.
+server {
+    listen 80 default_server;
+    server_name _;
+    return 301 https://$host$request_uri;
+}
+
+# Unknown host names get no certificate and no content.
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+
+# ---- t.<domain>: redirect service (only /t/... and /healthz are exposed) ----
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name t.${TCRM_DOMAIN};
+    include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/security-headers.conf;
+
+    location /t/ {
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-redirect:8081;
+    }
+
+    location = /healthz {
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-redirect:8081;
+        access_log off;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+# ---- kol.<domain>: creator portal ----
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name kol.${TCRM_DOMAIN};
+    include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/security-headers-web.conf;
+
+    root /usr/share/nginx/sites/kol;
+    client_max_body_size 20m;
+
+    location /kol-api/ {
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-admin:8080;
+    }
+
+    location /assets/ {
+        expires 1y;
+        try_files $uri =404;
+    }
+
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers-web.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# ---- admin.<domain>: admin console ----
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name admin.${TCRM_DOMAIN};
+    include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/security-headers-web.conf;
+
+    root /usr/share/nginx/sites/admin;
+    client_max_body_size 20m;
+
+    location = /admin-api/auth/login {
+        limit_req zone=tcrm_login burst=5 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-admin:8080;
+    }
+
+    location /admin-api/ {
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-admin:8080;
+    }
+
+    location /assets/ {
+        expires 1y;
+        try_files $uri =404;
+    }
+
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers-web.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
