@@ -23,6 +23,26 @@ updates:
     groups:
       redirect-minor-patch:
         update-types: ["minor", "patch"]
+  - package-ecosystem: npm
+    directory: /admin-ui
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      admin-ui-minor-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: npm
+    directory: /kol-portal
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      kol-portal-minor-patch:
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

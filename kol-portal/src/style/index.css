@@ -1,0 +1,19 @@
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  -webkit-text-size-adjust: 100%;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto,
+    sans-serif;
+  color: #303133;
+  background: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}

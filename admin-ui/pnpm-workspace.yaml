@@ -1,0 +1,4 @@
+# pnpm >= 10 reads build-script settings from this file.
+# Only esbuild needs its postinstall (downloads/links the platform binary).
+onlyBuiltDependencies:
+  - esbuild
