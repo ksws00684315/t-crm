@@ -244,6 +244,24 @@ class AuthControllerTest {
     assertThat(org.slf4j.MDC.get("traceId")).isNull();
   }
 
+  @Test
+  void shouldRejectPageBeyondLimit_whenListingUsers() throws Exception {
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
+    mvc.perform(get("/admin-api/system/users?page=10001").header("X-Admin-Token", token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+    verifyNoInteractions(users);
+  }
+
+  @Test
+  void shouldAcceptLastAllowedPage_whenListingUsers() throws Exception {
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
+    when(users.page(anyLong(), anyLong(), any(), any(), any()))
+        .thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
+    mvc.perform(get("/admin-api/system/users?page=10000").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
+  }
+
   @RestController
   static class ErrorController {
     @GetMapping("/test/error")
