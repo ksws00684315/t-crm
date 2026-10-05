@@ -49,7 +49,8 @@ public class RedirectService {
       LOG.error("Link lookup failed", e);
       return redirectTo(fallback);
     }
-    // TODO(task-01): Fetch missing indexes once the planned internal link API exists.
+    // A miss means the link does not exist: the index is kept complete by crm-admin (incremental
+    // updates plus a daily rebuild), so there is no fallback to the backend (ADR-012).
     if (value == null) {
       return redirectTo(fallback);
     }
