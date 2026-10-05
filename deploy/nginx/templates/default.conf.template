@@ -86,7 +86,8 @@ server {
     include /etc/nginx/snippets/security-headers-web.conf;
 
     root /usr/share/nginx/sites/admin;
-    client_max_body_size 20m;
+    # Imports accept files up to 20MB (spec 06); the extra 1MB covers multipart overhead.
+    client_max_body_size 21m;
 
     location = /admin-api/auth/login {
         limit_req zone=tcrm_login burst=5 nodelay;
