@@ -53,6 +53,8 @@ services:
       TCRM_BOOTSTRAP_ADMIN_USERNAME: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:-}
       TCRM_BOOTSTRAP_ADMIN_PASSWORD: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:-}
       TCRM_CORS_ALLOWED_ORIGINS: ${TCRM_CORS_ALLOWED_ORIGINS:-}
+      # Compose network is 172.30.0.0/24; Nginx is the only trusted peer (ADR-009).
+      TCRM_TRUSTED_PROXIES: 172.30.0.0/24
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     expose:
       - "8080"
@@ -87,6 +89,8 @@ services:
       TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
       TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
       TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
+      # Compose network is 172.30.0.0/24; Nginx is the only trusted peer (ADR-009).
+      TCRM_TRUSTED_PROXIES: 172.30.0.0/24
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     expose:
       - "8081"
