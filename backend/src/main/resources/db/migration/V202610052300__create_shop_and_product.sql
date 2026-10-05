@@ -1,6 +1,5 @@
--- Task 05: shops, original products, kol item mappings; extend task types for imports.
--- Intentionally omits Weidian sync credentials (task 09), target_url/track_id (task 06),
--- sheet_row (task 07) and source (task 09).
+-- Task 05: shops and original products (with product code sequence).
+-- Intentionally omits Weidian sync credentials (task 09) and sheet_row (task 07).
 
 CREATE TABLE crm_shop (
   id BIGINT NOT NULL,
@@ -18,11 +17,12 @@ CREATE TABLE crm_shop (
   CONSTRAINT ck_crm_shop_weidian_id CHECK (weidian_shop_id ~ '^[0-9]{1,32}$'),
   CONSTRAINT ck_crm_shop_status CHECK (status IN (0, 1))
 );
-CREATE UNIQUE INDEX uk_crm_shop_weidian_shop_id ON crm_shop (weidian_shop_id) WHERE is_deleted = FALSE;
+-- Full-table unique (prompt §4.1); codes never reused across soft deletes.
+CREATE UNIQUE INDEX uk_crm_shop_weidian_shop_id ON crm_shop (weidian_shop_id);
 COMMENT ON TABLE crm_shop IS '微店店铺；全表最多 3 个（应用层校验）；雪花 ID，逻辑删除；不含同步凭证（任务 09）';
 COMMENT ON COLUMN crm_shop.id IS '正数雪花主键';
 COMMENT ON COLUMN crm_shop.shop_name IS '店铺名称，1～64 字符';
-COMMENT ON COLUMN crm_shop.weidian_shop_id IS '微店店铺 ID，数字字符串 1～32 位；未删除记录中唯一；创建后不可修改';
+COMMENT ON COLUMN crm_shop.weidian_shop_id IS '微店店铺 ID，数字字符串 1～32 位；全表唯一（含已删除）；创建后不可修改';
 COMMENT ON COLUMN crm_shop.status IS '状态：0 停用、1 启用；停用后不可再导入商品或对应关系';
 COMMENT ON COLUMN crm_shop.remark IS '备注；空表示无备注';
 COMMENT ON COLUMN crm_shop.create_by IS '创建人 ID；系统操作为空';
@@ -82,48 +82,3 @@ COMMENT ON COLUMN crm_product.create_time IS '创建时间（UTC）';
 COMMENT ON COLUMN crm_product.update_by IS '修改人 ID；系统操作为空';
 COMMENT ON COLUMN crm_product.update_time IS '修改时间（UTC）';
 COMMENT ON COLUMN crm_product.is_deleted IS '逻辑删除：false 有效、true 已删除';
-
-CREATE TABLE crm_kol_item (
-  id BIGINT NOT NULL,
-  kol_id BIGINT NOT NULL,
-  product_id BIGINT NOT NULL,
-  shop_id BIGINT NOT NULL,
-  weidian_item_id VARCHAR(32) NOT NULL,
-  valid_from TIMESTAMPTZ(3) NOT NULL,
-  valid_to TIMESTAMPTZ(3),
-  create_by BIGINT,
-  create_time TIMESTAMPTZ(3) NOT NULL,
-  update_by BIGINT,
-  update_time TIMESTAMPTZ(3) NOT NULL,
-  CONSTRAINT pk_crm_kol_item PRIMARY KEY (id),
-  CONSTRAINT ck_crm_kol_item_id CHECK (id > 0),
-  CONSTRAINT ck_crm_kol_item_weidian_id CHECK (weidian_item_id ~ '^[0-9]{1,32}$'),
-  CONSTRAINT ck_crm_kol_item_period CHECK (valid_to IS NULL OR valid_to >= valid_from)
-);
--- One current mapping per exclusive item; one current mapping per kol+product.
-CREATE UNIQUE INDEX uk_crm_kol_item_shop_item ON crm_kol_item (shop_id, weidian_item_id) WHERE valid_to IS NULL;
-CREATE UNIQUE INDEX uk_crm_kol_item_kol_product ON crm_kol_item (kol_id, product_id) WHERE valid_to IS NULL;
--- Historical attribution by order time; also covers shopId + weidianItemId filters with history.
-CREATE INDEX idx_crm_kol_item_shop_item_from ON crm_kol_item (shop_id, weidian_item_id, valid_from);
--- List/filter by kol or product, ordered by valid_from DESC, id DESC.
-CREATE INDEX idx_crm_kol_item_kol ON crm_kol_item (kol_id, valid_from DESC, id DESC);
-CREATE INDEX idx_crm_kol_item_product ON crm_kol_item (product_id, valid_from DESC, id DESC);
--- Default current-only list without other filters.
-CREATE INDEX idx_crm_kol_item_current ON crm_kol_item (valid_from DESC, id DESC) WHERE valid_to IS NULL;
-COMMENT ON TABLE crm_kol_item IS '专属商品对应关系；只会被置失效，永不删除（无 is_deleted）；不含 target_url/track_id（任务 06）与 source（任务 09）；雪花 ID';
-COMMENT ON COLUMN crm_kol_item.id IS '正数雪花主键';
-COMMENT ON COLUMN crm_kol_item.kol_id IS '达人 crm_kol.id';
-COMMENT ON COLUMN crm_kol_item.product_id IS '原商品 crm_product.id';
-COMMENT ON COLUMN crm_kol_item.shop_id IS '专属商品所在店铺 crm_shop.id';
-COMMENT ON COLUMN crm_kol_item.weidian_item_id IS '专属商品微店 ID，数字字符串 1～32 位';
-COMMENT ON COLUMN crm_kol_item.valid_from IS '生效开始时间（UTC）';
-COMMENT ON COLUMN crm_kol_item.valid_to IS '失效时间（UTC）；空表示当前有效';
-COMMENT ON COLUMN crm_kol_item.create_by IS '创建人 ID；系统操作为空';
-COMMENT ON COLUMN crm_kol_item.create_time IS '创建时间（UTC）';
-COMMENT ON COLUMN crm_kol_item.update_by IS '修改人 ID；系统操作为空';
-COMMENT ON COLUMN crm_kol_item.update_time IS '修改时间（UTC）';
-
-ALTER TABLE crm_task DROP CONSTRAINT ck_crm_task_type;
-ALTER TABLE crm_task ADD CONSTRAINT ck_crm_task_type
-  CHECK (task_type IN ('KOL_IMPORT', 'PRODUCT_IMPORT', 'MAPPING_IMPORT'));
-COMMENT ON COLUMN crm_task.task_type IS '任务类型：KOL_IMPORT 达人导入、PRODUCT_IMPORT 原商品导入、MAPPING_IMPORT 对应关系导入（新增类型时通过迁移扩充约束）';

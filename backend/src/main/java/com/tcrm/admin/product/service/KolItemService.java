@@ -27,7 +27,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Kol item mapping query (task 05 §4.3, §4.4). SUPER_ADMIN, OPERATOR+ALL and FINANCE may read;
- * OPERATOR+OWN gets 403.
+ * OPERATOR+OWN gets 403. List requires at least one of kolCode / productCode / weidianItemId
+ * (shopId and current only combine with those) to avoid full-table COUNT at design capacity.
  */
 @Service
 public class KolItemService {
@@ -52,6 +53,9 @@ public class KolItemService {
 
   public PageResult<KolItemDTO> page(KolItemFilterDTO filter) {
     requireReader();
+    if (blank(filter.kolCode()) && blank(filter.productCode()) && blank(filter.weidianItemId())) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     Long kolId = null;
     if (filter.kolCode() != null && !filter.kolCode().isBlank()) {
       KolRefDTO kol = kols.getByCode(filter.kolCode().strip());
@@ -172,5 +176,9 @@ public class KolItemService {
         row.getWeidianItemId(),
         row.getValidFrom(),
         row.getValidTo());
+  }
+
+  private static boolean blank(String value) {
+    return value == null || value.isBlank();
   }
 }
