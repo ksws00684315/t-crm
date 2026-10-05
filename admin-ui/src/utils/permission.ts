@@ -18,6 +18,20 @@ export function hasAnyRole(required: readonly Role[] | undefined, owned: readonl
   return required.some(role => owned.includes(role));
 }
 
+/**
+ * Whether a signed-in user may open a route: role match plus data-scope (hideForOwn),
+ * matching buildMenu so OPERATOR+OWN cannot deep-link to hidden pages.
+ */
+export function canAccessRoute(
+  meta: { roles?: readonly Role[]; hideForOwn?: boolean } | undefined,
+  owned: readonly Role[],
+  dataScope: "ALL" | "OWN" | null | undefined
+): boolean {
+  if (!hasAnyRole(meta?.roles, owned)) return false;
+  if (meta?.hideForOwn && dataScope === "OWN") return false;
+  return true;
+}
+
 export interface MenuItem {
   path: string;
   title: string;
@@ -50,8 +64,7 @@ export function buildMenu(
               childMeta?.title &&
               !childMeta.public &&
               !childMeta.hideInMenu &&
-              !(childMeta.hideForOwn && dataScope === "OWN") &&
-              hasAnyRole(childMeta.roles, owned)
+              canAccessRoute(childMeta, owned, dataScope)
             ) {
               children.push({
                 path: childPath,

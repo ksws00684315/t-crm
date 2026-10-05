@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { routes } from "@/router/routes";
-import { buildMenu, hasAnyRole, kolAbilities, productAbilities } from "../permission";
+import {
+  buildMenu,
+  canAccessRoute,
+  hasAnyRole,
+  kolAbilities,
+  productAbilities
+} from "../permission";
 
 describe("hasAnyRole", () => {
   it("allows everyone when no roles are required", () => {
@@ -125,5 +131,22 @@ describe("productAbilities", () => {
       canViewMapping: true,
       canImportMapping: false
     });
+  });
+});
+
+describe("canAccessRoute", () => {
+  const mappingMeta = {
+    roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const,
+    hideForOwn: true
+  };
+
+  it("matches buildMenu: OWN operator cannot open mapping", () => {
+    expect(canAccessRoute(mappingMeta, ["OPERATOR"], "OWN")).toBe(false);
+    expect(canAccessRoute(mappingMeta, ["OPERATOR"], "ALL")).toBe(true);
+    expect(canAccessRoute(mappingMeta, ["FINANCE"], "ALL")).toBe(true);
+  });
+
+  it("still rejects roles that are not allowed", () => {
+    expect(canAccessRoute({ roles: ["SUPER_ADMIN"] }, ["OPERATOR"], "ALL")).toBe(false);
   });
 });

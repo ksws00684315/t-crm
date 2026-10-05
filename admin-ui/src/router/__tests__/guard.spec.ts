@@ -4,8 +4,10 @@ import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
 
 const signedOut: AuthState = { isLoggedIn: false, roles: [] };
-const operator: AuthState = { isLoggedIn: true, roles: ["OPERATOR"] };
-const superAdmin: AuthState = { isLoggedIn: true, roles: ["SUPER_ADMIN"] };
+const operator: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "ALL" };
+const operatorOwn: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "OWN" };
+const superAdmin: AuthState = { isLoggedIn: true, roles: ["SUPER_ADMIN"], dataScope: "ALL" };
+const finance: AuthState = { isLoggedIn: true, roles: ["FINANCE"], dataScope: "ALL" };
 
 function target(path: string, meta: Record<string, unknown> = {}) {
   return { path, fullPath: path, meta };
@@ -46,6 +48,27 @@ describe("resolveAccess", () => {
   it("allows any signed-in role when the route declares no roles", () => {
     expect(resolveAccess(target("/home", { title: "首页" }), operator)).toBe(true);
   });
+
+  it("rejects OPERATOR+OWN on hideForOwn routes (same as the menu)", () => {
+    expect(
+      resolveAccess(
+        target("/product/kol-items", {
+          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+          hideForOwn: true
+        }),
+        operatorOwn
+      )
+    ).toBe("/403");
+  });
+
+  it("allows OPERATOR+ALL and FINANCE on hideForOwn routes", () => {
+    const meta = {
+      roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const,
+      hideForOwn: true
+    };
+    expect(resolveAccess(target("/product/kol-items", meta), operator)).toBe(true);
+    expect(resolveAccess(target("/product/kol-items", meta), finance)).toBe(true);
+  });
 });
 
 describe("installGuard with the real route table", () => {
@@ -70,6 +93,14 @@ describe("installGuard with the real route table", () => {
   it("opens the user list and the audit log for the super administrator", async () => {
     expect((await navigate(superAdmin, "/system/users")).name).toBe("SystemUsers");
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
+  });
+
+  it("redirects OPERATOR+OWN away from /product/kol-items to 403", async () => {
+    expect((await navigate(operatorOwn, "/product/kol-items")).path).toBe("/403");
+  });
+
+  it("opens /product/kol-items for OPERATOR+ALL", async () => {
+    expect((await navigate(operator, "/product/kol-items")).name).toBe("KolItemList");
   });
 
   it("restricts the system pages to SUPER_ADMIN and opens KOL management to every role", () => {
