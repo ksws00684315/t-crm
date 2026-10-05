@@ -53,18 +53,15 @@ public class RedirectService {
     if (value == null) {
       return redirectTo(fallback);
     }
-    String[] parts = value.split("\\|", -1);
-    if (parts.length != 3 || !parts[0].matches("[1-9][0-9]{0,18}") || !parts[2].equals("1")) {
-      return redirectTo(fallback);
-    }
-    URI target = httpUri(parts[1]);
+    var entry = LinkEntry.parse(value);
+    URI target = entry.map(link -> httpUri(link.targetUrl())).orElse(null);
     if (target == null) {
       return redirectTo(fallback);
     }
     var event =
         Map.of(
             "kolItemId",
-            parts[0],
+            entry.get().kolItemId(),
             "kolCode",
             kolCode,
             "productCode",

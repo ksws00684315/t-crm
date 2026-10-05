@@ -120,4 +120,42 @@ class RedirectServiceTest {
             mock(ClickRedis.class), IPS, "https://example.com/fallback", "unit-salt");
     assertThat(service.health().getStatusCode().value()).isEqualTo(503);
   }
+
+  @Test
+  void shouldRedirectAndRecordItemId_whenIndexValueIsJson() {
+    var redis = mock(ClickRedis.class);
+    when(redis.lookup(anyString(), anyString()))
+        .thenReturn(
+            "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p?a=1%7C2\",\"status\":1}");
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    var response = service.redirect("KOL0001", "product", new MockHttpServletRequest());
+    assertThat(response.getHeaders().getLocation().toString())
+        .isEqualTo("https://example.com/p?a=1%7C2");
+    var events = org.mockito.ArgumentCaptor.forClass(Map.class);
+    verify(redis).append(events.capture());
+    assertThat(events.getValue().get("kolItemId")).isEqualTo("77");
+  }
+
+  @Test
+  void shouldUseFallbackWithoutRecording_whenIndexValueIsInactiveOrMalformed() {
+    var redis = mock(ClickRedis.class);
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    for (String value :
+        new String[] {
+          "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":0}",
+          "{broken",
+          "77|https://example.com/p|0"
+        }) {
+      when(redis.lookup(anyString(), anyString())).thenReturn(value);
+      assertThat(
+              service
+                  .redirect("KOL0001", "product", new MockHttpServletRequest())
+                  .getHeaders()
+                  .getLocation()
+                  .toString())
+          .as(value)
+          .isEqualTo("https://example.com/fallback");
+    }
+    verify(redis, never()).append(anyMap());
+  }
 }
