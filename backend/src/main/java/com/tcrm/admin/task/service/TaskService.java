@@ -38,13 +38,17 @@ public class TaskService {
   }
 
   public TaskFileDTO getErrorFile(Long id) {
-    requireAccessible(id);
+    TaskDO task = requireAccessible(id);
     TaskFileDO file =
         files.selectOne(
             new LambdaQueryWrapper<TaskFileDO>()
                 .eq(TaskFileDO::getTaskId, id)
                 .eq(TaskFileDO::getKind, TaskFileKind.ERROR));
     if (file == null) {
+      // Finished tasks with failures once had an error file; after 30-day cleanup it is gone.
+      if (task.getStatus().isFinished() && task.getFailed() != null && task.getFailed() > 0) {
+        throw new BusinessException(ErrorCode.TASK_FILE_EXPIRED);
+      }
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     return new TaskFileDTO(file.getFileName(), file.getContentType(), file.getContent());

@@ -15,4 +15,9 @@ public enum TaskStatus {
     }
     return failed >= total ? FAILED : PARTIAL;
   }
+
+  /** True when the task will not change again (SUCCESS, PARTIAL or FAILED). */
+  public boolean isFinished() {
+    return this == SUCCESS || this == PARTIAL || this == FAILED;
+  }
 }

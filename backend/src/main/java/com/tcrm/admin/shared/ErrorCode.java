@@ -25,7 +25,17 @@ public enum ErrorCode {
   TASK_FILE_TOO_LARGE(400, "Import file exceeds 20 MB"),
   TASK_FILE_TOO_MANY_ROWS(400, "Import file exceeds the row limit"),
   TASK_FILE_HEADER_MISMATCH(400, "Import file header does not match the template"),
-  TASK_FILE_EMPTY(400, "Import file contains no data rows");
+  TASK_FILE_EMPTY(400, "Import file contains no data rows"),
+  TASK_FILE_EXPIRED(404, "Task file has been cleaned up after the retention period"),
+  SHOP_LIMIT_REACHED(422, "At most 3 shops are allowed"),
+  SHOP_WEIDIAN_ID_EXISTS(409, "Weidian shop ID already exists"),
+  SHOP_DISABLED(422, "Shop is disabled"),
+  SHOP_NOT_FOUND(404, "Shop not found"),
+  PRODUCT_NOT_FOUND(404, "Product not found"),
+  PRODUCT_CODE_EXISTS(409, "Product code already exists"),
+  PRODUCT_WEIDIAN_ID_EXISTS(409, "Weidian item ID already exists in this shop"),
+  PRODUCT_CODE_IMMUTABLE(422, "Product code cannot be changed"),
+  PRODUCT_IS_EXCLUSIVE_ITEM(422, "Exclusive item cannot be registered as an original product");
   private final int status;
   private final String message;
 

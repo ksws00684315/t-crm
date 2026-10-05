@@ -24,9 +24,19 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   TASK_QUEUE_FULL: "当前排队的任务过多，请稍后再试",
   TASK_FILE_INVALID: "文件格式不正确，请上传 .xlsx 格式的 Excel 文件",
   TASK_FILE_TOO_LARGE: "文件超过 20MB，请拆分后再上传",
-  TASK_FILE_TOO_MANY_ROWS: "数据行数超过上限（2000 行），请拆分后再上传",
+  TASK_FILE_TOO_MANY_ROWS: "数据行数超过上限，请拆分后再上传",
   TASK_FILE_HEADER_MISMATCH: "表头与模板不一致，请下载最新模板后填写",
-  TASK_FILE_EMPTY: "文件中没有数据行"
+  TASK_FILE_EMPTY: "文件中没有数据行",
+  TASK_FILE_EXPIRED: "错误文件已超过 30 天，已被清理",
+  SHOP_LIMIT_REACHED: "店铺数量已达上限（最多 3 个）",
+  SHOP_WEIDIAN_ID_EXISTS: "该微店店铺 ID 已存在",
+  SHOP_DISABLED: "店铺已停用，无法执行该操作",
+  SHOP_NOT_FOUND: "店铺不存在",
+  PRODUCT_NOT_FOUND: "原商品不存在",
+  PRODUCT_CODE_EXISTS: "该原商品编码已存在",
+  PRODUCT_WEIDIAN_ID_EXISTS: "该店铺下微店商品 ID 已存在",
+  PRODUCT_CODE_IMMUTABLE: "原商品编码创建后不可修改",
+  PRODUCT_IS_EXCLUSIVE_ITEM: "该微店商品 ID 已是专属商品，不能登记为原商品"
 };
 
 export const GENERIC_ERROR_MESSAGE = "操作失败，请稍后重试";
