@@ -1,7 +1,6 @@
 package com.tcrm.admin.product.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,7 +47,14 @@ class ShopControllerTest {
     when(shops.list())
         .thenReturn(
             List.of(
-                new ShopDTO(1L, "店", "100", 1, null, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"))));
+                new ShopDTO(
+                    1L,
+                    "店",
+                    "100",
+                    1,
+                    null,
+                    Instant.parse("2026-01-01T00:00:00Z"),
+                    Instant.parse("2026-01-01T00:00:00Z"))));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].weidianShopId").value("100"));
@@ -58,7 +64,14 @@ class ShopControllerTest {
   void shouldCreate_whenSuperAdmin() throws Exception {
     when(shops.create(any()))
         .thenReturn(
-            new ShopDTO(1L, "店", "100", 1, null, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")));
+            new ShopDTO(
+                1L,
+                "店",
+                "100",
+                1,
+                null,
+                Instant.parse("2026-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z")));
     mvc.perform(
             post(BASE)
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL))

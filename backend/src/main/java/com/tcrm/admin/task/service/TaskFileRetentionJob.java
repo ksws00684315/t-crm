@@ -1,4 +1,4 @@
-package com.tcrm.admin.task.job;
+package com.tcrm.admin.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.shared.DistributedLocks;
@@ -37,14 +37,16 @@ public class TaskFileRetentionJob {
     locks.run(LOCK, 0, 600, this::cleanup);
   }
 
-  /** Deletes files whose create_time is strictly before now − retention. Package-visible for tests. */
+  /**
+   * Deletes files whose create_time is strictly before now − retention. Package-visible for tests.
+   */
   void cleanup() {
     Instant cutoff = Instant.now().minus(RETENTION_DAYS, ChronoUnit.DAYS);
     int deleted =
-        files.delete(
-            new LambdaQueryWrapper<TaskFileDO>().lt(TaskFileDO::getCreateTime, cutoff));
+        files.delete(new LambdaQueryWrapper<TaskFileDO>().lt(TaskFileDO::getCreateTime, cutoff));
     if (deleted > 0) {
-      LOG.info("Deleted {} task files older than {} days (before {})", deleted, RETENTION_DAYS, cutoff);
+      LOG.info(
+          "Deleted {} task files older than {} days (before {})", deleted, RETENTION_DAYS, cutoff);
     }
   }
 

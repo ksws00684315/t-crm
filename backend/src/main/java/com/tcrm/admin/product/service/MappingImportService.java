@@ -52,9 +52,7 @@ public class MappingImportService {
         TaskType.MAPPING_IMPORT,
         MappingImportColumn.headers(),
         file,
-        () ->
-            new MappingImportProcessor(
-                actorId, shops, products, items, productMapper, kols, tx),
+        () -> new MappingImportProcessor(actorId, shops, products, items, productMapper, kols, tx),
         TaskType.MAPPING_IMPORT.maxRows());
   }
 }

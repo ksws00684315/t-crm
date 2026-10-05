@@ -130,7 +130,13 @@ class ImportTaskServiceTest {
   void shouldStoreWaitingTaskAndQueueIt_whenFileIsValid() {
     byte[] content = workbook(List.of(List.of("KOL0001", "a"), List.of("", "b")));
 
-    Long id = service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null, TaskType.KOL_IMPORT.maxRows());
+    Long id =
+        service.submitImport(
+            TaskType.KOL_IMPORT,
+            HEADERS,
+            upload(content),
+            () -> null,
+            TaskType.KOL_IMPORT.maxRows());
 
     assertThat(id).isEqualTo(TASK_ID);
     ArgumentCaptor<TaskDO> task = ArgumentCaptor.forClass(TaskDO.class);
@@ -155,7 +161,13 @@ class ImportTaskServiceTest {
     byte[] content = excel.write(List.of("其他"), List.of(List.of("x")));
 
     assertThatThrownBy(
-            () -> service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null, TaskType.KOL_IMPORT.maxRows()))
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADERS,
+                    upload(content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.TASK_FILE_HEADER_MISMATCH);
@@ -174,7 +186,13 @@ class ImportTaskServiceTest {
     byte[] content = workbook(List.of(List.of("", "a")));
 
     assertThatThrownBy(
-            () -> service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null, TaskType.KOL_IMPORT.maxRows()))
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADERS,
+                    upload(content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.TASK_QUEUE_FULL);

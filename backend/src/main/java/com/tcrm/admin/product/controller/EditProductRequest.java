@@ -14,8 +14,7 @@ import java.math.BigDecimal;
 public record EditProductRequest(
     @NotBlank @Size(max = ProductRules.MAX_NAME) String name,
     @Size(max = ProductRules.MAX_CATEGORY) String category,
-    @Size(max = ProductRules.MAX_IMAGE_URL)
-        @Pattern(regexp = "^$|https://[^\\s/?#]+\\S*")
+    @Size(max = ProductRules.MAX_IMAGE_URL) @Pattern(regexp = "^$|https://[^\\s/?#]+\\S*")
         String imageUrl,
     @NotNull @DecimalMin("0") @Digits(integer = 12, fraction = 2) BigDecimal price,
     @DecimalMin("0") @DecimalMax("1") @Digits(integer = 1, fraction = 4) BigDecimal rate) {

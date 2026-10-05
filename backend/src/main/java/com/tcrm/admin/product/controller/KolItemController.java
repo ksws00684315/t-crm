@@ -11,9 +11,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Kol item mapping query (task 05 §5). OPERATOR+OWN is denied by the service; FINANCE may read.
- */
+/** Kol item mapping query (task 05 §5). OPERATOR+OWN is denied by the service; FINANCE may read. */
 @RestController
 @RequestMapping("/admin-api/product/kol-items")
 public class KolItemController {

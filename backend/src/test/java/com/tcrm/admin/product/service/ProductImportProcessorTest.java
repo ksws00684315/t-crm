@@ -35,7 +35,9 @@ class ProductImportProcessorTest {
   private final ProductMapper products = mock(ProductMapper.class);
   private final KolItemMapper kolItems = mock(KolItemMapper.class);
   private final ProductCodeGenerator codes = mock(ProductCodeGenerator.class);
-  private final TransactionTemplate tx = new TransactionTemplate(mock(org.springframework.transaction.PlatformTransactionManager.class));
+  private final TransactionTemplate tx =
+      new TransactionTemplate(
+          mock(org.springframework.transaction.PlatformTransactionManager.class));
   private ProductImportProcessor processor;
   private ShopDO shop;
 
@@ -69,7 +71,9 @@ class ProductImportProcessorTest {
   @Test
   void shouldInsert_whenNewShopItem() {
     when(products.selectOne(any())).thenReturn(null);
-    assertThat(processor.process(row("", "100", "2001", "鞋", "类", "https://a.com/x.png", "12.5", "10")))
+    assertThat(
+            processor.process(
+                row("", "100", "2001", "鞋", "类", "https://a.com/x.png", "12.5", "10")))
         .isEmpty();
     ArgumentCaptor<ProductDO> cap = ArgumentCaptor.forClass(ProductDO.class);
     verify(products).insert(cap.capture());
@@ -90,8 +94,7 @@ class ProductImportProcessorTest {
     existing.setName("旧名");
     existing.setPrice(new BigDecimal("1.00"));
     when(products.selectOne(any())).thenReturn(existing);
-    assertThat(processor.process(row("P000009", "100", "2001", "新名", "", "", "", "")))
-        .isEmpty();
+    assertThat(processor.process(row("P000009", "100", "2001", "新名", "", "", "", ""))).isEmpty();
     verify(products).update(any(), any());
     verify(products, never()).insert(any(ProductDO.class));
   }

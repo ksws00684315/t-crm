@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -43,7 +42,9 @@ class KolItemControllerTest {
   @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "FINANCE, ALL"})
   void shouldList_whenAllowedRoleReads(Role role, DataScope scope) throws Exception {
     when(items.page(any())).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
-    mvc.perform(get("/admin-api/product/kol-items").header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
+    mvc.perform(
+            get("/admin-api/product/kol-items")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
         .andExpect(status().isOk());
     verify(items).page(any());
   }

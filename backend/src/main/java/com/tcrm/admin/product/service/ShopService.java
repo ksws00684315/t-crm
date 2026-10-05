@@ -25,11 +25,7 @@ public class ShopService {
   }
 
   public List<ShopDTO> list() {
-    return shops
-        .selectList(
-            new LambdaQueryWrapper<ShopDO>()
-                .orderByAsc(ShopDO::getId))
-        .stream()
+    return shops.selectList(new LambdaQueryWrapper<ShopDO>().orderByAsc(ShopDO::getId)).stream()
         .map(ShopService::toDto)
         .toList();
   }

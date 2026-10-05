@@ -1,4 +1,4 @@
-package com.tcrm.admin.task.job;
+package com.tcrm.admin.task.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

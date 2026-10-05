@@ -115,7 +115,8 @@ class ExcelFilesTest {
   @Test
   void shouldIgnoreExtraColumns_whenRowIsWiderThanHeader() {
     byte[] content = workbook(HEADERS, List.of(List.of("1", "2", "3", "4")));
-    assertThat(excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS)).containsExactly(List.of("1", "2", "3"));
+    assertThat(excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS))
+        .containsExactly(List.of("1", "2", "3"));
   }
 
   @Test
@@ -128,24 +129,33 @@ class ExcelFilesTest {
   @Test
   void shouldRejectFile_whenHeaderDiffers() {
     byte[] reordered = workbook(List.of("姓名", "编号", "邮箱"), List.of(List.of("a", "b", "c")));
-    assertError(() -> excel.read(reordered, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    assertError(
+        () -> excel.read(reordered, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_HEADER_MISMATCH);
     byte[] missing = workbook(List.of("编号", "姓名"), List.of(List.of("a", "b")));
-    assertError(() -> excel.read(missing, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    assertError(
+        () -> excel.read(missing, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_HEADER_MISMATCH);
     byte[] extra = workbook(List.of("编号", "姓名", "邮箱", "备注"), List.of(List.of("a")));
-    assertError(() -> excel.read(extra, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    assertError(
+        () -> excel.read(extra, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 
   @Test
   void shouldRejectFile_whenSheetIsEmpty() {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     FastExcel.write(out).sheet("Sheet1").doWrite(List.<List<String>>of());
-    assertError(() -> excel.read(out.toByteArray(), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    assertError(
+        () -> excel.read(out.toByteArray(), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 
   @Test
   void shouldRejectFile_whenThereAreNoDataRows() {
     byte[] content = workbook(HEADERS, List.of());
-    assertError(() -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_EMPTY);
+    assertError(
+        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_EMPTY);
   }
 
   @Test
@@ -154,7 +164,8 @@ class ExcelFilesTest {
     for (int i = 0; i < ExcelFiles.DEFAULT_MAX_ROWS; i++) {
       rows.add(List.of("c" + i, "n", "e"));
     }
-    assertThat(excel.read(workbook(HEADERS, rows), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS)).hasSize(ExcelFiles.DEFAULT_MAX_ROWS);
+    assertThat(excel.read(workbook(HEADERS, rows), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS))
+        .hasSize(ExcelFiles.DEFAULT_MAX_ROWS);
   }
 
   @Test
@@ -164,13 +175,17 @@ class ExcelFilesTest {
       rows.add(List.of("c" + i, "n", "e"));
     }
     byte[] content = workbook(HEADERS, rows);
-    assertError(() -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_TOO_MANY_ROWS);
+    assertError(
+        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_TOO_MANY_ROWS);
   }
 
   @Test
   void shouldRejectFile_whenZipIsNotAWorkbook() {
     byte[] content = {0x50, 0x4B, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8};
-    assertError(() -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_INVALID);
+    assertError(
+        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        ErrorCode.TASK_FILE_INVALID);
   }
 
   @ParameterizedTest
@@ -211,5 +226,4 @@ class ExcelFilesTest {
     assertError(
         () -> excel.read(workbook(HEADERS, rows), HEADERS, 2), ErrorCode.TASK_FILE_TOO_MANY_ROWS);
   }
-
 }

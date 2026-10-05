@@ -29,8 +29,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Imports original products (task 05 §4.2): insert-or-update by (shop, weidian item id); blank cells
- * on update mean "leave unchanged"; codes are immutable.
+ * Imports original products (task 05 §4.2): insert-or-update by (shop, weidian item id); blank
+ * cells on update mean "leave unchanged"; codes are immutable.
  */
 class ProductImportProcessor implements ImportRowProcessor {
   static final String CODE_FORMAT = "原商品编码格式不正确，应为 1～16 位大写字母、数字、下划线或连字符";
@@ -139,7 +139,10 @@ class ProductImportProcessor implements ImportRowProcessor {
     if (!name.isEmpty() && ProductRules.length(name) > ProductRules.MAX_NAME) {
       errors.add(NAME_LENGTH);
     }
-    if (!errors.isEmpty() || shop == null || itemId.isEmpty() || !ProductRules.isWeidianId(itemId)) {
+    if (!errors.isEmpty()
+        || shop == null
+        || itemId.isEmpty()
+        || !ProductRules.isWeidianId(itemId)) {
       return errors;
     }
     ProductDO existing =

@@ -13,6 +13,12 @@ public record ShopVO(
     Instant updateTime) {
   static ShopVO from(ShopDTO s) {
     return new ShopVO(
-        s.id(), s.shopName(), s.weidianShopId(), s.status(), s.remark(), s.createTime(), s.updateTime());
+        s.id(),
+        s.shopName(),
+        s.weidianShopId(),
+        s.status(),
+        s.remark(),
+        s.createTime(),
+        s.updateTime());
   }
 }

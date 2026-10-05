@@ -2,7 +2,6 @@ package com.tcrm.admin.product.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,7 +39,8 @@ class MappingImportProcessorTest {
   private final ProductMapper productMapper = mock(ProductMapper.class);
   private final KolApi kols = mock(KolApi.class);
   private final TransactionTemplate tx =
-      new TransactionTemplate(mock(org.springframework.transaction.PlatformTransactionManager.class));
+      new TransactionTemplate(
+          mock(org.springframework.transaction.PlatformTransactionManager.class));
   private MappingImportProcessor processor;
   private ShopDO shop;
   private ProductDO product;
@@ -48,8 +48,7 @@ class MappingImportProcessorTest {
 
   @BeforeEach
   void setup() {
-    processor =
-        new MappingImportProcessor(9L, shops, products, items, productMapper, kols, tx);
+    processor = new MappingImportProcessor(9L, shops, products, items, productMapper, kols, tx);
     shop = new ShopDO();
     shop.setId(1L);
     shop.setWeidianShopId("100");

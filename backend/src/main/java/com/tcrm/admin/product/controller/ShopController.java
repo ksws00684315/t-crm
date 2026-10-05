@@ -52,8 +52,7 @@ public class ShopController {
   @PutMapping("/{id}/status")
   @SaCheckRole("SUPER_ADMIN")
   @AuditLog(module = "PRODUCT", action = "Change shop status")
-  public R<Void> status(
-      @PathVariable @Min(1) Long id, @Valid @RequestBody ShopStatusRequest r) {
+  public R<Void> status(@PathVariable @Min(1) Long id, @Valid @RequestBody ShopStatusRequest r) {
     shops.updateStatus(id, r.status());
     return R.ok(null);
   }

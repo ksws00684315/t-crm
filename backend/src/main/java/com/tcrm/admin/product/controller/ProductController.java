@@ -60,8 +60,7 @@ public class ProductController {
       value = {"SUPER_ADMIN", "OPERATOR"},
       mode = SaMode.OR)
   @AuditLog(module = "PRODUCT", action = "Change product status")
-  public R<Void> status(
-      @PathVariable @Min(1) Long id, @Valid @RequestBody ProductStatusRequest r) {
+  public R<Void> status(@PathVariable @Min(1) Long id, @Valid @RequestBody ProductStatusRequest r) {
     products.updateStatus(id, r.status());
     return R.ok(null);
   }

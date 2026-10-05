@@ -47,6 +47,9 @@ public class KolLookupService implements KolApi {
       return null;
     }
     return new KolRefDTO(
-        kol.getId(), kol.getKolCode(), kol.getName(), kol.getStatus() != null && kol.getStatus() == 1);
+        kol.getId(),
+        kol.getKolCode(),
+        kol.getName(),
+        kol.getStatus() != null && kol.getStatus() == 1);
   }
 }

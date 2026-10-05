@@ -18,7 +18,6 @@ import com.tcrm.admin.shared.PageResult;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -60,9 +59,7 @@ public class ProductService {
     String keyword = filter.keyword() == null ? "" : filter.keyword().strip();
     String pattern = "%" + ProductRules.escapeLike(keyword) + "%";
     String category =
-        filter.category() == null || filter.category().isBlank()
-            ? null
-            : filter.category().strip();
+        filter.category() == null || filter.category().isBlank() ? null : filter.category().strip();
     var query =
         new LambdaQueryWrapper<ProductDO>()
             .apply(
