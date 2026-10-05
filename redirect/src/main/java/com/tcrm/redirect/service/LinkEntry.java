@@ -7,8 +7,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * One active entry of the Redis link index (design §7.4). The value is a JSON object {@code
- * {"kolItemId":"1","targetUrl":"https://...","status":1}}; the legacy {@code id|url|status} value
- * is still read so existing indexes keep working while writers migrate.
+ * {"kolItemId":"1","targetUrl":"https://...","status":1}}; any other value is rejected.
  */
 record LinkEntry(String kolItemId, String targetUrl) {
   private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -19,10 +18,6 @@ record LinkEntry(String kolItemId, String targetUrl) {
     if (raw == null || raw.isBlank()) {
       return Optional.empty();
     }
-    return raw.charAt(0) == '{' ? parseJson(raw) : parseLegacy(raw);
-  }
-
-  private static Optional<LinkEntry> parseJson(String raw) {
     JsonNode node;
     try {
       node = JSON.readTree(raw);
@@ -39,14 +34,6 @@ record LinkEntry(String kolItemId, String targetUrl) {
       return Optional.empty();
     }
     return of(id.asString(), url.asString());
-  }
-
-  private static Optional<LinkEntry> parseLegacy(String raw) {
-    String[] parts = raw.split("\\|", -1);
-    if (parts.length != 3 || !parts[2].equals("1")) {
-      return Optional.empty();
-    }
-    return of(parts[0], parts[1]);
   }
 
   private static Optional<LinkEntry> of(String id, String url) {

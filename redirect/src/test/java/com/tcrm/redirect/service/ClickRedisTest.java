@@ -23,9 +23,11 @@ class ClickRedisTest {
     var redis = mock(StringRedisTemplate.class);
     HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
     when(redis.opsForHash()).thenReturn(hashes);
-    when(hashes.get("link:KOL0001", "product")).thenReturn("1|https://example.com/item|1");
+    when(hashes.get("link:KOL0001", "product"))
+        .thenReturn(
+            "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
     assertThat(new ClickRedis(redis, 1000).lookup("KOL0001", "product"))
-        .isEqualTo("1|https://example.com/item|1");
+        .isEqualTo("{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
   }
 
   @Test

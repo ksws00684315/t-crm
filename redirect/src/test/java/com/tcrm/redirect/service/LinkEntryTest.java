@@ -25,22 +25,11 @@ class LinkEntryTest {
   }
 
   @Test
-  void shouldParseLegacyPipeValue_whenValueIsNotJson() {
-    var entry = LinkEntry.parse("9|https://example.com/item|1");
-    assertThat(entry).isPresent();
-    assertThat(entry.get().kolItemId()).isEqualTo("9");
-    assertThat(entry.get().targetUrl()).isEqualTo("https://example.com/item");
-  }
-
-  @Test
   void shouldRejectValue_whenInactiveOrMalformed() {
     for (String value :
         new String[] {
           "",
-          "9|https://example.com/item|0",
-          "9|https://example.com/item",
-          "0|https://example.com/item|1",
-          "x|https://example.com/item|1",
+          "9|https://example.com/item|1",
           "{\"kolItemId\":\"9\",\"targetUrl\":\"https://example.com\",\"status\":0}",
           "{\"kolItemId\":\"0\",\"targetUrl\":\"https://example.com\",\"status\":1}",
           "{\"kolItemId\":\"9\",\"status\":1}",

@@ -18,6 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 class RedirectServiceTest {
+  private static final String ITEM =
+      "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}";
+
   private static final ClientIpResolver IPS =
       new ClientIpResolver("10.0.0.0/8", "CF-Connecting-IP,X-Forwarded-For");
 
@@ -59,7 +62,7 @@ class RedirectServiceTest {
 
   private Map<?, ?> clickFor(MockHttpServletRequest request) {
     var redis = mock(ClickRedis.class);
-    when(redis.lookup(anyString(), anyString())).thenReturn("1|https://example.com/item|1");
+    when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
     new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt")
         .redirect("KOL0001", "product", request);
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);
@@ -102,7 +105,8 @@ class RedirectServiceTest {
         new String[] {
           "https:///missing-host", "https://user:credential@example.com", "https://[invalid"
         }) {
-      when(redis.lookup(anyString(), anyString())).thenReturn("1|" + target + "|1");
+      when(redis.lookup(anyString(), anyString()))
+          .thenReturn("{\"kolItemId\":\"1\",\"targetUrl\":\"" + target + "\",\"status\":1}");
       assertThat(
               service
                   .redirect("KOL0001", "product", new MockHttpServletRequest())
@@ -142,9 +146,7 @@ class RedirectServiceTest {
     var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
     for (String value :
         new String[] {
-          "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":0}",
-          "{broken",
-          "77|https://example.com/p|0"
+          "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":0}", "{broken"
         }) {
       when(redis.lookup(anyString(), anyString())).thenReturn(value);
       assertThat(
