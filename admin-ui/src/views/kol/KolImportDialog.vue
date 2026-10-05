@@ -5,12 +5,15 @@ import { downloadKolTemplate, IMPORT_MAX_BYTES, uploadKolImport } from "@/api/ko
 import { downloadTaskErrorFile, getTask, isFinished } from "@/api/task/task";
 import type { TaskVO } from "@/api/types";
 import { saveBlob } from "@/utils/download";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "KolImportDialog" });
 
 /** Progress is polled once per second until the task finishes. */
 const POLL_INTERVAL_MS = 1000;
+/** Transient poll failures (network blip, 5xx) retry this many times; 401 stops immediately. */
+const POLL_MAX_FAILURES = 3;
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
@@ -79,7 +82,7 @@ watch(
 
 onBeforeUnmount(stopPolling);
 
-async function poll(id: string) {
+async function poll(id: string, failures = 0) {
   timer = null;
   try {
     const next = await getTask(id);
@@ -89,11 +92,22 @@ async function poll(id: string) {
       finishedAny = true;
       return;
     }
+    timer = setTimeout(() => void poll(id, 0), POLL_INTERVAL_MS);
   } catch (error) {
-    notifyError(error);
-    return;
+    if (!props.modelValue) return;
+    // Session gone: stop immediately (redirect handler already announced the 401).
+    if (error instanceof ApiError && error.status === 401) {
+      notifyError(error);
+      return;
+    }
+    const nextFailures = failures + 1;
+    if (nextFailures >= POLL_MAX_FAILURES) {
+      notifyError(error);
+      ElMessage.error("进度查询连续失败，已停止刷新；任务仍在后台执行，可关闭后稍后在列表查看");
+      return;
+    }
+    timer = setTimeout(() => void poll(id, nextFailures), POLL_INTERVAL_MS);
   }
-  timer = setTimeout(() => void poll(id), POLL_INTERVAL_MS);
 }
 
 function onFileChange(event: Event) {

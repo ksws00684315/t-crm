@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
 import * as taskApi from "@/api/task/task";
 import type { TaskVO } from "@/api/types";
+import { ApiError } from "@/utils/http/error";
+import * as notify from "@/utils/notify";
 import KolImportDialog from "../KolImportDialog.vue";
+
+vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 vi.mock("@/api/kol/kol", async importOriginal => ({
   ...(await importOriginal<typeof kolApi>()),
@@ -121,5 +125,61 @@ describe("KOL import dialog", () => {
     expect(document.body.textContent).toContain("文件无法处理或任务被中断");
     expect(document.body.textContent).not.toContain("Interrupted by restart");
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it("retries transient poll failures a few times before stopping", async () => {
+    const error = vi.spyOn(ElMessage, "error");
+    vi.mocked(kolApi.uploadKolImport).mockResolvedValue({ taskId: "77" });
+    vi.mocked(taskApi.getTask)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(task({ status: "SUCCESS", done: 4 }));
+    await mountDialog();
+    await choose(new File(["PK"], "kols.xlsx"));
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(1);
+    expect(notify.notifyError).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(3);
+    expect(document.body.textContent).toContain("导入完成：成功 4 行");
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining("连续失败"));
+  });
+
+  it("stops polling and notifies after too many transient failures", async () => {
+    const error = vi.spyOn(ElMessage, "error");
+    vi.mocked(kolApi.uploadKolImport).mockResolvedValue({ taskId: "77" });
+    vi.mocked(taskApi.getTask).mockRejectedValue(new Error("network"));
+    await mountDialog();
+    await choose(new File(["PK"], "kols.xlsx"));
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(3);
+    expect(notify.notifyError).toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      "进度查询连续失败，已停止刷新；任务仍在后台执行，可关闭后稍后在列表查看"
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops polling immediately on 401 without retrying", async () => {
+    vi.mocked(kolApi.uploadKolImport).mockResolvedValue({ taskId: "77" });
+    vi.mocked(taskApi.getTask).mockRejectedValue(
+      new ApiError({ status: 401, errorCode: "AUTH_UNAUTHORIZED", traceId: "t" })
+    );
+    await mountDialog();
+    await choose(new File(["PK"], "kols.xlsx"));
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(1);
+    expect(notify.notifyError).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(taskApi.getTask).toHaveBeenCalledTimes(1);
   });
 });
