@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -137,31 +138,52 @@ public class KolService {
     return toDto(saved == null ? kol : saved, bdNames(Stream.of(bd)));
   }
 
+  /**
+   * Updates editable KOL fields only. Uses a column whitelist so a concurrent {@link #updateBdUser}
+   * cannot be overwritten with a stale {@code bd_user_id} (never set here).
+   */
   public void update(Long id, EditKolCommand c) {
     AccountDTO user = requireWriter();
-    KolDO kol = requireVisible(id, user);
+    requireVisible(id, user);
     String email = normalizeEmail(c.email());
     if (emailTaken(email, id)) {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
-    kol.setName(c.name().strip());
-    kol.setEmail(email);
-    kol.setCountry(c.country().strip().toUpperCase(Locale.ROOT));
-    kol.setSocialAccounts(SocialAccountsJson.write(c.socialAccounts()));
-    kol.setDefaultRate(c.defaultRate());
-    kol.setRemark(blankToNull(c.remark()));
+    Instant now = Instant.now();
     try {
-      kols.updateById(kol);
+      kols.update(
+          null,
+          new LambdaUpdateWrapper<KolDO>()
+              .eq(KolDO::getId, id)
+              .set(KolDO::getName, c.name().strip())
+              .set(KolDO::getEmail, email)
+              .set(KolDO::getCountry, c.country().strip().toUpperCase(Locale.ROOT))
+              .set(
+                  KolDO::getSocialAccounts,
+                  SocialAccountsJson.write(c.socialAccounts()),
+                  "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
+              .set(KolDO::getDefaultRate, c.defaultRate())
+              .set(KolDO::getRemark, blankToNull(c.remark()))
+              .set(KolDO::getUpdateBy, user.id())
+              .set(KolDO::getUpdateTime, now));
     } catch (DuplicateKeyException e) {
       // Only uk_crm_kol_email can be violated by an edit; the code never changes here.
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
   }
 
+  /** Enables or disables a KOL; never touches {@code bd_user_id}. */
   public void updateStatus(Long id, int status) {
-    KolDO kol = requireVisible(id, requireWriter());
-    kol.setStatus(status);
-    kols.updateById(kol);
+    AccountDTO user = requireWriter();
+    requireVisible(id, user);
+    Instant now = Instant.now();
+    kols.update(
+        null,
+        new LambdaUpdateWrapper<KolDO>()
+            .eq(KolDO::getId, id)
+            .set(KolDO::getStatus, status)
+            .set(KolDO::getUpdateBy, user.id())
+            .set(KolDO::getUpdateTime, now));
   }
 
   /**
@@ -184,8 +206,13 @@ public class KolService {
             return;
           }
           Instant now = Instant.now();
-          kol.setBdUserId(bd);
-          kols.updateById(kol);
+          kols.update(
+              null,
+              new LambdaUpdateWrapper<KolDO>()
+                  .eq(KolDO::getId, id)
+                  .set(KolDO::getBdUserId, bd)
+                  .set(KolDO::getUpdateBy, user.id())
+                  .set(KolDO::getUpdateTime, now));
           history.closeCurrent(id, now, user.id());
           KolBdHistoryDO period = new KolBdHistoryDO();
           period.setKolId(id);

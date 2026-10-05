@@ -277,20 +277,33 @@ class KolServiceTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void shouldUpdateEditableFieldsOnly_whenBdEditsOwnKol() {
     actAs(BD, Role.OPERATOR, DataScope.OWN);
     KolDO kol = kol(BD);
     kol.setDefaultRate(new BigDecimal("0.1"));
     when(kols.selectById(11L)).thenReturn(kol);
+    when(kols.update(isNull(), any())).thenReturn(1);
+
     service.update(11L, edit());
-    verify(kols).updateById(kol);
-    assertThat(kol.getKolCode()).isEqualTo("KOL0001");
-    assertThat(kol.getBdUserId()).isEqualTo(BD);
-    assertThat(kol.getEmail()).isEqualTo("alice@example.com");
-    assertThat(kol.getCountry()).isEqualTo("GB");
-    assertThat(kol.getDefaultRate()).isNull();
-    assertThat(kol.getRemark()).isEqualTo("VIP");
-    @SuppressWarnings("unchecked")
+
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    verify(kols, never()).updateById(any(KolDO.class));
+    var sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                update.getValue())
+            .getSqlSet();
+    assertThat(sqlSet)
+        .contains("name=", "email=", "country=", "social_accounts=", "default_rate=", "remark=")
+        .doesNotContain("bd_user_id")
+        .doesNotContain("kol_code");
+    // update_by is the actor (BD); bd_user_id must stay out of the SET clause above.
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) update.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains("Alice B", "alice@example.com", "GB", "VIP");
     ArgumentCaptor<Wrapper<KolDO>> query = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).selectCount(query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("lower(email) =", "id <>");
@@ -304,19 +317,33 @@ class KolServiceTest {
     assertThatThrownBy(() -> service.update(11L, edit()))
         .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
     when(kols.selectCount(any())).thenReturn(0L);
-    when(kols.updateById(any(KolDO.class))).thenThrow(new DuplicateKeyException("unit"));
+    when(kols.update(isNull(), any())).thenThrow(new DuplicateKeyException("unit"));
     assertThatThrownBy(() -> service.update(11L, edit()))
         .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void shouldChangeStatus_whenAdminDisablesKol() {
     actAs(1L, Role.OPERATOR, DataScope.ALL);
-    KolDO kol = kol(OTHER_BD);
-    when(kols.selectById(11L)).thenReturn(kol);
+    when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
     service.updateStatus(11L, 0);
-    assertThat(kol.getStatus()).isZero();
-    verify(kols).updateById(kol);
+
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    verify(kols, never()).updateById(any(KolDO.class));
+    var sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                update.getValue())
+            .getSqlSet();
+    assertThat(sqlSet).contains("status=").doesNotContain("bd_user_id");
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) update.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains(0, 1L);
   }
 
   @Test
@@ -328,17 +355,29 @@ class KolServiceTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void shouldClosePeriodAndOpenNewOne_whenBdChanges() {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
     when(bdUsers.getById(OTHER_BD)).thenReturn(new BdUserDTO(OTHER_BD, "bd6", "BD", true));
     when(kols.lockById(11L)).thenReturn(11L);
-    KolDO kol = kol(BD);
-    when(kols.selectById(11L)).thenReturn(kol);
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
 
     service.updateBdUser(11L, OTHER_BD);
 
-    assertThat(kol.getBdUserId()).isEqualTo(OTHER_BD);
-    verify(kols).updateById(kol);
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    verify(kols, never()).updateById(any(KolDO.class));
+    var sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                update.getValue())
+            .getSqlSet();
+    assertThat(sqlSet).contains("bd_user_id=").doesNotContain("name=").doesNotContain("email=");
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) update.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains(OTHER_BD);
     var closedAt = ArgumentCaptor.forClass(Instant.class);
     verify(history).closeCurrent(eq(11L), closedAt.capture(), eq(1L));
     var period = ArgumentCaptor.forClass(KolBdHistoryDO.class);
@@ -349,11 +388,22 @@ class KolServiceTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void shouldRecordUnassignedPeriod_whenBdIsCleared() {
     actAs(1L, Role.OPERATOR, DataScope.ALL);
     when(kols.lockById(11L)).thenReturn(11L);
     when(kols.selectById(11L)).thenReturn(kol(BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
     service.updateBdUser(11L, null);
+
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                    update.getValue())
+                .getSqlSet())
+        .contains("bd_user_id=");
     var period = ArgumentCaptor.forClass(KolBdHistoryDO.class);
     verify(history).insert(period.capture());
     assertThat(period.getValue().getBdUserId()).isNull();
@@ -367,6 +417,7 @@ class KolServiceTest {
     when(kols.lockById(11L)).thenReturn(11L);
     when(kols.selectById(11L)).thenReturn(kol(BD));
     service.updateBdUser(11L, BD);
+    verify(kols, never()).update(isNull(), any());
     verify(kols, never()).updateById(any(KolDO.class));
     verifyNoInteractions(history);
   }
@@ -387,5 +438,61 @@ class KolServiceTest {
     assertThatThrownBy(() -> service.updateBdUser(11L, OTHER_BD))
         .hasMessage(ErrorCode.KOL_INVALID_BD_USER.message());
     verifyNoInteractions(history);
+  }
+
+  /**
+   * Regression for the race where edit/status used updateById on a stale row and overwrote a
+   * concurrent updateBdUser. Edit and status must update only their own columns and never set
+   * bd_user_id (architecture review on PR #20).
+   */
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldNotWriteBdUserId_whenEditingKol() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    service.update(11L, edit());
+
+    ArgumentCaptor<Wrapper<KolDO>> wrapper = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), wrapper.capture());
+    verify(kols, never()).updateById(any(KolDO.class));
+    String sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                wrapper.getValue())
+            .getSqlSet();
+    assertThat(sqlSet)
+        .contains("name=", "email=", "country=", "social_accounts=", "default_rate=", "remark=")
+        .doesNotContain("bd_user_id");
+    assertThat(wrapper.getValue().getSqlSegment()).contains("id =");
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) wrapper.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains("Alice B", "alice@example.com", "GB", "VIP");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldNotWriteBdUserId_whenChangingStatus() {
+    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    service.updateStatus(11L, 0);
+
+    ArgumentCaptor<Wrapper<KolDO>> wrapper = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), wrapper.capture());
+    verify(kols, never()).updateById(any(KolDO.class));
+    String sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                wrapper.getValue())
+            .getSqlSet();
+    assertThat(sqlSet).contains("status=").doesNotContain("bd_user_id");
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) wrapper.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains(0);
   }
 }

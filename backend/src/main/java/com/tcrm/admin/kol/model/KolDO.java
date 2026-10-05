@@ -7,8 +7,9 @@ import com.tcrm.admin.shared.BaseEntity;
 import java.math.BigDecimal;
 
 /**
- * KOL row. Nullable columns are always written by updateById, so update a fully loaded entity,
- * never a partial one.
+ * KOL row. Nullable editable columns ({@code defaultRate}, {@code remark}) use ALWAYS so clears
+ * survive updateById; {@code bdUserId} is NEVER written by entity updates — only {@code
+ * KolService.updateBdUser} sets it through a column whitelist.
  */
 @TableName("crm_kol")
 public class KolDO extends BaseEntity {
@@ -21,7 +22,8 @@ public class KolDO extends BaseEntity {
   @TableField(typeHandler = JsonbStringTypeHandler.class)
   private String socialAccounts;
 
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  /** Ownership; changed only by KolService.updateBdUser via LambdaUpdateWrapper. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long bdUserId;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
