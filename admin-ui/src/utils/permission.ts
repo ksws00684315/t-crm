@@ -42,3 +42,22 @@ export function buildMenu(routes: readonly RouteRecordRaw[], owned: readonly Rol
   visit(routes, "/");
   return items;
 }
+
+/** What the KOL pages show to an administrator (task 04 §4.3). The backend enforces the same. */
+export interface KolAbilities {
+  /** Create, edit, enable/disable and import: everyone except FINANCE. */
+  canWrite: boolean;
+  /** Change BD, pick a BD, filter by BD: SUPER_ADMIN and OPERATOR + ALL only. */
+  canManageBd: boolean;
+}
+
+export function kolAbilities(
+  user: { role: Role; dataScope: "ALL" | "OWN" } | null | undefined
+): KolAbilities {
+  if (!user) return { canWrite: false, canManageBd: false };
+  const bd = user.role === "OPERATOR" && user.dataScope === "OWN";
+  return {
+    canWrite: user.role !== "FINANCE",
+    canManageBd: user.role === "SUPER_ADMIN" || (user.role === "OPERATOR" && !bd)
+  };
+}

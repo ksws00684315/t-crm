@@ -126,6 +126,55 @@ ecosystem = "Maven"
 license.override = ["MIT"]
 reason = "Packaged META-INF/LICENSE.txt grants MIT; normalize POM license name. Official original: https://github.com/typetools/checker-framework/blob/checker-framework-3.55.1/LICENSE.txt"
 
+[[PackageOverrides]]
+name = "cn.idev.excel:fastexcel-support"
+version = "0.0.1"
+ecosystem = "Maven"
+license.override = ["Apache-2.0", "BSD-3-Clause"]
+reason = "Runtime dependency of FastExcel 1.3.0 (task 04). JAR has no license text; it shades Spring's repackaged CGLIB (Apache-2.0) and ASM, whose BSD-3-Clause header is kept in cn/idev/excel/support/asm/*.java of the same-version sources JAR; retain both. Project original: https://github.com/apache/fesod/blob/1.3.0/LICENSE"
+
+[[PackageOverrides]]
+name = "com.github.virtuald:curvesapi"
+version = "1.08"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of Apache POI 5.4.1 via FastExcel (task 04). POM says 'BSD License'; every source file header of the same-version sources JAR is the three-clause BSD text (Copyright (c) 2005, Graph Builder). Official original: https://repo.maven.apache.org/maven2/com/github/virtuald/curvesapi/1.08/curvesapi-1.08-sources.jar"
+
+[[PackageOverrides]]
+name = "com.sun.istack:istack-commons-runtime"
+version = "4.1.2"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of jaxb-runtime via Ehcache/FastExcel (task 04). Source headers of the same-version sources JAR grant EDL 1.0 with SPDX-License-Identifier: BSD-3-Clause. Official original: https://github.com/eclipse-ee4j/jaxb-istack-commons/blob/4.1.2/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.eclipse.angus:angus-activation"
+version = "2.0.3"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of jaxb-core via Ehcache/FastExcel (task 04). Packaged META-INF/LICENSE.md is EDL 1.0 and NOTICE.md declares SPDX-License-Identifier: BSD-3-Clause; no third-party content. Official original: https://github.com/eclipse-ee4j/angus-activation/blob/2.0.3/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.glassfish.jaxb:jaxb-core"
+version = "4.0.9"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of Ehcache 3.12.0 via FastExcel (task 04). Packaged META-INF/LICENSE.md is EDL 1.0 and NOTICE.md declares SPDX-License-Identifier: BSD-3-Clause; the NOTICE third-party list describes the whole JAXB RI project (tools), none of it is in this JAR. Official original: https://github.com/eclipse-ee4j/jaxb-ri/blob/4.0.9-RI/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.glassfish.jaxb:jaxb-runtime"
+version = "4.0.9"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of Ehcache 3.12.0 via FastExcel (task 04). Packaged META-INF/LICENSE.md is EDL 1.0 and NOTICE.md declares SPDX-License-Identifier: BSD-3-Clause; the NOTICE third-party list describes the whole JAXB RI project (tools), none of it is in this JAR. Official original: https://github.com/eclipse-ee4j/jaxb-ri/blob/4.0.9-RI/LICENSE.md"
+
+[[PackageOverrides]]
+name = "org.glassfish.jaxb:txw2"
+version = "4.0.9"
+ecosystem = "Maven"
+license.override = ["BSD-3-Clause"]
+reason = "Runtime dependency of jaxb-core via Ehcache/FastExcel (task 04). Packaged META-INF/LICENSE.md is EDL 1.0 and NOTICE.md declares SPDX-License-Identifier: BSD-3-Clause; the NOTICE third-party list describes the whole JAXB RI project (tools), none of it is in this JAR. Official original: https://github.com/eclipse-ee4j/jaxb-ri/blob/4.0.9-RI/LICENSE.md"
+
 # ---- npm (admin-ui, kol-portal) ----
 
 [[PackageOverrides]]

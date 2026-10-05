@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -92,6 +95,17 @@ public class GlobalExceptionHandler {
                                             error.getDefaultMessage())))
                     .sorted(FIELD_ORDER)
                     .toList()));
+  }
+
+  /** Uploads above spring.servlet.multipart.max-file-size never reach the controller. */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<R<?>> uploadTooLarge(MaxUploadSizeExceededException e) {
+    return response(ErrorCode.TASK_FILE_TOO_LARGE);
+  }
+
+  @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+  public ResponseEntity<R<?>> invalidMultipart(Exception e) {
+    return response(ErrorCode.COMMON_VALIDATION_FAILED);
   }
 
   @ExceptionHandler(DuplicateKeyException.class)

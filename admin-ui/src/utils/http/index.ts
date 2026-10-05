@@ -17,10 +17,45 @@ export interface HttpOptions {
   adapter?: AxiosAdapter;
 }
 
+/** A file returned by a non-JSON endpoint (`Content-Disposition: attachment`). */
+export interface DownloadedFile {
+  blob: Blob;
+  /** From `Content-Disposition`; null when the header has no file name. */
+  fileName: string | null;
+}
+
 export interface Http {
   instance: AxiosInstance;
   /** Resolves with `data` of a successful envelope, otherwise throws {@link ApiError}. */
   request<T>(config: AxiosRequestConfig): Promise<T>;
+  /** Fetches a file; failures carry the JSON envelope and throw {@link ApiError} like `request`. */
+  download(config: AxiosRequestConfig): Promise<DownloadedFile>;
+}
+
+/** File name from `Content-Disposition`, preferring the RFC 5987 `filename*` form. */
+export function fileNameFromDisposition(header: string | null | undefined): string | null {
+  if (!header) return null;
+  const extended = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+  if (extended) {
+    try {
+      return decodeURIComponent(extended[1].trim());
+    } catch {
+      // fall through to the plain form
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]*)"|filename\s*=\s*([^;]+)/.exec(header);
+  const name = plain ? (plain[1] ?? plain[2]).trim() : "";
+  return name.length > 0 ? name : null;
+}
+
+/** Reads a JSON envelope out of an error response that was requested as a blob. */
+async function blobBody(data: unknown): Promise<unknown> {
+  if (!(data instanceof Blob)) return data;
+  try {
+    return JSON.parse(await data.text());
+  } catch {
+    return null;
+  }
 }
 
 function isEnvelope(body: unknown): body is Envelope<unknown> {
@@ -81,5 +116,26 @@ export function createHttp(options: HttpOptions): Http {
     throw error;
   }
 
-  return { instance, request };
+  async function download(config: AxiosRequestConfig): Promise<DownloadedFile> {
+    let status: number;
+    let body: unknown;
+    let disposition: string | null = null;
+    try {
+      const response = await instance.request({ ...config, responseType: "blob" });
+      status = response.status;
+      body = response.data;
+      const header: unknown = response.headers?.["content-disposition"];
+      disposition = typeof header === "string" ? header : null;
+    } catch {
+      throw new ApiError({ status: 0, errorCode: NETWORK_ERROR, traceId: null });
+    }
+    if (status >= 200 && status < 300 && body instanceof Blob) {
+      return { blob: body, fileName: fileNameFromDisposition(disposition) };
+    }
+    const error = toApiError(status, await blobBody(body));
+    if (status === 401) options.onUnauthorized(error);
+    throw error;
+  }
+
+  return { instance, request, download };
 }

@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableAsync
 @EnableScheduling
 @MapperScan(
-    value = "com.tcrm.admin.system",
+    value = {"com.tcrm.admin.system", "com.tcrm.admin.task", "com.tcrm.admin.kol"},
     annotationClass = org.apache.ibatis.annotations.Mapper.class)
 @SpringBootApplication
 public class TcrmAdminApplication {

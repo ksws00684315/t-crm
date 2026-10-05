@@ -23,6 +23,16 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: "首页", icon: "HomeFilled" }
       },
       {
+        path: "kol/kols",
+        name: "KolList",
+        component: () => import("@/views/kol/index.vue"),
+        meta: {
+          title: "达人管理",
+          icon: "Avatar",
+          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+        }
+      },
+      {
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),

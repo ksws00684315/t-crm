@@ -2,7 +2,7 @@ THIRD-PARTY-NOTICES
 Generated; do not edit. Runtime dependencies only.
 
 
-Lists of 133 third-party dependencies.
+Lists of 154 third-party dependencies.
      (EPL-2.0) Logback Classic Module (ch.qos.logback:logback-classic:1.5.38 - http://logback.qos.ch/logback-classic)
      (EPL-2.0) Logback Core Module (ch.qos.logback:logback-core:1.5.38 - http://logback.qos.ch/logback-core)
      (Apache 2) sa-token-core (cn.dev33:sa-token-core:1.46.0 - https://github.com/dromara/sa-token/sa-token-core)
@@ -12,6 +12,8 @@ Lists of 133 third-party dependencies.
      (Apache 2) sa-token-spring-boot-webmvc-reactor-v2v3v4-common (cn.dev33:sa-token-spring-boot-webmvc-reactor-v2v3v4-common:1.46.0 - https://github.com/dromara/sa-token/sa-token-starter/sa-token-spring-boot-webmvc-reactor-v2v3v4-common)
      (Apache 2) sa-token-spring-boot-webmvc-v3v4-common (cn.dev33:sa-token-spring-boot-webmvc-v3v4-common:1.46.0 - https://github.com/dromara/sa-token/sa-token-starter/sa-token-spring-boot-webmvc-v3v4-common)
      (Apache 2) sa-token-spring-boot4-starter (cn.dev33:sa-token-spring-boot4-starter:1.46.0 - https://github.com/dromara/sa-token/sa-token-starter/sa-token-spring-boot4-starter)
+     (Apache License, Version 2.0) fastexcel (cn.idev.excel:fastexcel:1.3.0 - https://github.com/fast-excel/fastexcel/fastexcel)
+     (Apache-2.0 AND BSD-3-Clause) fastexcel-support (cn.idev.excel:fastexcel-support:0.0.1 - https://github.com/CodePhiliaX/fastexcel)
      (Apache License, Version 2.0) mybatis-plus (com.baomidou:mybatis-plus:3.5.17 - https://github.com/baomidou/mybatis-plus)
      (Apache License, Version 2.0) mybatis-plus-annotation (com.baomidou:mybatis-plus-annotation:3.5.17 - https://github.com/baomidou/mybatis-plus)
      (Apache License, Version 2.0) mybatis-plus-core (com.baomidou:mybatis-plus-core:3.5.17 - https://github.com/baomidou/mybatis-plus)
@@ -28,7 +30,12 @@ Lists of 133 third-party dependencies.
      (Apache License, Version 2.0) ClassMate (com.fasterxml:classmate:1.7.3 - https://github.com/FasterXML/java-classmate)
      (The Apache Software License, Version 2.0) Jackson-annotations (com.fasterxml.jackson.core:jackson-annotations:2.21 - https://github.com/FasterXML/jackson)
      (Apache-2.0) JSQLParser library (com.github.jsqlparser:jsqlparser:5.2 - https://github.com/JSQLParser/JSqlParser)
+     (BSD-3-Clause) curvesapi (com.github.virtuald:curvesapi:1.08 - https://github.com/virtuald/curvesapi)
+     (BSD-3-Clause) istack common utility code runtime (com.sun.istack:istack-commons-runtime:4.1.2 - https://projects.eclipse.org/projects/ee4j/istack-commons/istack-commons-runtime)
      (The Apache Software License, Version 2.0) HikariCP (com.zaxxer:HikariCP:7.0.2 - https://github.com/brettwooldridge/HikariCP)
+     (The Apache Software License, Version 2.0) SparseBitSet (com.zaxxer:SparseBitSet:1.3 - https://github.com/brettwooldridge/SparseBitSet)
+     (Apache-2.0) Apache Commons Codec (commons-codec:commons-codec:1.21.0 - https://commons.apache.org/proper/commons-codec/)
+     (Apache-2.0) Apache Commons IO (commons-io:commons-io:2.16.1 - https://commons.apache.org/proper/commons-io/)
      (Apache-2.0) Apache Commons Logging (commons-logging:commons-logging:1.3.6 - https://commons.apache.org/proper/commons-logging/)
      (MIT) Lettuce (io.lettuce:lettuce-core:7.5.2.RELEASE - https://github.com/redis/lettuce)
      (The Apache Software License, Version 2.0) micrometer-commons (io.micrometer:micrometer-commons:1.17.1 - https://github.com/micrometer-metrics/micrometer-commercial)
@@ -57,15 +64,29 @@ Lists of 133 third-party dependencies.
      (BSD-3-Clause) Jakarta XML Binding API (jakarta.xml.bind:jakarta.xml.bind-api:4.0.5 - https://github.com/jakartaee/jaxb-api/jakarta.xml.bind-api)
      (Apache License, Version 2.0) JSR107 API and SPI (javax.cache:cache-api:1.1.1 - https://github.com/jsr107/jsr107spec)
      (Apache License, Version 2.0) Byte Buddy (without dependencies) (net.bytebuddy:byte-buddy:1.18.11 - https://bytebuddy.net/byte-buddy)
+     (Apache License, Version 2.0) Apache Commons Collections (org.apache.commons:commons-collections4:4.4 - https://commons.apache.org/proper/commons-collections/)
+     (Apache-2.0) Apache Commons Compress (org.apache.commons:commons-compress:1.27.1 - https://commons.apache.org/proper/commons-compress/)
+     (Apache-2.0) Apache Commons CSV (org.apache.commons:commons-csv:1.11.0 - https://commons.apache.org/proper/commons-csv/)
+     (Apache-2.0) Apache Commons Lang (org.apache.commons:commons-lang3:3.20.0 - https://commons.apache.org/proper/commons-lang/)
+     (Apache License, Version 2.0) Apache Commons Math (org.apache.commons:commons-math3:3.6.1 - http://commons.apache.org/proper/commons-math/)
      (Apache-2.0) Apache Log4j API (org.apache.logging.log4j:log4j-api:2.25.5 - https://logging.apache.org/log4j/2.x/)
      (Apache-2.0) Log4j API to SLF4J Adapter (org.apache.logging.log4j:log4j-to-slf4j:2.25.5 - https://logging.apache.org/log4j/2.x/)
+     (Apache License, Version 2.0) Apache POI - Common (org.apache.poi:poi:5.4.1 - https://poi.apache.org/)
+     (Apache License, Version 2.0) Apache POI - API based on OPC and OOXML schemas (org.apache.poi:poi-ooxml:5.4.1 - https://poi.apache.org/)
+     (Apache License, Version 2.0) Apache POI (org.apache.poi:poi-ooxml-lite:5.4.1 - https://poi.apache.org/)
      (Apache License, Version 2.0) tomcat-embed-core (org.apache.tomcat.embed:tomcat-embed-core:11.0.26 - https://tomcat.apache.org/)
      (Apache License, Version 2.0) tomcat-embed-el (org.apache.tomcat.embed:tomcat-embed-el:11.0.26 - https://tomcat.apache.org/)
      (Apache License, Version 2.0) tomcat-embed-websocket (org.apache.tomcat.embed:tomcat-embed-websocket:11.0.26 - https://tomcat.apache.org/)
+     (The Apache Software License, Version 2.0) XmlBeans (org.apache.xmlbeans:xmlbeans:5.3.0 - https://xmlbeans.apache.org/)
      (EPL-2.0 AND BSD-3-Clause AND Apache-1.1) AspectJ Weaver (org.aspectj:aspectjweaver:1.9.25.1 - https://www.eclipse.org/aspectj/)
      (MIT) Checker Qual (org.checkerframework:checker-qual:3.55.1 - https://checkerframework.org/)
+     (BSD-3-Clause) Angus Activation Registries (org.eclipse.angus:angus-activation:2.0.3 - https://github.com/eclipse-ee4j/angus-activation/angus-activation)
+     (The Apache Software License, Version 2.0) Ehcache (org.ehcache:ehcache:3.12.0 - http://ehcache.org)
      (Apache License, Version 2.0) flyway-core (org.flywaydb:flyway-core:12.4.0 - https://flywaydb.org/flyway-core)
      (Apache License, Version 2.0) flyway-database-postgresql (org.flywaydb:flyway-database-postgresql:12.4.0 - https://flywaydb.org/flyway-database-postgresql)
+     (BSD-3-Clause) JAXB Core (org.glassfish.jaxb:jaxb-core:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
+     (BSD-3-Clause) JAXB Runtime (org.glassfish.jaxb:jaxb-runtime:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
+     (BSD-3-Clause) TXW2 Runtime (org.glassfish.jaxb:txw2:4.0.9 - https://eclipse-ee4j.github.io/jaxb-ri/)
      (BSD-2-Clause) HdrHistogram (org.hdrhistogram:HdrHistogram:2.2.2 - http://hdrhistogram.github.io/HdrHistogram/)
      (Apache License 2.0) Hibernate Validator Engine (org.hibernate.validator:hibernate-validator:9.1.3.Final - https://hibernate.org/validator)
      (Apache License 2.0) JBoss Logging 3 (org.jboss.logging:jboss-logging:3.6.3.Final - https://www.jboss.org)
@@ -157,6 +178,18 @@ Original source: https://repo.maven.apache.org/maven2/com/zaxxer/HikariCP/7.0.2/
 Original documents: D39eebb422aa370ae D69e4cf9b48175601 D749302187a7ef3bd D19e3faae296a3d68 D7b11f9500c1391db Dba04287317e5b44c D21b7476d64be58a0 D99f7b51e40c6f715 D5e2b29133a529373 D0323ddc4d0aa3881
 
 
+=== com.zaxxer:SparseBitSet:1.3 ===
+Original source: https://repo.maven.apache.org/maven2/com/zaxxer/SparseBitSet/1.3/SparseBitSet-1.3-sources.jar
+
+Original documents: Dbde90eb2effe0b9d
+
+
+=== org.eclipse.angus:angus-activation:2.0.3 ===
+Original source: https://repo.maven.apache.org/maven2/org/eclipse/angus/angus-activation/2.0.3/angus-activation-2.0.3.jar
+
+Original documents: D55e79d6289af6d7a Ddc21efc46ad8538e
+
+
 === org.aspectj:aspectjweaver:1.9.25.1 ===
 Original source: https://repo.maven.apache.org/maven2/org/aspectj/aspectjweaver/1.9.25.1/aspectjweaver-1.9.25.1.jar
 
@@ -187,10 +220,76 @@ Original source: https://repo.maven.apache.org/maven2/com/fasterxml/classmate/1.
 Original documents: D027b5df5269a0adc D03a284a9745d1d5f
 
 
+=== commons-codec:commons-codec:1.21.0 ===
+Original source: https://repo.maven.apache.org/maven2/commons-codec/commons-codec/1.21.0/commons-codec-1.21.0.jar
+
+Original documents: D2255265e102d9945 Df4f0011d1c688285
+
+
+=== org.apache.commons:commons-collections4:4.4 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/commons/commons-collections4/4.4/commons-collections4-4.4.jar
+
+Original documents: D2255265e102d9945 D7302aad131691e1c
+
+
+=== org.apache.commons:commons-compress:1.27.1 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.27.1/commons-compress-1.27.1.jar
+
+Original documents: D2255265e102d9945 D2ea87df7e679b5e8
+
+
+=== org.apache.commons:commons-csv:1.11.0 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/commons/commons-csv/1.11.0/commons-csv-1.11.0.jar
+
+Original documents: D2255265e102d9945 Def3b6ce8c312279e
+
+
+=== commons-io:commons-io:2.16.1 ===
+Original source: https://repo.maven.apache.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.jar
+
+Original documents: D2255265e102d9945 D0f06bdc9405e95ed
+
+
+=== org.apache.commons:commons-lang3:3.20.0 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.20.0/commons-lang3-3.20.0.jar
+
+Original documents: D2255265e102d9945 Dc75dedcd960586fa
+
+
 === commons-logging:commons-logging:1.3.6 ===
 Original source: https://repo.maven.apache.org/maven2/commons-logging/commons-logging/1.3.6/commons-logging-1.3.6.jar
 
 Original documents: D2255265e102d9945 Dc7c02bf8eadcb780
+
+
+=== org.apache.commons:commons-math3:3.6.1 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar
+
+Original documents: Dd373b4ae1d38d1ba Dcefdfb7604004c0a
+
+
+=== com.github.virtuald:curvesapi:1.08 ===
+Original source: https://repo.maven.apache.org/maven2/com/github/virtuald/curvesapi/1.08/curvesapi-1.08-sources.jar
+
+Original documents: D0e8f41d03da591e4 Deb0686e52d919a79
+
+
+=== org.ehcache:ehcache:3.12.0 ===
+Original source: https://repo.maven.apache.org/maven2/org/ehcache/ehcache/3.12.0/ehcache-3.12.0-sources.jar
+
+Original documents: D1ea510579e38145f D3a60af8fda124d76 D0df501d985235333 D9b06dd10b7b9df30 D88743d797db5a0df D88090ea10975e7e3 Ddfc4d06ed4eb9225 Dcbd29fe14f6a50d5 D9972d46b6f06e060 D3bfd31055269f19c Dc23a6469efe3c7ff D9f3c1aa0ae9e24f6 Dbc02c0116303bee2 D07976368bd3e38fc D0536cf08c31a8ec2 D53388c9eae4eb8c0 D777f00d1ec537bc9 D7f5911b3a99e95af Dd97383513e46d2bb D6337843dfd553a80 Dcad74d9c9b715853 D3374c53d9f27782f Deac361862f89eced D010fe0d884fcf532 D22df6c718c189c15 Df2228b2b95a3c3cc D26c969da95962067 D3da1b1f481a05f5c Dcfaca40a77e76846 D3f999a009687bcdb D18cc560382f2a4e8 D00e8f82e1b8a8364 Df00ce5cc4f7f72ed D5327ccab629cc076 D8680b89d442117e1 D058979a6d02ca96d D79f7b6a976b497fb D1459d52b93b09e1a Dea8f02dac58976d8 Daf459ea0cfc9d199 D3f75deb853795098 Dfff6b67fbc602f8a Db60f49ef4c75e8fd Db8213092f1a056f6 D77ec8b93c95ab437 D93cc4fbd3d5f22aa D379241c5dbb348ac D41d4a2a24de0fafa D4f159b00ecc9ce1f
+
+
+=== cn.idev.excel:fastexcel:1.3.0 ===
+Original source: https://repo.maven.apache.org/maven2/cn/idev/excel/fastexcel/1.3.0/fastexcel-1.3.0-sources.jar
+
+Original documents: Da36428643303f96d D130e1d7b29433b33 D8e1fa3af04cdc1b1 D2255265e102d9945
+
+
+=== cn.idev.excel:fastexcel-support:0.0.1 ===
+Original source: https://repo.maven.apache.org/maven2/cn/idev/excel/fastexcel-support/0.0.1/fastexcel-support-0.0.1-sources.jar
+
+Original documents: Db39635b1eaedfa43 D78dafefddc0bdadd D6a29af4a606eaa3a Dbcdd02bcb73c0a02 D757844605ef31a93 D0ce6479718f704c7 D532593e22e8875d9 D2255265e102d9945
 
 
 === org.flywaydb:flyway-core:12.4.0 ===
@@ -209,6 +308,12 @@ Original documents: D89f5bb0350322d4a D279b52a0fea93836
 Original source: https://repo.maven.apache.org/maven2/org/hibernate/validator/hibernate-validator/9.1.3.Final/hibernate-validator-9.1.3.Final.jar
 
 Original documents: D2255265e102d9945
+
+
+=== com.sun.istack:istack-commons-runtime:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons-runtime/4.1.2/istack-commons-runtime-4.1.2-sources.jar
+
+Original documents: D6b6fbf18d88f7337 D31a519164b547750 D91374b4138cd8e39 D20afc1eb0d4459e3 Db1605b28975ef1c0
 
 
 === com.fasterxml.jackson.core:jackson-annotations:2.21 ===
@@ -257,6 +362,18 @@ Original documents: Dcdf9703ffb731619 Dc6d650f83dd9bb69 Df8cf71258be98e2a Dd4d26
 Original source: https://repo.maven.apache.org/maven2/jakarta/xml/bind/jakarta.xml.bind-api/4.0.5/jakarta.xml.bind-api-4.0.5.jar
 
 Original documents: D9bca94ad5225028d Dadbcdefcfbd38afb
+
+
+=== org.glassfish.jaxb:jaxb-core:4.0.9 ===
+Original source: https://repo.maven.apache.org/maven2/org/glassfish/jaxb/jaxb-core/4.0.9/jaxb-core-4.0.9.jar
+
+Original documents: D55e79d6289af6d7a Dfcdcf9da0144bc02
+
+
+=== org.glassfish.jaxb:jaxb-runtime:4.0.9 ===
+Original source: https://repo.maven.apache.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.9/jaxb-runtime-4.0.9.jar
+
+Original documents: D55e79d6289af6d7a Dfcdcf9da0144bc02
 
 
 === org.jboss.logging:jboss-logging:3.6.3.Final ===
@@ -509,6 +626,24 @@ Original documents: D909b53f756d334b3 D786640d2407d47d4 Df83a13bb272b0ac8 D9d172
 Original source: https://repo.maven.apache.org/maven2/org/objenesis/objenesis/3.6/objenesis-3.6.jar
 
 Original documents: D2255265e102d9945 D3bf6225788ae60f7
+
+
+=== org.apache.poi:poi:5.4.1 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/poi/poi/5.4.1/poi-5.4.1.jar
+
+Original documents: D16ac761b6f88355e Dbb4ee328e0d0f85e
+
+
+=== org.apache.poi:poi-ooxml:5.4.1 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/poi/poi-ooxml/5.4.1/poi-ooxml-5.4.1.jar
+
+Original documents: D16ac761b6f88355e Dbb4ee328e0d0f85e
+
+
+=== org.apache.poi:poi-ooxml-lite:5.4.1 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/poi/poi-ooxml-lite/5.4.1/poi-ooxml-lite-5.4.1.jar
+
+Original documents: D16ac761b6f88355e Dbb4ee328e0d0f85e
 
 
 === org.postgresql:postgresql:42.7.13 ===
@@ -943,6 +1078,18 @@ Original source: https://repo.maven.apache.org/maven2/org/apache/tomcat/embed/to
 Original documents: D2255265e102d9945 D15cf65cd84f376d6
 
 
+=== org.glassfish.jaxb:txw2:4.0.9 ===
+Original source: https://repo.maven.apache.org/maven2/org/glassfish/jaxb/txw2/4.0.9/txw2-4.0.9.jar
+
+Original documents: D55e79d6289af6d7a Dfcdcf9da0144bc02
+
+
+=== org.apache.xmlbeans:xmlbeans:5.3.0 ===
+Original source: https://repo.maven.apache.org/maven2/org/apache/xmlbeans/xmlbeans/5.3.0/xmlbeans-5.3.0.jar
+
+Original documents: Dc4a0a65371a1dcd2 D73fc56a02068b6cc
+
+
 === SHARED ORIGINAL DOCUMENTS ===
 
 
@@ -951,6 +1098,7 @@ Original paths: Common Apache-2.0 original
 META-INF/LICENSE
 META-INF/LICENSE.txt
 META-INF/license.txt
+Upstream original: https://raw.githubusercontent.com/apache/fesod/1.3.0/LICENSE
 
 Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
@@ -1155,6 +1303,24 @@ Original paths: Source copyright/license header: com/zaxxer/hikari/util/Isolatio
 Text blocks: T50fb01802f6ec002 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
 
+--- Dbde90eb2effe0b9d ---
+Original paths: Upstream original: https://raw.githubusercontent.com/brettwooldridge/SparseBitSet/SparseBitSet-1.3/LICENSE
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T01ffd7ec643dc9d1 T7cd4cc2d021a2cda T5e3ec48f81e580fd Tef193b305c8701c6 Tc27a4358fa89a7e6 T88afe0ef50ded254 T9b4c490a63343726 T226a5f873d1ce834 T8409bea4f6852369 Te742d8c1a47c5317 T669e24e7ea7291e5 T781d6da09d478334 T80926c78e752865e T1e947877f92aef7d T58666ba1acff7460 T63b9d1ff7372a492 T1e4b3f1b26dff888 T26209596e5b7af47
+
+
+--- D55e79d6289af6d7a ---
+Original paths: META-INF/LICENSE.md
+
+Text blocks: Te5ea188d7859ea12 T7a72f9a2d7a07d51 T6f7cfb7cf9c68caa T3c28a6b2482f05c4 Tad0b65b4889237b2 Tcb79a766b4bedb63
+
+
+--- Ddc21efc46ad8538e ---
+Original paths: META-INF/NOTICE.md
+
+Text blocks: T43a1839ae35bd16a T4e73e15045a9734e Tb933ed0da2db1da7 T722a2858f4068985 T340e4ce40e43b348 T8dfc77ab4089e09d T52ad1a476a8829eb Ta60c522ca192b3d0 T975c32202c4cb638 Td75639ad3aebcc36 Tbc47da663d101bfc T768c6338e3d966cb T770affedc9faaaaf Td1ee2bab162bd261 Tf9c20e5161bdbaa2 Tdc937b59892604f5 Tb584eec728548ace T8add5c0ea0190931
+
+
 --- D852d077af8445aa8 ---
 Original paths: LICENSE-AspectJ.adoc
 
@@ -1304,10 +1470,1015 @@ Original paths: META-INF/NOTICE
 Text blocks: T387bdb3bc73353b3 T71ea6ee34d08d17f T10bfc13c206ba180 T8dfc77ab4089e09d Tf7272132a81e5ddc
 
 
+--- Df4f0011d1c688285 ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: T4080e98335973354 T95ff8aaf1616861d
+
+
+--- D7302aad131691e1c ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: T0771511967ec34af T5baa7fddf18c2f36
+
+
+--- D2ea87df7e679b5e8 ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: Ted2609ef9526268b T95ff8aaf1616861d
+
+
+--- Def3b6ce8c312279e ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: T6d4edc97c48c3944 T95ff8aaf1616861d
+
+
+--- D0f06bdc9405e95ed ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: T7f08e8863ff500d7 T95ff8aaf1616861d
+
+
+--- Dc75dedcd960586fa ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: T69c5355f0fbbc3f7 T95ff8aaf1616861d
+
+
 --- Dc7c02bf8eadcb780 ---
 Original paths: META-INF/NOTICE.txt
 
 Text blocks: Te7e1931b5fae4b75 T95ff8aaf1616861d
+
+
+--- Dd373b4ae1d38d1ba ---
+Original paths: META-INF/LICENSE.txt
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tba34bdf56a53eb88 T978a11ee0f16ed52 T4a7622508ebd22e4 T702edac97d34efeb Tf3fb7c8c128a635e Tae53940d99d6570b Td5a9a2b33ea538db T7a72f9a2d7a07d51 Tf40d165f25833406 T8abd57f1f4ea9a3f T3e0a3161844b6617 Tdd5f2fac91c1e7f4 T1dd66d2678f438b7 T1cb265092ca96e6d T9d01a8b48a196457 T7cbff02e913fa764 Tdeb292c0187dd012 T7a72f9a2d7a07d51 T6f7cfb7cf9c68caa T3c28a6b2482f05c4 T249291b829a350bf Tcfb2244834c3f5de T308a66e336f4a943 T7a72f9a2d7a07d51 Tf40d165f25833406 T8abd57f1f4ea9a3f T5db27175d886f6a3 Tcb79a766b4bedb63 T4a7622508ebd22e4 T94234c5e739c044a T11378ed2a32f162b T3b602acbc97300ce Tf7b26717f9c55655 T7a72f9a2d7a07d51 T96d30a7f6df5436d T693a5dc45091f6cb T964c93ba93897bd5 Te03b80c17b7b26bb T924928477b6957a3 Tb8b17f2415350ff4 T99de8082930fc5b1 Ta47cf34d505a2189 T2a3920211c315a50 T7a72f9a2d7a07d51 T96d30a7f6df5436d T693a5dc45091f6cb Ta0becbc35885bae5 Tcc6ca09412c5b516
+
+
+--- Dcefdfb7604004c0a ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: Tc67f4ca5ad118406 T5baa7fddf18c2f36 T5475b6e288299520
+
+
+--- D0e8f41d03da591e4 ---
+Original paths: Source copyright/license header: com/graphbuilder/curve/BSpline.java
+Source copyright/license header: com/graphbuilder/curve/BezierCurve.java
+Source copyright/license header: com/graphbuilder/curve/BinaryCurveApproximationAlgorithm.java
+Source copyright/license header: com/graphbuilder/curve/CardinalSpline.java
+Source copyright/license header: com/graphbuilder/curve/CatmullRomSpline.java
+Source copyright/license header: com/graphbuilder/curve/ControlPath.java
+Source copyright/license header: com/graphbuilder/curve/ControlStringParseException.java
+Source copyright/license header: com/graphbuilder/curve/CubicBSpline.java
+Source copyright/license header: com/graphbuilder/curve/Curve.java
+Source copyright/license header: com/graphbuilder/curve/GroupIterator.java
+Source copyright/license header: com/graphbuilder/curve/LagrangeCurve.java
+Source copyright/license header: com/graphbuilder/curve/MultiPath.java
+Source copyright/license header: com/graphbuilder/curve/NURBSpline.java
+Source copyright/license header: com/graphbuilder/curve/NaturalCubicSpline.java
+Source copyright/license header: com/graphbuilder/curve/ParametricCurve.java
+Source copyright/license header: com/graphbuilder/curve/Point.java
+Source copyright/license header: com/graphbuilder/curve/Polyline.java
+Source copyright/license header: com/graphbuilder/curve/ShapeMultiPath.java
+Source copyright/license header: com/graphbuilder/curve/ShapeMultiPathIterator.java
+Source copyright/license header: com/graphbuilder/curve/ValueVector.java
+Source copyright/license header: com/graphbuilder/curve/ValueVectorListener.java
+Source copyright/license header: com/graphbuilder/geom/Geom.java
+Source copyright/license header: com/graphbuilder/geom/Point2d.java
+Source copyright/license header: com/graphbuilder/geom/Point3d.java
+Source copyright/license header: com/graphbuilder/geom/PointFactory.java
+Source copyright/license header: com/graphbuilder/math/AddNode.java
+Source copyright/license header: com/graphbuilder/math/DivNode.java
+Source copyright/license header: com/graphbuilder/math/Expression.java
+Source copyright/license header: com/graphbuilder/math/ExpressionParseException.java
+Source copyright/license header: com/graphbuilder/math/ExpressionTree.java
+Source copyright/license header: com/graphbuilder/math/FuncMap.java
+Source copyright/license header: com/graphbuilder/math/FuncNode.java
+Source copyright/license header: com/graphbuilder/math/MultNode.java
+Source copyright/license header: com/graphbuilder/math/OpNode.java
+Source copyright/license header: com/graphbuilder/math/PascalsTriangle.java
+Source copyright/license header: com/graphbuilder/math/PowNode.java
+Source copyright/license header: com/graphbuilder/math/SubNode.java
+Source copyright/license header: com/graphbuilder/math/TermNode.java
+Source copyright/license header: com/graphbuilder/math/ValNode.java
+Source copyright/license header: com/graphbuilder/math/VarMap.java
+Source copyright/license header: com/graphbuilder/math/VarNode.java
+Source copyright/license header: com/graphbuilder/math/func/AbsFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AcosFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AcoshFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AsinFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AsinhFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AtanFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AtanhFunction.java
+Source copyright/license header: com/graphbuilder/math/func/AvgFunction.java
+Source copyright/license header: com/graphbuilder/math/func/CeilFunction.java
+Source copyright/license header: com/graphbuilder/math/func/CombinFunction.java
+Source copyright/license header: com/graphbuilder/math/func/CosFunction.java
+Source copyright/license header: com/graphbuilder/math/func/CoshFunction.java
+Source copyright/license header: com/graphbuilder/math/func/EFunction.java
+Source copyright/license header: com/graphbuilder/math/func/ExpFunction.java
+Source copyright/license header: com/graphbuilder/math/func/FactFunction.java
+Source copyright/license header: com/graphbuilder/math/func/FloorFunction.java
+Source copyright/license header: com/graphbuilder/math/func/Function.java
+Source copyright/license header: com/graphbuilder/math/func/LgFunction.java
+Source copyright/license header: com/graphbuilder/math/func/LnFunction.java
+Source copyright/license header: com/graphbuilder/math/func/LogFunction.java
+Source copyright/license header: com/graphbuilder/math/func/MaxFunction.java
+Source copyright/license header: com/graphbuilder/math/func/MinFunction.java
+Source copyright/license header: com/graphbuilder/math/func/ModFunction.java
+Source copyright/license header: com/graphbuilder/math/func/PiFunction.java
+Source copyright/license header: com/graphbuilder/math/func/PowFunction.java
+Source copyright/license header: com/graphbuilder/math/func/RandFunction.java
+Source copyright/license header: com/graphbuilder/math/func/RoundFunction.java
+Source copyright/license header: com/graphbuilder/math/func/SignFunction.java
+Source copyright/license header: com/graphbuilder/math/func/SinFunction.java
+Source copyright/license header: com/graphbuilder/math/func/SinhFunction.java
+Source copyright/license header: com/graphbuilder/math/func/SqrtFunction.java
+Source copyright/license header: com/graphbuilder/math/func/SumFunction.java
+Source copyright/license header: com/graphbuilder/math/func/TanFunction.java
+Source copyright/license header: com/graphbuilder/math/func/TanhFunction.java
+Source copyright/license header: com/graphbuilder/struc/Bag.java
+Source copyright/license header: com/graphbuilder/struc/LinkedList.java
+Source copyright/license header: com/graphbuilder/struc/Stack.java
+
+Text blocks: T9ee156dd003be607 T7a72f9a2d7a07d51 Td0e83c165200c1ab Td00b0a8fdc0c08e2 T7d6c1bb669aabdfc Tcb79a766b4bedb63
+
+
+--- Deb0686e52d919a79 ---
+Original paths: Source copyright/license header: com/graphbuilder/org/apache/harmony/awt/gl/Crossing.java
+
+Text blocks: T6ca556b8f25dc049 T652ab88cd07a1b79 T4a712cc813734dad
+
+
+--- D1ea510579e38145f ---
+Original paths: LICENSE
+META-INF/LICENSE
+META-INF/LICENSE.txt
+META-INF/license.txt
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 T307c4b492ac15b32 T47561b8d6123d618 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D3a60af8fda124d76 ---
+Original paths: Source copyright/license header: org/ehcache/Cache.java
+Source copyright/license header: org/ehcache/CacheIterationException.java
+Source copyright/license header: org/ehcache/CacheManager.java
+Source copyright/license header: org/ehcache/CachePersistenceException.java
+Source copyright/license header: org/ehcache/PersistentCacheManager.java
+Source copyright/license header: org/ehcache/PersistentUserManagedCache.java
+Source copyright/license header: org/ehcache/StateTransitionException.java
+Source copyright/license header: org/ehcache/Status.java
+Source copyright/license header: org/ehcache/UserManagedCache.java
+Source copyright/license header: org/ehcache/ValueSupplier.java
+Source copyright/license header: org/ehcache/config/Builder.java
+Source copyright/license header: org/ehcache/config/CacheConfiguration.java
+Source copyright/license header: org/ehcache/config/CacheRuntimeConfiguration.java
+Source copyright/license header: org/ehcache/config/Configuration.java
+Source copyright/license header: org/ehcache/config/Eviction.java
+Source copyright/license header: org/ehcache/config/EvictionAdvisor.java
+Source copyright/license header: org/ehcache/config/FluentCacheConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/FluentConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/ResourcePool.java
+Source copyright/license header: org/ehcache/config/ResourcePools.java
+Source copyright/license header: org/ehcache/config/ResourceType.java
+Source copyright/license header: org/ehcache/config/ResourceUnit.java
+Source copyright/license header: org/ehcache/config/SizedResourcePool.java
+Source copyright/license header: org/ehcache/config/builders/CacheConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/builders/CacheEventListenerConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/builders/CacheManagerBuilder.java
+Source copyright/license header: org/ehcache/config/builders/CacheManagerConfiguration.java
+Source copyright/license header: org/ehcache/config/builders/ConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/builders/ExpiryPolicyBuilder.java
+Source copyright/license header: org/ehcache/config/builders/PooledExecutionServiceConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/builders/ResourcePoolsBuilder.java
+Source copyright/license header: org/ehcache/config/builders/UserManagedCacheBuilder.java
+Source copyright/license header: org/ehcache/config/builders/UserManagedCacheConfiguration.java
+Source copyright/license header: org/ehcache/config/builders/WriteBehindConfigurationBuilder.java
+Source copyright/license header: org/ehcache/config/units/EntryUnit.java
+Source copyright/license header: org/ehcache/config/units/MemoryUnit.java
+Source copyright/license header: org/ehcache/core/CacheConfigurationChangeEvent.java
+Source copyright/license header: org/ehcache/core/CacheConfigurationChangeListener.java
+Source copyright/license header: org/ehcache/core/CacheConfigurationProperty.java
+Source copyright/license header: org/ehcache/core/DefaultCacheManagerProviderService.java
+Source copyright/license header: org/ehcache/core/Ehcache.java
+Source copyright/license header: org/ehcache/core/EhcacheBase.java
+Source copyright/license header: org/ehcache/core/EhcacheManager.java
+Source copyright/license header: org/ehcache/core/EhcachePrefixLoggerFactory.java
+Source copyright/license header: org/ehcache/core/EhcacheRuntimeConfiguration.java
+Source copyright/license header: org/ehcache/core/HumanReadable.java
+Source copyright/license header: org/ehcache/core/InternalCache.java
+Source copyright/license header: org/ehcache/core/InternalRuntimeConfiguration.java
+Source copyright/license header: org/ehcache/core/InternalStatus.java
+Source copyright/license header: org/ehcache/core/Jsr107Cache.java
+Source copyright/license header: org/ehcache/core/PersistentUserManagedEhcache.java
+Source copyright/license header: org/ehcache/core/PrefixLogger.java
+Source copyright/license header: org/ehcache/core/SpecIterator.java
+Source copyright/license header: org/ehcache/core/StatusTransitioner.java
+Source copyright/license header: org/ehcache/core/collections/ConcurrentWeakIdentityHashMap.java
+Source copyright/license header: org/ehcache/core/config/CoreConfigurationBuilder.java
+Source copyright/license header: org/ehcache/core/config/DefaultConfiguration.java
+Source copyright/license header: org/ehcache/core/config/ExpiryUtils.java
+Source copyright/license header: org/ehcache/core/config/store/StoreEventSourceConfiguration.java
+Source copyright/license header: org/ehcache/core/config/store/StoreStatisticsConfiguration.java
+Source copyright/license header: org/ehcache/core/events/CacheEventDispatcher.java
+Source copyright/license header: org/ehcache/core/events/CacheEventDispatcherFactory.java
+Source copyright/license header: org/ehcache/core/events/CacheEventListenerConfiguration.java
+Source copyright/license header: org/ehcache/core/events/CacheEventListenerProvider.java
+Source copyright/license header: org/ehcache/core/events/CacheEvents.java
+Source copyright/license header: org/ehcache/core/events/CacheManagerListener.java
+Source copyright/license header: org/ehcache/core/events/EventListenerWrapper.java
+Source copyright/license header: org/ehcache/core/events/NullStoreEventDispatcher.java
+Source copyright/license header: org/ehcache/core/events/StateChangeListener.java
+Source copyright/license header: org/ehcache/core/events/StoreEventDispatcher.java
+Source copyright/license header: org/ehcache/core/events/StoreEventSink.java
+Source copyright/license header: org/ehcache/core/exceptions/ExceptionFactory.java
+Source copyright/license header: org/ehcache/core/exceptions/StorePassThroughException.java
+Source copyright/license header: org/ehcache/core/internal/resilience/ThrowingResilienceStrategy.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DefaultCacheStatistics.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DefaultStatisticsService.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DefaultStatisticsServiceFactory.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DefaultTierStatistics.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DelegatedMappedOperationStatistics.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DelegatingOperationObserver.java
+Source copyright/license header: org/ehcache/core/internal/statistics/DelegatingOperationStatistic.java
+Source copyright/license header: org/ehcache/core/internal/statistics/StatsUtils.java
+Source copyright/license header: org/ehcache/core/internal/util/ValueSuppliers.java
+Source copyright/license header: org/ehcache/core/osgi/EhcacheActivator.java
+Source copyright/license header: org/ehcache/core/osgi/OsgiServiceLoader.java
+Source copyright/license header: org/ehcache/core/osgi/SafeOsgi.java
+Source copyright/license header: org/ehcache/core/resilience/DefaultRecoveryStore.java
+Source copyright/license header: org/ehcache/core/spi/LifeCycled.java
+Source copyright/license header: org/ehcache/core/spi/LifeCycledAdapter.java
+Source copyright/license header: org/ehcache/core/spi/ServiceLocator.java
+Source copyright/license header: org/ehcache/core/spi/service/CacheManagerProviderService.java
+Source copyright/license header: org/ehcache/core/spi/service/DiskResourceService.java
+Source copyright/license header: org/ehcache/core/spi/service/ExecutionService.java
+Source copyright/license header: org/ehcache/core/spi/service/FileBasedPersistenceContext.java
+Source copyright/license header: org/ehcache/core/spi/service/LocalPersistenceService.java
+Source copyright/license header: org/ehcache/core/spi/service/ServiceFactory.java
+Source copyright/license header: org/ehcache/core/spi/service/ServiceUtils.java
+Source copyright/license header: org/ehcache/core/spi/service/StatisticsService.java
+Source copyright/license header: org/ehcache/core/spi/store/AbstractValueHolder.java
+Source copyright/license header: org/ehcache/core/spi/store/AbstractWrapperStoreProvider.java
+Source copyright/license header: org/ehcache/core/spi/store/ConfigurationChangeSupport.java
+Source copyright/license header: org/ehcache/core/spi/store/InternalCacheManager.java
+Source copyright/license header: org/ehcache/core/spi/store/Store.java
+Source copyright/license header: org/ehcache/core/spi/store/TransientStateHolder.java
+Source copyright/license header: org/ehcache/core/spi/store/TransientStateRepository.java
+Source copyright/license header: org/ehcache/core/spi/store/events/StoreEvent.java
+Source copyright/license header: org/ehcache/core/spi/store/events/StoreEventFilter.java
+Source copyright/license header: org/ehcache/core/spi/store/events/StoreEventListener.java
+Source copyright/license header: org/ehcache/core/spi/store/events/StoreEventSource.java
+Source copyright/license header: org/ehcache/core/spi/store/heap/LimitExceededException.java
+Source copyright/license header: org/ehcache/core/spi/store/heap/SizeOfEngine.java
+Source copyright/license header: org/ehcache/core/spi/store/heap/SizeOfEngineProvider.java
+Source copyright/license header: org/ehcache/core/spi/store/tiering/AuthoritativeTier.java
+Source copyright/license header: org/ehcache/core/spi/store/tiering/CachingTier.java
+Source copyright/license header: org/ehcache/core/spi/store/tiering/HigherCachingTier.java
+Source copyright/license header: org/ehcache/core/spi/store/tiering/LowerCachingTier.java
+Source copyright/license header: org/ehcache/core/spi/time/SystemTimeSource.java
+Source copyright/license header: org/ehcache/core/spi/time/TickingTimeSource.java
+Source copyright/license header: org/ehcache/core/spi/time/TimeSource.java
+Source copyright/license header: org/ehcache/core/spi/time/TimeSourceService.java
+Source copyright/license header: org/ehcache/core/statistics/AuthoritativeTierOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/BulkOps.java
+Source copyright/license header: org/ehcache/core/statistics/CacheOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/CacheStatistics.java
+Source copyright/license header: org/ehcache/core/statistics/CachingTierOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/ChainedObserver.java
+Source copyright/license header: org/ehcache/core/statistics/ChainedOperationObserver.java
+Source copyright/license header: org/ehcache/core/statistics/HigherCachingTierOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/LowerCachingTierOperationsOutcome.java
+Source copyright/license header: org/ehcache/core/statistics/OperationObserver.java
+Source copyright/license header: org/ehcache/core/statistics/OperationStatistic.java
+Source copyright/license header: org/ehcache/core/statistics/SourceStatistic.java
+Source copyright/license header: org/ehcache/core/statistics/StatisticType.java
+Source copyright/license header: org/ehcache/core/statistics/StoreOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/SuppliedValueStatistic.java
+Source copyright/license header: org/ehcache/core/statistics/TierOperationOutcomes.java
+Source copyright/license header: org/ehcache/core/statistics/TierStatistics.java
+Source copyright/license header: org/ehcache/core/statistics/ValueStatistic.java
+Source copyright/license header: org/ehcache/core/statistics/ZeroOperationStatistic.java
+Source copyright/license header: org/ehcache/core/store/StoreConfigurationImpl.java
+Source copyright/license header: org/ehcache/core/store/StoreSupport.java
+Source copyright/license header: org/ehcache/core/util/ByteBufferInputStream.java
+Source copyright/license header: org/ehcache/core/util/ClassLoading.java
+Source copyright/license header: org/ehcache/core/util/CollectionUtil.java
+Source copyright/license header: org/ehcache/core/util/ExceptionUtil.java
+Source copyright/license header: org/ehcache/event/CacheEvent.java
+Source copyright/license header: org/ehcache/event/CacheEventListener.java
+Source copyright/license header: org/ehcache/event/EventFiring.java
+Source copyright/license header: org/ehcache/event/EventOrdering.java
+Source copyright/license header: org/ehcache/event/EventType.java
+Source copyright/license header: org/ehcache/expiry/Duration.java
+Source copyright/license header: org/ehcache/expiry/Expirations.java
+Source copyright/license header: org/ehcache/expiry/Expiry.java
+Source copyright/license header: org/ehcache/expiry/ExpiryPolicy.java
+Source copyright/license header: org/ehcache/impl/config/AbstractResourcePool.java
+Source copyright/license header: org/ehcache/impl/config/BaseCacheConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/ResourcePoolsImpl.java
+Source copyright/license header: org/ehcache/impl/config/SharedResourcePool.java
+Source copyright/license header: org/ehcache/impl/config/SizedResourcePoolImpl.java
+Source copyright/license header: org/ehcache/impl/config/copy/DefaultCopierConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/copy/DefaultCopyProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/event/CacheEventDispatcherFactoryConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/event/DefaultCacheEventDispatcherConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/event/DefaultCacheEventListenerConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/event/DefaultEventSourceConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/executor/PooledExecutionServiceConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/loaderwriter/DefaultCacheLoaderWriterConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/loaderwriter/DefaultCacheLoaderWriterProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/loaderwriter/writebehind/DefaultBatchingConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/loaderwriter/writebehind/DefaultWriteBehindConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/loaderwriter/writebehind/WriteBehindProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/persistence/CacheManagerPersistenceConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/persistence/DefaultPersistenceConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/persistence/UserManagedPersistenceContext.java
+Source copyright/license header: org/ehcache/impl/config/resilience/DefaultResilienceStrategyConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/resilience/DefaultResilienceStrategyProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/serializer/DefaultSerializationProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/serializer/DefaultSerializerConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/store/disk/OffHeapDiskStoreConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/store/disk/OffHeapDiskStoreProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/store/heap/DefaultSizeOfEngineConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/store/heap/DefaultSizeOfEngineProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/config/store/shared/SharedStorageConfiguration.java
+Source copyright/license header: org/ehcache/impl/copy/IdentityCopier.java
+Source copyright/license header: org/ehcache/impl/copy/ReadWriteCopier.java
+Source copyright/license header: org/ehcache/impl/copy/SerializingCopier.java
+Source copyright/license header: org/ehcache/impl/events/CacheEventAdapter.java
+Source copyright/license header: org/ehcache/impl/events/CacheEventDispatcherImpl.java
+Source copyright/license header: org/ehcache/impl/events/EventDispatchTask.java
+Source copyright/license header: org/ehcache/impl/internal/DefaultTimeSourceService.java
+Source copyright/license header: org/ehcache/impl/internal/TimeSourceConfiguration.java
+Source copyright/license header: org/ehcache/impl/internal/TimeSourceServiceFactory.java
+Source copyright/license header: org/ehcache/impl/internal/classes/ClassInstanceConfiguration.java
+Source copyright/license header: org/ehcache/impl/internal/classes/ClassInstanceProvider.java
+Source copyright/license header: org/ehcache/impl/internal/classes/ClassInstanceProviderConfiguration.java
+Source copyright/license header: org/ehcache/impl/internal/concurrent/EvictingConcurrentMap.java
+Source copyright/license header: org/ehcache/impl/internal/events/AbstractStoreEventDispatcher.java
+Source copyright/license header: org/ehcache/impl/internal/events/CacheEventDispatcherFactoryImpl.java
+Source copyright/license header: org/ehcache/impl/internal/events/CacheEventNotificationListenerServiceProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/events/CloseableStoreEventSink.java
+Source copyright/license header: org/ehcache/impl/internal/events/DisabledCacheEventNotificationService.java
+Source copyright/license header: org/ehcache/impl/internal/events/FireableStoreEventHolder.java
+Source copyright/license header: org/ehcache/impl/internal/events/FudgingInvocationScopedEventSink.java
+Source copyright/license header: org/ehcache/impl/internal/events/InvocationScopedEventSink.java
+Source copyright/license header: org/ehcache/impl/internal/events/StoreEventImpl.java
+Source copyright/license header: org/ehcache/impl/internal/events/StoreEvents.java
+Source copyright/license header: org/ehcache/impl/internal/events/ThreadLocalStoreEventDispatcher.java
+Source copyright/license header: org/ehcache/impl/internal/executor/DefaultExecutionServiceFactory.java
+Source copyright/license header: org/ehcache/impl/internal/executor/ExecutorUtil.java
+Source copyright/license header: org/ehcache/impl/internal/executor/OnDemandExecutionService.java
+Source copyright/license header: org/ehcache/impl/internal/executor/OutOfBandScheduledExecutor.java
+Source copyright/license header: org/ehcache/impl/internal/executor/PartitionedOrderedExecutor.java
+Source copyright/license header: org/ehcache/impl/internal/executor/PartitionedScheduledExecutor.java
+Source copyright/license header: org/ehcache/impl/internal/executor/PartitionedUnorderedExecutor.java
+Source copyright/license header: org/ehcache/impl/internal/executor/PooledExecutionService.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/AbstractWriteBehind.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/BatchingLocalHeapWriteBehindQueue.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/NonBatchingLocalHeapWriteBehindQueue.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/StripedWriteBehind.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/WriteBehind.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/WriteBehindProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/BatchOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/DeleteAllOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/DeleteOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/KeyBasedOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/SingleOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/WriteAllOperation.java
+Source copyright/license header: org/ehcache/impl/internal/loaderwriter/writebehind/operations/WriteOperation.java
+Source copyright/license header: org/ehcache/impl/internal/persistence/DefaultDiskResourceServiceFactory.java
+Source copyright/license header: org/ehcache/impl/internal/persistence/DefaultLocalPersistenceServiceFactory.java
+Source copyright/license header: org/ehcache/impl/internal/resilience/AbstractResilienceStrategy.java
+Source copyright/license header: org/ehcache/impl/internal/resilience/RobustLoaderWriterResilienceStrategy.java
+Source copyright/license header: org/ehcache/impl/internal/resilience/RobustResilienceStrategy.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/DefaultSizeOfEngine.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/DefaultSizeOfEngineProvider.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/DefaultSizeOfEngineProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/NoopSizeOfEngine.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/listeners/EhcacheVisitorListener.java
+Source copyright/license header: org/ehcache/impl/internal/sizeof/listeners/exceptions/VisitorListenerException.java
+Source copyright/license header: org/ehcache/impl/internal/spi/copy/DefaultCopyProvider.java
+Source copyright/license header: org/ehcache/impl/internal/spi/copy/DefaultCopyProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/spi/event/DefaultCacheEventListenerProvider.java
+Source copyright/license header: org/ehcache/impl/internal/spi/event/DefaultCacheEventListenerProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/spi/loaderwriter/DefaultCacheLoaderWriterProvider.java
+Source copyright/license header: org/ehcache/impl/internal/spi/loaderwriter/DefaultCacheLoaderWriterProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/spi/resilience/DefaultResilienceStrategyProvider.java
+Source copyright/license header: org/ehcache/impl/internal/spi/resilience/DefaultResilienceStrategyProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/spi/serialization/DefaultSerializationProvider.java
+Source copyright/license header: org/ehcache/impl/internal/spi/serialization/DefaultSerializationProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/BinaryValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/basic/NopStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/CopierStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/CopierStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/CopyingIterable.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/CopyingIterator.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/CopyingSpliterator.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/ImmutableCopyingCollection.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/ImmutableCopyingMap.java
+Source copyright/license header: org/ehcache/impl/internal/store/copy/ImmutableCopyingSet.java
+Source copyright/license header: org/ehcache/impl/internal/store/disk/DiskWriteThreadPool.java
+Source copyright/license header: org/ehcache/impl/internal/store/disk/EhcachePersistentConcurrentOffHeapClockCache.java
+Source copyright/license header: org/ehcache/impl/internal/store/disk/OffHeapDiskStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/disk/OffHeapDiskStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/disk/factories/EhcachePersistentSegmentFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/Backend.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/OnHeapStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/OnHeapStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/OnHeapStrategy.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/SimpleBackend.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/BaseOnHeapKey.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/CopiedOnHeapKey.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/LookupOnlyOnHeapKey.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/OnHeapKey.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/OnHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/heap/holders/SimpleOnHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/loaderwriter/LoaderWriterStoreProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/loaderwriter/LoaderWriterStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/loaderwriter/LoaderWriterValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/loaderwriter/LocalLoaderWriterStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/loaderwriter/LocalWriteBehindLoaderWriterStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/AbstractOffHeapStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/BasicOffHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/BinaryOffHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/EhcacheConcurrentOffHeapClockCache.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/EhcacheOffHeapBackingMap.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/HeuristicConfiguration.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/LazyOffHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/MemorySizeParser.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/OffHeapMapStatistics.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/OffHeapStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/OffHeapStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/OffHeapStoreUtils.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/OffHeapValueHolder.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/SwitchableEvictionAdvisor.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/factories/EhcacheSegmentFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/portability/OffHeapValueHolderPortability.java
+Source copyright/license header: org/ehcache/impl/internal/store/offheap/portability/SerializerPortability.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/AbstractPartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/AbstractSharedTierProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/SharedStorage.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/SharedStorageProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/SharedStorageProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/StateHolderIdGenerator.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/authoritative/AuthoritativeTierPartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/authoritative/SharedAuthoritativeTierProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/authoritative/SharedAuthoritativeTierProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/CachingTierPartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/SharedCachingTierProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/SharedCachingTierProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/higher/HigherCachingTierPartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/higher/SharedHigherCachingTierProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/higher/SharedHigherCachingTierProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/lower/LowerCachingTierPartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/lower/SharedLowerCachingTierProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/caching/lower/SharedLowerCachingTierProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeEvictionAdvisor.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeExpiryPolicy.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeInvalidationListener.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeInvalidationValve.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeSerializer.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/composites/CompositeValue.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/store/SharedStoreProvider.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/store/SharedStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/shared/store/StorePartition.java
+Source copyright/license header: org/ehcache/impl/internal/store/tiering/CompoundCachingTier.java
+Source copyright/license header: org/ehcache/impl/internal/store/tiering/CompoundCachingTierProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/store/tiering/TieredStore.java
+Source copyright/license header: org/ehcache/impl/internal/store/tiering/TieredStoreProviderFactory.java
+Source copyright/license header: org/ehcache/impl/internal/util/Pacer.java
+Source copyright/license header: org/ehcache/impl/internal/util/ServiceUtil.java
+Source copyright/license header: org/ehcache/impl/internal/util/ThreadFactoryUtil.java
+Source copyright/license header: org/ehcache/impl/persistence/DefaultDiskResourceService.java
+Source copyright/license header: org/ehcache/impl/persistence/DefaultLocalPersistenceService.java
+Source copyright/license header: org/ehcache/impl/persistence/FileBasedStateRepository.java
+Source copyright/license header: org/ehcache/impl/persistence/FileUtils.java
+Source copyright/license header: org/ehcache/impl/serialization/ByteArraySerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/CharSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/CompactJavaSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/DoubleSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/FloatSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/IntegerSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/LongSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/PlainJavaSerializer.java
+Source copyright/license header: org/ehcache/impl/serialization/StringSerializer.java
+Source copyright/license header: org/ehcache/impl/store/BaseStore.java
+Source copyright/license header: org/ehcache/impl/store/DefaultStoreEventDispatcher.java
+Source copyright/license header: org/ehcache/impl/store/HashUtils.java
+Source copyright/license header: org/ehcache/javadoc/PrivateApi.java
+Source copyright/license header: org/ehcache/javadoc/PublicApi.java
+Source copyright/license header: org/ehcache/jsr107/CacheResources.java
+Source copyright/license header: org/ehcache/jsr107/CloseUtil.java
+Source copyright/license header: org/ehcache/jsr107/ConfigurationMerger.java
+Source copyright/license header: org/ehcache/jsr107/DefaultConfigurationResolver.java
+Source copyright/license header: org/ehcache/jsr107/Eh107Cache.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheEntryEvent.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheLoaderWriter.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheLoaderWriterProvider.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheMXBean.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheManager.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CacheStatisticsMXBean.java
+Source copyright/license header: org/ehcache/jsr107/Eh107CompleteConfiguration.java
+Source copyright/license header: org/ehcache/jsr107/Eh107Configuration.java
+Source copyright/license header: org/ehcache/jsr107/Eh107Expiry.java
+Source copyright/license header: org/ehcache/jsr107/Eh107IdentityCopier.java
+Source copyright/license header: org/ehcache/jsr107/Eh107MXBean.java
+Source copyright/license header: org/ehcache/jsr107/Eh107ReverseConfiguration.java
+Source copyright/license header: org/ehcache/jsr107/EhcacheCachingProvider.java
+Source copyright/license header: org/ehcache/jsr107/EhcacheExpiryWrapper.java
+Source copyright/license header: org/ehcache/jsr107/EventListenerAdaptors.java
+Source copyright/license header: org/ehcache/jsr107/ExpiryPolicyToEhcacheExpiry.java
+Source copyright/license header: org/ehcache/jsr107/Jsr107Service.java
+Source copyright/license header: org/ehcache/jsr107/ListenerResources.java
+Source copyright/license header: org/ehcache/jsr107/NullCompletionListener.java
+Source copyright/license header: org/ehcache/jsr107/Unwrap.java
+Source copyright/license header: org/ehcache/jsr107/config/ConfigurationElementState.java
+Source copyright/license header: org/ehcache/jsr107/config/Jsr107CacheConfiguration.java
+Source copyright/license header: org/ehcache/jsr107/config/Jsr107Configuration.java
+Source copyright/license header: org/ehcache/jsr107/internal/DefaultJsr107Service.java
+Source copyright/license header: org/ehcache/jsr107/internal/Jsr107CacheConfigurationParser.java
+Source copyright/license header: org/ehcache/jsr107/internal/Jsr107CacheLoaderWriter.java
+Source copyright/license header: org/ehcache/jsr107/internal/Jsr107LatencyMonitor.java
+Source copyright/license header: org/ehcache/jsr107/internal/Jsr107Parser.java
+Source copyright/license header: org/ehcache/jsr107/internal/Jsr107ServiceConfigurationParser.java
+Source copyright/license header: org/ehcache/jsr107/internal/WrappedCacheLoaderWriter.java
+Source copyright/license header: org/ehcache/jsr107/internal/tck/Eh107MBeanServerBuilder.java
+Source copyright/license header: org/ehcache/spi/copy/Copier.java
+Source copyright/license header: org/ehcache/spi/copy/CopyProvider.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/BulkCacheLoadingException.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/BulkCacheWritingException.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/CacheLoaderWriter.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/CacheLoaderWriterConfiguration.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/CacheLoaderWriterProvider.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/CacheLoadingException.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/CacheWritingException.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/WriteBehindConfiguration.java
+Source copyright/license header: org/ehcache/spi/loaderwriter/WriteBehindProvider.java
+Source copyright/license header: org/ehcache/spi/persistence/PersistableResourceService.java
+Source copyright/license header: org/ehcache/spi/persistence/StateHolder.java
+Source copyright/license header: org/ehcache/spi/persistence/StateRepository.java
+Source copyright/license header: org/ehcache/spi/resilience/RecoveryStore.java
+Source copyright/license header: org/ehcache/spi/resilience/ResilienceStrategy.java
+Source copyright/license header: org/ehcache/spi/resilience/ResilienceStrategyProvider.java
+Source copyright/license header: org/ehcache/spi/resilience/StoreAccessException.java
+Source copyright/license header: org/ehcache/spi/serialization/SerializationProvider.java
+Source copyright/license header: org/ehcache/spi/serialization/Serializer.java
+Source copyright/license header: org/ehcache/spi/serialization/SerializerException.java
+Source copyright/license header: org/ehcache/spi/serialization/StatefulSerializer.java
+Source copyright/license header: org/ehcache/spi/serialization/UnsupportedTypeException.java
+Source copyright/license header: org/ehcache/spi/service/MaintainableService.java
+Source copyright/license header: org/ehcache/spi/service/OptionalServiceDependencies.java
+Source copyright/license header: org/ehcache/spi/service/PluralService.java
+Source copyright/license header: org/ehcache/spi/service/Service.java
+Source copyright/license header: org/ehcache/spi/service/ServiceConfiguration.java
+Source copyright/license header: org/ehcache/spi/service/ServiceCreationConfiguration.java
+Source copyright/license header: org/ehcache/spi/service/ServiceDependencies.java
+Source copyright/license header: org/ehcache/spi/service/ServiceProvider.java
+Source copyright/license header: org/ehcache/xml/ConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/CoreCacheConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/CoreServiceConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/CoreServiceCreationConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/JaxbHelper.java
+Source copyright/license header: org/ehcache/xml/ResourceConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/ServiceConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/ServiceCreationConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/XmlConfiguration.java
+Source copyright/license header: org/ehcache/xml/XmlModel.java
+Source copyright/license header: org/ehcache/xml/XmlUtil.java
+Source copyright/license header: org/ehcache/xml/model/CacheDefinition.java
+Source copyright/license header: org/ehcache/xml/model/CacheSpec.java
+Source copyright/license header: org/ehcache/xml/model/CacheTemplate.java
+Source copyright/license header: org/ehcache/xml/model/Expiry.java
+Source copyright/license header: org/ehcache/xml/model/ListenersConfig.java
+Source copyright/license header: org/ehcache/xml/model/SizeOfEngineLimits.java
+Source copyright/license header: org/ehcache/xml/multi/XmlMultiConfiguration.java
+Source copyright/license header: org/ehcache/xml/provider/CacheEventDispatcherFactoryConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/CacheManagerPersistenceConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/DefaultCopyProviderConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/DefaultSerializationProviderConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/DefaultSizeOfEngineProviderConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/OffHeapDiskStoreProviderConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/PooledExecutionServiceConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/SimpleCoreServiceCreationConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/ThreadPoolServiceCreationConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/provider/WriteBehindProviderConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultCacheEventDispatcherConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultCacheEventListenerConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultCacheLoaderWriterConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultCopierConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultResilienceStrategyConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultSerializerConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultSizeOfEngineConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/DefaultWriteBehindConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/OffHeapDiskStoreConfigurationParser.java
+Source copyright/license header: org/ehcache/xml/service/SimpleCoreServiceConfigurationParser.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D0df501d985235333 ---
+Original paths: Source copyright/license header: org/ehcache/config/builders/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T4ef2680cbba186a5
+
+
+--- D9b06dd10b7b9df30 ---
+Original paths: Source copyright/license header: org/ehcache/config/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T90aaadc17c39abba
+
+
+--- D88743d797db5a0df ---
+Original paths: Source copyright/license header: org/ehcache/config/units/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T881c2684a27c6523
+
+
+--- D88090ea10975e7e3 ---
+Original paths: Source copyright/license header: org/ehcache/core/config/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tb15aa7cc2852b9a2
+
+
+--- Ddfc4d06ed4eb9225 ---
+Original paths: Source copyright/license header: org/ehcache/core/config/store/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T7394ac2962c9c38f
+
+
+--- Dcbd29fe14f6a50d5 ---
+Original paths: Source copyright/license header: org/ehcache/core/events/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T3c2a9cead7eaa00d
+
+
+--- D9972d46b6f06e060 ---
+Original paths: Source copyright/license header: org/ehcache/core/exceptions/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T6c26a86b99e118a2
+
+
+--- D3bfd31055269f19c ---
+Original paths: Source copyright/license header: org/ehcache/core/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Te6a476191d328b35
+
+
+--- Dc23a6469efe3c7ff ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T5f7953f7c9b6ba16
+
+
+--- D9f3c1aa0ae9e24f6 ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/service/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T9535da599cb019e7
+
+
+--- Dbc02c0116303bee2 ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/store/events/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T9c4aa679e79faba8
+
+
+--- D07976368bd3e38fc ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/store/heap/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T028c80ddc187e981
+
+
+--- D0536cf08c31a8ec2 ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/store/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T55b030e1754c8b7a
+
+
+--- D53388c9eae4eb8c0 ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/store/tiering/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T679da17e9538871d
+
+
+--- D777f00d1ec537bc9 ---
+Original paths: Source copyright/license header: org/ehcache/core/spi/time/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tbf96f33439ad5abc
+
+
+--- D7f5911b3a99e95af ---
+Original paths: Source copyright/license header: org/ehcache/core/statistics/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T2a55c686f2a5e88f
+
+
+--- Dd97383513e46d2bb ---
+Original paths: Source copyright/license header: org/ehcache/event/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T0124655b65295602
+
+
+--- D6337843dfd553a80 ---
+Original paths: Source copyright/license header: org/ehcache/expiry/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Td3bec56d10634d28
+
+
+--- Dcad74d9c9b715853 ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/copy/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tc7fe7651f526e9cf
+
+
+--- D3374c53d9f27782f ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/event/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T13d5e53ce54b291c
+
+
+--- Deac361862f89eced ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/executor/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tbddf6083017a67db
+
+
+--- D010fe0d884fcf532 ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/loaderwriter/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T86a62a34ab172559
+
+
+--- D22df6c718c189c15 ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/loaderwriter/writebehind/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T05543b9ac96bcc30
+
+
+--- Df2228b2b95a3c3cc ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/persistence/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T16ec959cc1595544
+
+
+--- D26c969da95962067 ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/serializer/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T9f6c54864c55a861
+
+
+--- D3da1b1f481a05f5c ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/store/disk/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Ta54b1829577d166f
+
+
+--- Dcfaca40a77e76846 ---
+Original paths: Source copyright/license header: org/ehcache/impl/config/store/heap/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T977eb68d45e42d77
+
+
+--- D3f999a009687bcdb ---
+Original paths: Source copyright/license header: org/ehcache/impl/copy/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T741e32fb242c3dad
+
+
+--- D18cc560382f2a4e8 ---
+Original paths: Source copyright/license header: org/ehcache/impl/events/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T6d918fcd22aa9044
+
+
+--- D00e8f82e1b8a8364 ---
+Original paths: Source copyright/license header: org/ehcache/impl/internal/classes/commonslang/ArrayUtils.java
+Source copyright/license header: org/ehcache/impl/internal/classes/commonslang/ClassUtils.java
+Source copyright/license header: org/ehcache/impl/internal/classes/commonslang/reflect/ConstructorUtils.java
+Source copyright/license header: org/ehcache/impl/internal/classes/commonslang/reflect/MemberUtils.java
+Source copyright/license header: org/ehcache/impl/internal/classes/commonslang/reflect/MethodUtils.java
+
+Text blocks: T6ca556b8f25dc049 T652ab88cd07a1b79 T39a2bab3d1d9fa5f T73c24a493740f138
+
+
+--- Df00ce5cc4f7f72ed ---
+Original paths: Source copyright/license header: org/ehcache/impl/internal/concurrent/ConcurrentHashMap.java
+Source copyright/license header: org/ehcache/impl/internal/concurrent/ThreadLocalRandomUtil.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Ta543e79a4bbed8db
+
+
+--- D5327ccab629cc076 ---
+Original paths: Source copyright/license header: org/ehcache/impl/internal/concurrent/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T68f9c57ca811eea7
+
+
+--- D8680b89d442117e1 ---
+Original paths: Source copyright/license header: org/ehcache/impl/persistence/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tc7f8626e8aff9a46
+
+
+--- D058979a6d02ca96d ---
+Original paths: Source copyright/license header: org/ehcache/impl/serialization/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T4a9c091002449b73
+
+
+--- D79f7b6a976b497fb ---
+Original paths: Source copyright/license header: org/ehcache/javadoc/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Td447cd1dc73bc18c
+
+
+--- D1459d52b93b09e1a ---
+Original paths: Source copyright/license header: org/ehcache/jsr107/config/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T90fd57f0057d23bb
+
+
+--- Dea8f02dac58976d8 ---
+Original paths: Source copyright/license header: org/ehcache/jsr107/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tb16537c24e0fb0ab
+
+
+--- Daf459ea0cfc9d199 ---
+Original paths: Source copyright/license header: org/ehcache/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tb72ea54b0e286b94
+
+
+--- D3f75deb853795098 ---
+Original paths: Source copyright/license header: org/ehcache/spi/copy/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Teccc806df1590caa
+
+
+--- Dfff6b67fbc602f8a ---
+Original paths: Source copyright/license header: org/ehcache/spi/loaderwriter/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Ta54a028a6c0e0ebd
+
+
+--- Db60f49ef4c75e8fd ---
+Original paths: Source copyright/license header: org/ehcache/spi/persistence/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tf6526d96684aa98c
+
+
+--- Db8213092f1a056f6 ---
+Original paths: Source copyright/license header: org/ehcache/spi/resilience/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T254d09e2cd9abbe0
+
+
+--- D77ec8b93c95ab437 ---
+Original paths: Source copyright/license header: org/ehcache/spi/serialization/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T8986a394586594a1
+
+
+--- D93cc4fbd3d5f22aa ---
+Original paths: Source copyright/license header: org/ehcache/spi/service/package-info.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tbaade36f57070a63
+
+
+--- D379241c5dbb348ac ---
+Original paths: org/ehcache/impl/internal/store/copy/CopyingIterable.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tdf6eb1d058c5b990 Te71b64d1ef87d779 T789a71afb69b40a9 Tcca9452185afcd47 Tddad525514f56b52 T1eaeba370eea9779 T089782e4348eb913 T3eb2d5c9e6827385
+
+
+--- D41d4a2a24de0fafa ---
+Original paths: org/ehcache/impl/internal/store/copy/CopyingIterator.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tdf6eb1d058c5b990 T18e4513009ce7d9d Td1d72997b6aace50 T59322ffbe22f3a2f Tcfb0154437daee4d T9d4c2adcbe1f7b9b T34adfb39464caaea T5be3b42b8e9a1ba6 T02b2869485ca8ec4
+
+
+--- D4f159b00ecc9ce1f ---
+Original paths: org/ehcache/impl/internal/store/copy/CopyingSpliterator.java
+
+Text blocks: T28a40fc6a24080ee T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tdf6eb1d058c5b990 T8d4a8949b1799dd7 Tfc55ef22514b0fb7 T70411736a7f69a76 T04b7f7d59e2d45d3 T395ef1263756d16c Tf032e3d2492a0153 T25f8e7cdaebd045a T700a6db4191dcbe2
+
+
+--- Da36428643303f96d ---
+Original paths: Source copyright/license header: cn/idev/excel/analysis/v07/handlers/sax/SharedStringsTableHandler.java
+Source copyright/license header: cn/idev/excel/util/DateUtils.java
+Source copyright/license header: cn/idev/excel/util/FastExcelTempFileCreationStrategy.java
+
+Text blocks: T0f7486db52a5239a T652ab88cd07a1b79 T3f50da9f9523a437
+
+
+--- D130e1d7b29433b33 ---
+Original paths: Source copyright/license header: cn/idev/excel/metadata/format/DataFormatter.java
+
+Text blocks: T0f7486db52a5239a T652ab88cd07a1b79 T39a2bab3d1d9fa5f T29a3d7f3b885da04
+
+
+--- D8e1fa3af04cdc1b1 ---
+Original paths: Source copyright/license header: cn/idev/excel/util/BooleanUtils.java
+Source copyright/license header: cn/idev/excel/util/FieldUtils.java
+Source copyright/license header: cn/idev/excel/util/FileUtils.java
+Source copyright/license header: cn/idev/excel/util/ListUtils.java
+Source copyright/license header: cn/idev/excel/util/MapUtils.java
+Source copyright/license header: cn/idev/excel/util/MemberUtils.java
+Source copyright/license header: cn/idev/excel/util/StringUtils.java
+Source copyright/license header: cn/idev/excel/util/Validate.java
+
+Text blocks: Teef27df6a9fb5fde T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- Db39635b1eaedfa43 ---
+Original paths: Source copyright/license header: cn/idev/excel/support/asm/AnnotationVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/AnnotationWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/Attribute.java
+Source copyright/license header: cn/idev/excel/support/asm/ByteVector.java
+Source copyright/license header: cn/idev/excel/support/asm/ClassReader.java
+Source copyright/license header: cn/idev/excel/support/asm/ClassTooLargeException.java
+Source copyright/license header: cn/idev/excel/support/asm/ClassVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/ClassWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/ConstantDynamic.java
+Source copyright/license header: cn/idev/excel/support/asm/Constants.java
+Source copyright/license header: cn/idev/excel/support/asm/Context.java
+Source copyright/license header: cn/idev/excel/support/asm/CurrentFrame.java
+Source copyright/license header: cn/idev/excel/support/asm/Edge.java
+Source copyright/license header: cn/idev/excel/support/asm/FieldVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/FieldWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/Frame.java
+Source copyright/license header: cn/idev/excel/support/asm/Handle.java
+Source copyright/license header: cn/idev/excel/support/asm/Handler.java
+Source copyright/license header: cn/idev/excel/support/asm/Label.java
+Source copyright/license header: cn/idev/excel/support/asm/MethodTooLargeException.java
+Source copyright/license header: cn/idev/excel/support/asm/MethodVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/MethodWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/ModuleVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/ModuleWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/Opcodes.java
+Source copyright/license header: cn/idev/excel/support/asm/RecordComponentVisitor.java
+Source copyright/license header: cn/idev/excel/support/asm/RecordComponentWriter.java
+Source copyright/license header: cn/idev/excel/support/asm/Symbol.java
+Source copyright/license header: cn/idev/excel/support/asm/SymbolTable.java
+Source copyright/license header: cn/idev/excel/support/asm/Type.java
+Source copyright/license header: cn/idev/excel/support/asm/TypePath.java
+Source copyright/license header: cn/idev/excel/support/asm/TypeReference.java
+
+Text blocks: T96ec15ec1f5631af
+
+
+--- D78dafefddc0bdadd ---
+Original paths: Source copyright/license header: cn/idev/excel/support/asm/SpringAsmInfo.java
+
+Text blocks: T68091018632f3e50 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D6a29af4a606eaa3a ---
+Original paths: Source copyright/license header: cn/idev/excel/support/cglib/SpringCglibInfo.java
+Source copyright/license header: cn/idev/excel/support/cglib/core/SpringNamingPolicy.java
+
+Text blocks: Tb26df557883116c0 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- Dbcdd02bcb73c0a02 ---
+Original paths: Source copyright/license header: cn/idev/excel/support/cglib/beans/BeanCopier.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/BeanMap.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/BeanMapEmitter.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/BulkBeanEmitter.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/ImmutableBean.java
+Source copyright/license header: cn/idev/excel/support/cglib/core/AbstractClassGenerator.java
+Source copyright/license header: cn/idev/excel/support/cglib/core/AsmApi.java
+Source copyright/license header: cn/idev/excel/support/cglib/core/KeyFactory.java
+Source copyright/license header: cn/idev/excel/support/cglib/core/ReflectUtils.java
+Source copyright/license header: cn/idev/excel/support/cglib/proxy/MethodProxy.java
+
+Text blocks: T1348ce2c2db12e47 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D757844605ef31a93 ---
+Original paths: Source copyright/license header: cn/idev/excel/support/cglib/beans/BeanGenerator.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/BulkBean.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/BulkBeanException.java
+Source copyright/license header: cn/idev/excel/support/cglib/beans/FixedKeySet.java
+
+Text blocks: T341eaf8014a1f013 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D0ce6479718f704c7 ---
+Original paths: Source copyright/license header: cn/idev/excel/support/cglib/core/ClassLoaderAwareGeneratorStrategy.java
+
+Text blocks: Tfbfe3be371c84d97 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D532593e22e8875d9 ---
+Original paths: Source copyright/license header: cn/idev/excel/support/cglib/proxy/Enhancer.java
+
+Text blocks: T4a0cad2ef5aad190 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
 
 --- D8eccaf6ec06adf52 ---
@@ -1347,6 +2518,51 @@ Source copyright/license header: org/flywaydb/database/postgresql/package-info.j
 Text blocks: Tc38c9dfe9be955a0 T652ab88cd07a1b79 T276a64630a3f3c25
 
 
+--- D6b6fbf18d88f7337 ---
+Original paths: Source copyright/license header: com/sun/istack/Builder.java
+Source copyright/license header: com/sun/istack/ByteArrayDataSource.java
+Source copyright/license header: com/sun/istack/Interned.java
+Source copyright/license header: com/sun/istack/NotNull.java
+Source copyright/license header: com/sun/istack/Nullable.java
+Source copyright/license header: com/sun/istack/localization/LocalizableMessage.java
+Source copyright/license header: com/sun/istack/localization/LocalizableMessageFactory.java
+Source copyright/license header: com/sun/istack/localization/NullLocalizable.java
+Source copyright/license header: com/sun/istack/logging/Logger.java
+
+Text blocks: T26ca9366cd71da9f Tb00b112416eda83a Td75639ad3aebcc36
+
+
+--- D31a519164b547750 ---
+Original paths: Source copyright/license header: com/sun/istack/FinalArrayList.java
+Source copyright/license header: com/sun/istack/SAXException2.java
+Source copyright/license header: com/sun/istack/SAXParseException2.java
+Source copyright/license header: com/sun/istack/XMLStreamException2.java
+Source copyright/license header: com/sun/istack/XMLStreamReaderToContentHandler.java
+
+Text blocks: T20e18de8fce6ce65 Tb00b112416eda83a Td75639ad3aebcc36
+
+
+--- D91374b4138cd8e39 ---
+Original paths: Source copyright/license header: com/sun/istack/FragmentContentHandler.java
+Source copyright/license header: com/sun/istack/Pool.java
+Source copyright/license header: com/sun/istack/localization/Localizable.java
+Source copyright/license header: com/sun/istack/localization/Localizer.java
+
+Text blocks: T2bd42fe47c99d74e Tb00b112416eda83a Td75639ad3aebcc36
+
+
+--- D20afc1eb0d4459e3 ---
+Original paths: Source copyright/license header: com/sun/istack/logging/StackHelper.java
+
+Text blocks: T3c5022462e7816d8 Tb00b112416eda83a Td75639ad3aebcc36
+
+
+--- Db1605b28975ef1c0 ---
+Original paths: Source copyright/license header: com/sun/istack/package-info.java
+
+Text blocks: T26ca9366cd71da9f Tb00b112416eda83a Td75639ad3aebcc36 Tda48fa2e60c1ea2b
+
+
 --- D9a60afe21973eb66 ---
 Original paths: META-INF/NOTICE
 
@@ -1363,12 +2579,6 @@ Text blocks: Taafd7517fc66ad00 T83e2f1f8fb885517 T8dfc77ab4089e09d Tf7272132a81e
 Original paths: META-INF/NOTICE
 
 Text blocks: Taafd7517fc66ad00 T83e2f1f8fb885517 T8dfc77ab4089e09d Tf7272132a81e5ddc T75b38c876a58011b Tb6800a15aed32f45 T2a6b24ad28722034 Tc366dcdfdc1ce7ff
-
-
---- D55e79d6289af6d7a ---
-Original paths: META-INF/LICENSE.md
-
-Text blocks: Te5ea188d7859ea12 T7a72f9a2d7a07d51 T6f7cfb7cf9c68caa T3c28a6b2482f05c4 Tad0b65b4889237b2 Tcb79a766b4bedb63
 
 
 --- D1ca39c8b2bc0d7ac ---
@@ -1552,6 +2762,12 @@ Text blocks: T4aa1d4a12a9b8495 T7a72f9a2d7a07d51 T6f7cfb7cf9c68caa T3c28a6b2482f
 Original paths: META-INF/NOTICE.md
 
 Text blocks: T4744e48011be8997 Tdea9d1680206eee4 Tb12026bdb6a04159 T61e3f3f6ac221fa1 T722a2858f4068985 T129f604bc7fd787a T8dfc77ab4089e09d T52ad1a476a8829eb Ta60c522ca192b3d0 T975c32202c4cb638 Td75639ad3aebcc36 Tbc47da663d101bfc T768c6338e3d966cb T5b2ed9d2e8931e9c Tb584eec728548ace T8add5c0ea0190931
+
+
+--- Dfcdcf9da0144bc02 ---
+Original paths: META-INF/NOTICE.md
+
+Text blocks: Tc7dc89a74b3d45b6 T74d48ab7f445697e T4680c39515784825 T722a2858f4068985 T207d9eca0e5dd35d T8dfc77ab4089e09d T52ad1a476a8829eb Ta60c522ca192b3d0 Tbb793bf1a9046d6e Td75639ad3aebcc36 Tbc47da663d101bfc T768c6338e3d966cb Tb55dc147560b37b7 Td1ee2bab162bd261 Tf9c20e5161bdbaa2 T107cbc0d4ee71e95 T82e726dccf81bb76 T107cbc0d4ee71e95 T82e726dccf81bb76 Te357f6fbab507f9a Ta17e73397b438cde Tf9df0559f6563144 T3b3c3a13001db89b Tc26be9dbb4ab3dc7 T04019927ad60b83c T0158cb515d08a135 T7cc6a2a4e65a9488 T9f46027c3c2f7b67 T497e1401f027f966 T9f46027c3c2f7b67 T497e1401f027f966 Tab65badc0111ba71 T3c862cbc329c0e51 T6415ba84fed749d8 T52ebb98bc2fe9f8d T96a4ffd01cda7a3e T53470e2d90f599dc T6b52e6f0e4a79b3e T08b48c730f1dface Te2f78e09ea436a19 T08b48c730f1dface Te2f78e09ea436a19 T08b48c730f1dface Tb16d00329a4f7a37 T08b48c730f1dface T4821452ac4f15d80 T08b48c730f1dface T44b1b0d3be032ee5 T08b48c730f1dface Tc072b74a42e4202c T5e83dca226cf555b Ta48afda257f2a1e9 T08b48c730f1dface T7f7b7d2c09e30943 Tdf04992535125bb3 T497f9d7c3f5bae38 Ta17e73397b438cde T56eca972b5d0400d T48672cc57cc405ad Tba212930b04a4ada T08b48c730f1dface T70a8ec1eecd60666 Tfb0e2ce7eb5cabf1 T20f9f13924c08736 Tbb923fe3fc251a63 Tfa83b05998756f23 T4b6718f1c8edcdcf Te7a81de140d65458 T056729c0514b0121 Tfa21149497c65872 Ta2f136622ea5f03d T900367ca4c6d72b8 T1e50231336282bf4 Tb584eec728548ace T8add5c0ea0190931
 
 
 --- D174d0b172495665b ---
@@ -2905,14 +4121,6 @@ Text blocks: T4f2f8b31601178df T4caa61451c2f8fef T4c301d2fa8faf457 Te163fb715976
 Original paths: Source copyright/license header: ch/qos/logback/core/joran/util/PropertySetter.java
 
 Text blocks: T2e4dbadc305f8f1d Taa42bebd27dad5df T4c301d2fa8faf457 Ta16fa6ce67f9ea02
-
-
---- D1ea510579e38145f ---
-Original paths: META-INF/LICENSE
-META-INF/LICENSE.txt
-META-INF/license.txt
-
-Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 T307c4b492ac15b32 T47561b8d6123d618 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
 
 --- D208b1892820fa8b1 ---
@@ -4799,6 +6007,18 @@ Original paths: META-INF/NOTICE
 Text blocks: Tb8457be6ac16befc T3856d1bd9b5251dd T7479b1eb18b6737b
 
 
+--- D16ac761b6f88355e ---
+Original paths: META-INF/LICENSE
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tc5fc194647e223f3 T2901572b1277eea0 T07e0b7836e1903e7 Ta20758fb507d5281 T14deed44e2db0653 T2fedf936611c2528 T2784acc4ba14a58c Teccd3045f2302000 T74896d15800f7a63 Td43dcab8e37ad56d Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 Ta77bb8919a79da20 T97fec2b51459cdc6 Tcced41d2a3041055
+
+
+--- Dbb4ee328e0d0f85e ---
+Original paths: META-INF/NOTICE
+
+Text blocks: T193c44e005bfca85 T95ff8aaf1616861d T08494a7891bbb66a Td160488f04d99414 T2983428fb97495b8 T76cac9214160d7bc Tf1ac6793c2232511 T0b2cfc15ce9d8daa Tbc0c8cd60aa7e83e
+
+
 --- D00f214fda85f1c46 ---
 Original paths: META-INF/LICENSE
 
@@ -5399,6 +6619,18 @@ Original paths: META-INF/NOTICE
 Text blocks: T3031033388b4b06a T5baa7fddf18c2f36
 
 
+--- Dc4a0a65371a1dcd2 ---
+Original paths: META-INF/LICENSE.txt
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T7e73d9141e1f5f80 T3ba59c843c6831d4 T2e301670479d1c77 Tb74f726e3736ca81 Te38133177ef553f8 T9225f776951fe380 Td3f71676c58ffba0 T0f925b954961d1fe T5ff674c63090a4ea T263d41bfbfdb7310 T734b38dbb28807af
+
+
+--- D73fc56a02068b6cc ---
+Original paths: META-INF/NOTICE.txt
+
+Text blocks: Te4f963c59c67fe9a T5baa7fddf18c2f36 T7028870c212f1a50 T6773169856e35b68 T45d0a9dc47fb2182 T849b8cee8b303fc1 T7f424fd6c30c5084 Tf1ac6793c2232511 T0b2cfc15ce9d8daa Tbc0c8cd60aa7e83e
+
+
 === SHARED ORIGINAL TEXT BLOCKS ===
 
 
@@ -5773,6 +7005,263 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * Copyright (C) 2019 Brett Wooldridge
 
 
+--- T01ffd7ec643dc9d1 ---
+2. Grant of Copyright License.
+
+
+--- T7cd4cc2d021a2cda ---
+Subject to the terms and conditions of this License, each Contributor hereby
+grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free,
+irrevocable copyright license to reproduce, prepare Derivative Works of,
+publicly display, publicly perform, sublicense, and distribute the Work and such
+Derivative Works in Source or Object form.
+
+
+--- T5e3ec48f81e580fd ---
+3. Grant of Patent License.
+
+
+--- Tef193b305c8701c6 ---
+Subject to the terms and conditions of this License, each Contributor hereby
+grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free,
+irrevocable (except as stated in this section) patent license to make, have
+made, use, offer to sell, sell, import, and otherwise transfer the Work, where
+such license applies only to those patent claims licensable by such Contributor
+that are necessarily infringed by their Contribution(s) alone or by combination
+of their Contribution(s) with the Work to which such Contribution(s) was
+submitted. If You institute patent litigation against any entity (including a
+cross-claim or counterclaim in a lawsuit) alleging that the Work or a
+Contribution incorporated within the Work constitutes direct or contributory
+patent infringement, then any patent licenses granted to You under this License
+for that Work shall terminate as of the date such litigation is filed.
+
+
+--- Tc27a4358fa89a7e6 ---
+4. Redistribution.
+
+
+--- T88afe0ef50ded254 ---
+You may reproduce and distribute copies of the Work or Derivative Works thereof
+in any medium, with or without modifications, and in Source or Object form,
+provided that You meet the following conditions:
+
+
+--- T9b4c490a63343726 ---
+You must give any other recipients of the Work or Derivative Works a copy of
+this License; and
+You must cause any modified files to carry prominent notices stating that You
+changed the files; and
+You must retain, in the Source form of any Derivative Works that You distribute,
+all copyright, patent, trademark, and attribution notices from the Source form
+of the Work, excluding those notices that do not pertain to any part of the
+Derivative Works; and
+If the Work includes a "NOTICE" text file as part of its distribution, then any
+Derivative Works that You distribute must include a readable copy of the
+attribution notices contained within such NOTICE file, excluding those notices
+that do not pertain to any part of the Derivative Works, in at least one of the
+following places: within a NOTICE text file distributed as part of the
+Derivative Works; within the Source form or documentation, if provided along
+with the Derivative Works; or, within a display generated by the Derivative
+Works, if and wherever such third-party notices normally appear. The contents of
+the NOTICE file are for informational purposes only and do not modify the
+License. You may add Your own attribution notices within Derivative Works that
+You distribute, alongside or as an addendum to the NOTICE text from the Work,
+provided that such additional attribution notices cannot be construed as
+modifying the License.
+You may add Your own copyright statement to Your modifications and may provide
+additional or different license terms and conditions for use, reproduction, or
+distribution of Your modifications, or for any such Derivative Works as a whole,
+provided Your use, reproduction, and distribution of the Work otherwise complies
+with the conditions stated in this License.
+
+
+--- T226a5f873d1ce834 ---
+5. Submission of Contributions.
+
+
+--- T8409bea4f6852369 ---
+Unless You explicitly state otherwise, any Contribution intentionally submitted
+for inclusion in the Work by You to the Licensor shall be under the terms and
+conditions of this License, without any additional terms or conditions.
+Notwithstanding the above, nothing herein shall supersede or modify the terms of
+any separate license agreement you may have executed with Licensor regarding
+such Contributions.
+
+
+--- Te742d8c1a47c5317 ---
+6. Trademarks.
+
+
+--- T669e24e7ea7291e5 ---
+This License does not grant permission to use the trade names, trademarks,
+service marks, or product names of the Licensor, except as required for
+reasonable and customary use in describing the origin of the Work and
+reproducing the content of the NOTICE file.
+
+
+--- T781d6da09d478334 ---
+7. Disclaimer of Warranty.
+
+
+--- T80926c78e752865e ---
+Unless required by applicable law or agreed to in writing, Licensor provides the
+Work (and each Contributor provides its Contributions) on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied,
+including, without limitation, any warranties or conditions of TITLE,
+NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are
+solely responsible for determining the appropriateness of using or
+redistributing the Work and assume any risks associated with Your exercise of
+permissions under this License.
+
+
+--- T1e947877f92aef7d ---
+8. Limitation of Liability.
+
+
+--- T58666ba1acff7460 ---
+In no event and under no legal theory, whether in tort (including negligence),
+contract, or otherwise, unless required by applicable law (such as deliberate
+and grossly negligent acts) or agreed to in writing, shall any Contributor be
+liable to You for damages, including any direct, indirect, special, incidental,
+or consequential damages of any character arising as a result of this License or
+out of the use or inability to use the Work (including but not limited to
+damages for loss of goodwill, work stoppage, computer failure or malfunction, or
+any and all other commercial damages or losses), even if such Contributor has
+been advised of the possibility of such damages.
+
+
+--- T63b9d1ff7372a492 ---
+9. Accepting Warranty or Additional Liability.
+
+
+--- T1e4b3f1b26dff888 ---
+While redistributing the Work or Derivative Works thereof, You may choose to
+offer, and charge a fee for, acceptance of support, warranty, indemnity, or
+other liability obligations and/or rights consistent with this License. However,
+in accepting such obligations, You may act only on Your own behalf and on Your
+sole responsibility, not on behalf of any other Contributor, and only if You
+agree to indemnify, defend, and hold each Contributor harmless for any liability
+incurred by, or claims asserted against, such Contributor by reason of your
+accepting any such warranty or additional liability.
+
+
+--- Te5ea188d7859ea12 ---
+Copyright (c) 2018 Oracle and/or its affiliates. All rights reserved.
+
+
+--- T6f7cfb7cf9c68caa ---
+- Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+
+
+--- T3c28a6b2482f05c4 ---
+- Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in the
+        documentation and/or other materials provided with the distribution.
+
+
+--- Tad0b65b4889237b2 ---
+- Neither the name of the Eclipse Foundation, Inc. nor the names of its
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+
+
+--- Tcb79a766b4bedb63 ---
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+    THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+    PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- T43a1839ae35bd16a ---
+# Notices for Eclipse Angus
+
+
+--- T4e73e15045a9734e ---
+This content is produced and maintained by the Eclipse Angus project.
+
+
+--- Tb933ed0da2db1da7 ---
+* Project home: https://projects.eclipse.org/projects/ee4j.angus
+
+
+--- T722a2858f4068985 ---
+## Trademarks
+
+
+--- T340e4ce40e43b348 ---
+Eclipse Angus is a trademark of the Eclipse Foundation.
+
+
+--- T8dfc77ab4089e09d ---
+## Copyright
+
+
+--- T52ad1a476a8829eb ---
+All content is the property of the respective authors or their employers. For
+more information regarding authorship of content, please consult the listed
+source code repository logs.
+
+
+--- Ta60c522ca192b3d0 ---
+## Declared Project Licenses
+
+
+--- T975c32202c4cb638 ---
+This program and the accompanying materials are made available under the terms
+of the Eclipse Distribution License v1.0 which is available at
+https://www.eclipse.org/org/documents/edl-v10.php.
+
+
+--- Td75639ad3aebcc36 ---
+SPDX-License-Identifier: BSD-3-Clause
+
+
+--- Tbc47da663d101bfc ---
+## Source Code
+
+
+--- T768c6338e3d966cb ---
+The project maintains the following source code repositories:
+
+
+--- T770affedc9faaaaf ---
+* https://github.com/eclipse-ee4j/angus-activation
+* https://github.com/eclipse-ee4j/angus-mail
+
+
+--- Td1ee2bab162bd261 ---
+## Third-party Content
+
+
+--- Tf9c20e5161bdbaa2 ---
+This project leverages the following third party content.
+
+
+--- Tdc937b59892604f5 ---
+None
+
+
+--- Tb584eec728548ace ---
+## Cryptography
+
+
+--- T8add5c0ea0190931 ---
+Content may contain encryption software. The country in which you are currently
+may have restrictions on the import, possession, and use, and/or re-export to
+another country, of encryption software. BEFORE using any encryption software,
+please check the country's laws, regulations and policies concerning the import,
+possession, or use, and re-export of encryption software, to see if this is
+permitted.
+
+
 --- T737c54e75f39a548 ---
 SPDX-License-Identifier: EPL-2.0 AND BSD-3-Clause AND Apache-1.1
 
@@ -5968,20 +7457,6 @@ THE POSSIBILITY OF SUCH DAMAGE.
 ASM: a very small and fast Java bytecode manipulation framework
 Copyright (c) 2000-2011 INRIA, France Telecom
 All rights reserved.
-
-
---- Tcb79a766b4bedb63 ---
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-THE POSSIBILITY OF SUCH DAMAGE.
 
 
 --- Tb30c218169f3d5a7 ---
@@ -6469,12 +7944,48 @@ Other developers who have contributed code are:
 * Brian Langel
 
 
---- T8dfc77ab4089e09d ---
-## Copyright
-
-
 --- Tf7272132a81e5ddc ---
 Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+
+
+--- T4080e98335973354 ---
+Apache Commons Codec
+Copyright 2002-2026 The Apache Software Foundation
+
+
+--- T95ff8aaf1616861d ---
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+
+--- T0771511967ec34af ---
+Apache Commons Collections
+Copyright 2001-2019 The Apache Software Foundation
+
+
+--- T5baa7fddf18c2f36 ---
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+
+--- Ted2609ef9526268b ---
+Apache Commons Compress
+Copyright 2002-2024 The Apache Software Foundation
+
+
+--- T6d4edc97c48c3944 ---
+Apache Commons CSV
+Copyright 2005-2024 The Apache Software Foundation
+
+
+--- T7f08e8863ff500d7 ---
+Apache Commons IO
+Copyright 2002-2024 The Apache Software Foundation
+
+
+--- T69c5355f0fbbc3f7 ---
+Apache Commons Lang
+Copyright 2001-2025 The Apache Software Foundation
 
 
 --- Te7e1931b5fae4b75 ---
@@ -6482,9 +7993,890 @@ Apache Commons Logging
 Copyright 2001-2026 The Apache Software Foundation
 
 
---- T95ff8aaf1616861d ---
-This product includes software developed at
-The Apache Software Foundation (https://www.apache.org/).
+--- Tba34bdf56a53eb88 ---
+Apache Commons Math includes the following code provided to the ASF under the
+Apache License 2.0:
+
+
+--- T978a11ee0f16ed52 ---
+- The inverse error function implementation in the Erf class is based on CUDA
+   code developed by Mike Giles, Oxford-Man Institute of Quantitative Finance,
+   and published in GPU Computing Gems, volume 2, 2010 (grant received on
+   March 23th 2013)
+ - The LinearConstraint, LinearObjectiveFunction, LinearOptimizer,
+   RelationShip, SimplexSolver and SimplexTableau classes in package
+   org.apache.commons.math3.optimization.linear include software developed by
+   Benjamin McCann (http://www.benmccann.com) and distributed with
+   the following copyright: Copyright 2009 Google Inc. (grant received on
+   March 16th 2009)
+ - The class "org.apache.commons.math3.exception.util.LocalizedFormatsTest" which
+   is an adapted version of "OrekitMessagesTest" test class for the Orekit library
+ - The "org.apache.commons.math3.analysis.interpolation.HermiteInterpolator"
+   has been imported from the Orekit space flight dynamics library.
+
+
+--- T4a7622508ebd22e4 ---
+===============================================================================
+
+
+--- T702edac97d34efeb ---
+APACHE COMMONS MATH DERIVATIVE WORKS:
+
+
+--- Tf3fb7c8c128a635e ---
+The Apache commons-math library includes a number of subcomponents
+whose implementation is derived from original sources written
+in C or Fortran.  License terms of the original sources
+are reproduced below.
+
+
+--- Tae53940d99d6570b ---
+===============================================================================
+For the lmder, lmpar and qrsolv Fortran routine from minpack and translated in
+the LevenbergMarquardtOptimizer class in package
+org.apache.commons.math3.optimization.general
+Original source copyright and license statement:
+
+
+--- Td5a9a2b33ea538db ---
+Minpack Copyright Notice (1999) University of Chicago.  All rights reserved
+
+
+--- T3e0a3161844b6617 ---
+3. The end-user documentation included with the
+redistribution, if any, must include the following
+acknowledgment:
+
+
+--- Tdd5f2fac91c1e7f4 ---
+"This product includes software developed by the
+   University of Chicago, as Operator of Argonne National
+   Laboratory.
+
+
+--- T1dd66d2678f438b7 ---
+Alternately, this acknowledgment may appear in the software
+itself, if and wherever such third-party acknowledgments
+normally appear.
+
+
+--- T1cb265092ca96e6d ---
+4. WARRANTY DISCLAIMER. THE SOFTWARE IS SUPPLIED "AS IS"
+WITHOUT WARRANTY OF ANY KIND. THE COPYRIGHT HOLDER, THE
+UNITED STATES, THE UNITED STATES DEPARTMENT OF ENERGY, AND
+THEIR EMPLOYEES: (1) DISCLAIM ANY WARRANTIES, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO ANY IMPLIED WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE
+OR NON-INFRINGEMENT, (2) DO NOT ASSUME ANY LEGAL LIABILITY
+OR RESPONSIBILITY FOR THE ACCURACY, COMPLETENESS, OR
+USEFULNESS OF THE SOFTWARE, (3) DO NOT REPRESENT THAT USE OF
+THE SOFTWARE WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS, (4)
+DO NOT WARRANT THAT THE SOFTWARE WILL FUNCTION
+UNINTERRUPTED, THAT IT IS ERROR-FREE OR THAT ANY ERRORS WILL
+BE CORRECTED.
+
+
+--- T9d01a8b48a196457 ---
+5. LIMITATION OF LIABILITY. IN NO EVENT WILL THE COPYRIGHT
+HOLDER, THE UNITED STATES, THE UNITED STATES DEPARTMENT OF
+ENERGY, OR THEIR EMPLOYEES: BE LIABLE FOR ANY INDIRECT,
+INCIDENTAL, CONSEQUENTIAL, SPECIAL OR PUNITIVE DAMAGES OF
+ANY KIND OR NATURE, INCLUDING BUT NOT LIMITED TO LOSS OF
+PROFITS OR LOSS OF DATA, FOR ANY REASON WHATSOEVER, WHETHER
+SUCH LIABILITY IS ASSERTED ON THE BASIS OF CONTRACT, TORT
+(INCLUDING NEGLIGENCE OR STRICT LIABILITY), OR OTHERWISE,
+EVEN IF ANY OF SAID PARTIES HAS BEEN WARNED OF THE
+POSSIBILITY OF SUCH LOSS OR DAMAGES.
+===============================================================================
+
+
+--- T7cbff02e913fa764 ---
+Copyright and license statement for the odex Fortran routine developed by
+E. Hairer and G. Wanner and translated in GraggBulirschStoerIntegrator class
+in package org.apache.commons.math3.ode.nonstiff:
+
+
+--- Tdeb292c0187dd012 ---
+Copyright (c) 2004, Ernst Hairer
+
+
+--- T249291b829a350bf ---
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+===============================================================================
+
+
+--- Tcfb2244834c3f5de ---
+Copyright and license statement for the original Mersenne twister C
+routines translated in MersenneTwister class in package
+org.apache.commons.math3.random:
+
+
+--- T308a66e336f4a943 ---
+Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
+   All rights reserved.
+
+
+--- T5db27175d886f6a3 ---
+3. The names of its contributors may not be used to endorse or promote
+        products derived from this software without specific prior written
+        permission.
+
+
+--- T94234c5e739c044a ---
+The initial code for shuffling an array (originally in class
+"org.apache.commons.math3.random.RandomDataGenerator", now replaced by
+a method in class "org.apache.commons.math3.util.MathArrays") was
+inspired from the algorithm description provided in
+"Algorithms", by Ian Craw and John Pulham (University of Aberdeen 1999).
+The textbook (containing a proof that the shuffle is uniformly random) is
+available here:
+  http://citeseerx.ist.psu.edu/viewdoc/download;?doi=10.1.1.173.1898&rep=rep1&type=pdf
+
+
+--- T11378ed2a32f162b ---
+===============================================================================
+License statement for the direction numbers in the resource files for Sobol sequences.
+
+
+--- T3b602acbc97300ce ---
+-----------------------------------------------------------------------------
+Licence pertaining to sobol.cc and the accompanying sets of direction numbers
+
+
+--- Tf7b26717f9c55655 ---
+-----------------------------------------------------------------------------
+Copyright (c) 2008, Frances Y. Kuo and Stephen Joe
+All rights reserved.
+
+
+--- T96d30a7f6df5436d ---
+* Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+
+--- T693a5dc45091f6cb ---
+* Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+
+--- T964c93ba93897bd5 ---
+* Neither the names of the copyright holders nor the names of the
+      University of New South Wales and the University of Waikato
+      and its contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+
+--- Te03b80c17b7b26bb ---
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+===============================================================================
+
+
+--- T924928477b6957a3 ---
+The initial commit of package "org.apache.commons.math3.ml.neuralnet" is
+an adapted version of code developed in the context of the Data Processing
+and Analysis Consortium (DPAC) of the "Gaia" project of the European Space
+Agency (ESA).
+===============================================================================
+
+
+--- Tb8b17f2415350ff4 ---
+The initial commit of the class "org.apache.commons.math3.special.BesselJ" is
+an adapted version of code translated from the netlib Fortran program, rjbesl
+http://www.netlib.org/specfun/rjbesl by R.J. Cody at Argonne National
+Laboratory (USA).  There is no license or copyright statement included with the
+original Fortran sources.
+===============================================================================
+
+
+--- T99de8082930fc5b1 ---
+The BracketFinder (package org.apache.commons.math3.optimization.univariate)
+and PowellOptimizer (package org.apache.commons.math3.optimization.general)
+classes are based on the Python code in module "optimize.py" (version 0.5)
+developed by Travis E. Oliphant for the SciPy library (http://www.scipy.org/)
+Copyright © 2003-2009 SciPy Developers.
+
+
+--- Ta47cf34d505a2189 ---
+SciPy license
+Copyright © 2001, 2002 Enthought, Inc.
+All rights reserved.
+
+
+--- T2a3920211c315a50 ---
+Copyright © 2003-2013 SciPy Developers.
+All rights reserved.
+
+
+--- Ta0becbc35885bae5 ---
+* Neither the name of Enthought nor the names of the SciPy Developers may
+      be used to endorse or promote products derived from this software without
+      specific prior written permission.
+
+
+--- Tcc6ca09412c5b516 ---
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+===============================================================================
+
+
+--- Tc67f4ca5ad118406 ---
+Apache Commons Math
+Copyright 2001-2016 The Apache Software Foundation
+
+
+--- T5475b6e288299520 ---
+This product includes software developed for Orekit by
+CS Systèmes d'Information (http://www.c-s.fr/)
+Copyright 2010-2012 CS Systèmes d'Information
+
+
+--- T9ee156dd003be607 ---
+/*
+* Copyright (c) 2005, Graph Builder
+* All rights reserved.
+
+
+--- Td0e83c165200c1ab ---
+* * Redistributions of source code must retain the above copyright notice,
+* this list of conditions and the following disclaimer.
+
+
+--- Td00b0a8fdc0c08e2 ---
+* * Redistributions in binary form must reproduce the above copyright notice,
+* this list of conditions and the following disclaimer in the documentation
+* and/or other materials provided with the distribution.
+
+
+--- T7d6c1bb669aabdfc ---
+* * Neither the name of Graph Builder nor the names of its contributors may be
+* used to endorse or promote products derived from this software without
+* specific prior written permission.
+
+
+--- T6ca556b8f25dc049 ---
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the "License"); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+
+
+--- T4a712cc813734dad ---
+*  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/**
+ * @author Denis M. Kishenko
+ */
+
+
+--- T307c4b492ac15b32 ---
+To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "{}"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+
+--- T47561b8d6123d618 ---
+Copyright {yyyy} {name of copyright owner}
+
+
+--- T28a40fc6a24080ee ---
+/*
+ * Copyright Terracotta, Inc.
+ * Copyright IBM Corp. 2024, 2025
+
+
+--- T4ef2680cbba186a5 ---
+/**
+ * Builders designed to help with programmatic configuration of Ehcache using a fluent API
+ */
+@PublicApi
+
+
+--- T90aaadc17c39abba ---
+/**
+ * {@link org.ehcache.config.Configuration CacheManager configuration},
+ * {@link org.ehcache.config.CacheConfiguration Cache configuration} and other configuration classes.
+ */
+@PublicApi
+
+
+--- T881c2684a27c6523 ---
+/**
+ * {@link org.ehcache.config.ResourceUnit ResourceUnit} implementations
+ */
+@PublicApi
+
+
+--- Tb15aa7cc2852b9a2 ---
+/**
+ * Package holding core configuration implementations and utilities.
+ */
+@PublicApi
+
+
+--- T7394ac2962c9c38f ---
+/**
+ * Package holding types related to {@link org.ehcache.core.spi.store.Store} configuration.
+ */
+@PublicApi
+
+
+--- T3c2a9cead7eaa00d ---
+/**
+ * Package holding interfaces that relate to events, either at the {@link org.ehcache.CacheManager} level like
+ * {@link org.ehcache.core.events.CacheManagerListener} or the {@link org.ehcache.event.CacheEvent} subsystem like
+ * {@link org.ehcache.core.events.CacheEventDispatcher} and {@link org.ehcache.core.events.StoreEventDispatcher}.
+ */
+@PublicApi
+
+
+--- T6c26a86b99e118a2 ---
+/**
+ * Package holding core exception classes
+ */
+
+
+--- Te6a476191d328b35 ---
+/**
+ * Package for core implementation classes such as {@link org.ehcache.core.EhcacheManager} and
+ * {@link org.ehcache.core.Ehcache}.
+ */
+
+
+--- T5f7953f7c9b6ba16 ---
+/**
+ * Parent
+
+
+--- T9535da599cb019e7 ---
+/**
+ * Package for Core SPI {@link org.ehcache.spi.service.Service} related types.
+ */
+@PublicApi
+
+
+--- T9c4aa679e79faba8 ---
+/**
+ * Package for the SPI types related to store eventing.
+ */
+@PublicApi
+
+
+--- T028c80ddc187e981 ---
+/**
+ * Package for SPI related to the use of <a href="https://github.com/ehcache/sizeof">sizeof</a> in the on-heap
+ * {@link org.ehcache.core.spi.store.Store store} in Ehcache
+ */
+@PublicApi
+
+
+--- T55b030e1754c8b7a ---
+/**
+ * Package for the {@link org.ehcache.core.spi.store.Store} SPI and related types.
+ */
+@PublicApi
+
+
+--- T679da17e9538871d ---
+/**
+ * Package holding the different SPI interfaces that enable a {@link org.ehcache.Cache} to be backed by multiple
+ * {@link org.ehcache.core.spi.store.Store} stacked on each other.
+ */
+@PublicApi
+
+
+--- Tbf96f33439ad5abc ---
+/**
+ * Package holding SPI types abstracting the concept of time
+ */
+@PublicApi
+
+
+--- T2a55c686f2a5e88f ---
+/**
+ * Package holding the {@code enum}s representing operations statistics results.
+ */
+@PublicApi
+
+
+--- T0124655b65295602 ---
+/**
+ * {@link org.ehcache.event.CacheEvent CacheEvent} and related types.
+ */
+@PublicApi
+
+
+--- Td3bec56d10634d28 ---
+/**
+ * {@link org.ehcache.expiry.ExpiryPolicy Expiry} API of a {@link org.ehcache.Cache Cache}.
+ */
+@PublicApi
+
+
+--- Tc7fe7651f526e9cf ---
+/**
+ * Package for configuration classes for default {@link org.ehcache.spi.copy.CopyProvider} implementation.
+ */
+
+
+--- T13d5e53ce54b291c ---
+/**
+ * Package for configuration classes for default events related services.
+ */
+
+
+--- Tbddf6083017a67db ---
+/**
+ * Package for configuration of the pooled {@link org.ehcache.core.spi.service.ExecutionService}.
+ */
+
+
+--- T86a62a34ab172559 ---
+/**
+ * Package for configuration classes for default {@link org.ehcache.spi.loaderwriter.CacheLoaderWriter loader writer}
+ * {@link org.ehcache.spi.loaderwriter.CacheLoaderWriterProvider provider}.
+ */
+
+
+--- T05543b9ac96bcc30 ---
+/**
+ * Package for configuration classes for default {@link org.ehcache.spi.loaderwriter.WriteBehindProvider write-behind
+ * provider}.
+ */
+
+
+--- T16ec959cc1595544 ---
+/**
+ * Package for configuration classes for the default {@link org.ehcache.core.spi.service.LocalPersistenceService local
+ * persistence service} implementation.
+ */
+
+
+--- T9f6c54864c55a861 ---
+/**
+ * Package for configuration classes for the default {@link org.ehcache.spi.serialization.SerializationProvider
+ * serialization provider}.
+ */
+
+
+--- Ta54b1829577d166f ---
+/**
+ * Package for configuration classes for the default {@link org.ehcache.core.spi.store.Store disk store} implementation.
+ */
+
+
+--- T977eb68d45e42d77 ---
+/**
+ * Package for configuration classes for the default {@link org.ehcache.core.spi.store.heap.SizeOfEngineProvider sizeof
+ * engine provider} implementation used by the on heap {@link org.ehcache.core.spi.store.Store store}.
+ */
+
+
+--- T741e32fb242c3dad ---
+/**
+ * Package for bundled implementation of {@link org.ehcache.spi.copy.Copier copiers}.
+ */
+@PublicApi
+
+
+--- T6d918fcd22aa9044 ---
+/**
+ * Package for implementation classes related to cache eventing.
+ */
+
+
+--- T73c24a493740f138 ---
+/*
+ * This is a modified version of the original Apache class.  It has had unused
+ * members removed.
+ */
+
+
+--- Ta543e79a4bbed8db ---
+/*
+ * Written by Doug Lea with assistance from members of JCP JSR-166
+ * Expert Group and released to the public domain, as explained at
+ * http://creativecommons.org/publicdomain/zero/1.0/
+ */
+
+
+--- T68f9c57ca811eea7 ---
+@edu.umd.cs.findbugs.annotations.SuppressFBWarnings
+
+
+--- Tc7f8626e8aff9a46 ---
+/**
+ * Pacakge for default implementation related to the {@link org.ehcache.core.spi.service.LocalPersistenceService local
+ * persistence service}.
+ */
+
+
+--- T4a9c091002449b73 ---
+/**
+ * Package for bundled implementations of {@link org.ehcache.spi.serialization.Serializer serializers}.
+ */
+@PublicApi
+
+
+--- Td447cd1dc73bc18c ---
+/**
+ * Annotations processed by the Gradle build to restrict the set of source files presented to Javadoc.
+ */
+
+
+--- T90fd57f0057d23bb ---
+/**
+ * Package for JSR-107 related services and configuration
+ */
+
+
+--- Tb16537c24e0fb0ab ---
+/**
+ * Package for JSR-107 integration types.
+ */
+
+
+--- Tb72ea54b0e286b94 ---
+/**
+ * Main Ehcache API, including {@link org.ehcache.CacheManager cache managers} and
+ * {@link org.ehcache.Cache caches}.
+ */
+@PublicApi
+
+
+--- Teccc806df1590caa ---
+/**
+ * {@link org.ehcache.spi.copy.Copier Copier} SPI in Ehcache.
+ */
+@PublicApi
+
+
+--- Ta54a028a6c0e0ebd ---
+/**
+ * {@link org.ehcache.spi.loaderwriter.CacheLoaderWriter CacheLoaderWriter} SPI for a {@link org.ehcache.Cache Cache}.
+ */
+@PublicApi
+
+
+--- Tf6526d96684aa98c ---
+/**
+ * {@link org.ehcache.spi.persistence.PersistableResourceService PersistableResourceService} and other persistence
+ * related SPI.
+ */
+@PublicApi
+
+
+--- T254d09e2cd9abbe0 ---
+/**
+ * {@link org.ehcache.spi.resilience.ResilienceStrategy} API of a {@link org.ehcache.Cache Cache}.
+ */
+@PublicApi
+
+
+--- T8986a394586594a1 ---
+/**
+ * {@link org.ehcache.spi.serialization.Serializer Serializer} SPI in Ehcache.
+ */
+@PublicApi
+
+
+--- Tbaade36f57070a63 ---
+/**
+ * {@link org.ehcache.spi.service.Service Service} SPI related in Ehcache.
+ */
+@PublicApi
+
+
+--- Tdf6eb1d058c5b990 ---
+package org.ehcache.impl.internal.store.copy;
+
+
+--- Te71b64d1ef87d779 ---
+import java.util.Iterator;
+import java.util.Spliterator;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+
+--- T789a71afb69b40a9 ---
+public class CopyingIterable<T, U> implements Iterable<U> {
+
+
+--- Tcca9452185afcd47 ---
+private final Iterable<T> delegate;
+  private final Function<T, U> copier;
+
+
+--- Tddad525514f56b52 ---
+CopyingIterable(Iterable<T> delegate, Function<T, U> mapping) {
+    this.delegate = delegate;
+    this.copier = mapping;
+  }
+
+
+--- T1eaeba370eea9779 ---
+@Override
+  public Iterator<U> iterator() {
+    return new CopyingIterator<>(delegate.iterator(), copier);
+  }
+
+
+--- T089782e4348eb913 ---
+@Override
+  public void forEach(Consumer<? super U> action) {
+    delegate.forEach(t -> action.accept(copier.apply(t)));
+  }
+
+
+--- T3eb2d5c9e6827385 ---
+@Override
+  public Spliterator<U> spliterator() {
+    return new CopyingSpliterator<>(delegate.spliterator(), copier);
+  }
+}
+
+
+--- T18e4513009ce7d9d ---
+import java.util.Iterator;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+
+--- Td1d72997b6aace50 ---
+class CopyingIterator<T, U> implements Iterator<U> {
+
+
+--- T59322ffbe22f3a2f ---
+private final Iterator<T> delegate;
+  private final Function<T, U> copier;
+
+
+--- Tcfb0154437daee4d ---
+CopyingIterator(java.util.Iterator<T> delegate, Function<T, U> copier) {
+    this.delegate = delegate;
+    this.copier = copier;
+  }
+
+
+--- T9d4c2adcbe1f7b9b ---
+@Override
+  public boolean hasNext() {
+    return delegate.hasNext();
+  }
+
+
+--- T34adfb39464caaea ---
+@Override
+  public U next() {
+    return copier.apply(delegate.next());
+  }
+
+
+--- T5be3b42b8e9a1ba6 ---
+@Override
+  public void remove() {
+    delegate.remove();
+  }
+
+
+--- T02b2869485ca8ec4 ---
+@Override
+  public void forEachRemaining(Consumer<? super U> action) {
+    delegate.forEachRemaining(t -> action.accept(copier.apply(t)));
+  }
+}
+
+
+--- T8d4a8949b1799dd7 ---
+import java.util.Spliterator;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+
+--- Tfc55ef22514b0fb7 ---
+class CopyingSpliterator<T, U> implements Spliterator<U> {
+
+
+--- T70411736a7f69a76 ---
+private final Spliterator<T> delegate;
+  private final Function<T, U> copier;
+
+
+--- T04b7f7d59e2d45d3 ---
+public CopyingSpliterator(Spliterator<T> delegate, Function<T, U> copier) {
+    this.delegate = delegate;
+    this.copier = copier;
+  }
+
+
+--- T395ef1263756d16c ---
+@Override
+  public boolean tryAdvance(Consumer<? super U> action) {
+    return delegate.tryAdvance(t -> action.accept(copier.apply(t)));
+  }
+
+
+--- Tf032e3d2492a0153 ---
+@Override
+  public Spliterator<U> trySplit() {
+    Spliterator<T> split = delegate.trySplit();
+    if (split == null) {
+      return null;
+    } else {
+      return new CopyingSpliterator<>(split, copier);
+    }
+  }
+
+
+--- T25f8e7cdaebd045a ---
+@Override
+  public long estimateSize() {
+    return delegate.estimateSize();
+  }
+
+
+--- T700a6db4191dcbe2 ---
+@Override
+  public int characteristics() {
+    return delegate.characteristics();
+  }
+}
+
+
+--- T0f7486db52a5239a ---
+/* ====================================================================
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+
+--- T3f50da9f9523a437 ---
+Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+==================================================================== */
+
+
+--- T29a3d7f3b885da04 ---
+* 2012 - Alfresco Software, Ltd. Alfresco Software has modified source of this file The details of changes as svn diff
+ * can be found in svn at location root/projects/3rd-party/src
+ * ====================================================================
+ */
+
+
+--- Teef27df6a9fb5fde ---
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+
+
+--- T96ec15ec1f5631af ---
+// ASM: a very small and fast Java bytecode manipulation framework
+// Copyright (c) 2000-2011 INRIA, France Telecom
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+// 3. Neither the name of the copyright holders nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+// THE POSSIBILITY OF SUCH DAMAGE.
+
+
+--- T68091018632f3e50 ---
+/*
+ * Copyright 2002-2021 the original author or authors.
+
+
+--- Tb26df557883116c0 ---
+/*
+ * Copyright 2002-2014 the original author or authors.
+
+
+--- T1348ce2c2db12e47 ---
+/*
+ * Copyright 2003,2004 The Apache Software Foundation
+
+
+--- T341eaf8014a1f013 ---
+/*
+ * Copyright 2003 The Apache Software Foundation
+
+
+--- Tfbfe3be371c84d97 ---
+/*
+ * Copyright 2002-2019 the original author or authors.
+
+
+--- T4a0cad2ef5aad190 ---
+/*
+ * Copyright 2002,2003,2004 The Apache Software Foundation
 
 
 --- T72e301f1bcbe9daf ---
@@ -6523,6 +8915,38 @@ Copyright (C) Red Gate Software Ltd 2010-2026
  */
 /**
  * Private API. No compatibility guarantees provided.
+ */
+
+
+--- T26ca9366cd71da9f ---
+/*
+ * Copyright (c) 1997, 2021 Oracle and/or its affiliates. All rights reserved.
+
+
+--- Tb00b112416eda83a ---
+* This program and the accompanying materials are made available under the
+ * terms of the Eclipse Distribution License v. 1.0, which is available at
+ * http://www.eclipse.org/org/documents/edl-v10.php.
+
+
+--- T20e18de8fce6ce65 ---
+/*
+ * Copyright (c) 1997, 2022 Oracle and/or its affiliates. All rights reserved.
+
+
+--- T2bd42fe47c99d74e ---
+/*
+ * Copyright (c) 1997, 2023 Oracle and/or its affiliates. All rights reserved.
+
+
+--- T3c5022462e7816d8 ---
+/*
+ * Copyright (c) 2019, 2022 Oracle and/or its affiliates. All rights reserved.
+
+
+--- Tda48fa2e60c1ea2b ---
+/**
+ * istack-commons runtime utilities.
  */
 
 
@@ -6604,27 +9028,6 @@ Copyright 2018-2020 Raffaello Giulietti
 See Schubfach-LICENSE.
 
 
---- Te5ea188d7859ea12 ---
-Copyright (c) 2018 Oracle and/or its affiliates. All rights reserved.
-
-
---- T6f7cfb7cf9c68caa ---
-- Redistributions of source code must retain the above copyright
-        notice, this list of conditions and the following disclaimer.
-
-
---- T3c28a6b2482f05c4 ---
-- Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-
---- Tad0b65b4889237b2 ---
-- Neither the name of the Eclipse Foundation, Inc. nor the names of its
-        contributors may be used to endorse or promote products derived
-        from this software without specific prior written permission.
-
-
 --- Te2eb2de047a7f603 ---
 # Notices for Jakarta Activation
 
@@ -6637,22 +9040,8 @@ This content is produced and maintained by the Jakarta Activation project.
 * Project home: https://projects.eclipse.org/projects/ee4j.jaf
 
 
---- T722a2858f4068985 ---
-## Trademarks
-
-
 --- Tf65d277ccbb903ef ---
 Jakarta Activation is a trademark of the Eclipse Foundation.
-
-
---- T52ad1a476a8829eb ---
-All content is the property of the respective authors or their employers. For
-more information regarding authorship of content, please consult the listed
-source code repository logs.
-
-
---- Ta60c522ca192b3d0 ---
-## Declared Project Licenses
 
 
 --- T84f8187170c08c17 ---
@@ -6671,25 +9060,9 @@ SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause OR GPL-2.0-only with
 Classpath-exception-2.0
 
 
---- Tbc47da663d101bfc ---
-## Source Code
-
-
---- T768c6338e3d966cb ---
-The project maintains the following source code repositories:
-
-
 --- Tf23d0541adbfa702 ---
 * https://github.com/jakartaee/jaf-api
 * https://github.com/jakartaee/jaf-tck
-
-
---- Td1ee2bab162bd261 ---
-## Third-party Content
-
-
---- Tf9c20e5161bdbaa2 ---
-This project leverages the following third party content.
 
 
 --- T121f5c7e0c75b8a6 ---
@@ -6760,19 +9133,6 @@ SigTest (4.0)
 * License: GPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
 * Project: https://wiki.openjdk.java.net/display/CodeTools/sigtest
 * Source: http://hg.openjdk.java.net/code-tools/sigtest/file/c57f97e2ac2f
-
-
---- Tb584eec728548ace ---
-## Cryptography
-
-
---- T8add5c0ea0190931 ---
-Content may contain encryption software. The country in which you are currently
-may have restrictions on the import, possession, and use, and/or re-export to
-another country, of encryption software. BEFORE using any encryption software,
-please check the country's laws, regulations and policies concerning the import,
-possession, or use, and re-export of encryption software, to see if this is
-permitted.
 
 
 --- Tcb3f91d54eee30e5 ---
@@ -7475,19 +9835,235 @@ This content is produced and maintained by the Jakarta XML Binding project.
 Jakarta XML Binding™ is a trademark of the Eclipse Foundation.
 
 
---- T975c32202c4cb638 ---
-This program and the accompanying materials are made available under the terms
-of the Eclipse Distribution License v1.0 which is available at
-https://www.eclipse.org/org/documents/edl-v10.php.
-
-
---- Td75639ad3aebcc36 ---
-SPDX-License-Identifier: BSD-3-Clause
-
-
 --- T5b2ed9d2e8931e9c ---
 * https://github.com/jakartaee/jaxb-api
 * https://github.com/jakartaee/jaxb-tck
+
+
+--- Tc7dc89a74b3d45b6 ---
+# Notices for Eclipse Implementation of JAXB
+
+
+--- T74d48ab7f445697e ---
+This content is produced and maintained by the Eclipse Implementation of JAXB
+project.
+
+
+--- T4680c39515784825 ---
+* Project home: https://projects.eclipse.org/projects/ee4j.jaxb-impl
+
+
+--- T207d9eca0e5dd35d ---
+Eclipse Implementation of JAXB is a trademark of the Eclipse Foundation.
+
+
+--- Tbb793bf1a9046d6e ---
+This program and the accompanying materials are made available under the terms
+of the Eclipse Distribution License v. 1.0 which is available at
+http://www.eclipse.org/org/documents/edl-v10.php.
+
+
+--- Tb55dc147560b37b7 ---
+* https://github.com/eclipse-ee4j/jaxb-ri
+* https://github.com/eclipse-ee4j/jaxb-istack-commons
+* https://github.com/eclipse-ee4j/jaxb-dtd-parser
+* https://github.com/eclipse-ee4j/jaxb-fi
+* https://github.com/eclipse-ee4j/jaxb-stax-ex
+* https://github.com/eclipse-ee4j/jax-rpc-ri
+
+
+--- T107cbc0d4ee71e95 ---
+Apache Ant (1.10.2)
+
+
+--- T82e726dccf81bb76 ---
+* License: Apache-2.0 AND W3C AND LicenseRef-Public-Domain
+
+
+--- Te357f6fbab507f9a ---
+Apache Felix (1.2.0)
+
+
+--- Ta17e73397b438cde ---
+* License: Apache License, 2.0
+
+
+--- Tf9df0559f6563144 ---
+args4j (2.33)
+
+
+--- T3b3c3a13001db89b ---
+* License: MIT License
+
+
+--- Tc26be9dbb4ab3dc7 ---
+dom4j (1.6.1)
+
+
+--- T04019927ad60b83c ---
+* License: Custom license based on Apache 1.1
+
+
+--- T0158cb515d08a135 ---
+file-management (3.0.0)
+
+
+--- T7cc6a2a4e65a9488 ---
+* License: Apache-2.0
+* Project: https://maven.apache.org/shared/file-management/
+* Source:
+   https://svn.apache.org/viewvc/maven/shared/tags/file-management-3.0.0/
+
+
+--- Tab65badc0111ba71 ---
+maven-compat (3.5.2)
+
+
+--- T3c862cbc329c0e51 ---
+* License: Apache-2.0
+* Project: https://maven.apache.org/ref/3.5.2/maven-compat/
+* Source:
+   https://mvnrepository.com/artifact/org.apache.maven/maven-compat/3.5.2
+
+
+--- T6415ba84fed749d8 ---
+maven-core (3.5.2)
+
+
+--- T52ebb98bc2fe9f8d ---
+* License: Apache-2.0
+* Project: https://maven.apache.org/ref/3.5.2/maven-core/index.html
+* Source: https://mvnrepository.com/artifact/org.apache.maven/maven-core/3.5.2
+
+
+--- T96a4ffd01cda7a3e ---
+maven-plugin-annotations (3.5)
+
+
+--- T53470e2d90f599dc ---
+* License: Apache-2.0
+* Project: https://maven.apache.org/plugin-tools/maven-plugin-annotations/
+* Source:
+   https://github.com/apache/maven-plugin-tools/tree/master/maven-plugin-annotations
+
+
+--- T6b52e6f0e4a79b3e ---
+maven-plugin-api (3.5.2)
+
+
+--- Te2f78e09ea436a19 ---
+maven-resolver-api (1.1.1)
+
+
+--- Tb16d00329a4f7a37 ---
+maven-resolver-connector-basic (1.1.1)
+
+
+--- T4821452ac4f15d80 ---
+maven-resolver-impl (1.1.1)
+
+
+--- T44b1b0d3be032ee5 ---
+maven-resolver-spi (1.1.1)
+
+
+--- Tc072b74a42e4202c ---
+maven-resolver-transport-file (1.1.1)
+
+
+--- T5e83dca226cf555b ---
+* License: Apache-2.0
+* Project: https://maven.apache.org/resolver/maven-resolver-transport-file/
+* Source:
+   https://github.com/apache/maven-resolver/tree/master/maven-resolver-transport-file
+
+
+--- Ta48afda257f2a1e9 ---
+maven-resolver-util (1.1.1)
+
+
+--- T7f7b7d2c09e30943 ---
+maven-settings (3.5.2)
+
+
+--- Tdf04992535125bb3 ---
+* License: Apache-2.0
+* Source:
+   https://mvnrepository.com/artifact/org.apache.maven/maven-settings/3.5.2
+
+
+--- T497f9d7c3f5bae38 ---
+OSGi Service Platform Core Companion Code (6.0)
+
+
+--- T56eca972b5d0400d ---
+plexus-archiver (3.5)
+
+
+--- T48672cc57cc405ad ---
+* License: Apache-2.0
+* Project: https://codehaus-plexus.github.io/plexus-archiver/
+* Source: https://github.com/codehaus-plexus/plexus-archiver
+
+
+--- Tba212930b04a4ada ---
+plexus-io (3.0.0)
+
+
+--- T70a8ec1eecd60666 ---
+plexus-utils (3.1.0)
+
+
+--- Tfb0e2ce7eb5cabf1 ---
+* License: Apache- 2.0 or Apache- 1.1 or BSD or Public Domain or Indiana
+   University Extreme! Lab Software License V1.1.1 (Apache 1.1 style)
+
+
+--- T20f9f13924c08736 ---
+relaxng-datatype (1.0)
+
+
+--- Tbb923fe3fc251a63 ---
+* License: New BSD license
+
+
+--- Tfa83b05998756f23 ---
+Sax (0.2)
+
+
+--- T4b6718f1c8edcdcf ---
+* License: SAX-PD
+* Project: http://www.megginson.com/downloads/SAX/
+* Source: http://sourceforge.net/project/showfiles.php?group_id=29449
+
+
+--- Te7a81de140d65458 ---
+testng (6.14.2)
+
+
+--- T056729c0514b0121 ---
+* License: Apache-2.0 AND (MIT OR GPL-1.0+)
+* Project: https://testng.org/doc/index.html
+* Source: https://github.com/cbeust/testng
+
+
+--- Tfa21149497c65872 ---
+wagon-http-lightweight (3.0.0)
+
+
+--- Ta2f136622ea5f03d ---
+* License: Pending
+* Project: https://maven.apache.org/wagon/
+* Source:
+   https://mvnrepository.com/artifact/org.apache.maven.wagon/wagon-http-lightweight/3.0.0
+
+
+--- T900367ca4c6d72b8 ---
+xz for java (1.8)
+
+
+--- T1e50231336282bf4 ---
+* License: LicenseRef-Public-Domain
 
 
 --- T0db12e96b83a7918 ---
@@ -7886,11 +10462,6 @@ Apache Log4j API
 Copyright 1999-2026 The Apache Software Foundation
 
 
---- T5baa7fddf18c2f36 ---
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).
-
-
 --- T6d801c22485ec00b ---
 Log4j API to SLF4J Adapter
 Copyright 1999-2026 The Apache Software Foundation
@@ -7941,21 +10512,6 @@ Copyright 1999-2026 The Apache Software Foundation
  * as published by the Free Software Foundation.
  */
 // Contributors:  Georg Lundesgaard
-
-
---- T307c4b492ac15b32 ---
-To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "{}"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-
---- T47561b8d6123d618 ---
-Copyright {yyyy} {name of copyright owner}
 
 
 --- Tdfe1bccb08960850 ---
@@ -9211,19 +11767,6 @@ Copyright (c) 2011, Joe Walnes, Aslak Hellesøy and contributors
 All rights reserved.
 
 
---- T96d30a7f6df5436d ---
-* Redistributions of source code must retain the above
-  copyright notice, this list of conditions and the
-  following disclaimer.
-
-
---- T693a5dc45091f6cb ---
-* Redistributions in binary form must reproduce the above
-  copyright notice, this list of conditions and the
-  following disclaimer in the documentation and/or other
-  materials provided with the distribution.
-
-
 --- T1c06291e2ec7fd84 ---
 * Neither the name of the Webbit nor the names of
   its contributors may be used to endorse or promote products
@@ -9699,6 +12242,127 @@ Objenesis
 Copyright 2006-2026 Joe Walnes, Henri Tremblay, Leonardo Mesquita
 
 
+--- Tc5fc194647e223f3 ---
+APACHE POI SUBCOMPONENTS:
+
+
+--- T2901572b1277eea0 ---
+Apache POI includes subcomponents with separate copyright notices and
+license terms. Your use of these subcomponents is subject to the terms
+and conditions of the following licenses:
+
+
+--- T07e0b7836e1903e7 ---
+Office Open XML schemas (poi-ooxml-full-*.jar)
+
+
+--- Ta20758fb507d5281 ---
+The Office Open XML schema definitions used by Apache POI are
+    a part of the Office Open XML ECMA Specification (ECMA-376, [1]).
+    As defined in section 9.4 of the ECMA bylaws [2], this specification
+    is available to all interested parties without restriction:
+
+
+--- T14deed44e2db0653 ---
+9.4 All documents when approved shall be made available to
+            all interested parties without restriction.
+
+
+--- T2fedf936611c2528 ---
+Furthermore, both Microsoft and Adobe have granted patent licenses
+    to this work [3,4,5].
+
+
+--- T2784acc4ba14a58c ---
+[1] https://www.ecma-international.org/publications/standards/Ecma-376.htm
+    [2] https://www.ecma-international.org/memento/Ecmabylaws.htm
+    [3] https://www.microsoft.com/openspecifications/en/us/programs/osp/default.aspx
+    [4] https://www.ecma-international.org/publications/files/ECMA-ST/Ecma%20PATENT/
+        Patent%20statements%20ok/ECMA-376%20Edition%202%20Microsoft%20Patent%20Declaration.pdf
+    [5] https://www.ecma-international.org/publications/files/ECMA-ST/Ecma%20PATENT/
+        Patent%20statements%20ok/ECMA-376%20Adobe%20Patent%20Declaration.pdf
+
+
+--- Teccd3045f2302000 ---
+org.apache.poi.util.ReplacingInputStream is based on code from
+inbot-utils (https://github.com/Inbot/inbot-utils)
+
+
+--- T74896d15800f7a63 ---
+The MIT License (MIT)
+
+
+--- Td43dcab8e37ad56d ---
+Copyright (c) 2015 Inbot
+
+
+--- Ta77bb8919a79da20 ---
+ExceptionUtils is derived from `scala.util.control.NonFatal` in scala-library
+which was released under the Apache 2.0 license.
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+
+--- T97fec2b51459cdc6 ---
+The POI Source Release bundles the Gradle Wrapper. (https://docs.gradle.org/current/userguide/gradle_wrapper.html)
+This is released under the Apache License, v2.0.
+Copyright © 2015-2021 the original authors.
+
+
+--- Tcced41d2a3041055 ---
+The wrapper.gradle file was developed by the Apache Kafka project and is released under the Apache License, v2.0.
+
+
+--- T193c44e005bfca85 ---
+Apache POI
+Copyright 2003-2025 The Apache Software Foundation
+
+
+--- T08494a7891bbb66a ---
+This product contains parts that were originally based on software from BEA.
+Copyright (c) 2000-2003, BEA Systems, <http://www.bea.com/> (dead link),
+which was acquired by Oracle Corporation in 2008.
+<http://www.oracle.com/us/corporate/Acquisitions/bea/index.html>
+<https://en.wikipedia.org/wiki/BEA_Systems>
+Note: The ASF Secretary has on hand a Software Grant Agreement (SGA) from
+BEA Systems, Inc. dated 9 Sep 2003 for XMLBeans signed by their EVP/CFO.
+
+
+--- Td160488f04d99414 ---
+This product contains W3C XML Schema documents. Copyright 2001-2003 (c)
+World Wide Web Consortium (Massachusetts Institute of Technology, European
+Research Consortium for Informatics and Mathematics, Keio University)
+
+
+--- T2983428fb97495b8 ---
+This product contains the chunks_parse_cmds.tbl file from the vsdump program.
+Copyright (C) 2006-2007 Valek Filippov (frob@df.ru)
+
+
+--- T76cac9214160d7bc ---
+This product contains parts of the eID Applet project
+<http://eid-applet.googlecode.com> and <https://github.com/e-Contract/eid-applet>.
+Copyright (c) 2009-2018
+FedICT (federal ICT department of Belgium), e-Contract.be BVBA (https://www.e-contract.be),
+Bart Hanssens from FedICT
+
+
+--- Tf1ac6793c2232511 ---
+ExceptionUtils is derived from `scala.util.control.NonFatal` in scala-library
+which was released under the Apache 2.0 license.
+
+
+--- T0b2cfc15ce9d8daa ---
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+
+--- Tbc0c8cd60aa7e83e ---
+Scala includes software developed at
+LAMP/EPFL (https://lamp.epfl.ch/) and
+Lightbend, Inc. (https://www.lightbend.com/).
+
+
 --- T9b83c76ad3033cb9 ---
 Copyright (c) 1997, PostgreSQL Global Development Group
 All rights reserved.
@@ -9975,10 +12639,6 @@ Apache License, version 2.0, the text of which is included above.
 Per the NOTICE file in the Objenesis distribution downloaded from
 http://objenesis.org/download.html and corresponding to section 4d of the
 Apache License, Version 2.0, in this case for Objenesis:
-
-
---- T4a7622508ebd22e4 ---
-===============================================================================
 
 
 --- Tad7b01849f723d1f ---
@@ -10580,3 +13240,121 @@ The original XML Schemas for Java EE Deployment Descriptors:
 --- Te7733799add32aa4 ---
 may be obtained from:
 http://www.oracle.com/webfolder/technetwork/jsc/xml/ns/javaee/index.html
+
+
+--- T7e73d9141e1f5f80 ---
+------------------
+The XMLBeans Source Release bundles the Gradle Wrapper. (https://docs.gradle.org/current/userguide/gradle_wrapper.html)
+This is released under the Apache License, v2.0.
+Copyright © 2015-2021 the original authors.
+
+
+--- T3ba59c843c6831d4 ---
+------------------
+The wrapper.gradle file was developed by the Apache Kafka project and is released under the Apache License, v2.0.
+
+
+--- T2e301670479d1c77 ---
+------------------
+ExceptionUtils is derived from `scala.util.control.NonFatal` in scala-library
+which was released under the Apache 2.0 license.
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+
+--- Tb74f726e3736ca81 ---
+------------------
+A number of test cases in the XMLBeans test suite are derived from the W3C XML Schema Test Suite.
+Java source files in src/test/java/org/w3c and XML/DTD files in src/test/resources/xbean/dom/W3C.
+
+
+--- Te38133177ef553f8 ---
+W3C® SOFTWARE NOTICE AND LICENSE
+Copyright © 1994-2002 World Wide Web Consortium, (Massachusetts Institute of Technology,
+Institut National de Recherche en Informatique et en Automatique, Keio University).
+All Rights Reserved. http://www.w3.org/Consortium/Legal/
+This W3C work (including software, documents, or other related items) is being provided by the
+copyright holders under the following license. By obtaining, using and/or copying this work,
+you (the licensee) agree that you have read, understood, and will comply with the following
+terms and conditions:
+
+
+--- T9225f776951fe380 ---
+Permission to use, copy, modify, and distribute this software and its documentation, with or
+without modification,  for any purpose and without fee or royalty is hereby granted, provided
+that you include the following on ALL copies of the software and documentation or portions thereof,
+including modifications, that you make:
+
+
+--- Td3f71676c58ffba0 ---
+The full text of this NOTICE in a location viewable to users of the redistributed or derivative work.
+Any pre-existing intellectual property disclaimers, notices, or terms and conditions. If none exist,
+a short notice of the following form (hypertext is preferred, text is permitted) should be used within
+the body of any redistributed or derivative code: "Copyright © [$date-of-software] World Wide Web
+Consortium, (Massachusetts Institute of Technology, Institut National de Recherche en Informatique et
+en Automatique, Keio University). All Rights Reserved. http://www.w3.org/Consortium/Legal/"
+Notice of any changes or modifications to the W3C files, including the date changes were made.
+(We recommend you provide URIs to the location from which the code is derived.)
+THIS SOFTWARE AND DOCUMENTATION IS PROVIDED "AS IS," AND COPYRIGHT HOLDERS MAKE NO REPRESENTATIONS OR
+WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO, WARRANTIES OF MERCHANTABILITY OR FITNESS
+FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD
+PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+
+
+--- T0f925b954961d1fe ---
+COPYRIGHT HOLDERS WILL NOT BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF ANY USE OF THE SOFTWARE OR DOCUMENTATION.
+
+
+--- T5ff674c63090a4ea ---
+The name and trademarks of copyright holders may NOT be used in advertising or publicity pertaining to
+the software without specific, written prior permission. Title to copyright in this software and any
+associated documentation will at all times remain with copyright holders.
+
+
+--- T263d41bfbfdb7310 ---
+____________________________________
+
+
+--- T734b38dbb28807af ---
+This formulation of W3C's notice and license became active on August 14 1998 so as to improve
+compatibility with GPL. This version ensures that W3C software licensing terms are no more restrictive
+than GPL and consequently W3C software may be distributed in GPL packages. See the older formulation
+for the policy prior to this date. Please see our Copyright FAQ for common questions about using
+materials from our site, including specific terms and conditions for packages like libwww, Amaya, and
+Jigsaw. Other questions about this notice can be directed to site-policy@w3.org.
+
+
+--- Te4f963c59c67fe9a ---
+=========================================================================
+   ==  NOTICE file corresponding to section 4(d) of the Apache License,   ==
+   ==  Version 2.0, in this case for the Apache XmlBeans distribution.    ==
+   =========================================================================
+
+
+--- T7028870c212f1a50 ---
+Portions of this software were originally based on the following:
+     - software copyright (c) 2000-2003, BEA Systems, <http://www.bea.com/>.
+   Note: The ASF Secretary has on hand a Software Grant Agreement (SGA) from
+   BEA Systems, Inc. dated 9 Sep 2003 for XMLBeans signed by their EVP/CFO.
+
+
+--- T6773169856e35b68 ---
+Aside from contributions to the Apache XMLBeans project, this
+   software also includes:
+
+
+--- T45d0a9dc47fb2182 ---
+- one or more source files from the Apache Xerces-J and Apache Axis
+      products, Copyright (c) 1999-2003 Apache Software Foundation
+
+
+--- T849b8cee8b303fc1 ---
+- W3C XML Schema documents Copyright 2001-2003 (c) World Wide Web
+      Consortium (Massachusetts Institute of Technology, European Research
+      Consortium for Informatics and Mathematics, Keio University)
+
+
+--- T7f424fd6c30c5084 ---
+- resolver.jar from Apache Xml Commons project,
+      Copyright (c) 2001-2003 Apache Software Foundation

@@ -1,4 +1,12 @@
 {
+  "cn.idev.excel:fastexcel-support:0.0.1": {
+    "file": "fastexcel-1.3.0.txt",
+    "url": "https://raw.githubusercontent.com/apache/fesod/1.3.0/LICENSE"
+  },
+  "cn.idev.excel:fastexcel:1.3.0": {
+    "file": "fastexcel-1.3.0.txt",
+    "url": "https://raw.githubusercontent.com/apache/fesod/1.3.0/LICENSE"
+  },
   "com.baomidou:*:3.5.17": {
     "file": "mybatis-plus-3.5.17.txt",
     "url": "https://raw.githubusercontent.com/baomidou/mybatis-plus/v3.5.17/LICENSE"
@@ -6,6 +14,10 @@
   "com.esotericsoftware:minlog:1.3.1": {
     "file": "minlog-1.3.1.txt",
     "url": "https://raw.githubusercontent.com/EsotericSoftware/minlog/minlog-1.3.1/license.txt"
+  },
+  "com.zaxxer:SparseBitSet:1.3": {
+    "file": "SparseBitSet-1.3.txt",
+    "url": "https://raw.githubusercontent.com/brettwooldridge/SparseBitSet/SparseBitSet-1.3/LICENSE"
   },
   "io.netty:*:4.2.17.Final": {
     "file": "netty-4.2.17.Final.txt",
