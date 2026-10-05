@@ -64,9 +64,10 @@ public class ImportTaskService implements ImportTaskApi {
       TaskType type,
       List<String> headers,
       ImportFileDTO file,
-      Supplier<ImportRowProcessor> processor) {
+      Supplier<ImportRowProcessor> processor,
+      int maxRows) {
     excel.check(file);
-    int total = excel.read(file.content(), headers).size();
+    int total = excel.read(file.content(), headers, maxRows).size();
     TaskDO task = new TaskDO();
     task.setTaskType(type);
     task.setStatus(TaskStatus.WAITING);
@@ -87,7 +88,7 @@ public class ImportTaskService implements ImportTaskApi {
         });
     Long id = task.getId();
     try {
-      queue.submit(() -> run(id, headers, processor));
+      queue.submit(() -> run(id, headers, processor, maxRows));
     } catch (BusinessException e) {
       finish(id, null, TaskStatus.FAILED, MESSAGE_QUEUE_FULL);
       throw e;
@@ -102,7 +103,7 @@ public class ImportTaskService implements ImportTaskApi {
   }
 
   /** Worker body; never throws, every outcome ends in a final task status. */
-  void run(Long id, List<String> headers, Supplier<ImportRowProcessor> factory) {
+  void run(Long id, List<String> headers, Supplier<ImportRowProcessor> factory, int maxRows) {
     try {
       TaskDO task = tasks.selectById(id);
       if (task == null || task.getStatus() != TaskStatus.WAITING) {
@@ -115,7 +116,7 @@ public class ImportTaskService implements ImportTaskApi {
       tasks.updateById(running);
       List<List<String>> rows;
       try {
-        rows = excel.read(input(id), headers);
+        rows = excel.read(input(id), headers, maxRows);
       } catch (BusinessException e) {
         finish(id, null, TaskStatus.FAILED, MESSAGE_UNREADABLE);
         return;

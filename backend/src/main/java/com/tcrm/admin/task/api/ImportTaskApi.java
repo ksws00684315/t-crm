@@ -17,6 +17,7 @@ public interface ImportTaskApi {
    * @param file uploaded file
    * @param processor creates the row processor when the task starts; called on the worker thread,
    *     so it must capture everything it needs from the request (such as the submitter)
+   * @param maxRows maximum data rows for this import; see {@link TaskType#maxRows()}
    * @return the new task ID
    * @throws com.tcrm.admin.shared.BusinessException TASK_FILE_* (400) when the file is rejected,
    *     TASK_QUEUE_FULL (429) when the queue is full
@@ -25,7 +26,8 @@ public interface ImportTaskApi {
       TaskType type,
       List<String> headers,
       ImportFileDTO file,
-      Supplier<ImportRowProcessor> processor);
+      Supplier<ImportRowProcessor> processor,
+      int maxRows);
 
   /**
    * Returns an .xlsx workbook containing only the header row.

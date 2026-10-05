@@ -27,8 +27,8 @@ public class ExcelFiles {
   /** Upload size limit; Spring multipart is configured with the same value. */
   public static final long MAX_BYTES = 20L * 1024 * 1024;
 
-  /** Data row limit per file (KOL design capacity is 500). */
-  public static final int MAX_ROWS = 2_000;
+  /** Default data row limit (KOL import); callers pass a per-type limit to {@link #read}. */
+  public static final int DEFAULT_MAX_ROWS = 2_000;
 
   private static final Set<String> ACCEPTED_TYPES =
       Set.of(ImportTaskApi.XLSX_CONTENT_TYPE, "application/octet-stream");
@@ -67,8 +67,11 @@ public class ExcelFiles {
    * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
    *     TASK_FILE_TOO_MANY_ROWS
    */
-  public List<List<String>> read(byte[] content, List<String> headers) {
-    RowCollector collector = new RowCollector(headers);
+  public List<List<String>> read(byte[] content, List<String> headers, int maxRows) {
+    if (maxRows < 1) {
+      throw new IllegalArgumentException("maxRows must be positive");
+    }
+    RowCollector collector = new RowCollector(headers, maxRows);
     try {
       FastExcel.read(new ByteArrayInputStream(content), collector)
           .excelType(ExcelTypeEnum.XLSX)
@@ -131,12 +134,14 @@ public class ExcelFiles {
   /** Collects rows; stops reading as soon as the row limit is exceeded. */
   private static final class RowCollector extends AnalysisEventListener<Map<Integer, String>> {
     private final List<String> headers;
+    private final int maxRows;
     private final List<List<String>> rows = new ArrayList<>();
     private boolean headerChecked;
     private boolean tooMany;
 
-    RowCollector(List<String> headers) {
+    RowCollector(List<String> headers, int maxRows) {
       this.headers = headers;
+      this.maxRows = maxRows;
     }
 
     @Override
@@ -160,7 +165,7 @@ public class ExcelFiles {
       if (row.stream().allMatch(String::isEmpty)) {
         return;
       }
-      if (rows.size() >= MAX_ROWS) {
+      if (rows.size() >= maxRows) {
         tooMany = true;
         throw new ExcelAnalysisStopException();
       }
@@ -169,7 +174,7 @@ public class ExcelFiles {
 
     @Override
     public void doAfterAllAnalysed(AnalysisContext context) {
-      // Nothing to flush: rows are kept in memory and bounded by MAX_ROWS.
+      // Nothing to flush: rows are kept in memory and bounded by maxRows.
     }
 
     private static int maxIndex(Map<Integer, String> cells) {

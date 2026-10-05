@@ -49,6 +49,7 @@ public class KolImportService {
         TaskType.KOL_IMPORT,
         KolImportColumn.headers(),
         file,
-        () -> new KolImportProcessor(actor, kols, writer, bdUsers));
+        () -> new KolImportProcessor(actor, kols, writer, bdUsers),
+        TaskType.KOL_IMPORT.maxRows());
   }
 }

@@ -18,14 +18,33 @@ export function hasAnyRole(required: readonly Role[] | undefined, owned: readonl
   return required.some(role => owned.includes(role));
 }
 
+/**
+ * Whether a signed-in user may open a route: role match plus data-scope (hideForOwn),
+ * matching buildMenu so OPERATOR+OWN cannot deep-link to hidden pages.
+ */
+export function canAccessRoute(
+  meta: { roles?: readonly Role[]; hideForOwn?: boolean } | undefined,
+  owned: readonly Role[],
+  dataScope: "ALL" | "OWN" | null | undefined
+): boolean {
+  if (!hasAnyRole(meta?.roles, owned)) return false;
+  if (meta?.hideForOwn && dataScope === "OWN") return false;
+  return true;
+}
+
 export interface MenuItem {
   path: string;
   title: string;
   icon?: string;
+  children?: MenuItem[];
 }
 
-/** Side menu entries the given roles may open, in route order. */
-export function buildMenu(routes: readonly RouteRecordRaw[], owned: readonly Role[]): MenuItem[] {
+/** Side menu entries the given roles may open, in route order. Supports one level of grouping. */
+export function buildMenu(
+  routes: readonly RouteRecordRaw[],
+  owned: readonly Role[],
+  dataScope: "ALL" | "OWN" | null | undefined = "ALL"
+): MenuItem[] {
   const items: MenuItem[] = [];
   const visit = (list: readonly RouteRecordRaw[], base: string) => {
     for (const route of list) {
@@ -33,10 +52,42 @@ export function buildMenu(routes: readonly RouteRecordRaw[], owned: readonly Rol
         ? route.path
         : `${base.replace(/\/$/, "")}/${route.path}`;
       const meta = route.meta;
-      if (meta?.title && !meta.public && !meta.hideInMenu && hasAnyRole(meta.roles, owned)) {
-        items.push({ path, title: meta.title, icon: meta.icon });
+      if (meta?.menuGroup && meta.title && hasAnyRole(meta.roles, owned)) {
+        const children: MenuItem[] = [];
+        if (route.children) {
+          for (const child of route.children) {
+            const childPath = child.path.startsWith("/")
+              ? child.path
+              : `${path.replace(/\/$/, "")}/${child.path}`;
+            const childMeta = child.meta;
+            if (
+              childMeta?.title &&
+              !childMeta.public &&
+              !childMeta.hideInMenu &&
+              canAccessRoute(childMeta, owned, dataScope)
+            ) {
+              children.push({
+                path: childPath,
+                title: childMeta.title,
+                icon: childMeta.icon as string | undefined
+              });
+            }
+          }
+        }
+        if (children.length > 0) {
+          items.push({
+            path,
+            title: meta.title,
+            icon: meta.icon as string | undefined,
+            children
+          });
+        }
+        continue;
       }
-      if (route.children) visit(route.children, path);
+      if (meta?.title && !meta.public && !meta.hideInMenu && hasAnyRole(meta.roles, owned)) {
+        items.push({ path, title: meta.title, icon: meta.icon as string | undefined });
+      }
+      if (route.children && !meta?.menuGroup) visit(route.children, path);
     }
   };
   visit(routes, "/");
@@ -59,5 +110,38 @@ export function kolAbilities(
   return {
     canWrite: user.role !== "FINANCE",
     canManageBd: user.role === "SUPER_ADMIN" || (user.role === "OPERATOR" && !bd)
+  };
+}
+
+/** Product / shop / mapping button visibility (task 05 §4.4). Backend enforces the same. */
+export interface ProductAbilities {
+  /** Shop create/edit/status: SUPER_ADMIN only. */
+  canManageShop: boolean;
+  /** Product edit/status/import: SUPER_ADMIN and OPERATOR + ALL. */
+  canWriteProduct: boolean;
+  /** Mapping list: SUPER_ADMIN, OPERATOR + ALL, FINANCE. */
+  canViewMapping: boolean;
+  /** Mapping import: SUPER_ADMIN and OPERATOR + ALL. */
+  canImportMapping: boolean;
+}
+
+export function productAbilities(
+  user: { role: Role; dataScope: "ALL" | "OWN" } | null | undefined
+): ProductAbilities {
+  if (!user) {
+    return {
+      canManageShop: false,
+      canWriteProduct: false,
+      canViewMapping: false,
+      canImportMapping: false
+    };
+  }
+  const own = user.role === "OPERATOR" && user.dataScope === "OWN";
+  const allOp = user.role === "OPERATOR" && !own;
+  return {
+    canManageShop: user.role === "SUPER_ADMIN",
+    canWriteProduct: user.role === "SUPER_ADMIN" || allOp,
+    canViewMapping: user.role === "SUPER_ADMIN" || allOp || user.role === "FINANCE",
+    canImportMapping: user.role === "SUPER_ADMIN" || allOp
   };
 }

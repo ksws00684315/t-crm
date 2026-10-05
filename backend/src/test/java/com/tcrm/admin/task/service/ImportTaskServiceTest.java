@@ -130,7 +130,13 @@ class ImportTaskServiceTest {
   void shouldStoreWaitingTaskAndQueueIt_whenFileIsValid() {
     byte[] content = workbook(List.of(List.of("KOL0001", "a"), List.of("", "b")));
 
-    Long id = service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null);
+    Long id =
+        service.submitImport(
+            TaskType.KOL_IMPORT,
+            HEADERS,
+            upload(content),
+            () -> null,
+            TaskType.KOL_IMPORT.maxRows());
 
     assertThat(id).isEqualTo(TASK_ID);
     ArgumentCaptor<TaskDO> task = ArgumentCaptor.forClass(TaskDO.class);
@@ -155,7 +161,13 @@ class ImportTaskServiceTest {
     byte[] content = excel.write(List.of("其他"), List.of(List.of("x")));
 
     assertThatThrownBy(
-            () -> service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null))
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADERS,
+                    upload(content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.TASK_FILE_HEADER_MISMATCH);
@@ -174,7 +186,13 @@ class ImportTaskServiceTest {
     byte[] content = workbook(List.of(List.of("", "a")));
 
     assertThatThrownBy(
-            () -> service.submitImport(TaskType.KOL_IMPORT, HEADERS, upload(content), () -> null))
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADERS,
+                    upload(content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.TASK_QUEUE_FULL);
@@ -194,7 +212,8 @@ class ImportTaskServiceTest {
             cells -> {
               seen.add(cells);
               return List.of();
-            });
+            },
+        TaskType.KOL_IMPORT.maxRows());
 
     assertThat(seen).containsExactly(List.of("", "a"), List.of("", "b"));
     assertThat(updates.getFirst().getStatus()).isEqualTo(TaskStatus.RUNNING);
@@ -213,7 +232,7 @@ class ImportTaskServiceTest {
     ImportRowProcessor processor =
         cells -> cells.get(1).equals("bad") ? List.of("原因一", "原因二") : List.of();
 
-    service.run(TASK_ID, HEADERS, () -> processor);
+    service.run(TASK_ID, HEADERS, () -> processor, TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.PARTIAL);
     assertThat(lastUpdate().getDone()).isEqualTo(2);
@@ -235,7 +254,7 @@ class ImportTaskServiceTest {
   void shouldFinishFailed_whenEveryRowFails() {
     storedInput(workbook(List.of(List.of("", "a"))));
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of("错误"));
+    service.run(TASK_ID, HEADERS, () -> cells -> List.of("错误"), TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.FAILED);
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_ALL_FAILED);
@@ -253,7 +272,7 @@ class ImportTaskServiceTest {
           return null;
         };
 
-    service.run(TASK_ID, HEADERS, () -> processor);
+    service.run(TASK_ID, HEADERS, () -> processor, TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.PARTIAL);
     assertThat(readBack(inserted.getFirst().getContent()).get(1))
@@ -268,7 +287,7 @@ class ImportTaskServiceTest {
     }
     storedInput(workbook(rows));
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of());
+    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     // RUNNING, progress at 100 and 200, final SUCCESS.
     verify(tasks, times(4)).updateById(any(TaskDO.class));
@@ -281,7 +300,7 @@ class ImportTaskServiceTest {
   void shouldFailTask_whenStoredFileCannotBeParsed() {
     storedInput(new byte[] {0x50, 0x4B, 0x03, 0x04, 9, 9});
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of());
+    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.FAILED);
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_UNREADABLE);
@@ -296,7 +315,8 @@ class ImportTaskServiceTest {
         HEADERS,
         () -> {
           throw new IllegalStateException("cannot create processor");
-        });
+        },
+        TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.FAILED);
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_UNEXPECTED);
@@ -307,7 +327,7 @@ class ImportTaskServiceTest {
     storedInput(workbook(List.of(List.of("", "a"))));
     when(files.selectOne(any())).thenReturn(null);
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of());
+    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_UNEXPECTED);
   }
@@ -319,7 +339,7 @@ class ImportTaskServiceTest {
     failed.setStatus(TaskStatus.FAILED);
     when(tasks.selectById(TASK_ID)).thenReturn(failed);
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of());
+    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     verify(tasks, never()).updateById(any(TaskDO.class));
   }

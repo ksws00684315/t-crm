@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -51,13 +52,17 @@ class KolImportServiceTest {
   @SuppressWarnings("unchecked")
   void shouldCaptureBdSubmitter_whenBdImports() {
     actAs(5L, Role.OPERATOR, DataScope.OWN);
-    when(imports.submitImport(any(), any(), any(), any())).thenReturn(42L);
+    when(imports.submitImport(any(), any(), any(), any(), anyInt())).thenReturn(42L);
     assertThat(service.submit(file)).isEqualTo(42L);
     ArgumentCaptor<Supplier<ImportRowProcessor>> processor =
         ArgumentCaptor.forClass(Supplier.class);
     verify(imports)
         .submitImport(
-            eq(TaskType.KOL_IMPORT), eq(KolImportColumn.headers()), eq(file), processor.capture());
+            eq(TaskType.KOL_IMPORT),
+            eq(KolImportColumn.headers()),
+            eq(file),
+            processor.capture(),
+            eq(TaskType.KOL_IMPORT.maxRows()));
     List<String> row = new java.util.ArrayList<>(List.of("", "A", "a@x.io", "US", "ghost"));
     while (row.size() < KolImportColumn.values().length) {
       row.add("");

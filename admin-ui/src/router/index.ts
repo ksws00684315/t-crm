@@ -7,7 +7,11 @@ const router = createRouter({ history: createWebHistory(), routes });
 
 installGuard(router, () => {
   const user = useUserStore();
-  return { isLoggedIn: user.isLoggedIn, roles: user.roles };
+  return {
+    isLoggedIn: user.isLoggedIn,
+    roles: user.roles,
+    dataScope: user.user?.dataScope
+  };
 });
 
 export default router;

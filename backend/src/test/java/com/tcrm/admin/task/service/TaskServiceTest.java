@@ -118,8 +118,24 @@ class TaskServiceTest {
   }
 
   @Test
-  void shouldReturn404_whenTaskHasNoErrorFile() {
+  void shouldReturnExpired_whenFinishedTaskLostItsErrorFile() {
     actAs(SUBMITTER, Role.OPERATOR, DataScope.ALL);
+    when(files.selectOne(any())).thenReturn(null);
+    assertError(() -> service.getErrorFile(1L), ErrorCode.TASK_FILE_EXPIRED);
+  }
+
+  @Test
+  void shouldReturn404_whenSuccessfulTaskHasNoErrorFile() {
+    actAs(SUBMITTER, Role.OPERATOR, DataScope.ALL);
+    TaskDO success = new TaskDO();
+    success.setId(1L);
+    success.setTaskType(TaskType.KOL_IMPORT);
+    success.setStatus(TaskStatus.SUCCESS);
+    success.setTotal(3);
+    success.setDone(3);
+    success.setFailed(0);
+    success.setCreateBy(SUBMITTER);
+    when(tasks.selectById(1L)).thenReturn(success);
     when(files.selectOne(any())).thenReturn(null);
     assertError(() -> service.getErrorFile(1L), ErrorCode.COMMON_NOT_FOUND);
   }
