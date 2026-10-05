@@ -125,3 +125,103 @@ version = "3.55.1"
 ecosystem = "Maven"
 license.override = ["MIT"]
 reason = "Packaged META-INF/LICENSE.txt grants MIT; normalize POM license name. Official original: https://github.com/typetools/checker-framework/blob/checker-framework-3.55.1/LICENSE.txt"
+
+# ---- npm (admin-ui, kol-portal) ----
+
+[[PackageOverrides]]
+name = "source-map-js"
+version = "1.2.2"
+ecosystem = "npm"
+license.override = ["BSD-3-Clause"]
+reason = "Registry metadata carries no license; the packaged LICENSE is the BSD-3-Clause text (Copyright (c) 2009-2011, Mozilla Foundation and contributors). Runtime dependency of the Vue/Vite toolchain output. Official original: https://github.com/7rulnik/source-map-js/blob/v1.2.2/LICENSE"
+
+[[PackageOverrides]]
+name = "argparse"
+version = "2.0.1"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): Python-2.0 is OSI-approved but outside the runtime allowlist. Reached only through ESLint (via js-yaml) in both front ends; not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "chownr"
+version = "3.0.0"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist -> tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "common-ancestor-path"
+version = "2.0.0"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "glob"
+version = "13.0.6"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "isexe"
+version = "4.0.0"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "lru-cache"
+version = "11.5.3"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "10.2.6"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via glob); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "minipass"
+version = "7.1.3"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "minipass-flush"
+version = "1.0.7"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "path-scurry"
+version = "2.0.2"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via glob); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "spdx-exceptions"
+version = "2.5.0"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): CC-BY-3.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist -> validate-npm-package-license); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "tar"
+version = "7.5.22"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via @npmcli/arborist); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
+
+[[PackageOverrides]]
+name = "yallist"
+version = "5.0.0"
+ecosystem = "npm"
+license.ignore = true
+reason = "Build/test tool only (ADR-007): BlueOak-1.0.0 is OSI-approved but outside the runtime allowlist. Reached only through generate-license-file (via tar); not bundled into dist/ and not listed in THIRD-PARTY-NOTICES."
