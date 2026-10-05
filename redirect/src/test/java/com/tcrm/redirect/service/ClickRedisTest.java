@@ -1,6 +1,7 @@
 package com.tcrm.redirect.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisCallback;
@@ -22,7 +24,7 @@ class ClickRedisTest {
     HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
     when(redis.opsForHash()).thenReturn(hashes);
     when(hashes.get("link:KOL0001", "product")).thenReturn("1|https://example.com/item|1");
-    assertThat(new ClickRedis(redis).lookup("KOL0001", "product"))
+    assertThat(new ClickRedis(redis, 1000).lookup("KOL0001", "product"))
         .isEqualTo("1|https://example.com/item|1");
   }
 
@@ -32,11 +34,32 @@ class ClickRedisTest {
     StreamOperations<String, Object, Object> streams = mock(StreamOperations.class);
     when(redis.opsForStream()).thenReturn(streams);
     var fields = Map.of("kolCode", "KOL0001");
-    new ClickRedis(redis).append(fields);
+    new ClickRedis(redis, 1000).append(fields);
     var event = org.mockito.ArgumentCaptor.forClass(MapRecord.class);
-    verify(streams).add(event.capture());
+    var options = org.mockito.ArgumentCaptor.forClass(XAddOptions.class);
+    verify(streams).add(event.capture(), options.capture());
     assertThat(event.getValue().getStream()).isEqualTo("stream:click");
     assertThat(event.getValue().getValue()).isEqualTo(fields);
+  }
+
+  @Test
+  void shouldTrimStreamApproximately_whenAppendingClick() {
+    var redis = mock(StringRedisTemplate.class);
+    StreamOperations<String, Object, Object> streams = mock(StreamOperations.class);
+    when(redis.opsForStream()).thenReturn(streams);
+    new ClickRedis(redis, 5000).append(Map.of("kolCode", "KOL0001"));
+    var options = org.mockito.ArgumentCaptor.forClass(XAddOptions.class);
+    verify(streams).add(any(MapRecord.class), options.capture());
+    assertThat(options.getValue().getMaxlen()).isEqualTo(5000L);
+    assertThat(options.getValue().isApproximateTrimming()).isTrue();
+  }
+
+  @Test
+  void shouldRejectStartup_whenStreamLimitIsNotPositive() {
+    var redis = mock(StringRedisTemplate.class);
+    assertThatThrownBy(() -> new ClickRedis(redis, 0)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> new ClickRedis(redis, -1))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -45,7 +68,7 @@ class ClickRedisTest {
     var connection = mock(RedisConnection.class);
     when(redis.execute(any(RedisCallback.class)))
         .thenAnswer(i -> ((RedisCallback<Boolean>) i.getArgument(0)).doInRedis(connection));
-    var clicks = new ClickRedis(redis);
+    var clicks = new ClickRedis(redis, 1000);
     when(connection.ping()).thenReturn("PONG", "unexpected", null);
     assertThat(clicks.healthy()).isTrue();
     assertThat(clicks.healthy()).isFalse();
@@ -54,6 +77,6 @@ class ClickRedisTest {
 
   @Test
   void shouldReportUnavailable_whenCallbackHasNoResult() {
-    assertThat(new ClickRedis(mock(StringRedisTemplate.class)).healthy()).isFalse();
+    assertThat(new ClickRedis(mock(StringRedisTemplate.class), 1000).healthy()).isFalse();
   }
 }
