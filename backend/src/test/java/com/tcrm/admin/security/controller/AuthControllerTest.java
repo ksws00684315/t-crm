@@ -26,6 +26,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.security.config.SecurityConfiguration;
 import com.tcrm.admin.security.service.AuthService;
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ClientIpResolver;
 import com.tcrm.admin.shared.CommonConfiguration;
 import com.tcrm.admin.shared.GlobalExceptionHandler;
 import com.tcrm.admin.shared.PageResult;
@@ -86,7 +87,10 @@ class AuthControllerTest {
     new CommonConfiguration().jsonCustomizer().customize(builder);
     mvc =
         MockMvcBuilders.standaloneSetup(
-                new UserController(users), new AuthController(auth, current), new ErrorController())
+                new UserController(users),
+                new AuthController(
+                    auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For")),
+                new ErrorController())
             .setControllerAdvice(new GlobalExceptionHandler())
             .setMessageConverters(new JacksonJsonHttpMessageConverter(builder.build()))
             .addInterceptors(
@@ -151,10 +155,16 @@ class AuthControllerTest {
   @Test
   void shouldSerializeLoginUserWithoutCredentials_whenLoginSucceeds() throws Exception {
     var actor = current.user();
-    when(auth.login("operator", "test-input"))
+    when(auth.login("operator", "test-input", "198.51.100.8"))
         .thenReturn(new AuthService.LoginResult("X-Admin-Token", "unit-token", 28800, actor));
     mvc.perform(
             post("/admin-api/auth/login")
+                .with(
+                    request -> {
+                      request.setRemoteAddr("10.1.2.3");
+                      return request;
+                    })
+                .header("X-Forwarded-For", "192.0.2.77, 198.51.100.8")
                 .header("X-Admin-Token", token)
                 .contentType("application/json")
                 .content("{\"username\":\"operator\",\"password\":\"test-input\"}"))

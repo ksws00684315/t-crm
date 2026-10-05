@@ -130,4 +130,16 @@ class AuditAspectTest {
     new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
     assertThat(event().getIp()).isEqualTo("203.0.113.2");
   }
+
+  @Test
+  void shouldNotSerializeServletObjects_whenControllerReceivesRequest() throws Throwable {
+    var response = new org.springframework.mock.web.MockHttpServletResponse();
+    when(point.getArgs()).thenReturn(new Object[] {"body", request, response});
+    when(point.proceed()).thenReturn("result");
+    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    var captured = org.mockito.ArgumentCaptor.forClass(Object.class);
+    verify(sanitizer).sanitize(captured.capture());
+    var arguments = (Object[]) ((java.util.Map<?, ?>) captured.getValue()).get("arguments");
+    assertThat(arguments).containsExactly("body");
+  }
 }

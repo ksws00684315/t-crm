@@ -7,8 +7,11 @@ import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ClientIpResolver;
 import com.tcrm.admin.system.model.SysOperLogDO;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Map;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -53,7 +56,7 @@ public class AuditAspect {
     event.setIp(AuditSanitizer.truncate(clientIps.resolve(request), 45));
     event.setRequestParams(
         sanitizer.sanitize(
-            Map.of("arguments", point.getArgs(), "query", request.getParameterMap())));
+            Map.of("arguments", loggableArguments(point), "query", request.getParameterMap())));
     captureActor(event);
     for (Object arg : point.getArgs()) {
       if (arg instanceof LoginSubject login) {
@@ -80,6 +83,13 @@ public class AuditAspect {
         LOG.error("Audit submission failed", e);
       }
     }
+  }
+
+  /** Servlet request and response objects are not request data and must never be serialized. */
+  private static Object[] loggableArguments(ProceedingJoinPoint point) {
+    return Arrays.stream(point.getArgs())
+        .filter(arg -> !(arg instanceof ServletRequest) && !(arg instanceof ServletResponse))
+        .toArray();
   }
 
   private void captureActor(SysOperLogDO event) {
