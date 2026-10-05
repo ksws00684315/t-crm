@@ -1,0 +1,15 @@
+# The Dockerfiles of backend/ and redirect/ use the repository root as build context.
+.git
+.github
+docs
+deploy
+scripts
+**/node_modules
+**/target
+**/dist
+**/.env
+**/.env.*
+admin-ui/*
+!admin-ui/THIRD-PARTY-NOTICES
+kol-portal/*
+!kol-portal/THIRD-PARTY-NOTICES
