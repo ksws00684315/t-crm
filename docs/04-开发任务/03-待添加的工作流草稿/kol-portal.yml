@@ -1,0 +1,47 @@
+name: KOL Portal
+on:
+  pull_request:
+    branches: [main]
+    paths: ['kol-portal/**', '.github/workflows/kol-portal.yml']
+  push:
+    branches: [main]
+    paths: ['kol-portal/**', '.github/workflows/kol-portal.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: KOL Portal verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: kol-portal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: kol-portal/package.json
+      - name: Node.js LTS with pnpm cache
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: kol-portal/pnpm-lock.yaml
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Type check
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Third-party notices match the committed file
+        run: pnpm notices:check
+      - name: Dependency audit (high and above)
+        run: pnpm audit --audit-level high
