@@ -48,7 +48,7 @@ pom 中未写 `<version>` 的依赖与插件跟随 Spring Boot 升级（见 `.gi
 
 ## 本地开发（后端工程）
 
-安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `deploy/.env.example` 到 `deploy/.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐；在反向代理（Nginx / Cloudflare）之后部署时还必须设置 `TCRM_TRUSTED_PROXIES`（见下文）。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
+安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `deploy/.env.example` 到 `deploy/.env`，填写本机账号、密码、首次超管凭证、跳转回退地址、IP 哈希盐以及中转链接地址 `TCRM_LINK_BASE_URL`（必填，https、不带末尾斜杠，示例 `https://t.example.com`，生产为 `https://t.<域名>`）；在反向代理（Nginx / Cloudflare）之后部署时还必须设置 `TCRM_TRUSTED_PROXIES`（见下文）。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
 
 在所选工程目录运行：
 
@@ -84,7 +84,7 @@ git diff -- THIRD-PARTY-NOTICES
 
 **客户端 IP 与登录限流**：只有当 TCP 对端属于 `TCRM_TRUSTED_PROXIES`（逗号分隔的 IP/CIDR，默认空 = 不信任任何代理）时，才会读取 `CF-Connecting-IP`、`X-Forwarded-For`（可用 `TCRM_CLIENT_IP_HEADERS` 调整），详见 [ADR-009](docs/06-架构决策/ADR-009-可信代理与客户端IP解析.md)。登录失败在 15 分钟窗口内按“用户名+IP 5 次 / IP 20 次 / 用户名全部 IP 50 次”三层锁定 15 分钟（429），详见 [ADR-008](docs/06-架构决策/ADR-008-登录失败限流按用户名与来源IP分层.md)。未配置可信代理而部署在代理之后时，所有请求会被视为同一个 IP，20 次失败即全站锁定，生产环境必须配置。
 
-跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。它只读 Redis、不回源后台（[ADR-012](docs/06-架构决策/ADR-012-跳转服务不回源后台.md)），链接索引由后台维护（任务 06）。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000）。
+跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。它只读 Redis、不回源后台（[ADR-012](docs/06-架构决策/ADR-012-跳转服务不回源后台.md)），链接索引由后台维护（任务 06）。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000；后台按它的 50% / 80% 做积压告警）。后台只有一个实例消费点击流（消费组 `crm-admin`），写入按月分区的 `crm_click_log`；中转链接列表为 `GET /admin-api/link/links?kolCode=`，超管手动重建链接索引为 `POST /admin-api/link/index-rebuilds`。
 
 ## 遗留清单
 

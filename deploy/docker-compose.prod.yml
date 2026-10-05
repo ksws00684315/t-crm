@@ -53,6 +53,10 @@ services:
       TCRM_BOOTSTRAP_ADMIN_USERNAME: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:-}
       TCRM_BOOTSTRAP_ADMIN_PASSWORD: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:-}
       TCRM_CORS_ALLOWED_ORIGINS: ${TCRM_CORS_ALLOWED_ORIGINS:-}
+      # Required: https://t.<domain>, no trailing slash; startup fails when missing or malformed.
+      TCRM_LINK_BASE_URL: ${TCRM_LINK_BASE_URL}
+      # Same value as crm-redirect: the backlog alarm compares against it.
+      TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
       # Fixed to the compose network subnet; not taken from .env (ADR-009).
       TCRM_TRUSTED_PROXIES: 172.30.0.0/24
       # Empty falls back to CF-Connecting-IP,X-Forwarded-For in ClientIpResolver.
