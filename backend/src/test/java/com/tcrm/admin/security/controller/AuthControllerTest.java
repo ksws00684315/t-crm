@@ -26,6 +26,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.security.config.SecurityConfiguration;
 import com.tcrm.admin.security.service.AuthService;
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ClientIpResolver;
 import com.tcrm.admin.shared.CommonConfiguration;
 import com.tcrm.admin.shared.GlobalExceptionHandler;
 import com.tcrm.admin.shared.PageResult;
@@ -77,7 +78,7 @@ class AuthControllerTest {
             null,
             null);
     when(current.user()).thenReturn(actor);
-    when(current.role()).thenReturn(Role.OPERATOR);
+    when(current.roleNames(any())).thenReturn(List.of("OPERATOR"));
     var security = new SecurityConfiguration(current);
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
@@ -86,7 +87,10 @@ class AuthControllerTest {
     new CommonConfiguration().jsonCustomizer().customize(builder);
     mvc =
         MockMvcBuilders.standaloneSetup(
-                new UserController(users), new AuthController(auth, current), new ErrorController())
+                new UserController(users),
+                new AuthController(
+                    auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For")),
+                new ErrorController())
             .setControllerAdvice(new GlobalExceptionHandler())
             .setMessageConverters(new JacksonJsonHttpMessageConverter(builder.build()))
             .addInterceptors(
@@ -109,7 +113,7 @@ class AuthControllerTest {
 
   @Test
   void shouldListUsers_whenRoleIsSuperAdministrator() throws Exception {
-    when(current.role()).thenReturn(Role.SUPER_ADMIN);
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
     when(users.page(anyLong(), anyLong(), any(), any(), any()))
         .thenReturn(new PageResult<>(List.of(), 0, 1, 20));
     mvc.perform(get("/admin-api/system/users").header("X-Admin-Token", token))
@@ -151,10 +155,16 @@ class AuthControllerTest {
   @Test
   void shouldSerializeLoginUserWithoutCredentials_whenLoginSucceeds() throws Exception {
     var actor = current.user();
-    when(auth.login("operator", "test-input"))
+    when(auth.login("operator", "test-input", "198.51.100.8"))
         .thenReturn(new AuthService.LoginResult("X-Admin-Token", "unit-token", 28800, actor));
     mvc.perform(
             post("/admin-api/auth/login")
+                .with(
+                    request -> {
+                      request.setRemoteAddr("10.1.2.3");
+                      return request;
+                    })
+                .header("X-Forwarded-For", "192.0.2.77, 198.51.100.8")
                 .header("X-Admin-Token", token)
                 .contentType("application/json")
                 .content("{\"username\":\"operator\",\"password\":\"test-input\"}"))
@@ -217,7 +227,7 @@ class AuthControllerTest {
 
   @Test
   void shouldReturnAllInvalidFieldsAndTraceHeader_whenCreateRequestIsInvalid() throws Exception {
-    when(current.role()).thenReturn(Role.SUPER_ADMIN);
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
     var result =
         mvc.perform(
                 post("/admin-api/system/users")
@@ -234,11 +244,42 @@ class AuthControllerTest {
     assertThat(org.slf4j.MDC.get("traceId")).isNull();
   }
 
+  @Test
+  void shouldReportGenericConflict_whenAnyUniqueKeyIsViolated() throws Exception {
+    mvc.perform(get("/test/duplicate").header("X-Admin-Token", token))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_CONFLICT"))
+        .andExpect(jsonPath("$.msg").value("Conflicts with existing data"));
+  }
+
+  @Test
+  void shouldRejectPageBeyondLimit_whenListingUsers() throws Exception {
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
+    mvc.perform(get("/admin-api/system/users?page=10001").header("X-Admin-Token", token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+    verifyNoInteractions(users);
+  }
+
+  @Test
+  void shouldAcceptLastAllowedPage_whenListingUsers() throws Exception {
+    when(current.roleNames(any())).thenReturn(List.of("SUPER_ADMIN"));
+    when(users.page(anyLong(), anyLong(), any(), any(), any()))
+        .thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
+    mvc.perform(get("/admin-api/system/users?page=10000").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
+  }
+
   @RestController
   static class ErrorController {
     @GetMapping("/test/error")
     public R<Void> fail() {
       throw new IllegalStateException("private-internal-detail");
+    }
+
+    @GetMapping("/test/duplicate")
+    public R<Void> duplicate() {
+      throw new org.springframework.dao.DuplicateKeyException("private-index-name");
     }
 
     @GetMapping("/test/json")

@@ -2,7 +2,7 @@
 
 自研模块化单体，面向海外达人分销业务。交付范围以 `docs/01-报价与合同/` 的签约定稿为准，设计以 `docs/03-设计/系统详细设计说明书.md` 为准。当前后台包含管理员登录、用户管理、操作审计；独立跳转服务提供 302 跳转与 Redis 点击事件写入。其他业务模块目前仅占位。
 
-任务 02 已按第四次续做要求完成整改，本地验证及 Java / Docker / OSV CI 均通过，交 [PR #2](https://github.com/ksws00684315/t-crm/pull/2) 由负责人审查。Checkstyle 按 ADR-007 保留，ArchUnit 完整组合许可已声明。当前结果见 [执行报告第 11 节](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md#11-第四次续做记录2026-10-05)。
+任务 02（工程化基线与规范整改）已通过 [PR #2](https://github.com/ksws00684315/t-crm/pull/2) 合并；Checkstyle 按 ADR-007 保留，ArchUnit 完整组合许可已声明。执行记录见 [执行报告](docs/04-开发任务/02-工程化基线与规范整改-执行报告.md)。任务 03（前端与部署）待执行。
 
 ## 目录
 
@@ -19,23 +19,23 @@
 
 ## 版本
 
-| 项目 | 当前固定版本 |
+| 项目 | 当前版本 |
 |---|---|
 | 两工程 | 0.1.0；Java 21；Spring Boot 4.1.1 |
 | Sa-Token / MyBatis-Plus / Redisson | 1.46.0 / 3.5.17 / 4.8.0（后台） |
-| PostgreSQL / JDBC / Flyway | PostgreSQL 17；JDBC 42.7.13；Flyway 12.4.0（后台） |
+| PostgreSQL / JDBC / Flyway | PostgreSQL 17；JDBC、Flyway 由 Spring Boot 管理（Boot 4.1.1 解析为 42.7.13 / 12.4.0，后台） |
 | Tomcat / Jackson BOM | 11.0.26 / 3.1.7（按安全修复例外覆盖） |
 | Spotless / google-java-format | 3.10.3 / 1.28.0 |
 | Maven Checkstyle / Checkstyle 引擎 | 3.6.0 / 14.3.0（构建工具，见 ADR-007） |
 | JaCoCo / ArchUnit | 0.8.15 / 1.5.1 |
-| license-maven-plugin / Surefire / Failsafe | 2.7.1 / 3.5.5 / 3.5.5 |
+| license-maven-plugin / Surefire / Failsafe | 2.7.1；后两者由 Spring Boot 管理（Boot 4.1.1 解析为 3.5.6） |
 | Testcontainers / 测试镜像 | 2.0.5；`postgres:17.11`、`redis:7.4.5` |
 
-实际依赖以各工程 `pom.xml` 为准；新增版本、原文及兼容依据见执行报告。Redis 运行环境采用 7.x。
+pom 中未写 `<version>` 的依赖与插件跟随 Spring Boot 升级（见 `.github/dependabot.yml` 的策略说明），其余版本固定写在 `pom.xml`；实际版本以各工程 `pom.xml` 与 `mvn dependency:tree` 为准；新增版本、原文及兼容依据见执行报告。Redis 运行环境采用 7.x。
 
 ## 本地开发
 
-安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `.env.example` 到 `.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
+安装 JDK 21、Maven、Python 3；后台运行需要 PostgreSQL 17 和 Redis，跳转服务只需 Redis。复制 `.env.example` 到 `.env`，填写本机账号、密码、首次超管凭证以及跳转回退地址和 IP 哈希盐；在反向代理（Nginx / Cloudflare）之后部署时还必须设置 `TCRM_TRUSTED_PROXIES`（见下文）。不要提交 `.env`。Spring Boot 不会自动读取该文件，应通过 IDE 或终端把其中的值设为环境变量。首次超管凭证无默认值；不存在启用且未删除的超级管理员时，两个初始化变量均必须设置，缺少任意一个会启动失败并提示变量名。已有可用超管时无需初始化变量，也不会重复创建。
 
 在所选工程目录运行：
 
@@ -67,8 +67,19 @@ git diff -- THIRD-PARTY-NOTICES
 
 ## 接口与规范
 
-后台管理员令牌放在 `X-Admin-Token` 请求头。认证接口前缀 `/admin-api/auth`；用户管理为 `/admin-api/system/users`，审计列表为 `/admin-api/system/oper-logs`，后两者要求 `SUPER_ADMIN`。后台信封为 `{code,msg,data,errorCode,traceId}`，分页为 `{items,total,page,size}`；64 位整数与金额输出字符串，时间采用 UTC `Instant`。每个请求返回 `X-Trace-Id`。跨域来源仅允许 `TCRM_CORS_ALLOWED_ORIGINS` 的逗号分隔白名单，默认关闭。
+后台管理员令牌放在 `X-Admin-Token` 请求头。认证接口前缀 `/admin-api/auth`；用户管理为 `/admin-api/system/users`，审计列表为 `/admin-api/system/oper-logs`，后两者要求 `SUPER_ADMIN`。后台信封为 `{code,msg,data,errorCode,traceId}`，分页为 `{items,total,page,size}`；64 位整数与金额输出字符串，时间采用 UTC `Instant`。每个请求返回 `X-Trace-Id`。跨域来源仅允许 `TCRM_CORS_ALLOWED_ORIGINS` 的逗号分隔白名单，默认关闭。列表接口 `page` 最大 10000、`size` 最大 100。
 
-跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。其链接缓存初始化仍是任务 01 登记的 TODO，后续业务任务负责。
+**客户端 IP 与登录限流**：只有当 TCP 对端属于 `TCRM_TRUSTED_PROXIES`（逗号分隔的 IP/CIDR，默认空 = 不信任任何代理）时，才会读取 `CF-Connecting-IP`、`X-Forwarded-For`（可用 `TCRM_CLIENT_IP_HEADERS` 调整），详见 [ADR-009](docs/06-架构决策/ADR-009-可信代理与客户端IP解析.md)。登录失败在 15 分钟窗口内按“用户名+IP 5 次 / IP 20 次 / 用户名全部 IP 50 次”三层锁定 15 分钟（429），详见 [ADR-008](docs/06-架构决策/ADR-008-登录失败限流按用户名与来源IP分层.md)。未配置可信代理而部署在代理之后时，所有请求会被视为同一个 IP，20 次失败即全站锁定，生产环境必须配置。
+
+跳转服务继续返回 302 与纯文本健康检查，不使用后台信封。其链接缓存初始化仍是任务 01 登记的 TODO，后续业务任务负责。链接索引值只接受 JSON（见设计说明书 §7.4）；点击流 `stream:click` 以近似 `MAXLEN` 写入，上限 `TCRM_CLICK_STREAM_MAXLEN`（默认 1000000）。
+
+## 遗留清单
+
+以下问题已在 2026-10-05 审查中确认，暂不处理，留给后续业务任务：
+
+- 用户列表按用户名模糊查询（`ILIKE`）时未转义通配符 `%`、`_`，关键字含这两个字符会匹配过宽。
+- 用户更新接口没有乐观锁，并发修改时后写覆盖先写。
+- Sa-Token 沿用默认的并发登录策略，未配置空闲超时，只有 8 小时绝对超时（`sa-token.timeout`）。
+- 操作审计由 `@Async` 异步写入，写入失败或进程退出时可能丢失少量记录（内部系统，负责人已接受）。
 
 编码前读取 [AGENTS.md](AGENTS.md)、[工程规范](docs/05-工程规范/README.md) 和 [ADR](docs/06-架构决策/)。使用任务分支及 Conventional Commits；禁止直接推送 main。由负责人审查并合并 PR。

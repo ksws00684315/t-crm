@@ -24,7 +24,7 @@ public class OperLogController {
 
   @GetMapping
   public R<PageResult<OperLogVO>> page(
-      @RequestParam(defaultValue = "1") @Min(1) int page,
+      @RequestParam(defaultValue = "1") @Min(1) @Max(PageResult.MAX_PAGE) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
     return R.ok(logs.page(page, size).map(OperLogVO::from));
   }

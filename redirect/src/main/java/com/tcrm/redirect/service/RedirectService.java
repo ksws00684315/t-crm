@@ -1,5 +1,6 @@
 package com.tcrm.redirect.service;
 
+import com.tcrm.redirect.config.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -17,14 +18,17 @@ import org.springframework.stereotype.Service;
 public class RedirectService {
   private static final Logger LOG = LoggerFactory.getLogger(RedirectService.class);
   private final ClickRedis redis;
+  private final ClientIpResolver clientIps;
   private final URI fallback;
   private final String salt;
 
   public RedirectService(
       ClickRedis redis,
+      ClientIpResolver clientIps,
       @Value("${crm.redirect.fallback-url}") String fallback,
       @Value("${crm.redirect.ip-hash-salt}") String salt) {
     this.redis = redis;
+    this.clientIps = clientIps;
     this.fallback = httpUri(fallback);
     this.salt = salt;
     if (this.fallback == null || salt.isBlank()) {
@@ -49,18 +53,15 @@ public class RedirectService {
     if (value == null) {
       return redirectTo(fallback);
     }
-    String[] parts = value.split("\\|", -1);
-    if (parts.length != 3 || !parts[0].matches("[1-9][0-9]{0,18}") || !parts[2].equals("1")) {
-      return redirectTo(fallback);
-    }
-    URI target = httpUri(parts[1]);
+    var entry = LinkEntry.parse(value);
+    URI target = entry.map(link -> httpUri(link.targetUrl())).orElse(null);
     if (target == null) {
       return redirectTo(fallback);
     }
     var event =
         Map.of(
             "kolItemId",
-            parts[0],
+            entry.get().kolItemId(),
             "kolCode",
             kolCode,
             "productCode",
@@ -68,7 +69,7 @@ public class RedirectService {
             "ts",
             Long.toString(System.currentTimeMillis()),
             "ipHash",
-            hash(clientIp(request)),
+            hash(clientIps.resolve(request)),
             "ua",
             header(request, "User-Agent", 512),
             "ref",
@@ -93,18 +94,6 @@ public class RedirectService {
 
   private ResponseEntity<Void> redirectTo(URI target) {
     return ResponseEntity.status(302).location(target).header("Cache-Control", "no-store").build();
-  }
-
-  private String clientIp(HttpServletRequest request) {
-    String ip = header(request, "CF-Connecting-IP", 128).trim();
-    if (!ip.isEmpty()) {
-      return ip;
-    }
-    ip = header(request, "X-Forwarded-For", 1024);
-    if (!ip.isBlank()) {
-      return ip.split(",", 2)[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 
   private String hash(String ip) {

@@ -11,6 +11,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -55,7 +56,12 @@ public class UserService {
     user.setDataScope(r.dataScope());
     user.setStatus(1);
     user.setDeleted(false);
-    users.insert(user);
+    try {
+      users.insert(user);
+    } catch (DuplicateKeyException e) {
+      // Only username has a unique key on sys_user; see uk_sys_user_username.
+      throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
+    }
     return UserDTO.from(user);
   }
 
