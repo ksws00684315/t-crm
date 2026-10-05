@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tcrm.redirect.config.ClientIpResolver;
 import com.tcrm.redirect.service.ClickRedis;
 import com.tcrm.redirect.service.RedirectService;
 import java.util.Map;
@@ -33,7 +34,10 @@ class RedirectControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new RedirectController(
                     new RedirectService(
-                        redis, "https://example.com/unavailable", "unit-test-salt")))
+                        redis,
+                        new ClientIpResolver("127.0.0.1", "CF-Connecting-IP,X-Forwarded-For"),
+                        "https://example.com/unavailable",
+                        "unit-test-salt")))
             .build();
   }
 
