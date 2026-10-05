@@ -91,10 +91,12 @@ export interface BdUserVO {
 
 export type TaskStatus = "WAITING" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
 
+export type TaskType = "KOL_IMPORT" | "PRODUCT_IMPORT" | "MAPPING_IMPORT";
+
 /** `TaskVO`: progress of a batch task. `done` counts processed rows, failed ones included. */
 export interface TaskVO {
   id: string;
-  taskType: "KOL_IMPORT";
+  taskType: TaskType;
   status: TaskStatus;
   total: number;
   done: number;
@@ -105,4 +107,51 @@ export interface TaskVO {
   createTime: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+
+/** `ShopVO`. */
+export interface ShopVO {
+  id: string;
+  shopName: string;
+  weidianShopId: string;
+  status: 0 | 1;
+  remark: string | null;
+  createTime: string;
+  updateTime: string;
+}
+
+/** `ProductVO`. `price` 2 decimals; `rate` fraction 4 decimals or null. */
+export interface ProductVO {
+  id: string;
+  productCode: string;
+  shopId: string;
+  shopName: string | null;
+  weidianShopId: string | null;
+  weidianItemId: string;
+  name: string;
+  category: string | null;
+  imageUrl: string | null;
+  price: string;
+  rate: string | null;
+  status: 0 | 1;
+  createTime: string;
+  updateTime: string;
+}
+
+/** `KolItemVO`. `validTo` null means currently effective. */
+export interface KolItemVO {
+  id: string;
+  kolId: string;
+  kolCode: string | null;
+  kolName: string | null;
+  productId: string;
+  productCode: string | null;
+  productName: string | null;
+  shopId: string;
+  shopName: string | null;
+  weidianShopId: string | null;
+  weidianItemId: string;
+  validFrom: string;
+  validTo: string | null;
 }

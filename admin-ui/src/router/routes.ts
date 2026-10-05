@@ -33,6 +33,47 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "product",
+        name: "ProductGroup",
+        redirect: "/product/shops",
+        meta: {
+          title: "商品",
+          icon: "Goods",
+          menuGroup: true,
+          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+        },
+        children: [
+          {
+            path: "shops",
+            name: "ShopList",
+            component: () => import("@/views/product/shop/index.vue"),
+            meta: {
+              title: "店铺管理",
+              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+            }
+          },
+          {
+            path: "products",
+            name: "ProductList",
+            component: () => import("@/views/product/product/index.vue"),
+            meta: {
+              title: "原商品",
+              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+            }
+          },
+          {
+            path: "kol-items",
+            name: "KolItemList",
+            component: () => import("@/views/product/kol-item/index.vue"),
+            meta: {
+              title: "对应关系",
+              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              hideForOwn: true
+            }
+          }
+        ]
+      },
+      {
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),

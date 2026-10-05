@@ -12,11 +12,10 @@ const route = useRoute();
 const router = useRouter();
 const user = useUserStore();
 
-const menu = computed(() => buildMenu(routes, user.roles));
+const menu = computed(() => buildMenu(routes, user.roles, user.user?.dataScope));
 const roleLabel = computed(() => (user.user ? ROLE_LABELS[user.user.role] : ""));
 
 onMounted(() => {
-  // Pick up role changes or a disabled account made since the last visit. A 401 redirects by itself.
   user.refreshProfile().catch(() => undefined);
 });
 
@@ -35,10 +34,21 @@ async function onCommand(command: string) {
     <el-aside width="208px" class="layout__aside">
       <div class="layout__brand">T-CRM 管理端</div>
       <el-menu :default-active="route.path" router class="layout__menu">
-        <el-menu-item v-for="item in menu" :key="item.path" :index="item.path">
-          <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-          <span>{{ item.title }}</span>
-        </el-menu-item>
+        <template v-for="item in menu" :key="item.path">
+          <el-sub-menu v-if="item.children?.length" :index="item.path">
+            <template #title>
+              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+              <span>{{ item.title }}</span>
+            </template>
+            <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+              <span>{{ child.title }}</span>
+            </el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="item.path">
+            <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </el-menu-item>
+        </template>
       </el-menu>
     </el-aside>
     <el-container>

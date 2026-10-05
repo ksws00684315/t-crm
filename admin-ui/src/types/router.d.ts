@@ -13,5 +13,9 @@ declare module "vue-router" {
     hideInMenu?: boolean;
     /** Name of an Element Plus icon component. */
     icon?: string;
+    /** Parent menu group (children listed under a sub-menu). */
+    menuGroup?: boolean;
+    /** Hide from the menu when the signed-in operator has OWN data scope (task 05). */
+    hideForOwn?: boolean;
   }
 }

@@ -79,6 +79,7 @@ describe("installGuard with the real route table", () => {
       .map(route => [route.path, route.meta?.roles]);
     expect(restricted).toEqual([
       ["kol/kols", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
+      ["product", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
       ["system/users", ["SUPER_ADMIN"]],
       ["system/oper-logs", ["SUPER_ADMIN"]]
     ]);
