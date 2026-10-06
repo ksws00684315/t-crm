@@ -135,6 +135,40 @@ class ProductIT {
   }
 
   @Test
+  void shouldCreateAtMostThreeShops_whenCreatedConcurrently() throws Exception {
+    int attempts = 12;
+    ExecutorService pool = Executors.newFixedThreadPool(attempts);
+    try {
+      List<Future<Integer>> results = new java.util.ArrayList<>();
+      for (int i = 0; i < attempts; i++) {
+        String weidianId = Integer.toString(5000 + i);
+        Callable<Integer> create =
+            () ->
+                mvc.perform(
+                        post("/admin-api/product/shops")
+                            .header(TOKEN, adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                "{\"shopName\":\"并发\",\"weidianShopId\":\"" + weidianId + "\"}"))
+                    .andReturn()
+                    .getResponse()
+                    .getStatus();
+        results.add(pool.submit(create));
+      }
+      int created = 0;
+      for (Future<Integer> result : results) {
+        int code = result.get();
+        assertThat(code).isIn(200, 422);
+        created += code == 200 ? 1 : 0;
+      }
+      assertThat(created).isEqualTo(3);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM crm_shop", Integer.class)).isEqualTo(3);
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
   void shouldReplaceExclusiveItem_keepingSingleCurrentMapping() throws Exception {
     long shopId = createShop("店A", "1001");
     String kolCode = createKol("Alice", "alice@example.com");

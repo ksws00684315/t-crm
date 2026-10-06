@@ -11,8 +11,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -67,6 +73,7 @@ class SystemIT {
   private final ObjectMapper json;
   private final SysUserMapper users;
   private final StringRedisTemplate redis;
+  private final DataSource dataSource;
 
   @Autowired
   SystemIT(
@@ -74,12 +81,14 @@ class SystemIT {
       JdbcTemplate jdbc,
       ObjectMapper json,
       SysUserMapper users,
-      StringRedisTemplate redis) {
+      StringRedisTemplate redis,
+      DataSource dataSource) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.users = users;
     this.redis = redis;
+    this.dataSource = dataSource;
   }
 
   @BeforeEach
@@ -316,6 +325,224 @@ class SystemIT {
     var id = json.readTree(body).at("/data/id");
     assertThat(id.isString()).isTrue();
     return id.asText();
+  }
+
+  @Test
+  void shouldRejectToken_whenUnusedForTwoHours() throws Exception {
+    String token = login("bootstrap", PASSWORD);
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
+    // Sa-Token keeps the last activity per token; move it back past the 2 h inactivity limit.
+    String key = "X-Admin-Token:admin:last-active:" + token;
+    assertThat(redis.hasKey(key)).isTrue();
+    long twoHoursAgo = System.currentTimeMillis() - 7_201_000L;
+    redis.opsForValue().set(key, Long.toString(twoHoursAgo));
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void shouldRejectTokenIssuedDuringConcurrentPasswordReset() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    String[] issued = new String[1];
+    // The reset queues first; the login has checked the old password and waits to record the
+    // login time, then issues its token after the reset (and its logout) committed.
+    runAfterQueuedOnRowLock(
+        Long.valueOf(id),
+        () ->
+            putJson(
+                admin,
+                "/admin-api/system/users/" + id + "/password",
+                Map.of("password", UUID.randomUUID().toString())),
+        () -> issued[0] = login(username, PASSWORD));
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", issued[0]))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void shouldRejectOldToken_whenCredentialVersionChangedWithoutLogout() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    String token = login(username, PASSWORD);
+    // A password change whose Redis logout failed: the version moved on, the session remains.
+    jdbc.update(
+        "UPDATE sys_user SET credential_version = credential_version + 1 WHERE id=?",
+        Long.valueOf(id));
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isUnauthorized());
+    String fresh = login(username, PASSWORD);
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", fresh))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void shouldKeepOneSuperAdmin_whenTwoSuperAdminsDemoteEachOtherConcurrently() throws Exception {
+    String bootstrap = login("bootstrap", PASSWORD);
+    String otherName = randomName();
+    String other = create(bootstrap, otherName, Role.SUPER_ADMIN);
+    String otherToken = login(otherName, PASSWORD);
+    Long bootstrapId =
+        jdbc.queryForObject("SELECT id FROM sys_user WHERE username='bootstrap'", Long.class);
+    Map<String, String> demote =
+        Map.of("nickname", "Demoted", "role", "FINANCE", "dataScope", "ALL");
+    try {
+      int[] codes = new int[2];
+      runAfterQueuedOnRowLocks(
+          List.of(bootstrapId, Long.valueOf(other)),
+          () -> codes[0] = putStatus(bootstrap, "/admin-api/system/users/" + other, demote),
+          () -> codes[1] = putStatus(otherToken, "/admin-api/system/users/" + bootstrapId, demote));
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN' AND status=1",
+                  Integer.class))
+          .isEqualTo(1);
+      assertThat(codes).containsExactlyInAnyOrder(200, 422);
+    } finally {
+      jdbc.update("UPDATE sys_user SET role='SUPER_ADMIN', status=1 WHERE username='bootstrap'");
+    }
+  }
+
+  @Test
+  void shouldKeepAndRenewToken_whenUsedShortlyBeforeTwoHours() throws Exception {
+    String token = login("bootstrap", PASSWORD);
+    String key = "X-Admin-Token:admin:last-active:" + token;
+    long almostTwoHoursAgo = System.currentTimeMillis() - 7_000_000L;
+    redis.opsForValue().set(key, Long.toString(almostTwoHoursAgo));
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
+    long renewed = Long.parseLong(redis.opsForValue().get(key).split(",")[0]);
+    assertThat(renewed).isGreaterThan(System.currentTimeMillis() - 60_000L);
+  }
+
+  @Test
+  void shouldTreatWildcardsLiterally_whenSearchingUsernames() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    create(admin, randomName(), Role.OPERATOR);
+    for (String keyword : new String[] {"%", "_", "o_", "\\"}) {
+      mvc.perform(
+              get("/admin-api/system/users")
+                  .header("X-Admin-Token", admin)
+                  .param("username", keyword))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.total").value("0"));
+    }
+  }
+
+  @Test
+  void shouldKeepConcurrentDisable_whenAnotherAdministratorEditsTheSameUser() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    // The disable commits first; the edit has already read the row (status 1) and must not write
+    // that stale status back.
+    runAfterQueuedOnRowLock(
+        Long.valueOf(id),
+        () -> putJson(admin, "/admin-api/system/users/" + id + "/status", Map.of("status", 0)),
+        () -> putJson(admin, "/admin-api/system/users/" + id, editBody()));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM sys_user WHERE id=?", Integer.class, Long.valueOf(id)))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT nickname FROM sys_user WHERE id=?", String.class, Long.valueOf(id)))
+        .isEqualTo("Edited");
+    requestLogin(username, PASSWORD, 401);
+  }
+
+  @Test
+  void shouldKeepConcurrentPasswordReset_whenAnotherAdministratorEditsTheSameUser()
+      throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    String newPassword = UUID.randomUUID().toString();
+    runAfterQueuedOnRowLock(
+        Long.valueOf(id),
+        () ->
+            putJson(
+                admin,
+                "/admin-api/system/users/" + id + "/password",
+                Map.of("password", newPassword)),
+        () -> putJson(admin, "/admin-api/system/users/" + id, editBody()));
+    requestLogin(username, PASSWORD, 401);
+    login(username, newPassword);
+  }
+
+  /**
+   * Holds a row lock on the user, starts {@code first} and then {@code second} so that both read
+   * the row and queue behind the lock in that order, then releases it.
+   */
+  private void runAfterQueuedOnRowLock(Long userId, Callable<?> first, Callable<?> second)
+      throws Exception {
+    runAfterQueuedOnRowLocks(List.of(userId), first, second);
+  }
+
+  /** As {@link #runAfterQueuedOnRowLock}, holding row locks on several users. */
+  private void runAfterQueuedOnRowLocks(List<Long> userIds, Callable<?> first, Callable<?> second)
+      throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try (var lock = dataSource.getConnection()) {
+      lock.setAutoCommit(false);
+      for (Long userId : userIds) {
+        try (var statement =
+            lock.prepareStatement("SELECT id FROM sys_user WHERE id=? FOR UPDATE")) {
+          statement.setLong(1, userId);
+          statement.executeQuery().close();
+        }
+      }
+      Future<?> firstDone = pool.submit(first);
+      awaitLockWaiters(1);
+      Future<?> secondDone = pool.submit(second);
+      awaitLockWaiters(2);
+      lock.commit();
+      firstDone.get();
+      secondDone.get();
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private void awaitLockWaiters(int expected) throws InterruptedException {
+    for (int i = 0; i < 200; i++) {
+      Integer waiting =
+          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+      if (waiting != null && waiting >= expected) {
+        return;
+      }
+      Thread.sleep(25);
+    }
+    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
+  }
+
+  private Void putJson(String token, String path, Map<String, ?> body) throws Exception {
+    mvc.perform(
+            put(path)
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content(json.writeValueAsString(body)))
+        .andExpect(status().isOk());
+    return null;
+  }
+
+  private int putStatus(String token, String path, Map<String, ?> body) throws Exception {
+    return mvc.perform(
+            put(path)
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content(json.writeValueAsString(body)))
+        .andReturn()
+        .getResponse()
+        .getStatus();
+  }
+
+  private Map<String, String> editBody() {
+    return Map.of("nickname", "Edited", "role", "OPERATOR", "dataScope", "OWN");
   }
 
   private String login(String username, String password) throws Exception {

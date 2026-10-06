@@ -14,12 +14,23 @@ public record AccountDTO(
     DataScope dataScope,
     Integer status,
     Instant lastLoginTime,
-    Instant createTime) {
+    Instant createTime,
+    int credentialVersion) {
   /**
    * Copies the immutable snapshot with the UTC successful-login time; credentials remain internal.
    */
   public AccountDTO withLastLoginTime(Instant time) {
     return new AccountDTO(
-        id, username, passwordHash, nickname, email, role, dataScope, status, time, createTime);
+        id,
+        username,
+        passwordHash,
+        nickname,
+        email,
+        role,
+        dataScope,
+        status,
+        time,
+        createTime,
+        credentialVersion);
   }
 }

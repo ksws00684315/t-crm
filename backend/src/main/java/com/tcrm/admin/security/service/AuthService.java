@@ -47,6 +47,9 @@ public class AuthService {
     user = user.withLastLoginTime(Instant.now());
     users.updateLastLoginTime(user.id(), user.lastLoginTime());
     StpUtil.login(user.id());
+    // Bind the version read before the password check: if a reset committed in between, this
+    // token carries the old version and the first request with it is rejected.
+    StpUtil.getTokenSession().set(CurrentUserContext.CREDENTIAL_VERSION, user.credentialVersion());
     return new LoginResult(
         StpUtil.getTokenName(), StpUtil.getTokenValue(), StpUtil.getTokenTimeout(), user);
   }

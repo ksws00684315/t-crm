@@ -17,6 +17,7 @@ public class SysUserDO extends BaseEntity {
   private DataScope dataScope;
   private Integer status;
   private Instant lastLoginTime;
+  private Integer credentialVersion;
 
   public String getUsername() {
     return username;
@@ -80,5 +81,13 @@ public class SysUserDO extends BaseEntity {
 
   public void setLastLoginTime(Instant value) {
     this.lastLoginTime = value;
+  }
+
+  public Integer getCredentialVersion() {
+    return credentialVersion;
+  }
+
+  public void setCredentialVersion(Integer value) {
+    this.credentialVersion = value;
   }
 }

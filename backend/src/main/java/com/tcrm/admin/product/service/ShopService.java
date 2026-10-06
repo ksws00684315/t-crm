@@ -36,7 +36,14 @@ public class ShopService {
         .toList();
   }
 
+  /**
+   * Creates a shop. The count check and the insert run in one transaction behind a
+   * transaction-level advisory lock, so concurrent requests cannot exceed {@link
+   * ProductRules#MAX_SHOPS}.
+   */
+  @Transactional(rollbackFor = Exception.class)
   public ShopDTO create(CreateShopCommand c) {
+    shops.lockForCreate();
     if (shops.countAlive() >= ProductRules.MAX_SHOPS) {
       throw new BusinessException(ErrorCode.SHOP_LIMIT_REACHED);
     }

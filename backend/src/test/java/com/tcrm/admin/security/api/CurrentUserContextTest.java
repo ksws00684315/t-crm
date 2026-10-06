@@ -8,6 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -32,10 +33,12 @@ class CurrentUserContextTest {
             DataScope.OWN,
             1,
             null,
-            null);
+            null,
+            0);
     when(accounts.getById(7L)).thenReturn(user);
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindCredentialVersion(stp, 0);
       var current = new CurrentUserContext(accounts);
       assertThat(current.user()).isEqualTo(user);
       assertThat(current.id()).isEqualTo(7L);
@@ -60,7 +63,8 @@ class CurrentUserContextTest {
                 DataScope.OWN,
                 0,
                 null,
-                null));
+                null,
+                0));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       var current = new CurrentUserContext(accounts);
@@ -75,7 +79,7 @@ class CurrentUserContextTest {
 
   private static AccountDTO account(long id, Role role, int status) {
     return new AccountDTO(
-        id, "user" + id, "test-hash", "User", null, role, DataScope.ALL, status, null, null);
+        id, "user" + id, "test-hash", "User", null, role, DataScope.ALL, status, null, null, 0);
   }
 
   @AfterEach
@@ -91,6 +95,7 @@ class CurrentUserContextTest {
         new ServletRequestAttributes(new MockHttpServletRequest()));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindCredentialVersion(stp, 0);
       var current = new CurrentUserContext(accounts);
       current.user();
       current.id();
@@ -106,6 +111,7 @@ class CurrentUserContextTest {
     when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindCredentialVersion(stp, 0);
       var current = new CurrentUserContext(accounts);
       for (int i = 0; i < 2; i++) {
         RequestContextHolder.setRequestAttributes(
@@ -122,6 +128,7 @@ class CurrentUserContextTest {
     when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindCredentialVersion(stp, 0);
       var current = new CurrentUserContext(accounts);
       current.user();
       current.user();
@@ -143,6 +150,74 @@ class CurrentUserContextTest {
       verify(accounts, times(1)).getById(7L);
       stp.verify(() -> StpUtil.kickout(7L), times(2));
     }
+  }
+
+  @Test
+  void shouldRevokeToken_whenIssuedForAnOlderCredentialVersion() {
+    var accounts = mock(AccountStore.class);
+    when(accounts.getById(7L))
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "user7",
+                "test-hash",
+                "User",
+                null,
+                Role.OPERATOR,
+                DataScope.ALL,
+                1,
+                null,
+                null,
+                3));
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      stp.when(StpUtil::getTokenValue).thenReturn("old-token");
+      bindCredentialVersion(stp, 2);
+      var current = new CurrentUserContext(accounts);
+      assertThatThrownBy(current::user)
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ErrorCode.AUTH_UNAUTHORIZED.message());
+      stp.verify(() -> StpUtil.logoutByTokenValue("old-token"));
+    }
+  }
+
+  @Test
+  void shouldRevokeToken_whenSessionHasNoCredentialVersion() {
+    var accounts = mock(AccountStore.class);
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      stp.when(StpUtil::getTokenValue).thenReturn("legacy-token");
+      stp.when(StpUtil::getTokenSession).thenReturn(mock(SaSession.class));
+      var current = new CurrentUserContext(accounts);
+      assertThatThrownBy(current::user)
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ErrorCode.AUTH_UNAUTHORIZED.message());
+      stp.verify(() -> StpUtil.logoutByTokenValue("legacy-token"));
+    }
+  }
+
+  @Test
+  void shouldCheckCredentialVersionOnce_whenSeveralLookupsHappenInOneRequest() {
+    var accounts = mock(AccountStore.class);
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindCredentialVersion(stp, 0);
+      var current = new CurrentUserContext(accounts);
+      current.user();
+      current.id();
+      current.role();
+      stp.verify(StpUtil::getTokenSession, times(1));
+    }
+  }
+
+  private static void bindCredentialVersion(org.mockito.MockedStatic<StpUtil> stp, int version) {
+    var session = mock(SaSession.class);
+    when(session.get(CurrentUserContext.CREDENTIAL_VERSION)).thenReturn(version);
+    stp.when(StpUtil::getTokenSession).thenReturn(session);
   }
 
   @Test
