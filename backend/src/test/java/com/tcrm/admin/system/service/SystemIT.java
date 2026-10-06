@@ -13,6 +13,11 @@ import com.tcrm.admin.system.mapper.SysUserMapper;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -67,6 +72,7 @@ class SystemIT {
   private final ObjectMapper json;
   private final SysUserMapper users;
   private final StringRedisTemplate redis;
+  private final DataSource dataSource;
 
   @Autowired
   SystemIT(
@@ -74,12 +80,14 @@ class SystemIT {
       JdbcTemplate jdbc,
       ObjectMapper json,
       SysUserMapper users,
-      StringRedisTemplate redis) {
+      StringRedisTemplate redis,
+      DataSource dataSource) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.users = users;
     this.redis = redis;
+    this.dataSource = dataSource;
   }
 
   @BeforeEach
@@ -316,6 +324,126 @@ class SystemIT {
     var id = json.readTree(body).at("/data/id");
     assertThat(id.isString()).isTrue();
     return id.asText();
+  }
+
+  @Test
+  void shouldRejectToken_whenUnusedForTwoHours() throws Exception {
+    String token = login("bootstrap", PASSWORD);
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
+    // Sa-Token keeps the last activity per token; move it back past the 2 h inactivity limit.
+    String key = "X-Admin-Token:admin:last-active:" + token;
+    assertThat(redis.hasKey(key)).isTrue();
+    long twoHoursAgo = System.currentTimeMillis() - 7_201_000L;
+    redis.opsForValue().set(key, Long.toString(twoHoursAgo));
+    mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void shouldTreatWildcardsLiterally_whenSearchingUsernames() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    create(admin, randomName(), Role.OPERATOR);
+    for (String keyword : new String[] {"%", "_", "o_"}) {
+      mvc.perform(
+              get("/admin-api/system/users")
+                  .header("X-Admin-Token", admin)
+                  .param("username", keyword))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.total").value("0"));
+    }
+  }
+
+  @Test
+  void shouldKeepConcurrentDisable_whenAnotherAdministratorEditsTheSameUser() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    // The disable commits first; the edit has already read the row (status 1) and must not write
+    // that stale status back.
+    runAfterQueuedOnRowLock(
+        Long.valueOf(id),
+        () -> putJson(admin, "/admin-api/system/users/" + id + "/status", Map.of("status", 0)),
+        () -> putJson(admin, "/admin-api/system/users/" + id, editBody()));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM sys_user WHERE id=?", Integer.class, Long.valueOf(id)))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT nickname FROM sys_user WHERE id=?", String.class, Long.valueOf(id)))
+        .isEqualTo("Edited");
+    requestLogin(username, PASSWORD, 401);
+  }
+
+  @Test
+  void shouldKeepConcurrentPasswordReset_whenAnotherAdministratorEditsTheSameUser()
+      throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String username = randomName();
+    String id = create(admin, username, Role.OPERATOR);
+    String newPassword = UUID.randomUUID().toString();
+    runAfterQueuedOnRowLock(
+        Long.valueOf(id),
+        () ->
+            putJson(
+                admin,
+                "/admin-api/system/users/" + id + "/password",
+                Map.of("password", newPassword)),
+        () -> putJson(admin, "/admin-api/system/users/" + id, editBody()));
+    requestLogin(username, PASSWORD, 401);
+    login(username, newPassword);
+  }
+
+  /**
+   * Holds a row lock on the user, starts {@code first} and then {@code second} so that both read
+   * the row and queue behind the lock in that order, then releases it.
+   */
+  private void runAfterQueuedOnRowLock(Long userId, Callable<?> first, Callable<?> second)
+      throws Exception {
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try (var lock = dataSource.getConnection()) {
+      lock.setAutoCommit(false);
+      try (var statement = lock.prepareStatement("SELECT id FROM sys_user WHERE id=? FOR UPDATE")) {
+        statement.setLong(1, userId);
+        statement.executeQuery().close();
+      }
+      Future<?> firstDone = pool.submit(first);
+      awaitLockWaiters(1);
+      Future<?> secondDone = pool.submit(second);
+      awaitLockWaiters(2);
+      lock.commit();
+      firstDone.get();
+      secondDone.get();
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private void awaitLockWaiters(int expected) throws InterruptedException {
+    for (int i = 0; i < 200; i++) {
+      Integer waiting =
+          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+      if (waiting != null && waiting >= expected) {
+        return;
+      }
+      Thread.sleep(25);
+    }
+    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
+  }
+
+  private Void putJson(String token, String path, Map<String, ?> body) throws Exception {
+    mvc.perform(
+            put(path)
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content(json.writeValueAsString(body)))
+        .andExpect(status().isOk());
+    return null;
+  }
+
+  private Map<String, String> editBody() {
+    return Map.of("nickname", "Edited", "role", "OPERATOR", "dataScope", "OWN");
   }
 
   private String login(String username, String password) throws Exception {

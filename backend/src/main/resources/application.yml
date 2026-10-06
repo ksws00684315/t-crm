@@ -47,7 +47,10 @@ mybatis-plus:
       logic-not-delete-value: false
 sa-token:
   token-name: X-Admin-Token
+  # Absolute token lifetime 8 h; a token unused for 2 h also expires (OWASP ASVS L2 session
+  # inactivity timeout).
   timeout: 28800
+  active-timeout: 7200
   is-read-cookie: false
   is-read-body: false
   is-read-header: true

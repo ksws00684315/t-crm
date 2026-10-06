@@ -2,6 +2,7 @@ package com.tcrm.admin.system.service;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
@@ -11,10 +12,15 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
+import java.time.Instant;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+/**
+ * Administrator accounts. Every update writes only the columns of that operation (never a whole row
+ * read earlier), so concurrent edits cannot restore a stale status or password hash.
+ */
 @Service
 public class UserService {
   private final SysUserMapper users;
@@ -33,7 +39,9 @@ public class UserService {
     var query =
         new LambdaQueryWrapper<SysUserDO>()
             .apply(
-                username != null && !username.isBlank(), "username ILIKE {0}", "%" + username + "%")
+                username != null && !username.isBlank(),
+                "username ILIKE {0}",
+                "%" + escapeLike(username) + "%")
             .eq(role != null, SysUserDO::getRole, role)
             .eq(status != null, SysUserDO::getStatus, status)
             .orderByDesc(SysUserDO::getCreateTime, SysUserDO::getId);
@@ -67,34 +75,47 @@ public class UserService {
 
   public void update(Long id, EditUserCommand r) {
     validateScope(r.role(), r.dataScope());
-    SysUserDO user = require(id);
+    require(id);
     if (id.equals(current.id()) && r.role() != Role.SUPER_ADMIN) {
       throw new BusinessException(ErrorCode.USER_CANNOT_REMOVE_SELF_ROLE);
     }
-    user.setNickname(r.nickname());
-    user.setEmail(r.email());
-    user.setRole(r.role());
-    user.setDataScope(r.dataScope());
-    users.updateById(user);
+    write(
+        id,
+        new LambdaUpdateWrapper<SysUserDO>()
+            .set(SysUserDO::getNickname, r.nickname())
+            .set(SysUserDO::getEmail, r.email())
+            .set(SysUserDO::getRole, r.role())
+            .set(SysUserDO::getDataScope, r.dataScope()));
   }
 
   public void updateStatus(Long id, int status) {
     if (id.equals(current.id()) && status == 0) {
       throw new BusinessException(ErrorCode.USER_CANNOT_DISABLE_SELF);
     }
-    SysUserDO user = require(id);
-    user.setStatus(status);
-    users.updateById(user);
+    require(id);
+    write(id, new LambdaUpdateWrapper<SysUserDO>().set(SysUserDO::getStatus, status));
     if (status == 0) {
       StpUtil.kickout(id);
     }
   }
 
   public void updatePassword(Long id, String password) {
-    SysUserDO user = require(id);
-    user.setPasswordHash(passwords.encode(password));
-    users.updateById(user);
+    require(id);
+    write(
+        id,
+        new LambdaUpdateWrapper<SysUserDO>()
+            .set(SysUserDO::getPasswordHash, passwords.encode(password)));
     StpUtil.logout(id);
+  }
+
+  /** Applies the given column updates to one live user, with the audit columns. */
+  private void write(Long id, LambdaUpdateWrapper<SysUserDO> columns) {
+    users.update(
+        null,
+        columns
+            .eq(SysUserDO::getId, id)
+            .set(SysUserDO::getUpdateBy, current.id())
+            .set(SysUserDO::getUpdateTime, Instant.now()));
   }
 
   private SysUserDO require(Long id) {
@@ -109,5 +130,10 @@ public class UserService {
     if (scope == DataScope.OWN && role != Role.OPERATOR) {
       throw new BusinessException(ErrorCode.USER_INVALID_DATA_SCOPE);
     }
+  }
+
+  /** Escapes LIKE wildcards and the escape character itself (PostgreSQL default escape "\"). */
+  private static String escapeLike(String value) {
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 }

@@ -3,6 +3,7 @@ package com.tcrm.admin.system.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -12,6 +13,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
@@ -21,11 +26,20 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.util.List;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class UserServiceTest {
+  @BeforeAll
+  static void tableInfo() {
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), SysUserDO.class);
+  }
+
   private final SysUserMapper users = mock(SysUserMapper.class);
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
@@ -105,14 +119,14 @@ class UserServiceTest {
 
   @Test
   void shouldUpdateProfile_whenScopeAndRoleAreAllowed() {
-    var user = user();
-    when(users.selectById(7L)).thenReturn(user);
+    when(users.selectById(7L)).thenReturn(user());
     when(current.id()).thenReturn(8L);
     service.update(
         7L, new EditUserCommand("Finance", "test@example.invalid", Role.FINANCE, DataScope.ALL));
-    assertThat(user.getRole()).isEqualTo(Role.FINANCE);
-    assertThat(user.getNickname()).isEqualTo("Finance");
-    verify(users).updateById(user);
+    assertThat(updatedColumns())
+        .contains("nickname=", "email=", "role=", "data_scope=", "update_by=", "update_time=")
+        .doesNotContain("status", "password_hash", "username");
+    verify(users, never()).updateById(any(SysUserDO.class));
   }
 
   @Test
@@ -120,7 +134,7 @@ class UserServiceTest {
     when(users.selectById(7L)).thenReturn(user());
     when(current.id()).thenReturn(7L);
     service.update(7L, new EditUserCommand("Admin", null, Role.SUPER_ADMIN, DataScope.ALL));
-    verify(users).updateById(any(SysUserDO.class));
+    assertThat(updatedColumns()).contains("role=");
   }
 
   @Test
@@ -134,11 +148,12 @@ class UserServiceTest {
   @Test
   void shouldKickAllTokens_whenDisablingAnotherUser() {
     when(current.id()).thenReturn(8L);
-    var user = user();
-    when(users.selectById(7L)).thenReturn(user);
+    when(users.selectById(7L)).thenReturn(user());
     try (var stp = mockStatic(StpUtil.class)) {
       service.updateStatus(7L, 0);
-      assertThat(user.getStatus()).isZero();
+      assertThat(updatedColumns())
+          .contains("status=")
+          .doesNotContain("password_hash", "role", "nickname");
       stp.verify(() -> StpUtil.kickout(7L));
     }
   }
@@ -155,12 +170,13 @@ class UserServiceTest {
 
   @Test
   void shouldInvalidateAllTokens_whenResettingPassword() {
-    var user = user();
-    when(users.selectById(7L)).thenReturn(user);
+    when(users.selectById(7L)).thenReturn(user());
     when(passwords.encode("new-test-input")).thenReturn("new-test-hash");
     try (var stp = mockStatic(StpUtil.class)) {
       service.updatePassword(7L, "new-test-input");
-      assertThat(user.getPasswordHash()).isEqualTo("new-test-hash");
+      assertThat(updatedColumns())
+          .contains("password_hash=")
+          .doesNotContain("status", "role", "nickname");
       stp.verify(() -> StpUtil.logout(7L));
     }
   }
@@ -182,5 +198,13 @@ class UserServiceTest {
     assertThat(result.page()).isEqualTo(2);
     assertThat(result.size()).isEqualTo(20);
     assertThat(result.items()).extracting(UserDTO::username).containsExactly("operator");
+  }
+
+  /** SET clause of the single column-whitelist update sent to the mapper. */
+  @SuppressWarnings("unchecked")
+  private String updatedColumns() {
+    ArgumentCaptor<Wrapper<SysUserDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(users).update(isNull(), update.capture());
+    return ((LambdaUpdateWrapper<SysUserDO>) update.getValue()).getSqlSet();
   }
 }
