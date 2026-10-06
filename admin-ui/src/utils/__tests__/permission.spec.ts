@@ -5,6 +5,7 @@ import {
   canAccessRoute,
   hasAnyRole,
   kolAbilities,
+  linkAbilities,
   productAbilities
 } from "../permission";
 
@@ -148,5 +149,22 @@ describe("canAccessRoute", () => {
 
   it("still rejects roles that are not allowed", () => {
     expect(canAccessRoute({ roles: ["SUPER_ADMIN"] }, ["OPERATOR"], "ALL")).toBe(false);
+  });
+});
+
+describe("linkAbilities", () => {
+  it("lets every role view links and only SUPER_ADMIN rebuild the index", () => {
+    expect(linkAbilities(null)).toEqual({ canViewLinks: false, canRebuildIndex: false });
+    expect(linkAbilities({ role: "SUPER_ADMIN", dataScope: "ALL" })).toEqual({
+      canViewLinks: true,
+      canRebuildIndex: true
+    });
+    for (const user of [
+      { role: "OPERATOR", dataScope: "ALL" },
+      { role: "OPERATOR", dataScope: "OWN" },
+      { role: "FINANCE", dataScope: "ALL" }
+    ] as const) {
+      expect(linkAbilities(user)).toEqual({ canViewLinks: true, canRebuildIndex: false });
+    }
   });
 });

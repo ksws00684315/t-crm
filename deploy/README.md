@@ -23,12 +23,14 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 ## 生产部署（模板，使用前逐项审阅）
 
 1. 域名：Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>` 到服务器；SSL/TLS 模式用 Full (strict)，把 Cloudflare 源站证书放到 `TCRM_CERT_DIR`（`origin.pem`、`origin.key`）。
-2. 填写 `deploy/.env`（`TCRM_DOMAIN`、数据库、`TCRM_REDIS_PASSWORD`（生产必填）、首次超管、跳转回退地址、IP 哈希盐等）。
+2. 填写 `deploy/.env`（`TCRM_DOMAIN`、数据库、`TCRM_REDIS_PASSWORD`（生产必填）、首次超管、跳转回退地址、IP 哈希盐、中转链接地址 `TCRM_LINK_BASE_URL` 等）。`TCRM_LINK_BASE_URL` 必填，应为 `https://t.<域名>`（https、不带末尾斜杠），后台据此生成 `https://t.<域名>/t/{达人编号}/{原商品编码}`；缺失或格式不对时后台启动失败。
 3. 构建前端静态文件：`deploy/scripts/build-static.sh`（需要 Node.js 与 pnpm），输出到 `TCRM_STATIC_DIR`（默认 `deploy/www`）。
 4. 启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`。
 5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
 
 资源限制按设计说明书 §10：PostgreSQL 2G（`shared_buffers=512MB`）、Redis 1.5G（`maxmemory 1280mb`、`noeviction`）、crm-admin 2G、crm-redirect 512M。只有 nginx 映射 80/443；PostgreSQL、Redis、后台、跳转服务只在 compose 网络内可达。
+
+**链接索引与 Redis 容量**（设计说明书 §7.4）：`maxmemory 1280mb` 约可容纳 700 万个链接 field（约 350 位达人 × 2 万）；合同规模 100 位达人（200 万个 field，约 328MB）远低于上限，超过约 350 位达人时需把 Redis 上限调到 2GB 以上并相应增加服务器内存。后台每分钟检查一次 Redis 内存，超过上限 70% 记 `WARN`、85% 记 `ERROR`。链接索引每天 04:30（UTC）自动全量重建；Redis 数据丢失或换实例后，请超管在管理端"对应关系"页点击"重建链接索引"立即恢复，否则在下一次定时重建前，中转链接会跳到回退地址。
 
 ## Nginx 说明
 
@@ -40,7 +42,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 ## 可信代理（ADR-009）
 
-生产 compose 已为 `crm-admin`、`crm-redirect` **写死** `TCRM_TRUSTED_PROXIES=172.30.0.0/24`（与 compose 网络网段一致，不读 `.env` 里的同名变量）；应用因此只信任来自 Nginx 的转发头。`TCRM_CLIENT_IP_HEADERS`、`TCRM_CLICK_STREAM_MAXLEN` 会从 `.env` 传入容器；空的 headers 在应用内回退到默认值 `CF-Connecting-IP,X-Forwarded-For`。
+生产 compose 已为 `crm-admin`、`crm-redirect` **写死** `TCRM_TRUSTED_PROXIES=172.30.0.0/24`（与 compose 网络网段一致，不读 `.env` 里的同名变量）；应用因此只信任来自 Nginx 的转发头。`TCRM_CLIENT_IP_HEADERS`、`TCRM_CLICK_STREAM_MAXLEN` 会从 `.env` 传入容器（`TCRM_CLICK_STREAM_MAXLEN` 同时传给 crm-admin，用于点击积压告警：超过 50% 记 `WARN`、80% 记 `ERROR`）；空的 headers 在应用内回退到默认值 `CF-Connecting-IP,X-Forwarded-For`。
 
 **防伪造怎么做的**：本模板在 `proxy.conf` 里用 `$remote_addr` 覆盖转发给应用的转发头，所以客户端自带的 `CF-Connecting-IP` / `X-Forwarded-For` / `X-Real-IP` 不会到达应用。`set_real_ip_from`（`cloudflare-real-ip.conf`）只影响 Nginx 如何解析 `$remote_addr`，**不会**挡住非 Cloudflare 来源的连接。
 

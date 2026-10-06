@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.product.api.KolItemChangedEvent;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class MappingImportProcessorTest {
@@ -41,6 +43,7 @@ class MappingImportProcessorTest {
   private final TransactionTemplate tx =
       new TransactionTemplate(
           mock(org.springframework.transaction.PlatformTransactionManager.class));
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private MappingImportProcessor processor;
   private ShopDO shop;
   private ProductDO product;
@@ -48,7 +51,8 @@ class MappingImportProcessorTest {
 
   @BeforeEach
   void setup() {
-    processor = new MappingImportProcessor(9L, shops, products, items, productMapper, kols, tx);
+    processor =
+        new MappingImportProcessor(9L, shops, products, items, productMapper, kols, tx, events);
     shop = new ShopDO();
     shop.setId(1L);
     shop.setWeidianShopId("100");
@@ -59,7 +63,7 @@ class MappingImportProcessorTest {
     product.setProductCode("P000001");
     product.setName("鞋");
     when(products.findByCode("P000001")).thenReturn(product);
-    kol = new KolRefDTO(10L, "KOL0001", "Alice", true);
+    kol = new KolRefDTO(10L, "KOL0001", "Alice", true, null);
     when(kols.getByCode("KOL0001")).thenReturn(kol);
     doAnswer(
             inv -> {
@@ -87,6 +91,12 @@ class MappingImportProcessorTest {
   }
 
   @Test
+  void shouldPublishMappingChangedEvent_whenMappingInserted() {
+    processor.process(row("100", "9001", "KOL0001", "P000001"));
+    verify(events).publishEvent(new KolItemChangedEvent(10L, 20L));
+  }
+
+  @Test
   void shouldSucceedIdempotently_whenIdenticalCurrentMappingExists() {
     KolItemDO current = new KolItemDO();
     current.setId(5L);
@@ -98,6 +108,7 @@ class MappingImportProcessorTest {
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001"))).isEmpty();
     verify(items, never()).insert(any(KolItemDO.class));
     verify(items, never()).update(any(), any());
+    verify(events, never()).publishEvent(any(Object.class));
   }
 
   @Test
@@ -116,7 +127,8 @@ class MappingImportProcessorTest {
     current.setShopId(1L);
     current.setWeidianItemId("9001");
     when(items.findCurrentByShopItem(1L, "9001")).thenReturn(current);
-    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(11L, "KOL0002", "Bob", true)));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(11L, "KOL0002", "Bob", true, null)));
     ProductDO other = new ProductDO();
     other.setProductCode("P000002");
     when(productMapper.selectById(21L)).thenReturn(other);
@@ -147,7 +159,7 @@ class MappingImportProcessorTest {
 
   @Test
   void shouldRejectDisabledKol() {
-    when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "Alice", false));
+    when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "Alice", false, null));
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
         .contains(MappingImportProcessor.KOL_MISSING);
   }

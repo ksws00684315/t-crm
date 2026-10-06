@@ -36,7 +36,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PRODUCT_CODE_EXISTS: "该原商品编码已存在",
   PRODUCT_WEIDIAN_ID_EXISTS: "该店铺下微店商品 ID 已存在",
   PRODUCT_CODE_IMMUTABLE: "原商品编码创建后不可修改",
-  PRODUCT_IS_EXCLUSIVE_ITEM: "该微店商品 ID 已是专属商品，不能登记为原商品"
+  PRODUCT_IS_EXCLUSIVE_ITEM: "该微店商品 ID 已是专属商品，不能登记为原商品",
+  LINK_REBUILD_RUNNING: "链接索引正在重建，请稍后再试"
 };
 
 export const GENERIC_ERROR_MESSAGE = "操作失败，请稍后重试";

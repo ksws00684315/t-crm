@@ -35,7 +35,8 @@ public enum ErrorCode {
   PRODUCT_CODE_EXISTS(409, "Product code already exists"),
   PRODUCT_WEIDIAN_ID_EXISTS(409, "Weidian item ID already exists in this shop"),
   PRODUCT_CODE_IMMUTABLE(422, "Product code cannot be changed"),
-  PRODUCT_IS_EXCLUSIVE_ITEM(422, "Exclusive item cannot be registered as an original product");
+  PRODUCT_IS_EXCLUSIVE_ITEM(422, "Exclusive item cannot be registered as an original product"),
+  LINK_REBUILD_RUNNING(409, "A link index rebuild is already running");
   private final int status;
   private final String message;
 

@@ -7,18 +7,20 @@ import type { BdUserVO, KolVO } from "@/api/types";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { kolAbilities } from "@/utils/permission";
+import { kolAbilities, linkAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 import ChangeBdDialog from "./ChangeBdDialog.vue";
 import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
+import KolLinksDrawer from "./KolLinksDrawer.vue";
 
 defineOptions({ name: "KolListPage" });
 
 const me = useUserStore();
 /** Button visibility only; the backend enforces the same rules (task 04 §4.3). */
 const abilities = computed(() => kolAbilities(me.user));
+const links = computed(() => linkAbilities(me.user));
 
 const loading = ref(false);
 const rows = ref<KolVO[]>([]);
@@ -40,6 +42,8 @@ const bdKol = ref<KolVO | null>(null);
 const detailVisible = ref(false);
 const detailId = ref<string | null>(null);
 const importVisible = ref(false);
+const linksVisible = ref(false);
+const linksKol = ref<KolVO | null>(null);
 
 async function load() {
   loading.value = true;
@@ -101,6 +105,11 @@ function openBd(row: KolVO) {
 function openDetail(row: KolVO) {
   detailId.value = row.id;
   detailVisible.value = true;
+}
+
+function openLinks(row: KolVO) {
+  linksKol.value = row;
+  linksVisible.value = true;
 }
 
 async function toggleStatus(row: KolVO) {
@@ -207,9 +216,18 @@ onMounted(() => {
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ formatInstant((row as KolVO).createTime) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row as KolVO)">详情</el-button>
+          <el-button
+            v-if="links.canViewLinks"
+            link
+            type="primary"
+            data-test="links"
+            @click="openLinks(row as KolVO)"
+          >
+            链接
+          </el-button>
           <template v-if="abilities.canWrite">
             <el-button link type="primary" data-test="edit" @click="openEdit(row as KolVO)">
               编辑
@@ -258,6 +276,11 @@ onMounted(() => {
     <ChangeBdDialog v-model="bdVisible" :kol="bdKol" :bd-users="bdUsers" @saved="load" />
     <KolDetailDrawer v-model="detailVisible" :kol-id="detailId" />
     <KolImportDialog v-model="importVisible" @finished="search" />
+    <KolLinksDrawer
+      v-model="linksVisible"
+      :kol-code="linksKol?.kolCode ?? null"
+      :kol-name="linksKol?.name"
+    />
   </el-card>
 </template>
 

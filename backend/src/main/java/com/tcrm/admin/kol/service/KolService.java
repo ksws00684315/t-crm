@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -42,6 +44,7 @@ public class KolService {
   private final BdUserApi bdUsers;
   private final CurrentUserContext current;
   private final TransactionTemplate tx;
+  private final ApplicationEventPublisher events;
 
   public KolService(
       KolMapper kols,
@@ -49,13 +52,15 @@ public class KolService {
       KolWriter writer,
       BdUserApi bdUsers,
       CurrentUserContext current,
-      TransactionTemplate tx) {
+      TransactionTemplate tx,
+      ApplicationEventPublisher events) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
     this.bdUsers = bdUsers;
     this.current = current;
     this.tx = tx;
+    this.events = events;
   }
 
   /** True for a BD: OPERATOR with OWN data scope (OWN is only valid for OPERATOR). */
@@ -172,18 +177,26 @@ public class KolService {
     }
   }
 
-  /** Enables or disables a KOL; never touches {@code bd_user_id}. */
+  /**
+   * Enables or disables a KOL; never touches {@code bd_user_id}. Publishes {@link
+   * KolStatusChangedEvent} in the same transaction so the link index reacts after commit (task 06
+   * §4.3).
+   */
   public void updateStatus(Long id, int status) {
     AccountDTO user = requireWriter();
     requireVisible(id, user);
     Instant now = Instant.now();
-    kols.update(
-        null,
-        new LambdaUpdateWrapper<KolDO>()
-            .eq(KolDO::getId, id)
-            .set(KolDO::getStatus, status)
-            .set(KolDO::getUpdateBy, user.id())
-            .set(KolDO::getUpdateTime, now));
+    tx.executeWithoutResult(
+        txStatus -> {
+          kols.update(
+              null,
+              new LambdaUpdateWrapper<KolDO>()
+                  .eq(KolDO::getId, id)
+                  .set(KolDO::getStatus, status)
+                  .set(KolDO::getUpdateBy, user.id())
+                  .set(KolDO::getUpdateTime, now));
+          events.publishEvent(new KolStatusChangedEvent(id));
+        });
   }
 
   /**

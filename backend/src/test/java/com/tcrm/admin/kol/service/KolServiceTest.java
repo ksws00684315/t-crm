@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -58,6 +60,7 @@ class KolServiceTest {
   private final KolWriter writer = mock(KolWriter.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final KolService service =
       new KolService(
           kols,
@@ -65,7 +68,8 @@ class KolServiceTest {
           writer,
           bdUsers,
           current,
-          new TransactionTemplate(mock(PlatformTransactionManager.class)));
+          new TransactionTemplate(mock(PlatformTransactionManager.class)),
+          events);
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
@@ -470,6 +474,17 @@ class KolServiceTest {
                 .getParamNameValuePairs()
                 .values())
         .contains("Alice B", "alice@example.com", "GB", "VIP");
+  }
+
+  @Test
+  void shouldPublishStatusEvent_whenStatusChanges() {
+    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    service.updateStatus(11L, 0);
+
+    verify(events).publishEvent(new KolStatusChangedEvent(11L));
   }
 
   @Test

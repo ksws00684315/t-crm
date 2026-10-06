@@ -3,6 +3,7 @@ package com.tcrm.admin.product.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.product.api.ProductStatusChangedEvent;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.mapper.ShopMapper;
@@ -23,7 +24,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Original product management (task 05 §4.2, §4.4). Writes require SUPER_ADMIN or OPERATOR+ALL;
@@ -36,18 +39,21 @@ public class ProductService {
   private final KolItemMapper kolItems;
   private final ProductCodeGenerator codes;
   private final CurrentUserContext current;
+  private final ApplicationEventPublisher events;
 
   public ProductService(
       ProductMapper products,
       ShopMapper shops,
       KolItemMapper kolItems,
       ProductCodeGenerator codes,
-      CurrentUserContext current) {
+      CurrentUserContext current,
+      ApplicationEventPublisher events) {
     this.products = products;
     this.shops = shops;
     this.kolItems = kolItems;
     this.codes = codes;
     this.current = current;
+    this.events = events;
   }
 
   /** True for a BD: OPERATOR with OWN data scope — no product writes or mapping access. */
@@ -107,6 +113,11 @@ public class ProductService {
             .set(ProductDO::getUpdateTime, now));
   }
 
+  /**
+   * Puts the product on or off sale and publishes {@link ProductStatusChangedEvent}; the link index
+   * reacts after commit (task 06 §4.3).
+   */
+  @Transactional(rollbackFor = Exception.class)
   public void updateStatus(Long id, int status) {
     requireWriter();
     require(id);
@@ -118,6 +129,7 @@ public class ProductService {
             .set(ProductDO::getStatus, status)
             .set(ProductDO::getUpdateBy, current.id())
             .set(ProductDO::getUpdateTime, now));
+    events.publishEvent(new ProductStatusChangedEvent(id));
   }
 
   ProductDO require(Long id) {

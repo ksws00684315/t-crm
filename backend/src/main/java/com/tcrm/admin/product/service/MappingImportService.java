@@ -7,6 +7,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -21,6 +22,7 @@ public class MappingImportService {
   private final ProductMapper productMapper;
   private final KolApi kols;
   private final TransactionTemplate tx;
+  private final ApplicationEventPublisher events;
 
   public MappingImportService(
       ImportTaskApi imports,
@@ -30,7 +32,8 @@ public class MappingImportService {
       KolItemMapper items,
       ProductMapper productMapper,
       KolApi kols,
-      TransactionTemplate tx) {
+      TransactionTemplate tx,
+      ApplicationEventPublisher events) {
     this.imports = imports;
     this.kolItems = kolItems;
     this.shops = shops;
@@ -39,6 +42,7 @@ public class MappingImportService {
     this.productMapper = productMapper;
     this.kols = kols;
     this.tx = tx;
+    this.events = events;
   }
 
   public byte[] template() {
@@ -52,7 +56,9 @@ public class MappingImportService {
         TaskType.MAPPING_IMPORT,
         MappingImportColumn.headers(),
         file,
-        () -> new MappingImportProcessor(actorId, shops, products, items, productMapper, kols, tx),
+        () ->
+            new MappingImportProcessor(
+                actorId, shops, products, items, productMapper, kols, tx, events),
         TaskType.MAPPING_IMPORT.maxRows());
   }
 }

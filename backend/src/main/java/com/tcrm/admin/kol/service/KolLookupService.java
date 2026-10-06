@@ -42,6 +42,23 @@ public class KolLookupService implements KolApi {
         .toList();
   }
 
+  @Override
+  public List<KolRefDTO> listAll() {
+    return kols
+        .selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(
+                    KolDO::getId,
+                    KolDO::getKolCode,
+                    KolDO::getName,
+                    KolDO::getStatus,
+                    KolDO::getBdUserId)
+                .orderByAsc(KolDO::getId))
+        .stream()
+        .map(KolLookupService::toDto)
+        .toList();
+  }
+
   private static KolRefDTO toDto(KolDO kol) {
     if (kol == null) {
       return null;
@@ -50,6 +67,7 @@ public class KolLookupService implements KolApi {
         kol.getId(),
         kol.getKolCode(),
         kol.getName(),
-        kol.getStatus() != null && kol.getStatus() == 1);
+        kol.getStatus() != null && kol.getStatus() == 1,
+        kol.getBdUserId());
   }
 }

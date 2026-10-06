@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { rebuildLinkIndex } from "@/api/link/link";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
 import type { KolItemVO, ShopVO } from "@/api/types";
@@ -8,7 +9,7 @@ import ImportDialog from "@/components/ImportDialog.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { productAbilities } from "@/utils/permission";
+import { linkAbilities, productAbilities } from "@/utils/permission";
 
 defineOptions({ name: "KolItemListPage" });
 
@@ -16,6 +17,8 @@ const SEARCH_TIP = "请输入达人编号、原商品编码或专属商品 ID �
 
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
+const links = computed(() => linkAbilities(me.user));
+const rebuilding = ref(false);
 
 const loading = ref(false);
 /** False until the user runs a search with at least one precision filter. */
@@ -105,6 +108,27 @@ function reset() {
   clearResults();
 }
 
+async function rebuildIndex() {
+  try {
+    await ElMessageBox.confirm(
+      "将按当前对应关系、达人、商品与店铺状态重建全部中转链接索引，在后台执行。确定开始吗？",
+      "重建链接索引",
+      { type: "warning" }
+    );
+  } catch {
+    return; // cancelled
+  }
+  rebuilding.value = true;
+  try {
+    await rebuildLinkIndex();
+    ElMessage.success("已开始重建");
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    rebuilding.value = false;
+  }
+}
+
 onMounted(() => {
   void loadShops();
 });
@@ -157,6 +181,16 @@ onMounted(() => {
           @click="importVisible = true"
         >
           批量导入
+        </el-button>
+        <el-button
+          v-if="links.canRebuildIndex"
+          type="warning"
+          plain
+          :loading="rebuilding"
+          data-test="rebuild-index"
+          @click="rebuildIndex"
+        >
+          重建链接索引
         </el-button>
       </el-form-item>
     </el-form>
