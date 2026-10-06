@@ -86,6 +86,7 @@ class KolIT {
   private final ObjectMapper json;
   private final StringRedisTemplate redis;
   private final KolWriter writer;
+  private final javax.sql.DataSource dataSource;
 
   @Autowired
   KolIT(
@@ -93,12 +94,14 @@ class KolIT {
       JdbcTemplate jdbc,
       ObjectMapper json,
       StringRedisTemplate redis,
-      KolWriter writer) {
+      KolWriter writer,
+      javax.sql.DataSource dataSource) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.redis = redis;
     this.writer = writer;
+    this.dataSource = dataSource;
   }
 
   @BeforeEach
@@ -249,6 +252,87 @@ class KolIT {
         .andExpect(jsonPath("$.data.bdHistory.length()").value(4))
         .andExpect(jsonPath("$.data.bdHistory[0].bdUserName").value("bd-one"))
         .andExpect(jsonPath("$.data.bdHistory[0].endTime").doesNotExist());
+  }
+
+  @Test
+  void shouldRejectBdEdit_whenKolIsTransferredToAnotherBdMeanwhile() throws Exception {
+    String admin = login("bootstrap", PASSWORD);
+    String bd1 = createBd(admin, "bd-one");
+    String bd2 = createBd(admin, "bd-two");
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType("application/json")
+                            .content(
+                                "{\"name\":\"Alice\",\"email\":\"alice@example.com\","
+                                    + "\"country\":\"US\",\"bdUserId\":\""
+                                    + bd1
+                                    + "\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    String bd1Token = login("bd-one", PASSWORD);
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try (var lock = dataSource.getConnection()) {
+      lock.setAutoCommit(false);
+      try (var statement = lock.prepareStatement("SELECT id FROM crm_kol WHERE id=? FOR UPDATE")) {
+        statement.setLong(1, Long.parseLong(kolId));
+        statement.executeQuery().close();
+      }
+      // The transfer to bd2 queues first; bd1's edit has already passed its scope check.
+      var transfer =
+          pool.submit(
+              () ->
+                  mvc.perform(
+                          put("/admin-api/kol/kols/" + kolId + "/bd-user")
+                              .header(TOKEN, admin)
+                              .contentType("application/json")
+                              .content("{\"bdUserId\":\"" + bd2 + "\"}"))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      awaitLockWaiters(1);
+      var edit =
+          pool.submit(
+              () ->
+                  mvc.perform(
+                          put("/admin-api/kol/kols/" + kolId)
+                              .header(TOKEN, bd1Token)
+                              .contentType("application/json")
+                              .content(
+                                  "{\"name\":\"Changed by bd1\",\"email\":\"alice@example.com\","
+                                      + "\"country\":\"US\"}"))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+      awaitLockWaiters(2);
+      lock.commit();
+      assertThat(transfer.get()).isEqualTo(200);
+      assertThat(edit.get()).isEqualTo(403);
+    } finally {
+      pool.shutdownNow();
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT name FROM crm_kol WHERE id=?", String.class, Long.valueOf(kolId)))
+        .isEqualTo("Alice");
+  }
+
+  private void awaitLockWaiters(int expected) throws InterruptedException {
+    for (int i = 0; i < 200; i++) {
+      Integer waiting =
+          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+      if (waiting != null && waiting >= expected) {
+        return;
+      }
+      Thread.sleep(25);
+    }
+    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
   }
 
   @Test

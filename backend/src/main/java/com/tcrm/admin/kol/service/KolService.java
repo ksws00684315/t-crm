@@ -155,26 +155,28 @@ public class KolService {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
     Instant now = Instant.now();
+    int updated;
     try {
-      kols.update(
-          null,
-          new LambdaUpdateWrapper<KolDO>()
-              .eq(KolDO::getId, id)
-              .set(KolDO::getName, c.name().strip())
-              .set(KolDO::getEmail, email)
-              .set(KolDO::getCountry, c.country().strip().toUpperCase(Locale.ROOT))
-              .set(
-                  KolDO::getSocialAccounts,
-                  SocialAccountsJson.write(c.socialAccounts()),
-                  "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
-              .set(KolDO::getDefaultRate, c.defaultRate())
-              .set(KolDO::getRemark, blankToNull(c.remark()))
-              .set(KolDO::getUpdateBy, user.id())
-              .set(KolDO::getUpdateTime, now));
+      updated =
+          kols.update(
+              null,
+              scoped(id, user)
+                  .set(KolDO::getName, c.name().strip())
+                  .set(KolDO::getEmail, email)
+                  .set(KolDO::getCountry, c.country().strip().toUpperCase(Locale.ROOT))
+                  .set(
+                      KolDO::getSocialAccounts,
+                      SocialAccountsJson.write(c.socialAccounts()),
+                      "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
+                  .set(KolDO::getDefaultRate, c.defaultRate())
+                  .set(KolDO::getRemark, blankToNull(c.remark()))
+                  .set(KolDO::getUpdateBy, user.id())
+                  .set(KolDO::getUpdateTime, now));
     } catch (DuplicateKeyException e) {
       // Only uk_crm_kol_email can be violated by an edit; the code never changes here.
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
+    requireUpdated(updated, user);
   }
 
   /**
@@ -188,13 +190,14 @@ public class KolService {
     Instant now = Instant.now();
     tx.executeWithoutResult(
         txStatus -> {
-          kols.update(
-              null,
-              new LambdaUpdateWrapper<KolDO>()
-                  .eq(KolDO::getId, id)
-                  .set(KolDO::getStatus, status)
-                  .set(KolDO::getUpdateBy, user.id())
-                  .set(KolDO::getUpdateTime, now));
+          requireUpdated(
+              kols.update(
+                  null,
+                  scoped(id, user)
+                      .set(KolDO::getStatus, status)
+                      .set(KolDO::getUpdateBy, user.id())
+                      .set(KolDO::getUpdateTime, now)),
+              user);
           events.publishEvent(new KolStatusChangedEvent(id));
         });
   }
@@ -234,6 +237,25 @@ public class KolService {
           period.setDeleted(false);
           history.insert(period);
         });
+  }
+
+  /**
+   * Update condition for one KOL. For a BD (OWN) the row must still be assigned to them when the
+   * UPDATE runs, so a transfer committed after {@link #requireVisible} makes the write affect no
+   * row instead of changing a KOL that now belongs to someone else.
+   */
+  private static LambdaUpdateWrapper<KolDO> scoped(Long id, AccountDTO user) {
+    return new LambdaUpdateWrapper<KolDO>()
+        .eq(KolDO::getId, id)
+        .eq(own(user), KolDO::getBdUserId, user.id());
+  }
+
+  /** No row updated: the KOL left the BD's scope meanwhile (403), or no longer exists (404). */
+  private static void requireUpdated(int updated, AccountDTO user) {
+    if (updated == 0) {
+      throw new BusinessException(
+          own(user) ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
+    }
   }
 
   /** Validates a requested BD: null (unassigned) or a usable BD, else KOL_INVALID_BD_USER. */

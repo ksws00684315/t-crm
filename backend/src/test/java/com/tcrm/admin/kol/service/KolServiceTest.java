@@ -73,7 +73,7 @@ class KolServiceTest {
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
-        .thenReturn(new AccountDTO(id, "u" + id, null, "U", null, role, scope, 1, null, null));
+        .thenReturn(new AccountDTO(id, "u" + id, null, "U", null, role, scope, 1, null, null, 0));
   }
 
   private static KolDO kol(Long bd) {
@@ -278,6 +278,22 @@ class KolServiceTest {
 
   private static EditKolCommand edit() {
     return new EditKolCommand("Alice B", "ALICE@example.com", "gb", List.of(), null, "VIP");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldRejectBdEdit_whenKolLeftTheirScopeBeforeTheUpdate() {
+    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+    // Transferred to another BD after the visibility check: the scoped UPDATE matches no row.
+    when(kols.update(isNull(), any())).thenReturn(0);
+
+    assertThatThrownBy(() -> service.update(11L, edit()))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    assertThat(update.getValue().getSqlSegment()).contains("bd_user_id");
   }
 
   @Test
