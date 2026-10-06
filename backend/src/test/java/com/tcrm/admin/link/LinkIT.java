@@ -22,6 +22,7 @@ import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -287,6 +288,67 @@ class LinkIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].clicks30d").value(5))
         .andExpect(jsonPath("$.data.items[0].validClicks30d").value(3));
+  }
+
+  @Test
+  void shouldKeepLinkClickCounts_whenExclusiveItemChanges() throws Exception {
+    long shopId = createShop("店D", "1004");
+    String kolCode = createKol("Dave", "dave@example.com");
+    String otherKol = createKol("Erin", "erin@example.com");
+    String productCode = importProduct(shopId, "2301", "裙");
+    String otherProduct = importProduct(shopId, "2302", "衫");
+    importMapping("1004", "9301", kolCode, productCode);
+    importMapping("1004", "9302", kolCode, otherProduct);
+    importMapping("1004", "9303", otherKol, productCode);
+    long before = currentKolItemId(kolCode, productCode);
+    clickStream.ensureGroup();
+    long t0 = System.currentTimeMillis() - 60_000;
+    append(before, t0, HASH_A, "Mozilla/5.0");
+    append(before, t0 + 1_000, HASH_A, "Mozilla/5.0"); // dup
+    append(before, t0 + 2_000, HASH_A, "Mozilla/5.0"); // dup
+    append(currentKolItemId(kolCode, otherProduct), t0, HASH_A, "Mozilla/5.0");
+    append(currentKolItemId(otherKol, productCode), t0, HASH_A, "Mozilla/5.0");
+    assertThat(consumer.pollOnce()).isEqualTo(5);
+    assertLinkCounts(kolCode, productCode, "9301", 3, 1);
+
+    // Changing the exclusive item creates a new crm_kol_item row; the link (KOL + original
+    // product) and its clicks stay the same.
+    importMapping("1004", "8888888", kolCode, productCode);
+    long after = currentKolItemId(kolCode, productCode);
+    assertThat(after).isNotEqualTo(before);
+    assertLinkCounts(kolCode, productCode, "8888888", 3, 1);
+
+    append(after, t0 + 30_000, HASH_B, "Mozilla/5.0");
+    append(before, t0 + 40_000, HASH_A, "Mozilla/5.0"); // in flight with the closed mapping ID
+    assertThat(consumer.pollOnce()).isEqualTo(2);
+    assertLinkCounts(kolCode, productCode, "8888888", 5, 3);
+    assertThat(
+            jdbc.queryForList(
+                "SELECT kol_item_id FROM crm_click_log WHERE click_time >= ? ORDER BY click_time",
+                Long.class,
+                Timestamp.from(Instant.ofEpochMilli(t0 + 30_000))))
+        .containsExactly(after, before);
+    assertLinkCounts(kolCode, otherProduct, "9302", 1, 1);
+    assertLinkCounts(otherKol, productCode, "9303", 1, 1);
+  }
+
+  private void assertLinkCounts(
+      String kolCode, String productCode, String itemId, long total, long valid) throws Exception {
+    mvc.perform(
+            get("/admin-api/link/links")
+                .param("kolCode", kolCode)
+                .param("productCode", productCode)
+                .header(TOKEN, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(
+            jsonPath("$.data.items[0].linkUrl")
+                .value("https://t.example.com/t/" + kolCode + "/" + productCode))
+        .andExpect(
+            jsonPath("$.data.items[0].targetUrl")
+                .value("https://weidian.com/item.html?itemID=" + itemId))
+        .andExpect(jsonPath("$.data.items[0].clicks30d").value(total))
+        .andExpect(jsonPath("$.data.items[0].validClicks30d").value(valid));
   }
 
   @Test
