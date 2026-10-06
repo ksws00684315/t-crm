@@ -33,22 +33,28 @@ public interface ClickLogMapper {
   int insertIgnore(@Param("rows") List<ClickLogDO> rows);
 
   /**
-   * Clicks per link since the given time; uses idx_crm_click_log_kol_item_time on each partition.
+   * Clicks per link (KOL + original product) of one KOL since the given time, one row per product
+   * that has clicks; uses idx_crm_click_log_kol_product_time on each partition. Counting by link
+   * rather than by kol_item_id keeps the counts when the exclusive item is changed (which creates a
+   * new crm_kol_item row while the link stays the same).
    */
   @Select(
       """
       <script>
-      SELECT kol_item_id, COUNT(*) AS total,
+      SELECT product_id, COUNT(*) AS total,
              COUNT(*) FILTER (WHERE NOT is_bot AND NOT is_dup) AS valid
       FROM crm_click_log
-      WHERE kol_item_id IN
-      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      WHERE kol_id = #{kolId}
+        AND product_id IN
+      <foreach collection="productIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         AND click_time &gt;= #{since}
-      GROUP BY kol_item_id
+      GROUP BY product_id
       </script>
       """)
   List<ClickCountRow> countSince(
-      @Param("ids") Collection<Long> kolItemIds, @Param("since") Instant since);
+      @Param("kolId") long kolId,
+      @Param("productIds") Collection<Long> productIds,
+      @Param("since") Instant since);
 
   /** Names of the partitions currently attached to crm_click_log. */
   @Select(

@@ -1,17 +1,20 @@
 package com.tcrm.admin.link.model;
 
-/** Click counts of one link over a period: all clicks and valid ones (neither bot nor dup). */
+/**
+ * Click counts of one link (KOL + original product, identified by the product within one KOL's
+ * query) over a period: all clicks and valid ones (neither bot nor dup).
+ */
 public class ClickCountRow {
-  private Long kolItemId;
+  private Long productId;
   private Long total;
   private Long valid;
 
-  public Long getKolItemId() {
-    return kolItemId;
+  public Long getProductId() {
+    return productId;
   }
 
-  public void setKolItemId(Long value) {
-    this.kolItemId = value;
+  public void setProductId(Long value) {
+    this.productId = value;
   }
 
   public Long getTotal() {

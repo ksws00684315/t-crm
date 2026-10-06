@@ -24,8 +24,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Link list of one KOL (task 06 §5): current mappings ordered by original product code, with link
- * status and click counts of the last 30 days for the current page only. A BD (OPERATOR + OWN) sees
- * only the KOLs assigned to them (403 otherwise).
+ * status and click counts of the last 30 days for the current page only. Counts belong to the link
+ * (KOL + original product), so they survive a change of the exclusive item. A BD (OPERATOR + OWN)
+ * sees only the KOLs assigned to them (403 otherwise).
  */
 @Service
 public class LinkService {
@@ -78,21 +79,22 @@ public class LinkService {
             : filter.productCode().trim();
     PageResult<KolItemLinkDTO> links =
         kolItems.pageCurrentLinksByKol(kol.id(), productCode, filter.page(), filter.size());
-    Map<Long, ClickCountRow> counts = counts(links.items());
-    return links.map(link -> toDto(kol, link, counts.get(link.kolItemId())));
+    Map<Long, ClickCountRow> counts = counts(kol.id(), links.items());
+    return links.map(link -> toDto(kol, link, counts.get(link.productId())));
   }
 
   private static boolean own(AccountDTO user) {
     return user.role() == Role.OPERATOR && user.dataScope() == DataScope.OWN;
   }
 
-  private Map<Long, ClickCountRow> counts(List<KolItemLinkDTO> links) {
+  /** Counts keyed by original product ID; a KOL has at most one current link per product. */
+  private Map<Long, ClickCountRow> counts(long kolId, List<KolItemLinkDTO> links) {
     if (links.isEmpty()) {
       return Map.of();
     }
-    var ids = links.stream().map(KolItemLinkDTO::kolItemId).toList();
-    return clickLogs.countSince(ids, clock.instant().minus(CLICK_PERIOD)).stream()
-        .collect(Collectors.toMap(ClickCountRow::getKolItemId, Function.identity()));
+    var productIds = links.stream().map(KolItemLinkDTO::productId).toList();
+    return clickLogs.countSince(kolId, productIds, clock.instant().minus(CLICK_PERIOD)).stream()
+        .collect(Collectors.toMap(ClickCountRow::getProductId, Function.identity()));
   }
 
   private LinkDTO toDto(KolRefDTO kol, KolItemLinkDTO link, ClickCountRow count) {

@@ -60,9 +60,9 @@ class LinkServiceTest {
         id, 10L, 20L + id, code, "name " + code, 1L, "90" + id, onSale, shopEnabled);
   }
 
-  private static ClickCountRow count(long kolItemId, long total, long valid) {
+  private static ClickCountRow count(long productId, long total, long valid) {
     var row = new ClickCountRow();
-    row.setKolItemId(kolItemId);
+    row.setProductId(productId);
     row.setTotal(total);
     row.setValid(valid);
     return row;
@@ -76,8 +76,8 @@ class LinkServiceTest {
         .thenReturn(
             new PageResult<>(
                 List.of(link(1L, "P1", true, true), link(2L, "P2", false, false)), 2, 1, 20));
-    when(clickLogs.countSince(List.of(1L, 2L), Instant.parse("2026-09-06T00:00:00Z")))
-        .thenReturn(List.of(count(1L, 12, 7)));
+    when(clickLogs.countSince(10L, List.of(21L, 22L), Instant.parse("2026-09-06T00:00:00Z")))
+        .thenReturn(List.of(count(21L, 12, 7)));
 
     var page = service.page(new LinkFilterDTO("KOL0001", " ", 1, 20));
 
@@ -96,6 +96,28 @@ class LinkServiceTest {
             LinkUnavailableReason.PRODUCT_OFF_SHELF, LinkUnavailableReason.SHOP_DISABLED);
     assertThat(second.clicks30d()).isZero();
     assertThat(second.validClicks30d()).isZero();
+  }
+
+  @Test
+  void shouldCountClicksPerKolAndProduct_notPerKolItem() {
+    // The exclusive item of P1 was changed: the current mapping row (id 99) is new, but clicks
+    // recorded under the old row still belong to the same link (KOL 10 + original product 21).
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "A", true, null));
+    var replaced = new KolItemLinkDTO(99L, 10L, 21L, "P1", "name P1", 1L, "8888888", true, true);
+    when(items.pageCurrentLinksByKol(10L, null, 1, 20))
+        .thenReturn(new PageResult<>(List.of(replaced, link(2L, "P2", true, true)), 2, 1, 20));
+    when(clickLogs.countSince(10L, List.of(21L, 22L), Instant.parse("2026-09-06T00:00:00Z")))
+        .thenReturn(List.of(count(22L, 1, 1), count(21L, 3, 1)));
+
+    var page = service.page(new LinkFilterDTO("KOL0001", null, 1, 20));
+
+    var first = page.items().get(0);
+    assertThat(first.kolItemId()).isEqualTo(99L);
+    assertThat(first.targetUrl()).isEqualTo("https://weidian.com/item.html?itemID=8888888");
+    assertThat(first.clicks30d()).isEqualTo(3);
+    assertThat(first.validClicks30d()).isEqualTo(1);
+    assertThat(page.items().get(1).clicks30d()).isEqualTo(1);
   }
 
   @Test
