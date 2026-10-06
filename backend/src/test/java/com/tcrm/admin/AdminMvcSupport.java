@@ -65,7 +65,7 @@ public final class AdminMvcSupport {
   public static String actAs(CurrentUserContext current, long id, Role role, DataScope scope) {
     AccountDTO user =
         new AccountDTO(
-            id, "user" + id, "test-hash", "User " + id, null, role, scope, 1, null, null);
+            id, "user" + id, "test-hash", "User " + id, null, role, scope, 1, null, null, 0);
     when(current.user()).thenReturn(user);
     when(current.id()).thenReturn(id);
     when(current.role()).thenReturn(role);

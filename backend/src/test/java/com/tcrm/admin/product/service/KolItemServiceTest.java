@@ -53,7 +53,17 @@ class KolItemServiceTest {
     when(current.user())
         .thenReturn(
             new AccountDTO(
-                1L, "admin", null, "Admin", null, Role.SUPER_ADMIN, DataScope.ALL, 1, null, null));
+                1L,
+                "admin",
+                null,
+                "Admin",
+                null,
+                Role.SUPER_ADMIN,
+                DataScope.ALL,
+                1,
+                null,
+                null,
+                0));
   }
 
   @Test

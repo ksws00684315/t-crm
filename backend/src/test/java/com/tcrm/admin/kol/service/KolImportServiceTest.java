@@ -39,7 +39,7 @@ class KolImportServiceTest {
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
-        .thenReturn(new AccountDTO(id, "u", null, "U", null, role, scope, 1, null, null));
+        .thenReturn(new AccountDTO(id, "u", null, "U", null, role, scope, 1, null, null, 0));
   }
 
   @Test

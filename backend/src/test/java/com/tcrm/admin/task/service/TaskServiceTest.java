@@ -53,7 +53,7 @@ class TaskServiceTest {
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
-        .thenReturn(new AccountDTO(id, "u" + id, "h", "n", null, role, scope, 1, null, null));
+        .thenReturn(new AccountDTO(id, "u" + id, "h", "n", null, role, scope, 1, null, null, 0));
   }
 
   private static void assertError(Runnable action, ErrorCode code) {

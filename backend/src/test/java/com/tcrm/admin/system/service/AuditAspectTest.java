@@ -72,7 +72,8 @@ class AuditAspectTest {
                 DataScope.OWN,
                 1,
                 null,
-                null));
+                null,
+                0));
     when(point.proceed()).thenReturn("result");
     assertThat(new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation))
         .isEqualTo("result");

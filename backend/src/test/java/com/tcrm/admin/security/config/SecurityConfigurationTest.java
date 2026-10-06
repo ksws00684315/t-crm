@@ -21,7 +21,7 @@ class SecurityConfigurationTest {
 
   private static AccountDTO account(long id, Role role, int status) {
     return new AccountDTO(
-        id, "user" + id, "test-hash", "User", null, role, DataScope.ALL, status, null, null);
+        id, "user" + id, "test-hash", "User", null, role, DataScope.ALL, status, null, null, 0);
   }
 
   @Test

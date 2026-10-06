@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.system.mapper.SysUserMapper;
@@ -38,10 +39,14 @@ public class AccountStoreService implements AccountStore {
 
   @Override
   public void updatePassword(Long id, String hash) {
-    SysUserDO user = new SysUserDO();
-    user.setId(id);
-    user.setPasswordHash(hash);
-    users.updateById(user);
+    users.update(
+        null,
+        new LambdaUpdateWrapper<SysUserDO>()
+            .eq(SysUserDO::getId, id)
+            .set(SysUserDO::getPasswordHash, hash)
+            .setSql("credential_version = credential_version + 1")
+            .set(SysUserDO::getUpdateBy, id)
+            .set(SysUserDO::getUpdateTime, Instant.now()));
   }
 
   private AccountDTO snapshot(SysUserDO user) {
@@ -57,6 +62,7 @@ public class AccountStoreService implements AccountStore {
             user.getDataScope(),
             user.getStatus(),
             user.getLastLoginTime(),
-            user.getCreateTime());
+            user.getCreateTime(),
+            user.getCredentialVersion() == null ? 0 : user.getCredentialVersion());
   }
 }

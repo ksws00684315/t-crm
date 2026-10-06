@@ -18,6 +18,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   USER_CANNOT_DISABLE_SELF: "不能停用自己的账号",
   USER_CANNOT_REMOVE_SELF_ROLE: "不能取消自己的超级管理员角色",
   USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于运营角色",
+  USER_LAST_SUPER_ADMIN: "系统至少需要保留一个启用的超级管理员",
   KOL_EMAIL_EXISTS: "该邮箱已被其他达人使用",
   KOL_CODE_EXISTS: "该达人编号已存在",
   KOL_INVALID_BD_USER: "负责商务必须是已启用的商务账号（运营角色且仅本人数据）",

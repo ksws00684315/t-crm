@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.AccountStore;
@@ -43,7 +44,8 @@ class AuthServiceTest {
         DataScope.OWN,
         status,
         null,
-        null);
+        null,
+        0);
   }
 
   @Test
@@ -110,6 +112,8 @@ class AuthServiceTest {
       stp.when(StpUtil::getTokenName).thenReturn("X-Admin-Token");
       stp.when(StpUtil::getTokenValue).thenReturn("unit-token");
       stp.when(StpUtil::getTokenTimeout).thenReturn(28800L);
+      var session = mock(SaSession.class);
+      stp.when(StpUtil::getTokenSession).thenReturn(session);
       var result = auth.login("operator", "test-input", "198.51.100.8");
       assertThat(result.user().username()).isEqualTo(account.username());
       assertThat(result.user().lastLoginTime())
@@ -118,6 +122,7 @@ class AuthServiceTest {
       assertThat(result.tokenName()).isEqualTo("X-Admin-Token");
       assertThat(result.expiresIn()).isEqualTo(28800);
       stp.verify(() -> StpUtil.login(7L));
+      verify(session).set(CurrentUserContext.CREDENTIAL_VERSION, account.credentialVersion());
       verify(failures).clear("operator", "198.51.100.8");
       verify(accounts).updateLastLoginTime(eq(7L), any(Instant.class));
     }

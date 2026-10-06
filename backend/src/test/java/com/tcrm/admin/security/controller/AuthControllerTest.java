@@ -76,7 +76,8 @@ class AuthControllerTest {
             DataScope.OWN,
             1,
             null,
-            null);
+            null,
+            0);
     when(current.user()).thenReturn(actor);
     when(current.roleNames(any())).thenReturn(List.of("OPERATOR"));
     var security = new SecurityConfiguration(current);

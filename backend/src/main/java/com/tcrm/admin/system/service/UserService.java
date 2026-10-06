@@ -16,6 +16,7 @@ import java.time.Instant;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Administrator accounts. Every update writes only the columns of that operation (never a whole row
@@ -73,11 +74,15 @@ public class UserService {
     return UserDTO.from(user);
   }
 
+  @Transactional(rollbackFor = Exception.class)
   public void update(Long id, EditUserCommand r) {
     validateScope(r.role(), r.dataScope());
-    require(id);
+    SysUserDO target = require(id);
     if (id.equals(current.id()) && r.role() != Role.SUPER_ADMIN) {
       throw new BusinessException(ErrorCode.USER_CANNOT_REMOVE_SELF_ROLE);
+    }
+    if (target.getRole() == Role.SUPER_ADMIN && r.role() != Role.SUPER_ADMIN) {
+      requireAnotherSuperAdmin(id);
     }
     write(
         id,
@@ -88,11 +93,15 @@ public class UserService {
             .set(SysUserDO::getDataScope, r.dataScope()));
   }
 
+  @Transactional(rollbackFor = Exception.class)
   public void updateStatus(Long id, int status) {
     if (id.equals(current.id()) && status == 0) {
       throw new BusinessException(ErrorCode.USER_CANNOT_DISABLE_SELF);
     }
-    require(id);
+    SysUserDO target = require(id);
+    if (target.getRole() == Role.SUPER_ADMIN && status == 0) {
+      requireAnotherSuperAdmin(id);
+    }
     write(id, new LambdaUpdateWrapper<SysUserDO>().set(SysUserDO::getStatus, status));
     if (status == 0) {
       StpUtil.kickout(id);
@@ -104,8 +113,20 @@ public class UserService {
     write(
         id,
         new LambdaUpdateWrapper<SysUserDO>()
-            .set(SysUserDO::getPasswordHash, passwords.encode(password)));
+            .set(SysUserDO::getPasswordHash, passwords.encode(password))
+            .setSql("credential_version = credential_version + 1"));
     StpUtil.logout(id);
+  }
+
+  /**
+   * Fails with USER_LAST_SUPER_ADMIN unless an enabled super administrator other than {@code id}
+   * remains. The enabled super administrators stay locked until the transaction ends, so two
+   * administrators demoting or disabling each other at the same time cannot both succeed.
+   */
+  private void requireAnotherSuperAdmin(Long id) {
+    if (users.lockEnabledSuperAdmins().stream().noneMatch(other -> !other.equals(id))) {
+      throw new BusinessException(ErrorCode.USER_LAST_SUPER_ADMIN);
+    }
   }
 
   /** Applies the given column updates to one live user, with the audit columns. */
