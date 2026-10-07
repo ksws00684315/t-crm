@@ -14,6 +14,7 @@ import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -176,8 +177,8 @@ class MappingImportProcessor implements ImportRowProcessor {
           neu.setCreateBy(actorId);
           neu.setUpdateBy(actorId);
           items.insert(neu);
-          // The link index is updated after commit (task 06 §4.3).
-          events.publishEvent(new KolItemChangedEvent(kol.id(), product.getId()));
+          // Registered in this transaction and applied to the link index afterwards (task 06b).
+          TransactionalEvents.publish(events, new KolItemChangedEvent(kol.id(), product.getId()));
         });
     return List.of();
   }

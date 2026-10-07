@@ -9,6 +9,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TransactionalEvents;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
@@ -81,8 +82,8 @@ public class ShopService {
   }
 
   /**
-   * Enables or disables the shop and publishes {@link ShopStatusChangedEvent}; the link index
-   * reacts after commit (task 06 §4.3).
+   * Enables or disables the shop and publishes {@link ShopStatusChangedEvent} in this transaction;
+   * the link index is registered before commit and applied afterwards (task 06b).
    */
   @Transactional(rollbackFor = Exception.class)
   public void updateStatus(Long id, int status) {
@@ -95,7 +96,7 @@ public class ShopService {
             .set(ShopDO::getStatus, status)
             .set(ShopDO::getUpdateBy, current.id())
             .set(ShopDO::getUpdateTime, now));
-    events.publishEvent(new ShopStatusChangedEvent(id));
+    TransactionalEvents.publish(events, new ShopStatusChangedEvent(id));
   }
 
   /** Alive and enabled shop, or SHOP_NOT_FOUND / SHOP_DISABLED. */

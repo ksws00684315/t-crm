@@ -15,6 +15,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.time.Instant;
@@ -181,8 +182,8 @@ public class KolService {
 
   /**
    * Enables or disables a KOL; never touches {@code bd_user_id}. Publishes {@link
-   * KolStatusChangedEvent} in the same transaction so the link index reacts after commit (task 06
-   * §4.3).
+   * KolStatusChangedEvent} in the same transaction; the link index is registered before commit and
+   * applied afterwards (task 06b).
    */
   public void updateStatus(Long id, int status) {
     AccountDTO user = requireWriter();
@@ -198,7 +199,7 @@ public class KolService {
                       .set(KolDO::getUpdateBy, user.id())
                       .set(KolDO::getUpdateTime, now)),
               user);
-          events.publishEvent(new KolStatusChangedEvent(id));
+          TransactionalEvents.publish(events, new KolStatusChangedEvent(id));
         });
   }
 

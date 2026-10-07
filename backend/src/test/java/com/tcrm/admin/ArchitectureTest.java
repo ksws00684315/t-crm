@@ -3,18 +3,23 @@ package com.tcrm.admin;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.tcrm.admin.shared.DirectPublishFixture;
 import com.tcrm.admin.shared.PublicEndpoint;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -136,5 +141,41 @@ class ArchitectureTest {
               }
             })
         .check(classes);
+  }
+
+  /**
+   * {@code @TransactionalEventListener} drops events published outside a transaction. Only {@link
+   * TransactionalEvents} may call {@link ApplicationEventPublisher#publishEvent}.
+   */
+  @Test
+  void shouldPublishEventsOnlyThroughTransactionalEvents() {
+    eventsPublishedOnlyThroughTransactionalEvents().check(classes);
+  }
+
+  @Test
+  void shouldRejectDirectPublishEvent() {
+    JavaClasses fixture = new ClassFileImporter().importClasses(DirectPublishFixture.class);
+    assertThatThrownBy(() -> eventsPublishedOnlyThroughTransactionalEvents().check(fixture))
+        .isInstanceOf(AssertionError.class);
+  }
+
+  private static ArchRule eventsPublishedOnlyThroughTransactionalEvents() {
+    return classes()
+        .that()
+        .doNotHaveFullyQualifiedName(TransactionalEvents.class.getName())
+        .should(
+            new ArchCondition<JavaClass>("not call ApplicationEventPublisher.publishEvent") {
+              @Override
+              public void check(JavaClass type, ConditionEvents events) {
+                for (var call : type.getMethodCallsFromSelf()) {
+                  boolean publish =
+                      call.getName().equals("publishEvent")
+                          && call.getTargetOwner().isAssignableTo(ApplicationEventPublisher.class);
+                  if (publish) {
+                    events.add(SimpleConditionEvent.violated(call, call.getDescription()));
+                  }
+                }
+              }
+            });
   }
 }
