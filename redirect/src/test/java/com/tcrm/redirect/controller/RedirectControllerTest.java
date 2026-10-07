@@ -40,7 +40,7 @@ class RedirectControllerTest {
                         redis,
                         new ClientIpResolver("127.0.0.1", "CF-Connecting-IP,X-Forwarded-For"),
                         "https://example.com/unavailable",
-                        "unit-test-salt")))
+                        "unit-test-salt0123456789abcdef01")))
             .build();
   }
 
@@ -69,7 +69,7 @@ class RedirectControllerTest {
             .formatHex(
                 java.security.MessageDigest.getInstance("SHA-256")
                     .digest(
-                        "unit-test-salt203.0.113.1"
+                        "unit-test-salt0123456789abcdef01203.0.113.1"
                             .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     assertThat(fields.get("ipHash")).isEqualTo(expected);
   }

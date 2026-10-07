@@ -36,7 +36,7 @@ class RedirectIT {
     r.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     r.add("spring.data.redis.password", () -> "");
     r.add("crm.redirect.fallback-url", () -> "https://example.com/unavailable");
-    r.add("crm.redirect.ip-hash-salt", () -> "integration-test-salt");
+    r.add("crm.redirect.ip-hash-salt", () -> "integration-test-salt0123456789a");
   }
 
   private final MockMvc mvc;
