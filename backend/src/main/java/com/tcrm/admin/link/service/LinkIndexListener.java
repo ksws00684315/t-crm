@@ -1,60 +1,68 @@
 package com.tcrm.admin.link.service;
 
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
+import com.tcrm.admin.link.mapper.LinkIndexOutboxMapper;
+import com.tcrm.admin.link.model.LinkIndexOutboxDO;
+import com.tcrm.admin.link.model.LinkIndexScope;
 import com.tcrm.admin.product.api.KolItemChangedEvent;
 import com.tcrm.admin.product.api.ProductStatusChangedEvent;
 import com.tcrm.admin.product.api.ShopStatusChangedEvent;
-import java.util.function.IntSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.time.Clock;
+import java.time.Instant;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Incremental link index updates after the business transaction commits (task 06 §4.3). A failure
- * (Redis unavailable, ...) is only logged at ERROR: the committed change stands and the daily full
- * rebuild repairs the index.
+ * Registers one link-index outbox row in the business transaction (task 06b). The row is inserted
+ * before commit and disappears with the transaction if the business change rolls back. Redis is
+ * written later by {@link LinkIndexSyncJob}; a failure here fails the business transaction.
  */
 @Component
 public class LinkIndexListener {
-  private static final Logger LOG = LoggerFactory.getLogger(LinkIndexListener.class);
-  private final LinkIndexService index;
+  private final LinkIndexOutboxMapper outbox;
+  private final Clock clock;
 
-  public LinkIndexListener(LinkIndexService index) {
-    this.index = index;
+  @Autowired
+  public LinkIndexListener(LinkIndexOutboxMapper outbox) {
+    this(outbox, Clock.systemUTC());
   }
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  LinkIndexListener(LinkIndexOutboxMapper outbox, Clock clock) {
+    this.outbox = outbox;
+    this.clock = clock;
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onKolItemChanged(KolItemChangedEvent event) {
-    apply("mapping", event, () -> index.refreshMapping(event.kolId(), event.productId()));
+    insert(LinkIndexScope.MAPPING, event.kolId(), event.productId());
   }
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onProductStatusChanged(ProductStatusChangedEvent event) {
-    apply("product status", event, () -> index.refreshProduct(event.productId()));
+    insert(LinkIndexScope.PRODUCT, event.productId(), null);
   }
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onShopStatusChanged(ShopStatusChangedEvent event) {
-    apply("shop status", event, () -> index.refreshShop(event.shopId()));
+    insert(LinkIndexScope.SHOP, event.shopId(), null);
   }
 
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onKolStatusChanged(KolStatusChangedEvent event) {
-    apply("KOL status", event, () -> index.refreshKol(event.kolId()));
+    insert(LinkIndexScope.KOL, event.kolId(), null);
   }
 
-  private static void apply(String change, Object event, IntSupplier update) {
-    try {
-      int fields = update.getAsInt();
-      LOG.debug("Link index updated after {} change {}: {} fields", change, event, fields);
-    } catch (RuntimeException e) {
-      LOG.error(
-          "Link index update after {} change {} failed; the daily rebuild will repair it",
-          change,
-          event,
-          e);
-    }
+  private void insert(LinkIndexScope scope, Long scopeId, Long productId) {
+    Instant now = clock.instant();
+    LinkIndexOutboxDO row = new LinkIndexOutboxDO();
+    row.setScope(scope);
+    row.setScopeId(scopeId);
+    row.setProductId(productId);
+    row.setAttempts(0);
+    row.setNextAttemptAt(now);
+    row.setCreateTime(now);
+    outbox.insert(row);
   }
 }

@@ -43,6 +43,16 @@ public class KolItemLookupService implements KolItemApi {
   }
 
   @Override
+  public List<Long> pageKolIdsWithCurrentProduct(Long productId, Long afterKolId, int limit) {
+    return items.pageKolIdsWithCurrentProduct(productId, afterKolId, limit);
+  }
+
+  @Override
+  public List<Long> pageKolIdsWithCurrentShop(Long shopId, Long afterKolId, int limit) {
+    return items.pageKolIdsWithCurrentShop(shopId, afterKolId, limit);
+  }
+
+  @Override
   public KolItemLinkDTO getCurrentLink(Long kolId, Long productId) {
     KolItemLinkRow row = items.getCurrentLink(kolId, productId);
     return row == null ? null : toDto(row);

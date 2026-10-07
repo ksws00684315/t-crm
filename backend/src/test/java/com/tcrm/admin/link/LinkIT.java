@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.idev.excel.FastExcel;
+import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.link.mapper.ClickLogMapper;
 import com.tcrm.admin.link.model.ClickLogDO;
 import com.tcrm.admin.link.service.ClickConsumer;
@@ -18,28 +19,37 @@ import com.tcrm.admin.link.service.ClickPartitionJob;
 import com.tcrm.admin.link.service.ClickPartitions;
 import com.tcrm.admin.link.service.ClickStream;
 import com.tcrm.admin.link.service.LinkIndexService;
+import com.tcrm.admin.link.service.LinkIndexStore;
+import com.tcrm.admin.link.service.LinkIndexSyncJob;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
@@ -49,6 +59,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -101,6 +113,10 @@ class LinkIT {
   private final ObjectMapper json;
   private final StringRedisTemplate redis;
   private final LinkIndexService index;
+  private final LinkIndexSyncJob sync;
+  private final LinkIndexStore store;
+  private final ApplicationEventPublisher events;
+  private final PlatformTransactionManager transactions;
   private final ClickStream clickStream;
   private final ClickConsumer consumer;
   private final ClickPartitionJob partitions;
@@ -113,6 +129,10 @@ class LinkIT {
       ObjectMapper json,
       StringRedisTemplate redis,
       LinkIndexService index,
+      LinkIndexSyncJob sync,
+      LinkIndexStore store,
+      ApplicationEventPublisher events,
+      PlatformTransactionManager transactions,
       ClickStream clickStream,
       ClickConsumer consumer,
       ClickPartitionJob partitions,
@@ -122,6 +142,10 @@ class LinkIT {
     this.json = json;
     this.redis = redis;
     this.index = index;
+    this.sync = sync;
+    this.store = store;
+    this.events = events;
+    this.transactions = transactions;
     this.clickStream = clickStream;
     this.consumer = consumer;
     this.partitions = partitions;
@@ -132,8 +156,12 @@ class LinkIT {
 
   @BeforeEach
   void prepareIndependentData() throws Exception {
+    jdbc.update("DELETE FROM crm_link_index_outbox");
     jdbc.update("DELETE FROM crm_click_log");
     jdbc.update("DELETE FROM crm_kol_item");
+    store.setBeforeRename(() -> {});
+    store.failNextWrite(null);
+    sync.setScheduled(false);
     jdbc.update("DELETE FROM crm_product");
     jdbc.update("DELETE FROM crm_shop");
     jdbc.update("DELETE FROM crm_kol_bd_history");
@@ -166,6 +194,7 @@ class LinkIT {
     String kolCode = createKol("Alice", "alice@example.com");
     String productCode = importProduct(shopId, "2001", "鞋");
     importMapping("1001", "9001", kolCode, productCode);
+    syncIndex();
     long kolItemId = currentKolItemId(kolCode, productCode);
 
     // Same format the redirect service's LinkEntry parses.
@@ -178,19 +207,26 @@ class LinkIT {
     long kolId = id("SELECT id FROM crm_kol WHERE kol_code = ?", kolCode);
     long productId = id("SELECT id FROM crm_product WHERE product_code = ?", productCode);
     changeStatus("/admin-api/kol/kols/" + kolId + "/status", 0);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":0}");
     changeStatus("/admin-api/kol/kols/" + kolId + "/status", 1);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":1}");
     changeStatus("/admin-api/product/products/" + productId + "/status", 0);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":0}");
     changeStatus("/admin-api/product/products/" + productId + "/status", 1);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":1}");
     changeStatus("/admin-api/product/shops/" + shopId + "/status", 0);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":0}");
     changeStatus("/admin-api/product/shops/" + shopId + "/status", 1);
+    syncIndex();
     assertThat(field(kolCode, productCode)).endsWith("\"status\":1}");
 
     importMapping("1001", "9002", kolCode, productCode);
+    syncIndex();
     long replaced = currentKolItemId(kolCode, productCode);
     assertThat(replaced).isNotEqualTo(kolItemId);
     assertThat(redis.opsForHash().keys("link:" + kolCode)).containsExactly(productCode);
@@ -218,6 +254,7 @@ class LinkIT {
     String p2 = importProduct(shopId, "2102", "帽");
     importMapping("1002", "9101", kolCode, p1);
     importMapping("1002", "9102", kolCode, p2);
+    syncIndex();
     String good1 = field(kolCode, p1);
     String good2 = field(kolCode, p2);
 
@@ -236,6 +273,155 @@ class LinkIT {
 
     mvc.perform(post("/admin-api/link/index-rebuilds").header(TOKEN, adminToken))
         .andExpect(status().isAccepted());
+  }
+
+  /**
+   * Rebuild reads the old mapping, a newer mapping commits while the staging key is held, and the
+   * rename must not discard that newer mapping. The sync waits on the KOL lock until the rename
+   * finishes, then re-reads the database.
+   */
+  @Test
+  void shouldKeepMappingCommittedDuringRebuild() throws Exception {
+    long shopId = createShop("店R", "1008");
+    String kolCode = createKol("Rae", "rae@example.com");
+    String productCode = importProduct(shopId, "2801", "表");
+    importMapping("1008", "9801", kolCode, productCode);
+    syncIndex();
+    long oldItemId = currentKolItemId(kolCode, productCode);
+
+    CountDownLatch snapshotTaken = new CountDownLatch(1);
+    CountDownLatch releaseRename = new CountDownLatch(1);
+    store.setBeforeRename(
+        () -> {
+          snapshotTaken.countDown();
+          try {
+            if (!releaseRename.await(30, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("rebuild was not released");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        });
+    AtomicReference<Throwable> rebuildError = new AtomicReference<>();
+    Thread rebuild =
+        new Thread(
+            () -> {
+              try {
+                index.rebuildAll();
+              } catch (Throwable error) {
+                rebuildError.set(error);
+              }
+            },
+            "link-it-rebuild");
+    rebuild.start();
+    assertThat(snapshotTaken.await(15, TimeUnit.SECONDS)).isTrue();
+
+    importMapping("1008", "9802", kolCode, productCode);
+    long newItemId = currentKolItemId(kolCode, productCode);
+    assertThat(newItemId).isNotEqualTo(oldItemId);
+    AtomicReference<Throwable> syncError = new AtomicReference<>();
+    Thread syncThread =
+        new Thread(
+            () -> {
+              try {
+                sync.drain();
+              } catch (Throwable error) {
+                syncError.set(error);
+              }
+            },
+            "link-it-sync");
+    syncThread.start();
+
+    boolean overlapped = false;
+    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+    String newItem = "\"kolItemId\":\"" + newItemId + "\"";
+    while (System.nanoTime() < deadline) {
+      String live = field(kolCode, productCode);
+      if (live != null && live.contains(newItem)) {
+        overlapped = true;
+        break;
+      }
+      if (waitingForLock(syncThread)) {
+        overlapped = true;
+        break;
+      }
+      Thread.sleep(25);
+    }
+    releaseRename.countDown();
+    assertThat(rebuild.join(Duration.ofSeconds(20))).isTrue();
+    assertThat(syncThread.join(Duration.ofSeconds(20))).isTrue();
+    assertThat(rebuildError.get()).isNull();
+    assertThat(syncError.get()).isNull();
+    assertThat(overlapped).isTrue();
+    assertThat(field(kolCode, productCode)).contains(newItem).contains("itemID=9802");
+    assertThat(outboxCount()).isZero();
+  }
+
+  @Test
+  void shouldRetryOutboxRow_whenRedisWriteFails_andApplyItAfterRecovery() throws Exception {
+    long shopId = createShop("店F", "1009");
+    String kolCode = createKol("Fay", "fay@example.com");
+    String productCode = importProduct(shopId, "2901", "戒");
+    store.failNextWrite(new IllegalStateException("redis down"));
+    importMapping("1009", "9901", kolCode, productCode);
+    Instant before = Instant.now();
+    sync.drain();
+    Instant after = Instant.now();
+
+    assertThat(outboxCount()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT attempts FROM crm_link_index_outbox", Integer.class))
+        .isEqualTo(1);
+    Instant nextAttempt =
+        jdbc.queryForObject(
+            "SELECT next_attempt_at FROM crm_link_index_outbox",
+            (rs, row) -> rs.getObject(1, OffsetDateTime.class).toInstant());
+    assertThat(nextAttempt).isAfterOrEqualTo(before.plusSeconds(10).minusMillis(50));
+    assertThat(nextAttempt).isBeforeOrEqualTo(after.plusSeconds(10).plusSeconds(1));
+    assertThat(jdbc.queryForObject("SELECT last_error FROM crm_link_index_outbox", String.class))
+        .contains("IllegalStateException")
+        .contains("redis down");
+    assertThat(field(kolCode, productCode)).isNull();
+
+    sync.drain();
+    assertThat(outboxCount()).isEqualTo(1);
+    assertThat(field(kolCode, productCode)).isNull();
+
+    jdbc.update("UPDATE crm_link_index_outbox SET next_attempt_at = now()");
+    sync.drain();
+    assertThat(outboxCount()).isZero();
+    assertThat(field(kolCode, productCode)).contains("\"status\":1").contains("itemID=9901");
+  }
+
+  @Test
+  void shouldNotInsertOutboxRow_whenBusinessTransactionRollsBack() {
+    new TransactionTemplate(transactions)
+        .executeWithoutResult(
+            status -> {
+              TransactionalEvents.publish(events, new KolStatusChangedEvent(1L));
+              status.setRollbackOnly();
+            });
+    assertThat(outboxCount()).isZero();
+  }
+
+  @Test
+  void shouldDisableShopWithoutWritingRedisUntilTheWorkerRuns() throws Exception {
+    long shopId = createShop("店C", "1010");
+    String kolCode = createKol("Cara", "cara@example.com");
+    String productCode = importProduct(shopId, "2010", "链");
+    importMapping("1010", "9010", kolCode, productCode);
+    syncIndex();
+    assertThat(field(kolCode, productCode)).endsWith("\"status\":1}");
+
+    changeStatus("/admin-api/product/shops/" + shopId + "/status", 0);
+
+    assertThat(field(kolCode, productCode)).endsWith("\"status\":1}");
+    assertThat(outboxCount()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT scope FROM crm_link_index_outbox", String.class))
+        .isEqualTo("SHOP");
+    sync.drain();
+    assertThat(field(kolCode, productCode)).endsWith("\"status\":0}");
+    assertThat(outboxCount()).isZero();
   }
 
   @Test
@@ -413,6 +599,23 @@ class LinkIT {
 
   private long count() {
     return jdbc.queryForObject("SELECT COUNT(*) FROM crm_click_log", Long.class);
+  }
+
+  private void syncIndex() {
+    sync.drain();
+  }
+
+  private long outboxCount() {
+    return jdbc.queryForObject("SELECT COUNT(*) FROM crm_link_index_outbox", Long.class);
+  }
+
+  private static boolean waitingForLock(Thread thread) {
+    Thread.State state = thread.getState();
+    if (state != Thread.State.WAITING && state != Thread.State.TIMED_WAITING) {
+      return false;
+    }
+    return Arrays.stream(thread.getStackTrace())
+        .anyMatch(frame -> frame.getClassName().contains("redisson"));
   }
 
   private String field(String kolCode, String productCode) {

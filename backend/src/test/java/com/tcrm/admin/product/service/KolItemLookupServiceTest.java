@@ -50,6 +50,15 @@ class KolItemLookupServiceTest {
   }
 
   @Test
+  void shouldPageKolIds_whenRefreshingTheLinkIndex() {
+    when(items.pageKolIdsWithCurrentProduct(20L, null, 200)).thenReturn(List.of(10L, 11L));
+    when(items.pageKolIdsWithCurrentShop(1L, 10L, 200)).thenReturn(List.of(11L));
+
+    assertThat(service.pageKolIdsWithCurrentProduct(20L, null, 200)).containsExactly(10L, 11L);
+    assertThat(service.pageKolIdsWithCurrentShop(1L, 10L, 200)).containsExactly(11L);
+  }
+
+  @Test
   void shouldMapStatusesToFlags_whenListingByKol() {
     when(items.listCurrentLinksByKol(10L)).thenReturn(List.of(row(1, 0)));
     assertThat(service.listCurrentLinksByKol(10L))

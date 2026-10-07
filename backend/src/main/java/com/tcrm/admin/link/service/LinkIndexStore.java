@@ -28,13 +28,33 @@ public class LinkIndexStore {
 
   static final int CHUNK = 1000;
   private final StringRedisTemplate redis;
+  private volatile Runnable beforeRename = () -> {};
+  private volatile RuntimeException writeFailure;
 
   public LinkIndexStore(StringRedisTemplate redis) {
     this.redis = redis;
   }
 
+  /**
+   * Runs after a rebuild has written the staging key and before {@code RENAME} replaces the live
+   * key. Tests use it to commit a newer mapping in that window. An empty replace deletes the live
+   * key and does not call this hook.
+   */
+  public void setBeforeRename(Runnable hook) {
+    this.beforeRename = hook == null ? () -> {} : hook;
+  }
+
+  /**
+   * The next {@link #putAll}, {@link #remove} or {@link #replace} throws this exception once, then
+   * writes normally. Null clears a pending failure.
+   */
+  public void failNextWrite(RuntimeException failure) {
+    this.writeFailure = failure;
+  }
+
   /** Sets the given fields of {@code link:{kolCode}}; other fields are left untouched. */
   public void putAll(String kolCode, Map<String, String> fields) {
+    checkWriteFailure();
     if (!fields.isEmpty()) {
       write(KEY_PREFIX + kolCode, fields);
     }
@@ -42,6 +62,7 @@ public class LinkIndexStore {
 
   /** Removes one field (the mapping no longer exists). */
   public void remove(String kolCode, String productCode) {
+    checkWriteFailure();
     redis.opsForHash().delete(KEY_PREFIX + kolCode, productCode);
   }
 
@@ -50,6 +71,7 @@ public class LinkIndexStore {
    * staging key which is then renamed over the live key. An empty map deletes the key.
    */
   public void replace(String kolCode, Map<String, String> fields) {
+    checkWriteFailure();
     if (fields.isEmpty()) {
       redis.delete(KEY_PREFIX + kolCode);
       return;
@@ -57,7 +79,16 @@ public class LinkIndexStore {
     String staging = STAGING_PREFIX + kolCode;
     redis.delete(staging);
     write(staging, fields);
+    beforeRename.run();
     redis.rename(staging, KEY_PREFIX + kolCode);
+  }
+
+  private void checkWriteFailure() {
+    RuntimeException failure = writeFailure;
+    if (failure != null) {
+      writeFailure = null;
+      throw failure;
+    }
   }
 
   /** KOL codes that currently have a {@code link:*} key (SCAN, not KEYS). */
