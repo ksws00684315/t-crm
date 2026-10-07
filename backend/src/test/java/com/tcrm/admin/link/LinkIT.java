@@ -477,6 +477,28 @@ class LinkIT {
   }
 
   @Test
+  void shouldMarkDupFromTheClickLog_whenTheRedisKeyIsGone() throws Exception {
+    long shopId = createShop("店G", "1006");
+    String kolCode = createKol("Gina", "gina@example.com");
+    String productCode = importProduct(shopId, "2401", "帽");
+    importMapping("1006", "9401", kolCode, productCode);
+    long kolItemId = currentKolItemId(kolCode, productCode);
+    clickStream.ensureGroup();
+    long t0 = System.currentTimeMillis() - 30_000;
+
+    append(kolItemId, t0, HASH_A, "Mozilla/5.0");
+    assertThat(consumer.pollOnce()).isEqualTo(1);
+
+    redis.delete(redis.keys("click:last:*"));
+    append(kolItemId, t0 + 3_000, HASH_A, "Mozilla/5.0");
+    assertThat(consumer.pollOnce()).isEqualTo(1);
+
+    assertThat(jdbc.queryForList("SELECT is_dup FROM crm_click_log ORDER BY click_time, id"))
+        .extracting(row -> row.get("is_dup"))
+        .containsExactly(false, true);
+  }
+
+  @Test
   void shouldKeepLinkClickCounts_whenExclusiveItemChanges() throws Exception {
     long shopId = createShop("店D", "1004");
     String kolCode = createKol("Dave", "dave@example.com");

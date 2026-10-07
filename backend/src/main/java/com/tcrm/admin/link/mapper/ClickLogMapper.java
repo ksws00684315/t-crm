@@ -33,6 +33,29 @@ public interface ClickLogMapper {
   int insertIgnore(@Param("rows") List<ClickLogDO> rows);
 
   /**
+   * Latest {@code click_time} of each link and IP hash inside {@code [from, to]}. One statement:
+   * each arm carries {@code kol_id}, {@code product_id} and the time range so PostgreSQL can use
+   * {@code idx_crm_click_log_kol_product_time}, then filters {@code kol_item_id} and {@code
+   * ip_hash}. {@code keys} must be non-empty.
+   */
+  @Select(
+      """
+      <script>
+      SELECT kol_item_id, ip_hash, MAX(click_time) AS click_time
+      FROM crm_click_log
+      WHERE
+      <foreach collection="keys" item="k" separator=" OR ">
+        (kol_id = #{k.kolId} AND product_id = #{k.productId}
+         AND kol_item_id = #{k.kolItemId} AND ip_hash = #{k.ipHash}
+         AND click_time &gt;= #{from} AND click_time &lt;= #{to})
+      </foreach>
+      GROUP BY kol_item_id, ip_hash
+      </script>
+      """)
+  List<ClickLogDO> latestClickTimes(
+      @Param("keys") List<ClickLogDO> keys, @Param("from") Instant from, @Param("to") Instant to);
+
+  /**
    * Clicks per link (KOL + original product) of one KOL since the given time, one row per product
    * that has clicks; uses idx_crm_click_log_kol_product_time on each partition. Counting by link
    * rather than by kol_item_id keeps the counts when the exclusive item is changed (which creates a
