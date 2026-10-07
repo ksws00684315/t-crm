@@ -117,6 +117,17 @@ class ProductImportProcessorTest {
     when(kolItems.existsCurrentShopItem(1L, "2001")).thenReturn(true);
     assertThat(processor.process(row("", "100", "2001", "鞋", "", "", "10", "")))
         .contains(ProductImportProcessor.EXCLUSIVE);
+    verify(products, never()).lockShopItem(any());
+  }
+
+  @Test
+  void shouldReject_whenExclusiveItemAppearsAfterTheLock() {
+    when(products.selectOne(any())).thenReturn(null);
+    when(kolItems.existsCurrentShopItem(1L, "2001")).thenReturn(false, true);
+    assertThat(processor.process(row("", "100", "2001", "鞋", "", "", "10", "")))
+        .contains(ProductImportProcessor.EXCLUSIVE);
+    verify(products).lockShopItem("crm:shop-item:1:2001");
+    verify(products, never()).insert(any(ProductDO.class));
   }
 
   @Test

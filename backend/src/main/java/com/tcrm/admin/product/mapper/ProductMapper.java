@@ -28,4 +28,11 @@ public interface ProductMapper extends BaseMapper<ProductDO> {
       """)
   boolean existsAliveShopItem(
       @Param("shopId") Long shopId, @Param("weidianItemId") String weidianItemId);
+
+  /**
+   * Serializes original-product and exclusive-item writes for one shop item until the surrounding
+   * transaction ends. The key comes from {@code ProductRules.shopItemLockKey}.
+   */
+  @Select("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(#{key}, 0))")
+  Integer lockShopItem(@Param("key") String key);
 }

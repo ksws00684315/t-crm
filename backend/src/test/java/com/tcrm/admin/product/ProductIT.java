@@ -12,6 +12,7 @@ import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
+import java.sql.Connection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -79,18 +81,21 @@ class ProductIT {
   private final MockMvc mvc;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
+  private final DataSource dataSource;
 
   @Autowired
-  ProductIT(MockMvc mvc, JdbcTemplate jdbc, ObjectMapper json) {
+  ProductIT(MockMvc mvc, JdbcTemplate jdbc, ObjectMapper json, DataSource dataSource) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
+    this.dataSource = dataSource;
   }
 
   private String adminToken;
 
   @BeforeEach
   void prepareIndependentData() throws Exception {
+    jdbc.update("DELETE FROM crm_link_index_outbox");
     jdbc.update("DELETE FROM crm_kol_item");
     jdbc.update("DELETE FROM crm_product");
     jdbc.update("DELETE FROM crm_shop");
@@ -262,6 +267,41 @@ class ProductIT {
         .andExpect(jsonPath("$.data.hasErrorFile").value(true));
   }
 
+  /**
+   * An original-product import and a mapping import of the same shop item overlap. SHARE locks hold
+   * both inserts until they are both waiting, then exactly one claim may remain.
+   */
+  @Test
+  void shouldRejectOneClaim_whenOriginalAndExclusiveImportsOverlap() throws Exception {
+    long shopId = createShop("店E", "1005");
+    String kolCode = createKol("Fay", "fay-product@example.com");
+    String productCode = importProduct(shopId, "2005", "扣");
+    try (Connection hold = dataSource.getConnection()) {
+      hold.setAutoCommit(false);
+      try (var statement = hold.createStatement()) {
+        statement.execute("LOCK TABLE crm_product IN SHARE MODE");
+        statement.execute("LOCK TABLE crm_kol_item IN SHARE MODE");
+      }
+      String productTask = submitProduct("1005", "9001", "争");
+      String mappingTask = submitMapping("1005", "9001", kolCode, productCode);
+      awaitLockWaiters(2);
+      hold.commit();
+      JsonNode product = awaitTask(productTask);
+      JsonNode mapping = awaitTask(mappingTask);
+      assertThat(List.of(product.path("status").asText(), mapping.path("status").asText()))
+          .containsExactlyInAnyOrder("SUCCESS", "FAILED");
+    }
+    int products =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM crm_product WHERE weidian_item_id = '9001' AND is_deleted = FALSE",
+            Integer.class);
+    int exclusives =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM crm_kol_item WHERE weidian_item_id = '9001' AND valid_to IS NULL",
+            Integer.class);
+    assertThat(products + exclusives).isEqualTo(1);
+  }
+
   @Test
   void shouldReturnTaskFileExpired_afterRetentionCleanup() throws Exception {
     long shopId = createShop("店D", "1004");
@@ -326,9 +366,7 @@ class ProductIT {
   }
 
   private String importProduct(long shopId, String itemId, String name) throws Exception {
-    String weidianShopId =
-        jdbc.queryForObject(
-            "SELECT weidian_shop_id FROM crm_shop WHERE id = ?", String.class, shopId);
+    String weidianShopId = weidianShop(shopId);
     byte[] workbook =
         productWorkbook(List.of(List.of("", weidianShopId, itemId, name, "", "", "10.00", "")));
     MvcResult submit =
@@ -373,6 +411,53 @@ class ProductIT {
             .asText();
     JsonNode task = awaitTask(taskId);
     return "SUCCESS".equals(task.path("status").asText());
+  }
+
+  private String weidianShop(long shopId) {
+    return jdbc.queryForObject(
+        "SELECT weidian_shop_id FROM crm_shop WHERE id = ?", String.class, shopId);
+  }
+
+  private String submitProduct(String shopWeidian, String itemId, String name) throws Exception {
+    byte[] workbook =
+        productWorkbook(List.of(List.of("", shopWeidian, itemId, name, "", "", "10.00", "")));
+    return submit("/admin-api/product/product-imports", workbook, "p.xlsx");
+  }
+
+  private String submitMapping(String shop, String item, String kol, String product)
+      throws Exception {
+    return submit(
+        "/admin-api/product/kol-item-imports",
+        mappingWorkbook(List.of(List.of(shop, item, kol, product))),
+        "m.xlsx");
+  }
+
+  private String submit(String path, byte[] workbook, String filename) throws Exception {
+    MvcResult submit =
+        mvc.perform(
+                multipart(path)
+                    .file(
+                        new MockMultipartFile(
+                            "file", filename, ImportTaskApi.XLSX_CONTENT_TYPE, workbook))
+                    .header(TOKEN, adminToken))
+            .andExpect(status().isAccepted())
+            .andReturn();
+    return json.readTree(submit.getResponse().getContentAsString())
+        .path("data")
+        .path("taskId")
+        .asText();
+  }
+
+  private void awaitLockWaiters(int expected) throws InterruptedException {
+    for (int i = 0; i < 200; i++) {
+      Integer waiting =
+          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+      if (waiting != null && waiting >= expected) {
+        return;
+      }
+      Thread.sleep(25);
+    }
+    throw new IllegalStateException("Expected " + expected + " imports waiting on the table lock");
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {

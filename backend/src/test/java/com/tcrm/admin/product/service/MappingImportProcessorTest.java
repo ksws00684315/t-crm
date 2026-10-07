@@ -115,6 +115,25 @@ class MappingImportProcessorTest {
     when(productMapper.existsAliveShopItem(1L, "9001")).thenReturn(true);
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
         .contains(MappingImportProcessor.IS_ORIGINAL);
+    verify(productMapper, never()).lockShopItem(any());
+  }
+
+  @Test
+  void shouldReject_whenItemBecomesOriginalProductAfterTheLock() {
+    when(productMapper.existsAliveShopItem(1L, "9001")).thenReturn(false, true);
+    KolItemDO old = new KolItemDO();
+    old.setId(5L);
+    old.setKolId(10L);
+    old.setProductId(20L);
+    old.setShopId(1L);
+    old.setWeidianItemId("8000");
+    when(items.findCurrentByKolProduct(10L, 20L)).thenReturn(old);
+    assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
+        .contains(MappingImportProcessor.IS_ORIGINAL);
+    verify(productMapper).lockShopItem("crm:shop-item:1:9001");
+    verify(items, never()).update(any(), any());
+    verify(items, never()).insert(any(KolItemDO.class));
+    verify(events, never()).publishEvent(any(Object.class));
   }
 
   @Test

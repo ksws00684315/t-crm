@@ -156,30 +156,43 @@ class MappingImportProcessor implements ImportRowProcessor {
       return List.of(OCCUPIED_PREFIX + ownerCode + "，原商品 " + occupiedCode);
     }
     KolItemDO byPair = items.findCurrentByKolProduct(kol.id(), product.getId());
-    tx.executeWithoutResult(
-        status -> {
-          if (byPair != null) {
-            // Replace exclusive item: close old then insert (same transaction).
-            items.update(
-                null,
-                new LambdaUpdateWrapper<KolItemDO>()
-                    .eq(KolItemDO::getId, byPair.getId())
-                    .set(KolItemDO::getValidTo, now)
-                    .set(KolItemDO::getUpdateBy, actorId)
-                    .set(KolItemDO::getUpdateTime, now));
-          }
-          KolItemDO neu = new KolItemDO();
-          neu.setKolId(kol.id());
-          neu.setProductId(product.getId());
-          neu.setShopId(shop.getId());
-          neu.setWeidianItemId(exclusiveId);
-          neu.setValidFrom(now);
-          neu.setCreateBy(actorId);
-          neu.setUpdateBy(actorId);
-          items.insert(neu);
-          // Registered in this transaction and applied to the link index afterwards (task 06b).
-          TransactionalEvents.publish(events, new KolItemChangedEvent(kol.id(), product.getId()));
-        });
+    try {
+      tx.executeWithoutResult(
+          status -> {
+            productMapper.lockShopItem(ProductRules.shopItemLockKey(shop.getId(), exclusiveId));
+            // Recheck after the lock and before closing a previous mapping, so a collision writes
+            // nothing.
+            if (productMapper.existsAliveShopItem(shop.getId(), exclusiveId)) {
+              throw new OriginalProductClaim();
+            }
+            if (byPair != null) {
+              // Replace exclusive item: close old then insert (same transaction).
+              items.update(
+                  null,
+                  new LambdaUpdateWrapper<KolItemDO>()
+                      .eq(KolItemDO::getId, byPair.getId())
+                      .set(KolItemDO::getValidTo, now)
+                      .set(KolItemDO::getUpdateBy, actorId)
+                      .set(KolItemDO::getUpdateTime, now));
+            }
+            KolItemDO neu = new KolItemDO();
+            neu.setKolId(kol.id());
+            neu.setProductId(product.getId());
+            neu.setShopId(shop.getId());
+            neu.setWeidianItemId(exclusiveId);
+            neu.setValidFrom(now);
+            neu.setCreateBy(actorId);
+            neu.setUpdateBy(actorId);
+            items.insert(neu);
+            // Registered in this transaction and applied to the link index afterwards (task 06b).
+            TransactionalEvents.publish(events, new KolItemChangedEvent(kol.id(), product.getId()));
+          });
+    } catch (OriginalProductClaim claimed) {
+      return List.of(IS_ORIGINAL);
+    }
     return List.of();
   }
+
+  /** Signals that the shop item became an original product after the advisory lock was taken. */
+  private static final class OriginalProductClaim extends RuntimeException {}
 }
