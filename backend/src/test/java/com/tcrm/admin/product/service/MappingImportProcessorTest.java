@@ -18,6 +18,7 @@ import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
+import com.tcrm.admin.shared.TestTransactions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -40,9 +41,7 @@ class MappingImportProcessorTest {
   private final KolItemMapper items = mock(KolItemMapper.class);
   private final ProductMapper productMapper = mock(ProductMapper.class);
   private final KolApi kols = mock(KolApi.class);
-  private final TransactionTemplate tx =
-      new TransactionTemplate(
-          mock(org.springframework.transaction.PlatformTransactionManager.class));
+  private final TransactionTemplate tx = TestTransactions.template();
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private MappingImportProcessor processor;
   private ShopDO shop;
@@ -116,6 +115,25 @@ class MappingImportProcessorTest {
     when(productMapper.existsAliveShopItem(1L, "9001")).thenReturn(true);
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
         .contains(MappingImportProcessor.IS_ORIGINAL);
+    verify(productMapper, never()).lockShopItem(any());
+  }
+
+  @Test
+  void shouldReject_whenItemBecomesOriginalProductAfterTheLock() {
+    when(productMapper.existsAliveShopItem(1L, "9001")).thenReturn(false, true);
+    KolItemDO old = new KolItemDO();
+    old.setId(5L);
+    old.setKolId(10L);
+    old.setProductId(20L);
+    old.setShopId(1L);
+    old.setWeidianItemId("8000");
+    when(items.findCurrentByKolProduct(10L, 20L)).thenReturn(old);
+    assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
+        .contains(MappingImportProcessor.IS_ORIGINAL);
+    verify(productMapper).lockShopItem("crm:shop-item:1:9001");
+    verify(items, never()).update(any(), any());
+    verify(items, never()).insert(any(KolItemDO.class));
+    verify(events, never()).publishEvent(any(Object.class));
   }
 
   @Test

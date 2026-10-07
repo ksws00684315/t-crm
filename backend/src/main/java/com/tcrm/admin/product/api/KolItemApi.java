@@ -34,6 +34,26 @@ public interface KolItemApi {
   List<KolItemLinkDTO> listCurrentLinksByProduct(Long productId);
 
   /**
+   * Pages KOL ids that have a current mapping of the original product, in ascending id order. Used
+   * to refresh the link index without loading every mapping of a popular product at once.
+   *
+   * @param productId original product ID
+   * @param afterKolId exclusive lower bound; null starts at the first id
+   * @param limit maximum number of ids (positive)
+   */
+  List<Long> pageKolIdsWithCurrentProduct(Long productId, Long afterKolId, int limit);
+
+  /**
+   * Pages KOL ids that have a current mapping whose exclusive item belongs to the shop, in
+   * ascending id order.
+   *
+   * @param shopId shop of the exclusive item ({@code crm_kol_item.shop_id})
+   * @param afterKolId exclusive lower bound; null starts at the first id
+   * @param limit maximum number of ids (positive)
+   */
+  List<Long> pageKolIdsWithCurrentShop(Long shopId, Long afterKolId, int limit);
+
+  /**
    * Returns the current mapping of the KOL and original product, or null when there is none.
    *
    * @param kolId KOL ID

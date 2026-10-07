@@ -210,7 +210,14 @@ class ProductImportProcessor implements ImportRowProcessor {
       product.setId(null);
       product.setProductCode(code != null ? code : codes.next());
       try {
-        tx.executeWithoutResult(s -> products.insert(product));
+        tx.executeWithoutResult(
+            s -> {
+              products.lockShopItem(ProductRules.shopItemLockKey(shop.getId(), itemId));
+              if (kolItems.existsCurrentShopItem(shop.getId(), itemId)) {
+                throw new BusinessException(ErrorCode.PRODUCT_IS_EXCLUSIVE_ITEM);
+              }
+              products.insert(product);
+            });
         return List.of();
       } catch (DuplicateKeyException e) {
         String message = String.valueOf(e.getMostSpecificCause().getMessage());

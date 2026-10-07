@@ -27,6 +27,7 @@ import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TestTransactions;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
@@ -40,8 +41,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 class KolServiceTest {
   @BeforeAll
@@ -62,14 +61,7 @@ class KolServiceTest {
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final KolService service =
-      new KolService(
-          kols,
-          history,
-          writer,
-          bdUsers,
-          current,
-          new TransactionTemplate(mock(PlatformTransactionManager.class)),
-          events);
+      new KolService(kols, history, writer, bdUsers, current, TestTransactions.template(), events);
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())

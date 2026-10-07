@@ -67,6 +67,42 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
   @Select(LINK_COLUMNS + " WHERE ki.product_id = #{productId} AND ki.valid_to IS NULL")
   List<KolItemLinkRow> listCurrentLinksByProduct(@Param("productId") Long productId);
 
+  /**
+   * Keyset page of distinct KOL ids. The {@code product_id} predicate uses {@code
+   * idx_crm_kol_item_product}. A null {@code afterKolId} is the first page.
+   */
+  @Select(
+      """
+      SELECT DISTINCT kol_id FROM crm_kol_item
+      WHERE product_id = #{productId}
+        AND valid_to IS NULL
+        AND (CAST(#{afterKolId,jdbcType=BIGINT} AS BIGINT) IS NULL OR kol_id > #{afterKolId,jdbcType=BIGINT})
+      ORDER BY kol_id
+      LIMIT #{limit}
+      """)
+  List<Long> pageKolIdsWithCurrentProduct(
+      @Param("productId") Long productId,
+      @Param("afterKolId") Long afterKolId,
+      @Param("limit") int limit);
+
+  /**
+   * Keyset page of distinct KOL ids. The shop predicate uses the partial unique index {@code
+   * uk_crm_kol_item_shop_item} ({@code shop_id} leading, {@code valid_to IS NULL}).
+   */
+  @Select(
+      """
+      SELECT DISTINCT kol_id FROM crm_kol_item
+      WHERE shop_id = #{shopId}
+        AND valid_to IS NULL
+        AND (CAST(#{afterKolId,jdbcType=BIGINT} AS BIGINT) IS NULL OR kol_id > #{afterKolId,jdbcType=BIGINT})
+      ORDER BY kol_id
+      LIMIT #{limit}
+      """)
+  List<Long> pageKolIdsWithCurrentShop(
+      @Param("shopId") Long shopId,
+      @Param("afterKolId") Long afterKolId,
+      @Param("limit") int limit);
+
   @Select(
       LINK_COLUMNS
           + " WHERE ki.kol_id = #{kolId} AND ki.product_id = #{productId} AND ki.valid_to IS NULL")

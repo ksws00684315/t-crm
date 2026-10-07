@@ -31,9 +31,12 @@ public class RedirectService {
     this.clientIps = clientIps;
     this.fallback = httpUri(fallback);
     this.salt = salt;
-    if (this.fallback == null || salt.isBlank()) {
+    if (this.fallback == null) {
+      throw new IllegalArgumentException("An HTTP(S) fallback URL is required");
+    }
+    if (salt == null || salt.length() < 32) {
       throw new IllegalArgumentException(
-          "An HTTP(S) fallback URL and nonempty IP hash salt are required");
+          "TCRM_IP_HASH_SALT must be at least 32 characters; generate one with: openssl rand -hex 32");
     }
   }
 

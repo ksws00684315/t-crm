@@ -2,7 +2,8 @@ package com.tcrm.admin.product.api;
 
 /**
  * Published inside the transaction that adds, replaces or closes a kol item mapping (task 06 §4.3).
- * Listeners should react after commit and look up the current mapping of the pair themselves.
+ * The link index listener registers an outbox row before commit and reads the current mapping
+ * later.
  *
  * @param kolId KOL ID
  * @param productId original product ID

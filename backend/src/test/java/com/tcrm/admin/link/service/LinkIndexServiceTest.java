@@ -1,7 +1,9 @@
 package com.tcrm.admin.link.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -15,9 +17,11 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
+import com.tcrm.admin.shared.DistributedLocks;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -25,10 +29,21 @@ class LinkIndexServiceTest {
   private final KolItemApi items = mock(KolItemApi.class);
   private final KolApi kols = mock(KolApi.class);
   private final LinkIndexStore store = mock(LinkIndexStore.class);
-  private final LinkIndexService service = new LinkIndexService(items, kols, store);
+  private final DistributedLocks locks = mock(DistributedLocks.class);
+  private final LinkIndexService service = new LinkIndexService(items, kols, store, locks);
 
   private static final KolRefDTO ALICE = new KolRefDTO(10L, "KOL0001", "Alice", true, null);
   private static final KolRefDTO BOB = new KolRefDTO(11L, "KOL0002", "Bob", false, null);
+
+  @BeforeEach
+  void locksRunInline() throws InterruptedException {
+    when(locks.run(anyString(), anyLong(), anyLong(), any(Runnable.class)))
+        .thenAnswer(
+            invocation -> {
+              invocation.getArgument(3, Runnable.class).run();
+              return true;
+            });
+  }
 
   private static KolItemLinkDTO link(long id, long kolId, String code, String item) {
     return new KolItemLinkDTO(id, kolId, 20L, code, "name", 1L, item, true, true);
@@ -93,34 +108,11 @@ class LinkIndexServiceTest {
   }
 
   @Test
-  void shouldGroupFieldsByKol_whenProductStatusChanges() {
-    when(items.listCurrentLinksByProduct(20L))
-        .thenReturn(List.of(link(1L, 10L, "P1", "91"), link(2L, 11L, "P1", "92")));
-    when(kols.listByIds(Set.of(10L, 11L))).thenReturn(List.of(ALICE, BOB));
-
-    assertThat(service.refreshProduct(20L)).isEqualTo(2);
-
-    assertThat(fieldsWritten("KOL0001")).containsOnlyKeys("P1");
-    assertThat(fieldsWritten("KOL0002")).containsOnlyKeys("P1");
-  }
-
-  @Test
-  void shouldRewriteShopFieldsKolByKol_whenShopStatusChanges() {
-    when(kols.listAll()).thenReturn(List.of(ALICE, BOB));
-    when(items.listCurrentLinksByKolAndShop(10L, 1L))
-        .thenReturn(List.of(link(1L, 10L, "P1", "91")));
-    when(items.listCurrentLinksByKolAndShop(11L, 1L)).thenReturn(List.of());
-
-    assertThat(service.refreshShop(1L)).isEqualTo(1);
-
-    assertThat(fieldsWritten("KOL0001")).containsOnlyKeys("P1");
-    assertThat(fieldsWritten("KOL0002")).isEmpty();
-  }
-
-  @Test
   @SuppressWarnings("unchecked")
-  void shouldReplaceEveryKolAndDropOrphans_whenRebuilding() {
+  void shouldReplaceEveryKolAndDropOrphans_whenRebuilding() throws InterruptedException {
     when(kols.listAll()).thenReturn(List.of(ALICE, BOB));
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
+    when(kols.listByIds(List.of(11L))).thenReturn(List.of(BOB));
     when(items.listCurrentLinksByKol(10L))
         .thenReturn(List.of(link(1L, 10L, "P1", "91"), link(2L, 10L, "P2", "92")));
     when(items.listCurrentLinksByKol(11L)).thenReturn(List.of());
@@ -129,6 +121,7 @@ class LinkIndexServiceTest {
 
     LinkIndexService.RebuildResult result = service.rebuildAll();
 
+    verify(locks).run(eq("link:index:kol:10"), eq(120L), eq(-1L), any(Runnable.class));
     ArgumentCaptor<Map<String, String>> alice = ArgumentCaptor.forClass(Map.class);
     verify(store).replace(eq("KOL0001"), alice.capture());
     assertThat(alice.getValue()).containsOnlyKeys("P1", "P2");
@@ -141,10 +134,34 @@ class LinkIndexServiceTest {
   }
 
   @Test
-  void shouldNotTouchStore_whenProductHasNoCurrentMappings() {
-    when(items.listCurrentLinksByProduct(20L)).thenReturn(List.of());
-    when(kols.listByIds(any())).thenReturn(List.of());
-    assertThat(service.refreshProduct(20L)).isZero();
-    verifyNoInteractions(store);
+  void shouldDeleteKey_whenKolDisappearsBeforeRebuildWrites() {
+    when(kols.listAll()).thenReturn(List.of(ALICE));
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of());
+    when(store.deleteStagingKeys()).thenReturn(0);
+    when(store.listIndexedKolCodes()).thenReturn(Set.of());
+
+    service.rebuildAll();
+
+    verify(store).delete("KOL0001");
+    verify(store, never()).replace(anyString(), anyMap());
+  }
+
+  @Test
+  void shouldFailRebuild_whenKolLockIsBusy() throws InterruptedException {
+    when(kols.listAll()).thenReturn(List.of(ALICE));
+    when(locks.run(anyString(), anyLong(), anyLong(), any(Runnable.class))).thenReturn(false);
+
+    assertThatThrownBy(service::rebuildAll).isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void shouldRestoreInterrupt_whenRebuildIsInterrupted() throws InterruptedException {
+    when(kols.listAll()).thenReturn(List.of(ALICE));
+    when(locks.run(anyString(), anyLong(), anyLong(), any(Runnable.class)))
+        .thenThrow(new InterruptedException("stop"));
+
+    assertThatThrownBy(service::rebuildAll).isInstanceOf(IllegalStateException.class);
+    assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    Thread.interrupted();
   }
 }

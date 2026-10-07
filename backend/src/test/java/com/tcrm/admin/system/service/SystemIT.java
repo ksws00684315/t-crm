@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.mapper.SysUserMapper;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,6 +76,7 @@ class SystemIT {
   private final SysUserMapper users;
   private final StringRedisTemplate redis;
   private final DataSource dataSource;
+  private final OperLogRetentionJob operLogRetention;
 
   @Autowired
   SystemIT(
@@ -82,13 +85,15 @@ class SystemIT {
       ObjectMapper json,
       SysUserMapper users,
       StringRedisTemplate redis,
-      DataSource dataSource) {
+      DataSource dataSource,
+      OperLogRetentionJob operLogRetention) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.users = users;
     this.redis = redis;
     this.dataSource = dataSource;
+    this.operLogRetention = operLogRetention;
   }
 
   @BeforeEach
@@ -116,6 +121,36 @@ class SystemIT {
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN'", Integer.class))
         .isEqualTo(1);
+  }
+
+  @Test
+  void shouldDeleteOperationLogsOlderThan180Days_andKeepTheBoundary() {
+    Instant now = Instant.parse("2026-10-07T03:45:00Z");
+    Instant cutoff = now.minus(180, ChronoUnit.DAYS);
+    jdbc.update("DELETE FROM sys_oper_log WHERE id IN (9101, 9102, 9103)");
+    insertOperLog(9101, cutoff.minusMillis(1));
+    insertOperLog(9102, cutoff);
+    insertOperLog(9103, cutoff.plusMillis(1));
+    try {
+      operLogRetention.cleanup(now);
+      assertThat(
+              jdbc.queryForList(
+                  "SELECT id FROM sys_oper_log WHERE id IN (9101, 9102, 9103) ORDER BY id",
+                  Long.class))
+          .containsExactly(9102L, 9103L);
+    } finally {
+      jdbc.update("DELETE FROM sys_oper_log WHERE id IN (9101, 9102, 9103)");
+    }
+  }
+
+  private void insertOperLog(long id, Instant operTime) {
+    jdbc.update(
+        """
+        INSERT INTO sys_oper_log (id, module, action, method, request_uri, result, cost_ms, oper_time)
+        VALUES (?, 'system', 'Retention', 'GET', '/admin-api/system/operation-logs', 'SUCCESS', 1, ?)
+        """,
+        id,
+        Timestamp.from(operTime));
   }
 
   @Test

@@ -16,6 +16,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TransactionalEvents;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -114,8 +115,8 @@ public class ProductService {
   }
 
   /**
-   * Puts the product on or off sale and publishes {@link ProductStatusChangedEvent}; the link index
-   * reacts after commit (task 06 §4.3).
+   * Puts the product on or off sale and publishes {@link ProductStatusChangedEvent} in this
+   * transaction; the link index is registered before commit and applied afterwards (task 06b).
    */
   @Transactional(rollbackFor = Exception.class)
   public void updateStatus(Long id, int status) {
@@ -129,7 +130,7 @@ public class ProductService {
             .set(ProductDO::getStatus, status)
             .set(ProductDO::getUpdateBy, current.id())
             .set(ProductDO::getUpdateTime, now));
-    events.publishEvent(new ProductStatusChangedEvent(id));
+    TransactionalEvents.publish(events, new ProductStatusChangedEvent(id));
   }
 
   ProductDO require(Long id) {

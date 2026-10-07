@@ -10,6 +10,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ProductRulesTest {
   @Test
+  void shouldBuildShopItemLockKey() {
+    assertThat(ProductRules.shopItemLockKey(7L, "9001")).isEqualTo("crm:shop-item:7:9001");
+  }
+
+  @Test
   void shouldFormatCode_withAtLeastSixDigits() {
     assertThat(ProductRules.formatCode(1)).isEqualTo("P000001");
     assertThat(ProductRules.formatCode(999999)).isEqualTo("P999999");

@@ -24,6 +24,8 @@ class RedirectServiceTest {
   private static final ClientIpResolver IPS =
       new ClientIpResolver("10.0.0.0/8", "CF-Connecting-IP,X-Forwarded-For");
 
+  private static final String SALT = "0123456789abcdef0123456789abcdef";
+
   @Test
   void shouldRejectUnsafeConfiguration_whenFallbackOrSaltIsInvalid() {
     var redis = mock(ClickRedis.class);
@@ -31,11 +33,16 @@ class RedirectServiceTest {
         new String[] {
           "bad", "https:///missing-host", "ftp://example.com", "https://user:credential@example.com"
         }) {
-      assertThatThrownBy(() -> new RedirectService(redis, IPS, url, "unit-salt"))
+      assertThatThrownBy(() -> new RedirectService(redis, IPS, url, SALT))
           .isInstanceOf(IllegalArgumentException.class);
     }
     assertThatThrownBy(() -> new RedirectService(redis, IPS, "https://example.com", ""))
-        .isInstanceOf(IllegalArgumentException.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("TCRM_IP_HASH_SALT")
+        .hasMessageContaining("openssl rand -hex 32");
+    assertThatThrownBy(() -> new RedirectService(redis, IPS, "https://example.com", "unit-salt"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("TCRM_IP_HASH_SALT");
   }
 
   @Test
@@ -43,7 +50,7 @@ class RedirectServiceTest {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString()))
         .thenThrow(new IllegalStateException("unit-failure"));
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
     assertThat(
             service
                 .redirect("KOL0001", "product", new MockHttpServletRequest())
@@ -63,7 +70,7 @@ class RedirectServiceTest {
   private Map<?, ?> clickFor(MockHttpServletRequest request) {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
-    new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt")
+    new RedirectService(redis, IPS, "https://example.com/fallback", SALT)
         .redirect("KOL0001", "product", request);
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(redis).append(events.capture());
@@ -75,7 +82,7 @@ class RedirectServiceTest {
     var request = new MockHttpServletRequest();
     request.setRemoteAddr("10.1.2.3");
     request.addHeader("X-Forwarded-For", "192.0.2.77, 198.51.100.1");
-    assertThat(clickFor(request).get("ipHash")).isEqualTo(sha256("unit-salt198.51.100.1"));
+    assertThat(clickFor(request).get("ipHash")).isEqualTo(sha256(SALT + "198.51.100.1"));
   }
 
   @Test
@@ -84,7 +91,7 @@ class RedirectServiceTest {
     request.setRemoteAddr("203.0.113.2");
     request.addHeader("CF-Connecting-IP", "198.51.100.1");
     request.addHeader("X-Forwarded-For", "198.51.100.2");
-    assertThat(clickFor(request).get("ipHash")).isEqualTo(sha256("unit-salt203.0.113.2"));
+    assertThat(clickFor(request).get("ipHash")).isEqualTo(sha256(SALT + "203.0.113.2"));
   }
 
   @Test
@@ -100,7 +107,7 @@ class RedirectServiceTest {
   @Test
   void shouldRejectUnsafeIndexTargets_whenUriHasNoHostOrContainsUserInfo() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
     for (String target :
         new String[] {
           "https:///missing-host", "https://user:credential@example.com", "https://[invalid"
@@ -120,8 +127,7 @@ class RedirectServiceTest {
   @Test
   void shouldReturnUnavailable_whenRedisHealthIsFalse() {
     var service =
-        new RedirectService(
-            mock(ClickRedis.class), IPS, "https://example.com/fallback", "unit-salt");
+        new RedirectService(mock(ClickRedis.class), IPS, "https://example.com/fallback", SALT);
     assertThat(service.health().getStatusCode().value()).isEqualTo(503);
   }
 
@@ -131,7 +137,7 @@ class RedirectServiceTest {
     when(redis.lookup(anyString(), anyString()))
         .thenReturn(
             "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p?a=1%7C2\",\"status\":1}");
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
     var response = service.redirect("KOL0001", "product", new MockHttpServletRequest());
     assertThat(response.getHeaders().getLocation().toString())
         .isEqualTo("https://example.com/p?a=1%7C2");
@@ -143,7 +149,7 @@ class RedirectServiceTest {
   @Test
   void shouldUseFallbackWithoutRecording_whenIndexValueIsInactiveOrMalformed() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", "unit-salt");
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
     for (String value :
         new String[] {
           "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":0}", "{broken"

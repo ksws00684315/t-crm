@@ -5,6 +5,9 @@ server_tokens off;
 
 # Login endpoint rate limit (Cloudflare rules are the first line; this protects the origin).
 limit_req_zone $binary_remote_addr zone=tcrm_login:10m rate=10r/m;
+# Redirect rate limit. Loose on purpose so shared mobile egress (CGNAT) is not blocked.
+# Cloudflare rate limiting is the primary defense; this zone is the origin fallback.
+limit_req_zone $binary_remote_addr zone=tcrm_redirect:10m rate=30r/s;
 
 include /etc/nginx/snippets/cloudflare-real-ip.conf;
 
@@ -31,6 +34,8 @@ server {
     include /etc/nginx/snippets/security-headers.conf;
 
     location /t/ {
+        limit_req zone=tcrm_redirect burst=60 nodelay;
+        limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
         proxy_pass http://crm-redirect:8081;
     }

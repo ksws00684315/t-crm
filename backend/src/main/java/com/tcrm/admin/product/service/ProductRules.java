@@ -28,6 +28,23 @@ public final class ProductRules {
 
   private ProductRules() {}
 
+  /**
+   * Transaction advisory-lock key for one shop item. An original-product insert and an
+   * exclusive-item mapping both take this lock, then recheck the other table.
+   *
+   * <p>Advisory lock keys in this project:
+   *
+   * <ul>
+   *   <li>{@code crm:shop-item:{shopId}:{weidianItemId}} — this method; {@code
+   *       ProductMapper.lockShopItem} hashes it with {@code hashtextextended}
+   *   <li>{@code crm_shop:create} — shop creation; {@code ShopMapper.lockForCreate} hashes the
+   *       literal with {@code hashtext}
+   * </ul>
+   */
+  public static String shopItemLockKey(long shopId, String weidianItemId) {
+    return "crm:shop-item:" + shopId + ":" + weidianItemId;
+  }
+
   /** Formats a sequence number as a product code: at least 6 digits, zero-padded (P000001). */
   public static String formatCode(long number) {
     return String.format(Locale.ROOT, "P%06d", number);

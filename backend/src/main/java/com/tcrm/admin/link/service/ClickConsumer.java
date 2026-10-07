@@ -108,14 +108,16 @@ public class ClickConsumer {
 
   /**
    * Builds rows in stream order. The dup check compares with the previous click of the same link
-   * and IP hash: earlier in this batch, else the stored {@code click:last:*} time. {@code latest}
-   * receives the newest event time per key to store afterwards.
+   * and IP hash: earlier in this batch, else the stored {@code click:last:*} time, else the latest
+   * {@code crm_click_log} time in the batch window. {@code latest} receives the newest event time
+   * per key to store afterwards.
    */
   private List<ClickLogDO> toRows(
       List<ClickEvent> events, Map<Long, KolItemRefDTO> refs, Map<String, Long> latest) {
     var keys = new LinkedHashSet<String>();
     events.forEach(event -> keys.add(event.lastClickKey()));
     Map<String, Long> previous = new HashMap<>(stream.lastClickTimes(new ArrayList<>(keys)));
+    seedFromClickLog(events, refs, previous);
     Instant now = clock.instant();
     List<ClickLogDO> rows = new ArrayList<>();
     for (ClickEvent event : events) {
@@ -128,6 +130,45 @@ public class ClickConsumer {
       rows.add(row(event, refs.get(event.kolItemId()), dup, now));
     }
     return rows;
+  }
+
+  /**
+   * Redis {@code click:last:*} is only an accelerator. Keys missing from this batch's lookup are
+   * filled from one click-log query over {@code [earliest event - 10s, latest event]}.
+   */
+  private void seedFromClickLog(
+      List<ClickEvent> events, Map<Long, KolItemRefDTO> refs, Map<String, Long> previous) {
+    Map<String, ClickLogDO> misses = new LinkedHashMap<>();
+    long earliest = Long.MAX_VALUE;
+    long latest = Long.MIN_VALUE;
+    for (ClickEvent event : events) {
+      earliest = Math.min(earliest, event.clickMillis());
+      latest = Math.max(latest, event.clickMillis());
+      String key = event.lastClickKey();
+      if (previous.containsKey(key) || misses.containsKey(key)) {
+        continue;
+      }
+      KolItemRefDTO ref = refs.get(event.kolItemId());
+      ClickLogDO probe = new ClickLogDO();
+      probe.setKolId(ref.kolId());
+      probe.setProductId(ref.productId());
+      probe.setKolItemId(event.kolItemId());
+      probe.setIpHash(event.ipHash());
+      misses.put(key, probe);
+    }
+    if (misses.isEmpty()) {
+      return;
+    }
+    List<ClickLogDO> found =
+        clickLogs.latestClickTimes(
+            new ArrayList<>(misses.values()),
+            Instant.ofEpochMilli(earliest - ClickRules.DUP_WINDOW_MILLIS),
+            Instant.ofEpochMilli(latest));
+    for (ClickLogDO row : found) {
+      previous.putIfAbsent(
+          "click:last:" + row.getKolItemId() + ":" + row.getIpHash(),
+          row.getClickTime().toEpochMilli());
+    }
   }
 
   private static ClickLogDO row(ClickEvent event, KolItemRefDTO ref, boolean dup, Instant now) {
