@@ -1,7 +1,9 @@
-# 任务 06c：多公司底座
+# 任务 06c（后端）：多公司底座
 
 > 本文件是交给编码代理执行的提示词。直接把本文件全文作为任务输入即可。
 > **前置条件：PR #26（多公司与中英文切换设计）已合并到 `main`。** 未合并时停止，不要开始。
+>
+> **并行说明**：任务 06c 拆成两份同时执行。本文件只负责后端（`backend/`）及相关文档；管理端由另一个代理在另一个工作树中按《06c-多公司底座-管理端》实现，它依赖第 4.8 节的接口约定。**接口的路径、字段名、类型和错误码必须与第 4.8 节完全一致，不得自行调整。**另有代理同时在改 `kol-portal/`。
 
 ---
 
@@ -9,12 +11,12 @@
 
 签约时系统按一家公司设计。2026-10-11 客户提出：系统要支持客户旗下的多家公司，各公司数据完全隔离；同一个达人可能与多家公司合作，在每家公司各有一个账号。客户目前只有 1 家公司，要求以后增加公司时**系统不需要重构**。
 
-设计已定稿：设计说明书 §3.4、ADR-014，规范 03、04、05、06 中标注"任务 06c 起执行"的条款。本任务把已完成的 M1 改造成多公司结构，并提供平台管理员的公司管理功能。**不增加其他业务功能。**
+设计已定稿：设计说明书 §3.4、ADR-014，规范 03、04、05、06 中标注"任务 06c 起执行"的条款。本任务把已完成的 M1 后端改造成多公司结构，并提供平台管理员的公司管理接口。**不增加其他业务功能。**
 
 本任务完成后应达到：
 
 1. 所有业务数据带所属公司，查询和修改自动限定在当前公司，取不到当前公司时报错；
-2. 平台管理员能新建公司、为公司创建超级管理员，新公司的管理员登录后只能看到本公司的数据；
+2. 平台管理员能通过接口新建公司、为公司创建超级管理员，新公司的管理员登录后只能看到本公司的数据；
 3. 现有数据全部归入默认公司，现有功能（含跳转与点击计数）行为不变。
 
 ## 2. 开始前必读
@@ -27,12 +29,13 @@
    - `shared.CommonConfiguration`、`shared.BaseEntity`；
    - 全部 `*Mapper.java` 中的手写 SQL；
    - 所有定时任务、`@Async` 方法与后台线程：`task.service.TaskQueue`、`ImportTaskService`、`InterruptedTaskCleaner`、`TaskFileRetentionJob`，`link.service` 的 `LinkIndexSyncJob`、`LinkRebuildService`、`ClickConsumer`、`ClickConsumerRunner`、`ClickPartitionJob`、各 `*Monitor`；
-   - 集成测试 `KolIT`、`ProductIT`、`LinkIT`、`SystemIT` 的初始化与登录方式；`ArchitectureTest`；
-   - `admin-ui/src/utils/permission.ts`、`router/`、`api/types.ts`、`api/error-codes.ts`、`views/system/`。
+   - 集成测试 `KolIT`、`ProductIT`、`LinkIT`、`SystemIT` 的初始化与登录方式；`ArchitectureTest`。
 
 ## 3. 执行环境与交付
 
-- 从最新的 `main` 创建分支 `task/06c-multi-company`，按第 5 节的步骤分别提交。
+- 你在一个独立的 git 工作树中工作，分支 `task/06c-backend` 已基于最新的 `main` 检出，直接在此分支上提交。按第 5 节的步骤分别提交。
+- **只修改本任务范围内的文件**：`backend/`、`docs/03-设计/`、`deploy/README.md`、`.env.example`、你的执行报告。**不要修改** `admin-ui/`、`kol-portal/`、`redirect/` 和 `docs/04-开发任务/README.md`（任务索引由项目负责人维护）。
+- 迁移脚本版本号：创建 PR 前先合并最新的 `main`。如果 `main` 上已有版本号更大的迁移，就把你**尚未合并**的脚本改名为更晚的时间戳，否则已部署的环境会校验失败。
 - 能运行 Docker 时，本地运行集成测试：在 `backend/` 下执行 `mvn -B verify -Pdocker-it`；不能运行时，`*IT` 由 CI 运行。
 - 完成后推送分支，用 `gh pr create` 按 PR 模板创建 PR，并用 `gh pr checks --watch` 等待 CI 全部通过。**不要合并 PR，不要推送 `main`。**
 - 提交遵循规范 08，末尾加执行代理自己的 `Co-Authored-By` 行。
@@ -143,7 +146,7 @@
 1. `AccountDTO` 增加 `tenantId` 与"公司是否启用"。`AccountStoreService` 在系统范围内读取账号及其公司的状态（可以用一条关联查询，也可以分两次查询）。
 2. `CurrentUserContext.user()`：公司停用（或公司不存在）时，与账号停用一样处理：注销该账号，抛出 `AUTH_ACCOUNT_DISABLED`（401）。`roleNames` 在公司停用时返回空列表。
 3. `AuthService.login`：公司停用时，与账号停用、密码错误返回**完全相同**的失败（`AUTH_INVALID_CREDENTIALS`），也执行一次 BCrypt，并计入失败次数（规范 06 第 1 节）。
-4. `GET /admin-api/auth/me` 增加 `tenantId`、`tenantName`，平台管理员为 `null`。前端在页头显示公司名称。
+4. 登录返回的 `user` 与 `GET /admin-api/auth/me` 增加 `tenantId`、`tenantName`，平台管理员为 `null`（第 4.8 节）。
 5. 令牌、会话、凭据版本的机制不变（设计说明书 §3.3）。
 
 ### 4.4 平台管理员
@@ -157,7 +160,7 @@
 3. **初始化**：`BootstrapAdmin` 改为检查是否存在启用的平台管理员。没有时，用原有变量 `TCRM_BOOTSTRAP_ADMIN_USERNAME` / `TCRM_BOOTSTRAP_ADMIN_PASSWORD` 创建平台管理员，校验规则不变。
    - 如果该用户名已被其他账号占用（例如已有环境里，同名用户已迁移为默认公司的超管），启动失败，并明确提示"该用户名已被占用，请为平台管理员设置另一个 `TCRM_BOOTSTRAP_ADMIN_USERNAME`"。
    - 已存在启用的平台管理员时，不要求设置这两个变量。
-4. **平台接口**（设计说明书 §6.2），类上标注 `@SaCheckRole("PLATFORM_ADMIN")`，每个写操作加 `@AuditLog(module = "Platform", ...)`：
+4. **平台接口**（设计说明书 §6.2；字段与类型以第 4.8 节为准），类上标注 `@SaCheckRole("PLATFORM_ADMIN")`，每个写操作加 `@AuditLog(module = "Platform", ...)`：
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -188,19 +191,9 @@
 | 跨公司按 ID 访问 | 返回 404，与"不存在"相同。不得返回 403，否则会暴露 ID 存在 |
 | 跳转与点击 | 跳转服务、Redis 链接索引的 key 和 value 格式、点击事件格式**都不变**；`redirect/` 工程不改 |
 
-### 4.6 管理端（admin-ui）
+### 4.6 管理端
 
-1. `Role` 类型增加 `PLATFORM_ADMIN`；`ROLE_LABELS` 增加"平台管理员"。用户管理页面的角色下拉**不包含**平台管理员。
-2. 平台管理员登录后只看到"公司管理"菜单（以及个人账号相关入口）：
-   - 访问其他页面跳转到公司管理页；
-   - 不需要角色的路由也要检查，避免平台管理员进入后调用业务接口而报错。
-3. 公司管理页：
-   - 公司列表，以及新建、修改、启停公司；
-   - 每家公司的"超级管理员"抽屉或对话框：列表、新建、重置密码。
-4. 公司内用户登录后，页头显示公司名称。
-5. 新增错误码 `TENANT_CODE_EXISTS` 的中文映射。
-6. 界面文字本任务仍按现状写中文。**中英文切换由任务 06d 统一改造，本任务不要提前做。**
-7. 前端单元测试覆盖：平台管理员的菜单与路由守卫、公司页的主要交互。
+由并行任务《06c-多公司底座-管理端》实现，本任务不改 `admin-ui/`。新增的错误码 `TENANT_CODE_EXISTS` 只在后端登记，前端映射由管理端任务添加。
 
 ### 4.7 不在本任务范围
 
@@ -211,6 +204,82 @@
 | 中英文切换 | 任务 06d |
 | 数据库行级安全（RLS）、跨公司汇总、按公司区分品牌、删除公司 | 不做（ADR-014） |
 | 链接索引手动重建的权限 | 不变：仍由任一公司的超管触发，重建范围为全系统；重建只修复索引、不返回数据 |
+
+### 4.8 接口约定（与管理端任务共用，不得改动）
+
+响应使用统一信封；ID 为字符串，时间为 ISO 8601 UTC 字符串，`status` 为数字（规范 03）。
+
+**① 当前用户**
+
+登录返回的 `user`，以及 `GET /admin-api/auth/me` 的 `UserVO`，增加以下字段；其余字段不变。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `tenantId` | string \| null | 所属公司 ID；平台管理员为 `null` |
+| `tenantName` | string \| null | 所属公司名称；平台管理员为 `null` |
+
+`role` 的取值增加 `"PLATFORM_ADMIN"`。
+
+**② `TenantVO`**
+
+| 字段 | 类型 |
+|---|---|
+| `id` | string |
+| `tenantCode` | string |
+| `name` | string |
+| `status` | 0 \| 1 |
+| `remark` | string \| null |
+| `createTime` | string |
+
+**③ `TenantAdminVO`**
+
+| 字段 | 类型 |
+|---|---|
+| `id` | string |
+| `username` | string |
+| `nickname` | string |
+| `email` | string \| null |
+| `status` | 0 \| 1 |
+| `lastLoginTime` | string \| null |
+| `createTime` | string |
+
+**④ 平台接口**（只允许 `PLATFORM_ADMIN`）
+
+| 方法与路径 | 请求体 | 返回 `data` |
+|---|---|---|
+| `GET /admin-api/platform/tenants` | — | `TenantVO[]`，按 `createTime` 升序，不分页 |
+| `POST /admin-api/platform/tenants` | `{ tenantCode, name, remark? }` | `TenantVO` |
+| `PUT /admin-api/platform/tenants/{id}` | `{ name, remark? }` | `null` |
+| `PUT /admin-api/platform/tenants/{id}/status` | `{ status }` | `null` |
+| `GET /admin-api/platform/tenants/{id}/admins` | — | `TenantAdminVO[]`，按 `createTime` 升序 |
+| `POST /admin-api/platform/tenants/{id}/admins` | `{ username, password, nickname, email? }` | `TenantAdminVO` |
+| `PUT /admin-api/platform/tenants/{id}/admins/{userId}/password` | `{ password }` | `null` |
+
+**⑤ 校验规则**（前后端一致）
+
+| 字段 | 规则 |
+|---|---|
+| `tenantCode` | `^[a-z0-9-]{2,32}$` |
+| `name`、`nickname` | 非空白，最多 64 个字符 |
+| `remark` | 最多 500 个字符，可为 `null` |
+| `status` | 0 或 1 |
+| `username` | `^[A-Za-z0-9_.-]{3,64}$` |
+| `password` | 10～72 个可打印 ASCII 字符 |
+| `email` | 邮箱格式，最多 254 个字符，可为 `null` |
+
+这些规则沿用现有的 `CreateUserRequest` 与 `ResetPasswordRequest`。
+
+**⑥ 错误码**
+
+| HTTP | 错误码 | 含义 |
+|---|---|---|
+| 400 | `COMMON_VALIDATION_FAILED` | 参数校验失败，带字段级列表 |
+| 403 | `AUTH_FORBIDDEN` | 非平台管理员调用平台接口；平台管理员调用业务接口 |
+| 404 | `COMMON_NOT_FOUND` | 公司不存在；`userId` 不属于该公司，或不是超管 |
+| 409 | `TENANT_CODE_EXISTS` | 公司编码重复（新增） |
+| 409 | `USER_USERNAME_EXISTS` | 用户名重复 |
+
+公司内的用户管理接口（`/admin-api/system/users`）收到 `role = "PLATFORM_ADMIN"` 时，返回 `COMMON_VALIDATION_FAILED`，字段为 `role`。
 
 ## 5. 执行步骤
 
@@ -227,8 +296,7 @@
 6. **集成测试改造与隔离测试**：第 6 节。
    - 现有 IT 原来用初始化账号直接作为超管登录。现在初始化账号是平台管理员，请提取共用的测试辅助方法：用平台管理员为默认公司创建超管，再用这个超管登录；
    - 再提供"创建第二家公司及其超管"的辅助方法。
-7. **管理端**：第 4.6 节，`pnpm lint && pnpm typecheck && pnpm test && pnpm build` 通过。
-8. **文档与执行报告**：第 7 节。
+7. **文档与执行报告**：第 7 节。
 
 ## 6. 测试要求
 
@@ -275,8 +343,7 @@
    - 说明初始化变量现在创建的是平台管理员；
    - 首次部署流程：平台管理员登录 → 为默认公司创建超管；
    - 已有环境的升级注意事项：初始化用户名不能与已有用户同名。
-3. **`docs/04-开发任务/README.md`**：06c 状态改为"PR 已创建，等待审查"，并附提示词与执行报告链接。
-4. **执行报告** `docs/04-开发任务/06c-多公司底座-执行报告.md`：
+3. **执行报告** `docs/04-开发任务/06c-多公司底座-后端-执行报告.md`：
    - 每条设计决定的落实位置；
    - 系统范围的全部位置及理由（第 4.2 节 ③ 的完整清单）；
    - 手写 SQL 的核对结果（每条语句改写后的形态，或不经插件处理的理由）；
@@ -292,7 +359,7 @@
 - 降低覆盖率门槛，放宽 ArchUnit 规则，`@Disabled` 或弱化测试；
 - 整体关闭租户插件，或用"取不到公司就不过滤"的方式让测试通过；
 - 新增依赖；
-- 修改 `redirect/` 工程；
+- 修改 `redirect/`、`admin-ui/`、`kol-portal/` 工程，或任务索引 `docs/04-开发任务/README.md`；
 - 推送 `main` 或合并 PR；使用 `push --force`、`reset --hard`。
 
 **遇到以下情况停下来**：推送已完成的提交，以 `[WIP]` 标题创建 PR，在执行报告中说明后结束。
