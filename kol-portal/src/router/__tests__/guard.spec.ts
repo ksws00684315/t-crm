@@ -1,6 +1,9 @@
+import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useLocaleStore } from "@/stores/locale";
 import { installGuard, resolveAccess } from "../guard";
+import { applyDocumentTitle } from "../title";
 import { routes } from "../routes";
 
 function target(path: string, meta: Record<string, unknown> = {}) {
@@ -49,5 +52,35 @@ describe("installGuard with the real route table", () => {
 
   it("opens / when signed in", async () => {
     expect((await navigate(true, "/")).name).toBe("Home");
+  });
+});
+
+describe("document title", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+    useLocaleStore().setLocale("en-US");
+  });
+
+  async function navigate(isLoggedIn: boolean, path: string) {
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    installGuard(router, () => ({ isLoggedIn }));
+    await router.push(path);
+  }
+
+  it("translates the route title key into English", async () => {
+    await navigate(false, "/login");
+    expect(document.title).toBe("Sign in | T-CRM Creator Portal");
+  });
+
+  it("translates the route title key into Chinese", async () => {
+    useLocaleStore().setLocale("zh-CN");
+    await navigate(true, "/");
+    expect(document.title).toBe("首页 | T-CRM Creator Portal");
+  });
+
+  it("uses the app name alone when a route has no title key", () => {
+    applyDocumentTitle({});
+    expect(document.title).toBe("T-CRM Creator Portal");
   });
 });

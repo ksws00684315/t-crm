@@ -5,7 +5,7 @@ export const routes: RouteRecordRaw[] = [
     path: "/login",
     name: "Login",
     component: () => import("@/views/login/index.vue"),
-    meta: { title: "Sign in", public: true }
+    meta: { title: "route.login", public: true }
   },
   {
     path: "/",
@@ -15,7 +15,7 @@ export const routes: RouteRecordRaw[] = [
         path: "",
         name: "Home",
         component: () => import("@/views/home/index.vue"),
-        meta: { title: "Home" }
+        meta: { title: "route.home" }
       }
     ]
   },
@@ -23,6 +23,6 @@ export const routes: RouteRecordRaw[] = [
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/views/error/404.vue"),
-    meta: { title: "Page not found", public: true }
+    meta: { title: "route.notFound", public: true }
   }
 ];

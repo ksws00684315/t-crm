@@ -1,32 +1,36 @@
-/**
- * Maps backend error codes to English user-facing text. The backend `msg` is never shown.
- * Creator-specific codes are added together with the creator API in later tasks.
- */
-export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
-  COMMON_VALIDATION_FAILED:
-    "Some of the information you entered is not valid. Please check and try again.",
-  COMMON_NOT_FOUND: "The requested item does not exist.",
-  COMMON_METHOD_NOT_ALLOWED: "This action is not supported.",
-  COMMON_CONFLICT: "The data has changed. Please refresh and try again.",
-  COMMON_INTERNAL_ERROR: "Something went wrong on our side. Please try again later.",
-  AUTH_UNAUTHORIZED: "Your session has expired. Please sign in again.",
-  AUTH_FORBIDDEN: "You do not have permission to do this.",
-  AUTH_INVALID_CREDENTIALS: "Incorrect account or password.",
-  AUTH_ACCOUNT_LOCKED: "Too many failed sign-in attempts. Please try again later.",
-  AUTH_ACCOUNT_DISABLED: "This account is disabled or unavailable."
-};
+import { enUS, translate } from "@/locales";
 
-export const GENERIC_ERROR_MESSAGE = "The operation failed. Please try again later.";
-export const NETWORK_ERROR_MESSAGE = "Network error. Please check your connection and try again.";
-export const FIELD_ERROR_MESSAGE = "This field is not valid.";
+/**
+ * Error-code text for users, taken from the `errors.*` keys of the message packs in the current
+ * language; the backend `msg` is never shown (spec 02 section 7). Creator-specific codes are
+ * added together with the creator API in later tasks.
+ */
+
+// UPPER_SNAKE_CASE keys of the pack are backend error codes; lowercase ones (generic, network,
+// field) are the fallback texts and must not match a code.
+const knownErrorCodes: ReadonlySet<string> = new Set(
+  Object.keys(enUS.errors).filter(key => /^[A-Z][A-Z0-9_]*$/.test(key))
+);
 
 export function isKnownErrorCode(errorCode: string | null | undefined): boolean {
-  return !!errorCode && Object.prototype.hasOwnProperty.call(ERROR_MESSAGES, errorCode);
+  return !!errorCode && knownErrorCodes.has(errorCode);
 }
 
-/** English text for an error code; unknown or missing codes get the generic text. */
+/** Text for an error code in the current language; unknown or missing codes get the generic text. */
 export function messageForErrorCode(errorCode: string | null | undefined): string {
-  return errorCode && isKnownErrorCode(errorCode)
-    ? ERROR_MESSAGES[errorCode]
-    : GENERIC_ERROR_MESSAGE;
+  return isKnownErrorCode(errorCode)
+    ? translate(`errors.${errorCode}`)
+    : translate("errors.generic");
+}
+
+export function genericErrorMessage(): string {
+  return translate("errors.generic");
+}
+
+export function networkErrorMessage(): string {
+  return translate("errors.network");
+}
+
+export function fieldErrorMessage(): string {
+  return translate("errors.field");
 }

@@ -1,5 +1,6 @@
 import { ElMessage } from "element-plus";
 import type { Router } from "vue-router";
+import { messageForErrorCode } from "@/api/error-codes";
 import { LOGIN_PATH } from "@/router/guard";
 import { useSessionStore } from "@/stores/session";
 import { setUnauthorizedHandler } from "./http";
@@ -11,7 +12,7 @@ export function setupHttp(router: Router): void {
     const current = router.currentRoute.value;
     if (current.path === LOGIN_PATH) return;
     error.handled = true;
-    ElMessage.warning("Your session has expired. Please sign in again.");
+    ElMessage.warning(messageForErrorCode("AUTH_UNAUTHORIZED"));
     void router.replace({ path: LOGIN_PATH, query: { redirect: current.fullPath } });
   });
 }
