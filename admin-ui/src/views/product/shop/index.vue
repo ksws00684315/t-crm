@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { createShop, editShop, listShops, updateShopStatus } from "@/api/product/shop";
 import type { ShopVO } from "@/api/types";
 import { useUserStore } from "@/stores/user";
@@ -10,6 +11,7 @@ import { productAbilities } from "@/utils/permission";
 
 defineOptions({ name: "ShopListPage" });
 
+const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 
@@ -55,14 +57,14 @@ async function save() {
         shopName: form.shopName.trim(),
         remark: form.remark.trim() || null
       });
-      ElMessage.success("已保存");
+      ElMessage.success(t("shop.saved"));
     } else {
       await createShop({
         shopName: form.shopName.trim(),
         weidianShopId: form.weidianShopId.trim(),
         remark: form.remark.trim() || null
       });
-      ElMessage.success("已创建");
+      ElMessage.success(t("shop.created"));
     }
     formVisible.value = false;
     await load();
@@ -75,17 +77,21 @@ async function save() {
 
 async function toggleStatus(row: ShopVO) {
   const target = row.status === 1 ? 0 : 1;
-  const verb = target === 0 ? "停用" : "启用";
+  const disabling = target === 0;
   try {
-    await ElMessageBox.confirm(`确定要${verb}店铺「${row.shopName}」吗？`, `${verb}店铺`, {
-      type: "warning"
-    });
+    await ElMessageBox.confirm(
+      disabling
+        ? t("shop.confirmDisable", { name: row.shopName })
+        : t("shop.confirmEnable", { name: row.shopName }),
+      disabling ? t("shop.disableTitle") : t("shop.enableTitle"),
+      { type: "warning" }
+    );
   } catch {
     return;
   }
   try {
     await updateShopStatus(row.id, target);
-    ElMessage.success(`已${verb}`);
+    ElMessage.success(disabling ? t("shop.disabled") : t("shop.enabled"));
     await load();
   } catch (error) {
     notifyError(error);
@@ -98,35 +104,40 @@ onMounted(() => void load());
 <template>
   <el-card shadow="never">
     <div class="toolbar">
-      <span class="hint">全系统最多 3 个店铺；停用后不可再导入商品或对应关系。</span>
+      <span class="hint">{{ t("shop.hint") }}</span>
       <el-button
         v-if="abilities.canManageShop"
         type="primary"
         data-test="create"
         @click="openCreate"
       >
-        新增店铺
+        {{ t("shop.create") }}
       </el-button>
     </div>
 
     <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="shopName" label="店铺名称" min-width="140" />
-      <el-table-column prop="weidianShopId" label="微店店铺 ID" min-width="140" />
-      <el-table-column label="状态" width="90">
+      <el-table-column prop="shopName" :label="t('shop.name')" min-width="140" />
+      <el-table-column prop="weidianShopId" :label="t('shop.weidianId')" min-width="140" />
+      <el-table-column :label="t('common.status')" width="90">
         <template #default="{ row }">
           <el-tag :type="(row as ShopVO).status === 1 ? 'success' : 'info'">
-            {{ (row as ShopVO).status === 1 ? "启用" : "停用" }}
+            {{ (row as ShopVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="160" />
-      <el-table-column label="更新时间" width="170">
+      <el-table-column prop="remark" :label="t('common.remark')" min-width="160" />
+      <el-table-column :label="t('common.updatedAt')" width="170">
         <template #default="{ row }">{{ formatInstant((row as ShopVO).updateTime) }}</template>
       </el-table-column>
-      <el-table-column v-if="abilities.canManageShop" label="操作" width="160" fixed="right">
+      <el-table-column
+        v-if="abilities.canManageShop"
+        :label="t('common.actions')"
+        width="160"
+        fixed="right"
+      >
         <template #default="{ row }">
           <el-button link type="primary" data-test="edit" @click="openEdit(row as ShopVO)">
-            编辑
+            {{ t("common.edit") }}
           </el-button>
           <el-button
             link
@@ -134,7 +145,7 @@ onMounted(() => void load());
             data-test="status"
             @click="toggleStatus(row as ShopVO)"
           >
-            {{ (row as ShopVO).status === 1 ? "停用" : "启用" }}
+            {{ (row as ShopVO).status === 1 ? t("common.disabled") : t("common.enabled") }}
           </el-button>
         </template>
       </el-table-column>
@@ -142,29 +153,29 @@ onMounted(() => void load());
 
     <el-dialog
       v-model="formVisible"
-      :title="editing ? '编辑店铺' : '新增店铺'"
+      :title="editing ? t('shop.editTitle') : t('shop.createTitle')"
       width="480px"
       :close-on-click-modal="false"
     >
       <el-form label-width="110px" @submit.prevent>
-        <el-form-item label="店铺名称" required>
+        <el-form-item :label="t('shop.name')" required>
           <el-input v-model="form.shopName" maxlength="64" />
         </el-form-item>
-        <el-form-item label="微店店铺 ID" required>
+        <el-form-item :label="t('shop.weidianId')" required>
           <el-input
             v-model="form.weidianShopId"
             maxlength="32"
             :disabled="!!editing"
-            placeholder="数字，创建后不可修改"
+            :placeholder="t('shop.weidianPlaceholder')"
           />
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" maxlength="500" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="formVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button @click="formVisible = false">{{ t("common.cancel") }}</el-button>
+        <el-button type="primary" :loading="saving" @click="save">{{ t("common.save") }}</el-button>
       </template>
     </el-dialog>
   </el-card>

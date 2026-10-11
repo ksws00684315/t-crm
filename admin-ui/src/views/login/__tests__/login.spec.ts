@@ -1,9 +1,12 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocaleStore } from "@/stores/locale";
 import * as authApi from "@/api/auth";
+import { i18n } from "@/locales";
 import { ApiError } from "@/utils/http/error";
 import LoginPage from "../index.vue";
 
@@ -21,7 +24,7 @@ async function mountLogin(redirect?: string) {
   });
   await router.push({ path: "/login", query: redirect ? { redirect } : {} });
   await router.isReady();
-  const wrapper = mount(LoginPage, { global: { plugins: [ElementPlus, router] } });
+  const wrapper = mount(LoginPage, { global: { plugins: [ElementPlus, i18n, router] } });
   return { wrapper, router };
 }
 
@@ -104,5 +107,17 @@ describe("login page", () => {
     await fill(wrapper, "root", "wrong-password");
     expect(router.currentRoute.value.path).toBe("/login");
     expect((wrapper.findAll("input")[1].element as HTMLInputElement).value).toBe("");
+  });
+
+  it("renders the sign-in form in English", async () => {
+    const { wrapper } = await mountLogin();
+    useLocaleStore().setLocale("en-US");
+    await nextTick();
+    const text = wrapper.text();
+    expect(text).toContain("T-CRM Admin");
+    expect(text).toContain("Username");
+    expect(text).toContain("Password");
+    expect(text).toContain("Sign in");
+    expect(document.documentElement.lang).toBe("en-US");
   });
 });

@@ -24,6 +24,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.spec.ts"],
+    setupFiles: ["src/test/locale-setup.ts"],
     restoreMocks: true,
     // Load Element Plus through the same module graph as Vue so form injection works in tests.
     server: { deps: { inline: ["element-plus"] } }

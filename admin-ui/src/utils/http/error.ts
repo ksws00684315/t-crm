@@ -1,4 +1,5 @@
-import { isKnownErrorCode, messageForErrorCode, NETWORK_ERROR_MESSAGE } from "@/api/error-codes";
+import { isKnownErrorCode, messageForErrorCode, networkErrorMessage } from "@/api/error-codes";
+import { translate } from "@/locales";
 
 export const NETWORK_ERROR = "NETWORK_ERROR";
 
@@ -18,9 +19,10 @@ export class ApiError extends Error {
     traceId: string | null;
     fields?: string[];
   }) {
-    // The message is our own Chinese text, never the backend `msg`.
+    // Our own text in the language valid at throw time, never the backend `msg`; displayMessage
+    // resolves the text again so a language switch is reflected even for existing errors.
     super(
-      init.errorCode === NETWORK_ERROR ? NETWORK_ERROR_MESSAGE : messageForErrorCode(init.errorCode)
+      init.errorCode === NETWORK_ERROR ? networkErrorMessage() : messageForErrorCode(init.errorCode)
     );
     this.name = "ApiError";
     this.status = init.status;
@@ -34,9 +36,15 @@ export class ApiError extends Error {
    * can find the log line; other known codes are self-explanatory.
    */
   get displayMessage(): string {
+    const base =
+      this.errorCode === NETWORK_ERROR
+        ? networkErrorMessage()
+        : messageForErrorCode(this.errorCode);
     const needsTrace =
       this.errorCode !== NETWORK_ERROR &&
       (!isKnownErrorCode(this.errorCode) || this.errorCode === "COMMON_INTERNAL_ERROR");
-    return needsTrace && this.traceId ? `${this.message}（追踪号：${this.traceId}）` : this.message;
+    return needsTrace && this.traceId
+      ? translate("errors.withTrace", { message: base, traceId: this.traceId })
+      : base;
   }
 }

@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
 
+// The first real navigation compiles the login view, which now pulls in vue-i18n and both
+// locale packs. Import it here so that cost stays outside the 5s test timeout.
+import "@/views/login/index.vue";
+
 const signedOut: AuthState = { isLoggedIn: false, roles: [] };
 const operator: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "ALL" };
 const operatorOwn: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "OWN" };

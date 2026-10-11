@@ -2,6 +2,7 @@
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { createKol, editKol } from "@/api/kol/kol";
 import type { BdUserVO, KolVO } from "@/api/types";
 import {
@@ -20,6 +21,8 @@ defineOptions({ name: "KolFormDialog" });
 
 const MAX_SOCIAL_ACCOUNTS = 10;
 
+const { t } = useI18n();
+
 const props = defineProps<{
   modelValue: boolean;
   /** The KOL being edited; null creates a new one. */
@@ -34,6 +37,9 @@ const emit = defineEmits<{
 }>();
 
 const editing = computed(() => props.kol !== null);
+const title = computed(() =>
+  editing.value ? t("kol.editTitle", { code: props.kol?.kolCode ?? "" }) : t("kol.createTitle")
+);
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
@@ -95,7 +101,7 @@ function checkSocialAccounts(): boolean {
   for (const [index, account] of form.socialAccounts.entries()) {
     const message = validateSocialAccount(account);
     if (message) {
-      socialError.value = `第 ${index + 1} 个社媒账号：${message}`;
+      socialError.value = t("kol.socialError", { index: index + 1, message });
       return false;
     }
   }
@@ -127,7 +133,7 @@ async function submit() {
     } else {
       await createKol({ ...body, bdUserId: props.canPickBd ? form.bdUserId : null });
     }
-    ElMessage.success(props.kol ? "达人已保存" : "达人已创建");
+    ElMessage.success(props.kol ? t("kol.saved") : t("kol.created"));
     emit("saved");
     close();
   } catch (error) {
@@ -150,64 +156,95 @@ async function submit() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="editing ? `编辑达人 ${kol?.kolCode ?? ''}` : '新增达人'"
+    :title="title"
     width="720px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent>
-      <el-form-item label="姓名" prop="name" :error="serverErrors.name">
+      <el-form-item :label="t('common.name')" prop="name" :error="serverErrors.name">
         <el-input v-model="form.name" maxlength="64" />
       </el-form-item>
-      <el-form-item label="邮箱" prop="email" :error="serverErrors.email">
+      <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
         <el-input v-model="form.email" maxlength="128" />
       </el-form-item>
-      <el-form-item label="国家" prop="country" :error="serverErrors.country">
-        <el-input v-model="form.country" maxlength="2" placeholder="ISO 两位字母代码，如 US" />
+      <el-form-item :label="t('common.country')" prop="country" :error="serverErrors.country">
+        <el-input
+          v-model="form.country"
+          maxlength="2"
+          :placeholder="t('kol.countryCodePlaceholder')"
+        />
       </el-form-item>
       <el-form-item
         v-if="!editing && canPickBd"
-        label="负责商务"
+        :label="t('kol.bd')"
         prop="bdUserId"
         :error="serverErrors.bdUserId"
       >
-        <el-select v-model="form.bdUserId" clearable filterable placeholder="未分配">
+        <el-select
+          v-model="form.bdUserId"
+          clearable
+          filterable
+          :placeholder="t('common.unassigned')"
+        >
           <el-option
             v-for="bd in bdUsers"
             :key="bd.id"
-            :label="`${bd.nickname}（${bd.username}）`"
+            :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
             :value="bd.id"
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="默认佣金比例" prop="percent" :error="serverErrors.percent">
-        <el-input v-model="form.percent" placeholder="0～100，可留空" style="width: 200px">
+      <el-form-item :label="t('kol.rateLabel')" prop="percent" :error="serverErrors.percent">
+        <el-input
+          v-model="form.percent"
+          :placeholder="t('kol.ratePlaceholder')"
+          style="width: 200px"
+        >
           <template #append>%</template>
         </el-input>
       </el-form-item>
-      <el-form-item label="社媒账号" :error="socialError">
+      <el-form-item :label="t('kol.social')" :error="socialError">
         <div class="social">
           <div v-for="(account, index) in form.socialAccounts" :key="index" class="social__row">
-            <el-input v-model="account.platform" placeholder="平台" maxlength="32" />
-            <el-input v-model="account.handle" placeholder="账号" maxlength="128" />
-            <el-input v-model="account.url" placeholder="主页链接（https，可选）" maxlength="512" />
-            <el-input v-model="account.followers" placeholder="粉丝数（可选）" maxlength="15" />
-            <el-button link type="danger" @click="removeSocialAccount(index)">删除</el-button>
+            <el-input
+              v-model="account.platform"
+              :placeholder="t('kol.platformPlaceholder')"
+              maxlength="32"
+            />
+            <el-input
+              v-model="account.handle"
+              :placeholder="t('kol.handlePlaceholder')"
+              maxlength="128"
+            />
+            <el-input
+              v-model="account.url"
+              :placeholder="t('kol.urlPlaceholder')"
+              maxlength="512"
+            />
+            <el-input
+              v-model="account.followers"
+              :placeholder="t('kol.followersPlaceholder')"
+              maxlength="15"
+            />
+            <el-button link type="danger" @click="removeSocialAccount(index)">{{
+              t("common.delete")
+            }}</el-button>
           </div>
           <el-button
             :disabled="form.socialAccounts.length >= MAX_SOCIAL_ACCOUNTS"
             @click="addSocialAccount"
           >
-            添加社媒账号（最多 {{ MAX_SOCIAL_ACCOUNTS }} 个）
+            {{ t("kol.addSocial", { max: MAX_SOCIAL_ACCOUNTS }) }}
           </el-button>
         </div>
       </el-form-item>
-      <el-form-item label="备注" prop="remark" :error="serverErrors.remark">
+      <el-form-item :label="t('common.remark')" prop="remark" :error="serverErrors.remark">
         <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="close">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      <el-button @click="close">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">{{ t("common.save") }}</el-button>
     </template>
   </el-dialog>
 </template>

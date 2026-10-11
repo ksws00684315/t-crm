@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { downloadTaskErrorFile, getTask, isFinished } from "@/api/task/task";
 import type { TaskType, TaskVO } from "@/api/types";
 import type { DownloadedFile } from "@/utils/http";
@@ -10,6 +11,8 @@ import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "ImportDialog" });
 
+const { t } = useI18n();
+
 const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_FAILURES = 3;
 const IMPORT_MAX_BYTES = 20 * 1024 * 1024;
@@ -17,7 +20,7 @@ const IMPORT_MAX_BYTES = 20 * 1024 * 1024;
 const props = defineProps<{
   modelValue: boolean;
   title: string;
-  /** Shown in the first step, e.g. "单个文件不超过 20MB、20000 行". */
+  /** Shown in the first step, e.g. "One file, at most 20MB and 20,000 rows". */
   limitHint: string;
   templateFileName: string;
   taskType: TaskType;
@@ -39,27 +42,27 @@ let finishedAny = false;
 
 const running = computed(() => task.value !== null && !isFinished(task.value.status));
 const percentage = computed(() => {
-  const t = task.value;
-  if (!t || t.total <= 0) return 0;
-  return Math.min(100, Math.floor((t.done / t.total) * 100));
+  const current = task.value;
+  if (!current || current.total <= 0) return 0;
+  return Math.min(100, Math.floor((current.done / current.total) * 100));
 });
 const succeeded = computed(() => (task.value ? task.value.done - task.value.failed : 0));
 const resultText = computed(() => {
-  const t = task.value;
-  if (!t) return "";
-  switch (t.status) {
+  const current = task.value;
+  if (!current) return "";
+  switch (current.status) {
     case "WAITING":
-      return "排队中，请稍候…";
+      return t("import.waiting");
     case "RUNNING":
-      return `正在导入：已处理 ${t.done} / ${t.total} 行`;
+      return t("import.running", { done: current.done, total: current.total });
     case "SUCCESS":
-      return `导入完成：成功 ${t.total} 行`;
+      return t("import.success", { total: current.total });
     case "PARTIAL":
-      return `导入完成：成功 ${succeeded.value} 行，失败 ${t.failed} 行，请下载错误文件查看原因`;
+      return t("import.partial", { succeeded: succeeded.value, failed: current.failed });
     default:
-      return t.hasErrorFile
-        ? `导入失败：${t.failed} 行全部未导入，请下载错误文件查看原因`
-        : "导入失败：文件无法处理或任务被中断，请检查文件后重新上传";
+      return current.hasErrorFile
+        ? t("import.failedRows", { failed: current.failed })
+        : t("import.failedFile");
   }
 });
 
@@ -110,7 +113,7 @@ async function poll(id: string, failures = 0) {
     const nextFailures = failures + 1;
     if (nextFailures >= POLL_MAX_FAILURES) {
       notifyError(error);
-      ElMessage.error("进度查询连续失败，已停止刷新；任务仍在后台执行，可关闭后稍后在列表查看");
+      ElMessage.error(t("import.pollFailed"));
       return;
     }
     timer = setTimeout(() => void poll(id, nextFailures), POLL_INTERVAL_MS);
@@ -122,14 +125,14 @@ function onFileChange(event: Event) {
 }
 
 function checkFile(selected: File): string | null {
-  if (!selected.name.toLowerCase().endsWith(".xlsx")) return "请上传 .xlsx 格式的 Excel 文件";
-  if (selected.size > IMPORT_MAX_BYTES) return "文件超过 20MB，请拆分后再上传";
+  if (!selected.name.toLowerCase().endsWith(".xlsx")) return t("import.xlsxOnly");
+  if (selected.size > IMPORT_MAX_BYTES) return t("import.tooLarge");
   return null;
 }
 
 async function submitUpload() {
   if (!file.value) {
-    ElMessage.warning("请先选择文件");
+    ElMessage.warning(t("import.chooseFile"));
     return;
   }
   const problem = checkFile(file.value);
@@ -199,10 +202,12 @@ function close() {
   >
     <ol class="steps">
       <li>
-        下载模板并按列填写（{{ limitHint }}）。
-        <el-button link type="primary" @click="onDownloadTemplate">下载导入模板</el-button>
+        {{ t("import.stepTemplate", { limitHint: props.limitHint }) }}
+        <el-button link type="primary" @click="onDownloadTemplate">
+          {{ t("import.downloadTemplate") }}
+        </el-button>
       </li>
-      <li>选择填好的 .xlsx 文件并上传，导入在后台进行。</li>
+      <li>{{ t("import.stepUpload") }}</li>
     </ol>
 
     <div v-if="!task" class="picker">
@@ -235,13 +240,15 @@ function close() {
         data-test="error-file"
         @click="downloadErrors"
       >
-        下载错误文件
+        {{ t("import.downloadErrors") }}
       </el-button>
     </div>
 
     <template #footer>
-      <el-button @click="close">{{ running ? "后台继续，关闭窗口" : "关闭" }}</el-button>
-      <el-button v-if="task && !running" @click="again">继续导入</el-button>
+      <el-button @click="close">
+        {{ running ? t("import.closeRunning") : t("import.close") }}
+      </el-button>
+      <el-button v-if="task && !running" @click="again">{{ t("import.again") }}</el-button>
       <el-button
         v-if="!task"
         type="primary"
@@ -249,7 +256,7 @@ function close() {
         data-test="upload"
         @click="submitUpload"
       >
-        上传并导入
+        {{ t("import.submit") }}
       </el-button>
     </template>
   </el-dialog>

@@ -1,23 +1,39 @@
 <script setup lang="ts">
 import { ArrowDown } from "@element-plus/icons-vue";
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
+import LocaleSwitch from "@/components/LocaleSwitch.vue";
+import { translate } from "@/locales";
 import { routes } from "@/router/routes";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { buildMenu, ROLE_LABELS } from "@/utils/permission";
+import { buildMenu, roleLabel } from "@/utils/permission";
 
 defineOptions({ name: "AppLayout" });
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const user = useUserStore();
+const localeStore = useLocaleStore();
 
-const menu = computed(() => buildMenu(routes, user.roles, user.user?.dataScope));
-const roleLabel = computed(() => (user.user ? ROLE_LABELS[user.user.role] : ""));
+const menu = computed(() => {
+  void localeStore.locale;
+  return buildMenu(routes, user.roles, user.user?.dataScope);
+});
+const roleText = computed(() => (user.user ? roleLabel(user.user.role) : ""));
+const pageTitle = computed(() => {
+  void localeStore.locale;
+  return route.meta.title ? translate(route.meta.title) : "";
+});
 const tenantLabel = computed(() => {
-  if (user.user?.role === "PLATFORM_ADMIN") return "平台管理";
+  if (user.user?.role === "PLATFORM_ADMIN") return t("common.platformScope");
   return user.user?.tenantName || "";
 });
+const userLabel = computed(() =>
+  t("layout.user", { nickname: user.user?.nickname ?? "", role: roleText.value })
+);
 
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
@@ -36,7 +52,7 @@ async function onCommand(command: string) {
 <template>
   <el-container class="layout">
     <el-aside width="208px" class="layout__aside">
-      <div class="layout__brand">T-CRM 管理端</div>
+      <div class="layout__brand">{{ t("app.title") }}</div>
       <el-menu :default-active="route.path" router class="layout__menu">
         <template v-for="item in menu" :key="item.path">
           <el-sub-menu v-if="item.children?.length" :index="item.path">
@@ -57,20 +73,27 @@ async function onCommand(command: string) {
     </el-aside>
     <el-container>
       <el-header class="layout__header">
-        <span class="layout__title">{{ route.meta.title }}</span>
-        <el-dropdown trigger="click" @command="onCommand">
-          <span class="layout__user">
-            {{ user.user?.nickname }}（{{ roleLabel }}）
-            <span v-if="tenantLabel" class="layout__tenant">{{ tenantLabel }}</span>
-            <el-icon><ArrowDown /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="password">修改密码</el-dropdown-item>
-              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <span class="layout__title">{{ pageTitle }}</span>
+        <div class="layout__actions">
+          <LocaleSwitch />
+          <el-dropdown trigger="click" @command="onCommand">
+            <span class="layout__user">
+              {{ userLabel }}
+              <span v-if="tenantLabel" class="layout__tenant">{{ tenantLabel }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="password">{{
+                  t("layout.changePassword")
+                }}</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>{{
+                  t("common.signOut")
+                }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </el-header>
       <el-main class="layout__main">
         <RouterView />
@@ -107,6 +130,11 @@ async function onCommand(command: string) {
 .layout__title {
   font-size: 16px;
   font-weight: 600;
+}
+.layout__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .layout__user {
   display: inline-flex;

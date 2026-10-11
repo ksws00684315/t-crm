@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
 import * as taskApi from "@/api/task/task";
 import type { TaskVO } from "@/api/types";
+import { i18n } from "@/locales";
 import { ApiError } from "@/utils/http/error";
 import * as notify from "@/utils/notify";
 import KolImportDialog from "../KolImportDialog.vue";
@@ -39,7 +40,7 @@ const task = (patch: Partial<TaskVO>): TaskVO => ({
 async function mountDialog() {
   const wrapper = mount(KolImportDialog, {
     props: { modelValue: false },
-    global: { plugins: [ElementPlus] },
+    global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
   });
   await wrapper.setProps({ modelValue: true });

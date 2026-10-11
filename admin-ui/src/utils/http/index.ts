@@ -11,6 +11,8 @@ export interface HttpOptions {
   baseURL?: string;
   /** Supplies the current token, or null when signed out. */
   getToken: () => string | null;
+  /** Supplies the current UI language, sent as Accept-Language on every request (spec 03 section 6). */
+  getLanguage: () => string;
   /** Called on every HTTP 401, before the error is thrown. */
   onUnauthorized: (error: ApiError) => void;
   /** Test hook. */
@@ -95,6 +97,7 @@ export function createHttp(options: HttpOptions): Http {
   instance.interceptors.request.use(config => {
     const token = options.getToken();
     if (token) config.headers.set(TOKEN_HEADER, token);
+    config.headers.set("Accept-Language", options.getLanguage());
     return config;
   });
 

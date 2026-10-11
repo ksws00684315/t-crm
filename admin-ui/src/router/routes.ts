@@ -9,7 +9,7 @@ export const routes: RouteRecordRaw[] = [
     path: "/login",
     name: "Login",
     component: () => import("@/views/login/index.vue"),
-    meta: { title: "登录", public: true }
+    meta: { title: "route.login", public: true }
   },
   {
     path: "/",
@@ -21,7 +21,7 @@ export const routes: RouteRecordRaw[] = [
         name: "Home",
         component: () => import("@/views/home/index.vue"),
         meta: {
-          title: "首页",
+          title: "route.home",
           icon: "HomeFilled",
           roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
         }
@@ -30,14 +30,14 @@ export const routes: RouteRecordRaw[] = [
         path: "platform/tenants",
         name: "PlatformTenants",
         component: () => import("@/views/platform/tenant/index.vue"),
-        meta: { title: "公司管理", icon: "OfficeBuilding", roles: ["PLATFORM_ADMIN"] }
+        meta: { title: "route.tenants", icon: "OfficeBuilding", roles: ["PLATFORM_ADMIN"] }
       },
       {
         path: "kol/kols",
         name: "KolList",
         component: () => import("@/views/kol/index.vue"),
         meta: {
-          title: "达人管理",
+          title: "route.kols",
           icon: "Avatar",
           roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
         }
@@ -47,7 +47,7 @@ export const routes: RouteRecordRaw[] = [
         name: "ProductGroup",
         redirect: "/product/shops",
         meta: {
-          title: "商品",
+          title: "route.products",
           icon: "Goods",
           menuGroup: true,
           roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
@@ -58,7 +58,7 @@ export const routes: RouteRecordRaw[] = [
             name: "ShopList",
             component: () => import("@/views/product/shop/index.vue"),
             meta: {
-              title: "店铺管理",
+              title: "route.shops",
               roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
             }
           },
@@ -67,7 +67,7 @@ export const routes: RouteRecordRaw[] = [
             name: "ProductList",
             component: () => import("@/views/product/product/index.vue"),
             meta: {
-              title: "原商品",
+              title: "route.product",
               roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
             }
           },
@@ -76,7 +76,7 @@ export const routes: RouteRecordRaw[] = [
             name: "KolItemList",
             component: () => import("@/views/product/kol-item/index.vue"),
             meta: {
-              title: "对应关系",
+              title: "route.mappings",
               roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
               hideForOwn: true
             }
@@ -87,25 +87,25 @@ export const routes: RouteRecordRaw[] = [
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),
-        meta: { title: "用户管理", icon: "UserFilled", roles: ["SUPER_ADMIN"] }
+        meta: { title: "route.users", icon: "UserFilled", roles: ["SUPER_ADMIN"] }
       },
       {
         path: "system/oper-logs",
         name: "SystemOperLogs",
         component: () => import("@/views/system/oper-log/index.vue"),
-        meta: { title: "操作日志", icon: "Document", roles: ["SUPER_ADMIN"] }
+        meta: { title: "route.auditLogs", icon: "Document", roles: ["SUPER_ADMIN"] }
       },
       {
         path: "account/password",
         name: "AccountPassword",
         component: () => import("@/views/account/password.vue"),
-        meta: { title: "修改密码", hideInMenu: true }
+        meta: { title: "route.password", hideInMenu: true }
       },
       {
         path: "403",
         name: "Forbidden",
         component: () => import("@/views/error/403.vue"),
-        meta: { title: "无权访问", hideInMenu: true }
+        meta: { title: "route.forbidden", hideInMenu: true }
       }
     ]
   },
@@ -113,6 +113,6 @@ export const routes: RouteRecordRaw[] = [
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/views/error/404.vue"),
-    meta: { title: "页面不存在", public: true }
+    meta: { title: "route.notFound", public: true }
   }
 ];
