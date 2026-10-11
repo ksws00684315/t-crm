@@ -1,4 +1,5 @@
 import type { RouteLocationNormalized, RouteLocationRaw, Router } from "vue-router";
+import { applyDocumentTitle } from "./title";
 
 export const LOGIN_PATH = "/login";
 export const HOME_PATH = "/";
@@ -29,9 +30,5 @@ export function resolveAccess(
 /** Installs the guard. `getAuth` is read on every navigation so it always sees fresh state. */
 export function installGuard(router: Router, getAuth: () => AuthState): void {
   router.beforeEach(to => resolveAccess(to, getAuth()));
-  router.afterEach(to => {
-    document.title = to.meta.title
-      ? `${to.meta.title} | T-CRM Creator Portal`
-      : "T-CRM Creator Portal";
-  });
+  router.afterEach(to => applyDocumentTitle(to.meta));
 }

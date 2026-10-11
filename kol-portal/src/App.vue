@@ -1,7 +1,33 @@
 <script setup lang="ts">
+import { computed, watch } from "vue";
+import { ElConfigProvider } from "element-plus";
+import en from "element-plus/es/locale/lang/en";
+import zhCN from "element-plus/es/locale/lang/zh-cn";
+import { useRoute } from "vue-router";
+import { applyDocumentTitle } from "@/router/title";
+import { useLocaleStore } from "@/stores/locale";
+import type { LocaleId } from "@/utils/locale";
+
 defineOptions({ name: "AppRoot" });
+
+const elementLocales: Record<LocaleId, typeof en> = {
+  "en-US": en,
+  "zh-CN": zhCN
+};
+
+const localeStore = useLocaleStore();
+const elementLocale = computed(() => elementLocales[localeStore.locale]);
+
+// The router sets the title on navigation; a language switch updates it without navigating again.
+const route = useRoute();
+watch(
+  () => localeStore.locale,
+  () => applyDocumentTitle(route.meta)
+);
 </script>
 
 <template>
-  <RouterView />
+  <ElConfigProvider :locale="elementLocale">
+    <RouterView />
+  </ElConfigProvider>
 </template>

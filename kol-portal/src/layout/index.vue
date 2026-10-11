@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useSessionStore } from "@/stores/session";
 
 defineOptions({ name: "AppLayout" });
 
+const { t } = useI18n();
 const router = useRouter();
 const session = useSessionStore();
 
@@ -16,8 +19,11 @@ async function signOut() {
 <template>
   <div class="shell">
     <header class="shell__header">
-      <span class="shell__brand">T-CRM Creator Portal</span>
-      <el-button size="small" @click="signOut">Sign out</el-button>
+      <span class="shell__brand">{{ t("app.title") }}</span>
+      <div class="shell__actions">
+        <LocaleSwitch />
+        <el-button size="small" @click="signOut">{{ t("common.signOut") }}</el-button>
+      </div>
     </header>
     <main class="shell__main">
       <RouterView />
@@ -43,6 +49,11 @@ async function signOut() {
 .shell__brand {
   font-size: 16px;
   font-weight: 600;
+}
+.shell__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .shell__main {
   width: 100%;

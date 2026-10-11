@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 defineOptions({ name: "HomePage" });
+
+const { t } = useI18n();
 </script>
 
 <template>
   <el-card shadow="never">
-    <template #header>Welcome</template>
+    <template #header>{{ t("home.title") }}</template>
     <p>
-      This portal is under construction. Your sales, commission and withdrawal overview will appear
-      here.
+      {{ t("home.body") }}
     </p>
   </el-card>
 </template>

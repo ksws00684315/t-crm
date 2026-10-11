@@ -19,7 +19,12 @@ function setup(reply: Reply, token: string | null = "tok-1") {
   };
   const onUnauthorized = vi.fn();
   return {
-    http: createHttp({ getToken: () => token, onUnauthorized, adapter }),
+    http: createHttp({
+      getToken: () => token,
+      getLanguage: () => "en-US",
+      onUnauthorized,
+      adapter
+    }),
     seen,
     onUnauthorized
   };
@@ -61,6 +66,24 @@ describe("request wrapper", () => {
     const { http, seen } = setup({ status: 200, data: ok(null) }, null);
     await http.request({ url: "/me" });
     expect(seen[0].headers.has(KOL_TOKEN_HEADER)).toBe(false);
+  });
+
+  it("sends the current language as Accept-Language", async () => {
+    const seen: InternalAxiosRequestConfig[] = [];
+    const adapter: AxiosAdapter = async config => {
+      seen.push(config);
+      return { data: ok(null), status: 200, statusText: "", headers: {}, config };
+    };
+    const language = vi.fn(() => "zh-CN");
+    const http = createHttp({
+      getToken: () => null,
+      getLanguage: language,
+      onUnauthorized: () => {},
+      adapter
+    });
+    await http.request({ url: "/me" });
+    expect(seen[0].headers.get("Accept-Language")).toBe("zh-CN");
+    expect(language).toHaveBeenCalled();
   });
 
   it("shows English text for a known errorCode and never the backend msg", async () => {
