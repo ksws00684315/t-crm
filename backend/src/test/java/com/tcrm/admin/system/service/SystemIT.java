@@ -70,6 +70,11 @@ class SystemIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
+    r.add("crm.link.click-consumer.enabled", () -> "false");
+    r.add("crm.weidian.secret-key", () -> "gTy4Nsmgz3wogxbeBvSBRNJUVvAeIyUetIHWRkRCnzQ=");
+    r.add("crm.weidian.admin-base-url", () -> "https://admin.example.test");
+    r.add("crm.weidian.api-base-url", () -> "https://api.example.test/api");
+    r.add("crm.weidian.oauth-base-url", () -> "https://oauth.example.test");
   }
 
   private final MockMvc mvc;
@@ -164,6 +169,8 @@ class SystemIT {
             "crm_shop:NO",
             "crm_task:NO",
             "crm_task_file:NO",
+            "crm_weidian_app:NO",
+            "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
             "sys_user:YES");
     var without =

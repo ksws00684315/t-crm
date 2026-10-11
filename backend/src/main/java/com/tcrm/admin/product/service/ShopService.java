@@ -2,6 +2,8 @@ package com.tcrm.admin.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.ShopStatusChangedEvent;
 import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.ShopDO;
@@ -21,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Shop management (task 05 §4.1). At most 3 shops; only SUPER_ADMIN may write (controller). */
 @Service
-public class ShopService {
+public class ShopService implements ShopAccessApi {
   private final ShopMapper shops;
   private final CurrentUserContext current;
   private final ApplicationEventPublisher events;
@@ -137,6 +139,25 @@ public class ShopService {
 
   public ShopDO getById(Long id) {
     return shops.selectById(id);
+  }
+
+  @Override
+  public ShopAccessDTO findShop(Long id) {
+    ShopDO shop = shops.selectById(id);
+    return shop == null
+        ? null
+        : new ShopAccessDTO(
+            shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus());
+  }
+
+  @Override
+  public List<ShopAccessDTO> listShops() {
+    return shops.selectList(new LambdaQueryWrapper<ShopDO>().orderByAsc(ShopDO::getId)).stream()
+        .map(
+            shop ->
+                new ShopAccessDTO(
+                    shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus()))
+        .toList();
   }
 
   static ShopDTO toDto(ShopDO shop) {

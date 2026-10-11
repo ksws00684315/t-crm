@@ -69,6 +69,12 @@ crm:
     click-stream-max-len: ${TCRM_CLICK_STREAM_MAXLEN:1000000}
   cors:
     allowed-origins: ${TCRM_CORS_ALLOWED_ORIGINS:}
+  weidian:
+    secret-key: ${TCRM_SECRET_KEY:}
+    admin-base-url: ${TCRM_ADMIN_BASE_URL:}
+    api-base-url: https://api.vdian.com/api
+    oauth-base-url: https://oauth.open.weidian.com
+    qps: 5
   http:
     # Forwarding headers are honoured only when the direct peer matches trusted-proxies (CIDR list).
     trusted-proxies: ${TCRM_TRUSTED_PROXIES:}
