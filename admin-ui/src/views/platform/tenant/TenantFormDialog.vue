@@ -1,0 +1,106 @@
+<script setup lang="ts">
+import { ElMessage } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
+import { computed, reactive, ref, watch } from "vue";
+import { createTenant, updateTenant, type TenantVO } from "@/api/platform/tenant";
+import { messageForErrorCode } from "@/api/error-codes";
+import { ApiError } from "@/utils/http/error";
+import { notifyError } from "@/utils/notify";
+import {
+  rule,
+  serverFieldErrors,
+  validateRemark,
+  validateTenantCode,
+  validateTenantName
+} from "@/utils/validation";
+
+defineOptions({ name: "TenantFormDialog" });
+
+const props = defineProps<{ modelValue: boolean; tenant: TenantVO | null }>();
+const emit = defineEmits<{
+  (event: "update:modelValue", value: boolean): void;
+  (event: "saved"): void;
+}>();
+
+const editing = computed(() => props.tenant !== null);
+const formRef = ref<FormInstance>();
+const saving = ref(false);
+const serverErrors = ref<Record<string, string>>({});
+const form = reactive({ tenantCode: "", name: "", remark: "" });
+const rules = computed<FormRules>(() => ({
+  tenantCode: editing.value ? [] : [rule(validateTenantCode)],
+  name: [rule(validateTenantName)],
+  remark: [rule(value => validateRemark(value))]
+}));
+
+watch(
+  () => props.modelValue,
+  open => {
+    if (!open) return;
+    serverErrors.value = {};
+    form.tenantCode = props.tenant?.tenantCode ?? "";
+    form.name = props.tenant?.name ?? "";
+    form.remark = props.tenant?.remark ?? "";
+    formRef.value?.clearValidate();
+  }
+);
+
+function close() {
+  emit("update:modelValue", false);
+}
+
+async function submit() {
+  serverErrors.value = {};
+  if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return;
+  saving.value = true;
+  try {
+    const remark = form.remark.trim() || null;
+    if (props.tenant) {
+      await updateTenant(props.tenant.id, { name: form.name.trim(), remark });
+    } else {
+      await createTenant({ tenantCode: form.tenantCode, name: form.name.trim(), remark });
+    }
+    ElMessage.success(props.tenant ? "公司已保存" : "公司已创建");
+    emit("saved");
+    close();
+  } catch (error) {
+    serverErrors.value = serverFieldErrors(error, ["tenantCode", "name", "remark"]);
+    if (error instanceof ApiError && error.errorCode === "TENANT_CODE_EXISTS") {
+      serverErrors.value.tenantCode = messageForErrorCode(error.errorCode);
+    }
+    notifyError(error);
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <el-dialog
+    :model-value="modelValue"
+    :title="editing ? '编辑公司' : '新建公司'"
+    width="500px"
+    @update:model-value="emit('update:modelValue', $event)"
+  >
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" @submit.prevent>
+      <el-form-item label="公司编码" prop="tenantCode" :error="serverErrors.tenantCode">
+        <el-input
+          v-model="form.tenantCode"
+          :disabled="editing"
+          maxlength="32"
+          placeholder="小写字母、数字、连字符，2～32 位，创建后不可修改"
+        />
+      </el-form-item>
+      <el-form-item label="公司名称" prop="name" :error="serverErrors.name">
+        <el-input v-model="form.name" maxlength="64" />
+      </el-form-item>
+      <el-form-item label="备注" prop="remark" :error="serverErrors.remark">
+        <el-input v-model="form.remark" type="textarea" maxlength="500" show-word-limit />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="close">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+    </template>
+  </el-dialog>
+</template>

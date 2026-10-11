@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as userApi from "@/api/system/user";
 import type { UserVO } from "@/api/types";
+import { SELECTABLE_ROLES } from "@/utils/permission";
 import UserPage from "../index.vue";
 
 vi.mock("@/api/system/user");
@@ -15,6 +16,8 @@ const row: UserVO = {
   email: "alice@example.com",
   role: "OPERATOR",
   dataScope: "OWN",
+  tenantId: "1",
+  tenantName: "默认公司",
   status: 1,
   lastLoginTime: null,
   createTime: "2026-10-05T01:02:03Z"
@@ -63,5 +66,10 @@ describe("user management page", () => {
     expect(pagination.props("total")).toBe(42);
     expect(typeof pagination.props("total")).toBe("number");
     expect(wrapper.find(".el-pagination").exists()).toBe(true);
+  });
+
+  it("keeps platform administrator out of selectable company roles", () => {
+    expect(SELECTABLE_ROLES).toEqual(["SUPER_ADMIN", "OPERATOR", "FINANCE"]);
+    expect(SELECTABLE_ROLES).not.toContain("PLATFORM_ADMIN");
   });
 });

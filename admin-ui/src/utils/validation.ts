@@ -51,6 +51,25 @@ export function validateNickname(value: string): string | null {
   return null;
 }
 
+export function validateTenantCode(value: string): string | null {
+  if (!value) return "请输入公司编码";
+  if (!/^[a-z0-9-]{2,32}$/.test(value)) {
+    return "公司编码需为 2-32 位小写字母、数字或连字符";
+  }
+  return null;
+}
+
+export function validateTenantName(value: string): string | null {
+  if (blank(value)) return "请输入名称";
+  if (value.length > 64) return "名称不能超过 64 个字符";
+  return null;
+}
+
+export function validateRemark(value: string | null | undefined): string | null {
+  if (value && value.length > 500) return "备注不能超过 500 个字符";
+  return null;
+}
+
 export function validateEmail(value: string | null | undefined): string | null {
   if (!value) return null;
   if (value.length > 254) return "邮箱不能超过 254 个字符";

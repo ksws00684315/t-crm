@@ -36,6 +36,8 @@ function signIn(role: Role, dataScope: DataScope) {
     email: null,
     role,
     dataScope,
+    tenantId: "1",
+    tenantName: "默认公司",
     status: 1,
     lastLoginTime: null,
     createTime: "2026-10-01T00:00:00Z"

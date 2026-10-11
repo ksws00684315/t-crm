@@ -1,12 +1,12 @@
 import { http } from "../http";
-import type { DataScope, PageResult, Role, UserVO } from "../types";
+import type { CompanyRole, DataScope, PageResult, UserVO } from "../types";
 
 /** `UserQuery`; omitted fields mean "no filter". */
 export interface UserQuery {
   page?: number;
   size?: number;
   username?: string;
-  role?: Role;
+  role?: CompanyRole;
   status?: 0 | 1;
 }
 
@@ -16,7 +16,7 @@ export interface CreateUserRequest {
   password: string;
   nickname: string;
   email?: string | null;
-  role: Role;
+  role: CompanyRole;
   dataScope: DataScope;
 }
 
@@ -24,7 +24,7 @@ export interface CreateUserRequest {
 export interface EditUserRequest {
   nickname: string;
   email?: string | null;
-  role: Role;
+  role: CompanyRole;
   dataScope: DataScope;
 }
 

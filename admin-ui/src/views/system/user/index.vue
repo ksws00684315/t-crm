@@ -2,11 +2,11 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, reactive, ref } from "vue";
 import { listUsers, updateUserStatus } from "@/api/system/user";
-import type { Role, UserVO } from "@/api/types";
+import type { CompanyRole, UserVO } from "@/api/types";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { ROLE_LABELS, ROLES } from "@/utils/permission";
+import { ROLE_LABELS, SELECTABLE_ROLES } from "@/utils/permission";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
 
@@ -20,7 +20,7 @@ const query = reactive<{
   page: number;
   size: number;
   username: string;
-  role?: Role;
+  role?: CompanyRole;
   status?: 0 | 1;
 }>({
   page: 1,
@@ -109,7 +109,12 @@ onMounted(load);
       </el-form-item>
       <el-form-item label="角色">
         <el-select v-model="query.role" clearable placeholder="全部" style="width: 140px">
-          <el-option v-for="role in ROLES" :key="role" :label="ROLE_LABELS[role]" :value="role" />
+          <el-option
+            v-for="role in SELECTABLE_ROLES"
+            :key="role"
+            :label="ROLE_LABELS[role]"
+            :value="role"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
