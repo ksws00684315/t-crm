@@ -13,8 +13,9 @@ public interface ImportRowProcessor {
    *
    * @param cells trimmed cell texts in template column order; blank cells are empty strings, never
    *     null; the list size equals the template header count
-   * @return Chinese failure reasons for the error file; empty when the row was imported. Data
-   *     problems must be returned, not thrown; an exception counts as a failed row.
+   * @return failure reasons for the error file, as message keys plus arguments; empty when the row
+   *     was imported. Data problems must be returned, not thrown; an exception counts as a failed
+   *     row and gets the generic system-error reason.
    */
-  List<String> process(List<String> cells);
+  List<ImportReason> process(List<String> cells);
 }

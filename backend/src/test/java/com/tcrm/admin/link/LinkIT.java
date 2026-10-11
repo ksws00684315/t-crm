@@ -697,7 +697,7 @@ class LinkIT {
             "SELECT weidian_shop_id FROM crm_shop WHERE id = ?", String.class, shopId);
     byte[] workbook =
         workbook(
-            ProductImportColumn.headers(),
+            com.tcrm.admin.TestTemplates.render(ProductImportColumn.headerKeys()),
             List.of(List.of("", weidianShopId, itemId, name, "", "", "10.00", "")));
     awaitTask(submit("/admin-api/product/product-imports", workbook));
     return jdbc.queryForObject(
@@ -707,7 +707,9 @@ class LinkIT {
   private void importMapping(String shop, String item, String kol, String product)
       throws Exception {
     byte[] workbook =
-        workbook(MappingImportColumn.headers(), List.of(List.of(shop, item, kol, product)));
+        workbook(
+            com.tcrm.admin.TestTemplates.render(MappingImportColumn.headerKeys()),
+            List.of(List.of(shop, item, kol, product)));
     JsonNode task = awaitTask(submit("/admin-api/product/kol-item-imports", workbook));
     assertThat(task.path("status").asText()).isEqualTo("SUCCESS");
   }

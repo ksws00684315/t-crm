@@ -46,7 +46,7 @@ public class MappingImportService {
   }
 
   public byte[] template() {
-    return imports.template(MappingImportColumn.headers());
+    return imports.template(MappingImportColumn.headerKeys());
   }
 
   public Long submit(ImportFileDTO file) {
@@ -54,7 +54,7 @@ public class MappingImportService {
     Long actorId = user.id();
     return imports.submitImport(
         TaskType.MAPPING_IMPORT,
-        MappingImportColumn.headers(),
+        MappingImportColumn.headerKeys(),
         file,
         () ->
             new MappingImportProcessor(

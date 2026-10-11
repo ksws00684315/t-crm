@@ -18,6 +18,7 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -27,30 +28,31 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Imports KOL rows (task 04 §4.5): insert only, one transaction per row. Reasons are Chinese and in
- * column order; a value repeated in the file fails on its second and later occurrences.
+ * Imports KOL rows (task 04 §4.5): insert only, one transaction per row. Reasons are message keys
+ * (rendered per task language) in column order; a value repeated in the file fails on its second
+ * and later occurrences.
  */
 class KolImportProcessor implements ImportRowProcessor {
-  static final String CODE_FORMAT = "达人编号格式不正确，应为 KOL 加 4～8 位数字";
-  static final String CODE_DUPLICATE = "达人编号在文件中重复";
-  static final String CODE_EXISTS = "达人编号已存在";
-  static final String NAME_REQUIRED = "姓名不能为空";
-  static final String NAME_LENGTH = "姓名不能超过 64 个字符";
-  static final String EMAIL_REQUIRED = "邮箱不能为空";
-  static final String EMAIL_LENGTH = "邮箱不能超过 128 个字符";
-  static final String EMAIL_FORMAT = "邮箱格式不正确";
-  static final String EMAIL_DUPLICATE = "邮箱在文件中重复";
-  static final String EMAIL_EXISTS = "邮箱已存在";
-  static final String COUNTRY_REQUIRED = "国家不能为空";
-  static final String COUNTRY_FORMAT = "国家应为 ISO 3166-1 两位字母代码，如 US";
-  static final String BD_INVALID = "负责商务不存在或不是启用的商务账号";
-  static final String RATE_FORMAT = "默认佣金比例应为 0～100 的数字，最多 2 位小数";
-  static final String PLATFORM_LENGTH = "社媒平台不能超过 32 个字符";
-  static final String HANDLE_LENGTH = "社媒账号不能超过 128 个字符";
-  static final String SOCIAL_PAIR = "社媒平台与社媒账号须同时填写或同时为空";
-  static final String FOLLOWERS_FORMAT = "粉丝数应为非负整数";
-  static final String FOLLOWERS_WITHOUT_HANDLE = "填写粉丝数时须填写社媒账号";
-  static final String REMARK_LENGTH = "备注不能超过 500 个字符";
+  static final String CODE_FORMAT = "import.kol.error.code-format";
+  static final String CODE_DUPLICATE = "import.kol.error.code-duplicate";
+  static final String CODE_EXISTS = "import.kol.error.code-exists";
+  static final String NAME_REQUIRED = "import.kol.error.name-required";
+  static final String NAME_LENGTH = "import.kol.error.name-length";
+  static final String EMAIL_REQUIRED = "import.kol.error.email-required";
+  static final String EMAIL_LENGTH = "import.kol.error.email-length";
+  static final String EMAIL_FORMAT = "import.kol.error.email-format";
+  static final String EMAIL_DUPLICATE = "import.kol.error.email-duplicate";
+  static final String EMAIL_EXISTS = "import.kol.error.email-exists";
+  static final String COUNTRY_REQUIRED = "import.kol.error.country-required";
+  static final String COUNTRY_FORMAT = "import.kol.error.country-format";
+  static final String BD_INVALID = "import.kol.error.bd-invalid";
+  static final String RATE_FORMAT = "import.kol.error.rate-format";
+  static final String PLATFORM_LENGTH = "import.kol.error.platform-length";
+  static final String HANDLE_LENGTH = "import.kol.error.handle-length";
+  static final String SOCIAL_PAIR = "import.kol.error.social-pair";
+  static final String FOLLOWERS_FORMAT = "import.kol.error.followers-format";
+  static final String FOLLOWERS_WITHOUT_HANDLE = "import.kol.error.followers-without-handle";
+  static final String REMARK_LENGTH = "import.kol.error.remark-length";
 
   private final ImportActor actor;
   private final KolMapper kols;
@@ -67,34 +69,34 @@ class KolImportProcessor implements ImportRowProcessor {
   }
 
   @Override
-  public List<String> process(List<String> row) {
-    List<String> errors = new ArrayList<>();
+  public List<ImportReason> process(List<String> row) {
+    List<ImportReason> errors = new ArrayList<>();
     String code = code(CODE.of(row).toUpperCase(Locale.ROOT), errors);
     String name = NAME.of(row);
     if (name.isEmpty()) {
-      errors.add(NAME_REQUIRED);
+      errors.add(ImportReason.of(NAME_REQUIRED));
     } else if (KolRules.length(name) > KolRules.MAX_NAME) {
-      errors.add(NAME_LENGTH);
+      errors.add(ImportReason.of(NAME_LENGTH));
     }
     String email = email(EMAIL.of(row).toLowerCase(Locale.ROOT), errors);
     String country = COUNTRY.of(row).toUpperCase(Locale.ROOT);
     if (country.isEmpty()) {
-      errors.add(COUNTRY_REQUIRED);
+      errors.add(ImportReason.of(COUNTRY_REQUIRED));
     } else if (country.length() != 2 || !KolRules.isCountry(country)) {
-      errors.add(COUNTRY_FORMAT);
+      errors.add(ImportReason.of(COUNTRY_FORMAT));
     }
     Long bd = bd(BD_USERNAME.of(row), errors);
     BigDecimal rate = null;
     if (!DEFAULT_RATE.of(row).isEmpty()) {
       rate = KolRules.percentToRate(DEFAULT_RATE.of(row));
       if (rate == null) {
-        errors.add(RATE_FORMAT);
+        errors.add(ImportReason.of(RATE_FORMAT));
       }
     }
     List<SocialAccountDTO> social = social(row, errors);
     String remark = REMARK.of(row);
     if (KolRules.length(remark) > KolRules.MAX_REMARK) {
-      errors.add(REMARK_LENGTH);
+      errors.add(ImportReason.of(REMARK_LENGTH));
     }
     if (!errors.isEmpty()) {
       return errors;
@@ -113,46 +115,46 @@ class KolImportProcessor implements ImportRowProcessor {
     } catch (BusinessException e) {
       return List.of(
           switch (e.getErrorCode()) {
-            case KOL_EMAIL_EXISTS -> EMAIL_EXISTS;
-            case KOL_CODE_EXISTS -> CODE_EXISTS;
+            case KOL_EMAIL_EXISTS -> ImportReason.of(EMAIL_EXISTS);
+            case KOL_CODE_EXISTS -> ImportReason.of(CODE_EXISTS);
             default -> throw e;
           });
     }
     return List.of();
   }
 
-  private String code(String code, List<String> errors) {
+  private String code(String code, List<ImportReason> errors) {
     if (code.isEmpty()) {
       return null;
     }
     if (!KolRules.isCode(code)) {
-      errors.add(CODE_FORMAT);
+      errors.add(ImportReason.of(CODE_FORMAT));
     } else if (!seenCodes.add(code)) {
-      errors.add(CODE_DUPLICATE);
+      errors.add(ImportReason.of(CODE_DUPLICATE));
     } else if (TenantScope.callSystem("kol code uniqueness", () -> kols.existsCode(code))) {
-      errors.add(CODE_EXISTS);
+      errors.add(ImportReason.of(CODE_EXISTS));
     }
     return code;
   }
 
-  private String email(String email, List<String> errors) {
+  private String email(String email, List<ImportReason> errors) {
     if (email.isEmpty()) {
-      errors.add(EMAIL_REQUIRED);
+      errors.add(ImportReason.of(EMAIL_REQUIRED));
     } else if (KolRules.length(email) > KolRules.MAX_EMAIL) {
-      errors.add(EMAIL_LENGTH);
+      errors.add(ImportReason.of(EMAIL_LENGTH));
     } else if (!KolRules.isEmail(email)) {
-      errors.add(EMAIL_FORMAT);
+      errors.add(ImportReason.of(EMAIL_FORMAT));
     } else if (!seenEmails.add(email)) {
-      errors.add(EMAIL_DUPLICATE);
+      errors.add(ImportReason.of(EMAIL_DUPLICATE));
     } else if (kols.selectCount(new LambdaQueryWrapper<KolDO>().apply("lower(email) = {0}", email))
         > 0) {
-      errors.add(EMAIL_EXISTS);
+      errors.add(ImportReason.of(EMAIL_EXISTS));
     }
     return email;
   }
 
   /** A BD's own imports are always assigned to them; the column is then ignored (§4.2). */
-  private Long bd(String username, List<String> errors) {
+  private Long bd(String username, List<ImportReason> errors) {
     if (actor.own()) {
       return actor.id();
     }
@@ -161,32 +163,32 @@ class KolImportProcessor implements ImportRowProcessor {
     }
     BdUserDTO bd = bdUsers.getByUsername(username);
     if (bd == null || !bd.usable()) {
-      errors.add(BD_INVALID);
+      errors.add(ImportReason.of(BD_INVALID));
       return null;
     }
     return bd.id();
   }
 
-  private static List<SocialAccountDTO> social(List<String> row, List<String> errors) {
+  private static List<SocialAccountDTO> social(List<String> row, List<ImportReason> errors) {
     String platform = PLATFORM.of(row);
     String handle = HANDLE.of(row);
     String followersText = FOLLOWERS.of(row);
     if (KolRules.length(platform) > KolRules.MAX_PLATFORM) {
-      errors.add(PLATFORM_LENGTH);
+      errors.add(ImportReason.of(PLATFORM_LENGTH));
     }
     if (KolRules.length(handle) > KolRules.MAX_HANDLE) {
-      errors.add(HANDLE_LENGTH);
+      errors.add(ImportReason.of(HANDLE_LENGTH));
     }
     if (platform.isEmpty() != handle.isEmpty()) {
-      errors.add(SOCIAL_PAIR);
+      errors.add(ImportReason.of(SOCIAL_PAIR));
     }
     Long followers = null;
     if (!followersText.isEmpty()) {
       followers = KolRules.parseCount(followersText);
       if (followers == null) {
-        errors.add(FOLLOWERS_FORMAT);
+        errors.add(ImportReason.of(FOLLOWERS_FORMAT));
       } else if (handle.isEmpty()) {
-        errors.add(FOLLOWERS_WITHOUT_HANDLE);
+        errors.add(ImportReason.of(FOLLOWERS_WITHOUT_HANDLE));
       }
     }
     if (platform.isEmpty() || handle.isEmpty()) {

@@ -14,6 +14,7 @@ import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
+import com.tcrm.admin.task.api.ImportReason;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -108,7 +109,7 @@ class ProductImportProcessorTest {
     existing.setWeidianItemId("2001");
     when(products.selectOne(any())).thenReturn(existing);
     assertThat(processor.process(row("P000010", "100", "2001", "名", "", "", "1", "")))
-        .contains(ProductImportProcessor.CODE_IMMUTABLE);
+        .contains(ImportReason.of(ProductImportProcessor.CODE_IMMUTABLE));
   }
 
   @Test
@@ -116,7 +117,7 @@ class ProductImportProcessorTest {
     when(products.selectOne(any())).thenReturn(null);
     when(kolItems.existsCurrentShopItem(1L, "2001")).thenReturn(true);
     assertThat(processor.process(row("", "100", "2001", "鞋", "", "", "10", "")))
-        .contains(ProductImportProcessor.EXCLUSIVE);
+        .contains(ImportReason.of(ProductImportProcessor.EXCLUSIVE));
     verify(products, never()).lockShopItem(any());
   }
 
@@ -125,7 +126,7 @@ class ProductImportProcessorTest {
     when(products.selectOne(any())).thenReturn(null);
     when(kolItems.existsCurrentShopItem(1L, "2001")).thenReturn(false, true);
     assertThat(processor.process(row("", "100", "2001", "鞋", "", "", "10", "")))
-        .contains(ProductImportProcessor.EXCLUSIVE);
+        .contains(ImportReason.of(ProductImportProcessor.EXCLUSIVE));
     verify(products).lockShopItem("crm:shop-item:1:2001");
     verify(products, never()).insert(any(ProductDO.class));
   }
@@ -135,13 +136,15 @@ class ProductImportProcessorTest {
     when(products.selectOne(any())).thenReturn(null);
     assertThat(processor.process(row("", "100", "2001", "A", "", "", "1", ""))).isEmpty();
     assertThat(processor.process(row("", "100", "2001", "B", "", "", "2", "")))
-        .contains(ProductImportProcessor.ITEM_DUPLICATE);
+        .contains(ImportReason.of(ProductImportProcessor.ITEM_DUPLICATE));
   }
 
   @Test
   void shouldRequireNameAndPrice_onInsert() {
     when(products.selectOne(any())).thenReturn(null);
     assertThat(processor.process(row("", "100", "2001", "", "", "", "", "")))
-        .contains(ProductImportProcessor.NAME_REQUIRED, ProductImportProcessor.PRICE_REQUIRED);
+        .contains(
+            ImportReason.of(ProductImportProcessor.NAME_REQUIRED),
+            ImportReason.of(ProductImportProcessor.PRICE_REQUIRED));
   }
 }
