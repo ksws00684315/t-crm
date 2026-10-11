@@ -8,6 +8,7 @@ const operator: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: 
 const operatorOwn: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "OWN" };
 const superAdmin: AuthState = { isLoggedIn: true, roles: ["SUPER_ADMIN"], dataScope: "ALL" };
 const finance: AuthState = { isLoggedIn: true, roles: ["FINANCE"], dataScope: "ALL" };
+const platformAdmin: AuthState = { isLoggedIn: true, roles: ["PLATFORM_ADMIN"] };
 
 function target(path: string, meta: Record<string, unknown> = {}) {
   return { path, fullPath: path, meta };
@@ -31,6 +32,18 @@ describe("resolveAccess", () => {
 
   it("sends a signed-in user away from the login page", () => {
     expect(resolveAccess(target("/login", { public: true }), operator)).toBe("/");
+  });
+
+  it("sends a platform administrator from login and home to company management", () => {
+    expect(resolveAccess(target("/login", { public: true }), platformAdmin)).toBe(
+      "/platform/tenants"
+    );
+    expect(
+      resolveAccess(
+        target("/home", { roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] }),
+        platformAdmin
+      )
+    ).toBe("/platform/tenants");
   });
 
   it("rejects a role that is not allowed with the 403 page", () => {
@@ -103,12 +116,26 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(operator, "/product/kol-items")).name).toBe("KolItemList");
   });
 
+  it("routes platform home to company management and blocks business pages", async () => {
+    expect((await navigate(platformAdmin, "/")).name).toBe("PlatformTenants");
+    expect((await navigate(platformAdmin, "/home")).name).toBe("PlatformTenants");
+    for (const path of ["/kol/kols", "/system/users"]) {
+      expect((await navigate(platformAdmin, path)).path).toBe("/403");
+    }
+  });
+
+  it("denies company management to a company super administrator", async () => {
+    expect((await navigate(superAdmin, "/platform/tenants")).path).toBe("/403");
+  });
+
   it("restricts the system pages to SUPER_ADMIN and opens KOL management to every role", () => {
     const layout = routes.find(route => route.path === "/");
     const restricted = (layout?.children ?? [])
       .filter(route => route.meta?.roles?.length)
       .map(route => [route.path, route.meta?.roles]);
     expect(restricted).toEqual([
+      ["home", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
+      ["platform/tenants", ["PLATFORM_ADMIN"]],
       ["kol/kols", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
       ["product", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
       ["system/users", ["SUPER_ADMIN"]],

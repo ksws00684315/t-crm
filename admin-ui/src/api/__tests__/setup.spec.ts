@@ -17,6 +17,8 @@ const admin: UserVO = {
   email: null,
   role: "SUPER_ADMIN",
   dataScope: "ALL",
+  tenantId: "1",
+  tenantName: "默认公司",
   status: 1,
   lastLoginTime: null,
   createTime: "2026-10-05T00:00:00Z"

@@ -14,6 +14,10 @@ const user = useUserStore();
 
 const menu = computed(() => buildMenu(routes, user.roles, user.user?.dataScope));
 const roleLabel = computed(() => (user.user ? ROLE_LABELS[user.user.role] : ""));
+const tenantLabel = computed(() => {
+  if (user.user?.role === "PLATFORM_ADMIN") return "平台管理";
+  return user.user?.tenantName || "";
+});
 
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
@@ -57,6 +61,7 @@ async function onCommand(command: string) {
         <el-dropdown trigger="click" @command="onCommand">
           <span class="layout__user">
             {{ user.user?.nickname }}（{{ roleLabel }}）
+            <span v-if="tenantLabel" class="layout__tenant">{{ tenantLabel }}</span>
             <el-icon><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
@@ -108,6 +113,9 @@ async function onCommand(command: string) {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+.layout__tenant {
+  color: var(--el-text-color-secondary);
 }
 .layout__main {
   padding: 16px;

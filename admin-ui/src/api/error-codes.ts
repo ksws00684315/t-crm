@@ -15,6 +15,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   AUTH_ACCOUNT_DISABLED: "账号已被停用或不可用，请联系管理员",
   AUTH_OLD_PASSWORD_INCORRECT: "原密码不正确",
   USER_USERNAME_EXISTS: "用户名已存在",
+  TENANT_CODE_EXISTS: "公司编码已存在",
   USER_CANNOT_DISABLE_SELF: "不能停用自己的账号",
   USER_CANNOT_REMOVE_SELF_ROLE: "不能取消自己的超级管理员角色",
   USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于运营角色",

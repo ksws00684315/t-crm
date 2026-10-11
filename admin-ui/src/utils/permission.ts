@@ -2,12 +2,20 @@ import type { RouteRecordRaw } from "vue-router";
 import type { Role } from "@/api/types";
 
 export const ROLE_LABELS: Readonly<Record<Role, string>> = {
+  PLATFORM_ADMIN: "平台管理员",
   SUPER_ADMIN: "超级管理员",
   OPERATOR: "运营",
   FINANCE: "财务"
 };
 
-export const ROLES: readonly Role[] = ["SUPER_ADMIN", "OPERATOR", "FINANCE"];
+export const ALL_ROLES: readonly Role[] = ["PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"];
+
+/** Roles available in company user management; platform administrators are platform-level. */
+export const SELECTABLE_ROLES: readonly Exclude<Role, "PLATFORM_ADMIN">[] = [
+  "SUPER_ADMIN",
+  "OPERATOR",
+  "FINANCE"
+];
 
 /**
  * True when `required` is absent/empty (any signed-in administrator) or the user holds at least one
@@ -27,6 +35,11 @@ export function canAccessRoute(
   owned: readonly Role[],
   dataScope: "ALL" | "OWN" | null | undefined
 ): boolean {
+  if (owned.includes("PLATFORM_ADMIN")) {
+    const platformRoute = meta?.roles?.includes("PLATFORM_ADMIN") ?? false;
+    const accountOrError = !meta?.roles?.length;
+    if (!platformRoute && !accountOrError) return false;
+  }
   if (!hasAnyRole(meta?.roles, owned)) return false;
   if (meta?.hideForOwn && dataScope === "OWN") return false;
   return true;
@@ -84,7 +97,12 @@ export function buildMenu(
         }
         continue;
       }
-      if (meta?.title && !meta.public && !meta.hideInMenu && hasAnyRole(meta.roles, owned)) {
+      if (
+        meta?.title &&
+        !meta.public &&
+        !meta.hideInMenu &&
+        canAccessRoute(meta, owned, dataScope)
+      ) {
         items.push({ path, title: meta.title, icon: meta.icon as string | undefined });
       }
       if (route.children && !meta?.menuGroup) visit(route.children, path);

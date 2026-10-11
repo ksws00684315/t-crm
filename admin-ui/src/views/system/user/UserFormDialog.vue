@@ -3,9 +3,9 @@ import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { createUser, editUser } from "@/api/system/user";
-import type { DataScope, Role, UserVO } from "@/api/types";
+import type { CompanyRole, DataScope, UserVO } from "@/api/types";
 import { notifyError } from "@/utils/notify";
-import { ROLE_LABELS, ROLES } from "@/utils/permission";
+import { ROLE_LABELS, SELECTABLE_ROLES } from "@/utils/permission";
 import {
   rule,
   serverFieldErrors,
@@ -41,7 +41,7 @@ const form = reactive({
   password: "",
   nickname: "",
   email: "",
-  role: "OPERATOR" as Role,
+  role: "OPERATOR" as CompanyRole,
   dataScope: "ALL" as DataScope
 });
 
@@ -62,7 +62,7 @@ watch(
     form.password = "";
     form.nickname = current?.nickname ?? "";
     form.email = current?.email ?? "";
-    form.role = current?.role ?? "OPERATOR";
+    form.role = current?.role === "PLATFORM_ADMIN" ? "OPERATOR" : (current?.role ?? "OPERATOR");
     form.dataScope = current?.dataScope ?? "ALL";
     formRef.value?.clearValidate();
   }
@@ -142,7 +142,12 @@ async function submit() {
       </el-form-item>
       <el-form-item label="角色" prop="role" :error="serverErrors.role">
         <el-select v-model="form.role">
-          <el-option v-for="role in ROLES" :key="role" :label="ROLE_LABELS[role]" :value="role" />
+          <el-option
+            v-for="role in SELECTABLE_ROLES"
+            :key="role"
+            :label="ROLE_LABELS[role]"
+            :value="role"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="数据范围" prop="dataScope" :error="serverErrors.dataScope">

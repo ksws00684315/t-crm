@@ -24,13 +24,22 @@ export function resolveAccess(
   auth: AuthState
 ): true | RouteLocationRaw {
   if (to.meta.public) {
-    return auth.isLoggedIn && to.path === LOGIN_PATH ? HOME_PATH : true;
+    return auth.isLoggedIn && to.path === LOGIN_PATH
+      ? auth.roles.includes("PLATFORM_ADMIN")
+        ? "/platform/tenants"
+        : HOME_PATH
+      : true;
   }
   if (!auth.isLoggedIn) {
     const redirect = to.fullPath === HOME_PATH ? undefined : to.fullPath;
     return { path: LOGIN_PATH, query: redirect ? { redirect } : undefined };
   }
-  if (!canAccessRoute(to.meta, auth.roles, auth.dataScope)) return FORBIDDEN_PATH;
+  if (!canAccessRoute(to.meta, auth.roles, auth.dataScope)) {
+    if (auth.roles.includes("PLATFORM_ADMIN") && (to.path === "/" || to.path === "/home")) {
+      return "/platform/tenants";
+    }
+    return FORBIDDEN_PATH;
+  }
   return true;
 }
 

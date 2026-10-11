@@ -61,6 +61,10 @@ describe("buildMenu", () => {
     expect(titles(["OPERATOR"], "OWN")).toEqual(["首页", "达人管理", "商品", "店铺管理", "原商品"]);
   });
 
+  it("shows only company management to the platform administrator", () => {
+    expect(titles(["PLATFORM_ADMIN"])).toEqual(["公司管理"]);
+  });
+
   it("builds absolute paths and hides the login, password and error pages", () => {
     const items = buildMenu(routes, ["SUPER_ADMIN"]);
     const paths = items.flatMap(item =>
@@ -149,6 +153,14 @@ describe("canAccessRoute", () => {
 
   it("still rejects roles that are not allowed", () => {
     expect(canAccessRoute({ roles: ["SUPER_ADMIN"] }, ["OPERATOR"], "ALL")).toBe(false);
+  });
+
+  it("limits platform administrators to platform pages and roleless account/error pages", () => {
+    expect(canAccessRoute({ roles: ["PLATFORM_ADMIN"] }, ["PLATFORM_ADMIN"], null)).toBe(true);
+    expect(
+      canAccessRoute({ roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] }, ["PLATFORM_ADMIN"], null)
+    ).toBe(false);
+    expect(canAccessRoute({}, ["PLATFORM_ADMIN"], null)).toBe(true);
   });
 });
 

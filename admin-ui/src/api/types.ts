@@ -24,7 +24,9 @@ export interface FieldErrorVO {
   message: string;
 }
 
-export type Role = "SUPER_ADMIN" | "OPERATOR" | "FINANCE";
+export type Role = "PLATFORM_ADMIN" | "SUPER_ADMIN" | "OPERATOR" | "FINANCE";
+/** Roles that company administrators may assign to another company user. */
+export type CompanyRole = Exclude<Role, "PLATFORM_ADMIN">;
 export type DataScope = "ALL" | "OWN";
 
 /** `UserVO`. Ids are strings (backend Long), time stamps are ISO 8601 instants. */
@@ -35,6 +37,10 @@ export interface UserVO {
   email: string | null;
   role: Role;
   dataScope: DataScope;
+  /** Null for the platform administrator; optional at runtime for older backend responses. */
+  tenantId: string | null;
+  /** Null for the platform administrator; optional at runtime for older backend responses. */
+  tenantName: string | null;
   /** 1 = enabled, 0 = disabled. */
   status: 0 | 1;
   lastLoginTime: string | null;
