@@ -122,4 +122,13 @@ public class CurrentUserContext {
   public DataScope dataScope() {
     return user().dataScope();
   }
+
+  /**
+   * Account with this id, sharing the per-request cache used by {@link #user()}. A missing account
+   * is not cached. This does not check status or credential version. Without an HTTP request every
+   * call reads the store.
+   */
+  public AccountDTO account(Long id) {
+    return load(id);
+  }
 }
