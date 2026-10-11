@@ -83,10 +83,17 @@ public class KolItemLookupService implements KolItemApi {
     return items
         .selectList(
             new LambdaQueryWrapper<KolItemDO>()
-                .select(KolItemDO::getId, KolItemDO::getKolId, KolItemDO::getProductId)
+                .select(
+                    KolItemDO::getId,
+                    KolItemDO::getKolId,
+                    KolItemDO::getProductId,
+                    KolItemDO::getTenantId)
                 .in(KolItemDO::getId, kolItemIds))
         .stream()
-        .map(row -> new KolItemRefDTO(row.getId(), row.getKolId(), row.getProductId()))
+        .map(
+            row ->
+                new KolItemRefDTO(
+                    row.getId(), row.getKolId(), row.getProductId(), row.getTenantId()))
         .toList();
   }
 

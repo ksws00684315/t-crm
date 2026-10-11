@@ -1,5 +1,6 @@
 package com.tcrm.admin.link.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.link.model.ClickCountRow;
 import com.tcrm.admin.link.model.ClickLogDO;
 import java.time.Instant;
@@ -21,11 +22,11 @@ public interface ClickLogMapper {
       """
       <script>
       INSERT INTO crm_click_log (id, click_time, kol_id, product_id, kol_item_id, ip_hash, ua,
-        referer, country, is_bot, is_dup, create_time)
+        referer, country, is_bot, is_dup, create_time, tenant_id)
       VALUES
       <foreach collection="rows" item="r" separator=",">
         (#{r.id}, #{r.clickTime}, #{r.kolId}, #{r.productId}, #{r.kolItemId}, #{r.ipHash}, #{r.ua},
-         #{r.referer}, #{r.country}, #{r.bot}, #{r.dup}, #{r.createTime})
+         #{r.referer}, #{r.country}, #{r.bot}, #{r.dup}, #{r.createTime}, #{r.tenantId})
       </foreach>
       ON CONFLICT (id, click_time) DO NOTHING
       </script>
@@ -79,7 +80,12 @@ public interface ClickLogMapper {
       @Param("productIds") Collection<Long> productIds,
       @Param("since") Instant since);
 
-  /** Names of the partitions currently attached to crm_click_log. */
+  /**
+   * Names of the partitions currently attached to crm_click_log. Catalog tables have no tenant_id;
+   * the tenant line would add a column that does not exist, so this statement bypasses it. Callers
+   * still run in system scope.
+   */
+  @InterceptorIgnore(tenantLine = "true")
   @Select(
       """
       SELECT c.relname FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
@@ -91,19 +97,29 @@ public interface ClickLogMapper {
    * DDL cannot bind parameters: name and bounds are whitelisted by {@code ClickPartitions} (name
    * {@code crm_click_log_yyyymm}, bounds {@code yyyy-MM-01}) before this is called.
    */
+  /** Partition DDL cannot be parsed by the tenant line, even in system scope. */
+  @InterceptorIgnore(tenantLine = "true")
   @Update(
       "CREATE TABLE IF NOT EXISTS ${name} PARTITION OF crm_click_log"
           + " FOR VALUES FROM ('${from} 00:00:00+00') TO ('${to} 00:00:00+00')")
   void createPartition(
       @Param("name") String name, @Param("from") String from, @Param("to") String to);
 
-  /** Comment of a partition; {@code month} is a whitelisted {@code yyyy-MM}. */
+  /**
+   * Comment of a partition; {@code month} is a whitelisted {@code yyyy-MM}. COMMENT ON is not a
+   * tenant statement; bypass the parser so a missed system scope cannot fail the job.
+   */
+  @InterceptorIgnore(tenantLine = "true")
   @Update("COMMENT ON TABLE ${name} IS 'crm_click_log 的 ${month}（UTC）月分区'")
   void commentPartition(@Param("name") String name, @Param("month") String month);
 
+  /** DETACH is DDL. Bypass the tenant parser; see {@link #createPartition}. */
+  @InterceptorIgnore(tenantLine = "true")
   @Update("ALTER TABLE crm_click_log DETACH PARTITION ${name}")
   void detachPartition(@Param("name") String name);
 
+  /** DROP is DDL. Bypass the tenant parser; see {@link #createPartition}. */
+  @InterceptorIgnore(tenantLine = "true")
   @Update("DROP TABLE IF EXISTS ${name}")
   void dropPartition(@Param("name") String name);
 }

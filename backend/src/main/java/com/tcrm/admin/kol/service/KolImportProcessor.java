@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.task.api.ImportRowProcessor;
@@ -128,7 +129,7 @@ class KolImportProcessor implements ImportRowProcessor {
       errors.add(CODE_FORMAT);
     } else if (!seenCodes.add(code)) {
       errors.add(CODE_DUPLICATE);
-    } else if (kols.existsCode(code)) {
+    } else if (TenantScope.callSystem("kol code uniqueness", () -> kols.existsCode(code))) {
       errors.add(CODE_EXISTS);
     }
     return code;

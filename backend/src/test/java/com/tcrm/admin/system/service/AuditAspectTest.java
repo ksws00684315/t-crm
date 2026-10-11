@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.security.api.AccountDTO;
+import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.LoginSubject;
@@ -34,6 +35,7 @@ class AuditAspectTest {
   private final ProceedingJoinPoint point = mock(ProceedingJoinPoint.class);
   private final AuditLog annotation = mock(AuditLog.class);
   private final ClientIpResolver clientIps = new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For");
+  private final AccountStore accounts = mock(AccountStore.class);
   private MockHttpServletRequest request;
 
   @BeforeEach
@@ -73,12 +75,18 @@ class AuditAspectTest {
                 1,
                 null,
                 null,
-                0));
+                0,
+                9L,
+                "Acme",
+                true));
     when(point.proceed()).thenReturn("result");
-    assertThat(new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation))
+    assertThat(
+            new AuditAspect(writer, sanitizer, current, clientIps, accounts)
+                .audit(point, annotation))
         .isEqualTo("result");
     var event = event();
     assertThat(event.getUserId()).isEqualTo(7L);
+    assertThat(event.getTenantId()).isEqualTo(9L);
     assertThat(event.getResult()).isEqualTo("SUCCESS");
     assertThat(event.getRequestParams()).isEqualTo("[REDACTED]");
     assertThat(event.getCostMs()).isNotNegative();
@@ -87,12 +95,33 @@ class AuditAspectTest {
   @Test
   void shouldRecordFailedLoginSubject_whenActorIsAnonymous() throws Throwable {
     when(current.user()).thenThrow(new IllegalStateException());
+    when(accounts.getByUsername("operator"))
+        .thenReturn(
+            new AccountDTO(
+                4L,
+                "operator",
+                "test-hash",
+                "Operator",
+                null,
+                Role.OPERATOR,
+                DataScope.ALL,
+                1,
+                null,
+                null,
+                0,
+                4L,
+                "Other",
+                false));
     when(point.proceed()).thenThrow(new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS));
     assertThatThrownBy(
-            () -> new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation))
+            () ->
+                new AuditAspect(writer, sanitizer, current, clientIps, accounts)
+                    .audit(point, annotation))
         .isInstanceOf(BusinessException.class);
     var event = event();
     assertThat(event.getUsername()).isEqualTo("operator");
+    assertThat(event.getUserId()).isNull();
+    assertThat(event.getTenantId()).isEqualTo(4L);
     assertThat(event.getResult()).isEqualTo("FAILURE");
     assertThat(event.getErrorMsg()).isEqualTo(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
   }
@@ -101,7 +130,9 @@ class AuditAspectTest {
   void shouldSuppressInternalErrorDetails_whenUnexpectedOperationFails() throws Throwable {
     when(point.proceed()).thenThrow(new IllegalStateException("unit-private-details"));
     assertThatThrownBy(
-            () -> new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation))
+            () ->
+                new AuditAspect(writer, sanitizer, current, clientIps, accounts)
+                    .audit(point, annotation))
         .isInstanceOf(IllegalStateException.class);
     assertThat(event().getErrorMsg()).isEqualTo("IllegalStateException");
   }
@@ -111,7 +142,9 @@ class AuditAspectTest {
     when(point.getArgs()).thenReturn(new Object[] {"ordinary-input"});
     when(point.proceed()).thenReturn("result");
     doThrow(new IllegalStateException("unit-audit-failure")).when(writer).write(any());
-    assertThat(new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation))
+    assertThat(
+            new AuditAspect(writer, sanitizer, current, clientIps, accounts)
+                .audit(point, annotation))
         .isEqualTo("result");
   }
 
@@ -119,7 +152,7 @@ class AuditAspectTest {
   void shouldRecordResolvedClientIp_whenRequestComesThroughTrustedProxy() throws Throwable {
     request.addHeader("X-Forwarded-For", "192.0.2.77, 198.51.100.8");
     when(point.proceed()).thenReturn("result");
-    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    new AuditAspect(writer, sanitizer, current, clientIps, accounts).audit(point, annotation);
     assertThat(event().getIp()).isEqualTo("198.51.100.8");
   }
 
@@ -128,7 +161,7 @@ class AuditAspectTest {
     request.setRemoteAddr("203.0.113.2");
     request.addHeader("X-Forwarded-For", "198.51.100.8");
     when(point.proceed()).thenReturn("result");
-    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    new AuditAspect(writer, sanitizer, current, clientIps, accounts).audit(point, annotation);
     assertThat(event().getIp()).isEqualTo("203.0.113.2");
   }
 
@@ -137,7 +170,7 @@ class AuditAspectTest {
     var response = new org.springframework.mock.web.MockHttpServletResponse();
     when(point.getArgs()).thenReturn(new Object[] {"body", request, response});
     when(point.proceed()).thenReturn("result");
-    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    new AuditAspect(writer, sanitizer, current, clientIps, accounts).audit(point, annotation);
     var captured = org.mockito.ArgumentCaptor.forClass(Object.class);
     verify(sanitizer).sanitize(captured.capture());
     var arguments = (Object[]) ((java.util.Map<?, ?>) captured.getValue()).get("arguments");
@@ -151,7 +184,7 @@ class AuditAspectTest {
             "file", "kols.xlsx", "application/octet-stream", new byte[] {1, 2, 3});
     when(point.getArgs()).thenReturn(new Object[] {file, 5L});
     when(point.proceed()).thenReturn("result");
-    new AuditAspect(writer, sanitizer, current, clientIps).audit(point, annotation);
+    new AuditAspect(writer, sanitizer, current, clientIps, accounts).audit(point, annotation);
     var captured = org.mockito.ArgumentCaptor.forClass(Object.class);
     verify(sanitizer).sanitize(captured.capture());
     var arguments = (Object[]) ((java.util.Map<?, ?>) captured.getValue()).get("arguments");

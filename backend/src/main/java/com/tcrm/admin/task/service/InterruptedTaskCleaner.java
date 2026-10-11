@@ -1,6 +1,7 @@
 package com.tcrm.admin.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.mapper.TaskMapper;
 import com.tcrm.admin.task.model.TaskDO;
 import com.tcrm.admin.task.model.TaskStatus;
@@ -31,14 +32,17 @@ public class InterruptedTaskCleaner implements ApplicationRunner {
   public void run(ApplicationArguments args) {
     Instant now = Instant.now();
     int count =
-        tasks.update(
-            null,
-            new LambdaUpdateWrapper<TaskDO>()
-                .set(TaskDO::getStatus, TaskStatus.FAILED)
-                .set(TaskDO::getMessage, MESSAGE)
-                .set(TaskDO::getFinishedAt, now)
-                .set(TaskDO::getUpdateTime, now)
-                .in(TaskDO::getStatus, List.of(TaskStatus.WAITING, TaskStatus.RUNNING)));
+        TenantScope.callSystem(
+            "mark interrupted tasks failed across companies",
+            () ->
+                tasks.update(
+                    null,
+                    new LambdaUpdateWrapper<TaskDO>()
+                        .set(TaskDO::getStatus, TaskStatus.FAILED)
+                        .set(TaskDO::getMessage, MESSAGE)
+                        .set(TaskDO::getFinishedAt, now)
+                        .set(TaskDO::getUpdateTime, now)
+                        .in(TaskDO::getStatus, List.of(TaskStatus.WAITING, TaskStatus.RUNNING))));
     if (count > 0) {
       LOG.warn("Marked {} interrupted batch tasks as failed", count);
     }

@@ -18,6 +18,7 @@ public enum ErrorCode {
   USER_CANNOT_REMOVE_SELF_ROLE(422, "Cannot remove your own super administrator role"),
   USER_INVALID_DATA_SCOPE(422, "OWN data scope requires OPERATOR role"),
   USER_LAST_SUPER_ADMIN(422, "At least one enabled super administrator must remain"),
+  TENANT_CODE_EXISTS(409, "Tenant code already exists"),
   KOL_EMAIL_EXISTS(409, "KOL email already exists"),
   KOL_CODE_EXISTS(409, "KOL code already exists"),
   KOL_INVALID_BD_USER(422, "BD must be an enabled OPERATOR account with OWN data scope"),

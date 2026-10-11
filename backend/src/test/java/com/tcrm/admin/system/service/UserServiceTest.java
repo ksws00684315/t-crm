@@ -200,6 +200,16 @@ class UserServiceTest {
     assertThat(result.items()).extracting(UserDTO::username).containsExactly("operator");
   }
 
+  @Test
+  void shouldListEveryUserInTheCompany_whenUsernameIsOmitted() {
+    Page<SysUserDO> page = new Page<>(1, 20, 1);
+    page.setRecords(List.of(user()));
+    when(users.selectPage(any(Page.class), any())).thenReturn(page);
+    var result = service.page(1, 20, null, null, null);
+    assertThat(result.total()).isEqualTo(1);
+    assertThat(result.items()).extracting(UserDTO::username).containsExactly("operator");
+  }
+
   /** SET clause of the single column-whitelist update sent to the mapper. */
   @SuppressWarnings("unchecked")
   private String updatedColumns() {

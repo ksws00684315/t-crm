@@ -45,7 +45,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
       mode = SaMode.OR)
   @PostMapping("/logout")
   @AuditLog(module = "Auth", action = "Logout")
@@ -55,7 +55,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
       mode = SaMode.OR)
   @GetMapping("/me")
   public R<UserVO> me() {
@@ -63,7 +63,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
       mode = SaMode.OR)
   @PutMapping("/password")
   @AuditLog(module = "Auth", action = "Change password")

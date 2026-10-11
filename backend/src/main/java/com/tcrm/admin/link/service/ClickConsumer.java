@@ -4,6 +4,7 @@ import com.tcrm.admin.link.mapper.ClickLogMapper;
 import com.tcrm.admin.link.model.ClickLogDO;
 import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.product.api.KolItemRefDTO;
+import com.tcrm.admin.shared.TenantScope;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,6 +66,10 @@ public class ClickConsumer {
 
   /** Stores a batch and acknowledges every message in it; returns the rows sent to the database. */
   int process(List<ClickMessage> batch) {
+    return TenantScope.callSystem("consume clicks across companies", () -> processInScope(batch));
+  }
+
+  private int processInScope(List<ClickMessage> batch) {
     long started = System.nanoTime();
     List<ClickEvent> events = new ArrayList<>();
     for (ClickMessage message : batch) {
@@ -185,6 +190,7 @@ public class ClickConsumer {
     row.setBot(ClickRules.isBot(event.ua()));
     row.setDup(dup);
     row.setCreateTime(now);
+    row.setTenantId(ref.tenantId());
     return row;
   }
 }

@@ -18,6 +18,10 @@ public class ShopDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String remark;
 
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
+
   public String getShopName() {
     return shopName;
   }
@@ -48,5 +52,13 @@ public class ShopDO extends BaseEntity {
 
   public void setRemark(String value) {
     this.remark = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

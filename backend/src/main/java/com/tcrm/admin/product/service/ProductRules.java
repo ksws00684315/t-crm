@@ -37,8 +37,8 @@ public final class ProductRules {
    * <ul>
    *   <li>{@code crm:shop-item:{shopId}:{weidianItemId}} — this method; {@code
    *       ProductMapper.lockShopItem} hashes it with {@code hashtextextended}
-   *   <li>{@code crm_shop:create} — shop creation; {@code ShopMapper.lockForCreate} hashes the
-   *       literal with {@code hashtext}
+   *   <li>{@code crm_shop:create:{tenantId}} — shop creation for one company; {@code
+   *       ShopMapper.lockForCreate} hashes it with {@code hashtextextended}
    * </ul>
    */
   public static String shopItemLockKey(long shopId, String weidianItemId) {

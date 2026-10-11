@@ -6,5 +6,6 @@ package com.tcrm.admin.product.api;
  * @param kolItemId {@code crm_kol_item.id}
  * @param kolId KOL ID
  * @param productId original product ID
+ * @param tenantId company that owns the mapping; click rows copy this value
  */
-public record KolItemRefDTO(Long kolItemId, Long kolId, Long productId) {}
+public record KolItemRefDTO(Long kolItemId, Long kolId, Long productId, Long tenantId) {}

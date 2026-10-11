@@ -65,7 +65,8 @@ class ClickConsumerTest {
   @Test
   void shouldStoreRowsAndAck_inStreamOrderWithDupAndBotFlags() {
     when(items.listRefsByIds(Set.of(5L, 6L)))
-        .thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L), new KolItemRefDTO(6L, 11L, 21L)));
+        .thenReturn(
+            List.of(new KolItemRefDTO(5L, 10L, 20L, 1L), new KolItemRefDTO(6L, 11L, 21L, 1L)));
     String key5 = "click:last:5:" + HASH;
     when(stream.lastClickTimes(List.of(key5, "click:last:6:" + HASH)))
         .thenReturn(Map.of(key5, 990_000L));
@@ -104,7 +105,7 @@ class ClickConsumerTest {
 
   @Test
   void shouldMarkDup_whenRedisMissesButTheClickLogHasThePreviousClick() {
-    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L)));
+    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L, 1L)));
     String key = "click:last:5:" + HASH;
     when(stream.lastClickTimes(List.of(key))).thenReturn(Map.of());
     ClickLogDO earlier = new ClickLogDO();
@@ -142,7 +143,8 @@ class ClickConsumerTest {
   @Test
   void shouldQueryTheClickLogOnce_onlyForRedisMisses() {
     when(items.listRefsByIds(Set.of(5L, 6L)))
-        .thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L), new KolItemRefDTO(6L, 11L, 21L)));
+        .thenReturn(
+            List.of(new KolItemRefDTO(5L, 10L, 20L, 1L), new KolItemRefDTO(6L, 11L, 21L, 1L)));
     when(stream.lastClickTimes(anyList())).thenReturn(Map.of("click:last:5:" + HASH, 1_000_000L));
 
     consumer.process(
@@ -170,7 +172,7 @@ class ClickConsumerTest {
 
   @Test
   void shouldKeepLatestTime_whenEventsArriveOutOfOrder() {
-    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L)));
+    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L, 1L)));
     String key = "click:last:5:" + HASH;
     when(stream.lastClickTimes(List.of(key))).thenReturn(Map.of(key, 2_000_000L));
 
@@ -202,7 +204,7 @@ class ClickConsumerTest {
 
   @Test
   void shouldNotAck_whenInsertFails() {
-    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L)));
+    when(items.listRefsByIds(Set.of(5L))).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L, 1L)));
     when(stream.lastClickTimes(anyList())).thenReturn(Map.of());
     when(mapper.insertIgnore(anyList())).thenThrow(new IllegalStateException("db down"));
 
@@ -215,7 +217,7 @@ class ClickConsumerTest {
 
   @Test
   void shouldReadPendingFirst_thenNewEntries() {
-    when(items.listRefsByIds(any())).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L)));
+    when(items.listRefsByIds(any())).thenReturn(List.of(new KolItemRefDTO(5L, 10L, 20L, 1L)));
     when(stream.lastClickTimes(anyList())).thenReturn(Map.of());
     when(stream.readPending(500)).thenReturn(List.of(message("5-0", 5, 1, "Mozilla/5.0")));
 

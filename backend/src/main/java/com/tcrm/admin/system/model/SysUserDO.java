@@ -1,5 +1,7 @@
 package com.tcrm.admin.system.model;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tcrm.admin.security.api.DataScope;
@@ -18,6 +20,10 @@ public class SysUserDO extends BaseEntity {
   private Integer status;
   private Instant lastLoginTime;
   private Integer credentialVersion;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public String getUsername() {
     return username;
@@ -89,5 +95,13 @@ public class SysUserDO extends BaseEntity {
 
   public void setCredentialVersion(Integer value) {
     this.credentialVersion = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

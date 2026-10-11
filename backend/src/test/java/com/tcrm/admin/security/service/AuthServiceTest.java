@@ -45,7 +45,10 @@ class AuthServiceTest {
         status,
         null,
         null,
-        0);
+        0,
+        null,
+        null,
+        true);
   }
 
   @Test
@@ -72,6 +75,33 @@ class AuthServiceTest {
     // their own.
     verify(passwords).matches("test-input", "timing-hash");
     verify(passwords).matches("test-input", "test-hash");
+  }
+
+  @Test
+  void shouldRejectLogin_whenCompanyIsDisabled() {
+    when(accounts.getByUsername("operator"))
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "operator",
+                "test-hash",
+                "Operator",
+                null,
+                Role.OPERATOR,
+                DataScope.OWN,
+                1,
+                null,
+                null,
+                0,
+                2L,
+                "Stopped",
+                false));
+    when(passwords.matches("test-input", "test-hash")).thenReturn(true);
+    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+        .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
+    verify(passwords).matches("test-input", "test-hash");
+    verify(failures).fail("operator", "198.51.100.8");
+    verify(accounts, never()).updateLastLoginTime(any(), any());
   }
 
   @Test

@@ -35,7 +35,7 @@ public class CurrentUserContext {
   public AccountDTO user() {
     Long id = StpUtil.getLoginIdAsLong();
     AccountDTO user = load(id);
-    if (user == null || !Integer.valueOf(1).equals(user.status())) {
+    if (user == null || !Integer.valueOf(1).equals(user.status()) || !user.tenantEnabled()) {
       StpUtil.kickout(id);
       throw new BusinessException(ErrorCode.AUTH_ACCOUNT_DISABLED);
     }
@@ -71,7 +71,7 @@ public class CurrentUserContext {
   public List<String> roleNames(Object loginId) {
     Long id = toId(loginId);
     AccountDTO user = id == null ? null : load(id);
-    if (user == null || !Integer.valueOf(1).equals(user.status())) {
+    if (user == null || !Integer.valueOf(1).equals(user.status()) || !user.tenantEnabled()) {
       return List.of();
     }
     return List.of(user.role().name());
@@ -121,5 +121,14 @@ public class CurrentUserContext {
   /** Returns the current data scope; authentication and availability checks are enforced. */
   public DataScope dataScope() {
     return user().dataScope();
+  }
+
+  /**
+   * Account with this id, sharing the per-request cache used by {@link #user()}. A missing account
+   * is not cached. This does not check status or credential version. Without an HTTP request every
+   * call reads the store.
+   */
+  public AccountDTO account(Long id) {
+    return load(id);
   }
 }

@@ -1,6 +1,7 @@
 package com.tcrm.admin.link.service;
 
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import java.util.Objects;
 import java.util.Properties;
 import org.redisson.api.RedissonClient;
@@ -64,6 +65,10 @@ public class ClickStreamMonitor {
   }
 
   void check() {
+    TenantScope.runSystem("read click stream backlog", this::checkInScope);
+  }
+
+  private void checkInScope() {
     try {
       long backlog = backlog(streamState());
       log(

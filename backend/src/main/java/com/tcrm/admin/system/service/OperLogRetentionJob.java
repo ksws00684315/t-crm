@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.service;
 
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -51,7 +52,11 @@ public class OperLogRetentionJob {
     long total = 0;
     int deleted;
     do {
-      deleted = tx.execute(status -> logs.deleteOlderThan(cutoff, BATCH_SIZE));
+      // System scope: the inner select of oldest ids must not be limited to one company.
+      deleted =
+          TenantScope.callSystem(
+              "delete operation logs across companies",
+              () -> tx.execute(status -> logs.deleteOlderThan(cutoff, BATCH_SIZE)));
       total += deleted;
     } while (deleted >= BATCH_SIZE);
     LOG.info(

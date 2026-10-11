@@ -3,6 +3,7 @@ package com.tcrm.admin.shared;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import jakarta.validation.MessageInterpolator;
 import java.math.BigDecimal;
 import java.util.Locale;
@@ -39,9 +40,14 @@ public class CommonConfiguration {
                 configuration.getDefaultMessageInterpolator(), Locale.ENGLISH));
   }
 
+  /**
+   * The company line runs before pagination so the page is counted inside the company. System scope
+   * and the two ignored tables are decided by {@link CompanyTenantLineHandler}.
+   */
   @Bean
-  public MybatisPlusInterceptor pagination() {
+  public MybatisPlusInterceptor pagination(CompanyTenantLineHandler tenantLineHandler) {
     var interceptor = new MybatisPlusInterceptor();
+    interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(tenantLineHandler));
     interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.POSTGRE_SQL));
     return interceptor;
   }

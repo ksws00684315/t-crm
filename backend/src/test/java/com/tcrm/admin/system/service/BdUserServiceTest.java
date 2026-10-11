@@ -53,7 +53,9 @@ class BdUserServiceTest {
 
   private void actAs(Role role, DataScope scope) {
     when(current.user())
-        .thenReturn(new AccountDTO(1L, "me", null, "Me", null, role, scope, 1, null, null, 0));
+        .thenReturn(
+            new AccountDTO(
+                1L, "me", null, "Me", null, role, scope, 1, null, null, 0, null, null, true));
   }
 
   @ParameterizedTest

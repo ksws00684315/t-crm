@@ -15,7 +15,10 @@ public record AccountDTO(
     Integer status,
     Instant lastLoginTime,
     Instant createTime,
-    int credentialVersion) {
+    int credentialVersion,
+    Long tenantId,
+    String tenantName,
+    @JsonIgnore boolean tenantEnabled) {
   /**
    * Copies the immutable snapshot with the UTC successful-login time; credentials remain internal.
    */
@@ -31,6 +34,9 @@ public record AccountDTO(
         status,
         time,
         createTime,
-        credentialVersion);
+        credentialVersion,
+        tenantId,
+        tenantName,
+        tenantEnabled);
   }
 }

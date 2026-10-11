@@ -49,7 +49,7 @@ class BootstrapAdminTest {
   }
 
   @Test
-  void shouldSkipBootstrap_whenSuperAdministratorExists() {
+  void shouldSkipBootstrap_whenPlatformAdministratorExists() {
     when(users.selectCount(any())).thenReturn(1L);
     new BootstrapAdmin(users, passwords, "", "").run(null);
     verify(users, never()).insert(any(SysUserDO.class));
@@ -66,13 +66,30 @@ class BootstrapAdminTest {
   }
 
   @Test
-  void shouldCreateHashedSuperAdministrator_whenCredentialsAreValid() {
+  void shouldCreateHashedPlatformAdministrator_whenCredentialsAreValid() {
     when(users.selectCount(any())).thenReturn(0L);
     new BootstrapAdmin(users, passwords, "test-admin", "unit-test-password").run(null);
     var saved = org.mockito.ArgumentCaptor.forClass(SysUserDO.class);
     verify(users).insert(saved.capture());
-    assertThat(saved.getValue().getRole()).isEqualTo(Role.SUPER_ADMIN);
+    assertThat(saved.getValue().getRole()).isEqualTo(Role.PLATFORM_ADMIN);
+    assertThat(saved.getValue().getTenantId()).isNull();
+    assertThat(saved.getValue().getDataScope())
+        .isEqualTo(com.tcrm.admin.security.api.DataScope.ALL);
     assertThat(passwords.matches("unit-test-password", saved.getValue().getPasswordHash()))
         .isTrue();
+  }
+
+  @Test
+  void shouldFailStartup_whenBootstrapUsernameIsTaken() {
+    when(users.selectCount(any())).thenReturn(0L);
+    when(users.countByUsername("taken-admin")).thenReturn(1L);
+    assertThatThrownBy(
+            () ->
+                new BootstrapAdmin(users, passwords, "taken-admin", "unit-test-password").run(null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TCRM_BOOTSTRAP_ADMIN_USERNAME")
+        .hasMessage("该用户名已被占用，请为平台管理员设置另一个 TCRM_BOOTSTRAP_ADMIN_USERNAME")
+        .satisfies(error -> assertThat(error.getMessage()).doesNotContain("unit-test-password"));
+    verify(users, never()).insert(any(SysUserDO.class));
   }
 }

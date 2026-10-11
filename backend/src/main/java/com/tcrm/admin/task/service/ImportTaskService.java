@@ -2,6 +2,7 @@ package com.tcrm.admin.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import com.tcrm.admin.task.api.ImportTaskApi;
@@ -102,13 +103,28 @@ public class ImportTaskService implements ImportTaskApi {
     return excel.write(headers, List.of());
   }
 
-  /** Worker body; never throws, every outcome ends in a final task status. */
+  /**
+   * Worker body; never throws, every outcome ends in a final task status. The queue thread has no
+   * login, so the company is read from the task row in system scope and the rest runs in that
+   * company. A missing task or a missing company is left untouched.
+   */
   void run(Long id, List<String> headers, Supplier<ImportRowProcessor> factory, int maxRows) {
+    TaskDO task;
     try {
-      TaskDO task = tasks.selectById(id);
-      if (task == null || task.getStatus() != TaskStatus.WAITING) {
-        return;
-      }
+      task = TenantScope.callSystem("read import task company", () -> tasks.selectById(id));
+    } catch (RuntimeException e) {
+      LOG.error("Batch task {} failed unexpectedly: {}", id, e.getClass().getName());
+      return;
+    }
+    if (task == null || task.getStatus() != TaskStatus.WAITING || task.getTenantId() == null) {
+      return;
+    }
+    TenantScope.runCompany(task.getTenantId(), () -> work(id, headers, factory, maxRows));
+  }
+
+  private void work(
+      Long id, List<String> headers, Supplier<ImportRowProcessor> factory, int maxRows) {
+    try {
       TaskDO running = new TaskDO();
       running.setId(id);
       running.setStatus(TaskStatus.RUNNING);

@@ -1,6 +1,7 @@
 package com.tcrm.admin.task.model;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -21,6 +22,10 @@ public class TaskFileDO {
 
   @TableField(fill = FieldFill.INSERT)
   private Instant createTime;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public Long getId() {
     return id;
@@ -84,5 +89,13 @@ public class TaskFileDO {
 
   public void setCreateTime(Instant value) {
     this.createTime = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

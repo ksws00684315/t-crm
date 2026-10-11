@@ -10,6 +10,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.time.Instant;
@@ -37,12 +38,10 @@ public class UserService {
 
   public PageResult<UserDTO> page(
       long page, long size, String username, Role role, Integer status) {
+    String keyword = username == null ? "" : username.strip();
     var query =
         new LambdaQueryWrapper<SysUserDO>()
-            .apply(
-                username != null && !username.isBlank(),
-                "username ILIKE {0}",
-                "%" + escapeLike(username) + "%")
+            .apply(!keyword.isEmpty(), "username ILIKE {0}", "%" + escapeLike(keyword) + "%")
             .eq(role != null, SysUserDO::getRole, role)
             .eq(status != null, SysUserDO::getStatus, status)
             .orderByDesc(SysUserDO::getCreateTime, SysUserDO::getId);
@@ -56,6 +55,10 @@ public class UserService {
 
   public UserDTO create(CreateUserCommand r) {
     validateScope(r.role(), r.dataScope());
+    if (TenantScope.callSystem(
+        "username uniqueness", () -> users.countByUsername(r.username()) > 0)) {
+      throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
+    }
     SysUserDO user = new SysUserDO();
     user.setUsername(r.username());
     user.setPasswordHash(passwords.encode(r.password()));
@@ -148,6 +151,9 @@ public class UserService {
   }
 
   private void validateScope(Role role, DataScope scope) {
+    if (role == Role.PLATFORM_ADMIN) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     if (scope == DataScope.OWN && role != Role.OPERATOR) {
       throw new BusinessException(ErrorCode.USER_INVALID_DATA_SCOPE);
     }

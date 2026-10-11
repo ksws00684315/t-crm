@@ -37,6 +37,10 @@ public class ProductDO extends BaseEntity {
 
   private Integer status;
 
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
+
   public String getProductCode() {
     return productCode;
   }
@@ -107,5 +111,13 @@ public class ProductDO extends BaseEntity {
 
   public void setStatus(Integer value) {
     this.status = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }
