@@ -111,6 +111,7 @@ class ImportTaskServiceTest {
     TaskDO waiting = new TaskDO();
     waiting.setId(TASK_ID);
     waiting.setStatus(TaskStatus.WAITING);
+    waiting.setTenantId(1L);
     when(tasks.selectById(TASK_ID)).thenReturn(waiting);
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);

@@ -10,9 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.idev.excel.FastExcel;
+import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.service.KolImportColumn;
 import com.tcrm.admin.kol.service.KolWriter;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -148,9 +150,9 @@ class KolIT {
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "INSERT INTO crm_kol (id, kol_code, name, email, country, create_by,"
+                    "INSERT INTO crm_kol (id, kol_code, name, email, country, tenant_id, create_by,"
                         + " create_time, update_by, update_time)"
-                        + " VALUES (1, 'KOL12', 'x', 'x@x.io', 'US', 1, now(), 1, now())"))
+                        + " VALUES (1, 'KOL12', 'x', 'x@x.io', 'US', 1, 1, now(), 1, now())"))
         .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
         .hasMessageContaining("ck_crm_kol_code");
   }
@@ -159,13 +161,17 @@ class KolIT {
   void shouldIssueUniqueCodesAndSkipTakenOnes_whenCreatingConcurrently() throws Exception {
     long next = jdbc.queryForObject("SELECT last_value + 1 FROM crm_kol_code_seq", Long.class);
     // An imported code occupying an upcoming sequence number must be skipped, not reused.
-    writer.insert(kol("taken@x.io"), String.format("KOL%04d", next + 2), 1L);
+    TenantScope.runCompany(
+        1L, () -> writer.insert(kol("taken@x.io"), String.format("KOL%04d", next + 2), 1L));
     ExecutorService pool = Executors.newFixedThreadPool(8);
     try {
       List<Callable<String>> jobs = new ArrayList<>();
       for (int i = 0; i < 40; i++) {
         String email = "c" + i + "@conc.io";
-        jobs.add(() -> writer.insert(kol(email), null, 1L).getKolCode());
+        jobs.add(
+            () ->
+                TenantScope.callCompany(
+                    1L, () -> writer.insert(kol(email), null, 1L).getKolCode()));
       }
       Set<String> codes = new HashSet<>();
       for (Future<String> f : pool.invokeAll(jobs)) {
@@ -182,7 +188,7 @@ class KolIT {
 
   @Test
   void shouldKeepOneCurrentPeriod_whenBdChangesRepeatedly() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String bd1 = createBd(admin, "bd-one");
     String bd2 = createBd(admin, "bd-two");
     String kolId =
@@ -232,9 +238,9 @@ class KolIT {
     assertThatThrownBy(
             () ->
                 jdbc.update(
-                    "INSERT INTO crm_kol_bd_history (id, kol_id, bd_user_id, start_time, create_by,"
-                        + " create_time, update_by, update_time)"
-                        + " VALUES (99, ?, NULL, ?, 1, now(), 1, now())",
+                    "INSERT INTO crm_kol_bd_history (id, kol_id, bd_user_id, start_time, tenant_id,"
+                        + " create_by, create_time, update_by, update_time)"
+                        + " VALUES (99, ?, NULL, ?, 1, 1, now(), 1, now())",
                     Long.valueOf(kolId),
                     Timestamp.from(Instant.now())))
         .isInstanceOf(DuplicateKeyException.class)
@@ -256,7 +262,7 @@ class KolIT {
 
   @Test
   void shouldRejectBdEdit_whenKolIsTransferredToAnotherBdMeanwhile() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String bd1 = createBd(admin, "bd-one");
     String bd2 = createBd(admin, "bd-two");
     String kolId =
@@ -337,9 +343,9 @@ class KolIT {
 
   @Test
   void shouldImportPartiallyAndServeErrorFile_whenWorkbookHasBadRows() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     createBd(admin, "bd-import");
-    writer.insert(kol("existing@x.io"), "KOL0900", 1L);
+    TenantScope.runCompany(1L, () -> writer.insert(kol("existing@x.io"), "KOL0900", 1L));
     List<List<String>> rows =
         List.of(
             row("", "Dave", "Dave@X.io", "de", "BD-IMPORT", "12.5", "YouTube", "@dave", "1,200"),
@@ -468,6 +474,10 @@ class KolIT {
                 .getContentAsString())
         .at("/data/id")
         .asText();
+  }
+
+  private String companyAdmin() throws Exception {
+    return CompanySessions.companyAdmin(mvc, json, PASSWORD);
   }
 
   private String login(String username, String password) throws Exception {

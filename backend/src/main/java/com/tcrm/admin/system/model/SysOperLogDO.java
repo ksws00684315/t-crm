@@ -1,5 +1,7 @@
 package com.tcrm.admin.system.model;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.Instant;
@@ -19,6 +21,10 @@ public class SysOperLogDO {
   private String ip;
   private Long costMs;
   private Instant operTime;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public Long getId() {
     return id;
@@ -122,5 +128,13 @@ public class SysOperLogDO {
 
   public void setOperTime(Instant value) {
     this.operTime = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

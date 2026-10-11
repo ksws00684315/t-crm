@@ -13,5 +13,5 @@ public record CreateUserRequest(
     @NotBlank @Size(min = 10, max = 72) @Pattern(regexp = "[\\x20-\\x7E]+") String password,
     @NotBlank @Size(max = 64) String nickname,
     @Email @Size(max = 254) String email,
-    @NotNull Role role,
+    @NotNull @CompanyRole Role role,
     @NotNull DataScope dataScope) {}

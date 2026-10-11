@@ -9,6 +9,8 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.MissingTenantException;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
 import java.time.Instant;
 import java.util.List;
@@ -44,13 +46,21 @@ public class ShopService {
    */
   @Transactional(rollbackFor = Exception.class)
   public ShopDTO create(CreateShopCommand c) {
-    shops.lockForCreate();
+    Long tenantId = current.user().tenantId();
+    if (tenantId == null) {
+      throw new MissingTenantException("shop creation requires a company");
+    }
+    shops.lockForCreate(tenantId);
     if (shops.countAlive() >= ProductRules.MAX_SHOPS) {
       throw new BusinessException(ErrorCode.SHOP_LIMIT_REACHED);
     }
     String weidianId = c.weidianShopId().strip();
     if (!ProductRules.isWeidianId(weidianId)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    if (TenantScope.callSystem(
+        "weidian shop id uniqueness", () -> shops.countByWeidianId(weidianId) > 0)) {
+      throw new BusinessException(ErrorCode.SHOP_WEIDIAN_ID_EXISTS);
     }
     AccountDTO user = current.user();
     ShopDO shop = new ShopDO();

@@ -1,5 +1,7 @@
 package com.tcrm.admin.task.model;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.tcrm.admin.shared.BaseEntity;
 import com.tcrm.admin.task.api.TaskType;
@@ -15,6 +17,10 @@ public class TaskDO extends BaseEntity {
   private String message;
   private Instant startedAt;
   private Instant finishedAt;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public TaskType getTaskType() {
     return taskType;
@@ -78,5 +84,13 @@ public class TaskDO extends BaseEntity {
 
   public void setFinishedAt(Instant value) {
     this.finishedAt = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

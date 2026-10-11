@@ -1,5 +1,7 @@
 package com.tcrm.admin.kol.model;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.tcrm.admin.shared.BaseEntity;
 import java.time.Instant;
@@ -11,6 +13,10 @@ public class KolBdHistoryDO extends BaseEntity {
   private Long bdUserId;
   private Instant startTime;
   private Instant endTime;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public Long getKolId() {
     return kolId;
@@ -42,5 +48,13 @@ public class KolBdHistoryDO extends BaseEntity {
 
   public void setEndTime(Instant value) {
     this.endTime = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

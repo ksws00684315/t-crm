@@ -49,8 +49,8 @@ class TaskControllerTest {
   }
 
   @ParameterizedTest
-  @EnumSource(Role.class)
-  void shouldReturnProgress_whenAnyAdministratorRoleCalls(Role role) throws Exception {
+  @EnumSource(value = Role.class, mode = EnumSource.Mode.EXCLUDE, names = "PLATFORM_ADMIN")
+  void shouldReturnProgress_whenAnyCompanyRoleCalls(Role role) throws Exception {
     String token = AdminMvcSupport.actAs(current, 1L, role, DataScope.ALL);
     when(tasks.get(5L)).thenReturn(task());
 
@@ -62,6 +62,14 @@ class TaskControllerTest {
         .andExpect(jsonPath("$.data.failed").value(1))
         .andExpect(jsonPath("$.data.hasErrorFile").value(true))
         .andExpect(jsonPath("$.data.finishedAt").value("2026-10-05T00:00:02Z"));
+  }
+
+  @Test
+  void shouldReturn403_whenCallerIsPlatformAdmin() throws Exception {
+    String token = AdminMvcSupport.actAs(current, 1L, Role.PLATFORM_ADMIN, DataScope.ALL);
+    mvc.perform(get("/admin-api/task/tasks/5").header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(tasks);
   }
 
   @Test

@@ -10,5 +10,5 @@ import jakarta.validation.constraints.Size;
 public record EditUserRequest(
     @NotBlank @Size(max = 64) String nickname,
     @Email @Size(max = 254) String email,
-    @NotNull Role role,
+    @NotNull @CompanyRole Role role,
     @NotNull DataScope dataScope) {}

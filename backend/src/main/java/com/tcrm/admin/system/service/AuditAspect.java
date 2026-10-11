@@ -1,5 +1,6 @@
 package com.tcrm.admin.system.service;
 
+import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.LoginSubject;
 import com.tcrm.admin.shared.AuditLog;
@@ -31,16 +32,19 @@ public class AuditAspect {
   private final AuditSanitizer sanitizer;
   private final CurrentUserContext current;
   private final ClientIpResolver clientIps;
+  private final AccountStore accounts;
 
   public AuditAspect(
       AuditWriter writer,
       AuditSanitizer sanitizer,
       CurrentUserContext current,
-      ClientIpResolver clientIps) {
+      ClientIpResolver clientIps,
+      AccountStore accounts) {
     this.writer = writer;
     this.sanitizer = sanitizer;
     this.current = current;
     this.clientIps = clientIps;
+    this.accounts = accounts;
   }
 
   @Around("@annotation(annotation)")
@@ -78,6 +82,7 @@ public class AuditAspect {
       throw e;
     } finally {
       event.setCostMs((System.nanoTime() - start) / 1_000_000);
+      attributeCompany(event);
       try {
         writer.write(event);
       } catch (RuntimeException e) {
@@ -105,9 +110,25 @@ public class AuditAspect {
       var actor = current.user();
       event.setUserId(actor.id());
       event.setUsername(actor.username());
+      // Null for a platform administrator. Do not replace that with a lookup.
+      event.setTenantId(actor.tenantId());
     } catch (RuntimeException e) {
       // Anonymous login keeps its submitted username; logout retains its previously captured actor.
       return;
+    }
+  }
+
+  /**
+   * A failed login has no user id. The company is the one that owns the submitted username, even
+   * when the password is wrong or the company is disabled. Unknown names stay unscoped.
+   */
+  private void attributeCompany(SysOperLogDO event) {
+    if (event.getUserId() != null || event.getUsername() == null) {
+      return;
+    }
+    var account = accounts.getByUsername(event.getUsername());
+    if (account != null) {
+      event.setTenantId(account.tenantId());
     }
   }
 }

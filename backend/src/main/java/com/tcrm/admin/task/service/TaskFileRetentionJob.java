@@ -2,6 +2,7 @@ package com.tcrm.admin.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.mapper.TaskFileMapper;
 import com.tcrm.admin.task.model.TaskFileDO;
 import java.time.Instant;
@@ -43,7 +44,11 @@ public class TaskFileRetentionJob {
   void cleanup() {
     Instant cutoff = Instant.now().minus(RETENTION_DAYS, ChronoUnit.DAYS);
     int deleted =
-        files.delete(new LambdaQueryWrapper<TaskFileDO>().lt(TaskFileDO::getCreateTime, cutoff));
+        TenantScope.callSystem(
+            "delete task files across companies",
+            () ->
+                files.delete(
+                    new LambdaQueryWrapper<TaskFileDO>().lt(TaskFileDO::getCreateTime, cutoff)));
     if (deleted > 0) {
       LOG.info(
           "Deleted {} task files older than {} days (before {})", deleted, RETENTION_DAYS, cutoff);

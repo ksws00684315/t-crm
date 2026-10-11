@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.idev.excel.FastExcel;
+import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.link.mapper.ClickLogMapper;
 import com.tcrm.admin.link.model.ClickLogDO;
@@ -23,6 +24,7 @@ import com.tcrm.admin.link.service.LinkIndexStore;
 import com.tcrm.admin.link.service.LinkIndexSyncJob;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
@@ -172,20 +174,7 @@ class LinkIT {
     keys.addAll(redis.keys("click:last:*"));
     keys.add("stream:click");
     redis.delete(keys);
-    MvcResult result =
-        mvc.perform(
-                post("/admin-api/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        json.writeValueAsString(
-                            Map.of("username", "bootstrap", "password", PASSWORD))))
-            .andExpect(status().isOk())
-            .andReturn();
-    adminToken =
-        json.readTree(result.getResponse().getContentAsString())
-            .path("data")
-            .path("token")
-            .asText();
+    adminToken = CompanySessions.companyAdmin(mvc, json, PASSWORD);
   }
 
   @Test
@@ -263,7 +252,7 @@ class LinkIT {
     redis.opsForHash().put("link:" + kolCode, "P999999", "stale");
     redis.opsForHash().put("link:KOL99999", "P1", "orphan");
 
-    index.rebuildAll();
+    TenantScope.runSystem("test rebuild of every company", index::rebuildAll);
 
     assertThat(field(kolCode, p1)).isEqualTo(good1);
     assertThat(field(kolCode, p2)).isEqualTo(good2);
@@ -308,7 +297,7 @@ class LinkIT {
         new Thread(
             () -> {
               try {
-                index.rebuildAll();
+                TenantScope.runSystem("test rebuild of every company", index::rebuildAll);
               } catch (Throwable error) {
                 rebuildError.set(error);
               }
@@ -597,6 +586,7 @@ class LinkIT {
       row.setBot(false);
       row.setDup(false);
       row.setCreateTime(Instant.now());
+      row.setTenantId(1L);
       rows.add(row);
     }
     assertThat(clickLogs.insertIgnore(rows)).isZero();

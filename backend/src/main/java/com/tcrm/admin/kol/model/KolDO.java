@@ -34,6 +34,10 @@ public class KolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String remark;
 
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
+
   public String getKolCode() {
     return kolCode;
   }
@@ -104,5 +108,13 @@ public class KolDO extends BaseEntity {
 
   public void setRemark(String value) {
     this.remark = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

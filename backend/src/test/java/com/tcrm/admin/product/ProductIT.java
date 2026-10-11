@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.idev.excel.FastExcel;
+import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.task.api.ImportTaskApi;
@@ -15,7 +16,6 @@ import java.io.ByteArrayOutputStream;
 import java.sql.Connection;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -104,20 +104,7 @@ class ProductIT {
     jdbc.update("DELETE FROM crm_task_file");
     jdbc.update("DELETE FROM crm_task");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
-    MvcResult result =
-        mvc.perform(
-                post("/admin-api/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        json.writeValueAsString(
-                            Map.of("username", "bootstrap", "password", PASSWORD))))
-            .andExpect(status().isOk())
-            .andReturn();
-    adminToken =
-        json.readTree(result.getResponse().getContentAsString())
-            .path("data")
-            .path("token")
-            .asText();
+    adminToken = CompanySessions.companyAdmin(mvc, json, PASSWORD);
   }
 
   @Test

@@ -123,7 +123,8 @@ class KolItemLookupServiceTest {
     item.setKolId(10L);
     item.setProductId(20L);
     when(items.selectList(any())).thenReturn(List.of(item));
-    assertThat(service.listRefsByIds(List.of(5L))).containsExactly(new KolItemRefDTO(5L, 10L, 20L));
+    assertThat(service.listRefsByIds(List.of(5L)))
+        .containsExactly(new KolItemRefDTO(5L, 10L, 20L, null));
     KolItemMapper unused = mock(KolItemMapper.class);
     assertThat(new KolItemLookupService(unused, products).listRefsByIds(List.of())).isEmpty();
     assertThat(new KolItemLookupService(unused, products).listRefsByIds(null)).isEmpty();

@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -120,7 +122,76 @@ class SystemIT {
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN'", Integer.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE role='PLATFORM_ADMIN' AND tenant_id IS NULL"
+                    + " AND status=1",
+                Integer.class))
         .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_tenant WHERE id=1 AND tenant_code='default' AND status=1",
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void shouldRequireTenantIdOnBusinessTables_whenMigrationsRun() {
+    var columns =
+        jdbc.queryForList(
+            """
+            SELECT c.table_name, c.is_nullable
+            FROM information_schema.columns c
+            JOIN information_schema.tables t
+              ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+            WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
+              AND t.table_type = 'BASE TABLE'
+              AND NOT EXISTS (
+                SELECT 1 FROM pg_inherits i
+                JOIN pg_class child ON child.oid = i.inhrelid
+                WHERE child.relname = c.table_name)
+            ORDER BY c.table_name
+            """);
+    assertThat(columns)
+        .extracting(row -> row.get("table_name") + ":" + row.get("is_nullable"))
+        .containsExactlyInAnyOrder(
+            "crm_click_log:NO",
+            "crm_kol:NO",
+            "crm_kol_bd_history:NO",
+            "crm_kol_item:NO",
+            "crm_product:NO",
+            "crm_shop:NO",
+            "crm_task:NO",
+            "crm_task_file:NO",
+            "sys_oper_log:YES",
+            "sys_user:YES");
+    var without =
+        jdbc.queryForList(
+            """
+            SELECT t.table_name
+            FROM information_schema.tables t
+            WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+              AND NOT EXISTS (
+                SELECT 1 FROM information_schema.columns c
+                WHERE c.table_schema = t.table_schema AND c.table_name = t.table_name
+                  AND c.column_name = 'tenant_id')
+              AND NOT EXISTS (
+                SELECT 1 FROM pg_inherits i
+                JOIN pg_class child ON child.oid = i.inhrelid
+                WHERE child.relname = t.table_name)
+            ORDER BY t.table_name
+            """,
+            String.class);
+    assertThat(without)
+        .contains("sys_tenant", "crm_link_index_outbox", "flyway_schema_history")
+        .doesNotContain("crm_kol", "crm_click_log", "sys_user");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sys_user_tenant'",
+                String.class))
+        .contains("PLATFORM_ADMIN")
+        .contains("tenant_id");
   }
 
   @Test
@@ -154,7 +225,7 @@ class SystemIT {
   }
 
   @Test
-  void shouldFailBootstrap_whenOnlyDisabledSuperAdministratorExists() {
+  void shouldFailBootstrap_whenOnlyDisabledPlatformAdministratorExists() {
     jdbc.update("UPDATE sys_user SET status=0 WHERE username='bootstrap'");
     try {
       assertThatThrownBy(
@@ -172,7 +243,9 @@ class SystemIT {
     String token = login("BOOTSTRAP", PASSWORD);
     mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.role").value("SUPER_ADMIN"))
+        .andExpect(jsonPath("$.data.role").value("PLATFORM_ADMIN"))
+        .andExpect(jsonPath("$.data.tenantId").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.tenantName").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.passwordHash").doesNotExist());
   }
 
@@ -192,7 +265,7 @@ class SystemIT {
 
   @Test
   void shouldRejectProtectedLists_whenRoleIsOperatorOrFinance() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     for (var role : java.util.List.of(Role.OPERATOR, Role.FINANCE)) {
       String username = randomName();
       create(admin, username, role);
@@ -207,7 +280,7 @@ class SystemIT {
 
   @Test
   void shouldInvalidateTokens_whenAccountIsDisabled() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String token = login(username, PASSWORD);
@@ -224,7 +297,7 @@ class SystemIT {
 
   @Test
   void shouldInvalidateAllTokens_whenAdministratorResetsPassword() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String token = login(username, PASSWORD);
@@ -241,7 +314,7 @@ class SystemIT {
 
   @Test
   void shouldReturnConflict_whenUsernameDiffersOnlyInCase() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     mvc.perform(
             post("/admin-api/system/users")
                 .header("X-Admin-Token", admin)
@@ -253,30 +326,31 @@ class SystemIT {
 
   @Test
   void shouldPreserveInstant_whenOrmRoundTripsUtcTimestamp() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     Long id = Long.valueOf(create(admin, username, Role.OPERATOR));
     Instant instant = Instant.parse("2026-10-04T04:30:12.123Z");
-    var user = users.selectById(id);
+    var user = TenantScope.callCompany(1L, () -> users.selectById(id));
     user.setLastLoginTime(instant);
-    users.updateById(user);
-    assertThat(users.selectById(id).getLastLoginTime()).isEqualTo(instant);
+    TenantScope.runCompany(1L, () -> users.updateById(user));
+    assertThat(TenantScope.callCompany(1L, () -> users.selectById(id)).getLastLoginTime())
+        .isEqualTo(instant);
     assertThat(jdbc.queryForObject("SHOW TIME ZONE", String.class)).isEqualTo("UTC");
   }
 
   @Test
   void shouldHideLogicalDeletion_whenDeletingThroughMapper() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     Long id = Long.valueOf(create(admin, randomName(), Role.OPERATOR));
-    assertThat(users.deleteById(id)).isEqualTo(1);
-    assertThat(users.selectById(id)).isNull();
+    assertThat(TenantScope.callCompany(1L, () -> users.deleteById(id))).isEqualTo(1);
+    assertThat(TenantScope.callCompany(1L, () -> users.selectById(id))).isNull();
     assertThat(jdbc.queryForObject("SELECT is_deleted FROM sys_user WHERE id=?", Boolean.class, id))
         .isTrue();
   }
 
   @Test
   void shouldFindUppercaseSearchAndPagingMetadata_whenListingUsers() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     mvc.perform(
@@ -294,7 +368,7 @@ class SystemIT {
 
   @Test
   void shouldRedactPasswordInAudit_whenCreatingUser() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     create(admin, username, Role.OPERATOR);
     org.awaitility.Awaitility.await()
@@ -378,7 +452,7 @@ class SystemIT {
 
   @Test
   void shouldRejectTokenIssuedDuringConcurrentPasswordReset() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String[] issued = new String[1];
@@ -398,7 +472,7 @@ class SystemIT {
 
   @Test
   void shouldRejectOldToken_whenCredentialVersionChangedWithoutLogout() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String token = login(username, PASSWORD);
@@ -417,29 +491,26 @@ class SystemIT {
 
   @Test
   void shouldKeepOneSuperAdmin_whenTwoSuperAdminsDemoteEachOtherConcurrently() throws Exception {
-    String bootstrap = login("bootstrap", PASSWORD);
+    String first = companyAdmin();
     String otherName = randomName();
-    String other = create(bootstrap, otherName, Role.SUPER_ADMIN);
+    String other = create(first, otherName, Role.SUPER_ADMIN);
     String otherToken = login(otherName, PASSWORD);
-    Long bootstrapId =
-        jdbc.queryForObject("SELECT id FROM sys_user WHERE username='bootstrap'", Long.class);
+    Long firstId =
+        jdbc.queryForObject("SELECT id FROM sys_user WHERE username='company-admin'", Long.class);
     Map<String, String> demote =
         Map.of("nickname", "Demoted", "role", "FINANCE", "dataScope", "ALL");
-    try {
-      int[] codes = new int[2];
-      runAfterQueuedOnRowLocks(
-          List.of(bootstrapId, Long.valueOf(other)),
-          () -> codes[0] = putStatus(bootstrap, "/admin-api/system/users/" + other, demote),
-          () -> codes[1] = putStatus(otherToken, "/admin-api/system/users/" + bootstrapId, demote));
-      assertThat(
-              jdbc.queryForObject(
-                  "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN' AND status=1",
-                  Integer.class))
-          .isEqualTo(1);
-      assertThat(codes).containsExactlyInAnyOrder(200, 422);
-    } finally {
-      jdbc.update("UPDATE sys_user SET role='SUPER_ADMIN', status=1 WHERE username='bootstrap'");
-    }
+    int[] codes = new int[2];
+    runAfterQueuedOnRowLocks(
+        List.of(firstId, Long.valueOf(other)),
+        () -> codes[0] = putStatus(first, "/admin-api/system/users/" + other, demote),
+        () -> codes[1] = putStatus(otherToken, "/admin-api/system/users/" + firstId, demote));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN' AND status=1"
+                    + " AND tenant_id = 1",
+                Integer.class))
+        .isEqualTo(1);
+    assertThat(codes).containsExactlyInAnyOrder(200, 422);
   }
 
   @Test
@@ -456,7 +527,7 @@ class SystemIT {
 
   @Test
   void shouldTreatWildcardsLiterally_whenSearchingUsernames() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     create(admin, randomName(), Role.OPERATOR);
     for (String keyword : new String[] {"%", "_", "o_", "\\"}) {
       mvc.perform(
@@ -470,7 +541,7 @@ class SystemIT {
 
   @Test
   void shouldKeepConcurrentDisable_whenAnotherAdministratorEditsTheSameUser() throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     // The disable commits first; the edit has already read the row (status 1) and must not write
@@ -493,7 +564,7 @@ class SystemIT {
   @Test
   void shouldKeepConcurrentPasswordReset_whenAnotherAdministratorEditsTheSameUser()
       throws Exception {
-    String admin = login("bootstrap", PASSWORD);
+    String admin = companyAdmin();
     String username = randomName();
     String id = create(admin, username, Role.OPERATOR);
     String newPassword = UUID.randomUUID().toString();
@@ -578,6 +649,10 @@ class SystemIT {
 
   private Map<String, String> editBody() {
     return Map.of("nickname", "Edited", "role", "OPERATOR", "dataScope", "OWN");
+  }
+
+  private String companyAdmin() throws Exception {
+    return CompanySessions.companyAdmin(mvc, json, PASSWORD);
   }
 
   private String login(String username, String password) throws Exception {

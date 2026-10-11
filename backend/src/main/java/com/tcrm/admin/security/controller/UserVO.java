@@ -14,7 +14,9 @@ public record UserVO(
     DataScope dataScope,
     Integer status,
     Instant lastLoginTime,
-    Instant createTime) {
+    Instant createTime,
+    Long tenantId,
+    String tenantName) {
   public static UserVO from(AccountDTO u) {
     return new UserVO(
         u.id(),
@@ -25,6 +27,8 @@ public record UserVO(
         u.dataScope(),
         u.status(),
         u.lastLoginTime(),
-        u.createTime());
+        u.createTime(),
+        u.tenantId(),
+        u.tenantName());
   }
 }

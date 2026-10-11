@@ -4,6 +4,7 @@ import com.tcrm.admin.link.mapper.LinkIndexOutboxMapper;
 import com.tcrm.admin.link.model.LinkIndexOutboxDO;
 import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -87,6 +88,10 @@ public class LinkIndexSyncJob {
    * be the only caller (tests).
    */
   public void drain() {
+    TenantScope.runSystem("sync link index outbox across companies", this::drainInScope);
+  }
+
+  private void drainInScope() {
     while (!Thread.currentThread().isInterrupted()) {
       List<LinkIndexOutboxDO> due = outbox.listDue(clock.instant(), BATCH);
       if (due.isEmpty()) {

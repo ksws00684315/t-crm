@@ -39,7 +39,10 @@ public class AuthService {
     AccountDTO user = users.getByUsername(username);
     boolean passwordMatches =
         passwords.matches(password, user == null ? timingHash : user.passwordHash());
-    if (user == null || !Integer.valueOf(1).equals(user.status()) || !passwordMatches) {
+    if (user == null
+        || !Integer.valueOf(1).equals(user.status())
+        || !user.tenantEnabled()
+        || !passwordMatches) {
       failures.fail(username, clientIp);
       throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
     }

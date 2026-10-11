@@ -3,6 +3,7 @@ package com.tcrm.admin.link.service;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.DistributedLocks;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TenantScope;
 import jakarta.annotation.PreDestroy;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -78,7 +79,11 @@ public class LinkRebuildService {
   private void runLocked() {
     try {
       // Non-positive lease: the watchdog keeps the lock for as long as the rebuild runs.
-      if (!locks.run(LOCK, 0, -1, index::rebuildAll)) {
+      if (!locks.run(
+          LOCK,
+          0,
+          -1,
+          () -> TenantScope.runSystem("rebuild link index for every company", index::rebuildAll))) {
         LOG.info("Link index rebuild skipped: another instance holds the lock");
       }
     } catch (InterruptedException e) {

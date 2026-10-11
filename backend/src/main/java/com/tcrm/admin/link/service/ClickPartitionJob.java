@@ -2,6 +2,7 @@ package com.tcrm.admin.link.service;
 
 import com.tcrm.admin.link.mapper.ClickLogMapper;
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -47,6 +48,10 @@ public class ClickPartitionJob {
 
   /** Creates and drops partitions for the given UTC date. */
   public void maintain(LocalDate todayUtc) {
+    TenantScope.runSystem("maintain click log partitions", () -> maintainInScope(todayUtc));
+  }
+
+  private void maintainInScope(LocalDate todayUtc) {
     Set<String> existing = new HashSet<>(clickLogs.listPartitions());
     for (YearMonth month : ClickPartitions.required(todayUtc)) {
       String name = ClickPartitions.name(month);

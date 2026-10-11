@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.service;
 
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.shared.TenantScope;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,7 +24,7 @@ public class KolCodeGenerator {
   public String next() {
     for (int i = 0; i <= MAX_SKIPS; i++) {
       String code = KolRules.formatCode(kols.nextCodeNumber());
-      if (!kols.existsCode(code)) {
+      if (!TenantScope.callSystem("kol code uniqueness", () -> kols.existsCode(code))) {
         return code;
       }
     }

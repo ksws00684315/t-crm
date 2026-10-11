@@ -1,6 +1,7 @@
 package com.tcrm.admin.product.model;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -31,6 +32,10 @@ public class KolItemDO {
 
   @TableField(fill = FieldFill.INSERT_UPDATE)
   private Instant updateTime;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public Long getId() {
     return id;
@@ -118,5 +123,13 @@ public class KolItemDO {
 
   public void setUpdateTime(Instant value) {
     this.updateTime = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

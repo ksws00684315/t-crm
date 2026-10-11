@@ -3,6 +3,7 @@ package com.tcrm.admin.link.service;
 import com.tcrm.admin.link.mapper.LinkIndexOutboxMapper;
 import com.tcrm.admin.link.model.LinkIndexOutboxDO;
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.TenantScope;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,6 +55,10 @@ public class LinkIndexOutboxMonitor {
   }
 
   void check() {
+    TenantScope.runSystem("read link index outbox lag", this::checkInScope);
+  }
+
+  private void checkInScope() {
     Instant oldest = outbox.oldestCreateTime();
     if (oldest != null) {
       logWait(Duration.between(oldest, clock.instant()));

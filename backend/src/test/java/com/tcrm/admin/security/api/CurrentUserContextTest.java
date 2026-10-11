@@ -34,7 +34,10 @@ class CurrentUserContextTest {
             1,
             null,
             null,
-            0);
+            0,
+            null,
+            null,
+            true);
     when(accounts.getById(7L)).thenReturn(user);
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
@@ -64,7 +67,10 @@ class CurrentUserContextTest {
                 0,
                 null,
                 null,
-                0));
+                0,
+                null,
+                null,
+                true));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       var current = new CurrentUserContext(accounts);
@@ -79,7 +85,20 @@ class CurrentUserContextTest {
 
   private static AccountDTO account(long id, Role role, int status) {
     return new AccountDTO(
-        id, "user" + id, "test-hash", "User", null, role, DataScope.ALL, status, null, null, 0);
+        id,
+        "user" + id,
+        "test-hash",
+        "User",
+        null,
+        role,
+        DataScope.ALL,
+        status,
+        null,
+        null,
+        0,
+        null,
+        null,
+        true);
   }
 
   @AfterEach
@@ -168,7 +187,10 @@ class CurrentUserContextTest {
                 1,
                 null,
                 null,
-                3));
+                3,
+                null,
+                null,
+                true));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("old-token");
@@ -178,6 +200,38 @@ class CurrentUserContextTest {
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_UNAUTHORIZED.message());
       stp.verify(() -> StpUtil.logoutByTokenValue("old-token"));
+    }
+  }
+
+  @Test
+  void shouldKickOut_whenCompanyIsDisabled() {
+    var accounts = mock(AccountStore.class);
+    when(accounts.getById(7L))
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "operator",
+                "test-hash",
+                "Operator",
+                null,
+                Role.OPERATOR,
+                DataScope.OWN,
+                1,
+                null,
+                null,
+                0,
+                2L,
+                "Stopped",
+                false));
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      var current = new CurrentUserContext(accounts);
+      assertThatThrownBy(current::user)
+          .isInstanceOf(BusinessException.class)
+          .hasMessage(ErrorCode.AUTH_ACCOUNT_DISABLED.message());
+      stp.verify(() -> StpUtil.kickout(7L));
+      assertThat(current.roleNames(7L)).isEmpty();
+      assertThat(current.roleNames("not-a-number")).isEmpty();
     }
   }
 

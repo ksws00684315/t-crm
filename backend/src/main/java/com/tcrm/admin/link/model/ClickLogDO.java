@@ -1,5 +1,7 @@
 package com.tcrm.admin.link.model;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import java.time.Instant;
 
 /** One row of the append-only, monthly partitioned {@code crm_click_log} (task 06 §4.5). */
@@ -16,6 +18,10 @@ public class ClickLogDO {
   private Boolean bot;
   private Boolean dup;
   private Instant createTime;
+
+  /** Owning company. Updates never write this column. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Long tenantId;
 
   public Long getId() {
     return id;
@@ -111,5 +117,13 @@ public class ClickLogDO {
 
   public void setCreateTime(Instant value) {
     this.createTime = value;
+  }
+
+  public Long getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(Long value) {
+    this.tenantId = value;
   }
 }

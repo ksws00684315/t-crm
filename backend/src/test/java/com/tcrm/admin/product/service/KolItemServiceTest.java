@@ -63,7 +63,10 @@ class KolItemServiceTest {
                 1,
                 null,
                 null,
-                0));
+                0,
+                null,
+                null,
+                true));
   }
 
   @Test

@@ -1,5 +1,6 @@
 package com.tcrm.admin.system.service;
 
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
 import com.tcrm.admin.system.model.SysOperLogDO;
 import org.slf4j.Logger;
@@ -19,7 +20,8 @@ public class AuditWriter {
   @Async
   public void write(SysOperLogDO event) {
     try {
-      logs.insert(event);
+      // The async thread has no login. tenant_id was chosen on the request thread.
+      TenantScope.runSystem("persist audit log", () -> logs.insert(event));
     } catch (RuntimeException e) {
       LOG.error("Audit persistence failed", e);
     }
