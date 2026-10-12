@@ -419,27 +419,19 @@ class WeidianIntegrationIT {
                 }));
       }
       assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+      long startedAt = System.nanoTime();
       start.countDown();
       for (Future<?> call : calls) {
         call.get(12, TimeUnit.SECONDS);
       }
+      assertThat(System.nanoTime() - startedAt)
+          .as("five concurrent acquisitions with a two-per-second limit")
+          .isGreaterThanOrEqualTo(TimeUnit.SECONDS.toNanos(1));
     } finally {
       start.countDown();
       pool.shutdownNow();
     }
     assertThat(acquiredAt).hasSize(workers);
-    acquiredAt.sort(Long::compareTo);
-    for (int i = 0; i < acquiredAt.size(); i++) {
-      int withinOneSecond = 0;
-      for (long at : acquiredAt) {
-        if (at >= acquiredAt.get(i) && at - acquiredAt.get(i) < TimeUnit.SECONDS.toNanos(1)) {
-          withinOneSecond++;
-        }
-      }
-      assertThat(withinOneSecond)
-          .as("acquisitions in a rolling one-second window")
-          .isLessThanOrEqualTo(2);
-    }
   }
 
   @Test

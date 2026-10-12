@@ -30,7 +30,7 @@ public class WeidianRateLimiter {
 
   public void acquire(String appKey) {
     RRateLimiter limiter = redis.getRateLimiter("weidian:api:qps:" + digest(appKey));
-    limiter.setRate(RateType.OVERALL, qps, 1, RateIntervalUnit.SECONDS);
+    limiter.trySetRate(RateType.OVERALL, qps, 1, RateIntervalUnit.SECONDS);
     if (!limiter.tryAcquire(1, 10, TimeUnit.SECONDS)) {
       throw new BusinessException(ErrorCode.WEIDIAN_RATE_LIMITED);
     }
