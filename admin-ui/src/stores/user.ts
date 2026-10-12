@@ -43,6 +43,28 @@ export const useUserStore = defineStore("user", () => {
     });
   }
 
+  /**
+   * Unlock / re-auth that must not leave the previous Sa-Token session hanging: login first (public),
+   * then best-effort logout of the still-current token, then apply the new session.
+   */
+  async function loginReplacingToken(
+    username: string,
+    password: string,
+    captcha?: authApi.CaptchaAnswer
+  ) {
+    const result = await authApi.login({ username, password, ...captcha });
+    try {
+      if (token.value) await authApi.logout();
+    } catch {
+      // the old token may already be gone; the new one still proceeds
+    }
+    setSession({
+      token: result.token,
+      expiresAt: Date.now() + result.expiresIn * 1000,
+      user: result.user
+    });
+  }
+
   /** Best effort server-side logout; local state is cleared either way. */
   async function logout() {
     try {
@@ -61,5 +83,15 @@ export const useUserStore = defineStore("user", () => {
     setSession({ token: token.value, expiresAt: expiresAt.value, user: fresh });
   }
 
-  return { user, token, isLoggedIn, roles, login, logout, clearSession, refreshProfile };
+  return {
+    user,
+    token,
+    isLoggedIn,
+    roles,
+    login,
+    loginReplacingToken,
+    logout,
+    clearSession,
+    refreshProfile
+  };
 });

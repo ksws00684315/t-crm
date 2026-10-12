@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Lock } from "@element-plus/icons-vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
-import { reactive, ref, watch } from "vue";
+import { nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { messageForErrorCode } from "@/api/error-codes";
@@ -40,6 +40,8 @@ const rules: FormRules = {
   ]
 };
 
+const passwordRef = ref<{ focus?: () => void; input?: HTMLInputElement } | null>(null);
+
 watch(
   () => lock.locked,
   locked => {
@@ -47,7 +49,13 @@ watch(
     form.password = "";
     errorText.value = "";
     captchaError.value = "";
-  }
+    void nextTick(() => {
+      // Element Plus wraps the native input; prefer the exposed focus helper.
+      passwordRef.value?.focus?.();
+      passwordRef.value?.input?.focus?.();
+    });
+  },
+  { immediate: true }
 );
 
 async function signOut(): Promise<void> {
@@ -64,7 +72,7 @@ async function submit(): Promise<void> {
   errorText.value = "";
   captchaError.value = "";
   try {
-    await user.login(user.user.username, form.password, captchaRef.value?.answer());
+    await user.loginReplacingToken(user.user.username, form.password, captchaRef.value?.answer());
   } catch (error) {
     void captchaRef.value?.refresh();
     if (error instanceof ApiError && error.errorCode === "AUTH_ACCOUNT_LOCKED") {
@@ -114,11 +122,13 @@ async function submit(): Promise<void> {
         <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
           <el-form-item :label="t('common.password')" prop="password" :error="errorText">
             <el-input
+              ref="passwordRef"
               v-model="form.password"
               type="password"
               show-password
               maxlength="72"
               autocomplete="current-password"
+              autofocus
               data-test="lock-password"
               @keyup.enter="submit"
             />

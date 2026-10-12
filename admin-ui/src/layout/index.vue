@@ -208,6 +208,8 @@ onBeforeUnmount(() => {
   <el-container
     class="layout"
     :class="{ 'is-collapsed': collapsed && !narrow, 'is-narrow': narrow }"
+    :inert="lockStore.locked || undefined"
+    data-test="layout-root"
   >
     <el-aside v-if="!narrow" :width="asideWidth" class="layout__aside">
       <SideMenu

@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { defineComponent, nextTick, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { createCaptcha, login } from "@/api/auth";
+import { createCaptcha, login, logout } from "@/api/auth";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { useLockStore } from "@/stores/lock";
@@ -54,6 +54,8 @@ describe("lock screen", () => {
     localStorage.clear();
     document.body.innerHTML = "";
     vi.mocked(login).mockReset();
+    vi.mocked(logout).mockReset();
+    vi.mocked(logout).mockResolvedValue(null);
     let seq = 0;
     vi.mocked(createCaptcha).mockReset();
     vi.mocked(createCaptcha).mockImplementation(async () => ({
@@ -112,6 +114,9 @@ describe("lock screen", () => {
       captchaId: "c1",
       captchaCode: "ab7k"
     });
+    // Old session is logged out while the store still held the previous token, then the new one applied.
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(useUserStore().token).toBe("next");
     expect(useLockStore().locked).toBe(false);
     expect(loadLocked()).toBe(false);
     await nextTick();

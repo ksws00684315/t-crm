@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
+import { useLockStore } from "@/stores/lock";
 import { useMenuSearchStore } from "@/stores/menu-search";
 import { useUserStore } from "@/stores/user";
 import {
@@ -22,6 +23,7 @@ const router = useRouter();
 const user = useUserStore();
 const localeStore = useLocaleStore();
 const menuSearch = useMenuSearchStore();
+const lock = useLockStore();
 
 const query = ref("");
 const active = ref(0);
@@ -80,6 +82,8 @@ function onKeydown(event: KeyboardEvent): void {
   const key = event.key.toLowerCase();
   if ((event.ctrlKey || event.metaKey) && key === "k" && !event.altKey) {
     event.preventDefault();
+    // Shortcuts must not pierce the lock overlay (layout root is inert; this listener is on window).
+    if (lock.locked) return;
     menuSearch.open();
     return;
   }
