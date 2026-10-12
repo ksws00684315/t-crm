@@ -376,7 +376,9 @@ class LinkIT {
     assertThat(outboxCount()).isEqualTo(1);
     assertThat(field(kolCode, productCode)).isNull();
 
-    jdbc.update("UPDATE crm_link_index_outbox SET next_attempt_at = now()");
+    // TIMESTAMPTZ(3) rounds now() to the millisecond, which can land up to 0.5 ms after the clock
+    // reading drain() uses for "due"; move the row clearly into the past instead.
+    jdbc.update("UPDATE crm_link_index_outbox SET next_attempt_at = now() - INTERVAL '1 second'");
     sync.drain();
     assertThat(outboxCount()).isZero();
     assertThat(field(kolCode, productCode)).contains("\"status\":1").contains("itemID=9901");
