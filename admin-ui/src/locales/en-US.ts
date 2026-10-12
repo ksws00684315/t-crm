@@ -228,7 +228,43 @@ const enUS: MessageSchema = {
     exitFullscreen: "Exit table full screen",
     empty: "No data",
     emptyFiltered: "No matching data · {n} filters applied",
-    clearFilters: "Clear filters"
+    clearFilters: "Clear filters",
+    export: "Export",
+    selected: "{n} selected",
+    selectedPageOnly: "current page only",
+    clearSelection: "Clear selection"
+  },
+  export: {
+    done: "Exported {n} rows",
+    truncated: "{total} results; exported the first {n}. Narrow the filters and export in parts",
+    fileKol: "kols",
+    fileProduct: "products",
+    fileMapping: "kol-items",
+    fileUser: "users"
+  },
+  batch: {
+    enable: "Enable selected",
+    disable: "Disable selected",
+    on: "Put on sale",
+    off: "Take off sale",
+    confirmEnable: "Enable the {n} selected items?",
+    confirmDisable: "Disable the {n} selected items?",
+    confirmOn: "Put the {n} selected products on sale?",
+    confirmOff: "Take the {n} selected products off sale?",
+    nothingToChange: "The selected rows already have that status",
+    allDone: "Done: {n} items",
+    partial: "{ok} succeeded, {failed} failed: {details}",
+    unknown: "Unknown error"
+  },
+  lock: {
+    title: "Screen locked",
+    hint: "Signed in as {username}. Enter your password to unlock",
+    unlock: "Unlock",
+    lockNow: "Lock screen",
+    autoLock: "Auto lock when idle",
+    idleOff: "Off",
+    idleMinutes: "{n} min",
+    failed: "Unlock failed, please try again"
   },
   tabs: {
     close: "Close",

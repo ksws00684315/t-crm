@@ -6,6 +6,8 @@ import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import { useBatchAction } from "@/composables/useBatchAction";
+import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -76,15 +78,65 @@ const editingUser = ref<UserVO | null>(null);
 const resetVisible = ref(false);
 const resetUser = ref<UserVO | null>(null);
 
+function appliedQuery() {
+  return {
+    username: applied.value.username || undefined,
+    role: applied.value.role,
+    status: applied.value.status
+  };
+}
+
+const { exporting, exportCsv } = useListExport<UserVO>({
+  fileBase: () => t("export.fileUser"),
+  fetchPage: (page, size) => listUsers({ page, size, ...appliedQuery() }),
+  columns: () => [
+    { label: t("common.username"), value: row => row.username },
+    { label: t("common.nickname"), value: row => row.nickname },
+    { label: t("user.role"), value: row => (row.role ? roleLabel(row.role) : "") },
+    {
+      label: t("user.dataScope"),
+      value: row => (row.dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort"))
+    },
+    {
+      label: t("common.status"),
+      value: row => (row.status === 1 ? t("common.enabled") : t("common.disabled"))
+    },
+    { label: t("user.lastLogin"), value: row => formatInstant(row.lastLoginTime) },
+    { label: t("common.createdAt"), value: row => formatInstant(row.createTime) }
+  ]
+});
+
+const selection = ref<UserVO[]>([]);
+const batch = useBatchAction();
+/** The row action is disabled for the signed-in account, so selection is too. */
+const selectableUser = (row: object) => (row as UserVO).id !== me.user?.id;
+
+function batchStatus(target: 0 | 1): void {
+  const targets = selection.value.filter(row => row.status !== target && selectableUser(row));
+  if (targets.length === 0) {
+    ElMessage.info(t("batch.nothingToChange"));
+    return;
+  }
+  void batch.run({
+    rows: targets,
+    title: target === 0 ? t("user.disableTitle") : t("user.enableTitle"),
+    message:
+      target === 0
+        ? t("batch.confirmDisable", { n: targets.length })
+        : t("batch.confirmEnable", { n: targets.length }),
+    label: row => row.username,
+    action: row => updateUserStatus(row.id, target),
+    after: load
+  });
+}
+
 async function load() {
   loading.value = true;
   try {
     const page = await listUsers({
       page: query.page,
       size: query.size,
-      username: applied.value.username || undefined,
-      role: applied.value.role,
-      status: applied.value.status
+      ...appliedQuery()
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -223,11 +275,37 @@ onMounted(load);
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
+      exportable
+      :exporting="exporting"
+      selectable
+      :selectable-row="selectableUser"
+      @export="exportCsv"
+      @selection-change="selection = $event as UserVO[]"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
       @clear-filters="reset"
     >
+      <template #batch>
+        <el-button
+          type="success"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-enable"
+          @click="batchStatus(1)"
+          >{{ t("batch.enable") }}</el-button
+        >
+        <el-button
+          type="danger"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-disable"
+          @click="batchStatus(0)"
+          >{{ t("batch.disable") }}</el-button
+        >
+      </template>
       <template #cell-role="{ row }">
         {{ asUser(row).role ? roleLabel(asUser(row).role) : "" }}
       </template>

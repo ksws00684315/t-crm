@@ -8,6 +8,8 @@ import type { BdUserVO, KolVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import { useBatchAction } from "@/composables/useBatchAction";
+import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -107,10 +109,7 @@ async function load() {
     const page = await listKols({
       page: query.page,
       size: query.size,
-      keyword: applied.value.keyword || undefined,
-      country: applied.value.country || undefined,
-      status: applied.value.status,
-      bdUserId: abilities.value.canManageBd ? applied.value.bdUserId || undefined : undefined
+      ...appliedQuery()
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -119,6 +118,55 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+function appliedQuery() {
+  return {
+    keyword: applied.value.keyword || undefined,
+    country: applied.value.country || undefined,
+    status: applied.value.status,
+    bdUserId: abilities.value.canManageBd ? applied.value.bdUserId || undefined : undefined
+  };
+}
+
+const { exporting, exportCsv } = useListExport<KolVO>({
+  fileBase: () => t("export.fileKol"),
+  fetchPage: (page, size) => listKols({ page, size, ...appliedQuery() }),
+  columns: () => [
+    { label: t("kol.code"), value: row => row.kolCode },
+    { label: t("common.name"), value: row => row.name },
+    { label: t("common.email"), value: row => row.email },
+    { label: t("common.country"), value: row => row.country },
+    { label: t("kol.bd"), value: row => row.bdUserName ?? t("common.unassigned") },
+    { label: t("kol.defaultRate"), value: row => formatRate(row.defaultRate) },
+    {
+      label: t("common.status"),
+      value: row => (row.status === 1 ? t("common.enabled") : t("common.disabled"))
+    },
+    { label: t("common.createdAt"), value: row => formatInstant(row.createTime) }
+  ]
+});
+
+const selection = ref<KolVO[]>([]);
+const batch = useBatchAction();
+
+function batchStatus(target: 0 | 1): void {
+  const targets = selection.value.filter(row => row.status !== target);
+  if (targets.length === 0) {
+    ElMessage.info(t("batch.nothingToChange"));
+    return;
+  }
+  void batch.run({
+    rows: targets,
+    title: target === 0 ? t("kol.disableTitle") : t("kol.enableTitle"),
+    message:
+      target === 0
+        ? t("batch.confirmDisable", { n: targets.length })
+        : t("batch.confirmEnable", { n: targets.length }),
+    label: row => row.kolCode,
+    action: row => updateKolStatus(row.id, target),
+    after: load
+  });
 }
 
 async function loadBdUsers() {
@@ -294,11 +342,36 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
+      exportable
+      :exporting="exporting"
+      :selectable="abilities.canWrite"
+      @export="exportCsv"
+      @selection-change="selection = $event as KolVO[]"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
       @clear-filters="reset"
     >
+      <template #batch>
+        <el-button
+          type="success"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-enable"
+          @click="batchStatus(1)"
+          >{{ t("batch.enable") }}</el-button
+        >
+        <el-button
+          type="danger"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-disable"
+          @click="batchStatus(0)"
+          >{{ t("batch.disable") }}</el-button
+        >
+      </template>
       <template #cell-kolCode="{ row }"><CopyText :value="asKol(row).kolCode" /></template>
       <template #cell-email="{ row }"><CopyText :value="asKol(row).email" /></template>
       <template #cell-bd="{ row }">{{ asKol(row).bdUserName ?? t("common.unassigned") }}</template>

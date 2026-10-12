@@ -66,3 +66,55 @@ describe("DataTable", () => {
     expect(wrapper.text()).toContain("共 3 条");
   });
 });
+
+describe("DataTable export and selection", () => {
+  const rows = [
+    { id: "1", code: "KOL0001", name: "Ada" },
+    { id: "2", code: "KOL0002", name: "Bob" }
+  ];
+
+  it("emits export from the toolbar button and hides it unless exportable", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "exp", rows, columns, total: 2, exportable: true },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await wrapper.get("[data-test=export]").trigger("click");
+    expect(wrapper.emitted("export")).toHaveLength(1);
+    await wrapper.setProps({ exportable: false });
+    expect(wrapper.find("[data-test=export]").exists()).toBe(false);
+  });
+
+  it("shows the batch bar for a current-page selection and clears it on new rows", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "sel", rows, columns, total: 2, selectable: true },
+      slots: { batch: '<button data-test="batch-action">go</button>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.find("[data-test=batch-bar]").exists()).toBe(false);
+    const table = wrapper.findComponent({ name: "ElTable" });
+    (
+      table.vm as unknown as { toggleRowSelection: (row: object, on: boolean) => void }
+    ).toggleRowSelection(rows[0], true);
+    await nextTick();
+    expect(wrapper.get("[data-test=batch-bar]").text()).toContain("已选 1 项");
+    expect(wrapper.text()).toContain("仅限当前页");
+    expect(wrapper.find("[data-test=batch-action]").exists()).toBe(true);
+    const emitted = wrapper.emitted("selectionChange")!;
+    expect(emitted[emitted.length - 1][0]).toHaveLength(1);
+
+    await wrapper.setProps({ rows: [{ id: "3", code: "KOL0003", name: "Cy" }] });
+    await nextTick();
+    expect(wrapper.find("[data-test=batch-bar]").exists()).toBe(false);
+    const last = wrapper.emitted("selectionChange")!;
+    expect(last[last.length - 1][0]).toEqual([]);
+  });
+
+  it("has no selection column unless selectable", () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "nosel", rows, columns, total: 2 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(wrapper.find(".el-table-column--selection").exists()).toBe(false);
+  });
+});

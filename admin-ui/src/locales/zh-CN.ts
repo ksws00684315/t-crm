@@ -231,7 +231,43 @@ const zhCN = {
     exitFullscreen: "退出表格全屏",
     empty: "暂无数据",
     emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
-    clearFilters: "清除筛选"
+    clearFilters: "清除筛选",
+    export: "导出",
+    selected: "已选 {n} 项",
+    selectedPageOnly: "仅限当前页",
+    clearSelection: "取消选择"
+  },
+  export: {
+    done: "已导出 {n} 条",
+    truncated: "结果共 {total} 条，已导出前 {n} 条；请缩小筛选范围后分批导出",
+    fileKol: "达人列表",
+    fileProduct: "商品列表",
+    fileMapping: "对应关系",
+    fileUser: "用户列表"
+  },
+  batch: {
+    enable: "批量启用",
+    disable: "批量停用",
+    on: "批量上架",
+    off: "批量下架",
+    confirmEnable: "确定启用选中的 {n} 项吗？",
+    confirmDisable: "确定停用选中的 {n} 项吗？",
+    confirmOn: "确定上架选中的 {n} 个商品吗？",
+    confirmOff: "确定下架选中的 {n} 个商品吗？",
+    nothingToChange: "选中的数据已经是目标状态",
+    allDone: "已完成 {n} 项",
+    partial: "成功 {ok} 项，失败 {failed} 项：{details}",
+    unknown: "未知错误"
+  },
+  lock: {
+    title: "屏幕已锁定",
+    hint: "当前账号 {username}，输入密码解锁",
+    unlock: "解锁",
+    lockNow: "锁定屏幕",
+    autoLock: "空闲自动锁屏",
+    idleOff: "关闭",
+    idleMinutes: "{n} 分钟",
+    failed: "解锁失败，请重试"
   },
   tabs: {
     close: "关闭",
