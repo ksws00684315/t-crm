@@ -177,6 +177,13 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  reauth: {
+    title: "登录已过期",
+    hint: "请重新输入密码。当前页面已填写的内容会保留，失败的请求不会自动重发。",
+    submit: "重新登录",
+    switch: "切换账号",
+    failed: "重新登录失败，请重试"
+  },
   menuSearch: {
     title: "搜索菜单",
     placeholder: "输入菜单名称",

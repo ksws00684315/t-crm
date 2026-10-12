@@ -21,6 +21,7 @@ import {
   subscribeNarrow
 } from "@/utils/sidebar";
 import MenuSearch from "./MenuSearch.vue";
+import ReauthDialog from "./ReauthDialog.vue";
 import SideMenu from "./SideMenu.vue";
 import TabBar from "./TabBar.vue";
 
@@ -256,6 +257,7 @@ onBeforeUnmount(() => {
       </el-main>
     </el-container>
     <MenuSearch />
+    <ReauthDialog />
   </el-container>
 </template>
 

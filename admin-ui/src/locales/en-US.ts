@@ -174,6 +174,13 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  reauth: {
+    title: "Session expired",
+    hint: "Enter your password. What you already filled in stays on this page, and the failed request is not sent again.",
+    submit: "Sign in again",
+    switch: "Switch account",
+    failed: "Could not sign in again. Try once more."
+  },
   menuSearch: {
     title: "Search menu",
     placeholder: "Menu name",
