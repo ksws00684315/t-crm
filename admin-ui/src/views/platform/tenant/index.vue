@@ -85,7 +85,7 @@ onMounted(load);
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch @search="load" @reset="load">
       <template #actions>
         <el-button type="primary" @click="openCreate">{{ t("tenant.create") }}</el-button>
@@ -126,5 +126,5 @@ onMounted(load);
 
     <TenantFormDialog v-model="formVisible" :tenant="editingTenant" @saved="load" />
     <TenantAdminsDialog v-model="adminsVisible" :tenant="adminsTenant" />
-  </el-card>
+  </div>
 </template>

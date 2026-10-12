@@ -58,7 +58,7 @@ onMounted(load);
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch @search="load" @reset="load" />
     <DataTable
       table-id="oper-log"
@@ -74,5 +74,5 @@ onMounted(load);
     >
       <template #cell-time="{ row }">{{ formatInstant(asLog(row).operTime) }}</template>
     </DataTable>
-  </el-card>
+  </div>
 </template>

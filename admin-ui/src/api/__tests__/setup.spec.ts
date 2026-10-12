@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installGuard } from "@/router/guard";
 import { routes } from "@/router/routes";
 import { useReauthStore } from "@/stores/reauth";
+import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import { loadSession, saveSession, SESSION_KEY } from "@/utils/session";
 import { ApiError } from "@/utils/http/error";
@@ -37,12 +38,15 @@ function appWithSession() {
 }
 
 describe("401 handling", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
-  function failWith(errorCode: string) {
+  function failWith(errorCode: string, status = 401) {
     http.instance.defaults.adapter = async config => ({
-      data: { code: 401, msg: "x", data: null, errorCode, traceId: "t" },
-      status: 401,
+      data: { code: status, msg: "x", data: null, errorCode, traceId: "t" },
+      status,
       statusText: "",
       headers: {},
       config
@@ -67,9 +71,16 @@ describe("401 handling", () => {
     expect(useReauthStore().visible).toBe(true);
   });
 
-  it("returns to the login page when the account is disabled", async () => {
+  it("returns to the login page when the account is disabled and closes the reauth dialog", async () => {
     const { store, router } = appWithSession();
     await router.push("/system/users");
+    useReauthStore().open();
+    useTabsStore().open({
+      path: "/system/users",
+      titleKey: "route.users",
+      affix: false,
+      componentName: "SystemUserPage"
+    });
     failWith("AUTH_ACCOUNT_DISABLED");
     const failure = await http.request({ url: "/auth/me" }).catch((error: unknown) => error);
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
@@ -79,9 +90,10 @@ describe("401 handling", () => {
     expect(localStorage.getItem(SESSION_KEY)).toBeNull();
     expect(router.currentRoute.value.query.redirect).toBe("/system/users");
     expect(useReauthStore().visible).toBe(false);
+    expect(useTabsStore().tabs).toEqual([]);
   });
 
-  it("ignores a wrong password while the dialog is open and leaves for a lockout", async () => {
+  it("ignores a wrong password while the dialog is open", async () => {
     const { store, router } = appWithSession();
     await router.push("/system/users");
     useReauthStore().open();
@@ -90,11 +102,21 @@ describe("401 handling", () => {
     expect((wrong as ApiError).handled).toBe(true);
     expect(store.isLoggedIn).toBe(true);
     expect(router.currentRoute.value.path).toBe("/system/users");
+    expect(useReauthStore().visible).toBe(true);
+  });
 
-    failWith("AUTH_ACCOUNT_LOCKED");
-    await http.request({ url: "/auth/login" }).catch(() => undefined);
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
+  it("closes reauth after an expired-session logout so the next login does not show the dialog", async () => {
+    const { store, router } = appWithSession();
+    await router.push("/system/users");
+    failWith("AUTH_UNAUTHORIZED");
+    // logout hits the expired token → handler opens reauth, then clearSession closes it
+    await store.logout();
     expect(store.isLoggedIn).toBe(false);
+    expect(useReauthStore().visible).toBe(false);
+
+    // Same pinia survives into the next signed-in layout; the dialog must stay closed.
+    store.$patch({}); // no-op keep store
+    expect(useReauthStore().visible).toBe(false);
   });
 });
 

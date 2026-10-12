@@ -21,11 +21,17 @@ function tab(path: string, affix = false): TabRecord {
   return { path, titleKey: `route.${path}`, affix, componentName: path };
 }
 
-function state(paths: string[], active: string, affixPath = "/home"): TabSnapshot {
+function state(
+  paths: string[],
+  active: string,
+  affixPath = "/home",
+  userId: string | null = "u1"
+): TabSnapshot {
   return {
     v: 1,
     active,
-    tabs: paths.map(path => tab(path, path === affixPath))
+    tabs: paths.map(path => tab(path, path === affixPath)),
+    userId
   };
 }
 
@@ -73,11 +79,11 @@ describe("tabs", () => {
     const raw = JSON.stringify(
       state(["/home", "/kol/kols", "/system/users", "/secret"], "/system/users")
     );
-    const restored = restoreTabs(raw, homeAffix(), path => path !== "/secret");
+    const restored = restoreTabs(raw, homeAffix(), path => path !== "/secret", "u1");
     expect(restored.tabs.map(item => item.path)).toEqual(["/home", "/kol/kols", "/system/users"]);
     expect(restored.active).toBe("/system/users");
-    expect(restoreTabs("{", homeAffix(), () => true).tabs).toEqual([homeAffix()]);
-    expect(restoreTabs("null", homeAffix(), () => true).active).toBe("/home");
+    expect(restoreTabs("{", homeAffix(), () => true, "u1").tabs).toEqual([homeAffix()]);
+    expect(restoreTabs("null", homeAffix(), () => true, "u1").active).toBe("/home");
   });
 
   it("does not throw when sessionStorage is unusable and clears on reset", () => {
@@ -98,5 +104,12 @@ describe("tabs", () => {
   it("pins 公司管理 for a platform administrator and 首页 otherwise", () => {
     expect(affixFor(true).path).toBe("/platform/tenants");
     expect(affixFor(false).path).toBe("/home");
+  });
+
+  it("discards tabs saved for another user", () => {
+    const raw = JSON.stringify(state(["/home", "/kol/kols"], "/kol/kols", "/home", "alice"));
+    const restored = restoreTabs(raw, homeAffix(), () => true, "bob");
+    expect(restored.tabs.map(item => item.path)).toEqual(["/home"]);
+    expect(restored.userId).toBe("bob");
   });
 });

@@ -8,6 +8,7 @@ import { translate } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import { useMenuSearchStore } from "@/stores/menu-search";
+import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
@@ -35,6 +36,7 @@ const user = useUserStore();
 const localeStore = useLocaleStore();
 const theme = useThemeStore();
 const menuSearch = useMenuSearchStore();
+const reauth = useReauthStore();
 const tabs = useTabsStore();
 
 const collapsed = ref(loadSidebarCollapsed());
@@ -70,10 +72,14 @@ const crumbs = computed(() => {
 const asideWidth = computed(() =>
   collapsed.value ? "var(--tcrm-sidebar-collapsed)" : "var(--tcrm-sidebar-width)"
 );
-const watermark = computed(() =>
+const watermark = ref(
   watermarkText(user.user?.nickname ?? "", user.user?.username ?? "", new Date())
 );
 const watermarkColor = ref(watermarkInk("#15181d"));
+
+function refreshWatermark(): void {
+  watermark.value = watermarkText(user.user?.nickname ?? "", user.user?.username ?? "", new Date());
+}
 
 function syncWatermarkColor(): void {
   const hex = getComputedStyle(document.documentElement)
@@ -117,20 +123,26 @@ async function onCommand(command: string) {
   if (command === "password") {
     await router.push("/account/password");
   } else if (command === "logout") {
+    reauth.close();
     tabs.reset();
     await user.logout();
     await router.replace("/login");
   }
 }
 
-tabs.restore(affixFor(user.roles.includes("PLATFORM_ADMIN")), path => {
-  const resolved = router.resolve(path);
-  return canAccessRoute(resolved.meta, user.roles, user.user?.dataScope);
-});
+tabs.restore(
+  affixFor(user.roles.includes("PLATFORM_ADMIN")),
+  path => {
+    const resolved = router.resolve(path);
+    return canAccessRoute(resolved.meta, user.roles, user.user?.dataScope);
+  },
+  user.user?.id ?? null
+);
 
 watch(
   () => route.path,
   () => {
+    refreshWatermark();
     const componentName = route.meta.componentName;
     const titleKey = route.meta.title;
     if (!componentName || !titleKey || route.meta.noTab) return;
@@ -218,7 +230,7 @@ onBeforeUnmount(() => {
         <div class="layout__actions">
           <el-button data-test="menu-search" @click="menuSearch.open()">
             <el-icon><Search /></el-icon>
-            <span>{{ t("layout.searchMenu") }}</span>
+            <span class="layout__label">{{ t("layout.searchMenu") }}</span>
             <kbd class="layout__kbd">{{
               mac ? t("layout.shortcutMac") : t("layout.shortcutOther")
             }}</kbd>
@@ -247,13 +259,13 @@ onBeforeUnmount(() => {
             :aria-label="t('theme.cycle')"
             @click="theme.cycle()"
           >
-            {{ t(`theme.${theme.mode}`) }}
+            <span class="layout__label">{{ t(`theme.${theme.mode}`) }}</span>
           </el-button>
           <LocaleSwitch />
           <el-dropdown trigger="click" @command="onCommand">
             <span class="layout__user">
-              {{ userLabel }}
-              <span v-if="tenantLabel" class="layout__tenant">{{ tenantLabel }}</span>
+              <span class="layout__label">{{ userLabel }}</span>
+              <span v-if="tenantLabel" class="layout__tenant layout__label">{{ tenantLabel }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -280,7 +292,7 @@ onBeforeUnmount(() => {
           data-test="watermark"
         >
           <RouterView v-slot="{ Component }">
-            <Transition name="tcrm-page">
+            <Transition name="tcrm-page" mode="out-in">
               <KeepAlive :include="tabs.include">
                 <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
               </KeepAlive>
@@ -352,12 +364,27 @@ onBeforeUnmount(() => {
   color: var(--tcrm-color-text-secondary);
 }
 .layout__main {
+  display: flex;
+  flex-direction: column;
   background: var(--tcrm-color-page);
   padding: var(--tcrm-space-4);
   min-height: 0;
+  overflow: hidden;
 }
 .layout__watermark {
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.layout__watermark :deep(> div) {
+  height: 100%;
+  min-height: 0;
+}
+@media (max-width: 991px) {
+  .layout__label,
+  .layout__kbd {
+    display: none;
+  }
 }
 </style>
 

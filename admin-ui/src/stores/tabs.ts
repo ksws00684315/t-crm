@@ -21,6 +21,7 @@ import {
 export const useTabsStore = defineStore("tabs", () => {
   const tabs = ref<TabRecord[]>([]);
   const active = ref("");
+  const userId = ref<string | null>(null);
   const generations = ref<Record<string, number>>({});
   const suspended = ref<string | null>(null);
 
@@ -29,17 +30,22 @@ export const useTabsStore = defineStore("tabs", () => {
   );
 
   function current(): TabSnapshot {
-    return { v: 1, active: active.value, tabs: tabs.value };
+    return { v: 1, active: active.value, tabs: tabs.value, userId: userId.value };
   }
 
   function apply(next: TabSnapshot): void {
     tabs.value = next.tabs;
     active.value = next.active;
+    userId.value = next.userId;
     saveStoredTabs(next);
   }
 
-  function restore(affix: TabRecord, canAccess: (path: string) => boolean): void {
-    apply(loadStoredTabs(affix, canAccess));
+  function restore(
+    affix: TabRecord,
+    canAccess: (path: string) => boolean,
+    nextUserId: string | null = null
+  ): void {
+    apply(loadStoredTabs(affix, canAccess, nextUserId));
   }
 
   function open(tab: TabRecord): void {
@@ -97,6 +103,7 @@ export const useTabsStore = defineStore("tabs", () => {
   function reset(): void {
     tabs.value = [];
     active.value = "";
+    userId.value = null;
     generations.value = {};
     suspended.value = null;
     clearStoredTabs();

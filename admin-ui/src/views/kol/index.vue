@@ -57,27 +57,35 @@ const columns = computed<DataColumn[]>(() => [
   { key: "actions", label: t("common.actions"), width: 280 }
 ]);
 
+/** Chips and empty-state filter-count reflect the last applied search, not in-progress typing. */
+const applied = ref({
+  keyword: "",
+  country: "",
+  status: undefined as 0 | 1 | undefined,
+  bdUserId: undefined as string | undefined
+});
+
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
-  const keyword = query.keyword.trim();
-  const country = query.country.trim().toUpperCase();
+  const keyword = applied.value.keyword;
+  const country = applied.value.country;
   if (keyword) list.push({ key: "keyword", label: t("common.keyword"), text: keyword });
   if (country) list.push({ key: "country", label: t("common.country"), text: country });
-  if (query.status === 0 || query.status === 1) {
+  if (applied.value.status === 0 || applied.value.status === 1) {
     list.push({
       key: "status",
       label: t("common.status"),
-      text: query.status === 1 ? t("common.enabled") : t("common.disabled")
+      text: applied.value.status === 1 ? t("common.enabled") : t("common.disabled")
     });
   }
-  if (query.bdUserId) {
-    const bd = bdUsers.value.find(item => item.id === query.bdUserId);
+  if (applied.value.bdUserId) {
+    const bd = bdUsers.value.find(item => item.id === applied.value.bdUserId);
     list.push({
       key: "bd",
       label: t("kol.bd"),
       text: bd
         ? t("kol.bdOption", { nickname: bd.nickname, username: bd.username })
-        : query.bdUserId
+        : applied.value.bdUserId
     });
   }
   return list;
@@ -122,8 +130,18 @@ async function loadBdUsers() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    keyword: query.keyword.trim(),
+    country: query.country.trim().toUpperCase(),
+    status: query.status,
+    bdUserId: abilities.value.canManageBd ? query.bdUserId : undefined
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -207,7 +225,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('common.keyword')">
@@ -344,5 +362,5 @@ onMounted(() => {
       :kol-code="linksKol?.kolCode ?? null"
       :kol-name="linksKol?.name"
     />
-  </el-card>
+  </div>
 </template>

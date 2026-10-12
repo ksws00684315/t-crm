@@ -236,7 +236,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
       </div>
     </header>
     <div class="data-table__body">
-      <el-table v-loading="loading" :data="rows" :row-key="rowKey" :size="tableSize" border>
+      <el-table
+        v-loading="loading"
+        :data="rows"
+        :row-key="rowKey"
+        :size="tableSize"
+        :height="plain ? undefined : '100%'"
+        border
+      >
         <el-table-column
           v-for="column in visibleColumns"
           :key="column.key"
@@ -294,14 +301,16 @@ function canMove(index: number, delta: -1 | 1): boolean {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-2);
-  min-height: 320px;
-  height: calc(100vh - var(--tcrm-header-height) - 40px - 32px);
+  flex: 1;
+  min-height: 0;
+  height: auto;
   padding: var(--tcrm-space-3);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
 .data-table.is-plain {
+  flex: initial;
   height: auto;
   min-height: 0;
   padding: 0;
@@ -325,6 +334,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
   align-items: center;
   justify-content: space-between;
   gap: var(--tcrm-space-2);
+  flex-shrink: 0;
 }
 .data-table__tools {
   display: flex;
@@ -337,12 +347,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table__body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-}
-.data-table :deep(.el-table__header-wrapper) {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  /* el-table height=100% owns vertical and horizontal scroll; no outer overflow */
+  overflow: hidden;
 }
 .data-table__columns {
   display: flex;

@@ -23,3 +23,14 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* List pages: search keeps its height; the table card fills the rest so el-table can fix the header.
+ * Height uses the viewport minus header (56) + tab bar (40) + main padding (16*2), so the page does
+ * not depend on every ancestor passing height:100% through Transition/KeepAlive. */
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-3);
+  height: calc(100vh - var(--tcrm-header-height) - 40px - 32px);
+  min-height: 320px;
+}

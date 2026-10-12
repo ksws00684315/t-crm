@@ -63,24 +63,31 @@ const columns = computed<DataColumn[]>(() => {
   return list;
 });
 
+const applied = ref({
+  keyword: "",
+  shopId: undefined as string | undefined,
+  status: undefined as 0 | 1 | undefined,
+  category: ""
+});
+
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
-  const keyword = query.keyword.trim();
-  const category = query.category.trim();
+  const keyword = applied.value.keyword;
+  const category = applied.value.category;
   if (keyword) list.push({ key: "keyword", label: t("common.keyword"), text: keyword });
-  if (query.shopId) {
-    const shop = shops.value.find(item => item.id === query.shopId);
+  if (applied.value.shopId) {
+    const shop = shops.value.find(item => item.id === applied.value.shopId);
     list.push({
       key: "shop",
       label: t("product.shop"),
-      text: shop?.shopName ?? query.shopId
+      text: shop?.shopName ?? applied.value.shopId
     });
   }
-  if (query.status === 0 || query.status === 1) {
+  if (applied.value.status === 0 || applied.value.status === 1) {
     list.push({
       key: "status",
       label: t("common.status"),
-      text: query.status === 1 ? t("product.onSale") : t("product.offShelf")
+      text: applied.value.status === 1 ? t("product.onSale") : t("product.offShelf")
     });
   }
   if (category) list.push({ key: "category", label: t("product.category"), text: category });
@@ -129,8 +136,18 @@ async function loadShops() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    keyword: query.keyword.trim(),
+    shopId: query.shopId,
+    status: query.status,
+    category: query.category.trim()
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -225,7 +242,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('common.keyword')">
@@ -363,5 +380,5 @@ onMounted(() => {
       :upload="uploadProductImport"
       @finished="search"
     />
-  </el-card>
+  </div>
 </template>

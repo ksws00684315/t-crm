@@ -10,6 +10,7 @@ import { i18n } from "@/locales";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
+import { ApiError } from "@/utils/http/error";
 import { saveSession } from "@/utils/session";
 import ReauthDialog from "../ReauthDialog.vue";
 
@@ -148,5 +149,28 @@ describe("reauth dialog", () => {
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
     expect(login).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+
+  it("leaves for the login page when reauth login returns AUTH_ACCOUNT_LOCKED as HTTP 429", async () => {
+    vi.mocked(login).mockRejectedValue(
+      new ApiError({ status: 429, errorCode: "AUTH_ACCOUNT_LOCKED", traceId: "t" })
+    );
+    const { wrapper, router } = await mountHost();
+    await typePassword("StrongPass!42");
+    await bodyButton("reauth-submit").trigger("click");
+    await flushPromises();
+
+    expect(useUserStore().isLoggedIn).toBe(false);
+    expect(useTabsStore().tabs).toEqual([]);
+    expect(useReauthStore().visible).toBe(false);
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
+    wrapper.unmount();
+  });
+
+  it("closes the store flag when the dialog unmounts", async () => {
+    const { wrapper } = await mountHost();
+    expect(useReauthStore().visible).toBe(true);
+    wrapper.unmount();
+    expect(useReauthStore().visible).toBe(false);
   });
 });

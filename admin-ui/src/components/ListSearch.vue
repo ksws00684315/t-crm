@@ -26,11 +26,20 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const expanded = ref(false);
+
+/** HTML will not submit a form that has several text inputs and no submit button. */
+function onEnter(event: KeyboardEvent): void {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.tagName === "TEXTAREA" || target.closest("textarea")) return;
+  if (target.closest("button, [role='button']")) return;
+  emit("search");
+}
 </script>
 
 <template>
   <section class="list-search">
-    <el-form class="list-search__form" @submit.prevent="emit('search')">
+    <el-form class="list-search__form" @submit.prevent="emit('search')" @keyup.enter="onEnter">
       <div class="list-search__row">
         <slot name="primary" />
         <div class="list-search__actions">
@@ -79,7 +88,11 @@ const expanded = ref(false);
 
 <style scoped>
 .list-search {
-  margin-bottom: var(--tcrm-space-3);
+  padding: var(--tcrm-space-3);
+  margin-bottom: 0;
+  background: var(--tcrm-color-card);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
 }
 .list-search__form :deep(.el-form-item) {
   margin-right: var(--tcrm-space-3);

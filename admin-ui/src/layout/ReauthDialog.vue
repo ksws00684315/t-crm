@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from "element-plus";
-import { reactive, ref, watch } from "vue";
+import { onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useReauthStore } from "@/stores/reauth";
@@ -32,6 +32,18 @@ watch(
   }
 );
 
+/** Layout unmount must not leave visible=true for the next login. */
+onBeforeUnmount(() => {
+  reauth.close();
+});
+
+async function leaveForLogin(): Promise<void> {
+  tabs.reset();
+  reauth.close();
+  user.clearSession();
+  await router.replace("/login");
+}
+
 async function submit(): Promise<void> {
   if (!user.user || !formRef.value || !(await formRef.value.validate().catch(() => false))) return;
   const previousId = user.user.id;
@@ -41,6 +53,11 @@ async function submit(): Promise<void> {
     await user.login(user.user.username, form.password);
   } catch (error) {
     form.password = "";
+    // AUTH_ACCOUNT_LOCKED is HTTP 429, so the 401 handler never sees it.
+    if (error instanceof ApiError && error.errorCode === "AUTH_ACCOUNT_LOCKED") {
+      await leaveForLogin();
+      return;
+    }
     errorText.value = error instanceof ApiError ? error.displayMessage : t("reauth.failed");
     return;
   } finally {
@@ -56,11 +73,8 @@ async function submit(): Promise<void> {
 }
 
 async function switchAccount(): Promise<void> {
-  tabs.reset();
-  reauth.close();
   // The server session is already gone. Calling logout would 401 and open this dialog again.
-  user.clearSession();
-  await router.replace("/login");
+  await leaveForLogin();
 }
 </script>
 

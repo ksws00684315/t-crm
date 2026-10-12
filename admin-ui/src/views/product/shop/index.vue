@@ -123,7 +123,7 @@ onMounted(() => void load());
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch @search="load" @reset="load">
       <template #primary>
         <span class="hint">{{ t("shop.hint") }}</span>
@@ -195,7 +195,7 @@ onMounted(() => void load());
         <el-button type="primary" :loading="saving" @click="save">{{ t("common.save") }}</el-button>
       </template>
     </el-dialog>
-  </el-card>
+  </div>
 </template>
 
 <style scoped>

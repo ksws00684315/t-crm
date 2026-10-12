@@ -62,23 +62,35 @@ const columns = computed<DataColumn[]>(() => [
   { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true }
 ]);
 
+const applied = ref({
+  kolCode: "",
+  productCode: "",
+  shopId: undefined as string | undefined,
+  weidianItemId: "",
+  includeHistory: false
+});
+
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
-  const kolCode = query.kolCode.trim();
-  const productCode = query.productCode.trim();
-  const weidianItemId = query.weidianItemId.trim();
+  const kolCode = applied.value.kolCode;
+  const productCode = applied.value.productCode;
+  const weidianItemId = applied.value.weidianItemId;
   if (kolCode) list.push({ key: "kolCode", label: t("mapping.kolCode"), text: kolCode });
   if (productCode) {
     list.push({ key: "productCode", label: t("mapping.productCode"), text: productCode });
   }
-  if (query.shopId) {
-    const shop = shops.value.find(item => item.id === query.shopId);
-    list.push({ key: "shop", label: t("mapping.shop"), text: shop?.shopName ?? query.shopId });
+  if (applied.value.shopId) {
+    const shop = shops.value.find(item => item.id === applied.value.shopId);
+    list.push({
+      key: "shop",
+      label: t("mapping.shop"),
+      text: shop?.shopName ?? applied.value.shopId
+    });
   }
   if (weidianItemId) {
     list.push({ key: "weidianItemId", label: t("mapping.exclusiveId"), text: weidianItemId });
   }
-  if (query.includeHistory) {
+  if (applied.value.includeHistory) {
     list.push({
       key: "history",
       label: t("mapping.includeHistory"),
@@ -140,8 +152,19 @@ async function loadShops() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    kolCode: query.kolCode.trim(),
+    productCode: query.productCode.trim(),
+    shopId: query.shopId,
+    weidianItemId: query.weidianItemId.trim(),
+    includeHistory: query.includeHistory
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -152,6 +175,13 @@ function reset() {
   query.weidianItemId = "";
   query.includeHistory = false;
   query.page = 1;
+  applied.value = {
+    kolCode: "",
+    productCode: "",
+    shopId: undefined,
+    weidianItemId: "",
+    includeHistory: false
+  };
   clearResults();
 }
 
@@ -198,7 +228,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('mapping.kolCode')">
@@ -298,7 +328,7 @@ onMounted(() => {
       :upload="uploadKolItemImport"
       @finished="search"
     />
-  </el-card>
+  </div>
 </template>
 
 <style scoped>

@@ -14,6 +14,8 @@ export interface TabSnapshot {
   v: 1;
   active: string;
   tabs: TabRecord[];
+  /** Owning user. Restore discards the snapshot when it does not match the signed-in user. */
+  userId: string | null;
 }
 
 export function homeAffix(): TabRecord {
@@ -34,8 +36,8 @@ export function affixFor(platformAdmin: boolean): TabRecord {
   return platformAdmin ? tenantAffix() : homeAffix();
 }
 
-function snapshot(active: string, tabs: TabRecord[]): TabSnapshot {
-  return { v: 1, active, tabs };
+function snapshot(active: string, tabs: TabRecord[], userId: string | null = null): TabSnapshot {
+  return { v: 1, active, tabs, userId };
 }
 
 function evict(tabs: TabRecord[], active: string): TabRecord[] {
@@ -54,7 +56,7 @@ export function openTab(current: TabSnapshot, tab: TabRecord): TabSnapshot {
   const tabs = existing
     ? current.tabs.map(item => (item.path === tab.path ? { ...item, ...tab } : item))
     : evict([...current.tabs, tab], tab.path);
-  return snapshot(tab.path, tabs);
+  return snapshot(tab.path, tabs, current.userId);
 }
 
 /** Closing the active tab activates the right neighbor, otherwise the left. Affix tabs stay. */
@@ -66,7 +68,7 @@ export function closeTab(current: TabSnapshot, path: string): TabSnapshot {
     current.active === path
       ? (current.tabs[index + 1]?.path ?? current.tabs[index - 1]?.path ?? current.active)
       : current.active;
-  return snapshot(active, tabs);
+  return snapshot(active, tabs, current.userId);
 }
 
 function subjectIndex(current: TabSnapshot, path: string): number {
@@ -82,7 +84,7 @@ function retain(
   const active = tabs.some(tab => tab.path === current.active)
     ? current.active
     : (tabs.find(tab => tab.path === subject)?.path ?? tabs[0]?.path ?? current.active);
-  return snapshot(active, tabs);
+  return snapshot(active, tabs, current.userId);
 }
 
 export function closeOthers(current: TabSnapshot, path: string): TabSnapshot {
@@ -103,7 +105,7 @@ export function closeRight(current: TabSnapshot, path: string): TabSnapshot {
 
 export function closeAll(current: TabSnapshot): TabSnapshot {
   const tabs = current.tabs.filter(tab => tab.affix);
-  return snapshot(tabs[0]?.path ?? current.active, tabs);
+  return snapshot(tabs[0]?.path ?? current.active, tabs, current.userId);
 }
 
 function isRecord(value: unknown): value is TabRecord {
@@ -124,9 +126,10 @@ function isRecord(value: unknown): value is TabRecord {
 export function restoreTabs(
   raw: string | null,
   affix: TabRecord,
-  canAccess: (path: string) => boolean
+  canAccess: (path: string) => boolean,
+  userId: string | null = null
 ): TabSnapshot {
-  const fallback = snapshot(affix.path, [affix]);
+  const fallback = snapshot(affix.path, [affix], userId);
   if (!raw) return fallback;
   let parsed: unknown;
   try {
@@ -137,6 +140,8 @@ export function restoreTabs(
   if (!parsed || typeof parsed !== "object") return fallback;
   const body = parsed as Partial<TabSnapshot>;
   if (body.v !== 1 || !Array.isArray(body.tabs)) return fallback;
+  // Another account's tabs must not reopen after disable → login as someone else.
+  if ((body.userId ?? null) !== userId) return fallback;
   const extras: TabRecord[] = [];
   for (const item of body.tabs) {
     if (!isRecord(item) || item.path === affix.path || item.affix) continue;
@@ -148,17 +153,18 @@ export function restoreTabs(
     typeof body.active === "string" ? body.active : affix.path
   );
   const active = tabs.some(tab => tab.path === body.active) ? String(body.active) : affix.path;
-  return snapshot(active, tabs);
+  return snapshot(active, tabs, userId);
 }
 
 export function loadStoredTabs(
   affix: TabRecord,
-  canAccess: (path: string) => boolean
+  canAccess: (path: string) => boolean,
+  userId: string | null = null
 ): TabSnapshot {
   try {
-    return restoreTabs(sessionStorage.getItem(TABS_STORAGE_KEY), affix, canAccess);
+    return restoreTabs(sessionStorage.getItem(TABS_STORAGE_KEY), affix, canAccess, userId);
   } catch {
-    return restoreTabs(null, affix, canAccess);
+    return restoreTabs(null, affix, canAccess, userId);
   }
 }
 

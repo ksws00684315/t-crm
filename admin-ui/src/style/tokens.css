@@ -148,3 +148,42 @@ html.dark {
 .el-select__wrapper {
   border-radius: var(--tcrm-radius-control);
 }
+
+/*
+ * Dark solid status buttons: keep the bright status colors for tags and text, but paint the
+ * button fill with the deep light-theme values so white label text stays ≥ 4.5:1.
+ * Measured (white on fill): primary 6.16, success 5.33, warning 5.79, danger 6.57.
+ */
+html.dark .el-button--success {
+  --el-button-bg-color: #1e7a4c;
+  --el-button-border-color: #1e7a4c;
+  --el-button-hover-bg-color: #24965c;
+  --el-button-hover-border-color: #24965c;
+  --el-button-active-bg-color: #19663f;
+  --el-button-active-border-color: #19663f;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}
+html.dark .el-button--warning {
+  --el-button-bg-color: #94570a;
+  --el-button-border-color: #94570a;
+  --el-button-hover-bg-color: #b06a10;
+  --el-button-hover-border-color: #b06a10;
+  --el-button-active-bg-color: #7a4808;
+  --el-button-active-border-color: #7a4808;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}
+html.dark .el-button--danger {
+  --el-button-bg-color: #b42318;
+  --el-button-border-color: #b42318;
+  --el-button-hover-bg-color: #d12b1e;
+  --el-button-hover-border-color: #d12b1e;
+  --el-button-active-bg-color: #961e14;
+  --el-button-active-border-color: #961e14;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}

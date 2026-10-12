@@ -48,16 +48,24 @@ const columns = computed<DataColumn[]>(() => [
   { key: "actions", label: t("common.actions"), width: 230 }
 ]);
 
+const applied = ref({
+  username: "",
+  role: undefined as typeof query.role,
+  status: undefined as 0 | 1 | undefined
+});
+
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
-  const username = query.username.trim();
+  const username = applied.value.username;
   if (username) list.push({ key: "username", label: t("common.username"), text: username });
-  if (query.role) list.push({ key: "role", label: t("user.role"), text: roleLabel(query.role) });
-  if (query.status === 0 || query.status === 1) {
+  if (applied.value.role) {
+    list.push({ key: "role", label: t("user.role"), text: roleLabel(applied.value.role) });
+  }
+  if (applied.value.status === 0 || applied.value.status === 1) {
     list.push({
       key: "status",
       label: t("common.status"),
-      text: query.status === 1 ? t("common.enabled") : t("common.disabled")
+      text: applied.value.status === 1 ? t("common.enabled") : t("common.disabled")
     });
   }
   return list;
@@ -87,8 +95,17 @@ async function load() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    username: query.username.trim(),
+    role: query.role,
+    status: query.status
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -157,7 +174,7 @@ onMounted(load);
 </script>
 
 <template>
-  <el-card shadow="never">
+  <div class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('common.username')">
@@ -244,5 +261,5 @@ onMounted(load);
 
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
-  </el-card>
+  </div>
 </template>
