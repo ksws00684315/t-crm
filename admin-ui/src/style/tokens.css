@@ -154,7 +154,7 @@ html.dark {
  * button fill with the deep light-theme values so white label text stays ≥ 4.5:1.
  * Measured (white on fill): primary 6.16, success 5.33, warning 5.79, danger 6.57.
  */
-html.dark .el-button--success {
+html.dark .el-button--success:not(.is-plain):not(.is-link):not(.is-text) {
   --el-button-bg-color: #1e7a4c;
   --el-button-border-color: #1e7a4c;
   --el-button-hover-bg-color: #24965c;
@@ -165,7 +165,7 @@ html.dark .el-button--success {
   --el-button-hover-text-color: #ffffff;
   --el-button-active-text-color: #ffffff;
 }
-html.dark .el-button--warning {
+html.dark .el-button--warning:not(.is-plain):not(.is-link):not(.is-text) {
   --el-button-bg-color: #94570a;
   --el-button-border-color: #94570a;
   --el-button-hover-bg-color: #b06a10;
@@ -176,7 +176,7 @@ html.dark .el-button--warning {
   --el-button-hover-text-color: #ffffff;
   --el-button-active-text-color: #ffffff;
 }
-html.dark .el-button--danger {
+html.dark .el-button--danger:not(.is-plain):not(.is-link):not(.is-text) {
   --el-button-bg-color: #b42318;
   --el-button-border-color: #b42318;
   --el-button-hover-bg-color: #d12b1e;
@@ -186,4 +186,14 @@ html.dark .el-button--danger {
   --el-button-text-color: #ffffff;
   --el-button-hover-text-color: #ffffff;
   --el-button-active-text-color: #ffffff;
+}
+
+/* Dark link/text buttons and links use the brightened text tokens on the card (≥ 4.5:1). */
+html.dark .el-button--primary.is-link,
+html.dark .el-button--primary.is-text,
+html.dark .el-link--primary {
+  --el-button-text-color: var(--tcrm-color-primary-text);
+  --el-button-hover-link-text-color: var(--tcrm-color-primary-text);
+  --el-link-text-color: var(--tcrm-color-primary-text);
+  color: var(--tcrm-color-primary-text);
 }

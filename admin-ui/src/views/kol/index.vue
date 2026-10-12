@@ -107,10 +107,10 @@ async function load() {
     const page = await listKols({
       page: query.page,
       size: query.size,
-      keyword: query.keyword.trim() || undefined,
-      country: query.country.trim().toUpperCase() || undefined,
-      status: query.status,
-      bdUserId: abilities.value.canManageBd ? query.bdUserId || undefined : undefined
+      keyword: applied.value.keyword || undefined,
+      country: applied.value.country || undefined,
+      status: applied.value.status,
+      bdUserId: abilities.value.canManageBd ? applied.value.bdUserId || undefined : undefined
     });
     rows.value = page.items;
     total.value = Number(page.total);

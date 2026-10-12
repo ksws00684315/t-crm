@@ -353,6 +353,23 @@ onBeforeUnmount(() => {
   color: var(--tcrm-color-text-secondary);
   background: var(--tcrm-color-muted);
 }
+.layout__header-start :deep(.el-breadcrumb) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.layout__header-start :deep(.el-breadcrumb__item) {
+  float: none;
+  display: inline;
+  white-space: nowrap;
+}
+.layout__actions,
+.layout__user,
+.layout__tenant {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .layout__user {
   display: inline-flex;
   align-items: center;

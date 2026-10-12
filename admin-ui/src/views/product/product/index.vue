@@ -114,10 +114,10 @@ async function load() {
     const page = await listProducts({
       page: query.page,
       size: query.size,
-      keyword: query.keyword.trim() || undefined,
-      shopId: query.shopId || undefined,
-      status: query.status,
-      category: query.category.trim() || undefined
+      keyword: applied.value.keyword || undefined,
+      shopId: applied.value.shopId || undefined,
+      status: applied.value.status,
+      category: applied.value.category || undefined
     });
     rows.value = page.items;
     total.value = Number(page.total);

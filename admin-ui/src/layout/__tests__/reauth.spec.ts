@@ -1,5 +1,5 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessage } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { defineComponent, nextTick, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -155,11 +155,15 @@ describe("reauth dialog", () => {
     vi.mocked(login).mockRejectedValue(
       new ApiError({ status: 429, errorCode: "AUTH_ACCOUNT_LOCKED", traceId: "t" })
     );
+    const warning = vi.spyOn(ElMessage, "warning");
     const { wrapper, router } = await mountHost();
     await typePassword("StrongPass!42");
     await bodyButton("reauth-submit").trigger("click");
     await flushPromises();
 
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith("登录失败次数过多，请稍后再试");
+    warning.mockRestore();
     expect(useUserStore().isLoggedIn).toBe(false);
     expect(useTabsStore().tabs).toEqual([]);
     expect(useReauthStore().visible).toBe(false);

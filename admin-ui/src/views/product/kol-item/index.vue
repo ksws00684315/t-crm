@@ -105,9 +105,9 @@ const importLimitHint = computed(() => t("mapping.limitHint"));
 
 function hasPrecisionFilter(): boolean {
   return (
-    query.kolCode.trim() !== "" ||
-    query.productCode.trim() !== "" ||
-    query.weidianItemId.trim() !== ""
+    applied.value.kolCode !== "" ||
+    applied.value.productCode !== "" ||
+    applied.value.weidianItemId !== ""
   );
 }
 
@@ -128,11 +128,11 @@ async function load() {
     const page = await listKolItems({
       page: query.page,
       size: query.size,
-      kolCode: query.kolCode.trim() || undefined,
-      productCode: query.productCode.trim() || undefined,
-      shopId: query.shopId || undefined,
-      weidianItemId: query.weidianItemId.trim() || undefined,
-      current: !query.includeHistory
+      kolCode: applied.value.kolCode || undefined,
+      productCode: applied.value.productCode || undefined,
+      shopId: applied.value.shopId || undefined,
+      weidianItemId: applied.value.weidianItemId || undefined,
+      current: !applied.value.includeHistory
     });
     hasQueried.value = true;
     rows.value = page.items;

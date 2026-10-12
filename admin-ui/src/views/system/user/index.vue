@@ -82,9 +82,9 @@ async function load() {
     const page = await listUsers({
       page: query.page,
       size: query.size,
-      username: query.username.trim() || undefined,
-      role: query.role,
-      status: query.status
+      username: applied.value.username || undefined,
+      role: applied.value.role,
+      status: applied.value.status
     });
     rows.value = page.items;
     total.value = Number(page.total);

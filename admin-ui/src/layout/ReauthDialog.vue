@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { FormInstance, FormRules } from "element-plus";
+import { ElMessage, type FormInstance, type FormRules } from "element-plus";
+import { messageForErrorCode } from "@/api/error-codes";
 import { onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -55,6 +56,7 @@ async function submit(): Promise<void> {
     form.password = "";
     // AUTH_ACCOUNT_LOCKED is HTTP 429, so the 401 handler never sees it.
     if (error instanceof ApiError && error.errorCode === "AUTH_ACCOUNT_LOCKED") {
+      ElMessage.warning(messageForErrorCode("AUTH_ACCOUNT_LOCKED"));
       await leaveForLogin();
       return;
     }
