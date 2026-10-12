@@ -174,6 +174,12 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  search: {
+    expand: "Expand",
+    collapse: "Collapse",
+    chip: "{label}: {text}",
+    clearAll: "Clear all"
+  },
   table: {
     total: "{total} in total",
     range: "{from}–{to} of {total}",

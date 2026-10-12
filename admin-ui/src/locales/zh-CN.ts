@@ -177,6 +177,12 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  search: {
+    expand: "展开",
+    collapse: "收起",
+    chip: "{label}：{text}",
+    clearAll: "清除全部"
+  },
   table: {
     total: "共 {total} 条",
     range: "第 {from}–{to} 条 / 共 {total} 条",
