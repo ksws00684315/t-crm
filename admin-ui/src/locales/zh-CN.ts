@@ -167,7 +167,76 @@ const zhCN = {
   },
   layout: {
     changePassword: "修改密码",
-    user: "{nickname}（{role}）"
+    user: "{nickname}（{role}）",
+    collapse: "折叠侧边栏",
+    expand: "展开侧边栏",
+    searchMenu: "搜索菜单",
+    refresh: "刷新当前页",
+    fullscreen: "全屏",
+    exitFullscreen: "退出全屏",
+    shortcutMac: "⌘ K",
+    shortcutOther: "Ctrl K"
+  },
+  version: {
+    message: "系统已更新，刷新页面以使用新版本。已打开的标签会保留。",
+    refresh: "立即刷新",
+    later: "稍后"
+  },
+  reauth: {
+    title: "登录已过期",
+    hint: "请重新输入密码。当前页面已填写的内容会保留，失败的请求不会自动重发。",
+    submit: "重新登录",
+    switch: "切换账号",
+    failed: "重新登录失败，请重试"
+  },
+  menuSearch: {
+    title: "搜索菜单",
+    placeholder: "输入菜单名称",
+    recent: "最近访问",
+    empty: "没有匹配的菜单"
+  },
+  copy: {
+    done: "已复制 {text}",
+    failed: "复制失败，请手动复制"
+  },
+  search: {
+    expand: "展开",
+    collapse: "收起",
+    chip: "{label}：{text}",
+    clearAll: "清除全部"
+  },
+  table: {
+    total: "共 {total} 条",
+    range: "第 {from}–{to} 条 / 共 {total} 条",
+    densityDefault: "默认",
+    densityCompact: "紧凑",
+    densityLoose: "宽松",
+    refresh: "刷新",
+    columns: "列设置",
+    hidden: "已隐藏 {n} 列",
+    moveUp: "上移",
+    moveDown: "下移",
+    reset: "重置",
+    fullscreen: "表格全屏",
+    exitFullscreen: "退出表格全屏",
+    empty: "暂无数据",
+    emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
+    clearFilters: "清除筛选"
+  },
+  tabs: {
+    close: "关闭",
+    closeOthers: "关闭其他",
+    closeLeft: "关闭左侧",
+    closeRight: "关闭右侧",
+    closeAll: "关闭全部",
+    refresh: "刷新当前页",
+    more: "标签操作"
+  },
+  theme: {
+    cycle: "切换主题",
+    light: "浅色",
+    dark: "深色",
+    system: "跟随系统"
   },
   password: {
     old: "原密码",

@@ -1,0 +1,199 @@
+/*
+ * Design tokens for the admin console. Light values live on :root; dark values override them
+ * under html.dark (the class Element Plus dark CSS variables also key off). Import this file
+ * after element-plus/theme-chalk/dark/css-vars.css so these overrides win.
+ *
+ * Contrast (body, secondary text, status tags vs their backgrounds) is at least 4.5:1 in both
+ * modes. Status colors also differ in lightness, not only hue. Dark-mode primary text is lighter
+ * than the button fill: white on #2457D6 stays the button pair, and #9BB4FF is for text/links.
+ */
+
+:root {
+  --tcrm-color-primary: #2457d6;
+  --tcrm-color-primary-text: #2457d6;
+  --tcrm-color-on-primary: #ffffff;
+  --tcrm-color-page: #f5f6f8;
+  --tcrm-color-card: #ffffff;
+  --tcrm-color-muted: #f0f2f5;
+  --tcrm-color-border: #e2e5ea;
+  --tcrm-color-text: #15181d;
+  --tcrm-color-text-secondary: #5c6470;
+  --tcrm-color-success: #1e7a4c;
+  --tcrm-color-success-bg: #e6f4ec;
+  --tcrm-color-warning: #94570a;
+  --tcrm-color-warning-bg: #fbf1de;
+  --tcrm-color-danger: #b42318;
+  --tcrm-color-danger-bg: #fdecea;
+  --tcrm-shadow-overlay: 0 8px 24px rgba(21, 24, 29, 0.12);
+
+  --tcrm-space-1: 4px;
+  --tcrm-space-2: 8px;
+  --tcrm-space-3: 12px;
+  --tcrm-space-4: 16px;
+  --tcrm-space-5: 24px;
+  --tcrm-control-height: 32px;
+  --tcrm-radius-card: 12px;
+  --tcrm-radius-control: 8px;
+  --tcrm-radius-tag: 6px;
+  --tcrm-sidebar-width: 224px;
+  --tcrm-sidebar-collapsed: 64px;
+  --tcrm-header-height: 56px;
+  --tcrm-font-sans:
+    "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  --tcrm-font-mono: "SFMono-Regular", Consolas, Menlo, ui-monospace, monospace;
+
+  --el-color-primary: var(--tcrm-color-primary);
+  --el-color-success: var(--tcrm-color-success);
+  --el-color-warning: var(--tcrm-color-warning);
+  --el-color-danger: var(--tcrm-color-danger);
+  --el-color-info: var(--tcrm-color-text-secondary);
+  --el-color-success-light-9: var(--tcrm-color-success-bg);
+  --el-color-warning-light-9: var(--tcrm-color-warning-bg);
+  --el-color-danger-light-9: var(--tcrm-color-danger-bg);
+  --el-color-info-light-9: var(--tcrm-color-muted);
+  --el-color-success-light-8: var(--tcrm-color-success-bg);
+  --el-color-warning-light-8: var(--tcrm-color-warning-bg);
+  --el-color-danger-light-8: var(--tcrm-color-danger-bg);
+  --el-color-info-light-8: var(--tcrm-color-muted);
+  --el-bg-color: var(--tcrm-color-card);
+  --el-bg-color-page: var(--tcrm-color-page);
+  --el-bg-color-overlay: var(--tcrm-color-card);
+  --el-text-color-primary: var(--tcrm-color-text);
+  --el-text-color-regular: var(--tcrm-color-text);
+  --el-text-color-secondary: var(--tcrm-color-text-secondary);
+  --el-text-color-placeholder: var(--tcrm-color-text-secondary);
+  --el-border-color: var(--tcrm-color-border);
+  --el-border-color-light: var(--tcrm-color-border);
+  --el-border-color-lighter: var(--tcrm-color-border);
+  --el-border-color-extra-light: var(--tcrm-color-border);
+  --el-fill-color: var(--tcrm-color-muted);
+  --el-fill-color-light: var(--tcrm-color-muted);
+  --el-fill-color-blank: var(--tcrm-color-card);
+  --el-mask-color: rgba(21, 24, 29, 0.45);
+  --el-border-radius-base: var(--tcrm-radius-control);
+  --el-border-radius-small: var(--tcrm-radius-tag);
+  --el-component-size: var(--tcrm-control-height);
+  --el-box-shadow: var(--tcrm-shadow-overlay);
+  --el-box-shadow-light: var(--tcrm-shadow-overlay);
+  color-scheme: light;
+}
+
+html.dark {
+  --tcrm-color-primary: #2457d6;
+  --tcrm-color-primary-text: #9bb4ff;
+  --tcrm-color-on-primary: #ffffff;
+  --tcrm-color-page: #0d0f12;
+  --tcrm-color-card: #15181d;
+  --tcrm-color-muted: #1d2128;
+  --tcrm-color-border: #2a2f38;
+  --tcrm-color-text: #e7e9ec;
+  --tcrm-color-text-secondary: #a3aab5;
+  --tcrm-color-success: #5cc98e;
+  --tcrm-color-success-bg: #123528;
+  --tcrm-color-warning: #f0b35a;
+  --tcrm-color-warning-bg: #3a2c12;
+  --tcrm-color-danger: #f2877d;
+  --tcrm-color-danger-bg: #3c1816;
+  --tcrm-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --el-color-primary: var(--tcrm-color-primary);
+  --el-color-primary-light-3: var(--tcrm-color-primary-text);
+  --el-link-text-color: var(--tcrm-color-primary-text);
+  --el-link-hover-text-color: var(--tcrm-color-primary-text);
+  --el-color-success: var(--tcrm-color-success);
+  --el-color-warning: var(--tcrm-color-warning);
+  --el-color-danger: var(--tcrm-color-danger);
+  --el-color-info: var(--tcrm-color-text-secondary);
+  --el-color-success-light-9: var(--tcrm-color-success-bg);
+  --el-color-warning-light-9: var(--tcrm-color-warning-bg);
+  --el-color-danger-light-9: var(--tcrm-color-danger-bg);
+  --el-color-info-light-9: var(--tcrm-color-muted);
+  --el-color-success-light-8: var(--tcrm-color-success-bg);
+  --el-color-warning-light-8: var(--tcrm-color-warning-bg);
+  --el-color-danger-light-8: var(--tcrm-color-danger-bg);
+  --el-color-info-light-8: var(--tcrm-color-muted);
+  --el-bg-color: var(--tcrm-color-card);
+  --el-bg-color-page: var(--tcrm-color-page);
+  --el-bg-color-overlay: var(--tcrm-color-card);
+  --el-text-color-primary: var(--tcrm-color-text);
+  --el-text-color-regular: var(--tcrm-color-text);
+  --el-text-color-secondary: var(--tcrm-color-text-secondary);
+  --el-text-color-placeholder: var(--tcrm-color-text-secondary);
+  --el-border-color: var(--tcrm-color-border);
+  --el-border-color-light: var(--tcrm-color-border);
+  --el-border-color-lighter: var(--tcrm-color-border);
+  --el-border-color-extra-light: var(--tcrm-color-border);
+  --el-fill-color: var(--tcrm-color-muted);
+  --el-fill-color-light: var(--tcrm-color-muted);
+  --el-fill-color-blank: var(--tcrm-color-card);
+  --el-fill-color-dark: var(--tcrm-color-muted);
+  --el-mask-color: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+/* Cards use a hairline border. Shadows stay on overlays (menus, dialogs, notices). */
+.el-card {
+  --el-card-border-radius: var(--tcrm-radius-card);
+  border: 1px solid var(--tcrm-color-border);
+  box-shadow: none;
+}
+
+.el-tag {
+  --el-tag-border-radius: var(--tcrm-radius-tag);
+}
+
+.el-button,
+.el-input__wrapper,
+.el-select__wrapper {
+  border-radius: var(--tcrm-radius-control);
+}
+
+/*
+ * Dark solid status buttons: keep the bright status colors for tags and text, but paint the
+ * button fill with the deep light-theme values so white label text stays ≥ 4.5:1.
+ * Measured (white on fill): primary 6.16, success 5.33, warning 5.79, danger 6.57.
+ */
+html.dark .el-button--success:not(.is-plain):not(.is-link):not(.is-text) {
+  --el-button-bg-color: #1e7a4c;
+  --el-button-border-color: #1e7a4c;
+  --el-button-hover-bg-color: #24965c;
+  --el-button-hover-border-color: #24965c;
+  --el-button-active-bg-color: #19663f;
+  --el-button-active-border-color: #19663f;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}
+html.dark .el-button--warning:not(.is-plain):not(.is-link):not(.is-text) {
+  --el-button-bg-color: #94570a;
+  --el-button-border-color: #94570a;
+  --el-button-hover-bg-color: #b06a10;
+  --el-button-hover-border-color: #b06a10;
+  --el-button-active-bg-color: #7a4808;
+  --el-button-active-border-color: #7a4808;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}
+html.dark .el-button--danger:not(.is-plain):not(.is-link):not(.is-text) {
+  --el-button-bg-color: #b42318;
+  --el-button-border-color: #b42318;
+  --el-button-hover-bg-color: #d12b1e;
+  --el-button-hover-border-color: #d12b1e;
+  --el-button-active-bg-color: #961e14;
+  --el-button-active-border-color: #961e14;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-active-text-color: #ffffff;
+}
+
+/* Dark link/text buttons and links use the brightened text tokens on the card (≥ 4.5:1). */
+html.dark .el-button--primary.is-link,
+html.dark .el-button--primary.is-text,
+html.dark .el-link--primary {
+  --el-button-text-color: var(--tcrm-color-primary-text);
+  --el-button-hover-link-text-color: var(--tcrm-color-primary-text);
+  --el-link-text-color: var(--tcrm-color-primary-text);
+  color: var(--tcrm-color-primary-text);
+}

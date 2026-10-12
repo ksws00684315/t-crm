@@ -6,13 +6,31 @@ body,
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto,
-    sans-serif;
-  color: #303133;
-  background: #f5f7fa;
+  font-family: var(--tcrm-font-sans);
+  color: var(--tcrm-color-text);
+  background: var(--tcrm-color-page);
+}
+
+.tcrm-mono {
+  font-family: var(--tcrm-font-mono);
+}
+
+.tcrm-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* List pages: search keeps its height; the table card fills the rest so el-table can fix the header.
+ * Height uses the viewport minus header (56) + tab bar (40) + main padding (16*2), so the page does
+ * not depend on every ancestor passing height:100% through Transition/KeepAlive. */
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-3);
+  height: calc(100vh - var(--tcrm-header-height) - 40px - 32px);
+  min-height: 320px;
 }

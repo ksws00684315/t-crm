@@ -164,7 +164,76 @@ const enUS: MessageSchema = {
   },
   layout: {
     changePassword: "Change Password",
-    user: "{nickname} ({role})"
+    user: "{nickname} ({role})",
+    collapse: "Collapse sidebar",
+    expand: "Expand sidebar",
+    searchMenu: "Search menu",
+    refresh: "Refresh current page",
+    fullscreen: "Full screen",
+    exitFullscreen: "Exit full screen",
+    shortcutMac: "⌘ K",
+    shortcutOther: "Ctrl K"
+  },
+  version: {
+    message: "The system has been updated. Refresh to use the new version. Open tabs are kept.",
+    refresh: "Refresh now",
+    later: "Later"
+  },
+  reauth: {
+    title: "Session expired",
+    hint: "Enter your password. What you already filled in stays on this page, and the failed request is not sent again.",
+    submit: "Sign in again",
+    switch: "Switch account",
+    failed: "Could not sign in again. Try once more."
+  },
+  menuSearch: {
+    title: "Search menu",
+    placeholder: "Menu name",
+    recent: "Recent",
+    empty: "No matching menus"
+  },
+  copy: {
+    done: "Copied {text}",
+    failed: "Could not copy. Select the text and copy it manually."
+  },
+  search: {
+    expand: "Expand",
+    collapse: "Collapse",
+    chip: "{label}: {text}",
+    clearAll: "Clear all"
+  },
+  table: {
+    total: "{total} in total",
+    range: "{from}–{to} of {total}",
+    densityDefault: "Default",
+    densityCompact: "Compact",
+    densityLoose: "Loose",
+    refresh: "Refresh",
+    columns: "Columns",
+    hidden: "{n} hidden",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    reset: "Reset",
+    fullscreen: "Table full screen",
+    exitFullscreen: "Exit table full screen",
+    empty: "No data",
+    emptyFiltered: "No matching data · {n} filters applied",
+    clearFilters: "Clear filters"
+  },
+  tabs: {
+    close: "Close",
+    closeOthers: "Close others",
+    closeLeft: "Close left",
+    closeRight: "Close right",
+    closeAll: "Close all",
+    refresh: "Refresh current page",
+    more: "Tab actions"
+  },
+  theme: {
+    cycle: "Switch theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System"
   },
   password: {
     old: "Current password",

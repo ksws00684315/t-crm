@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, UserVO } from "@/api/types";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
+import { readPageSize } from "@/utils/table-prefs";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
 
@@ -26,8 +29,46 @@ const query = reactive<{
   status?: 0 | 1;
 }>({
   page: 1,
-  size: 20,
+  size: readPageSize("users", 20),
   username: ""
+});
+
+function asUser(row: object): UserVO {
+  return row as UserVO;
+}
+
+const columns = computed<DataColumn[]>(() => [
+  { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
+  { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
+  { key: "role", label: t("user.role"), width: 110 },
+  { key: "dataScope", label: t("user.dataScope"), width: 100 },
+  { key: "status", label: t("common.status"), width: 80 },
+  { key: "lastLogin", label: t("user.lastLogin"), width: 170, mono: true },
+  { key: "createdAt", label: t("common.createdAt"), width: 170, mono: true },
+  { key: "actions", label: t("common.actions"), width: 230 }
+]);
+
+const applied = ref({
+  username: "",
+  role: undefined as typeof query.role,
+  status: undefined as 0 | 1 | undefined
+});
+
+const chips = computed<SearchChip[]>(() => {
+  const list: SearchChip[] = [];
+  const username = applied.value.username;
+  if (username) list.push({ key: "username", label: t("common.username"), text: username });
+  if (applied.value.role) {
+    list.push({ key: "role", label: t("user.role"), text: roleLabel(applied.value.role) });
+  }
+  if (applied.value.status === 0 || applied.value.status === 1) {
+    list.push({
+      key: "status",
+      label: t("common.status"),
+      text: applied.value.status === 1 ? t("common.enabled") : t("common.disabled")
+    });
+  }
+  return list;
 });
 
 const formVisible = ref(false);
@@ -41,9 +82,9 @@ async function load() {
     const page = await listUsers({
       page: query.page,
       size: query.size,
-      username: query.username.trim() || undefined,
-      role: query.role,
-      status: query.status
+      username: applied.value.username || undefined,
+      role: applied.value.role,
+      status: applied.value.status
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -54,8 +95,17 @@ async function load() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    username: query.username.trim(),
+    role: query.role,
+    status: query.status
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -64,6 +114,22 @@ function reset() {
   query.role = undefined;
   query.status = undefined;
   search();
+}
+
+function removeChip(key: string): void {
+  if (key === "username") query.username = "";
+  if (key === "role") query.role = undefined;
+  if (key === "status") query.status = undefined;
+  search();
+}
+
+function onPage(page: number): void {
+  query.page = page;
+  void load();
+}
+
+function onSize(size: number): void {
+  query.size = size;
 }
 
 function openCreate() {
@@ -108,110 +174,92 @@ onMounted(load);
 </script>
 
 <template>
-  <el-card shadow="never">
-    <el-form :inline="true" :model="query" @submit.prevent>
-      <el-form-item :label="t('common.username')">
-        <el-input v-model="query.username" clearable maxlength="64" @keyup.enter="search" />
-      </el-form-item>
-      <el-form-item :label="t('user.role')">
-        <el-select
-          v-model="query.role"
-          clearable
-          :placeholder="t('common.all')"
-          style="width: 140px"
-        >
-          <el-option
-            v-for="role in SELECTABLE_ROLES"
-            :key="role"
-            :label="roleLabel(role)"
-            :value="role"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item :label="t('common.status')">
-        <el-select
-          v-model="query.status"
-          clearable
-          :placeholder="t('common.all')"
-          style="width: 120px"
-        >
-          <el-option :label="t('common.enabled')" :value="1" />
-          <el-option :label="t('common.disabled')" :value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="search">{{ t("common.search") }}</el-button>
-        <el-button @click="reset">{{ t("common.reset") }}</el-button>
-        <el-button type="success" @click="openCreate">{{ t("user.create") }}</el-button>
-      </el-form-item>
-    </el-form>
-
-    <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="username" :label="t('common.username')" min-width="130" />
-      <el-table-column prop="nickname" :label="t('common.nickname')" min-width="120" />
-      <el-table-column :label="t('user.role')" width="110">
-        <template #default="{ row }">
-          {{ (row as UserVO).role ? roleLabel((row as UserVO).role) : "" }}
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('user.dataScope')" width="100">
-        <template #default="{ row }">
-          {{ (row as UserVO).dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort") }}
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('common.status')" width="80">
-        <template #default="{ row }">
-          <el-tag :type="(row as UserVO).status === 1 ? 'success' : 'info'">
-            {{ (row as UserVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('user.lastLogin')" width="170">
-        <template #default="{ row }">{{ formatInstant((row as UserVO).lastLoginTime) }}</template>
-      </el-table-column>
-      <el-table-column :label="t('common.createdAt')" width="170">
-        <template #default="{ row }">{{ formatInstant((row as UserVO).createTime) }}</template>
-      </el-table-column>
-      <el-table-column :label="t('common.actions')" width="230" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row as UserVO)">{{
-            t("common.edit")
-          }}</el-button>
-          <el-button
-            link
-            :type="(row as UserVO).status === 1 ? 'danger' : 'success'"
-            :disabled="(row as UserVO).id === me.user?.id"
-            @click="toggleStatus(row as UserVO)"
+  <div class="list-page">
+    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+      <template #primary>
+        <el-form-item :label="t('common.username')">
+          <el-input v-model="query.username" clearable maxlength="64" />
+        </el-form-item>
+      </template>
+      <template #more>
+        <el-form-item :label="t('user.role')">
+          <el-select
+            v-model="query.role"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 140px"
           >
-            {{ (row as UserVO).status === 1 ? t("common.disabled") : t("common.enabled") }}
-          </el-button>
-          <el-button link type="warning" @click="openReset(row as UserVO)">
-            {{ t("user.resetPassword") }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+            <el-option
+              v-for="role in SELECTABLE_ROLES"
+              :key="role"
+              :label="roleLabel(role)"
+              :value="role"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('common.status')">
+          <el-select
+            v-model="query.status"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 120px"
+          >
+            <el-option :label="t('common.enabled')" :value="1" />
+            <el-option :label="t('common.disabled')" :value="0" />
+          </el-select>
+        </el-form-item>
+      </template>
+      <template #actions>
+        <el-button type="success" @click="openCreate">{{ t("user.create") }}</el-button>
+      </template>
+    </ListSearch>
 
-    <el-pagination
-      v-model:current-page="query.page"
-      v-model:page-size="query.size"
-      class="pager"
-      background
-      layout="total, sizes, prev, pager, next"
-      :page-sizes="[10, 20, 50, 100]"
+    <DataTable
+      table-id="users"
+      :rows="rows"
+      :columns="columns"
+      :loading="loading"
       :total="total"
-      @current-change="load"
-      @size-change="search"
-    />
+      :page="query.page"
+      :size="query.size"
+      :filter-count="chips.length"
+      @update:page="onPage"
+      @update:size="onSize"
+      @refresh="load"
+      @clear-filters="reset"
+    >
+      <template #cell-role="{ row }">
+        {{ asUser(row).role ? roleLabel(asUser(row).role) : "" }}
+      </template>
+      <template #cell-dataScope="{ row }">
+        {{ asUser(row).dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort") }}
+      </template>
+      <template #cell-status="{ row }">
+        <el-tag :type="asUser(row).status === 1 ? 'success' : 'info'">
+          {{ asUser(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
+        </el-tag>
+      </template>
+      <template #cell-lastLogin="{ row }">{{ formatInstant(asUser(row).lastLoginTime) }}</template>
+      <template #cell-createdAt="{ row }">{{ formatInstant(asUser(row).createTime) }}</template>
+      <template #actions="{ row }">
+        <el-button link type="primary" @click="openEdit(asUser(row))">{{
+          t("common.edit")
+        }}</el-button>
+        <el-button
+          link
+          :type="asUser(row).status === 1 ? 'danger' : 'success'"
+          :disabled="asUser(row).id === me.user?.id"
+          @click="toggleStatus(asUser(row))"
+        >
+          {{ asUser(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+        </el-button>
+        <el-button link type="warning" @click="openReset(asUser(row))">
+          {{ t("user.resetPassword") }}
+        </el-button>
+      </template>
+    </DataTable>
 
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
-  </el-card>
+  </div>
 </template>
-
-<style scoped>
-.pager {
-  margin-top: 16px;
-  justify-content: flex-end;
-}
-</style>

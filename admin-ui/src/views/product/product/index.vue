@@ -11,12 +11,16 @@ import {
 } from "@/api/product/product";
 import { listShops } from "@/api/product/shop";
 import type { ProductVO, ShopVO } from "@/api/types";
+import CopyText from "@/components/CopyText.vue";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
+import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { productAbilities } from "@/utils/permission";
 import { formatRate, percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
+import { readPageSize } from "@/utils/table-prefs";
 
 defineOptions({ name: "ProductListPage" });
 
@@ -35,7 +39,60 @@ const query = reactive<{
   shopId?: string;
   status?: 0 | 1;
   category: string;
-}>({ page: 1, size: 20, keyword: "", category: "" });
+}>({ page: 1, size: readPageSize("products", 20), keyword: "", category: "" });
+
+function asProduct(row: object): ProductVO {
+  return row as ProductVO;
+}
+
+const columns = computed<DataColumn[]>(() => {
+  const list: DataColumn[] = [
+    { key: "productCode", label: t("product.code"), width: 130, mono: true },
+    { key: "name", label: t("product.name"), prop: "name", minWidth: 160 },
+    { key: "shopName", label: t("product.shop"), prop: "shopName", minWidth: 120 },
+    { key: "weidianItemId", label: t("product.weidianItemId"), minWidth: 130, mono: true },
+    { key: "category", label: t("product.category"), prop: "category", width: 100 },
+    { key: "price", label: t("product.price"), width: 100, amount: true },
+    { key: "rate", label: t("product.rate"), width: 100, amount: true },
+    { key: "status", label: t("common.status"), width: 80 },
+    { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
+  ];
+  if (abilities.value.canWriteProduct) {
+    list.push({ key: "actions", label: t("common.actions"), width: 140 });
+  }
+  return list;
+});
+
+const applied = ref({
+  keyword: "",
+  shopId: undefined as string | undefined,
+  status: undefined as 0 | 1 | undefined,
+  category: ""
+});
+
+const chips = computed<SearchChip[]>(() => {
+  const list: SearchChip[] = [];
+  const keyword = applied.value.keyword;
+  const category = applied.value.category;
+  if (keyword) list.push({ key: "keyword", label: t("common.keyword"), text: keyword });
+  if (applied.value.shopId) {
+    const shop = shops.value.find(item => item.id === applied.value.shopId);
+    list.push({
+      key: "shop",
+      label: t("product.shop"),
+      text: shop?.shopName ?? applied.value.shopId
+    });
+  }
+  if (applied.value.status === 0 || applied.value.status === 1) {
+    list.push({
+      key: "status",
+      label: t("common.status"),
+      text: applied.value.status === 1 ? t("product.onSale") : t("product.offShelf")
+    });
+  }
+  if (category) list.push({ key: "category", label: t("product.category"), text: category });
+  return list;
+});
 
 const formVisible = ref(false);
 const editing = ref<ProductVO | null>(null);
@@ -57,10 +114,10 @@ async function load() {
     const page = await listProducts({
       page: query.page,
       size: query.size,
-      keyword: query.keyword.trim() || undefined,
-      shopId: query.shopId || undefined,
-      status: query.status,
-      category: query.category.trim() || undefined
+      keyword: applied.value.keyword || undefined,
+      shopId: applied.value.shopId || undefined,
+      status: applied.value.status,
+      category: applied.value.category || undefined
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -79,8 +136,18 @@ async function loadShops() {
   }
 }
 
+function snapshotFilters(): void {
+  applied.value = {
+    keyword: query.keyword.trim(),
+    shopId: query.shopId,
+    status: query.status,
+    category: query.category.trim()
+  };
+}
+
 function search() {
   query.page = 1;
+  snapshotFilters();
   void load();
 }
 
@@ -90,6 +157,23 @@ function reset() {
   query.status = undefined;
   query.category = "";
   search();
+}
+
+function removeChip(key: string): void {
+  if (key === "keyword") query.keyword = "";
+  if (key === "shop") query.shopId = undefined;
+  if (key === "status") query.status = undefined;
+  if (key === "category") query.category = "";
+  search();
+}
+
+function onPage(page: number): void {
+  query.page = page;
+  void load();
+}
+
+function onSize(size: number): void {
+  query.size = size;
 }
 
 function openEdit(row: ProductVO) {
@@ -158,109 +242,93 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-card shadow="never">
-    <el-form :inline="true" :model="query" @submit.prevent>
-      <el-form-item :label="t('common.keyword')">
-        <el-input
-          v-model="query.keyword"
-          clearable
-          maxlength="64"
-          :placeholder="t('product.keywordPlaceholder')"
-          @keyup.enter="search"
-        />
-      </el-form-item>
-      <el-form-item :label="t('product.shop')">
-        <el-select
-          v-model="query.shopId"
-          clearable
-          :placeholder="t('common.all')"
-          style="width: 160px"
-        >
-          <el-option v-for="s in shops" :key="s.id" :label="s.shopName" :value="s.id" />
-        </el-select>
-      </el-form-item>
-      <el-form-item :label="t('common.status')">
-        <el-select
-          v-model="query.status"
-          clearable
-          :placeholder="t('common.all')"
-          style="width: 110px"
-        >
-          <el-option :label="t('product.onSale')" :value="1" />
-          <el-option :label="t('product.offShelf')" :value="0" />
-        </el-select>
-      </el-form-item>
-      <el-form-item :label="t('product.category')">
-        <el-input v-model="query.category" clearable maxlength="64" @keyup.enter="search" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="search">{{ t("common.search") }}</el-button>
-        <el-button @click="reset">{{ t("common.reset") }}</el-button>
-        <el-button
-          v-if="abilities.canWriteProduct"
-          data-test="import"
-          @click="importVisible = true"
-        >
+  <div class="list-page">
+    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+      <template #primary>
+        <el-form-item :label="t('common.keyword')">
+          <el-input
+            v-model="query.keyword"
+            clearable
+            maxlength="64"
+            :placeholder="t('product.keywordPlaceholder')"
+          />
+        </el-form-item>
+        <el-form-item :label="t('product.shop')">
+          <el-select
+            v-model="query.shopId"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 160px"
+          >
+            <el-option v-for="s in shops" :key="s.id" :label="s.shopName" :value="s.id" />
+          </el-select>
+        </el-form-item>
+      </template>
+      <template #more>
+        <el-form-item :label="t('common.status')">
+          <el-select
+            v-model="query.status"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 110px"
+          >
+            <el-option :label="t('product.onSale')" :value="1" />
+            <el-option :label="t('product.offShelf')" :value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('product.category')">
+          <el-input v-model="query.category" clearable maxlength="64" />
+        </el-form-item>
+      </template>
+      <template v-if="abilities.canWriteProduct" #actions>
+        <el-button data-test="import" @click="importVisible = true">
           {{ t("kol.import") }}
         </el-button>
-      </el-form-item>
-    </el-form>
+      </template>
+    </ListSearch>
 
-    <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="productCode" :label="t('product.code')" width="130" />
-      <el-table-column prop="name" :label="t('product.name')" min-width="160" />
-      <el-table-column prop="shopName" :label="t('product.shop')" min-width="120" />
-      <el-table-column prop="weidianItemId" :label="t('product.weidianItemId')" min-width="130" />
-      <el-table-column prop="category" :label="t('product.category')" width="100" />
-      <el-table-column :label="t('product.price')" width="100">
-        <template #default="{ row }">{{ (row as ProductVO).price }}</template>
-      </el-table-column>
-      <el-table-column :label="t('product.rate')" width="100">
-        <template #default="{ row }">{{ formatRate((row as ProductVO).rate) }}</template>
-      </el-table-column>
-      <el-table-column :label="t('common.status')" width="80">
-        <template #default="{ row }">
-          <el-tag :type="(row as ProductVO).status === 1 ? 'success' : 'info'">
-            {{ (row as ProductVO).status === 1 ? t("product.onSale") : t("product.offShelf") }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('common.updatedAt')" width="170">
-        <template #default="{ row }">{{ formatInstant((row as ProductVO).updateTime) }}</template>
-      </el-table-column>
-      <el-table-column
-        v-if="abilities.canWriteProduct"
-        :label="t('common.actions')"
-        width="140"
-        fixed="right"
-      >
-        <template #default="{ row }">
-          <el-button link type="primary" data-test="edit" @click="openEdit(row as ProductVO)">
-            {{ t("common.edit") }}
-          </el-button>
-          <el-button
-            link
-            :type="(row as ProductVO).status === 1 ? 'danger' : 'success'"
-            data-test="status"
-            @click="toggleStatus(row as ProductVO)"
-          >
-            {{ (row as ProductVO).status === 1 ? t("product.offShelf") : t("product.putOnShelf") }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination
-      v-model:current-page="query.page"
-      v-model:page-size="query.size"
-      class="pager"
-      background
-      layout="total, sizes, prev, pager, next"
-      :page-sizes="[10, 20, 50, 100]"
+    <DataTable
+      table-id="products"
+      :rows="rows"
+      :columns="columns"
+      :loading="loading"
       :total="total"
-      @current-change="load"
-      @size-change="search"
-    />
+      :page="query.page"
+      :size="query.size"
+      :filter-count="chips.length"
+      @update:page="onPage"
+      @update:size="onSize"
+      @refresh="load"
+      @clear-filters="reset"
+    >
+      <template #cell-productCode="{ row }">
+        <CopyText :value="asProduct(row).productCode" />
+      </template>
+      <template #cell-weidianItemId="{ row }">
+        <CopyText :value="asProduct(row).weidianItemId" />
+      </template>
+      <template #cell-price="{ row }">{{ asProduct(row).price }}</template>
+      <template #cell-rate="{ row }">{{ formatRate(asProduct(row).rate) }}</template>
+      <template #cell-status="{ row }">
+        <el-tag :type="asProduct(row).status === 1 ? 'success' : 'info'">
+          {{ asProduct(row).status === 1 ? t("product.onSale") : t("product.offShelf") }}
+        </el-tag>
+      </template>
+      <template #cell-updatedAt="{ row }">{{ formatInstant(asProduct(row).updateTime) }}</template>
+      <template v-if="abilities.canWriteProduct" #actions="{ row }">
+        <el-button link type="primary" data-test="edit" @click="openEdit(asProduct(row))">
+          {{ t("common.edit") }}
+        </el-button>
+        <el-button
+          link
+          :type="asProduct(row).status === 1 ? 'danger' : 'success'"
+          data-test="status"
+          @click="toggleStatus(asProduct(row))"
+        >
+          {{ asProduct(row).status === 1 ? t("product.offShelf") : t("product.putOnShelf") }}
+        </el-button>
+      </template>
+    </DataTable>
 
     <el-dialog
       v-model="formVisible"
@@ -312,12 +380,5 @@ onMounted(() => {
       :upload="uploadProductImport"
       @finished="search"
     />
-  </el-card>
+  </div>
 </template>
-
-<style scoped>
-.pager {
-  margin-top: 16px;
-  justify-content: flex-end;
-}
-</style>

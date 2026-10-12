@@ -127,4 +127,22 @@ describe("KOL list page", () => {
       bdUserId: undefined
     });
   });
+
+  it("pages with the applied conditions, not text typed without searching", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage("60");
+    const keyword = wrapper.findAll("input").find(input => input.attributes("maxlength") === "128");
+    await keyword!.setValue("applied");
+    await keyword!.trigger("keyup.enter");
+    await flushPromises();
+    await keyword!.setValue("typed-only");
+    vi.mocked(kolApi.listKols).mockClear();
+    wrapper.findComponent({ name: "ElPagination" }).vm.$emit("current-change", 2);
+    await flushPromises();
+    expect(kolApi.listKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, keyword: "applied" })
+    );
+    expect(wrapper.text()).toContain("applied");
+    expect(wrapper.text()).not.toContain("typed-only");
+  });
 });

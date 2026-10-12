@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import * as authApi from "@/api/auth";
 import type { Role, UserVO } from "@/api/types";
+import { useReauthStore } from "@/stores/reauth";
 import { clearStoredSession, loadSession, saveSession } from "@/utils/session";
 
 export const useUserStore = defineStore("user", () => {
@@ -21,12 +22,13 @@ export const useUserStore = defineStore("user", () => {
     saveSession(next);
   }
 
-  /** Clears local state only (used on 401 and after logout). */
+  /** Clears local state only (used on 401 and after logout). Also closes reauth so a later login does not reopen the dialog. */
   function clearSession() {
     token.value = null;
     expiresAt.value = 0;
     user.value = null;
     clearStoredSession();
+    useReauthStore().close();
   }
 
   async function login(username: string, password: string) {

@@ -4,6 +4,7 @@ import { ElConfigProvider } from "element-plus";
 import en from "element-plus/es/locale/lang/en";
 import zhCN from "element-plus/es/locale/lang/zh-cn";
 import { useRoute } from "vue-router";
+import VersionNotice from "@/components/VersionNotice.vue";
 import { applyDocumentTitle } from "@/router/title";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
@@ -29,5 +30,6 @@ watch(
 <template>
   <ElConfigProvider :locale="elementLocale">
     <RouterView />
+    <VersionNotice />
   </ElConfigProvider>
 </template>

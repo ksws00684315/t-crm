@@ -15,9 +15,21 @@ const greeting = computed(() =>
 </script>
 
 <template>
-  <el-card shadow="never">
+  <el-card class="home" shadow="never">
     <template #header>{{ t("home.welcome") }}</template>
-    <p v-if="user.user">{{ greeting }}</p>
-    <p>{{ t("home.body") }}</p>
+    <p v-if="user.user" class="home__greeting">{{ greeting }}</p>
+    <p class="home__body">{{ t("home.body") }}</p>
   </el-card>
 </template>
+
+<style scoped>
+.home__greeting,
+.home__body {
+  margin: 0;
+  color: var(--tcrm-color-text);
+}
+.home__body {
+  margin-top: var(--tcrm-space-2);
+  color: var(--tcrm-color-text-secondary);
+}
+</style>
