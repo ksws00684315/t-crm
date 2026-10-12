@@ -80,6 +80,8 @@ const enUS: MessageSchema = {
     AUTH_FORBIDDEN: "You do not have permission to do this.",
     AUTH_INVALID_CREDENTIALS: "Incorrect username or password.",
     AUTH_ACCOUNT_LOCKED: "Too many failed sign-in attempts. Please try again later.",
+    AUTH_CAPTCHA_INVALID: "The captcha is wrong or has expired. Please enter the new one.",
+    AUTH_CAPTCHA_RATE_LIMITED: "Too many captcha requests. Please try again later.",
     AUTH_ACCOUNT_DISABLED: "This account is disabled or unavailable. Contact an administrator.",
     AUTH_OLD_PASSWORD_INCORRECT: "The current password is incorrect.",
     USER_USERNAME_EXISTS: "This username already exists.",
@@ -123,6 +125,7 @@ const enUS: MessageSchema = {
     usernameRequired: "Enter a username.",
     usernamePattern: "Username must be 3-64 letters, digits, underscores, dots, or hyphens.",
     passwordRequired: "Enter a password.",
+    captchaRequired: "Enter the captcha.",
     passwordLength: "Password must be {min}-{max} characters.",
     passwordCharset: "Password can only contain letters, digits, and common symbols.",
     passwordTooLong: "Password cannot exceed {max} characters.",
@@ -156,6 +159,13 @@ const enUS: MessageSchema = {
     username: "Username",
     password: "Password",
     submit: "Sign in"
+  },
+  captcha: {
+    label: "Captcha",
+    placeholder: "Enter the characters shown",
+    imageAlt: "Captcha image, click for a new one",
+    refresh: "Can't read it? Click the image for a new one.",
+    loadFailed: "Failed to load. Click to retry."
   },
   home: {
     welcome: "Welcome to T-CRM",

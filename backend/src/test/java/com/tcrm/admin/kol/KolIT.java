@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.idev.excel.FastExcel;
+import com.tcrm.admin.Captchas;
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.model.KolDO;
@@ -548,7 +549,7 @@ class KolIT {
                         .contentType("application/json")
                         .content(
                             json.writeValueAsString(
-                                Map.of("username", username, "password", password))))
+                                Captchas.loginBody(mvc, json, username, password))))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

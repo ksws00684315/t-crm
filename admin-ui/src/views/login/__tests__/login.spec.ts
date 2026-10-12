@@ -14,6 +14,13 @@ vi.mock("@/api/auth");
 
 async function mountLogin(redirect?: string) {
   setActivePinia(createPinia());
+  let seq = 0;
+  vi.mocked(authApi.createCaptcha).mockImplementation(async () => ({
+    enabled: true,
+    captchaId: `c${++seq}`,
+    image: "data:image/png;base64,AA==",
+    expiresIn: 180
+  }));
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -25,23 +32,30 @@ async function mountLogin(redirect?: string) {
   await router.push({ path: "/login", query: redirect ? { redirect } : {} });
   await router.isReady();
   const wrapper = mount(LoginPage, { global: { plugins: [ElementPlus, i18n, router] } });
+  await flushPromises();
   return { wrapper, router };
 }
 
 async function fill(
   wrapper: Awaited<ReturnType<typeof mountLogin>>["wrapper"],
   u: string,
-  p: string
+  p: string,
+  c = "ab7k"
 ) {
   const inputs = wrapper.findAll("input");
   await inputs[0].setValue(u);
   await inputs[1].setValue(p);
-  await wrapper.find("button").trigger("click");
+  await wrapper.get("input[data-test=captcha-input]").setValue(c);
+  await wrapper.find("button.login__submit").trigger("click");
   await flushPromises();
 }
 
 describe("login page", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    vi.mocked(authApi.login).mockReset();
+    vi.mocked(authApi.createCaptcha).mockReset();
+  });
 
   it("does not call the API when the form is invalid", async () => {
     const { wrapper } = await mountLogin();
@@ -71,7 +85,12 @@ describe("login page", () => {
     });
     const { wrapper, router } = await mountLogin("/system/users");
     await fill(wrapper, "root", "any-password");
-    expect(authApi.login).toHaveBeenCalledWith({ username: "root", password: "any-password" });
+    expect(authApi.login).toHaveBeenCalledWith({
+      username: "root",
+      password: "any-password",
+      captchaId: "c1",
+      captchaCode: "ab7k"
+    });
     expect(router.currentRoute.value.path).toBe("/system/users");
   });
 
@@ -109,6 +128,84 @@ describe("login page", () => {
     expect((wrapper.findAll("input")[1].element as HTMLInputElement).value).toBe("");
   });
 
+  it("shows the captcha image and loads a new one when it is clicked", async () => {
+    const { wrapper } = await mountLogin();
+    expect(wrapper.get("[data-test=captcha-image]").attributes("src")).toContain("data:image/png");
+    await wrapper.get("input[data-test=captcha-input]").setValue("zz");
+    await wrapper.get("[data-test=captcha-refresh]").trigger("click");
+    await flushPromises();
+    expect(authApi.createCaptcha).toHaveBeenCalledTimes(2);
+    expect((wrapper.get("input[data-test=captcha-input]").element as HTMLInputElement).value).toBe(
+      ""
+    );
+  });
+
+  it("requires the captcha before calling the API", async () => {
+    const { wrapper } = await mountLogin();
+    await fill(wrapper, "root", "any-password", "");
+    expect(authApi.login).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(wrapper.text()).toContain("请输入验证码"));
+  });
+
+  it("refreshes the captcha after a failed login and sends the new id next time", async () => {
+    vi.mocked(authApi.login).mockRejectedValueOnce(
+      new ApiError({ status: 400, errorCode: "AUTH_CAPTCHA_INVALID", traceId: "t" })
+    );
+    vi.mocked(authApi.login).mockRejectedValueOnce(
+      new ApiError({ status: 401, errorCode: "AUTH_INVALID_CREDENTIALS", traceId: "t" })
+    );
+    const { wrapper } = await mountLogin();
+    await fill(wrapper, "root", "any-password");
+    await flushPromises();
+    expect(authApi.createCaptcha).toHaveBeenCalledTimes(2);
+    // Only the captcha was wrong, so the password stays.
+    expect((wrapper.findAll("input")[1].element as HTMLInputElement).value).toBe("any-password");
+    await fill(wrapper, "root", "any-password", "q2w3");
+    await flushPromises();
+    expect(vi.mocked(authApi.login).mock.calls[1][0]).toMatchObject({
+      captchaId: "c2",
+      captchaCode: "q2w3"
+    });
+    expect(authApi.createCaptcha).toHaveBeenCalledTimes(3);
+  });
+
+  it("submits on Enter in the captcha field", async () => {
+    vi.mocked(authApi.login).mockRejectedValue(
+      new ApiError({ status: 401, errorCode: "AUTH_INVALID_CREDENTIALS", traceId: "t" })
+    );
+    const { wrapper } = await mountLogin();
+    const inputs = wrapper.findAll("input");
+    await inputs[0].setValue("root");
+    await inputs[1].setValue("any-password");
+    const captcha = wrapper.get("input[data-test=captcha-input]");
+    await captcha.setValue("ab7k");
+    await captcha.trigger("keyup", { key: "Enter" });
+    await flushPromises();
+    expect(authApi.login).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the captcha and omits it when the backend has captchas disabled", async () => {
+    const { wrapper } = await mountLogin();
+    vi.mocked(authApi.createCaptcha).mockResolvedValue({
+      enabled: false,
+      captchaId: null,
+      image: null,
+      expiresIn: 0
+    });
+    await wrapper.get("[data-test=captcha-refresh]").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test=captcha]").exists()).toBe(false);
+    vi.mocked(authApi.login).mockRejectedValue(
+      new ApiError({ status: 401, errorCode: "AUTH_INVALID_CREDENTIALS", traceId: "t" })
+    );
+    const inputs = wrapper.findAll("input");
+    await inputs[0].setValue("root");
+    await inputs[1].setValue("any-password");
+    await wrapper.find("button.login__submit").trigger("click");
+    await flushPromises();
+    expect(authApi.login).toHaveBeenCalledWith({ username: "root", password: "any-password" });
+  });
+
   it("renders the sign-in form in English", async () => {
     const { wrapper } = await mountLogin();
     useLocaleStore().setLocale("en-US");
@@ -118,6 +215,7 @@ describe("login page", () => {
     expect(text).toContain("Username");
     expect(text).toContain("Password");
     expect(text).toContain("Sign in");
+    expect(text).toContain("Captcha");
     expect(document.documentElement.lang).toBe("en-US");
   });
 });

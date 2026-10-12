@@ -17,6 +17,7 @@ public class AuthService {
   private final BCryptPasswordEncoder passwords;
   private final LoginFailures failures;
   private final CurrentUserContext current;
+  private final CaptchaService captchas;
   // Verified for unknown or disabled accounts so every attempt pays one BCrypt comparison.
   private final String timingHash;
 
@@ -24,17 +25,26 @@ public class AuthService {
       AccountStore users,
       BCryptPasswordEncoder passwords,
       LoginFailures failures,
-      CurrentUserContext current) {
+      CurrentUserContext current,
+      CaptchaService captchas) {
     this.users = users;
     this.passwords = passwords;
     this.failures = failures;
     this.current = current;
+    this.captchas = captchas;
     this.timingHash = passwords.encode(UUID.randomUUID().toString());
   }
 
   public record LoginResult(String tokenName, String token, long expiresIn, AccountDTO user) {}
 
-  public LoginResult login(String username, String password, String clientIp) {
+  /**
+   * The captcha is checked and consumed first, before the lock check and the password: a wrong or
+   * expired captcha answers AUTH_CAPTCHA_INVALID and does not count as a login failure (design
+   * document §3.3, ADR-008 addendum), and the lock state cannot be probed without solving one.
+   */
+  public LoginResult login(
+      String username, String password, String captchaId, String captchaCode, String clientIp) {
+    captchas.verify(captchaId, captchaCode);
     failures.check(username, clientIp);
     AccountDTO user = users.getByUsername(username);
     boolean passwordMatches =

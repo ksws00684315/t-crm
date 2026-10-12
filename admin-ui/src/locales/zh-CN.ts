@@ -84,6 +84,8 @@ const zhCN = {
     AUTH_FORBIDDEN: "没有权限执行该操作",
     AUTH_INVALID_CREDENTIALS: "用户名或密码错误",
     AUTH_ACCOUNT_LOCKED: "登录失败次数过多，请稍后再试",
+    AUTH_CAPTCHA_INVALID: "验证码错误或已过期，请重新输入",
+    AUTH_CAPTCHA_RATE_LIMITED: "验证码获取过于频繁，请稍后再试",
     AUTH_ACCOUNT_DISABLED: "账号已被停用或不可用，请联系管理员",
     AUTH_OLD_PASSWORD_INCORRECT: "原密码不正确",
     USER_USERNAME_EXISTS: "用户名已存在",
@@ -126,6 +128,7 @@ const zhCN = {
     usernameRequired: "请输入用户名",
     usernamePattern: "用户名需为 3-64 位字母、数字、下划线、点或连字符",
     passwordRequired: "请输入密码",
+    captchaRequired: "请输入验证码",
     passwordLength: "密码长度需为 {min}-{max} 位",
     passwordCharset: "密码只能包含英文字母、数字和常见符号",
     passwordTooLong: "密码不能超过 {max} 位",
@@ -159,6 +162,13 @@ const zhCN = {
     username: "用户名",
     password: "密码",
     submit: "登录"
+  },
+  captcha: {
+    label: "验证码",
+    placeholder: "请输入图中字符",
+    imageAlt: "验证码图片，点击换一张",
+    refresh: "看不清？点击图片换一张",
+    loadFailed: "加载失败，点击重试"
   },
   home: {
     welcome: "欢迎使用 T-CRM",

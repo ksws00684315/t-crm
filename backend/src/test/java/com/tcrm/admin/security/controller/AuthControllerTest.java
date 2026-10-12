@@ -25,6 +25,7 @@ import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.security.config.SecurityConfiguration;
 import com.tcrm.admin.security.service.AuthService;
+import com.tcrm.admin.security.service.CaptchaService;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ClientIpResolver;
 import com.tcrm.admin.shared.CommonConfiguration;
@@ -51,6 +52,7 @@ class AuthControllerTest {
   private CurrentUserContext current;
   private String token;
   private AuthService auth;
+  private CaptchaService captchas;
 
   @BeforeEach
   void setup() {
@@ -65,6 +67,7 @@ class AuthControllerTest {
     current = mock(CurrentUserContext.class);
     users = mock(UserService.class);
     auth = mock(AuthService.class);
+    captchas = mock(CaptchaService.class);
     var actor =
         new com.tcrm.admin.security.api.AccountDTO(
             1L,
@@ -93,7 +96,7 @@ class AuthControllerTest {
         MockMvcBuilders.standaloneSetup(
                 new UserController(users),
                 new AuthController(
-                    auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For")),
+                    auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For"), captchas),
                 new ErrorController())
             .setControllerAdvice(new GlobalExceptionHandler())
             .setMessageConverters(new JacksonJsonHttpMessageConverter(builder.build()))
@@ -159,7 +162,7 @@ class AuthControllerTest {
   @Test
   void shouldSerializeLoginUserWithoutCredentials_whenLoginSucceeds() throws Exception {
     var actor = current.user();
-    when(auth.login("operator", "test-input", "198.51.100.8"))
+    when(auth.login("operator", "test-input", "cid", "ab7k", "198.51.100.8"))
         .thenReturn(new AuthService.LoginResult("X-Admin-Token", "unit-token", 28800, actor));
     mvc.perform(
             post("/admin-api/auth/login")
@@ -171,7 +174,9 @@ class AuthControllerTest {
                 .header("X-Forwarded-For", "192.0.2.77, 198.51.100.8")
                 .header("X-Admin-Token", token)
                 .contentType("application/json")
-                .content("{\"username\":\"operator\",\"password\":\"test-input\"}"))
+                .content(
+                    "{\"username\":\"operator\",\"password\":\"test-input\","
+                        + "\"captchaId\":\"cid\",\"captchaCode\":\"ab7k\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.id").value("1"))
         .andExpect(jsonPath("$.data.user.passwordHash").doesNotExist())
@@ -294,4 +299,28 @@ class AuthControllerTest {
   }
 
   record JsonValue(Long id, BigDecimal amount, Instant time) {}
+
+  @Test
+  void shouldIssueCaptchaForClientIpWithNoStore_whenRequested() throws Exception {
+    when(captchas.issue("198.51.100.8"))
+        .thenReturn(
+            new CaptchaService.IssuedCaptcha(true, "cid", "data:image/png;base64,AQID", 180));
+    mvc.perform(
+            post("/admin-api/auth/captchas")
+                .with(
+                    request -> {
+                      request.setRemoteAddr("10.1.2.3");
+                      return request;
+                    })
+                .header("X-Forwarded-For", "198.51.100.8")
+                // This slice applies the role interceptor to every path; the public exclusion
+                // is covered by CaptchaLoginIT.
+                .header("X-Admin-Token", token))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("$.data.enabled").value(true))
+        .andExpect(jsonPath("$.data.captchaId").value("cid"))
+        .andExpect(jsonPath("$.data.image").value("data:image/png;base64,AQID"))
+        .andExpect(jsonPath("$.data.expiresIn").value(180));
+  }
 }

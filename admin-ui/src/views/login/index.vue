@@ -3,10 +3,17 @@ import type { FormInstance, FormRules } from "element-plus";
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
+import CaptchaInput from "@/components/CaptchaInput.vue";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useUserStore } from "@/stores/user";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
-import { rule, validateExistingPassword, validateUsername } from "@/utils/validation";
+import {
+  rule,
+  validateCaptcha,
+  validateExistingPassword,
+  validateUsername
+} from "@/utils/validation";
 
 defineOptions({ name: "LoginPage" });
 
@@ -17,10 +24,15 @@ const user = useUserStore();
 
 const formRef = ref<FormInstance>();
 const loading = ref(false);
-const form = reactive({ username: "", password: "" });
+const captchaRef = ref<InstanceType<typeof CaptchaInput>>();
+const form = reactive({ username: "", password: "", captchaCode: "" });
 const rules: FormRules = {
   username: [rule(validateUsername)],
-  password: [rule(validateExistingPassword)]
+  password: [rule(validateExistingPassword)],
+  // Skipped only when the backend reports captchas disabled (dev/test property).
+  captchaCode: [
+    rule(value => (captchaRef.value?.enabled === false ? null : validateCaptcha(value)))
+  ]
 };
 
 /** Only same-site paths are honoured, never an absolute URL. */
@@ -34,10 +46,15 @@ async function submit() {
   if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return;
   loading.value = true;
   try {
-    await user.login(form.username, form.password);
+    await user.login(form.username, form.password, captchaRef.value?.answer());
     await router.replace(safeRedirect(route.query.redirect));
   } catch (error) {
-    form.password = "";
+    // The backend consumed the captcha whatever the outcome, so a new one is always needed.
+    void captchaRef.value?.refresh();
+    // A wrong or expired captcha keeps the password; any other failure clears it.
+    if (!(error instanceof ApiError && error.errorCode === "AUTH_CAPTCHA_INVALID")) {
+      form.password = "";
+    }
     notifyError(error);
   } finally {
     loading.value = false;
@@ -62,6 +79,13 @@ async function submit() {
             maxlength="72"
             @keyup.enter="submit"
           />
+        </el-form-item>
+        <el-form-item
+          v-show="captchaRef?.enabled !== false"
+          :label="t('captcha.label')"
+          prop="captchaCode"
+        >
+          <CaptchaInput ref="captchaRef" v-model="form.captchaCode" @enter="submit" />
         </el-form-item>
         <el-button type="primary" class="login__submit" :loading="loading" @click="submit">
           {{ t("login.submit") }}

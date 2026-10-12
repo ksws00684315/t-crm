@@ -48,6 +48,10 @@ export function validateExistingPassword(value: string): string | null {
   return null;
 }
 
+export function validateCaptcha(value: string): string | null {
+  return blank(value) ? translate("validation.captchaRequired") : null;
+}
+
 export function validateNickname(value: string): string | null {
   if (blank(value)) return translate("validation.nicknameRequired");
   if (value.length > 64) return translate("validation.nicknameTooLong");
