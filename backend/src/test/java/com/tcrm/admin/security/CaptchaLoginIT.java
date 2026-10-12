@@ -199,7 +199,8 @@ class CaptchaLoginIT {
 
   @Test
   void shouldRateLimitCaptchaIssuingPerClientIp() throws Exception {
-    for (int i = 0; i < 30; i++) {
+    // Default configuration: 120 per IP per minute.
+    for (int i = 0; i < 120; i++) {
       issueFrom("192.0.2.17").andExpect(status().isOk());
     }
     issueFrom("192.0.2.17")

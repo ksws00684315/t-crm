@@ -25,13 +25,14 @@ import org.springframework.stereotype.Service;
  *   <li>Single use: verification reads and deletes the key in one GETDEL, whether the answer is
  *       right or wrong, so one image allows exactly one guess.
  *   <li>Answers are compared case-insensitively.
- *   <li>Issuing is limited to {@link #ISSUE_LIMIT} per client IP per minute (ADR-008 addendum).
+ *   <li>Issuing is limited per client IP per minute ({@code crm.auth.captcha.issue-per-minute},
+ *       default {@link #DEFAULT_ISSUE_LIMIT}; ADR-017).
  * </ul>
  */
 @Service
 public class CaptchaService {
   static final Duration TTL = Duration.ofMinutes(3);
-  static final int ISSUE_LIMIT = 30;
+  static final int DEFAULT_ISSUE_LIMIT = 120;
   static final long ISSUE_WINDOW_MS = 60_000;
   static final String KEY_PREFIX = "auth:captcha:";
   private static final DefaultRedisScript<Long> COUNT =
@@ -45,14 +46,20 @@ public class CaptchaService {
   private final StringRedisTemplate redis;
   private final CaptchaImageGenerator generator;
   private final boolean enabled;
+  private final int issueLimit;
 
   public CaptchaService(
       StringRedisTemplate redis,
       CaptchaImageGenerator generator,
-      @Value("${crm.auth.captcha.enabled:true}") boolean enabled) {
+      @Value("${crm.auth.captcha.enabled:true}") boolean enabled,
+      @Value("${crm.auth.captcha.issue-per-minute:" + DEFAULT_ISSUE_LIMIT + "}") int issueLimit) {
+    if (issueLimit < 1) {
+      throw new IllegalArgumentException("crm.auth.captcha.issue-per-minute must be at least 1");
+    }
     this.redis = redis;
     this.generator = generator;
     this.enabled = enabled;
+    this.issueLimit = issueLimit;
   }
 
   public record IssuedCaptcha(boolean enabled, String captchaId, String image, long expiresIn) {}
@@ -71,7 +78,7 @@ public class CaptchaService {
             COUNT,
             List.of(KEY_PREFIX + "rate:" + digest(clientIp)),
             Long.toString(ISSUE_WINDOW_MS));
-    if (issued != null && issued > ISSUE_LIMIT) {
+    if (issued != null && issued > issueLimit) {
       throw new BusinessException(ErrorCode.AUTH_CAPTCHA_RATE_LIMITED);
     }
     var captcha = generator.generate();

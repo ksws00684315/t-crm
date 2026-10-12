@@ -32,7 +32,7 @@ class CaptchaServiceTest {
   private final ValueOperations<String, String> values = mock(ValueOperations.class);
 
   private final CaptchaImageGenerator generator = mock(CaptchaImageGenerator.class);
-  private final CaptchaService captchas = new CaptchaService(redis, generator, true);
+  private final CaptchaService captchas = new CaptchaService(redis, generator, true, 120);
 
   @BeforeEach
   void setUp() {
@@ -61,8 +61,7 @@ class CaptchaServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldRateLimitPerHashedIp_whenIssuing() {
-    when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class)))
-        .thenReturn((long) CaptchaService.ISSUE_LIMIT + 1);
+    when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(121L);
     assertThatThrownBy(() -> captchas.issue("198.51.100.8"))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.AUTH_CAPTCHA_RATE_LIMITED.message());
@@ -126,10 +125,26 @@ class CaptchaServiceTest {
 
   @Test
   void shouldSkipEverything_whenDisabled() {
-    var off = new CaptchaService(redis, generator, false);
+    var off = new CaptchaService(redis, generator, false, 120);
     assertThat(off.issue("198.51.100.8").enabled()).isFalse();
     assertThatCode(() -> off.verify(null, null)).doesNotThrowAnyException();
     verifyNoInteractions(generator);
     verify(redis, never()).opsForValue();
+  }
+
+  @Test
+  void shouldAllowExactlyTheConfiguredLimit_whenIssuing() {
+    var small = new CaptchaService(redis, generator, true, 5);
+    when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(5L, 6L);
+    assertThatCode(() -> small.issue("198.51.100.8")).doesNotThrowAnyException();
+    assertThatThrownBy(() -> small.issue("198.51.100.8"))
+        .hasMessage(ErrorCode.AUTH_CAPTCHA_RATE_LIMITED.message());
+    assertThat(CaptchaService.DEFAULT_ISSUE_LIMIT).isEqualTo(120);
+  }
+
+  @Test
+  void shouldRejectNonPositiveLimit_whenConstructing() {
+    assertThatThrownBy(() -> new CaptchaService(redis, generator, true, 0))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

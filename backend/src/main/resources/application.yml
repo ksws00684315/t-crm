@@ -67,6 +67,8 @@ crm:
       # Image captcha on every administrator login (ADR-017). Never disable in production; false
       # is only for local development.
       enabled: true
+      # Captchas one client IP may request per minute (owner decision on PR #35); 429 above it.
+      issue-per-minute: 120
   bootstrap:
     username: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:}
