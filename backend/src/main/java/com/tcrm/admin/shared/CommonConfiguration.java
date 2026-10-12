@@ -13,6 +13,7 @@ import org.springframework.boot.validation.autoconfigure.ValidationConfiguration
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.servlet.LocaleResolver;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.std.ToStringSerializer;
 
@@ -29,15 +30,26 @@ public class CommonConfiguration {
   }
 
   /**
-   * Validation messages are part of the API contract (English, like every backend message), so they
-   * must not depend on the server's default locale or on the request's Accept-Language header.
+   * Resolves the request language (ADR-0.15): only {@code zh-CN} and {@code en-US} exist, a missing
+   * or unsupported {@code Accept-Language} yields English regardless of the server's default
+   * locale.
    */
   @Bean
-  public ValidationConfigurationCustomizer englishValidationMessages() {
+  public LocaleResolver localeResolver() {
+    return new SupportedLocaleResolver();
+  }
+
+  /**
+   * Validation messages follow the request language (ADR-0.15). Hibernate Validator passes the JVM
+   * default locale into interpolation, so the wrapper ignores the incoming locale and resolves
+   * through the request's locale context instead; anything that is not one of the two supported
+   * languages — and every locale outside a request — becomes English.
+   */
+  @Bean
+  public ValidationConfigurationCustomizer localeAwareValidationMessages() {
     return configuration ->
         configuration.messageInterpolator(
-            new LocaleSpecificMessageInterpolator(
-                configuration.getDefaultMessageInterpolator(), Locale.ENGLISH));
+            new RequestLocaleMessageInterpolator(configuration.getDefaultMessageInterpolator()));
   }
 
   /**
@@ -73,17 +85,17 @@ public class CommonConfiguration {
     return new BCryptPasswordEncoder(12);
   }
 
-  /** Always interpolates with one fixed locale, ignoring the locale the caller passes in. */
-  private record LocaleSpecificMessageInterpolator(MessageInterpolator delegate, Locale locale)
+  /** Interpolates in the request language only; everything else becomes English. */
+  private record RequestLocaleMessageInterpolator(MessageInterpolator delegate)
       implements MessageInterpolator {
     @Override
     public String interpolate(String template, Context context) {
-      return delegate.interpolate(template, context, locale);
+      return delegate.interpolate(template, context, AppLocale.current().locale());
     }
 
     @Override
     public String interpolate(String template, Context context, Locale ignored) {
-      return delegate.interpolate(template, context, locale);
+      return delegate.interpolate(template, context, AppLocale.current().locale());
     }
   }
 }

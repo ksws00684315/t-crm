@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { listKols, updateKolStatus } from "@/api/kol/kol";
 import { listBdUsers } from "@/api/system/bd-user";
 import type { BdUserVO, KolVO } from "@/api/types";
@@ -17,6 +18,7 @@ import KolLinksDrawer from "./KolLinksDrawer.vue";
 
 defineOptions({ name: "KolListPage" });
 
+const { t } = useI18n();
 const me = useUserStore();
 /** Button visibility only; the backend enforces the same rules (task 04 §4.3). */
 const abilities = computed(() => kolAbilities(me.user));
@@ -114,21 +116,21 @@ function openLinks(row: KolVO) {
 
 async function toggleStatus(row: KolVO) {
   const target = row.status === 1 ? 0 : 1;
-  const verb = target === 0 ? "停用" : "启用";
+  const disabling = target === 0;
   try {
     await ElMessageBox.confirm(
-      `确定要${verb}达人 ${row.kolCode}（${row.name}）吗？`,
-      `${verb}达人`,
-      {
-        type: "warning"
-      }
+      disabling
+        ? t("kol.confirmDisable", { code: row.kolCode, name: row.name })
+        : t("kol.confirmEnable", { code: row.kolCode, name: row.name }),
+      disabling ? t("kol.disableTitle") : t("kol.enableTitle"),
+      { type: "warning" }
     );
   } catch {
     return; // cancelled
   }
   try {
     await updateKolStatus(row.id, target);
-    ElMessage.success(`已${verb}`);
+    ElMessage.success(disabling ? t("kol.disabled") : t("kol.enabled"));
     await load();
   } catch (error) {
     notifyError(error);
@@ -144,81 +146,94 @@ onMounted(() => {
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" @submit.prevent>
-      <el-form-item label="关键字">
+      <el-form-item :label="t('common.keyword')">
         <el-input
           v-model="query.keyword"
           clearable
           maxlength="128"
-          placeholder="编号 / 姓名 / 邮箱"
+          :placeholder="t('kol.keywordPlaceholder')"
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="国家">
+      <el-form-item :label="t('common.country')">
         <el-input
           v-model="query.country"
           clearable
           maxlength="2"
-          placeholder="如 US"
+          :placeholder="t('kol.countryPlaceholder')"
           style="width: 90px"
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="状态">
-        <el-select v-model="query.status" clearable placeholder="全部" style="width: 110px">
-          <el-option label="启用" :value="1" />
-          <el-option label="停用" :value="0" />
+      <el-form-item :label="t('common.status')">
+        <el-select
+          v-model="query.status"
+          clearable
+          :placeholder="t('common.all')"
+          style="width: 110px"
+        >
+          <el-option :label="t('common.enabled')" :value="1" />
+          <el-option :label="t('common.disabled')" :value="0" />
         </el-select>
       </el-form-item>
-      <el-form-item v-if="abilities.canManageBd" label="负责商务" data-test="bd-filter">
+      <el-form-item v-if="abilities.canManageBd" :label="t('kol.bd')" data-test="bd-filter">
         <el-select
           v-model="query.bdUserId"
           clearable
           filterable
-          placeholder="全部"
+          :placeholder="t('common.all')"
           style="width: 160px"
         >
           <el-option
             v-for="bd in bdUsers"
             :key="bd.id"
-            :label="`${bd.nickname}（${bd.username}）`"
+            :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
             :value="bd.id"
           />
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="search">查询</el-button>
-        <el-button @click="reset">重置</el-button>
+        <el-button type="primary" @click="search">{{ t("common.search") }}</el-button>
+        <el-button @click="reset">{{ t("common.reset") }}</el-button>
         <template v-if="abilities.canWrite">
-          <el-button type="success" data-test="create" @click="openCreate">新增达人</el-button>
-          <el-button data-test="import" @click="importVisible = true">批量导入</el-button>
+          <el-button type="success" data-test="create" @click="openCreate">{{
+            t("kol.create")
+          }}</el-button>
+          <el-button data-test="import" @click="importVisible = true">{{
+            t("kol.import")
+          }}</el-button>
         </template>
       </el-form-item>
     </el-form>
 
     <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="kolCode" label="达人编号" width="120" />
-      <el-table-column prop="name" label="姓名" min-width="120" />
-      <el-table-column prop="email" label="邮箱" min-width="180" />
-      <el-table-column prop="country" label="国家" width="70" />
-      <el-table-column label="负责商务" min-width="110">
-        <template #default="{ row }">{{ (row as KolVO).bdUserName ?? "未分配" }}</template>
+      <el-table-column prop="kolCode" :label="t('kol.code')" width="120" />
+      <el-table-column prop="name" :label="t('common.name')" min-width="120" />
+      <el-table-column prop="email" :label="t('common.email')" min-width="180" />
+      <el-table-column prop="country" :label="t('common.country')" width="70" />
+      <el-table-column :label="t('kol.bd')" min-width="110">
+        <template #default="{ row }">{{
+          (row as KolVO).bdUserName ?? t("common.unassigned")
+        }}</template>
       </el-table-column>
-      <el-table-column label="默认佣金" width="100">
+      <el-table-column :label="t('kol.defaultRate')" width="100">
         <template #default="{ row }">{{ formatRate((row as KolVO).defaultRate) }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column :label="t('common.status')" width="80">
         <template #default="{ row }">
           <el-tag :type="(row as KolVO).status === 1 ? 'success' : 'info'">
-            {{ (row as KolVO).status === 1 ? "启用" : "停用" }}
+            {{ (row as KolVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" width="170">
+      <el-table-column :label="t('common.createdAt')" width="170">
         <template #default="{ row }">{{ formatInstant((row as KolVO).createTime) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column :label="t('common.actions')" width="280" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row as KolVO)">详情</el-button>
+          <el-button link type="primary" @click="openDetail(row as KolVO)">{{
+            t("common.detail")
+          }}</el-button>
           <el-button
             v-if="links.canViewLinks"
             link
@@ -226,11 +241,11 @@ onMounted(() => {
             data-test="links"
             @click="openLinks(row as KolVO)"
           >
-            链接
+            {{ t("kol.links") }}
           </el-button>
           <template v-if="abilities.canWrite">
             <el-button link type="primary" data-test="edit" @click="openEdit(row as KolVO)">
-              编辑
+              {{ t("common.edit") }}
             </el-button>
             <el-button
               link
@@ -238,7 +253,7 @@ onMounted(() => {
               data-test="status"
               @click="toggleStatus(row as KolVO)"
             >
-              {{ (row as KolVO).status === 1 ? "停用" : "启用" }}
+              {{ (row as KolVO).status === 1 ? t("common.disabled") : t("common.enabled") }}
             </el-button>
           </template>
           <el-button
@@ -248,7 +263,7 @@ onMounted(() => {
             data-test="change-bd"
             @click="openBd(row as KolVO)"
           >
-            更换商务
+            {{ t("kol.changeBd") }}
           </el-button>
         </template>
       </el-table-column>

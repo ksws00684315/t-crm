@@ -93,9 +93,23 @@ class KolRulesTest {
 
   @Test
   void shouldExposeTemplateHeadersInDocumentedOrder() {
-    assertThat(KolImportColumn.headers())
+    assertThat(com.tcrm.admin.TestTemplates.render(KolImportColumn.headerKeys()))
         .containsExactly(
             "达人编号", "姓名", "邮箱", "国家", "负责商务用户名", "默认佣金比例(%)", "社媒平台", "社媒账号", "粉丝数", "备注");
+    assertThat(
+            com.tcrm.admin.TestTemplates.render(
+                KolImportColumn.headerKeys(), java.util.Locale.ENGLISH))
+        .containsExactly(
+            "KOL Code",
+            "Name",
+            "Email",
+            "Country",
+            "BD Username",
+            "Default Commission Rate (%)",
+            "Social Platform",
+            "Social Handle",
+            "Followers",
+            "Remark");
   }
 
   @Test

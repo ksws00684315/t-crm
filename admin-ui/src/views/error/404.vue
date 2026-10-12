@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 defineOptions({ name: "NotFoundPage" });
+const { t } = useI18n();
 </script>
 
 <template>
-  <el-result icon="info" title="404" sub-title="页面不存在">
+  <el-result icon="info" title="404" :sub-title="t('notFound.subtitle')">
     <template #extra>
-      <el-button type="primary" @click="$router.push('/')">返回首页</el-button>
+      <el-button type="primary" @click="$router.push('/')">{{ t("common.backToHome") }}</el-button>
     </template>
   </el-result>
 </template>

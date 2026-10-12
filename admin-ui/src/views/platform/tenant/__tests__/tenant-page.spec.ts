@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as tenantApi from "@/api/platform/tenant";
+import { i18n } from "@/locales";
 import { ApiError } from "@/utils/http/error";
 import TenantAdminsDialog from "../TenantAdminsDialog.vue";
 import TenantFormDialog from "../TenantFormDialog.vue";
@@ -28,7 +29,7 @@ const admin: tenantApi.TenantAdminVO = {
   createTime: "2026-10-05T01:02:03Z"
 };
 
-const mountOptions = { global: { plugins: [ElementPlus], stubs: { teleport: true } } };
+const mountOptions = { global: { plugins: [ElementPlus, i18n], stubs: { teleport: true } } };
 
 describe("platform tenant management", () => {
   beforeEach(() => {
@@ -45,6 +46,18 @@ describe("platform tenant management", () => {
     expect(wrapper.text()).toContain("North America");
     expect(wrapper.text()).toContain("启用");
     expect(wrapper.text()).toContain("Primary company");
+  });
+
+  it("renders the company list in English", async () => {
+    i18n.global.locale.value = "en-US";
+    vi.mocked(tenantApi.listTenants).mockResolvedValue([tenant]);
+    const wrapper = mount(TenantPage, mountOptions);
+    await flushPromises();
+    const text = wrapper.text();
+    expect(text).toContain("Company Code");
+    expect(text).toContain("Create Company");
+    expect(text).toContain("Enabled");
+    expect(text).toContain("North America");
   });
 
   it("does not call create when the tenant code is invalid", async () => {

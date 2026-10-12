@@ -1,5 +1,6 @@
 import type { FormItemRule } from "element-plus";
-import { FIELD_ERROR_MESSAGE } from "@/api/error-codes";
+import { fieldErrorMessage } from "@/api/error-codes";
+import { translate } from "@/locales";
 import type { ApiError } from "@/utils/http/error";
 
 /*
@@ -23,57 +24,57 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const blank = (value: string | null | undefined) => !value || value.trim().length === 0;
 
 export function validateUsername(value: string): string | null {
-  if (blank(value)) return "请输入用户名";
-  if (!USERNAME_PATTERN.test(value)) return "用户名需为 3-64 位字母、数字、下划线、点或连字符";
+  if (blank(value)) return translate("validation.usernameRequired");
+  if (!USERNAME_PATTERN.test(value)) return translate("validation.usernamePattern");
   return null;
 }
 
 /** Password being set (create, reset, change). */
 export function validateNewPassword(value: string): string | null {
-  if (blank(value)) return "请输入密码";
+  if (blank(value)) return translate("validation.passwordRequired");
   if (value.length < PASSWORD_MIN || value.length > PASSWORD_MAX) {
-    return `密码长度需为 ${PASSWORD_MIN}-${PASSWORD_MAX} 位`;
+    return translate("validation.passwordLength", { min: PASSWORD_MIN, max: PASSWORD_MAX });
   }
-  if (!PRINTABLE_ASCII.test(value)) return "密码只能包含英文字母、数字和常见符号";
+  if (!PRINTABLE_ASCII.test(value)) return translate("validation.passwordCharset");
   return null;
 }
 
 /** Password being presented (login, old password): only presence and the 72 character cap. */
 export function validateExistingPassword(value: string): string | null {
-  if (blank(value)) return "请输入密码";
-  if (value.length > PASSWORD_MAX) return `密码不能超过 ${PASSWORD_MAX} 位`;
-  return null;
-}
-
-export function validateNickname(value: string): string | null {
-  if (blank(value)) return "请输入昵称";
-  if (value.length > 64) return "昵称不能超过 64 个字符";
-  return null;
-}
-
-export function validateTenantCode(value: string): string | null {
-  if (!value) return "请输入公司编码";
-  if (!/^[a-z0-9-]{2,32}$/.test(value)) {
-    return "公司编码需为 2-32 位小写字母、数字或连字符";
+  if (blank(value)) return translate("validation.passwordRequired");
+  if (value.length > PASSWORD_MAX) {
+    return translate("validation.passwordTooLong", { max: PASSWORD_MAX });
   }
   return null;
 }
 
+export function validateNickname(value: string): string | null {
+  if (blank(value)) return translate("validation.nicknameRequired");
+  if (value.length > 64) return translate("validation.nicknameTooLong");
+  return null;
+}
+
+export function validateTenantCode(value: string): string | null {
+  if (!value) return translate("validation.tenantCodeRequired");
+  if (!/^[a-z0-9-]{2,32}$/.test(value)) return translate("validation.tenantCodePattern");
+  return null;
+}
+
 export function validateTenantName(value: string): string | null {
-  if (blank(value)) return "请输入名称";
-  if (value.length > 64) return "名称不能超过 64 个字符";
+  if (blank(value)) return translate("validation.nameRequired");
+  if (value.length > 64) return translate("validation.nameTooLong");
   return null;
 }
 
 export function validateRemark(value: string | null | undefined): string | null {
-  if (value && value.length > 500) return "备注不能超过 500 个字符";
+  if (value && value.length > 500) return translate("validation.remarkTooLong");
   return null;
 }
 
 export function validateEmail(value: string | null | undefined): string | null {
   if (!value) return null;
-  if (value.length > 254) return "邮箱不能超过 254 个字符";
-  if (!EMAIL_PATTERN.test(value)) return "邮箱格式不正确";
+  if (value.length > 254) return translate("validation.emailTooLong");
+  if (!EMAIL_PATTERN.test(value)) return translate("validation.emailInvalid");
   return null;
 }
 
@@ -102,7 +103,7 @@ export function serverFieldErrors(
   const result: Record<string, string> = {};
   const fields = (error as Partial<ApiError> | null)?.fields ?? [];
   for (const field of fields) {
-    if (knownFields.includes(field)) result[field] = FIELD_ERROR_MESSAGE;
+    if (knownFields.includes(field)) result[field] = fieldErrorMessage();
   }
   return result;
 }

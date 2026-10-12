@@ -17,7 +17,12 @@ function setup(reply: Reply, token: string | null = "tok-1") {
     return { data: reply.data, status: reply.status, statusText: "", headers: {}, config };
   };
   const onUnauthorized = vi.fn();
-  const http = createHttp({ getToken: () => token, onUnauthorized, adapter });
+  const http = createHttp({
+    getToken: () => token,
+    getLanguage: () => "zh-CN",
+    onUnauthorized,
+    adapter
+  });
   return { http, seen, onUnauthorized };
 }
 
@@ -52,6 +57,22 @@ describe("request wrapper", () => {
     expect(TOKEN_HEADER).toBe("X-Admin-Token");
     expect(seen[0].headers.get("X-Admin-Token")).toBe("tok-1");
     expect(seen[0].baseURL).toBe("/admin-api");
+  });
+
+  it("sends the current language as Accept-Language", async () => {
+    const seen: InternalAxiosRequestConfig[] = [];
+    const adapter: AxiosAdapter = async config => {
+      seen.push(config);
+      return { data: ok(null), status: 200, statusText: "", headers: {}, config };
+    };
+    const http = createHttp({
+      getToken: () => null,
+      getLanguage: () => "en-US",
+      onUnauthorized: vi.fn(),
+      adapter
+    });
+    await http.request({ url: "/auth/login" });
+    expect(seen[0].headers.get("Accept-Language")).toBe("en-US");
   });
 
   it("omits the header when signed out", async () => {

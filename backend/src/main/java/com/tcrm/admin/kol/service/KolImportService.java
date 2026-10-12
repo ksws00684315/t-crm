@@ -35,7 +35,7 @@ public class KolImportService {
   }
 
   public byte[] template() {
-    return imports.template(KolImportColumn.headers());
+    return imports.template(KolImportColumn.headerKeys());
   }
 
   /** Validates and queues the file; returns the task ID. FINANCE may not import (403). */
@@ -47,7 +47,7 @@ public class KolImportService {
     ImportActor actor = new ImportActor(user.id(), KolService.own(user));
     return imports.submitImport(
         TaskType.KOL_IMPORT,
-        KolImportColumn.headers(),
+        KolImportColumn.headerKeys(),
         file,
         () -> new KolImportProcessor(actor, kols, writer, bdUsers),
         TaskType.KOL_IMPORT.maxRows());

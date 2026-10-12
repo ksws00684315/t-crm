@@ -10,10 +10,12 @@ public interface ImportTaskApi {
 
   /**
    * Validates the file synchronously (extension, MIME type, size, ZIP signature, header, row
-   * count), stores it, creates a WAITING task owned by the current administrator and queues it.
+   * count), stores it, creates a WAITING task owned by the current administrator and queues it. The
+   * task remembers the request language, and its error file is rendered in that language.
    *
    * @param type task type
-   * @param headers template header texts in column order
+   * @param headerKeys template header message keys ("import.*") in column order; the file is
+   *     accepted when its header row equals either the full Chinese or the full English rendering
    * @param file uploaded file
    * @param processor creates the row processor when the task starts; called on the worker thread,
    *     so it must capture everything it needs from the request (such as the submitter)
@@ -24,15 +26,15 @@ public interface ImportTaskApi {
    */
   Long submitImport(
       TaskType type,
-      List<String> headers,
+      List<String> headerKeys,
       ImportFileDTO file,
       Supplier<ImportRowProcessor> processor,
       int maxRows);
 
   /**
-   * Returns an .xlsx workbook containing only the header row.
+   * Returns an .xlsx workbook containing only the header row, rendered in the request language.
    *
-   * @param headers template header texts in column order
+   * @param headerKeys template header message keys ("import.*") in column order
    */
-  byte[] template(List<String> headers);
+  byte[] template(List<String> headerKeys);
 }

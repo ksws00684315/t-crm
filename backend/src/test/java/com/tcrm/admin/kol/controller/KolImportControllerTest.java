@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,7 +35,16 @@ class KolImportControllerTest {
   private static final String BASE = "/admin-api/kol/kol-imports";
   private final KolImportService imports = mock(KolImportService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
-  private final MockMvc mvc = AdminMvcSupport.build(current, new KolImportController(imports));
+  private final ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+  private final MockMvc mvc;
+
+  {
+    messages.setBasenames("messages");
+    messages.setDefaultEncoding("UTF-8");
+    messages.setFallbackToSystemLocale(false);
+    mvc = AdminMvcSupport.build(current, new KolImportController(imports, messages));
+  }
+
   private final MockMultipartFile file =
       new MockMultipartFile("file", "达人.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, new byte[] {1, 2});
 
@@ -107,10 +117,13 @@ class KolImportControllerTest {
   }
 
   @Test
-  void shouldDownloadTemplateAsAttachment() throws Exception {
+  void shouldDownloadEnglishTemplateName_whenRequestIsEnglish() throws Exception {
     when(imports.template()).thenReturn(new byte[] {'P', 'K'});
     String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.OWN);
-    mvc.perform(get(BASE + "/template").header(AdminMvcSupport.TOKEN_HEADER, token))
+    mvc.perform(
+            get(BASE + "/template")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .header("Accept-Language", "en-US"))
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Type", ImportTaskApi.XLSX_CONTENT_TYPE))
         .andExpect(
@@ -122,5 +135,21 @@ class KolImportControllerTest {
                     "Content-Disposition",
                     org.hamcrest.Matchers.containsString("kol-import-template.xlsx")))
         .andExpect(content().bytes(new byte[] {'P', 'K'}));
+  }
+
+  @Test
+  void shouldDownloadChineseTemplateName_whenRequestIsChinese() throws Exception {
+    when(imports.template()).thenReturn(new byte[] {'P', 'K'});
+    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.OWN);
+    // Non-ASCII file names are sent as the RFC 5987 filename* parameter.
+    String encoded =
+        java.net.URLEncoder.encode("达人导入模板.xlsx", java.nio.charset.StandardCharsets.UTF_8);
+    mvc.perform(
+            get(BASE + "/template")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .header("Accept-Language", "zh-CN"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header().string("Content-Disposition", org.hamcrest.Matchers.containsString(encoded)));
   }
 }

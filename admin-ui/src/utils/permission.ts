@@ -1,14 +1,11 @@
 import type { RouteRecordRaw } from "vue-router";
 import type { Role } from "@/api/types";
+import { translate } from "@/locales";
 
-export const ROLE_LABELS: Readonly<Record<Role, string>> = {
-  PLATFORM_ADMIN: "平台管理员",
-  SUPER_ADMIN: "超级管理员",
-  OPERATOR: "运营",
-  FINANCE: "财务"
-};
-
-export const ALL_ROLES: readonly Role[] = ["PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"];
+/** Role name in the current language. Resolved at call time so a switch updates open screens. */
+export function roleLabel(role: Role): string {
+  return translate(`role.${role}`);
+}
 
 /** Roles available in company user management; platform administrators are platform-level. */
 export const SELECTABLE_ROLES: readonly Exclude<Role, "PLATFORM_ADMIN">[] = [
@@ -81,7 +78,7 @@ export function buildMenu(
             ) {
               children.push({
                 path: childPath,
-                title: childMeta.title,
+                title: translate(childMeta.title),
                 icon: childMeta.icon as string | undefined
               });
             }
@@ -90,7 +87,7 @@ export function buildMenu(
         if (children.length > 0) {
           items.push({
             path,
-            title: meta.title,
+            title: translate(meta.title),
             icon: meta.icon as string | undefined,
             children
           });
@@ -103,7 +100,11 @@ export function buildMenu(
         !meta.hideInMenu &&
         canAccessRoute(meta, owned, dataScope)
       ) {
-        items.push({ path, title: meta.title, icon: meta.icon as string | undefined });
+        items.push({
+          path,
+          title: translate(meta.title),
+          icon: meta.icon as string | undefined
+        });
       }
       if (route.children && !meta?.menuGroup) visit(route.children, path);
     }

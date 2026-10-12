@@ -363,7 +363,11 @@ class KolIT {
 
     String taskId =
         json.readTree(
-                mvc.perform(multipart("/admin-api/kol/kol-imports").file(file).header(TOKEN, admin))
+                mvc.perform(
+                        multipart("/admin-api/kol/kol-imports")
+                            .file(file)
+                            .header(TOKEN, admin)
+                            .header("Accept-Language", "zh-CN"))
                     .andExpect(status().isAccepted())
                     .andReturn()
                     .getResponse()
@@ -433,6 +437,57 @@ class KolIT {
     }
   }
 
+  @Test
+  void shouldServeEnglishErrorFile_whenImportWasSubmittedInEnglish() throws Exception {
+    String admin = companyAdmin();
+    List<List<String>> rows =
+        List.of(row("BAD!", "Dave", "dave@x.io", "US"), row("", "Eve", "eve@x.io", "US"));
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    FastExcel.write(out)
+        .head(
+            com.tcrm.admin.TestTemplates.render(
+                    KolImportColumn.headerKeys(), java.util.Locale.ENGLISH)
+                .stream()
+                .map(List::of)
+                .toList())
+        .sheet("Sheet1")
+        .doWrite(rows);
+    byte[] content = out.toByteArray();
+    MockMultipartFile file =
+        new MockMultipartFile("file", "kols.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, content);
+
+    String taskId =
+        json.readTree(
+                mvc.perform(
+                        multipart("/admin-api/kol/kol-imports")
+                            .file(file)
+                            .header(TOKEN, admin)
+                            .header("Accept-Language", "en-US"))
+                    .andExpect(status().isAccepted())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/taskId")
+            .asText();
+    var task = waitForTask(admin, taskId);
+    assertThat(task.at("/status").asText()).isEqualTo("PARTIAL");
+
+    byte[] errors =
+        mvc.perform(get("/admin-api/task/tasks/" + taskId + "/error-file").header(TOKEN, admin))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    List<Map<Integer, String>> sheet =
+        FastExcel.read(new java.io.ByteArrayInputStream(errors))
+            .sheet(0)
+            .headRowNumber(0)
+            .doReadSync();
+    assertThat(sheet.get(0).get(10)).isEqualTo("Error");
+    assertThat(sheet.get(1).get(10))
+        .isEqualTo("Invalid KOL code; it must be KOL followed by 4 to 8 digits");
+  }
+
   private static List<String> row(String... cells) {
     List<String> row = new ArrayList<>(List.of(cells));
     row.addAll(Collections.nCopies(KolImportColumn.values().length - cells.length, ""));
@@ -442,7 +497,10 @@ class KolIT {
   private static byte[] workbook(List<List<String>> rows) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     FastExcel.write(out)
-        .head(KolImportColumn.headers().stream().map(List::of).toList())
+        .head(
+            com.tcrm.admin.TestTemplates.render(KolImportColumn.headerKeys()).stream()
+                .map(List::of)
+                .toList())
         .sheet("Sheet1")
         .doWrite(rows);
     return out.toByteArray();

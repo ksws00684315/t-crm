@@ -3,34 +3,37 @@ package com.tcrm.admin.product.service;
 import java.util.Arrays;
 import java.util.List;
 
-/** Original-product import template columns (task 05 §4.6). */
+/**
+ * Original-product import template columns (task 05 §4.6); header message keys resolve per language
+ * in messages*.properties.
+ */
 public enum ProductImportColumn {
-  CODE("原商品编码"),
-  SHOP_ID("店铺 ID"),
-  WEIDIAN_ITEM_ID("微店商品 ID"),
-  NAME("商品名称"),
-  CATEGORY("分类"),
-  IMAGE_URL("图片地址"),
-  PRICE("价格"),
-  RATE("商品佣金比例(%)");
+  CODE("import.product.header.code"),
+  SHOP_ID("import.product.header.shop-id"),
+  WEIDIAN_ITEM_ID("import.product.header.weidian-item-id"),
+  NAME("import.product.header.name"),
+  CATEGORY("import.product.header.category"),
+  IMAGE_URL("import.product.header.image-url"),
+  PRICE("import.product.header.price"),
+  RATE("import.product.header.rate");
 
-  private static final List<String> HEADERS =
-      Arrays.stream(values()).map(ProductImportColumn::header).toList();
-  private final String header;
+  private static final List<String> HEADER_KEYS =
+      Arrays.stream(values()).map(ProductImportColumn::headerKey).toList();
+  private final String headerKey;
 
-  ProductImportColumn(String header) {
-    this.header = header;
+  ProductImportColumn(String headerKey) {
+    this.headerKey = headerKey;
   }
 
-  public String header() {
-    return header;
+  public String headerKey() {
+    return headerKey;
   }
 
   public String of(List<String> row) {
     return row.get(ordinal());
   }
 
-  public static List<String> headers() {
-    return HEADERS;
+  public static List<String> headerKeys() {
+    return HEADER_KEYS;
   }
 }

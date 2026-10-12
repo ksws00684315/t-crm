@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { resetUserPassword } from "@/api/system/user";
 import type { UserVO } from "@/api/types";
 import { notifyError } from "@/utils/notify";
@@ -12,7 +13,9 @@ defineOptions({ name: "ResetPasswordDialog" });
 const props = defineProps<{ modelValue: boolean; user: UserVO | null }>();
 const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
 
+const { t } = useI18n();
 const formRef = ref<FormInstance>();
+const title = computed(() => t("user.resetTitle", { username: props.user?.username ?? "" }));
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
 const form = reactive({ password: "" });
@@ -38,7 +41,7 @@ async function submit() {
   saving.value = true;
   try {
     await resetUserPassword(props.user.id, form.password);
-    ElMessage.success("密码已重置，该用户需使用新密码重新登录");
+    ElMessage.success(t("user.resetDone"));
     close();
   } catch (error) {
     serverErrors.value = serverFieldErrors(error, ["password"]);
@@ -52,12 +55,12 @@ async function submit() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="`重置密码：${user?.username ?? ''}`"
+    :title="title"
     width="440px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" @submit.prevent>
-      <el-form-item label="新密码" prop="password" :error="serverErrors.password">
+      <el-form-item :label="t('user.newPassword')" prop="password" :error="serverErrors.password">
         <el-input
           v-model="form.password"
           type="password"
@@ -68,8 +71,10 @@ async function submit() {
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="close">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">确定</el-button>
+      <el-button @click="close">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">{{
+        t("common.confirm")
+      }}</el-button>
     </template>
   </el-dialog>
 </template>

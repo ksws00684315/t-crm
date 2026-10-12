@@ -2,6 +2,7 @@
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { createTenant, updateTenant, type TenantVO } from "@/api/platform/tenant";
 import { messageForErrorCode } from "@/api/error-codes";
 import { ApiError } from "@/utils/http/error";
@@ -16,6 +17,8 @@ import {
 
 defineOptions({ name: "TenantFormDialog" });
 
+const { t } = useI18n();
+
 const props = defineProps<{ modelValue: boolean; tenant: TenantVO | null }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
@@ -23,6 +26,7 @@ const emit = defineEmits<{
 }>();
 
 const editing = computed(() => props.tenant !== null);
+const title = computed(() => (editing.value ? t("tenant.editTitle") : t("tenant.createTitle")));
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
@@ -60,7 +64,7 @@ async function submit() {
     } else {
       await createTenant({ tenantCode: form.tenantCode, name: form.name.trim(), remark });
     }
-    ElMessage.success(props.tenant ? "公司已保存" : "公司已创建");
+    ElMessage.success(props.tenant ? t("tenant.saved") : t("tenant.created"));
     emit("saved");
     close();
   } catch (error) {
@@ -78,29 +82,29 @@ async function submit() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="editing ? '编辑公司' : '新建公司'"
+    :title="title"
     width="500px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" @submit.prevent>
-      <el-form-item label="公司编码" prop="tenantCode" :error="serverErrors.tenantCode">
+      <el-form-item :label="t('tenant.code')" prop="tenantCode" :error="serverErrors.tenantCode">
         <el-input
           v-model="form.tenantCode"
           :disabled="editing"
           maxlength="32"
-          placeholder="小写字母、数字、连字符，2～32 位，创建后不可修改"
+          :placeholder="t('tenant.codePlaceholder')"
         />
       </el-form-item>
-      <el-form-item label="公司名称" prop="name" :error="serverErrors.name">
+      <el-form-item :label="t('tenant.name')" prop="name" :error="serverErrors.name">
         <el-input v-model="form.name" maxlength="64" />
       </el-form-item>
-      <el-form-item label="备注" prop="remark" :error="serverErrors.remark">
+      <el-form-item :label="t('common.remark')" prop="remark" :error="serverErrors.remark">
         <el-input v-model="form.remark" type="textarea" maxlength="500" show-word-limit />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="close">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      <el-button @click="close">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">{{ t("common.save") }}</el-button>
     </template>
   </el-dialog>
 </template>

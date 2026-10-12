@@ -1,9 +1,11 @@
 package com.tcrm.admin.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.api.ImportFileDTO;
+import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
@@ -17,23 +19,27 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Runs Excel imports as batch tasks: synchronous file checks, then asynchronous row-by-row
- * processing with progress, an error file and a final status.
+ * processing with progress, an error file and a final status. Templates and error files are
+ * rendered through the message bundles: templates in the request language, error files in the
+ * language stored on the task row at submission (design §2.4; the worker thread has no request).
  */
 @Service
 public class ImportTaskService implements ImportTaskApi {
   /** Progress is written every this many rows, and once more at the end. */
   static final int PROGRESS_INTERVAL = 100;
 
-  static final String ERROR_COLUMN = "错误原因";
-  static final String REASON_SEPARATOR = "；";
-  static final String ROW_ERROR = "系统错误，该行未导入";
+  static final String ERROR_COLUMN = "import.error.column";
+  static final String REASON_SEPARATOR = "import.error.reason-separator";
+  static final String ROW_ERROR = "import.error.row-error";
   static final String MESSAGE_ALL_FAILED = "All rows failed";
   static final String MESSAGE_UNREADABLE = "File cannot be parsed";
   static final String MESSAGE_QUEUE_FULL = "Rejected: task queue full";
@@ -46,29 +52,35 @@ public class ImportTaskService implements ImportTaskApi {
   private final TaskFileMapper files;
   private final TaskQueue queue;
   private final TransactionTemplate tx;
+  private final MessageSource messages;
 
   public ImportTaskService(
       ExcelFiles excel,
       TaskMapper tasks,
       TaskFileMapper files,
       TaskQueue queue,
-      TransactionTemplate tx) {
+      TransactionTemplate tx,
+      MessageSource messages) {
     this.excel = excel;
     this.tasks = tasks;
     this.files = files;
     this.queue = queue;
     this.tx = tx;
+    this.messages = messages;
   }
 
   @Override
   public Long submitImport(
       TaskType type,
-      List<String> headers,
+      List<String> headerKeys,
       ImportFileDTO file,
       Supplier<ImportRowProcessor> processor,
       int maxRows) {
     excel.check(file);
-    int total = excel.read(file.content(), headers, maxRows).size();
+    // The file must carry one full template language; the worker later re-reads the same variant.
+    ExcelFiles.SheetData sheet =
+        excel.read(file.content(), variants(headerKeys, AppLocale.ZH_CN, AppLocale.EN_US), maxRows);
+    int total = sheet.rows().size();
     TaskDO task = new TaskDO();
     task.setTaskType(type);
     task.setStatus(TaskStatus.WAITING);
@@ -76,6 +88,7 @@ public class ImportTaskService implements ImportTaskApi {
     task.setDone(0);
     task.setFailed(0);
     task.setDeleted(false);
+    task.setLocale(AppLocale.current().tag());
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
     input.setFileName(fileName(file.fileName()));
@@ -89,7 +102,7 @@ public class ImportTaskService implements ImportTaskApi {
         });
     Long id = task.getId();
     try {
-      queue.submit(() -> run(id, headers, processor, maxRows));
+      queue.submit(() -> run(id, sheet.matchedHeaders(), processor, maxRows));
     } catch (BusinessException e) {
       finish(id, null, TaskStatus.FAILED, MESSAGE_QUEUE_FULL);
       throw e;
@@ -99,8 +112,8 @@ public class ImportTaskService implements ImportTaskApi {
   }
 
   @Override
-  public byte[] template(List<String> headers) {
-    return excel.write(headers, List.of());
+  public byte[] template(List<String> headerKeys) {
+    return excel.write(render(headerKeys, List.of(), AppLocale.current()), List.of());
   }
 
   /**
@@ -119,25 +132,31 @@ public class ImportTaskService implements ImportTaskApi {
     if (task == null || task.getStatus() != TaskStatus.WAITING || task.getTenantId() == null) {
       return;
     }
-    TenantScope.runCompany(task.getTenantId(), () -> work(id, headers, factory, maxRows));
+    TenantScope.runCompany(
+        task.getTenantId(),
+        () -> work(id, headers, AppLocale.ofTag(task.getLocale()), factory, maxRows));
   }
 
   private void work(
-      Long id, List<String> headers, Supplier<ImportRowProcessor> factory, int maxRows) {
+      Long id,
+      List<String> headers,
+      AppLocale locale,
+      Supplier<ImportRowProcessor> factory,
+      int maxRows) {
     try {
       TaskDO running = new TaskDO();
       running.setId(id);
       running.setStatus(TaskStatus.RUNNING);
       running.setStartedAt(Instant.now());
       tasks.updateById(running);
-      List<List<String>> rows;
+      ExcelFiles.SheetData sheet;
       try {
-        rows = excel.read(input(id), headers, maxRows);
+        sheet = excel.read(input(id), List.of(headers), maxRows);
       } catch (BusinessException e) {
         finish(id, null, TaskStatus.FAILED, MESSAGE_UNREADABLE);
         return;
       }
-      processRows(id, headers, rows, factory.get());
+      processRows(id, sheet.matchedHeaders(), sheet.rows(), locale, factory.get());
     } catch (RuntimeException e) {
       // Exception messages may echo row data (e-mail addresses); log the type only (spec 02 §4).
       LOG.error("Batch task {} failed unexpectedly: {}", id, e.getClass().getName());
@@ -146,17 +165,21 @@ public class ImportTaskService implements ImportTaskApi {
   }
 
   private void processRows(
-      Long id, List<String> headers, List<List<String>> rows, ImportRowProcessor processor) {
+      Long id,
+      List<String> headers,
+      List<List<String>> rows,
+      AppLocale locale,
+      ImportRowProcessor processor) {
     List<List<String>> errors = new ArrayList<>();
     int done = 0;
     int failed = 0;
     for (List<String> row : rows) {
-      List<String> reasons = processRow(id, processor, row);
+      List<ImportReason> reasons = processRow(id, processor, row);
       done++;
       if (!reasons.isEmpty()) {
         failed++;
         List<String> errorRow = new ArrayList<>(row);
-        errorRow.add(String.join(REASON_SEPARATOR, reasons));
+        errorRow.add(join(reasons, locale));
         errors.add(errorRow);
       }
       if (done % PROGRESS_INTERVAL == 0 && done < rows.size()) {
@@ -170,7 +193,7 @@ public class ImportTaskService implements ImportTaskApi {
     TaskFileDO errorFile = null;
     if (!errors.isEmpty()) {
       List<String> errorHeaders = new ArrayList<>(headers);
-      errorHeaders.add(ERROR_COLUMN);
+      errorHeaders.add(message(ERROR_COLUMN, List.of(), locale));
       errorFile = new TaskFileDO();
       errorFile.setTaskId(id);
       errorFile.setKind(TaskFileKind.ERROR);
@@ -182,13 +205,13 @@ public class ImportTaskService implements ImportTaskApi {
     LOG.info("Batch task {} finished {}: {} rows, {} failed", id, status, done, failed);
   }
 
-  private List<String> processRow(Long id, ImportRowProcessor processor, List<String> row) {
+  private List<ImportReason> processRow(Long id, ImportRowProcessor processor, List<String> row) {
     try {
-      List<String> reasons = processor.process(row);
+      List<ImportReason> reasons = processor.process(row);
       return reasons == null ? List.of() : reasons;
     } catch (RuntimeException e) {
       LOG.error("Batch task {} row failed unexpectedly: {}", id, e.getClass().getName());
-      return List.of(ROW_ERROR);
+      return List.of(ImportReason.of(ROW_ERROR));
     }
   }
 
@@ -238,5 +261,24 @@ public class ImportTaskService implements ImportTaskApi {
       name = "import.xlsx";
     }
     return name.length() > MAX_FILE_NAME ? name.substring(name.length() - MAX_FILE_NAME) : name;
+  }
+
+  private List<List<String>> variants(List<String> headerKeys, AppLocale first, AppLocale second) {
+    return List.of(render(headerKeys, List.of(), first), render(headerKeys, List.of(), second));
+  }
+
+  private List<String> render(List<String> keys, List<Object> args, AppLocale locale) {
+    return keys.stream().map(key -> message(key, args, locale)).toList();
+  }
+
+  private String join(List<ImportReason> reasons, AppLocale locale) {
+    String separator = message(REASON_SEPARATOR, List.of(), locale);
+    return reasons.stream()
+        .map(reason -> message(reason.key(), reason.args(), locale))
+        .collect(Collectors.joining(separator));
+  }
+
+  private String message(String key, List<Object> args, AppLocale locale) {
+    return messages.getMessage(key, args.toArray(), locale.locale());
   }
 }

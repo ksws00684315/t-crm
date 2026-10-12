@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   createTenantAdmin,
   listTenantAdmins,
@@ -22,14 +23,20 @@ import {
 
 defineOptions({ name: "TenantAdminsDialog" });
 
+const { t } = useI18n();
+
 const props = defineProps<{ modelValue: boolean; tenant: TenantVO | null }>();
 const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
 
+const title = computed(() => t("tenantAdmin.title", { name: props.tenant?.name ?? "" }));
 const loading = ref(false);
 const rows = ref<TenantAdminVO[]>([]);
 const createVisible = ref(false);
 const resetVisible = ref(false);
 const resettingAdmin = ref<TenantAdminVO | null>(null);
+const resetTitle = computed(() =>
+  t("tenantAdmin.resetTitle", { username: resettingAdmin.value?.username ?? "" })
+);
 const createFormRef = ref<FormInstance>();
 const resetFormRef = ref<FormInstance>();
 const creating = ref(false);
@@ -96,7 +103,7 @@ async function submitCreate() {
       email: createForm.email.trim() || null,
       password: createForm.password
     });
-    ElMessage.success("超级管理员已创建");
+    ElMessage.success(t("tenantAdmin.created"));
     createVisible.value = false;
     await load();
   } catch (error) {
@@ -127,7 +134,7 @@ async function submitReset() {
   resetErrors.value = {};
   try {
     await resetTenantAdminPassword(props.tenant.id, resettingAdmin.value.id, resetForm.password);
-    ElMessage.success("该管理员已在所有设备上退出");
+    ElMessage.success(t("tenantAdmin.signedOut"));
     resetVisible.value = false;
   } catch (error) {
     resetErrors.value = serverFieldErrors(error, ["password"]);
@@ -141,41 +148,43 @@ async function submitReset() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="`超级管理员：${tenant?.name ?? ''}`"
+    :title="title"
     width="900px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="actions">
-      <el-button type="primary" @click="openCreate">新建超级管理员</el-button>
+      <el-button type="primary" @click="openCreate">{{ t("tenantAdmin.create") }}</el-button>
     </div>
     <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="username" label="用户名" min-width="130" />
-      <el-table-column prop="nickname" label="昵称" min-width="120" />
-      <el-table-column prop="email" label="邮箱" min-width="180" />
-      <el-table-column label="状态" width="90">
+      <el-table-column prop="username" :label="t('common.username')" min-width="130" />
+      <el-table-column prop="nickname" :label="t('common.nickname')" min-width="120" />
+      <el-table-column prop="email" :label="t('common.email')" min-width="180" />
+      <el-table-column :label="t('common.status')" width="90">
         <template #default="{ row }">
           <el-tag :type="(row as TenantAdminVO).status === 1 ? 'success' : 'info'">
-            {{ (row as TenantAdminVO).status === 1 ? "启用" : "停用" }}
+            {{ (row as TenantAdminVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="最近登录" width="180">
+      <el-table-column :label="t('tenantAdmin.lastLogin')" width="180">
         <template #default="{ row }">
           {{ formatInstant((row as TenantAdminVO).lastLoginTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="110" fixed="right">
+      <el-table-column :label="t('common.actions')" width="110" fixed="right">
         <template #default="{ row }">
           <el-button link type="warning" @click="openReset(row as TenantAdminVO)">
-            重置密码
+            {{ t("tenantAdmin.resetPassword") }}
           </el-button>
         </template>
       </el-table-column>
     </el-table>
-    <template #footer><el-button @click="close">关闭</el-button></template>
+    <template #footer>
+      <el-button @click="close">{{ t("common.close") }}</el-button>
+    </template>
   </el-dialog>
 
-  <el-dialog v-model="createVisible" title="新建超级管理员" width="500px">
+  <el-dialog v-model="createVisible" :title="t('tenantAdmin.createTitle')" width="500px">
     <el-form
       ref="createFormRef"
       :model="createForm"
@@ -183,16 +192,20 @@ async function submitReset() {
       label-width="100px"
       @submit.prevent
     >
-      <el-form-item label="用户名" prop="username" :error="createErrors.username">
+      <el-form-item :label="t('common.username')" prop="username" :error="createErrors.username">
         <el-input v-model="createForm.username" maxlength="64" />
       </el-form-item>
-      <el-form-item label="昵称" prop="nickname" :error="createErrors.nickname">
+      <el-form-item :label="t('common.nickname')" prop="nickname" :error="createErrors.nickname">
         <el-input v-model="createForm.nickname" maxlength="64" />
       </el-form-item>
-      <el-form-item label="邮箱" prop="email" :error="createErrors.email">
+      <el-form-item :label="t('common.email')" prop="email" :error="createErrors.email">
         <el-input v-model="createForm.email" maxlength="254" />
       </el-form-item>
-      <el-form-item label="初始密码" prop="password" :error="createErrors.password">
+      <el-form-item
+        :label="t('tenantAdmin.initialPassword')"
+        prop="password"
+        :error="createErrors.password"
+      >
         <el-input
           v-model="createForm.password"
           type="password"
@@ -203,16 +216,14 @@ async function submitReset() {
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="createVisible = false">取消</el-button>
-      <el-button type="primary" :loading="creating" @click="submitCreate">创建</el-button>
+      <el-button @click="createVisible = false">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="creating" @click="submitCreate">{{
+        t("common.create")
+      }}</el-button>
     </template>
   </el-dialog>
 
-  <el-dialog
-    v-model="resetVisible"
-    :title="`重置密码：${resettingAdmin?.username ?? ''}`"
-    width="460px"
-  >
+  <el-dialog v-model="resetVisible" :title="resetTitle" width="460px">
     <el-form
       ref="resetFormRef"
       :model="resetForm"
@@ -220,7 +231,11 @@ async function submitReset() {
       label-width="90px"
       @submit.prevent
     >
-      <el-form-item label="新密码" prop="password" :error="resetErrors.password">
+      <el-form-item
+        :label="t('tenantAdmin.newPassword')"
+        prop="password"
+        :error="resetErrors.password"
+      >
         <el-input
           v-model="resetForm.password"
           type="password"
@@ -231,8 +246,10 @@ async function submitReset() {
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="resetVisible = false">取消</el-button>
-      <el-button type="primary" :loading="resetting" @click="submitReset">确定</el-button>
+      <el-button @click="resetVisible = false">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="resetting" @click="submitReset">{{
+        t("common.confirm")
+      }}</el-button>
     </template>
   </el-dialog>
 </template>

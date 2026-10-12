@@ -3,7 +3,7 @@ import type { Role } from "@/api/types";
 
 declare module "vue-router" {
   interface RouteMeta {
-    /** Page title; also the menu label. */
+    /** Locale key for the page title; also the menu label (for example "route.home"). */
     title?: string;
     /** Roles allowed to open the route. Missing or empty means any signed-in administrator. */
     roles?: Role[];

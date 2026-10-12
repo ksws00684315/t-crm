@@ -1,9 +1,13 @@
 import { mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
+import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UserVO } from "@/api/types";
+import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
+import { useLocaleStore } from "@/stores/locale";
 import Layout from "../index.vue";
 
 const storeState = vi.hoisted(() => ({ user: null as Record<string, unknown> | null }));
@@ -18,6 +22,11 @@ vi.mock("@/stores/user", () => ({
 }));
 
 describe("layout tenant label", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+  });
+
   it("shows the tenant name next to a company user", async () => {
     storeState.user = {
       id: "1",
@@ -35,7 +44,7 @@ describe("layout tenant label", () => {
     const router = createRouter({ history: createMemoryHistory(), routes });
     await router.push("/home");
     const wrapper = mount(Layout, {
-      global: { plugins: [ElementPlus, router], stubs: { RouterView: true } }
+      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
     });
 
     expect(wrapper.text()).toContain("北美公司");
@@ -57,7 +66,7 @@ describe("layout tenant label", () => {
     } satisfies UserVO;
     const router = createRouter({ history: createMemoryHistory(), routes });
     const wrapper = mount(Layout, {
-      global: { plugins: [ElementPlus, router], stubs: { RouterView: true } }
+      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
     });
 
     expect(wrapper.text()).toContain("平台管理");
@@ -78,10 +87,43 @@ describe("layout tenant label", () => {
     };
     const router = createRouter({ history: createMemoryHistory(), routes });
     const wrapper = mount(Layout, {
-      global: { plugins: [ElementPlus, router], stubs: { RouterView: true } }
+      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
     });
 
     expect(wrapper.text()).not.toContain("undefined");
     expect(wrapper.text()).not.toContain("null");
+  });
+
+  it("renders the menu and header in English", async () => {
+    storeState.user = {
+      id: "1",
+      username: "alice",
+      nickname: "Alice",
+      email: null,
+      role: "SUPER_ADMIN",
+      dataScope: "ALL",
+      tenantId: "1",
+      tenantName: "North America",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-05T00:00:00Z"
+    } satisfies UserVO;
+    useLocaleStore().setLocale("en-US");
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    await router.push("/home");
+    const wrapper = mount(Layout, {
+      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
+    });
+    await nextTick();
+    const text = wrapper.text();
+    expect(text).toContain("T-CRM Admin");
+    expect(text).toContain("Home");
+    expect(text).toContain("Creators");
+    expect(text).toContain("Super Admin");
+    expect(document.documentElement.lang).toBe("en-US");
+    await wrapper.find(".layout__user").trigger("click");
+    await nextTick();
+    expect(document.body.textContent).toContain("Change Password");
+    expect(document.body.textContent).toContain("Sign out");
   });
 });

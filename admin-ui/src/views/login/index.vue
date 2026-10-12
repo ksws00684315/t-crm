@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from "element-plus";
 import { reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
+import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useUserStore } from "@/stores/user";
 import { notifyError } from "@/utils/notify";
 import { rule, validateExistingPassword, validateUsername } from "@/utils/validation";
 
 defineOptions({ name: "LoginPage" });
 
+const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const user = useUserStore();
@@ -45,12 +48,12 @@ async function submit() {
 <template>
   <div class="login">
     <el-card class="login__card" shadow="always">
-      <h1 class="login__title">T-CRM 管理端</h1>
+      <h1 class="login__title">{{ t("login.title") }}</h1>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-        <el-form-item label="用户名" prop="username">
+        <el-form-item :label="t('login.username')" prop="username">
           <el-input v-model="form.username" autocomplete="username" maxlength="64" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
+        <el-form-item :label="t('login.password')" prop="password">
           <el-input
             v-model="form.password"
             type="password"
@@ -61,20 +64,30 @@ async function submit() {
           />
         </el-form-item>
         <el-button type="primary" class="login__submit" :loading="loading" @click="submit">
-          登录
+          {{ t("login.submit") }}
         </el-button>
       </el-form>
     </el-card>
+    <!-- After the form in the DOM so existing tests still address the first two inputs. -->
+    <div class="login__bar">
+      <LocaleSwitch />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .login {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100%;
   padding: 16px;
+}
+.login__bar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
 }
 .login__card {
   width: 100%;

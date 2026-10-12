@@ -3,6 +3,7 @@ package com.tcrm.admin.product.controller;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.product.service.MappingImportService;
+import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -11,6 +12,7 @@ import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,11 +32,13 @@ import org.springframework.web.multipart.MultipartFile;
     value = {"SUPER_ADMIN", "OPERATOR"},
     mode = SaMode.OR)
 public class KolItemImportController {
-  static final String TEMPLATE_NAME = "kol-item-import-template.xlsx";
+  static final String TEMPLATE_NAME_KEY = "import.mapping.template-name";
   private final MappingImportService imports;
+  private final MessageSource messages;
 
-  public KolItemImportController(MappingImportService imports) {
+  public KolItemImportController(MappingImportService imports, MessageSource messages) {
     this.imports = imports;
+    this.messages = messages;
   }
 
   @GetMapping("/template")
@@ -43,7 +47,9 @@ public class KolItemImportController {
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.attachment()
-                .filename(TEMPLATE_NAME, StandardCharsets.UTF_8)
+                .filename(
+                    messages.getMessage(TEMPLATE_NAME_KEY, null, AppLocale.current().locale()),
+                    StandardCharsets.UTF_8)
                 .build()
                 .toString())
         .contentType(MediaType.parseMediaType(ImportTaskApi.XLSX_CONTENT_TYPE))

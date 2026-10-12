@@ -380,7 +380,9 @@ class LinkIT {
     assertThat(outboxCount()).isEqualTo(1);
     assertThat(field(kolCode, productCode)).isNull();
 
-    jdbc.update("UPDATE crm_link_index_outbox SET next_attempt_at = now()");
+    // TIMESTAMPTZ(3) rounds now() to the millisecond, which can land up to 0.5 ms after the clock
+    // reading drain() uses for "due"; move the row clearly into the past instead.
+    jdbc.update("UPDATE crm_link_index_outbox SET next_attempt_at = now() - INTERVAL '1 second'");
     sync.drain();
     assertThat(outboxCount()).isZero();
     assertThat(field(kolCode, productCode)).contains("\"status\":1").contains("itemID=9901");
@@ -701,7 +703,7 @@ class LinkIT {
             "SELECT weidian_shop_id FROM crm_shop WHERE id = ?", String.class, shopId);
     byte[] workbook =
         workbook(
-            ProductImportColumn.headers(),
+            com.tcrm.admin.TestTemplates.render(ProductImportColumn.headerKeys()),
             List.of(List.of("", weidianShopId, itemId, name, "", "", "10.00", "")));
     awaitTask(submit("/admin-api/product/product-imports", workbook));
     return jdbc.queryForObject(
@@ -711,7 +713,9 @@ class LinkIT {
   private void importMapping(String shop, String item, String kol, String product)
       throws Exception {
     byte[] workbook =
-        workbook(MappingImportColumn.headers(), List.of(List.of(shop, item, kol, product)));
+        workbook(
+            com.tcrm.admin.TestTemplates.render(MappingImportColumn.headerKeys()),
+            List.of(List.of(shop, item, kol, product)));
     JsonNode task = awaitTask(submit("/admin-api/product/kol-item-imports", workbook));
     assertThat(task.path("status").asText()).isEqualTo("SUCCESS");
   }

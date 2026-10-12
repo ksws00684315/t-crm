@@ -1,5 +1,6 @@
 import { ElMessage } from "element-plus";
 import type { Router } from "vue-router";
+import { messageForErrorCode } from "@/api/error-codes";
 import { useUserStore } from "@/stores/user";
 import { LOGIN_PATH } from "@/router/guard";
 import { setUnauthorizedHandler } from "./http";
@@ -14,7 +15,7 @@ export function setupHttp(router: Router): void {
     const current = router.currentRoute.value;
     if (current.path === LOGIN_PATH) return; // a failed login attempt: the page shows its own error
     error.handled = true;
-    ElMessage.warning("登录已失效，请重新登录");
+    ElMessage.warning(messageForErrorCode("AUTH_UNAUTHORIZED"));
     void router.replace({ path: LOGIN_PATH, query: { redirect: current.fullPath } });
   });
 }

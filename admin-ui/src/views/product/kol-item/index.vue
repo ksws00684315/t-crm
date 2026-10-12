@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { rebuildLinkIndex } from "@/api/link/link";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
@@ -13,8 +14,7 @@ import { linkAbilities, productAbilities } from "@/utils/permission";
 
 defineOptions({ name: "KolItemListPage" });
 
-const SEARCH_TIP = "请输入达人编号、原商品编码或专属商品 ID 查询";
-
+const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 const links = computed(() => linkAbilities(me.user));
@@ -43,6 +43,8 @@ const query = reactive<{
   includeHistory: false
 });
 const importVisible = ref(false);
+const importTitle = computed(() => t("mapping.importTitle"));
+const importLimitHint = computed(() => t("mapping.limitHint"));
 
 function hasPrecisionFilter(): boolean {
   return (
@@ -60,7 +62,7 @@ function clearResults() {
 
 async function load() {
   if (!hasPrecisionFilter()) {
-    ElMessage.warning(SEARCH_TIP);
+    ElMessage.warning(t("mapping.searchTip"));
     clearResults();
     return;
   }
@@ -110,18 +112,16 @@ function reset() {
 
 async function rebuildIndex() {
   try {
-    await ElMessageBox.confirm(
-      "将按当前对应关系、达人、商品与店铺状态重建全部中转链接索引，在后台执行。确定开始吗？",
-      "重建链接索引",
-      { type: "warning" }
-    );
+    await ElMessageBox.confirm(t("mapping.confirmRebuild"), t("mapping.rebuildTitle"), {
+      type: "warning"
+    });
   } catch {
     return; // cancelled
   }
   rebuilding.value = true;
   try {
     await rebuildLinkIndex();
-    ElMessage.success("已开始重建");
+    ElMessage.success(t("mapping.rebuildStarted"));
   } catch (error) {
     notifyError(error);
   } finally {
@@ -137,7 +137,7 @@ onMounted(() => {
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" @submit.prevent>
-      <el-form-item label="达人编号">
+      <el-form-item :label="t('mapping.kolCode')">
         <el-input
           v-model="query.kolCode"
           clearable
@@ -146,7 +146,7 @@ onMounted(() => {
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="原商品编码">
+      <el-form-item :label="t('mapping.productCode')">
         <el-input
           v-model="query.productCode"
           clearable
@@ -155,12 +155,17 @@ onMounted(() => {
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="店铺">
-        <el-select v-model="query.shopId" clearable placeholder="全部" style="width: 160px">
+      <el-form-item :label="t('mapping.shop')">
+        <el-select
+          v-model="query.shopId"
+          clearable
+          :placeholder="t('common.all')"
+          style="width: 160px"
+        >
           <el-option v-for="s in shops" :key="s.id" :label="s.shopName" :value="s.id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="专属商品 ID">
+      <el-form-item :label="t('mapping.exclusiveId')">
         <el-input
           v-model="query.weidianItemId"
           clearable
@@ -169,18 +174,20 @@ onMounted(() => {
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="含历史">
+      <el-form-item :label="t('mapping.includeHistory')">
         <el-switch v-model="query.includeHistory" data-test="history" />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" data-test="search" @click="search">查询</el-button>
-        <el-button data-test="reset" @click="reset">重置</el-button>
+        <el-button type="primary" data-test="search" @click="search">{{
+          t("common.search")
+        }}</el-button>
+        <el-button data-test="reset" @click="reset">{{ t("common.reset") }}</el-button>
         <el-button
           v-if="abilities.canImportMapping"
           data-test="import"
           @click="importVisible = true"
         >
-          批量导入
+          {{ t("kol.import") }}
         </el-button>
         <el-button
           v-if="links.canRebuildIndex"
@@ -190,7 +197,7 @@ onMounted(() => {
           data-test="rebuild-index"
           @click="rebuildIndex"
         >
-          重建链接索引
+          {{ t("mapping.rebuildTitle") }}
         </el-button>
       </el-form-item>
     </el-form>
@@ -200,26 +207,28 @@ onMounted(() => {
       data-test="search-tip"
       type="info"
       :closable="false"
-      :title="SEARCH_TIP"
+      :title="t('mapping.searchTip')"
       show-icon
       class="tip"
     />
 
     <template v-else>
       <el-table v-loading="loading" :data="rows" row-key="id" border>
-        <el-table-column prop="kolCode" label="达人编号" width="120" />
-        <el-table-column prop="kolName" label="达人姓名" min-width="110" />
-        <el-table-column prop="productCode" label="原商品编码" width="130" />
-        <el-table-column prop="productName" label="原商品名称" min-width="140" />
-        <el-table-column prop="shopName" label="店铺" min-width="110" />
-        <el-table-column prop="weidianItemId" label="专属商品 ID" min-width="130" />
-        <el-table-column label="生效时间" width="170">
+        <el-table-column prop="kolCode" :label="t('mapping.kolCode')" width="120" />
+        <el-table-column prop="kolName" :label="t('mapping.kolName')" min-width="110" />
+        <el-table-column prop="productCode" :label="t('mapping.productCode')" width="130" />
+        <el-table-column prop="productName" :label="t('mapping.productName')" min-width="140" />
+        <el-table-column prop="shopName" :label="t('mapping.shop')" min-width="110" />
+        <el-table-column prop="weidianItemId" :label="t('mapping.exclusiveId')" min-width="130" />
+        <el-table-column :label="t('mapping.validFrom')" width="170">
           <template #default="{ row }">{{ formatInstant((row as KolItemVO).validFrom) }}</template>
         </el-table-column>
-        <el-table-column label="失效时间" width="170">
+        <el-table-column :label="t('mapping.validTo')" width="170">
           <template #default="{ row }">
             {{
-              (row as KolItemVO).validTo ? formatInstant((row as KolItemVO).validTo) : "当前有效"
+              (row as KolItemVO).validTo
+                ? formatInstant((row as KolItemVO).validTo)
+                : t("mapping.current")
             }}
           </template>
         </el-table-column>
@@ -240,8 +249,8 @@ onMounted(() => {
 
     <ImportDialog
       v-model="importVisible"
-      title="批量导入对应关系"
-      limit-hint="单个文件不超过 20MB、20000 行"
+      :title="importTitle"
+      :limit-hint="importLimitHint"
       template-file-name="kol-item-import-template.xlsx"
       task-type="MAPPING_IMPORT"
       :download-template="downloadKolItemTemplate"

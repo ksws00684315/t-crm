@@ -658,7 +658,7 @@ class TenantIsolationIT {
             "SELECT weidian_shop_id FROM crm_shop WHERE id = ?", String.class, shopId);
     byte[] workbook =
         workbook(
-            ProductImportColumn.headers(),
+            com.tcrm.admin.TestTemplates.render(ProductImportColumn.headerKeys()),
             List.of(List.of(code, weidianShopId, itemId, name, "", "", "10.00", "")));
     awaitTask(token, submit(token, "/admin-api/product/product-imports", workbook));
     return jdbc.queryForObject(
@@ -668,7 +668,9 @@ class TenantIsolationIT {
   private String importMapping(String token, String shop, String item, String kol, String product)
       throws Exception {
     byte[] workbook =
-        workbook(MappingImportColumn.headers(), List.of(List.of(shop, item, kol, product)));
+        workbook(
+            com.tcrm.admin.TestTemplates.render(MappingImportColumn.headerKeys()),
+            List.of(List.of(shop, item, kol, product)));
     return awaitTask(token, submit(token, "/admin-api/product/kol-item-imports", workbook))
         .path("id")
         .asText();
@@ -677,7 +679,7 @@ class TenantIsolationIT {
   private String importKol(String token, String code, String name, String email) throws Exception {
     byte[] workbook =
         workbook(
-            KolImportColumn.headers(),
+            com.tcrm.admin.TestTemplates.render(KolImportColumn.headerKeys()),
             List.of(List.of(code, name, email, "US", "", "", "", "", "", "")));
     return awaitTask(token, submit(token, "/admin-api/kol/kol-imports", workbook))
         .path("id")
@@ -691,6 +693,7 @@ class TenantIsolationIT {
                     .file(
                         new MockMultipartFile(
                             "file", "f.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, workbook))
+                    .header("Accept-Language", "zh-CN")
                     .header(TOKEN, token))
             .andExpect(status().isAccepted())
             .andReturn();

@@ -15,6 +15,10 @@ public class TaskDO extends BaseEntity {
   private Integer done;
   private Integer failed;
   private String message;
+
+  /** Request language at submission ("zh-CN" / "en-US"); the error file is rendered with it. */
+  private String locale;
+
   private Instant startedAt;
   private Instant finishedAt;
 
@@ -68,6 +72,14 @@ public class TaskDO extends BaseEntity {
 
   public void setMessage(String value) {
     this.message = value;
+  }
+
+  public String getLocale() {
+    return locale;
+  }
+
+  public void setLocale(String value) {
+    this.locale = value;
   }
 
   public Instant getStartedAt() {

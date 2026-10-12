@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { listOperLogs, type OperLogVO } from "@/api/system/oper-log";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "SystemOperLogPage" });
+
+const { t } = useI18n();
 
 const loading = ref(false);
 const rows = ref<OperLogVO[]>([]);
@@ -35,16 +38,21 @@ onMounted(load);
 <template>
   <el-card shadow="never">
     <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column label="时间" width="170">
+      <el-table-column :label="t('audit.time')" width="170">
         <template #default="{ row }">{{ formatInstant((row as OperLogVO).operTime) }}</template>
       </el-table-column>
-      <el-table-column prop="username" label="操作人" width="130" />
-      <el-table-column prop="module" label="模块" width="100" />
-      <el-table-column prop="action" label="操作" min-width="140" />
-      <el-table-column prop="result" label="结果" width="100" />
-      <el-table-column prop="requestUri" label="请求地址" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="ip" label="IP" width="140" />
-      <el-table-column prop="costMs" label="耗时(ms)" width="100" />
+      <el-table-column prop="username" :label="t('audit.operator')" width="130" />
+      <el-table-column prop="module" :label="t('audit.module')" width="100" />
+      <el-table-column prop="action" :label="t('audit.action')" min-width="140" />
+      <el-table-column prop="result" :label="t('audit.result')" width="100" />
+      <el-table-column
+        prop="requestUri"
+        :label="t('audit.uri')"
+        min-width="200"
+        show-overflow-tooltip
+      />
+      <el-table-column prop="ip" :label="t('audit.ip')" width="140" />
+      <el-table-column prop="costMs" :label="t('audit.cost')" width="100" />
     </el-table>
 
     <el-pagination

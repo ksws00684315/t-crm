@@ -1,17 +1,23 @@
 <script setup lang="ts">
-import { ROLE_LABELS } from "@/utils/permission";
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useUserStore } from "@/stores/user";
+import { roleLabel } from "@/utils/permission";
 
 defineOptions({ name: "HomePage" });
+const { t } = useI18n();
 const user = useUserStore();
+const greeting = computed(() =>
+  user.user
+    ? t("home.greeting", { nickname: user.user.nickname, role: roleLabel(user.user.role) })
+    : ""
+);
 </script>
 
 <template>
   <el-card shadow="never">
-    <template #header>欢迎使用 T-CRM</template>
-    <p v-if="user.user">
-      {{ user.user.nickname }}，你好。当前角色：{{ ROLE_LABELS[user.user.role] }}。
-    </p>
-    <p>业务功能将在后续阶段陆续上线，目前可使用账号管理相关功能。</p>
+    <template #header>{{ t("home.welcome") }}</template>
+    <p v-if="user.user">{{ greeting }}</p>
+    <p>{{ t("home.body") }}</p>
   </el-card>
 </template>

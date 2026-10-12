@@ -10,12 +10,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** A company role. Platform administrators are created only by bootstrap, not by this API. */
+/**
+ * A company role. Platform administrators are created only by bootstrap, not by this API. The
+ * message template is resolved per request language from ValidationMessages*.properties.
+ */
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = CompanyRole.Validator.class)
 public @interface CompanyRole {
-  String message() default "must be a company role";
+  String message() default "{tcrm.constraint.company-role}";
 
   Class<?>[] groups() default {};
 
