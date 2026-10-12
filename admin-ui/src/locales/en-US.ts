@@ -164,7 +164,15 @@ const enUS: MessageSchema = {
   },
   layout: {
     changePassword: "Change Password",
-    user: "{nickname} ({role})"
+    user: "{nickname} ({role})",
+    collapse: "Collapse sidebar",
+    expand: "Expand sidebar",
+    searchMenu: "Search menu",
+    refresh: "Refresh current page",
+    fullscreen: "Full screen",
+    exitFullscreen: "Exit full screen",
+    shortcutMac: "⌘ K",
+    shortcutOther: "Ctrl K"
   },
   theme: {
     cycle: "Switch theme",

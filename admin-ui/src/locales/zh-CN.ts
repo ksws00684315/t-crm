@@ -167,7 +167,15 @@ const zhCN = {
   },
   layout: {
     changePassword: "修改密码",
-    user: "{nickname}（{role}）"
+    user: "{nickname}（{role}）",
+    collapse: "折叠侧边栏",
+    expand: "展开侧边栏",
+    searchMenu: "搜索菜单",
+    refresh: "刷新当前页",
+    fullscreen: "全屏",
+    exitFullscreen: "退出全屏",
+    shortcutMac: "⌘ K",
+    shortcutOther: "Ctrl K"
   },
   theme: {
     cycle: "切换主题",

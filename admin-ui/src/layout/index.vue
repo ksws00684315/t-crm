@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { ArrowDown } from "@element-plus/icons-vue";
-import { computed, onMounted } from "vue";
+import { ArrowDown, Expand, Fold, FullScreen, Refresh, Search } from "@element-plus/icons-vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
+import { useMenuSearchStore } from "@/stores/menu-search";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { buildMenu, roleLabel } from "@/utils/permission";
+import {
+  isMacPlatform,
+  loadSidebarCollapsed,
+  saveSidebarCollapsed,
+  subscribeNarrow
+} from "@/utils/sidebar";
+import SideMenu from "./SideMenu.vue";
 
 defineOptions({ name: "AppLayout" });
 
@@ -19,16 +27,23 @@ const router = useRouter();
 const user = useUserStore();
 const localeStore = useLocaleStore();
 const theme = useThemeStore();
+const menuSearch = useMenuSearchStore();
+
+const collapsed = ref(loadSidebarCollapsed());
+const narrow = ref(false);
+const drawerOpen = ref(false);
+const viewKey = ref(0);
+const fullscreenOn = ref(false);
+const fullscreenEnabled = ref(
+  typeof document !== "undefined" && document.fullscreenEnabled === true
+);
+const mac = isMacPlatform();
 
 const menu = computed(() => {
   void localeStore.locale;
   return buildMenu(routes, user.roles, user.user?.dataScope);
 });
 const roleText = computed(() => (user.user ? roleLabel(user.user.role) : ""));
-const pageTitle = computed(() => {
-  void localeStore.locale;
-  return route.meta.title ? translate(route.meta.title) : "";
-});
 const tenantLabel = computed(() => {
   if (user.user?.role === "PLATFORM_ADMIN") return t("common.platformScope");
   return user.user?.tenantName || "";
@@ -36,10 +51,49 @@ const tenantLabel = computed(() => {
 const userLabel = computed(() =>
   t("layout.user", { nickname: user.user?.nickname ?? "", role: roleText.value })
 );
-
-onMounted(() => {
-  user.refreshProfile().catch(() => undefined);
+const crumbs = computed(() => {
+  void localeStore.locale;
+  return route.matched
+    .filter(record => Boolean(record.meta.title) && record.path !== "/")
+    .map(record => ({
+      path: record.path,
+      title: translate(String(record.meta.title))
+    }));
 });
+const asideWidth = computed(() =>
+  collapsed.value ? "var(--tcrm-sidebar-collapsed)" : "var(--tcrm-sidebar-width)"
+);
+
+const unsubscribeNarrow = subscribeNarrow(matches => {
+  narrow.value = matches;
+  if (!matches) drawerOpen.value = false;
+});
+
+function toggleSidebar(): void {
+  if (narrow.value) {
+    drawerOpen.value = !drawerOpen.value;
+    return;
+  }
+  collapsed.value = !collapsed.value;
+  saveSidebarCollapsed(collapsed.value);
+}
+
+function refreshPage(): void {
+  viewKey.value += 1;
+}
+
+function toggleFullscreen(): void {
+  if (!document.fullscreenEnabled) return;
+  if (document.fullscreenElement) {
+    void document.exitFullscreen();
+  } else {
+    void document.documentElement.requestFullscreen();
+  }
+}
+
+function onFullscreenChange(): void {
+  fullscreenOn.value = document.fullscreenElement != null;
+}
 
 async function onCommand(command: string) {
   if (command === "password") {
@@ -49,34 +103,85 @@ async function onCommand(command: string) {
     await router.replace("/login");
   }
 }
+
+onMounted(() => {
+  user.refreshProfile().catch(() => undefined);
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("fullscreenchange", onFullscreenChange);
+  unsubscribeNarrow();
+});
 </script>
 
 <template>
   <el-container class="layout">
-    <el-aside width="208px" class="layout__aside">
-      <div class="layout__brand">{{ t("app.title") }}</div>
-      <el-menu :default-active="route.path" router class="layout__menu">
-        <template v-for="item in menu" :key="item.path">
-          <el-sub-menu v-if="item.children?.length" :index="item.path">
-            <template #title>
-              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-              <span>{{ item.title }}</span>
-            </template>
-            <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
-              <span>{{ child.title }}</span>
-            </el-menu-item>
-          </el-sub-menu>
-          <el-menu-item v-else :index="item.path">
-            <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-            <span>{{ item.title }}</span>
-          </el-menu-item>
-        </template>
-      </el-menu>
+    <el-aside v-if="!narrow" :width="asideWidth" class="layout__aside">
+      <SideMenu
+        :items="menu"
+        :active="route.path"
+        :collapse="collapsed"
+        @select="drawerOpen = false"
+      />
     </el-aside>
+    <el-drawer
+      v-else
+      v-model="drawerOpen"
+      direction="ltr"
+      :size="224"
+      :with-header="false"
+      class="layout__drawer"
+      data-test="sidebar-drawer"
+    >
+      <SideMenu :items="menu" :active="route.path" :collapse="false" @select="drawerOpen = false" />
+    </el-drawer>
     <el-container>
-      <el-header class="layout__header">
-        <span class="layout__title">{{ pageTitle }}</span>
+      <el-header class="layout__header" height="56px">
+        <div class="layout__header-start">
+          <el-button
+            text
+            data-test="sidebar-toggle"
+            :aria-label="collapsed || narrow ? t('layout.expand') : t('layout.collapse')"
+            @click="toggleSidebar"
+          >
+            <el-icon><Expand v-if="collapsed || narrow" /><Fold v-else /></el-icon>
+          </el-button>
+          <el-breadcrumb>
+            <el-breadcrumb-item
+              v-for="(crumb, index) in crumbs"
+              :key="crumb.path"
+              :to="index < crumbs.length - 1 ? crumb.path : undefined"
+            >
+              {{ crumb.title }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
         <div class="layout__actions">
+          <el-button data-test="menu-search" @click="menuSearch.open()">
+            <el-icon><Search /></el-icon>
+            <span>{{ t("layout.searchMenu") }}</span>
+            <kbd class="layout__kbd">{{
+              mac ? t("layout.shortcutMac") : t("layout.shortcutOther")
+            }}</kbd>
+          </el-button>
+          <el-button
+            text
+            data-test="refresh-page"
+            :aria-label="t('layout.refresh')"
+            @click="refreshPage"
+          >
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+          <el-button
+            v-if="fullscreenEnabled"
+            text
+            data-test="fullscreen"
+            :aria-label="fullscreenOn ? t('layout.exitFullscreen') : t('layout.fullscreen')"
+            @click="toggleFullscreen"
+          >
+            <el-icon><FullScreen /></el-icon>
+          </el-button>
           <el-button
             text
             class="layout__theme"
@@ -107,7 +212,9 @@ async function onCommand(command: string) {
         </div>
       </el-header>
       <el-main class="layout__main">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <component :is="Component" :key="viewKey" />
+        </RouterView>
       </el-main>
     </el-container>
   </el-container>
@@ -120,43 +227,52 @@ async function onCommand(command: string) {
 .layout__aside {
   background: var(--tcrm-color-card);
   border-right: 1px solid var(--tcrm-color-border);
-}
-.layout__brand {
-  height: 56px;
-  line-height: 56px;
-  padding: 0 20px;
-  font-size: 18px;
-  font-weight: 600;
-}
-.layout__menu {
-  border-right: none;
+  overflow: hidden;
 }
 .layout__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--tcrm-space-3);
   background: var(--tcrm-color-card);
   border-bottom: 1px solid var(--tcrm-color-border);
+  padding: 0 var(--tcrm-space-4);
 }
-.layout__title {
-  font-size: 16px;
-  font-weight: 600;
+.layout__header-start {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
 }
 .layout__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--tcrm-space-2);
+}
+.layout__kbd {
+  margin-left: var(--tcrm-space-2);
+  padding: 0 6px;
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-tag);
+  font-family: var(--tcrm-font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--tcrm-color-text-secondary);
+  background: var(--tcrm-color-muted);
 }
 .layout__user {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  color: var(--tcrm-color-text);
 }
 .layout__tenant {
-  color: var(--el-text-color-secondary);
+  color: var(--tcrm-color-text-secondary);
 }
 .layout__main {
-  padding: 16px;
+  background: var(--tcrm-color-page);
+  padding: var(--tcrm-space-4);
+  min-height: 0;
 }
 </style>
