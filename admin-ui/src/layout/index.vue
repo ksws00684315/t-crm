@@ -11,6 +11,7 @@ import { useMenuSearchStore } from "@/stores/menu-search";
 import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
+import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
 import { buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
 import { affixFor } from "@/utils/tabs";
 import {
@@ -19,6 +20,7 @@ import {
   saveSidebarCollapsed,
   subscribeNarrow
 } from "@/utils/sidebar";
+import MenuSearch from "./MenuSearch.vue";
 import SideMenu from "./SideMenu.vue";
 import TabBar from "./TabBar.vue";
 
@@ -126,6 +128,10 @@ watch(
       affix: route.path === affix.path,
       componentName
     });
+    const userId = user.user?.id;
+    if (userId && flattenMenu(menu.value).some(entry => entry.path === route.path)) {
+      rememberRecentMenu(userId, route.path);
+    }
   },
   { immediate: true }
 );
@@ -249,6 +255,7 @@ onBeforeUnmount(() => {
         </RouterView>
       </el-main>
     </el-container>
+    <MenuSearch />
   </el-container>
 </template>
 

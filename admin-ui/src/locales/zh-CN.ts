@@ -177,6 +177,12 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  menuSearch: {
+    title: "搜索菜单",
+    placeholder: "输入菜单名称",
+    recent: "最近访问",
+    empty: "没有匹配的菜单"
+  },
   copy: {
     done: "已复制 {text}",
     failed: "复制失败，请手动复制"

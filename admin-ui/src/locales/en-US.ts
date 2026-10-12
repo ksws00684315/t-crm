@@ -174,6 +174,12 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  menuSearch: {
+    title: "Search menu",
+    placeholder: "Menu name",
+    recent: "Recent",
+    empty: "No matching menus"
+  },
   copy: {
     done: "Copied {text}",
     failed: "Could not copy. Select the text and copy it manually."
