@@ -13,6 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.time.Duration;
@@ -20,6 +23,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -146,5 +150,42 @@ class CaptchaServiceTest {
   void shouldRejectNonPositiveLimit_whenConstructing() {
     assertThatThrownBy(() -> new CaptchaService(redis, generator, true, 0))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void shouldWarnAtStartup_whenCaptchasAreDisabled() {
+    ListAppender<ILoggingEvent> logs = new ListAppender<>();
+    logs.start();
+    Logger logger = (Logger) LoggerFactory.getLogger(CaptchaService.class);
+    logger.addAppender(logs);
+    try {
+      new CaptchaService(redis, generator, false, 120);
+      assertThat(logs.list)
+          .singleElement()
+          .satisfies(
+              event -> {
+                assertThat(event.getLevel().toString()).isEqualTo("WARN");
+                assertThat(event.getFormattedMessage())
+                    .contains("crm.auth.captcha.enabled is false")
+                    .contains("DISABLED")
+                    .contains("Do not use this setting in production");
+              });
+    } finally {
+      logger.detachAppender(logs);
+    }
+  }
+
+  @Test
+  void shouldNotWarnAtStartup_whenCaptchasAreEnabled() {
+    ListAppender<ILoggingEvent> logs = new ListAppender<>();
+    logs.start();
+    Logger logger = (Logger) LoggerFactory.getLogger(CaptchaService.class);
+    logger.addAppender(logs);
+    try {
+      new CaptchaService(redis, generator, true, 120);
+      assertThat(logs.list).isEmpty();
+    } finally {
+      logger.detachAppender(logs);
+    }
   }
 }

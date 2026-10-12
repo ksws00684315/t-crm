@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { createCaptcha, type CaptchaAnswer } from "@/api/auth";
 
 /**
  * Captcha input plus image for every administrator login (login page and reauth dialog).
  * Each captcha is single-use on the backend, so the parent calls `refresh()` after every failed
- * attempt. When the backend has captchas disabled nothing is rendered and `answer()` is undefined.
+ * attempt. The image is also refreshed about 10 seconds before `expiresIn` so a long-idle form
+ * never submits a stale captcha. When the backend has captchas disabled nothing is rendered and
+ * `answer()` is undefined.
  */
 defineOptions({ name: "CaptchaInput" });
+
+/** Seconds before expiry when the next image is requested. */
+const REFRESH_LEAD_SECONDS = 10;
 
 const code = defineModel<string>({ required: true });
 const emit = defineEmits<{ enter: [] }>();
@@ -20,9 +25,28 @@ const image = ref<string | null>(null);
 const failed = ref(false);
 const loading = ref(false);
 let requestSeq = 0;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearRefreshTimer(): void {
+  if (refreshTimer == null) return;
+  clearTimeout(refreshTimer);
+  refreshTimer = null;
+}
+
+/** Schedules a silent refresh ~10s before the captcha expires (clamped to at least 1s). */
+function scheduleRefresh(expiresIn: number): void {
+  clearRefreshTimer();
+  if (!enabled.value || expiresIn <= 0) return;
+  const delayMs = Math.max(1, expiresIn - REFRESH_LEAD_SECONDS) * 1000;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void refresh();
+  }, delayMs);
+}
 
 async function refresh(): Promise<void> {
   const seq = ++requestSeq;
+  clearRefreshTimer();
   code.value = "";
   loading.value = true;
   try {
@@ -32,6 +56,7 @@ async function refresh(): Promise<void> {
     captchaId.value = result.captchaId;
     image.value = result.image;
     failed.value = false;
+    scheduleRefresh(result.expiresIn);
   } catch {
     if (seq !== requestSeq) return;
     captchaId.value = null;
@@ -53,6 +78,11 @@ const visible = computed(() => enabled.value);
 defineExpose({ refresh, answer, enabled: visible });
 
 onMounted(refresh);
+onBeforeUnmount(() => {
+  // Drop in-flight responses and the pending timer so a closed dialog cannot refresh forever.
+  requestSeq += 1;
+  clearRefreshTimer();
+});
 </script>
 
 <template>

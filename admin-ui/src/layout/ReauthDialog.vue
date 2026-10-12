@@ -40,8 +40,7 @@ watch(
     form.password = "";
     errorText.value = "";
     captchaError.value = "";
-    // A dialog reopened later must not reuse a captcha that may have expired.
-    void captchaRef.value?.refresh();
+    // CaptchaInput mounts with the dialog (v-if) and loads a fresh image on open.
   }
 );
 
@@ -127,6 +126,7 @@ async function switchAccount(): Promise<void> {
         />
       </el-form-item>
       <el-form-item
+        v-if="reauth.visible"
         v-show="captchaRef?.enabled !== false"
         :label="t('captcha.label')"
         prop="captchaCode"

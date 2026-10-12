@@ -65,7 +65,7 @@ crm:
   auth:
     captcha:
       # Image captcha on every administrator login (ADR-017). Never disable in production; false
-      # is only for local development.
+      # is only for local development and logs a WARN at startup when set.
       enabled: true
       # Captchas one client IP may request per minute (owner decision on PR #35); 429 above it.
       issue-per-minute: 120

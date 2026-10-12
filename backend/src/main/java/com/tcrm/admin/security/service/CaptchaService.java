@@ -11,6 +11,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class CaptchaService {
+  private static final Logger LOG = LoggerFactory.getLogger(CaptchaService.class);
   static final Duration TTL = Duration.ofMinutes(3);
   static final int DEFAULT_ISSUE_LIMIT = 120;
   static final long ISSUE_WINDOW_MS = 60_000;
@@ -60,6 +63,13 @@ public class CaptchaService {
     this.generator = generator;
     this.enabled = enabled;
     this.issueLimit = issueLimit;
+    if (!enabled) {
+      // Spec 06 / ADR-017: production must keep captchas on. A WARN at startup makes a mis-set
+      // env var visible in the first log lines instead of only when someone tries to log in.
+      LOG.warn(
+          "crm.auth.captcha.enabled is false: administrator login captchas are DISABLED. "
+              + "Do not use this setting in production (security spec 06, ADR-017).");
+    }
   }
 
   public record IssuedCaptcha(boolean enabled, String captchaId, String image, long expiresIn) {}
