@@ -12,7 +12,15 @@ function setup(status: number, data: unknown, headers: Record<string, string> = 
     config
   });
   const onUnauthorized = vi.fn();
-  return { http: createHttp({ getToken: () => "tok", onUnauthorized, adapter }), onUnauthorized };
+  return {
+    http: createHttp({
+      getToken: () => "tok",
+      getLanguage: () => "zh-CN",
+      onUnauthorized,
+      adapter
+    }),
+    onUnauthorized
+  };
 }
 
 const envelope = (status: number, errorCode: string) =>
@@ -56,7 +64,12 @@ describe("file download", () => {
     const adapter: AxiosAdapter = async () => {
       throw new Error("socket hang up");
     };
-    const http = createHttp({ getToken: () => null, onUnauthorized: vi.fn(), adapter });
+    const http = createHttp({
+      getToken: () => null,
+      getLanguage: () => "zh-CN",
+      onUnauthorized: vi.fn(),
+      adapter
+    });
     await expect(http.download({ url: "/x" })).rejects.toMatchObject({
       errorCode: "NETWORK_ERROR"
     });

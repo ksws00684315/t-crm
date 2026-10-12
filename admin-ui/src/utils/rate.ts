@@ -3,6 +3,8 @@
  * percentage with at most 2 decimals ("15.5"). String arithmetic avoids floating point drift.
  */
 
+import { translate } from "@/locales";
+
 const PERCENT_PATTERN = /^(\d{1,3})(?:\.(\d{1,2}))?$/;
 const RATE_PATTERN = /^(\d)(?:\.(\d{1,4}))?$/;
 
@@ -10,7 +12,7 @@ const RATE_PATTERN = /^(\d)(?:\.(\d{1,4}))?$/;
 export function validatePercent(value: string | null | undefined): string | null {
   const text = (value ?? "").trim();
   if (text === "") return null;
-  return percentToRate(text) === null ? "请输入 0～100 的数字，最多 2 位小数" : null;
+  return percentToRate(text) === null ? translate("validation.percent") : null;
 }
 
 /** "15.5" → "0.1550"; empty → null; invalid or above 100 → null. */

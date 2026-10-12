@@ -1,6 +1,7 @@
 import type { RouteLocationNormalized, RouteLocationRaw, Router } from "vue-router";
 import NProgress from "nprogress";
 import type { Role } from "@/api/types";
+import { applyDocumentTitle } from "@/router/title";
 import { canAccessRoute } from "@/utils/permission";
 
 export const LOGIN_PATH = "/login";
@@ -53,6 +54,6 @@ export function installGuard(router: Router, getAuth: () => AuthState): void {
   });
   router.afterEach(to => {
     NProgress.done();
-    document.title = to.meta.title ? `${to.meta.title} | T-CRM 管理端` : "T-CRM 管理端";
+    applyDocumentTitle(to.meta);
   });
 }

@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { describe, expect, it, vi } from "vitest";
 import * as operLogApi from "@/api/system/oper-log";
+import { i18n } from "@/locales";
 import OperLogPage from "../index.vue";
 
 vi.mock("@/api/system/oper-log");
@@ -14,7 +15,7 @@ describe("oper-log page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(OperLogPage, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(OperLogPage, { global: { plugins: [ElementPlus, i18n] } });
     await flushPromises();
     const pagination = wrapper.findComponent({ name: "ElPagination" });
     expect(pagination.exists()).toBe(true);

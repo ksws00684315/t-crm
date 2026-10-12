@@ -6,6 +6,7 @@ import * as linkApi from "@/api/link/link";
 import * as kolItemApi from "@/api/product/kol-item";
 import * as shopApi from "@/api/product/shop";
 import type { DataScope, KolItemVO, Role } from "@/api/types";
+import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import KolItemPage from "../index.vue";
 
@@ -63,7 +64,7 @@ async function mountPage() {
     page: 1,
     size: 20
   });
-  const wrapper = mount(KolItemPage, { global: { plugins: [ElementPlus] } });
+  const wrapper = mount(KolItemPage, { global: { plugins: [ElementPlus, i18n] } });
   await flushPromises();
   return wrapper;
 }

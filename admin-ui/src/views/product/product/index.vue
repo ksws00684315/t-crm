@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   downloadProductTemplate,
   editProduct,
@@ -19,6 +20,7 @@ import { formatRate, percentToRate, rateToPercent, validatePercent } from "@/uti
 
 defineOptions({ name: "ProductListPage" });
 
+const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 
@@ -46,6 +48,8 @@ const form = reactive({
 });
 const saving = ref(false);
 const importVisible = ref(false);
+const importTitle = computed(() => t("product.importTitle"));
+const importLimitHint = computed(() => t("product.limitHint"));
 
 async function load() {
   loading.value = true;
@@ -114,7 +118,7 @@ async function save() {
       price: form.price.trim(),
       rate: percentToRate(form.ratePercent)
     });
-    ElMessage.success("已保存");
+    ElMessage.success(t("product.saved"));
     formVisible.value = false;
     await load();
   } catch (error) {
@@ -126,17 +130,21 @@ async function save() {
 
 async function toggleStatus(row: ProductVO) {
   const target = row.status === 1 ? 0 : 1;
-  const verb = target === 0 ? "下架" : "上架";
+  const takingOff = target === 0;
   try {
-    await ElMessageBox.confirm(`确定要${verb}商品 ${row.productCode} 吗？`, `${verb}商品`, {
-      type: "warning"
-    });
+    await ElMessageBox.confirm(
+      takingOff
+        ? t("product.confirmOff", { code: row.productCode })
+        : t("product.confirmOn", { code: row.productCode }),
+      takingOff ? t("product.offTitle") : t("product.onTitle"),
+      { type: "warning" }
+    );
   } catch {
     return;
   }
   try {
     await updateProductStatus(row.id, target);
-    ElMessage.success(`已${verb}`);
+    ElMessage.success(takingOff ? t("product.doneOff") : t("product.doneOn"));
     await load();
   } catch (error) {
     notifyError(error);
@@ -152,68 +160,83 @@ onMounted(() => {
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" @submit.prevent>
-      <el-form-item label="关键字">
+      <el-form-item :label="t('common.keyword')">
         <el-input
           v-model="query.keyword"
           clearable
           maxlength="64"
-          placeholder="编码 / 名称 / 微店商品 ID"
+          :placeholder="t('product.keywordPlaceholder')"
           @keyup.enter="search"
         />
       </el-form-item>
-      <el-form-item label="店铺">
-        <el-select v-model="query.shopId" clearable placeholder="全部" style="width: 160px">
+      <el-form-item :label="t('product.shop')">
+        <el-select
+          v-model="query.shopId"
+          clearable
+          :placeholder="t('common.all')"
+          style="width: 160px"
+        >
           <el-option v-for="s in shops" :key="s.id" :label="s.shopName" :value="s.id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态">
-        <el-select v-model="query.status" clearable placeholder="全部" style="width: 110px">
-          <el-option label="在售" :value="1" />
-          <el-option label="下架" :value="0" />
+      <el-form-item :label="t('common.status')">
+        <el-select
+          v-model="query.status"
+          clearable
+          :placeholder="t('common.all')"
+          style="width: 110px"
+        >
+          <el-option :label="t('product.onSale')" :value="1" />
+          <el-option :label="t('product.offShelf')" :value="0" />
         </el-select>
       </el-form-item>
-      <el-form-item label="分类">
+      <el-form-item :label="t('product.category')">
         <el-input v-model="query.category" clearable maxlength="64" @keyup.enter="search" />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="search">查询</el-button>
-        <el-button @click="reset">重置</el-button>
+        <el-button type="primary" @click="search">{{ t("common.search") }}</el-button>
+        <el-button @click="reset">{{ t("common.reset") }}</el-button>
         <el-button
           v-if="abilities.canWriteProduct"
           data-test="import"
           @click="importVisible = true"
         >
-          批量导入
+          {{ t("kol.import") }}
         </el-button>
       </el-form-item>
     </el-form>
 
     <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="productCode" label="原商品编码" width="130" />
-      <el-table-column prop="name" label="商品名称" min-width="160" />
-      <el-table-column prop="shopName" label="店铺" min-width="120" />
-      <el-table-column prop="weidianItemId" label="微店商品 ID" min-width="130" />
-      <el-table-column prop="category" label="分类" width="100" />
-      <el-table-column label="价格" width="100">
+      <el-table-column prop="productCode" :label="t('product.code')" width="130" />
+      <el-table-column prop="name" :label="t('product.name')" min-width="160" />
+      <el-table-column prop="shopName" :label="t('product.shop')" min-width="120" />
+      <el-table-column prop="weidianItemId" :label="t('product.weidianItemId')" min-width="130" />
+      <el-table-column prop="category" :label="t('product.category')" width="100" />
+      <el-table-column :label="t('product.price')" width="100">
         <template #default="{ row }">{{ (row as ProductVO).price }}</template>
       </el-table-column>
-      <el-table-column label="佣金比例" width="100">
+      <el-table-column :label="t('product.rate')" width="100">
         <template #default="{ row }">{{ formatRate((row as ProductVO).rate) }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column :label="t('common.status')" width="80">
         <template #default="{ row }">
           <el-tag :type="(row as ProductVO).status === 1 ? 'success' : 'info'">
-            {{ (row as ProductVO).status === 1 ? "在售" : "下架" }}
+            {{ (row as ProductVO).status === 1 ? t("product.onSale") : t("product.offShelf") }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="更新时间" width="170">
+      <el-table-column :label="t('common.updatedAt')" width="170">
         <template #default="{ row }">{{ formatInstant((row as ProductVO).updateTime) }}</template>
       </el-table-column>
-      <el-table-column v-if="abilities.canWriteProduct" label="操作" width="140" fixed="right">
+      <el-table-column
+        v-if="abilities.canWriteProduct"
+        :label="t('common.actions')"
+        width="140"
+        fixed="right"
+      >
         <template #default="{ row }">
           <el-button link type="primary" data-test="edit" @click="openEdit(row as ProductVO)">
-            编辑
+            {{ t("common.edit") }}
           </el-button>
           <el-button
             link
@@ -221,7 +244,7 @@ onMounted(() => {
             data-test="status"
             @click="toggleStatus(row as ProductVO)"
           >
-            {{ (row as ProductVO).status === 1 ? "下架" : "上架" }}
+            {{ (row as ProductVO).status === 1 ? t("product.offShelf") : t("product.putOnShelf") }}
           </el-button>
         </template>
       </el-table-column>
@@ -239,37 +262,50 @@ onMounted(() => {
       @size-change="search"
     />
 
-    <el-dialog v-model="formVisible" title="编辑原商品" width="520px" :close-on-click-modal="false">
+    <el-dialog
+      v-model="formVisible"
+      :title="t('product.editTitle')"
+      width="520px"
+      :close-on-click-modal="false"
+    >
       <el-form label-width="120px" @submit.prevent>
-        <el-form-item label="原商品编码">
+        <el-form-item :label="t('product.code')">
           <el-input :model-value="editing?.productCode" disabled />
         </el-form-item>
-        <el-form-item label="商品名称" required>
+        <el-form-item :label="t('product.name')" required>
           <el-input v-model="form.name" maxlength="200" />
         </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="form.category" maxlength="64" placeholder="可清空" />
+        <el-form-item :label="t('product.category')">
+          <el-input
+            v-model="form.category"
+            maxlength="64"
+            :placeholder="t('product.categoryPlaceholder')"
+          />
         </el-form-item>
-        <el-form-item label="图片地址">
-          <el-input v-model="form.imageUrl" maxlength="512" placeholder="https://，可清空" />
+        <el-form-item :label="t('product.image')">
+          <el-input
+            v-model="form.imageUrl"
+            maxlength="512"
+            :placeholder="t('product.imagePlaceholder')"
+          />
         </el-form-item>
-        <el-form-item label="价格" required>
-          <el-input v-model="form.price" placeholder="如 128.50" />
+        <el-form-item :label="t('product.price')" required>
+          <el-input v-model="form.price" :placeholder="t('product.pricePlaceholder')" />
         </el-form-item>
-        <el-form-item label="佣金比例(%)">
-          <el-input v-model="form.ratePercent" placeholder="0～100，可清空" />
+        <el-form-item :label="t('product.rateLabel')">
+          <el-input v-model="form.ratePercent" :placeholder="t('product.ratePlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="formVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button @click="formVisible = false">{{ t("common.cancel") }}</el-button>
+        <el-button type="primary" :loading="saving" @click="save">{{ t("common.save") }}</el-button>
       </template>
     </el-dialog>
 
     <ImportDialog
       v-model="importVisible"
-      title="批量导入原商品"
-      limit-hint="单个文件不超过 20MB、20000 行"
+      :title="importTitle"
+      :limit-hint="importLimitHint"
       template-file-name="product-import-template.xlsx"
       task-type="PRODUCT_IMPORT"
       :download-template="downloadProductTemplate"

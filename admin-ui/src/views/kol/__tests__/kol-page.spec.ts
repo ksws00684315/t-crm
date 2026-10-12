@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
 import * as bdApi from "@/api/system/bd-user";
 import type { DataScope, KolVO, Role } from "@/api/types";
+import { i18n } from "@/locales";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
@@ -49,7 +51,7 @@ async function mountPage(total = "1") {
   vi.mocked(bdApi.listBdUsers).mockResolvedValue([
     { id: "5", username: "bd5", nickname: "BD Five" }
   ]);
-  const wrapper = mount(KolPage, { global: { plugins: [ElementPlus] } });
+  const wrapper = mount(KolPage, { global: { plugins: [ElementPlus, i18n] } });
   await flushPromises();
   return wrapper;
 }
@@ -65,6 +67,17 @@ describe("KOL list page", () => {
     expect(text).toContain("15.5%");
     expect(text).toContain("未分配");
     expect(text).toContain("启用");
+  });
+
+  it("renders the creator list in English", async () => {
+    useLocaleStore().setLocale("en-US");
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    const text = wrapper.text();
+    expect(text).toContain("Creator Code");
+    expect(text).toContain("Unassigned");
+    expect(text).toContain("Enabled");
+    expect(text).toContain("Bulk Import");
   });
 
   it("converts the string total before handing it to el-pagination", async () => {

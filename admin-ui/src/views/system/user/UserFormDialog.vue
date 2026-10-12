@@ -2,10 +2,11 @@
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { createUser, editUser } from "@/api/system/user";
 import type { CompanyRole, DataScope, UserVO } from "@/api/types";
 import { notifyError } from "@/utils/notify";
-import { ROLE_LABELS, SELECTABLE_ROLES } from "@/utils/permission";
+import { roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
 import {
   rule,
   serverFieldErrors,
@@ -17,6 +18,8 @@ import {
 
 defineOptions({ name: "UserFormDialog" });
 
+const { t } = useI18n();
+
 const props = defineProps<{
   modelValue: boolean;
   /** The user being edited; null creates a new one. */
@@ -27,10 +30,10 @@ const emit = defineEmits<{
   (event: "saved"): void;
 }>();
 
-const DATA_SCOPES: { value: DataScope; label: string }[] = [
-  { value: "ALL", label: "全部数据" },
-  { value: "OWN", label: "仅本人数据（限运营）" }
-];
+const dataScopes = computed<{ value: DataScope; label: string }[]>(() => [
+  { value: "ALL", label: t("scope.ALL") },
+  { value: "OWN", label: t("scope.OWN") }
+]);
 
 const editing = computed(() => props.user !== null);
 const formRef = ref<FormInstance>();
@@ -95,7 +98,7 @@ async function submit() {
         dataScope: form.dataScope
       });
     }
-    ElMessage.success(props.user ? "用户已保存" : "用户已创建");
+    ElMessage.success(props.user ? t("user.saved") : t("user.created"));
     emit("saved");
     close();
   } catch (error) {
@@ -117,15 +120,20 @@ async function submit() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="editing ? '编辑用户' : '新增用户'"
+    :title="editing ? t('user.editTitle') : t('user.createTitle')"
     width="480px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" @submit.prevent>
-      <el-form-item label="用户名" prop="username" :error="serverErrors.username">
+      <el-form-item :label="t('common.username')" prop="username" :error="serverErrors.username">
         <el-input v-model="form.username" :disabled="editing" maxlength="64" />
       </el-form-item>
-      <el-form-item v-if="!editing" label="初始密码" prop="password" :error="serverErrors.password">
+      <el-form-item
+        v-if="!editing"
+        :label="t('user.initialPassword')"
+        prop="password"
+        :error="serverErrors.password"
+      >
         <el-input
           v-model="form.password"
           type="password"
@@ -134,26 +142,26 @@ async function submit() {
           maxlength="72"
         />
       </el-form-item>
-      <el-form-item label="昵称" prop="nickname" :error="serverErrors.nickname">
+      <el-form-item :label="t('common.nickname')" prop="nickname" :error="serverErrors.nickname">
         <el-input v-model="form.nickname" maxlength="64" />
       </el-form-item>
-      <el-form-item label="邮箱" prop="email" :error="serverErrors.email">
+      <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
         <el-input v-model="form.email" maxlength="254" />
       </el-form-item>
-      <el-form-item label="角色" prop="role" :error="serverErrors.role">
+      <el-form-item :label="t('user.role')" prop="role" :error="serverErrors.role">
         <el-select v-model="form.role">
           <el-option
             v-for="role in SELECTABLE_ROLES"
             :key="role"
-            :label="ROLE_LABELS[role]"
+            :label="roleLabel(role)"
             :value="role"
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="数据范围" prop="dataScope" :error="serverErrors.dataScope">
+      <el-form-item :label="t('user.dataScope')" prop="dataScope" :error="serverErrors.dataScope">
         <el-select v-model="form.dataScope">
           <el-option
-            v-for="scope in DATA_SCOPES"
+            v-for="scope in dataScopes"
             :key="scope.value"
             :label="scope.label"
             :value="scope.value"
@@ -162,8 +170,8 @@ async function submit() {
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="close">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      <el-button @click="close">{{ t("common.cancel") }}</el-button>
+      <el-button type="primary" :loading="saving" @click="submit">{{ t("common.save") }}</el-button>
     </template>
   </el-dialog>
 </template>

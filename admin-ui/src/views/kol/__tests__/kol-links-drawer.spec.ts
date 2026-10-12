@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage } from "element-plus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as linkApi from "@/api/link/link";
+import { i18n } from "@/locales";
 import type { LinkVO } from "@/api/types";
 import KolLinksDrawer from "../KolLinksDrawer.vue";
 
@@ -40,7 +41,7 @@ async function mountDrawer() {
   });
   const wrapper = mount(KolLinksDrawer, {
     props: { modelValue: false, kolCode: "KOL0001", kolName: "Alice" },
-    global: { plugins: [ElementPlus] },
+    global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
   });
   await wrapper.setProps({ modelValue: true });

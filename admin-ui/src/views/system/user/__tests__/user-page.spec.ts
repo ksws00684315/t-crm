@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as userApi from "@/api/system/user";
 import type { UserVO } from "@/api/types";
+import { i18n } from "@/locales";
+import { useLocaleStore } from "@/stores/locale";
 import { SELECTABLE_ROLES } from "@/utils/permission";
 import UserPage from "../index.vue";
 
@@ -33,7 +35,7 @@ describe("user management page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
     await flushPromises();
     expect(userApi.listUsers).toHaveBeenCalledWith({
       page: 1,
@@ -59,13 +61,31 @@ describe("user management page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus] } });
+    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
     await flushPromises();
     const pagination = wrapper.findComponent({ name: "ElPagination" });
     expect(pagination.exists()).toBe(true);
     expect(pagination.props("total")).toBe(42);
     expect(typeof pagination.props("total")).toBe("number");
     expect(wrapper.find(".el-pagination").exists()).toBe(true);
+  });
+
+  it("renders the user list in English", async () => {
+    useLocaleStore().setLocale("en-US");
+    vi.mocked(userApi.listUsers).mockResolvedValue({
+      items: [row],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    await flushPromises();
+    const text = wrapper.text();
+    expect(text).toContain("Operator");
+    expect(text).toContain("Own only");
+    expect(text).toContain("Enabled");
+    expect(text).toContain("Reset Password");
+    expect(text).toContain("Create User");
   });
 
   it("keeps platform administrator out of selectable company roles", () => {
