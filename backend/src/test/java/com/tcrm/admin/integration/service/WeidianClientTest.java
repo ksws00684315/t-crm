@@ -89,7 +89,7 @@ class WeidianClientTest {
   }
 
   @Test
-  void shouldFailAfterOnePassiveRefresh_whenTokenRemainsInvalid() {
+  void shouldFailAfterOnePassiveRefreshWithoutMarkingShopExpired_whenTokenRemainsInvalid() {
     when(gateway.apiPost("m", "1.0", "access-one", "{}")).thenReturn(envelope(10016));
     when(tokens.refreshAfterInvalid(3L, "access-one")).thenReturn(newToken);
     when(gateway.apiPost("m", "1.0", "access-two", "{}")).thenReturn(envelope(10013));
@@ -97,7 +97,7 @@ class WeidianClientTest {
     assertThatThrownBy(() -> client.call(3L, "m", "1.0", new Object()))
         .isInstanceOf(WeidianApiException.class);
 
-    verify(tokens).markExpired(3L, "Weidian access token stayed invalid after renewal");
+    verify(tokens, never()).markExpired(eq(3L), any());
   }
 
   private tools.jackson.databind.JsonNode envelope(int status) {

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.service.KolImportColumn;
 import com.tcrm.admin.kol.service.KolWriter;
@@ -82,10 +83,7 @@ class KolIT {
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
-    r.add("crm.weidian.secret-key", () -> "gTy4Nsmgz3wogxbeBvSBRNJUVvAeIyUetIHWRkRCnzQ=");
-    r.add("crm.weidian.admin-base-url", () -> "https://admin.example.test");
-    r.add("crm.weidian.api-base-url", () -> "https://api.example.test/api");
-    r.add("crm.weidian.oauth-base-url", () -> "https://oauth.example.test");
+    WeidianTestProperties.register(r);
   }
 
   private final MockMvc mvc;

@@ -193,9 +193,10 @@ public class WeidianIntegrationService {
         LOG.error("Weidian authorization audit persistence failed for shop {}", saved.shopId());
       }
       return CallbackResult.ok();
+    } catch (WeidianShopMismatchException e) {
+      return CallbackResult.failure("SHOP_MISMATCH");
     } catch (WeidianApiException e) {
-      return CallbackResult.failure(
-          e.statusCode() == -2 ? "SHOP_MISMATCH" : "TOKEN_EXCHANGE_FAILED");
+      return CallbackResult.failure("TOKEN_EXCHANGE_FAILED");
     } catch (RuntimeException e) {
       return CallbackResult.failure("TOKEN_EXCHANGE_FAILED");
     }

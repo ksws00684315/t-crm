@@ -204,7 +204,7 @@ public class WeidianTokenCenter {
                 () -> {
                   ShopAccessDTO shop = requireEnabledShop(shopId);
                   if (payload.openid() == null || !payload.openid().equals(shop.weidianShopId())) {
-                    throw new WeidianApiException(-2, "Weidian shop identity mismatch", false);
+                    throw new WeidianShopMismatchException();
                   }
                   WeidianShopAuthDO auth = findAuth(shopId);
                   if (auth == null) {
@@ -242,7 +242,7 @@ public class WeidianTokenCenter {
             try {
               renewLocked(auth);
             } catch (RuntimeException e) {
-              LOG.warn("Weidian token renewal failed for shop {}", shopId);
+              LOG.error("Weidian token renewal failed for shop {}", shopId);
             }
           }
           return null;
@@ -264,8 +264,8 @@ public class WeidianTokenCenter {
           Boolean allowed =
               redis.opsForValue().setIfAbsent(debounceKey, "1", PASSIVE_REFRESH_WINDOW);
           if (!Boolean.TRUE.equals(allowed)) {
-            markExpired(auth, "Weidian access token remained invalid after passive refresh");
-            throw new WeidianApiException(10013, "Weidian access token is invalid", false);
+            throw new WeidianApiException(
+                10013, "Weidian access token refresh is in cooldown", false);
           }
           try {
             renewLocked(auth);
@@ -340,7 +340,7 @@ public class WeidianTokenCenter {
                 clock.instant(),
                 auth.getRefreshExpiresAt());
         if (payload.openid() != null && !payload.openid().equals(auth.getOpenid())) {
-          throw new WeidianApiException(-2, "Weidian shop identity mismatch", false);
+          throw new WeidianShopMismatchException();
         }
       }
       applyPayload(auth, payload, clock.instant(), false);

@@ -53,7 +53,6 @@ public class WeidianClient {
           }
           if (statusCode == 10013 || statusCode == 10016) {
             if (passiveRefreshUsed) {
-              tokens.markExpired(shopId, "Weidian access token stayed invalid after renewal");
               throw new WeidianApiException(statusCode, "Weidian access token is invalid", false);
             }
             tokens.refreshAfterInvalid(shopId, token.accessToken());
