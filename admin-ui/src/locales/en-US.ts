@@ -174,6 +174,24 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  table: {
+    total: "{total} in total",
+    range: "{from}–{to} of {total}",
+    densityDefault: "Default",
+    densityCompact: "Compact",
+    densityLoose: "Loose",
+    refresh: "Refresh",
+    columns: "Columns",
+    hidden: "{n} hidden",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    reset: "Reset",
+    fullscreen: "Table full screen",
+    exitFullscreen: "Exit table full screen",
+    empty: "No data",
+    emptyFiltered: "No matching data · {n} filters applied",
+    clearFilters: "Clear filters"
+  },
   tabs: {
     close: "Close",
     closeOthers: "Close others",

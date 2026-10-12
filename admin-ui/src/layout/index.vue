@@ -142,7 +142,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <el-container class="layout">
+  <el-container
+    class="layout"
+    :class="{ 'is-collapsed': collapsed && !narrow, 'is-narrow': narrow }"
+  >
     <el-aside v-if="!narrow" :width="asideWidth" class="layout__aside">
       <SideMenu
         :items="menu"
@@ -252,6 +255,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .layout {
   height: 100%;
+  --layout-aside-width: var(--tcrm-sidebar-width);
+}
+.layout.is-collapsed {
+  --layout-aside-width: var(--tcrm-sidebar-collapsed);
+}
+.layout.is-narrow {
+  --layout-aside-width: 0px;
 }
 .layout__aside {
   background: var(--tcrm-color-card);

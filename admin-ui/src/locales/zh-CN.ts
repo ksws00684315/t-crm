@@ -177,6 +177,24 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  table: {
+    total: "共 {total} 条",
+    range: "第 {from}–{to} 条 / 共 {total} 条",
+    densityDefault: "默认",
+    densityCompact: "紧凑",
+    densityLoose: "宽松",
+    refresh: "刷新",
+    columns: "列设置",
+    hidden: "已隐藏 {n} 列",
+    moveUp: "上移",
+    moveDown: "下移",
+    reset: "重置",
+    fullscreen: "表格全屏",
+    exitFullscreen: "退出表格全屏",
+    empty: "暂无数据",
+    emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
+    clearFilters: "清除筛选"
+  },
   tabs: {
     close: "关闭",
     closeOthers: "关闭其他",
