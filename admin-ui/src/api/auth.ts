@@ -4,6 +4,24 @@ import type { UserVO } from "./types";
 export interface LoginRequest {
   username: string;
   password: string;
+  /** Required while the backend has captchas enabled (every login, including reauth). */
+  captchaId?: string;
+  captchaCode?: string;
+}
+
+/** `CaptchaVO`. When `enabled` is false the other fields are null and no captcha is sent. */
+export interface CaptchaVO {
+  enabled: boolean;
+  captchaId: string | null;
+  /** PNG data URL. */
+  image: string | null;
+  /** Seconds until the captcha expires. */
+  expiresIn: number;
+}
+
+export interface CaptchaAnswer {
+  captchaId: string;
+  captchaCode: string;
 }
 
 /** `LoginVO`. */
@@ -22,6 +40,11 @@ export interface PasswordRequest {
 
 export function login(request: LoginRequest): Promise<LoginVO> {
   return http.request<LoginVO>({ method: "post", url: "/auth/login", data: request });
+}
+
+/** Issues a new single-use captcha (rate limited per client IP). */
+export function createCaptcha(): Promise<CaptchaVO> {
+  return http.request<CaptchaVO>({ method: "post", url: "/auth/captchas" });
 }
 
 export function logout(): Promise<null> {

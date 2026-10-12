@@ -11,6 +11,8 @@ public enum ErrorCode {
   AUTH_FORBIDDEN(403, "Access denied"),
   AUTH_INVALID_CREDENTIALS(401, "Invalid username or password"),
   AUTH_ACCOUNT_LOCKED(429, "Too many failed login attempts; try again in 15 minutes"),
+  AUTH_CAPTCHA_INVALID(400, "Captcha is wrong or expired"),
+  AUTH_CAPTCHA_RATE_LIMITED(429, "Too many captcha requests; try again later"),
   AUTH_ACCOUNT_DISABLED(401, "Account disabled or unavailable"),
   AUTH_OLD_PASSWORD_INCORRECT(422, "Old password is incorrect"),
   USER_USERNAME_EXISTS(409, "Username already exists"),

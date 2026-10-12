@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { defineComponent, nextTick, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
-import { login } from "@/api/auth";
+import { createCaptcha, login } from "@/api/auth";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { useReauthStore } from "@/stores/reauth";
@@ -16,6 +16,7 @@ import ReauthDialog from "../ReauthDialog.vue";
 
 vi.mock("@/api/auth", () => ({
   login: vi.fn(),
+  createCaptcha: vi.fn(),
   logout: vi.fn(),
   fetchCurrentUser: vi.fn()
 }));
@@ -49,6 +50,14 @@ describe("reauth dialog", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(login).mockReset();
+    let seq = 0;
+    vi.mocked(createCaptcha).mockReset();
+    vi.mocked(createCaptcha).mockImplementation(async () => ({
+      enabled: true,
+      captchaId: `c${++seq}`,
+      image: "data:image/png;base64,AA==",
+      expiresIn: 180
+    }));
     saveSession({ token: "tok", expiresAt: Date.now() + 60_000, user: me });
     setActivePinia(createPinia());
   });
@@ -98,6 +107,14 @@ describe("reauth dialog", () => {
     const field = document.body.querySelector("[data-test=reauth-password]");
     if (!(field instanceof HTMLInputElement)) throw new Error("password input missing");
     await new DOMWrapper(field).setValue(value);
+    await typeCaptcha("ab7k");
+  }
+
+  async function typeCaptcha(value: string): Promise<void> {
+    await flushPromises();
+    const field = document.body.querySelector("input[data-test=captcha-input]");
+    if (!(field instanceof HTMLInputElement)) throw new Error("captcha input missing");
+    await new DOMWrapper(field).setValue(value);
   }
 
   it("keeps the page and the draft after the same account signs in again", async () => {
@@ -113,7 +130,12 @@ describe("reauth dialog", () => {
     await bodyButton("reauth-submit").trigger("click");
     await flushPromises();
 
-    expect(login).toHaveBeenCalledWith({ username: "root", password: "StrongPass!42" });
+    expect(login).toHaveBeenCalledWith({
+      username: "root",
+      password: "StrongPass!42",
+      captchaId: "c1",
+      captchaCode: "ab7k"
+    });
     expect(useReauthStore().visible).toBe(false);
     expect(router.currentRoute.value.path).toBe("/system/users");
     expect(wrapper.get("[data-test=draft]").element).toHaveProperty("value", "still here");
@@ -168,6 +190,50 @@ describe("reauth dialog", () => {
     expect(useTabsStore().tabs).toEqual([]);
     expect(useReauthStore().visible).toBe(false);
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
+    wrapper.unmount();
+  });
+
+  it("requires the captcha before calling login", async () => {
+    const { wrapper } = await mountHost();
+    const field = document.body.querySelector("[data-test=reauth-password]") as HTMLInputElement;
+    await new DOMWrapper(field).setValue("StrongPass!42");
+    await bodyButton("reauth-submit").trigger("click");
+    await flushPromises();
+    expect(login).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(document.body.textContent).toContain("请输入验证码"));
+    wrapper.unmount();
+  });
+
+  it("shows the captcha message and loads a new captcha after AUTH_CAPTCHA_INVALID", async () => {
+    vi.mocked(login).mockRejectedValue(
+      new ApiError({ status: 400, errorCode: "AUTH_CAPTCHA_INVALID", traceId: "t" })
+    );
+    const { wrapper } = await mountHost();
+    await typePassword("StrongPass!42");
+    await bodyButton("reauth-submit").trigger("click");
+    await flushPromises();
+
+    expect(createCaptcha).toHaveBeenCalledTimes(2);
+    expect(useReauthStore().visible).toBe(true);
+    expect(useUserStore().isLoggedIn).toBe(true);
+    await vi.waitFor(() => expect(document.body.textContent).toContain("验证码错误或已过期"));
+    const password = document.body.querySelector("[data-test=reauth-password]") as HTMLInputElement;
+    expect(password.value).toBe("StrongPass!42");
+    const captcha = document.body.querySelector(
+      "input[data-test=captcha-input]"
+    ) as HTMLInputElement;
+    expect(captcha.value).toBe("");
+    // The second attempt carries the new captcha id.
+    vi.mocked(login).mockResolvedValue({
+      tokenName: "satoken",
+      token: "n",
+      expiresIn: 60,
+      user: me
+    });
+    await typePassword("StrongPass!42");
+    await bodyButton("reauth-submit").trigger("click");
+    await flushPromises();
+    expect(vi.mocked(login).mock.calls[1][0]).toMatchObject({ captchaId: "c2" });
     wrapper.unmount();
   });
 

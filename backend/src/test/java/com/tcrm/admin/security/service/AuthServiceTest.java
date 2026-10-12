@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -27,11 +28,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class AuthServiceTest {
+  private static final String CAPTCHA_ID = "6f1c2a3b-0000-4000-8000-000000000001";
   private final AccountStore accounts = mock(AccountStore.class);
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
   private final LoginFailures failures = mock(LoginFailures.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
-  private final AuthService auth = new AuthService(accounts, passwords, failures, current);
+  private final CaptchaService captchas = mock(CaptchaService.class);
+  private final AuthService auth =
+      new AuthService(accounts, passwords, failures, current, captchas);
 
   private AccountDTO account(Integer status) {
     return new AccountDTO(
@@ -55,7 +59,8 @@ class AuthServiceTest {
   void shouldRejectCredentials_whenUnknownOrDisabled() {
     when(accounts.getByUsername("operator")).thenReturn(null, account(0), account(null));
     for (int i = 0; i < 3; i++) {
-      assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+      assertThatThrownBy(
+              () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
     }
@@ -65,10 +70,11 @@ class AuthServiceTest {
   @Test
   void shouldVerifyPasswordHash_whenAccountIsUnknownOrDisabled() {
     when(passwords.encode(any())).thenReturn("timing-hash");
-    var timed = new AuthService(accounts, passwords, failures, current);
+    var timed = new AuthService(accounts, passwords, failures, current, captchas);
     when(accounts.getByUsername("operator")).thenReturn(null, account(0));
     for (int i = 0; i < 2; i++) {
-      assertThatThrownBy(() -> timed.login("operator", "test-input", "198.51.100.8"))
+      assertThatThrownBy(
+              () -> timed.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
           .isInstanceOf(BusinessException.class);
     }
     // One comparison per attempt: unknown users use the startup-generated hash, disabled users
@@ -97,7 +103,8 @@ class AuthServiceTest {
                 "Stopped",
                 false));
     when(passwords.matches("test-input", "test-hash")).thenReturn(true);
-    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+    assertThatThrownBy(
+            () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
         .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
     verify(passwords).matches("test-input", "test-hash");
     verify(failures).fail("operator", "198.51.100.8");
@@ -108,7 +115,8 @@ class AuthServiceTest {
   void shouldRejectDisabledAccount_whenPasswordIsCorrect() {
     when(accounts.getByUsername("operator")).thenReturn(account(0));
     when(passwords.matches("test-input", "test-hash")).thenReturn(true);
-    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+    assertThatThrownBy(
+            () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
         .hasMessage(ErrorCode.AUTH_INVALID_CREDENTIALS.message());
     verify(failures).fail("operator", "198.51.100.8");
   }
@@ -116,7 +124,8 @@ class AuthServiceTest {
   @Test
   void shouldCountFailure_whenPasswordIsWrong() {
     when(accounts.getByUsername("operator")).thenReturn(account(1));
-    assertThatThrownBy(() -> auth.login("operator", "incorrect", "198.51.100.8"))
+    assertThatThrownBy(
+            () -> auth.login("operator", "incorrect", CAPTCHA_ID, "AB7K", "198.51.100.8"))
         .isInstanceOf(BusinessException.class);
     verify(failures).fail("operator", "198.51.100.8");
     verify(accounts, never()).updateLastLoginTime(any(), any());
@@ -127,7 +136,8 @@ class AuthServiceTest {
     doThrow(new BusinessException(ErrorCode.AUTH_ACCOUNT_LOCKED))
         .when(failures)
         .check("operator", "198.51.100.8");
-    assertThatThrownBy(() -> auth.login("operator", "test-input", "198.51.100.8"))
+    assertThatThrownBy(
+            () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
         .hasMessage(ErrorCode.AUTH_ACCOUNT_LOCKED.message());
     verifyNoInteractions(accounts);
     verify(passwords, never()).matches(any(), any());
@@ -144,7 +154,7 @@ class AuthServiceTest {
       stp.when(StpUtil::getTokenTimeout).thenReturn(28800L);
       var session = mock(SaSession.class);
       stp.when(StpUtil::getTokenSession).thenReturn(session);
-      var result = auth.login("operator", "test-input", "198.51.100.8");
+      var result = auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8");
       assertThat(result.user().username()).isEqualTo(account.username());
       assertThat(result.user().lastLoginTime())
           .isBetween(Instant.now().minusSeconds(5), Instant.now());
@@ -184,5 +194,31 @@ class AuthServiceTest {
       auth.logout();
       stp.verify(StpUtil::logout);
     }
+  }
+
+  @Test
+  void shouldVerifyCaptchaBeforeLockCheckAndPassword_whenLoggingIn() {
+    when(accounts.getByUsername("operator")).thenReturn(null);
+    when(passwords.matches(any(), any())).thenReturn(false);
+    assertThatThrownBy(
+            () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
+        .isInstanceOf(BusinessException.class);
+    var order = inOrder(captchas, failures, passwords);
+    order.verify(captchas).verify(CAPTCHA_ID, "AB7K");
+    order.verify(failures).check("operator", "198.51.100.8");
+    order.verify(passwords).matches(any(), any());
+  }
+
+  @Test
+  void shouldNotCountFailureOrCheckPassword_whenCaptchaIsInvalid() {
+    doThrow(new BusinessException(ErrorCode.AUTH_CAPTCHA_INVALID))
+        .when(captchas)
+        .verify(any(), any());
+    assertThatThrownBy(
+            () -> auth.login("operator", "test-input", CAPTCHA_ID, "XXXX", "198.51.100.8"))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.AUTH_CAPTCHA_INVALID.message());
+    verifyNoInteractions(failures, accounts);
+    verify(passwords, never()).matches(any(), any());
   }
 }

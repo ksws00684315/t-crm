@@ -31,8 +31,8 @@ export const useUserStore = defineStore("user", () => {
     useReauthStore().close();
   }
 
-  async function login(username: string, password: string) {
-    const result = await authApi.login({ username, password });
+  async function login(username: string, password: string, captcha?: authApi.CaptchaAnswer) {
+    const result = await authApi.login({ username, password, ...captcha });
     setSession({
       token: result.token,
       expiresAt: Date.now() + result.expiresIn * 1000,

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tcrm.admin.Captchas;
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.security.api.Role;
@@ -669,7 +670,7 @@ class SystemIT {
             post("/admin-api/auth/login")
                 .contentType("application/json")
                 .content(
-                    json.writeValueAsString(Map.of("username", username, "password", password))))
+                    json.writeValueAsString(Captchas.loginBody(mvc, json, username, password))))
         .andExpect(status().is(expected))
         .andReturn()
         .getResponse()

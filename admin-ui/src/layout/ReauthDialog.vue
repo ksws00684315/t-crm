@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { messageForErrorCode } from "@/api/error-codes";
+import CaptchaInput from "@/components/CaptchaInput.vue";
 import { onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -8,7 +9,7 @@ import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import { ApiError } from "@/utils/http/error";
-import { rule, validateExistingPassword } from "@/utils/validation";
+import { rule, validateCaptcha, validateExistingPassword } from "@/utils/validation";
 
 defineOptions({ name: "ReauthDialog" });
 
@@ -21,8 +22,16 @@ const reauth = useReauthStore();
 const formRef = ref<FormInstance>();
 const loading = ref(false);
 const errorText = ref("");
-const form = reactive({ password: "" });
-const rules: FormRules = { password: [rule(validateExistingPassword)] };
+const captchaError = ref("");
+const captchaRef = ref<InstanceType<typeof CaptchaInput>>();
+const form = reactive({ password: "", captchaCode: "" });
+const rules: FormRules = {
+  password: [rule(validateExistingPassword)],
+  // Reauth is a login too, so it needs a captcha (design document §3.3).
+  captchaCode: [
+    rule(value => (captchaRef.value?.enabled === false ? null : validateCaptcha(value)))
+  ]
+};
 
 watch(
   () => reauth.visible,
@@ -30,6 +39,9 @@ watch(
     if (!open) return;
     form.password = "";
     errorText.value = "";
+    captchaError.value = "";
+    // A dialog reopened later must not reuse a captcha that may have expired.
+    void captchaRef.value?.refresh();
   }
 );
 
@@ -50,16 +62,24 @@ async function submit(): Promise<void> {
   const previousId = user.user.id;
   loading.value = true;
   errorText.value = "";
+  captchaError.value = "";
   try {
-    await user.login(user.user.username, form.password);
+    await user.login(user.user.username, form.password, captchaRef.value?.answer());
   } catch (error) {
-    form.password = "";
+    // The backend consumed the captcha whatever the outcome, so a new one is always needed.
+    void captchaRef.value?.refresh();
     // AUTH_ACCOUNT_LOCKED is HTTP 429, so the 401 handler never sees it.
     if (error instanceof ApiError && error.errorCode === "AUTH_ACCOUNT_LOCKED") {
       ElMessage.warning(messageForErrorCode("AUTH_ACCOUNT_LOCKED"));
       await leaveForLogin();
       return;
     }
+    if (error instanceof ApiError && error.errorCode === "AUTH_CAPTCHA_INVALID") {
+      // Keep the password: only the captcha was wrong or expired.
+      captchaError.value = error.displayMessage;
+      return;
+    }
+    form.password = "";
     errorText.value = error instanceof ApiError ? error.displayMessage : t("reauth.failed");
     return;
   } finally {
@@ -105,6 +125,14 @@ async function switchAccount(): Promise<void> {
           data-test="reauth-password"
           @keyup.enter="submit"
         />
+      </el-form-item>
+      <el-form-item
+        v-show="captchaRef?.enabled !== false"
+        :label="t('captcha.label')"
+        prop="captchaCode"
+        :error="captchaError"
+      >
+        <CaptchaInput ref="captchaRef" v-model="form.captchaCode" @enter="submit" />
       </el-form-item>
       <div class="reauth__actions">
         <el-button data-test="reauth-switch" @click="switchAccount">{{

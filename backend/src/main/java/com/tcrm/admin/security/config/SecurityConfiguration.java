@@ -70,7 +70,9 @@ public class SecurityConfiguration implements WebMvcConfigurer {
             })
         .addPathPatterns("/admin-api/**")
         .excludePathPatterns(
-            "/admin-api/auth/login", "/admin-api/integration/weidian/oauth/callback");
+            "/admin-api/auth/login",
+            "/admin-api/auth/captchas",
+            "/admin-api/integration/weidian/oauth/callback");
     registry
         .addInterceptor(
             new SaInterceptor(
@@ -80,6 +82,8 @@ public class SecurityConfiguration implements WebMvcConfigurer {
                 }))
         .addPathPatterns("/admin-api/**")
         .excludePathPatterns(
-            "/admin-api/auth/login", "/admin-api/integration/weidian/oauth/callback");
+            "/admin-api/auth/login",
+            "/admin-api/auth/captchas",
+            "/admin-api/integration/weidian/oauth/callback");
   }
 }

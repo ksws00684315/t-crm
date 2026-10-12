@@ -62,6 +62,11 @@ sa-token:
   is-read-header: true
   is-log: false
 crm:
+  auth:
+    captcha:
+      # Image captcha on every administrator login (ADR-017). Never disable in production; false
+      # is only for local development.
+      enabled: true
   bootstrap:
     username: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:}

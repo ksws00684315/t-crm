@@ -91,8 +91,7 @@ public final class CompanySessions {
                 post("/admin-api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        json.writeValueAsString(
-                            Map.of("username", username, "password", password))))
+                        json.writeValueAsString(Captchas.loginBody(mvc, json, username, password))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

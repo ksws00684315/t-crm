@@ -528,6 +528,7 @@ class TenantIsolationIT {
 
   private static boolean authAllowed(String path) {
     return path.equals("/admin-api/auth/login")
+        || path.equals("/admin-api/auth/captchas")
         || path.equals("/admin-api/auth/logout")
         || path.equals("/admin-api/auth/me")
         || path.equals("/admin-api/auth/password")
@@ -586,7 +587,7 @@ class TenantIsolationIT {
   }
 
   private String loginBody(String username, String password) throws Exception {
-    return json.writeValueAsString(Map.of("username", username, "password", password));
+    return json.writeValueAsString(Captchas.loginBody(mvc, json, username, password));
   }
 
   private String withoutTrace(String body) throws Exception {
