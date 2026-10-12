@@ -23,7 +23,14 @@ export default tseslint.config(
     }
   },
   {
-    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        // Inlined by the Vite plugin in vite.config.ts. Same string as version.json.
+        __APP_VERSION__: "readonly"
+      }
+    },
     plugins: { prettier: pluginPrettier },
     rules: {
       // Engineering spec 02 section 7: strict typing, no any.

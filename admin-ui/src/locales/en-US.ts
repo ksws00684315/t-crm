@@ -174,6 +174,11 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  version: {
+    message: "The system has been updated. Refresh to use the new version. Open tabs are kept.",
+    refresh: "Refresh now",
+    later: "Later"
+  },
   reauth: {
     title: "Session expired",
     hint: "Enter your password. What you already filled in stays on this page, and the failed request is not sent again.",

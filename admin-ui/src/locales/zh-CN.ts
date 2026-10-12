@@ -177,6 +177,11 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  version: {
+    message: "系统已更新，刷新页面以使用新版本。已打开的标签会保留。",
+    refresh: "立即刷新",
+    later: "稍后"
+  },
   reauth: {
     title: "登录已过期",
     hint: "请重新输入密码。当前页面已填写的内容会保留，失败的请求不会自动重发。",

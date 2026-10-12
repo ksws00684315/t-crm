@@ -13,6 +13,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
 import { buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
+import { watermarkInk, watermarkText } from "@/utils/watermark";
 import { affixFor } from "@/utils/tabs";
 import {
   isMacPlatform,
@@ -69,6 +70,17 @@ const crumbs = computed(() => {
 const asideWidth = computed(() =>
   collapsed.value ? "var(--tcrm-sidebar-collapsed)" : "var(--tcrm-sidebar-width)"
 );
+const watermark = computed(() =>
+  watermarkText(user.user?.nickname ?? "", user.user?.username ?? "", new Date())
+);
+const watermarkColor = ref(watermarkInk("#15181d"));
+
+function syncWatermarkColor(): void {
+  const hex = getComputedStyle(document.documentElement)
+    .getPropertyValue("--tcrm-color-text")
+    .trim();
+  watermarkColor.value = watermarkInk(hex || "#15181d");
+}
 
 const unsubscribeNarrow = subscribeNarrow(matches => {
   narrow.value = matches;
@@ -137,9 +149,19 @@ watch(
   { immediate: true }
 );
 
+// The theme class is applied before this runs, so the canvas color can be read immediately.
+watch(
+  () => theme.resolved,
+  () => {
+    syncWatermarkColor();
+  },
+  { flush: "sync" }
+);
+
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
   document.addEventListener("fullscreenchange", onFullscreenChange);
+  syncWatermarkColor();
 });
 
 onBeforeUnmount(() => {
@@ -249,11 +271,22 @@ onBeforeUnmount(() => {
       </el-header>
       <TabBar />
       <el-main class="layout__main">
-        <RouterView v-slot="{ Component }">
-          <KeepAlive :include="tabs.include">
-            <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
-          </KeepAlive>
-        </RouterView>
+        <el-watermark
+          class="layout__watermark"
+          :content="watermark"
+          :rotate="-20"
+          :gap="[140, 120]"
+          :font="{ color: watermarkColor, fontSize: 14 }"
+          data-test="watermark"
+        >
+          <RouterView v-slot="{ Component }">
+            <Transition name="tcrm-page">
+              <KeepAlive :include="tabs.include">
+                <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
+              </KeepAlive>
+            </Transition>
+          </RouterView>
+        </el-watermark>
       </el-main>
     </el-container>
     <MenuSearch />
@@ -322,5 +355,25 @@ onBeforeUnmount(() => {
   background: var(--tcrm-color-page);
   padding: var(--tcrm-space-4);
   min-height: 0;
+}
+.layout__watermark {
+  min-height: 100%;
+}
+</style>
+
+<style>
+.tcrm-page-enter-active,
+.tcrm-page-leave-active {
+  transition: opacity 150ms;
+}
+.tcrm-page-enter-from,
+.tcrm-page-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tcrm-page-enter-active,
+  .tcrm-page-leave-active {
+    transition: none;
+  }
 }
 </style>
