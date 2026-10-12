@@ -38,7 +38,12 @@ public enum ErrorCode {
   PRODUCT_WEIDIAN_ID_EXISTS(409, "Weidian item ID already exists in this shop"),
   PRODUCT_CODE_IMMUTABLE(422, "Product code cannot be changed"),
   PRODUCT_IS_EXCLUSIVE_ITEM(422, "Exclusive item cannot be registered as an original product"),
-  LINK_REBUILD_RUNNING(409, "A link index rebuild is already running");
+  LINK_REBUILD_RUNNING(409, "A link index rebuild is already running"),
+  WEIDIAN_APP_NOT_CONFIGURED(422, "Weidian service application is not configured"),
+  WEIDIAN_SHOP_NOT_AUTHORIZED(422, "Weidian shop is not connected"),
+  WEIDIAN_CREDENTIAL_INVALID(422, "Weidian appkey or secret is invalid"),
+  WEIDIAN_API_FAILED(502, "Weidian API request failed"),
+  WEIDIAN_RATE_LIMITED(429, "Weidian API rate limit wait timed out");
   private final int status;
   private final String message;
 

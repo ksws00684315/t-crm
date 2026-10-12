@@ -96,6 +96,7 @@ class TenantIsolationIT {
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
+    WeidianTestProperties.register(r);
   }
 
   private final MockMvc mvc;
@@ -529,7 +530,8 @@ class TenantIsolationIT {
     return path.equals("/admin-api/auth/login")
         || path.equals("/admin-api/auth/logout")
         || path.equals("/admin-api/auth/me")
-        || path.equals("/admin-api/auth/password");
+        || path.equals("/admin-api/auth/password")
+        || path.equals("/admin-api/integration/weidian/oauth/callback");
   }
 
   private void expectNotFound(org.springframework.test.web.servlet.RequestBuilder request)

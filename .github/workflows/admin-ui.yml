@@ -2,10 +2,10 @@ name: Admin UI
 on:
   pull_request:
     branches: [main]
-    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml']
+    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml', 'backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java']
   push:
     branches: [main]
-    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml']
+    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml', 'backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java']
 permissions:
   contents: read
 jobs:

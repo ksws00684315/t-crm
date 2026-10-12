@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysUserMapper;
@@ -70,6 +71,8 @@ class SystemIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
+    r.add("crm.link.click-consumer.enabled", () -> "false");
+    WeidianTestProperties.register(r);
   }
 
   private final MockMvc mvc;
@@ -164,6 +167,8 @@ class SystemIT {
             "crm_shop:NO",
             "crm_task:NO",
             "crm_task_file:NO",
+            "crm_weidian_app:NO",
+            "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
             "sys_user:YES");
     var without =
