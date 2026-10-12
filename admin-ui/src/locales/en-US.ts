@@ -166,6 +166,12 @@ const enUS: MessageSchema = {
     changePassword: "Change Password",
     user: "{nickname} ({role})"
   },
+  theme: {
+    cycle: "Switch theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System"
+  },
   password: {
     old: "Current password",
     next: "New password",

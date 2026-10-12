@@ -6,11 +6,18 @@ body,
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto,
-    sans-serif;
-  color: #303133;
-  background: #f5f7fa;
+  font-family: var(--tcrm-font-sans);
+  color: var(--tcrm-color-text);
+  background: var(--tcrm-color-page);
+}
+
+.tcrm-mono {
+  font-family: var(--tcrm-font-mono);
+}
+
+.tcrm-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 * {

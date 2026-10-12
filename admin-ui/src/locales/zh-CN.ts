@@ -169,6 +169,12 @@ const zhCN = {
     changePassword: "修改密码",
     user: "{nickname}（{role}）"
   },
+  theme: {
+    cycle: "切换主题",
+    light: "浅色",
+    dark: "深色",
+    system: "跟随系统"
+  },
   password: {
     old: "原密码",
     next: "新密码",

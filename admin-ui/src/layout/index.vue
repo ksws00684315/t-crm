@@ -7,6 +7,7 @@ import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
+import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { buildMenu, roleLabel } from "@/utils/permission";
 
@@ -17,6 +18,7 @@ const route = useRoute();
 const router = useRouter();
 const user = useUserStore();
 const localeStore = useLocaleStore();
+const theme = useThemeStore();
 
 const menu = computed(() => {
   void localeStore.locale;
@@ -75,6 +77,15 @@ async function onCommand(command: string) {
       <el-header class="layout__header">
         <span class="layout__title">{{ pageTitle }}</span>
         <div class="layout__actions">
+          <el-button
+            text
+            class="layout__theme"
+            data-test="theme"
+            :aria-label="t('theme.cycle')"
+            @click="theme.cycle()"
+          >
+            {{ t(`theme.${theme.mode}`) }}
+          </el-button>
           <LocaleSwitch />
           <el-dropdown trigger="click" @command="onCommand">
             <span class="layout__user">
@@ -107,8 +118,8 @@ async function onCommand(command: string) {
   height: 100%;
 }
 .layout__aside {
-  background: #fff;
-  border-right: 1px solid var(--el-border-color-light);
+  background: var(--tcrm-color-card);
+  border-right: 1px solid var(--tcrm-color-border);
 }
 .layout__brand {
   height: 56px;
@@ -124,8 +135,8 @@ async function onCommand(command: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--tcrm-color-card);
+  border-bottom: 1px solid var(--tcrm-color-border);
 }
 .layout__title {
   font-size: 16px;
