@@ -464,11 +464,11 @@ class ProductIT {
   }
 
   private static byte[] productWorkbook(List<List<String>> rows) {
-    return workbook(ProductImportColumn.headers(), rows);
+    return workbook(com.tcrm.admin.TestTemplates.render(ProductImportColumn.headerKeys()), rows);
   }
 
   private static byte[] mappingWorkbook(List<List<String>> rows) {
-    return workbook(MappingImportColumn.headers(), rows);
+    return workbook(com.tcrm.admin.TestTemplates.render(MappingImportColumn.headerKeys()), rows);
   }
 
   private static byte[] workbook(List<String> headers, List<List<String>> rows) {

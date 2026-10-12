@@ -42,7 +42,7 @@ public class ProductImportService {
   }
 
   public byte[] template() {
-    return imports.template(ProductImportColumn.headers());
+    return imports.template(ProductImportColumn.headerKeys());
   }
 
   public Long submit(ImportFileDTO file) {
@@ -50,7 +50,7 @@ public class ProductImportService {
     Long actorId = user.id();
     return imports.submitImport(
         TaskType.PRODUCT_IMPORT,
-        ProductImportColumn.headers(),
+        ProductImportColumn.headerKeys(),
         file,
         () -> new ProductImportProcessor(actorId, shops, products, kolItems, codes, tx),
         TaskType.PRODUCT_IMPORT.maxRows());

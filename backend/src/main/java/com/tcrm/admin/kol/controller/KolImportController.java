@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.controller;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.kol.service.KolImportService;
+import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -11,6 +12,7 @@ import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.springframework.context.MessageSource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,21 +32,27 @@ import org.springframework.web.multipart.MultipartFile;
     value = {"SUPER_ADMIN", "OPERATOR"},
     mode = SaMode.OR)
 public class KolImportController {
-  static final String TEMPLATE_NAME = "kol-import-template.xlsx";
+  static final String TEMPLATE_NAME_KEY = "import.kol.template-name";
   private final KolImportService imports;
+  private final MessageSource messages;
 
-  public KolImportController(KolImportService imports) {
+  public KolImportController(KolImportService imports, MessageSource messages) {
     this.imports = imports;
+    this.messages = messages;
   }
 
-  /** Header-only workbook generated from the column definition; not a JSON endpoint. */
+  /**
+   * Header-only workbook in the request language; the file name follows it. Not a JSON endpoint.
+   */
   @GetMapping("/template")
   public ResponseEntity<byte[]> template() {
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.attachment()
-                .filename(TEMPLATE_NAME, StandardCharsets.UTF_8)
+                .filename(
+                    messages.getMessage(TEMPLATE_NAME_KEY, null, AppLocale.current().locale()),
+                    StandardCharsets.UTF_8)
                 .build()
                 .toString())
         .contentType(MediaType.parseMediaType(ImportTaskApi.XLSX_CONTENT_TYPE))

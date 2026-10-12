@@ -19,6 +19,7 @@ import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.TestTransactions;
+import com.tcrm.admin.task.api.ImportReason;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -114,7 +115,7 @@ class MappingImportProcessorTest {
   void shouldReject_whenExclusiveItemIsOriginalProduct() {
     when(productMapper.existsAliveShopItem(1L, "9001")).thenReturn(true);
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
-        .contains(MappingImportProcessor.IS_ORIGINAL);
+        .contains(ImportReason.of(MappingImportProcessor.IS_ORIGINAL));
     verify(productMapper, never()).lockShopItem(any());
   }
 
@@ -129,7 +130,7 @@ class MappingImportProcessorTest {
     old.setWeidianItemId("8000");
     when(items.findCurrentByKolProduct(10L, 20L)).thenReturn(old);
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
-        .contains(MappingImportProcessor.IS_ORIGINAL);
+        .contains(ImportReason.of(MappingImportProcessor.IS_ORIGINAL));
     verify(productMapper).lockShopItem("crm:shop-item:1:9001");
     verify(items, never()).update(any(), any());
     verify(items, never()).insert(any(KolItemDO.class));
@@ -151,7 +152,7 @@ class MappingImportProcessorTest {
     other.setProductCode("P000002");
     when(productMapper.selectById(21L)).thenReturn(other);
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
-        .anyMatch(s -> s.contains("KOL0002") && s.contains("P000002"));
+        .containsExactly(ImportReason.of(MappingImportProcessor.OCCUPIED, "KOL0002", "P000002"));
   }
 
   @Test
@@ -172,13 +173,13 @@ class MappingImportProcessorTest {
   void shouldRejectDuplicateExclusive_inSameFile() {
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001"))).isEmpty();
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
-        .contains(MappingImportProcessor.ITEM_DUPLICATE);
+        .contains(ImportReason.of(MappingImportProcessor.ITEM_DUPLICATE));
   }
 
   @Test
   void shouldRejectDisabledKol() {
     when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "Alice", false, null));
     assertThat(processor.process(row("100", "9001", "KOL0001", "P000001")))
-        .contains(MappingImportProcessor.KOL_MISSING);
+        .contains(ImportReason.of(MappingImportProcessor.KOL_MISSING));
   }
 }

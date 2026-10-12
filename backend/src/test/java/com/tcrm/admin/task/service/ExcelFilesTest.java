@@ -21,7 +21,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ExcelFilesTest {
   private static final List<String> HEADERS = List.of("编号", "姓名", "邮箱");
+  private static final List<String> HEADERS_EN = List.of("Code", "Name", "Email");
+
+  /** The two template languages, as the import framework passes them to read(). */
+  private static final List<List<String>> VARIANTS = List.of(HEADERS, HEADERS_EN);
+
   private final ExcelFiles excel = new ExcelFiles();
+
+  private List<List<String>> read(byte[] content, int maxRows) {
+    return excel.read(content, VARIANTS, maxRows).rows();
+  }
 
   private static byte[] workbook(List<String> head, List<List<String>> rows) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -108,38 +117,34 @@ class ExcelFilesTest {
         workbook(
             List.of(" 编号 ", "姓名", "邮箱"),
             List.of(List.of(" KOL0001 ", "张三", "a@example.com"), List.of("", "李四")));
-    assertThat(excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS))
+    assertThat(read(content, ExcelFiles.DEFAULT_MAX_ROWS))
         .containsExactly(List.of("KOL0001", "张三", "a@example.com"), List.of("", "李四", ""));
   }
 
   @Test
   void shouldIgnoreExtraColumns_whenRowIsWiderThanHeader() {
     byte[] content = workbook(HEADERS, List.of(List.of("1", "2", "3", "4")));
-    assertThat(excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS))
-        .containsExactly(List.of("1", "2", "3"));
+    assertThat(read(content, ExcelFiles.DEFAULT_MAX_ROWS)).containsExactly(List.of("1", "2", "3"));
   }
 
   @Test
   void shouldSkipBlankRows_whenReading() {
     byte[] content =
         workbook(HEADERS, List.of(List.of("a", "b", "c"), List.of(" ", "", " "), List.of("d")));
-    assertThat(excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS)).hasSize(2);
+    assertThat(read(content, ExcelFiles.DEFAULT_MAX_ROWS)).hasSize(2);
   }
 
   @Test
   void shouldRejectFile_whenHeaderDiffers() {
     byte[] reordered = workbook(List.of("姓名", "编号", "邮箱"), List.of(List.of("a", "b", "c")));
     assertError(
-        () -> excel.read(reordered, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
-        ErrorCode.TASK_FILE_HEADER_MISMATCH);
+        () -> read(reordered, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
     byte[] missing = workbook(List.of("编号", "姓名"), List.of(List.of("a", "b")));
     assertError(
-        () -> excel.read(missing, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
-        ErrorCode.TASK_FILE_HEADER_MISMATCH);
+        () -> read(missing, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
     byte[] extra = workbook(List.of("编号", "姓名", "邮箱", "备注"), List.of(List.of("a")));
     assertError(
-        () -> excel.read(extra, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
-        ErrorCode.TASK_FILE_HEADER_MISMATCH);
+        () -> read(extra, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 
   @Test
@@ -147,15 +152,14 @@ class ExcelFilesTest {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     FastExcel.write(out).sheet("Sheet1").doWrite(List.<List<String>>of());
     assertError(
-        () -> excel.read(out.toByteArray(), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
+        () -> read(out.toByteArray(), ExcelFiles.DEFAULT_MAX_ROWS),
         ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 
   @Test
   void shouldRejectFile_whenThereAreNoDataRows() {
     byte[] content = workbook(HEADERS, List.of());
-    assertError(
-        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_EMPTY);
+    assertError(() -> read(content, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_EMPTY);
   }
 
   @Test
@@ -164,7 +168,7 @@ class ExcelFilesTest {
     for (int i = 0; i < ExcelFiles.DEFAULT_MAX_ROWS; i++) {
       rows.add(List.of("c" + i, "n", "e"));
     }
-    assertThat(excel.read(workbook(HEADERS, rows), HEADERS, ExcelFiles.DEFAULT_MAX_ROWS))
+    assertThat(read(workbook(HEADERS, rows), ExcelFiles.DEFAULT_MAX_ROWS))
         .hasSize(ExcelFiles.DEFAULT_MAX_ROWS);
   }
 
@@ -176,16 +180,13 @@ class ExcelFilesTest {
     }
     byte[] content = workbook(HEADERS, rows);
     assertError(
-        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
-        ErrorCode.TASK_FILE_TOO_MANY_ROWS);
+        () -> read(content, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_TOO_MANY_ROWS);
   }
 
   @Test
   void shouldRejectFile_whenZipIsNotAWorkbook() {
     byte[] content = {0x50, 0x4B, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8};
-    assertError(
-        () -> excel.read(content, HEADERS, ExcelFiles.DEFAULT_MAX_ROWS),
-        ErrorCode.TASK_FILE_INVALID);
+    assertError(() -> read(content, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_INVALID);
   }
 
   @ParameterizedTest
@@ -216,14 +217,29 @@ class ExcelFilesTest {
   @Test
   void shouldAcceptFile_whenRowCountIsExactlyCustomLimit() {
     List<List<String>> rows = List.of(List.of("1", "a", "b"), List.of("2", "c", "d"));
-    assertThat(excel.read(workbook(HEADERS, rows), HEADERS, 2)).hasSize(2);
+    assertThat(read(workbook(HEADERS, rows), 2)).hasSize(2);
   }
 
   @Test
   void shouldRejectFile_whenRowCountExceedsCustomLimit() {
     List<List<String>> rows =
         List.of(List.of("1", "a", "b"), List.of("2", "c", "d"), List.of("3", "e", "f"));
+    assertError(() -> read(workbook(HEADERS, rows), 2), ErrorCode.TASK_FILE_TOO_MANY_ROWS);
+  }
+
+  @Test
+  void shouldMatchEitherTemplateLanguage_whenHeaderRowEqualsOneVariant() {
+    assertThat(excel.read(workbook(HEADERS, List.of(List.of("1"))), VARIANTS, 10).matchedHeaders())
+        .isEqualTo(HEADERS);
+    assertThat(
+            excel.read(workbook(HEADERS_EN, List.of(List.of("1"))), VARIANTS, 10).matchedHeaders())
+        .isEqualTo(HEADERS_EN);
+  }
+
+  @Test
+  void shouldRejectFile_whenHeaderMixesLanguages() {
+    byte[] mixed = workbook(List.of("编号", "Name", "邮箱"), List.of(List.of("a", "b", "c")));
     assertError(
-        () -> excel.read(workbook(HEADERS, rows), HEADERS, 2), ErrorCode.TASK_FILE_TOO_MANY_ROWS);
+        () -> read(mixed, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 }

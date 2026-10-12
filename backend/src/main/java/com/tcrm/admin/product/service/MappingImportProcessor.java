@@ -15,6 +15,7 @@ import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.TransactionalEvents;
+import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,20 +32,20 @@ import org.springframework.transaction.support.TransactionTemplate;
  * idempotent; replacing the exclusive item closes the old row then inserts.
  */
 class MappingImportProcessor implements ImportRowProcessor {
-  static final String SHOP_REQUIRED = "店铺 ID 不能为空";
-  static final String SHOP_FORMAT = "店铺 ID 应为 1～32 位数字";
-  static final String SHOP_MISSING = "店铺不存在或已停用";
-  static final String ITEM_REQUIRED = "专属商品 ID 不能为空";
-  static final String ITEM_FORMAT = "专属商品 ID 应为 1～32 位数字";
-  static final String ITEM_DUPLICATE = "同一专属商品在文件中重复";
-  static final String KOL_REQUIRED = "达人编号不能为空";
-  static final String KOL_MISSING = "达人编号不存在或已停用";
-  static final String PRODUCT_REQUIRED = "原商品编码不能为空";
-  static final String PRODUCT_MISSING = "原商品编码不存在";
-  static final String PAIR_DUPLICATE = "同一达人与原商品在文件中重复";
-  static final String IS_ORIGINAL = "专属商品不能是原商品本身";
-  static final String OCCUPIED_PREFIX = "专属商品已被占用：达人 ";
-  static final String CONFLICT = "数据已被其他操作修改，请重新导入该行";
+  static final String SHOP_REQUIRED = "import.mapping.error.shop-required";
+  static final String SHOP_FORMAT = "import.mapping.error.shop-format";
+  static final String SHOP_MISSING = "import.mapping.error.shop-missing";
+  static final String ITEM_REQUIRED = "import.mapping.error.item-required";
+  static final String ITEM_FORMAT = "import.mapping.error.item-format";
+  static final String ITEM_DUPLICATE = "import.mapping.error.item-duplicate";
+  static final String KOL_REQUIRED = "import.mapping.error.kol-required";
+  static final String KOL_MISSING = "import.mapping.error.kol-missing";
+  static final String PRODUCT_REQUIRED = "import.mapping.error.product-required";
+  static final String PRODUCT_MISSING = "import.mapping.error.product-missing";
+  static final String PAIR_DUPLICATE = "import.mapping.error.pair-duplicate";
+  static final String IS_ORIGINAL = "import.mapping.error.is-original";
+  static final String OCCUPIED = "import.mapping.error.occupied";
+  static final String CONFLICT = "import.mapping.error.conflict";
 
   private final Long actorId;
   private final ShopService shops;
@@ -77,50 +78,50 @@ class MappingImportProcessor implements ImportRowProcessor {
   }
 
   @Override
-  public List<String> process(List<String> row) {
-    List<String> errors = new ArrayList<>();
+  public List<ImportReason> process(List<String> row) {
+    List<ImportReason> errors = new ArrayList<>();
     String shopWeidian = SHOP_ID.of(row);
     ShopDO shop = null;
     if (shopWeidian.isEmpty()) {
-      errors.add(SHOP_REQUIRED);
+      errors.add(ImportReason.of(SHOP_REQUIRED));
     } else if (!ProductRules.isWeidianId(shopWeidian)) {
-      errors.add(SHOP_FORMAT);
+      errors.add(ImportReason.of(SHOP_FORMAT));
     } else {
       shop = shops.findEnabledByWeidianId(shopWeidian);
       if (shop == null) {
-        errors.add(SHOP_MISSING);
+        errors.add(ImportReason.of(SHOP_MISSING));
       }
     }
     String exclusiveId = WEIDIAN_ITEM_ID.of(row);
     if (exclusiveId.isEmpty()) {
-      errors.add(ITEM_REQUIRED);
+      errors.add(ImportReason.of(ITEM_REQUIRED));
     } else if (!ProductRules.isWeidianId(exclusiveId)) {
-      errors.add(ITEM_FORMAT);
+      errors.add(ImportReason.of(ITEM_FORMAT));
     } else if (shop != null && !seenExclusive.add(shop.getId() + ":" + exclusiveId)) {
-      errors.add(ITEM_DUPLICATE);
+      errors.add(ImportReason.of(ITEM_DUPLICATE));
     }
     String kolCode = KOL_CODE.of(row).toUpperCase(Locale.ROOT);
     KolRefDTO kol = null;
     if (kolCode.isEmpty()) {
-      errors.add(KOL_REQUIRED);
+      errors.add(ImportReason.of(KOL_REQUIRED));
     } else {
       kol = kols.getByCode(kolCode);
       if (kol == null || !kol.enabled()) {
-        errors.add(KOL_MISSING);
+        errors.add(ImportReason.of(KOL_MISSING));
       }
     }
     String productCode = PRODUCT_CODE.of(row).toUpperCase(Locale.ROOT);
     ProductDO product = null;
     if (productCode.isEmpty()) {
-      errors.add(PRODUCT_REQUIRED);
+      errors.add(ImportReason.of(PRODUCT_REQUIRED));
     } else {
       product = products.findByCode(productCode);
       if (product == null) {
-        errors.add(PRODUCT_MISSING);
+        errors.add(ImportReason.of(PRODUCT_MISSING));
       }
     }
     if (kol != null && product != null && !seenPairs.add(kol.id() + ":" + product.getId())) {
-      errors.add(PAIR_DUPLICATE);
+      errors.add(ImportReason.of(PAIR_DUPLICATE));
     }
     if (!errors.isEmpty() || shop == null || kol == null || product == null) {
       return errors;
@@ -130,16 +131,17 @@ class MappingImportProcessor implements ImportRowProcessor {
     }
     // Exclusive item must not be an original product.
     if (productMapper.existsAliveShopItem(shop.getId(), exclusiveId)) {
-      return List.of(IS_ORIGINAL);
+      return List.of(ImportReason.of(IS_ORIGINAL));
     }
     try {
       return apply(shop, exclusiveId, kol, product);
     } catch (DuplicateKeyException e) {
-      return List.of(CONFLICT);
+      return List.of(ImportReason.of(CONFLICT));
     }
   }
 
-  private List<String> apply(ShopDO shop, String exclusiveId, KolRefDTO kol, ProductDO product) {
+  private List<ImportReason> apply(
+      ShopDO shop, String exclusiveId, KolRefDTO kol, ProductDO product) {
     Instant now = Instant.now();
     KolItemDO byExclusive = items.findCurrentByShopItem(shop.getId(), exclusiveId);
     if (byExclusive != null) {
@@ -153,7 +155,7 @@ class MappingImportProcessor implements ImportRowProcessor {
       ProductDO occupiedProduct = productMapper.selectById(byExclusive.getProductId());
       String ownerCode = owner == null ? "?" : owner.kolCode();
       String occupiedCode = occupiedProduct == null ? "?" : occupiedProduct.getProductCode();
-      return List.of(OCCUPIED_PREFIX + ownerCode + "，原商品 " + occupiedCode);
+      return List.of(ImportReason.of(OCCUPIED, ownerCode, occupiedCode));
     }
     KolItemDO byPair = items.findCurrentByKolProduct(kol.id(), product.getId());
     try {
@@ -188,7 +190,7 @@ class MappingImportProcessor implements ImportRowProcessor {
             TransactionalEvents.publish(events, new KolItemChangedEvent(kol.id(), product.getId()));
           });
     } catch (OriginalProductClaim claimed) {
-      return List.of(IS_ORIGINAL);
+      return List.of(ImportReason.of(IS_ORIGINAL));
     }
     return List.of();
   }

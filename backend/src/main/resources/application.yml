@@ -17,6 +17,11 @@ spring:
       database: 0
   flyway:
     locations: classpath:db/migration
+  messages:
+    # User-facing texts follow the request language (ADR-0.15); an unsupported locale never falls
+    # back to the server default but to the base bundle, which equals the English one.
+    fallback-to-system-locale: false
+    encoding: UTF-8
   servlet:
     multipart:
       # Import files are limited to 20 MB (spec 06 section 3); the request adds form overhead.

@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.task.api.ImportFileDTO;
+import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
@@ -28,18 +29,44 @@ import com.tcrm.admin.task.model.TaskStatus;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class ImportTaskServiceTest {
+  /** Real bundle keys, so the service renders through the production message files. */
+  private static final List<String> HEADER_KEYS =
+      List.of("import.kol.header.code", "import.kol.header.name");
+
+  private static final String REASON_CODE_DUPLICATE = "import.kol.error.code-duplicate";
+  private static final String REASON_CODE_EXISTS = "import.kol.error.code-exists";
+  private static final long TASK_ID = 42L;
+
+  private static MessageSource bundles() {
+    ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+    source.setBasenames("messages");
+    source.setDefaultEncoding("UTF-8");
+    source.setFallbackToSystemLocale(false);
+    return source;
+  }
+
+  private static List<String> render(List<String> keys, Locale locale) {
+    MessageSource messages = bundles();
+    return keys.stream().map(key -> messages.getMessage(key, null, locale)).toList();
+  }
+
   @BeforeAll
   static void tableInfo() {
     TableInfoHelper.initTableInfo(
@@ -48,9 +75,6 @@ class ImportTaskServiceTest {
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), TaskFileDO.class);
   }
 
-  private static final List<String> HEADERS = List.of("编号", "姓名");
-  private static final long TASK_ID = 42L;
-
   private final ExcelFiles excel = new ExcelFiles();
   private final TaskMapper tasks = mock(TaskMapper.class);
   private final TaskFileMapper files = mock(TaskFileMapper.class);
@@ -58,10 +82,14 @@ class ImportTaskServiceTest {
   private final List<Runnable> queued = new ArrayList<>();
   private final List<TaskDO> updates = new ArrayList<>();
   private final List<TaskFileDO> inserted = new ArrayList<>();
+  private final MessageSource messages = bundles();
+  private final List<String> headersZh = render(HEADER_KEYS, Locale.SIMPLIFIED_CHINESE);
+  private final List<String> headersEn = render(HEADER_KEYS, Locale.ENGLISH);
   private ImportTaskService service;
 
   @BeforeEach
   void setup() {
+    LocaleContextHolder.setLocale(Locale.SIMPLIFIED_CHINESE);
     doAnswer(
             invocation -> {
               queued.add(invocation.getArgument(0));
@@ -96,22 +124,29 @@ class ImportTaskServiceTest {
             tasks,
             files,
             new TaskQueue(executor),
-            new TransactionTemplate(mock(PlatformTransactionManager.class)));
+            new TransactionTemplate(mock(PlatformTransactionManager.class)),
+            messages);
+  }
+
+  @AfterEach
+  void resetLocale() {
+    LocaleContextHolder.resetLocaleContext();
   }
 
   private byte[] workbook(List<List<String>> rows) {
-    return excel.write(HEADERS, rows);
+    return excel.write(headersZh, rows);
   }
 
   private ImportFileDTO upload(byte[] content) {
     return new ImportFileDTO("C:\\temp\\达人.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, content);
   }
 
-  private void storedInput(byte[] content) {
+  private void storedInput(byte[] content, String locale) {
     TaskDO waiting = new TaskDO();
     waiting.setId(TASK_ID);
     waiting.setStatus(TaskStatus.WAITING);
     waiting.setTenantId(1L);
+    waiting.setLocale(locale);
     when(tasks.selectById(TASK_ID)).thenReturn(waiting);
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
@@ -134,7 +169,7 @@ class ImportTaskServiceTest {
     Long id =
         service.submitImport(
             TaskType.KOL_IMPORT,
-            HEADERS,
+            HEADER_KEYS,
             upload(content),
             () -> null,
             TaskType.KOL_IMPORT.maxRows());
@@ -145,6 +180,7 @@ class ImportTaskServiceTest {
     assertThat(task.getValue().getStatus()).isEqualTo(TaskStatus.WAITING);
     assertThat(task.getValue().getTaskType()).isEqualTo(TaskType.KOL_IMPORT);
     assertThat(task.getValue().getTotal()).isEqualTo(2);
+    assertThat(task.getValue().getLocale()).isEqualTo("zh-CN");
     assertThat(inserted)
         .singleElement()
         .satisfies(
@@ -158,6 +194,42 @@ class ImportTaskServiceTest {
   }
 
   @Test
+  void shouldStoreTaskLocale_whenRequestIsEnglish() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    byte[] content = excel.write(headersEn, List.of(List.of("KOL0001", "a")));
+
+    service.submitImport(
+        TaskType.KOL_IMPORT,
+        HEADER_KEYS,
+        upload(content),
+        () -> null,
+        TaskType.KOL_IMPORT.maxRows());
+
+    ArgumentCaptor<TaskDO> task = ArgumentCaptor.forClass(TaskDO.class);
+    verify(tasks).insert(task.capture());
+    assertThat(task.getValue().getLocale()).isEqualTo("en-US");
+  }
+
+  @Test
+  void shouldProcessEnglishTemplateEndToEnd_whenFileCarriesEnglishHeaders() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    byte[] content = excel.write(headersEn, List.of(List.of("KOL0001", "a")));
+    service.submitImport(
+        TaskType.KOL_IMPORT,
+        HEADER_KEYS,
+        upload(content),
+        () -> cells -> List.of(),
+        TaskType.KOL_IMPORT.maxRows());
+    // The queued worker must re-read the file with the English variant it matched at submission.
+    LocaleContextHolder.setLocale(Locale.SIMPLIFIED_CHINESE);
+    storedInput(content, "en-US");
+
+    queued.getFirst().run();
+
+    assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.SUCCESS);
+  }
+
+  @Test
   void shouldRejectBeforeStoring_whenFileIsInvalid() {
     byte[] content = excel.write(List.of("其他"), List.of(List.of("x")));
 
@@ -165,7 +237,7 @@ class ImportTaskServiceTest {
             () ->
                 service.submitImport(
                     TaskType.KOL_IMPORT,
-                    HEADERS,
+                    HEADER_KEYS,
                     upload(content),
                     () -> null,
                     TaskType.KOL_IMPORT.maxRows()))
@@ -174,6 +246,24 @@ class ImportTaskServiceTest {
         .isEqualTo(ErrorCode.TASK_FILE_HEADER_MISMATCH);
     verify(tasks, never()).insert(any(TaskDO.class));
     assertThat(queued).isEmpty();
+  }
+
+  @Test
+  void shouldRejectMixedLanguageHeader_evenWhenBothListsAreKnown() {
+    List<String> mixed = List.of(headersZh.get(0), headersEn.get(1));
+    byte[] content = excel.write(mixed, List.of(List.of("KOL0001", "a")));
+
+    assertThatThrownBy(
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADER_KEYS,
+                    upload(content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.TASK_FILE_HEADER_MISMATCH);
   }
 
   @Test
@@ -190,7 +280,7 @@ class ImportTaskServiceTest {
             () ->
                 service.submitImport(
                     TaskType.KOL_IMPORT,
-                    HEADERS,
+                    HEADER_KEYS,
                     upload(content),
                     () -> null,
                     TaskType.KOL_IMPORT.maxRows()))
@@ -203,12 +293,12 @@ class ImportTaskServiceTest {
 
   @Test
   void shouldFinishSuccess_whenEveryRowIsImported() {
-    storedInput(workbook(List.of(List.of("", "a"), List.of("", "b"))));
+    storedInput(workbook(List.of(List.of("", "a"), List.of("", "b"))), "zh-CN");
     List<List<String>> seen = new ArrayList<>();
 
     service.run(
         TASK_ID,
-        HEADERS,
+        headersZh,
         () ->
             cells -> {
               seen.add(cells);
@@ -228,12 +318,16 @@ class ImportTaskServiceTest {
   }
 
   @Test
-  void shouldFinishPartialWithErrorFile_whenSomeRowsFail() {
-    storedInput(workbook(List.of(List.of("", "ok"), List.of("=cmd", "bad"))));
+  void shouldFinishPartialWithErrorFileInChinese_whenTaskWasSubmittedInChinese() {
+    storedInput(workbook(List.of(List.of("", "ok"), List.of("=cmd", "bad"))), "zh-CN");
     ImportRowProcessor processor =
-        cells -> cells.get(1).equals("bad") ? List.of("原因一", "原因二") : List.of();
+        cells ->
+            cells.get(1).equals("bad")
+                ? List.of(
+                    ImportReason.of(REASON_CODE_DUPLICATE), ImportReason.of(REASON_CODE_EXISTS))
+                : List.of();
 
-    service.run(TASK_ID, HEADERS, () -> processor, TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> processor, TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.PARTIAL);
     assertThat(lastUpdate().getDone()).isEqualTo(2);
@@ -244,18 +338,45 @@ class ImportTaskServiceTest {
     assertThat(errorFile.getFileName()).isEqualTo("task-42-errors.xlsx");
     List<Map<Integer, String>> rows = readBack(errorFile.getContent());
     assertThat(rows).hasSize(2);
-    assertThat(rows.get(0)).containsEntry(0, "编号").containsEntry(2, "错误原因");
+    assertThat(rows.get(0)).containsEntry(0, "达人编号").containsEntry(2, "错误原因");
     assertThat(rows.get(1))
         .containsEntry(0, "'=cmd")
         .containsEntry(1, "bad")
-        .containsEntry(2, "原因一；原因二");
+        .containsEntry(2, "达人编号在文件中重复；达人编号已存在");
+  }
+
+  @Test
+  void shouldFinishWithErrorFileInEnglish_whenTaskWasSubmittedInEnglish() {
+    // English template in the file, English task language, Chinese thread locale on the worker.
+    byte[] content = excel.write(headersEn, List.of(List.of("", "ok"), List.of("=cmd", "bad")));
+    storedInput(content, "en-US");
+    LocaleContextHolder.setLocale(Locale.SIMPLIFIED_CHINESE);
+    ImportRowProcessor processor =
+        cells ->
+            cells.get(1).equals("bad")
+                ? List.of(
+                    ImportReason.of(REASON_CODE_DUPLICATE), ImportReason.of(REASON_CODE_EXISTS))
+                : List.of();
+
+    service.run(TASK_ID, headersEn, () -> processor, TaskType.KOL_IMPORT.maxRows());
+
+    assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.PARTIAL);
+    List<Map<Integer, String>> rows = readBack(inserted.getFirst().getContent());
+    // The file's own headers are echoed; error texts follow the task language, not the thread.
+    assertThat(rows.get(0)).containsEntry(0, "KOL Code").containsEntry(2, "Error");
+    assertThat(rows.get(1))
+        .containsEntry(2, "KOL code appears more than once in the file; KOL code already exists");
   }
 
   @Test
   void shouldFinishFailed_whenEveryRowFails() {
-    storedInput(workbook(List.of(List.of("", "a"))));
+    storedInput(workbook(List.of(List.of("", "a"))), "zh-CN");
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of("错误"), TaskType.KOL_IMPORT.maxRows());
+    service.run(
+        TASK_ID,
+        headersZh,
+        () -> cells -> List.of(ImportReason.of(REASON_CODE_DUPLICATE)),
+        TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.FAILED);
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_ALL_FAILED);
@@ -264,7 +385,7 @@ class ImportTaskServiceTest {
 
   @Test
   void shouldCountRowAsFailed_whenProcessorThrows() {
-    storedInput(workbook(List.of(List.of("", "a"), List.of("", "b"))));
+    storedInput(workbook(List.of(List.of("", "a"), List.of("", "b"))), "zh-CN");
     ImportRowProcessor processor =
         cells -> {
           if (cells.get(1).equals("a")) {
@@ -273,11 +394,12 @@ class ImportTaskServiceTest {
           return null;
         };
 
-    service.run(TASK_ID, HEADERS, () -> processor, TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> processor, TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.PARTIAL);
     assertThat(readBack(inserted.getFirst().getContent()).get(1))
-        .containsEntry(2, ImportTaskService.ROW_ERROR);
+        .containsEntry(
+            2, messages.getMessage(ImportTaskService.ROW_ERROR, null, Locale.SIMPLIFIED_CHINESE));
   }
 
   @Test
@@ -286,9 +408,9 @@ class ImportTaskServiceTest {
     for (int i = 0; i < 250; i++) {
       rows.add(List.of("", "n" + i));
     }
-    storedInput(workbook(rows));
+    storedInput(workbook(rows), "zh-CN");
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     // RUNNING, progress at 100 and 200, final SUCCESS.
     verify(tasks, times(4)).updateById(any(TaskDO.class));
@@ -299,9 +421,9 @@ class ImportTaskServiceTest {
 
   @Test
   void shouldFailTask_whenStoredFileCannotBeParsed() {
-    storedInput(new byte[] {0x50, 0x4B, 0x03, 0x04, 9, 9});
+    storedInput(new byte[] {0x50, 0x4B, 0x03, 0x04, 9, 9}, "zh-CN");
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getStatus()).isEqualTo(TaskStatus.FAILED);
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_UNREADABLE);
@@ -309,11 +431,11 @@ class ImportTaskServiceTest {
 
   @Test
   void shouldFailTask_whenUnexpectedErrorOccurs() {
-    storedInput(workbook(List.of(List.of("", "a"))));
+    storedInput(workbook(List.of(List.of("", "a"))), "zh-CN");
 
     service.run(
         TASK_ID,
-        HEADERS,
+        headersZh,
         () -> {
           throw new IllegalStateException("cannot create processor");
         },
@@ -325,10 +447,10 @@ class ImportTaskServiceTest {
 
   @Test
   void shouldFailTask_whenInputFileIsMissing() {
-    storedInput(workbook(List.of(List.of("", "a"))));
+    storedInput(workbook(List.of(List.of("", "a"))), "zh-CN");
     when(files.selectOne(any())).thenReturn(null);
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     assertThat(lastUpdate().getMessage()).isEqualTo(ImportTaskService.MESSAGE_UNEXPECTED);
   }
@@ -340,14 +462,25 @@ class ImportTaskServiceTest {
     failed.setStatus(TaskStatus.FAILED);
     when(tasks.selectById(TASK_ID)).thenReturn(failed);
 
-    service.run(TASK_ID, HEADERS, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
+    service.run(TASK_ID, headersZh, () -> cells -> List.of(), TaskType.KOL_IMPORT.maxRows());
 
     verify(tasks, never()).updateById(any(TaskDO.class));
   }
 
   @Test
-  void shouldProduceHeaderOnlyWorkbook_whenTemplateRequested() {
-    List<Map<Integer, String>> rows = readBack(service.template(HEADERS));
+  void shouldProduceChineseTemplate_whenRequestIsChinese() {
+    List<Map<Integer, String>> rows = readBack(service.template(HEADER_KEYS));
     assertThat(rows).singleElement().satisfies(r -> assertThat(r).containsEntry(1, "姓名"));
+  }
+
+  @Test
+  void shouldProduceEnglishTemplate_whenRequestIsEnglish() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    List<Map<Integer, String>> rows = readBack(service.template(HEADER_KEYS));
+    assertThat(rows).singleElement().satisfies(r -> assertThat(r).containsEntry(1, "Name"));
+  }
+
+  private List<String> headersZh_ZH() {
+    return headersZh;
   }
 }

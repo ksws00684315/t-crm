@@ -60,18 +60,22 @@ public class ExcelFiles {
     }
   }
 
+  /** A parsed sheet: the header variant the file matched, and its data rows. */
+  public record SheetData(List<String> matchedHeaders, List<List<String>> rows) {}
+
   /**
-   * Reads the first sheet: the first row must equal {@code headers}; the following non-blank rows
+   * Reads the first sheet: the header row must equal one of {@code headerVariants} exactly (the
+   * Chinese and the English template; mixing languages is a mismatch); the following non-blank rows
    * are returned as trimmed texts padded to the header count (extra columns are ignored).
    *
    * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
    *     TASK_FILE_TOO_MANY_ROWS
    */
-  public List<List<String>> read(byte[] content, List<String> headers, int maxRows) {
+  public SheetData read(byte[] content, List<List<String>> headerVariants, int maxRows) {
     if (maxRows < 1) {
       throw new IllegalArgumentException("maxRows must be positive");
     }
-    RowCollector collector = new RowCollector(headers, maxRows);
+    RowCollector collector = new RowCollector(headerVariants, maxRows);
     try {
       FastExcel.read(new ByteArrayInputStream(content), collector)
           .excelType(ExcelTypeEnum.XLSX)
@@ -91,13 +95,13 @@ public class ExcelFiles {
     if (collector.tooMany) {
       throw new BusinessException(ErrorCode.TASK_FILE_TOO_MANY_ROWS);
     }
-    if (!collector.headerChecked) {
+    if (collector.matched == null) {
       throw new BusinessException(ErrorCode.TASK_FILE_HEADER_MISMATCH);
     }
     if (collector.rows.isEmpty()) {
       throw new BusinessException(ErrorCode.TASK_FILE_EMPTY);
     }
-    return collector.rows;
+    return new SheetData(collector.matched, collector.rows);
   }
 
   /** Writes one sheet with a header row; every cell is escaped against formula injection. */
@@ -133,14 +137,14 @@ public class ExcelFiles {
 
   /** Collects rows; stops reading as soon as the row limit is exceeded. */
   private static final class RowCollector extends AnalysisEventListener<Map<Integer, String>> {
-    private final List<String> headers;
+    private final List<List<String>> headerVariants;
     private final int maxRows;
     private final List<List<String>> rows = new ArrayList<>();
-    private boolean headerChecked;
+    private List<String> matched;
     private boolean tooMany;
 
-    RowCollector(List<String> headers, int maxRows) {
-      this.headers = headers;
+    RowCollector(List<List<String>> headerVariants, int maxRows) {
+      this.headerVariants = headerVariants;
       this.maxRows = maxRows;
     }
 
@@ -150,18 +154,22 @@ public class ExcelFiles {
       while (!actual.isEmpty() && actual.getLast().isEmpty()) {
         actual.removeLast();
       }
-      if (!actual.equals(headers)) {
+      matched =
+          headerVariants.stream()
+              .filter(variant -> actual.equals(variant))
+              .findFirst()
+              .orElse(null);
+      if (matched == null) {
         throw new BusinessException(ErrorCode.TASK_FILE_HEADER_MISMATCH);
       }
-      headerChecked = true;
     }
 
     @Override
     public void invoke(Map<Integer, String> data, AnalysisContext context) {
-      if (!headerChecked) {
+      if (matched == null) {
         throw new BusinessException(ErrorCode.TASK_FILE_HEADER_MISMATCH);
       }
-      List<String> row = cells(data, headers.size());
+      List<String> row = cells(data, matched.size());
       if (row.stream().allMatch(String::isEmpty)) {
         return;
       }

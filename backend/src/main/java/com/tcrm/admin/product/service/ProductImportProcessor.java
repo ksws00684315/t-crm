@@ -17,6 +17,7 @@ import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -33,25 +34,25 @@ import org.springframework.transaction.support.TransactionTemplate;
  * cells on update mean "leave unchanged"; codes are immutable.
  */
 class ProductImportProcessor implements ImportRowProcessor {
-  static final String CODE_FORMAT = "原商品编码格式不正确，应为 1～16 位大写字母、数字、下划线或连字符";
-  static final String CODE_DUPLICATE = "原商品编码在文件中重复";
-  static final String CODE_EXISTS = "原商品编码已存在";
-  static final String CODE_IMMUTABLE = "原商品编码不可修改";
-  static final String SHOP_REQUIRED = "店铺 ID 不能为空";
-  static final String SHOP_FORMAT = "店铺 ID 应为 1～32 位数字";
-  static final String SHOP_MISSING = "店铺不存在或已停用";
-  static final String ITEM_REQUIRED = "微店商品 ID 不能为空";
-  static final String ITEM_FORMAT = "微店商品 ID 应为 1～32 位数字";
-  static final String ITEM_DUPLICATE = "同一店铺下微店商品 ID 在文件中重复";
-  static final String NAME_REQUIRED = "新增时商品名称不能为空";
-  static final String NAME_LENGTH = "商品名称不能超过 200 个字符";
-  static final String CATEGORY_LENGTH = "分类不能超过 64 个字符";
-  static final String IMAGE_FORMAT = "图片地址须为 https 开头，且不超过 512 个字符";
-  static final String PRICE_REQUIRED = "新增时价格不能为空";
-  static final String PRICE_FORMAT = "价格应为非负数字，最多 2 位小数";
-  static final String RATE_FORMAT = "商品佣金比例应为 0～100 的数字，最多 2 位小数";
-  static final String EXCLUSIVE = "该微店商品 ID 已是专属商品，不能登记为原商品";
-  static final String CONFLICT = "数据已被其他操作修改，请重新导入该行";
+  static final String CODE_FORMAT = "import.product.error.code-format";
+  static final String CODE_DUPLICATE = "import.product.error.code-duplicate";
+  static final String CODE_EXISTS = "import.product.error.code-exists";
+  static final String CODE_IMMUTABLE = "import.product.error.code-immutable";
+  static final String SHOP_REQUIRED = "import.product.error.shop-required";
+  static final String SHOP_FORMAT = "import.product.error.shop-format";
+  static final String SHOP_MISSING = "import.product.error.shop-missing";
+  static final String ITEM_REQUIRED = "import.product.error.item-required";
+  static final String ITEM_FORMAT = "import.product.error.item-format";
+  static final String ITEM_DUPLICATE = "import.product.error.item-duplicate";
+  static final String NAME_REQUIRED = "import.product.error.name-required";
+  static final String NAME_LENGTH = "import.product.error.name-length";
+  static final String CATEGORY_LENGTH = "import.product.error.category-length";
+  static final String IMAGE_FORMAT = "import.product.error.image-format";
+  static final String PRICE_REQUIRED = "import.product.error.price-required";
+  static final String PRICE_FORMAT = "import.product.error.price-format";
+  static final String RATE_FORMAT = "import.product.error.rate-format";
+  static final String EXCLUSIVE = "import.product.error.exclusive";
+  static final String CONFLICT = "import.product.error.conflict";
 
   private final Long actorId;
   private final ShopService shops;
@@ -78,36 +79,36 @@ class ProductImportProcessor implements ImportRowProcessor {
   }
 
   @Override
-  public List<String> process(List<String> row) {
-    List<String> errors = new ArrayList<>();
+  public List<ImportReason> process(List<String> row) {
+    List<ImportReason> errors = new ArrayList<>();
     String codeText = CODE.of(row).toUpperCase(Locale.ROOT);
     String code = codeText.isEmpty() ? null : codeText;
     if (code != null) {
       if (!ProductRules.isCode(code)) {
-        errors.add(CODE_FORMAT);
+        errors.add(ImportReason.of(CODE_FORMAT));
       } else if (!seenCodes.add(code)) {
-        errors.add(CODE_DUPLICATE);
+        errors.add(ImportReason.of(CODE_DUPLICATE));
       }
     }
     String shopWeidian = SHOP_ID.of(row);
     ShopDO shop = null;
     if (shopWeidian.isEmpty()) {
-      errors.add(SHOP_REQUIRED);
+      errors.add(ImportReason.of(SHOP_REQUIRED));
     } else if (!ProductRules.isWeidianId(shopWeidian)) {
-      errors.add(SHOP_FORMAT);
+      errors.add(ImportReason.of(SHOP_FORMAT));
     } else {
       shop = shops.findEnabledByWeidianId(shopWeidian);
       if (shop == null) {
-        errors.add(SHOP_MISSING);
+        errors.add(ImportReason.of(SHOP_MISSING));
       }
     }
     String itemId = WEIDIAN_ITEM_ID.of(row);
     if (itemId.isEmpty()) {
-      errors.add(ITEM_REQUIRED);
+      errors.add(ImportReason.of(ITEM_REQUIRED));
     } else if (!ProductRules.isWeidianId(itemId)) {
-      errors.add(ITEM_FORMAT);
+      errors.add(ImportReason.of(ITEM_FORMAT));
     } else if (shop != null && !seenShopItems.add(shop.getId() + ":" + itemId)) {
-      errors.add(ITEM_DUPLICATE);
+      errors.add(ImportReason.of(ITEM_DUPLICATE));
     }
     String name = NAME.of(row);
     String category = CATEGORY.of(row);
@@ -115,29 +116,29 @@ class ProductImportProcessor implements ImportRowProcessor {
     String priceText = PRICE.of(row);
     String rateText = RATE.of(row);
     if (!category.isEmpty() && ProductRules.length(category) > ProductRules.MAX_CATEGORY) {
-      errors.add(CATEGORY_LENGTH);
+      errors.add(ImportReason.of(CATEGORY_LENGTH));
     }
     if (!image.isEmpty()
         && (ProductRules.length(image) > ProductRules.MAX_IMAGE_URL
             || !ProductRules.isHttpsUrl(image))) {
-      errors.add(IMAGE_FORMAT);
+      errors.add(ImportReason.of(IMAGE_FORMAT));
     }
     BigDecimal price = null;
     if (!priceText.isEmpty()) {
       price = ProductRules.parsePrice(priceText);
       if (price == null) {
-        errors.add(PRICE_FORMAT);
+        errors.add(ImportReason.of(PRICE_FORMAT));
       }
     }
     BigDecimal rate = null;
     if (!rateText.isEmpty()) {
       rate = ProductRules.percentToRate(rateText);
       if (rate == null) {
-        errors.add(RATE_FORMAT);
+        errors.add(ImportReason.of(RATE_FORMAT));
       }
     }
     if (!name.isEmpty() && ProductRules.length(name) > ProductRules.MAX_NAME) {
-      errors.add(NAME_LENGTH);
+      errors.add(ImportReason.of(NAME_LENGTH));
     }
     if (!errors.isEmpty()
         || shop == null
@@ -159,17 +160,17 @@ class ProductImportProcessor implements ImportRowProcessor {
     } catch (BusinessException e) {
       return List.of(
           switch (e.getErrorCode()) {
-            case PRODUCT_CODE_EXISTS -> CODE_EXISTS;
-            case PRODUCT_CODE_IMMUTABLE -> CODE_IMMUTABLE;
-            case PRODUCT_IS_EXCLUSIVE_ITEM -> EXCLUSIVE;
-            case PRODUCT_WEIDIAN_ID_EXISTS -> ITEM_DUPLICATE;
-            case COMMON_CONFLICT -> CONFLICT;
+            case PRODUCT_CODE_EXISTS -> ImportReason.of(CODE_EXISTS);
+            case PRODUCT_CODE_IMMUTABLE -> ImportReason.of(CODE_IMMUTABLE);
+            case PRODUCT_IS_EXCLUSIVE_ITEM -> ImportReason.of(EXCLUSIVE);
+            case PRODUCT_WEIDIAN_ID_EXISTS -> ImportReason.of(ITEM_DUPLICATE);
+            case COMMON_CONFLICT -> ImportReason.of(CONFLICT);
             default -> throw e;
           });
     }
   }
 
-  private List<String> insert(
+  private List<ImportReason> insert(
       ShopDO shop,
       String itemId,
       String code,
@@ -178,18 +179,18 @@ class ProductImportProcessor implements ImportRowProcessor {
       String image,
       BigDecimal price,
       BigDecimal rate,
-      List<String> errors) {
+      List<ImportReason> errors) {
     if (name.isEmpty()) {
-      errors.add(NAME_REQUIRED);
+      errors.add(ImportReason.of(NAME_REQUIRED));
     }
     if (price == null) {
-      errors.add(PRICE_REQUIRED);
+      errors.add(ImportReason.of(PRICE_REQUIRED));
     }
     if (code != null && products.existsCode(code)) {
-      errors.add(CODE_EXISTS);
+      errors.add(ImportReason.of(CODE_EXISTS));
     }
     if (kolItems.existsCurrentShopItem(shop.getId(), itemId)) {
-      errors.add(EXCLUSIVE);
+      errors.add(ImportReason.of(EXCLUSIVE));
     }
     if (!errors.isEmpty()) {
       return errors;
@@ -234,7 +235,7 @@ class ProductImportProcessor implements ImportRowProcessor {
     }
   }
 
-  private List<String> update(
+  private List<ImportReason> update(
       ProductDO existing,
       String code,
       String name,
@@ -242,9 +243,9 @@ class ProductImportProcessor implements ImportRowProcessor {
       String image,
       BigDecimal price,
       BigDecimal rate,
-      List<String> errors) {
+      List<ImportReason> errors) {
     if (code != null && !code.equals(existing.getProductCode())) {
-      errors.add(CODE_IMMUTABLE);
+      errors.add(ImportReason.of(CODE_IMMUTABLE));
     }
     if (!errors.isEmpty()) {
       return errors;

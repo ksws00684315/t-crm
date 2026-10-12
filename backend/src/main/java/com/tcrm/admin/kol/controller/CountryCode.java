@@ -10,12 +10,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** ISO 3166-1 alpha-2 country code, case-insensitive; null is valid (combine with NotBlank). */
+/**
+ * ISO 3166-1 alpha-2 country code, case-insensitive; null is valid (combine with NotBlank). The
+ * message template is resolved per request language from ValidationMessages*.properties.
+ */
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = CountryCode.Validator.class)
 public @interface CountryCode {
-  String message() default "must be an ISO 3166-1 alpha-2 country code";
+  String message() default "{tcrm.constraint.country-code}";
 
   Class<?>[] groups() default {};
 

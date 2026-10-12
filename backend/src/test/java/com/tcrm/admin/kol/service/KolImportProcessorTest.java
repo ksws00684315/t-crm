@@ -19,6 +19,7 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.task.api.ImportReason;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -110,10 +111,10 @@ class KolImportProcessorTest {
   void shouldReportBd_whenUsernameIsUnknownOrNotUsable() {
     var p = processor(false);
     assertThat(p.process(row("", "A", "a@x.io", "CN", "ghost")))
-        .containsExactly(KolImportProcessor.BD_INVALID);
+        .containsExactly(ImportReason.of(KolImportProcessor.BD_INVALID));
     when(bdUsers.getByUsername("ops")).thenReturn(new BdUserDTO(2L, "ops", "Ops", false));
     assertThat(p.process(row("", "A", "b@x.io", "CN", "ops")))
-        .containsExactly(KolImportProcessor.BD_INVALID);
+        .containsExactly(ImportReason.of(KolImportProcessor.BD_INVALID));
     verify(writer, never()).insert(any(), any(), any());
   }
 
@@ -124,14 +125,14 @@ class KolImportProcessorTest {
             processor(false)
                 .process(row("K1", "", "bad", "XX", "", "101", "TikTok", "", "-1", longText)))
         .containsExactly(
-            KolImportProcessor.CODE_FORMAT,
-            KolImportProcessor.NAME_REQUIRED,
-            KolImportProcessor.EMAIL_FORMAT,
-            KolImportProcessor.COUNTRY_FORMAT,
-            KolImportProcessor.RATE_FORMAT,
-            KolImportProcessor.SOCIAL_PAIR,
-            KolImportProcessor.FOLLOWERS_FORMAT,
-            KolImportProcessor.REMARK_LENGTH);
+            ImportReason.of(KolImportProcessor.CODE_FORMAT),
+            ImportReason.of(KolImportProcessor.NAME_REQUIRED),
+            ImportReason.of(KolImportProcessor.EMAIL_FORMAT),
+            ImportReason.of(KolImportProcessor.COUNTRY_FORMAT),
+            ImportReason.of(KolImportProcessor.RATE_FORMAT),
+            ImportReason.of(KolImportProcessor.SOCIAL_PAIR),
+            ImportReason.of(KolImportProcessor.FOLLOWERS_FORMAT),
+            ImportReason.of(KolImportProcessor.REMARK_LENGTH));
     verify(writer, never()).insert(any(), any(), any());
   }
 
@@ -140,16 +141,16 @@ class KolImportProcessorTest {
     var p = processor(false);
     assertThat(p.process(row("", "x".repeat(65), "", "")))
         .containsExactly(
-            KolImportProcessor.NAME_LENGTH,
-            KolImportProcessor.EMAIL_REQUIRED,
-            KolImportProcessor.COUNTRY_REQUIRED);
+            ImportReason.of(KolImportProcessor.NAME_LENGTH),
+            ImportReason.of(KolImportProcessor.EMAIL_REQUIRED),
+            ImportReason.of(KolImportProcessor.COUNTRY_REQUIRED));
     String longEmail = "a".repeat(120) + "@example.com";
     assertThat(p.process(row("", "A", longEmail, "USA", "", "", "p".repeat(33), "h".repeat(129))))
         .containsExactly(
-            KolImportProcessor.EMAIL_LENGTH,
-            KolImportProcessor.COUNTRY_FORMAT,
-            KolImportProcessor.PLATFORM_LENGTH,
-            KolImportProcessor.HANDLE_LENGTH);
+            ImportReason.of(KolImportProcessor.EMAIL_LENGTH),
+            ImportReason.of(KolImportProcessor.COUNTRY_FORMAT),
+            ImportReason.of(KolImportProcessor.PLATFORM_LENGTH),
+            ImportReason.of(KolImportProcessor.HANDLE_LENGTH));
   }
 
   @Test
@@ -176,9 +177,9 @@ class KolImportProcessorTest {
   @Test
   void shouldRejectFollowers_whenHandleIsEmpty() {
     assertThat(processor(false).process(row("", "A", "a@x.io", "US", "", "", "", "", "10")))
-        .containsExactly(KolImportProcessor.FOLLOWERS_WITHOUT_HANDLE);
+        .containsExactly(ImportReason.of(KolImportProcessor.FOLLOWERS_WITHOUT_HANDLE));
     assertThat(processor(false).process(row("", "A", "a@x.io", "US", "", "", "", "@a")))
-        .containsExactly(KolImportProcessor.SOCIAL_PAIR);
+        .containsExactly(ImportReason.of(KolImportProcessor.SOCIAL_PAIR));
   }
 
   @Test
@@ -186,9 +187,11 @@ class KolImportProcessorTest {
     var p = processor(false);
     assertThat(p.process(row("KOL0100", "A", "a@x.io", "US"))).isEmpty();
     assertThat(p.process(row("kol0100", "B", "A@X.IO", "US")))
-        .containsExactly(KolImportProcessor.CODE_DUPLICATE, KolImportProcessor.EMAIL_DUPLICATE);
+        .containsExactly(
+            ImportReason.of(KolImportProcessor.CODE_DUPLICATE),
+            ImportReason.of(KolImportProcessor.EMAIL_DUPLICATE));
     assertThat(p.process(row("KOL0100", "C", "c@x.io", "US")))
-        .containsExactly(KolImportProcessor.CODE_DUPLICATE);
+        .containsExactly(ImportReason.of(KolImportProcessor.CODE_DUPLICATE));
   }
 
   @Test
@@ -196,7 +199,9 @@ class KolImportProcessorTest {
     when(kols.existsCode("KOL0100")).thenReturn(true);
     when(kols.selectCount(any())).thenReturn(1L);
     assertThat(processor(false).process(row("KOL0100", "A", "a@x.io", "US")))
-        .containsExactly(KolImportProcessor.CODE_EXISTS, KolImportProcessor.EMAIL_EXISTS);
+        .containsExactly(
+            ImportReason.of(KolImportProcessor.CODE_EXISTS),
+            ImportReason.of(KolImportProcessor.EMAIL_EXISTS));
   }
 
   @Test
@@ -207,9 +212,9 @@ class KolImportProcessorTest {
         .thenThrow(new BusinessException(ErrorCode.COMMON_CONFLICT));
     var p = processor(false);
     assertThat(p.process(row("", "A", "a@x.io", "US")))
-        .containsExactly(KolImportProcessor.EMAIL_EXISTS);
+        .containsExactly(ImportReason.of(KolImportProcessor.EMAIL_EXISTS));
     assertThat(p.process(row("", "A", "b@x.io", "US")))
-        .containsExactly(KolImportProcessor.CODE_EXISTS);
+        .containsExactly(ImportReason.of(KolImportProcessor.CODE_EXISTS));
     assertThatThrownBy(() -> p.process(row("", "A", "c@x.io", "US")))
         .isInstanceOf(BusinessException.class);
   }

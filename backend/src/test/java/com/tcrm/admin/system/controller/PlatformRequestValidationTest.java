@@ -6,10 +6,29 @@ import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.util.Locale;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/**
+ * The plain Jakarta validator (no Spring request context) captures the JVM default locale when the
+ * factory is built; pin English before instantiation so the assertions hold on any machine.
+ */
 class PlatformRequestValidationTest {
+  private static Locale originalDefault;
   private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+  @BeforeAll
+  static void useEnglish() {
+    originalDefault = Locale.getDefault();
+    Locale.setDefault(Locale.ENGLISH);
+  }
+
+  @AfterAll
+  static void restoreLocale() {
+    Locale.setDefault(originalDefault);
+  }
 
   @Test
   void shouldRejectPlatformRole_andKeepCompanyRoles() {
