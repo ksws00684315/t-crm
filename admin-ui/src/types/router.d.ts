@@ -17,5 +17,12 @@ declare module "vue-router" {
     menuGroup?: boolean;
     /** Hide from the menu when the signed-in operator has OWN data scope (task 05). */
     hideForOwn?: boolean;
+    /**
+     * SFC `name` of the page component. KeepAlive include matches this, not the route name.
+     * Required for every page that opens a tab.
+     */
+    componentName?: string;
+    /** Logged-in page that must not open a tab (403). */
+    noTab?: boolean;
   }
 }

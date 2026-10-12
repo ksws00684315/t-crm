@@ -174,6 +174,15 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  tabs: {
+    close: "Close",
+    closeOthers: "Close others",
+    closeLeft: "Close left",
+    closeRight: "Close right",
+    closeAll: "Close all",
+    refresh: "Refresh current page",
+    more: "Tab actions"
+  },
   theme: {
     cycle: "Switch theme",
     light: "Light",

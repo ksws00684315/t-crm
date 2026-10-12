@@ -177,6 +177,15 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  tabs: {
+    close: "关闭",
+    closeOthers: "关闭其他",
+    closeLeft: "关闭左侧",
+    closeRight: "关闭右侧",
+    closeAll: "关闭全部",
+    refresh: "刷新当前页",
+    more: "标签操作"
+  },
   theme: {
     cycle: "切换主题",
     light: "浅色",

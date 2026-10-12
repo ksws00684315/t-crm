@@ -23,14 +23,20 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.home",
           icon: "HomeFilled",
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+          componentName: "HomePage"
         }
       },
       {
         path: "platform/tenants",
         name: "PlatformTenants",
         component: () => import("@/views/platform/tenant/index.vue"),
-        meta: { title: "route.tenants", icon: "OfficeBuilding", roles: ["PLATFORM_ADMIN"] }
+        meta: {
+          title: "route.tenants",
+          icon: "OfficeBuilding",
+          roles: ["PLATFORM_ADMIN"],
+          componentName: "PlatformTenantPage"
+        }
       },
       {
         path: "kol/kols",
@@ -39,7 +45,8 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.kols",
           icon: "Avatar",
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+          componentName: "KolListPage"
         }
       },
       {
@@ -59,7 +66,8 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/product/shop/index.vue"),
             meta: {
               title: "route.shops",
-              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              componentName: "ShopListPage"
             }
           },
           {
@@ -68,7 +76,8 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/product/product/index.vue"),
             meta: {
               title: "route.product",
-              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              componentName: "ProductListPage"
             }
           },
           {
@@ -78,7 +87,8 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.mappings",
               roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
-              hideForOwn: true
+              hideForOwn: true,
+              componentName: "KolItemListPage"
             }
           }
         ]
@@ -87,25 +97,40 @@ export const routes: RouteRecordRaw[] = [
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),
-        meta: { title: "route.users", icon: "UserFilled", roles: ["SUPER_ADMIN"] }
+        meta: {
+          title: "route.users",
+          icon: "UserFilled",
+          roles: ["SUPER_ADMIN"],
+          componentName: "SystemUserPage"
+        }
       },
       {
         path: "system/oper-logs",
         name: "SystemOperLogs",
         component: () => import("@/views/system/oper-log/index.vue"),
-        meta: { title: "route.auditLogs", icon: "Document", roles: ["SUPER_ADMIN"] }
+        meta: {
+          title: "route.auditLogs",
+          icon: "Document",
+          roles: ["SUPER_ADMIN"],
+          componentName: "SystemOperLogPage"
+        }
       },
       {
         path: "account/password",
         name: "AccountPassword",
         component: () => import("@/views/account/password.vue"),
-        meta: { title: "route.password", hideInMenu: true }
+        meta: { title: "route.password", hideInMenu: true, componentName: "AccountPasswordPage" }
       },
       {
         path: "403",
         name: "Forbidden",
         component: () => import("@/views/error/403.vue"),
-        meta: { title: "route.forbidden", hideInMenu: true }
+        meta: {
+          title: "route.forbidden",
+          hideInMenu: true,
+          componentName: "ForbiddenPage",
+          noTab: true
+        }
       }
     ]
   },

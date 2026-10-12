@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowDown, Expand, Fold, FullScreen, Refresh, Search } from "@element-plus/icons-vue";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
@@ -8,9 +8,11 @@ import { translate } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import { useMenuSearchStore } from "@/stores/menu-search";
+import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
-import { buildMenu, roleLabel } from "@/utils/permission";
+import { buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
+import { affixFor } from "@/utils/tabs";
 import {
   isMacPlatform,
   loadSidebarCollapsed,
@@ -18,6 +20,7 @@ import {
   subscribeNarrow
 } from "@/utils/sidebar";
 import SideMenu from "./SideMenu.vue";
+import TabBar from "./TabBar.vue";
 
 defineOptions({ name: "AppLayout" });
 
@@ -28,11 +31,11 @@ const user = useUserStore();
 const localeStore = useLocaleStore();
 const theme = useThemeStore();
 const menuSearch = useMenuSearchStore();
+const tabs = useTabsStore();
 
 const collapsed = ref(loadSidebarCollapsed());
 const narrow = ref(false);
 const drawerOpen = ref(false);
-const viewKey = ref(0);
 const fullscreenOn = ref(false);
 const fullscreenEnabled = ref(
   typeof document !== "undefined" && document.fullscreenEnabled === true
@@ -79,7 +82,7 @@ function toggleSidebar(): void {
 }
 
 function refreshPage(): void {
-  viewKey.value += 1;
+  tabs.refresh(route.path);
 }
 
 function toggleFullscreen(): void {
@@ -99,10 +102,33 @@ async function onCommand(command: string) {
   if (command === "password") {
     await router.push("/account/password");
   } else if (command === "logout") {
+    tabs.reset();
     await user.logout();
     await router.replace("/login");
   }
 }
+
+tabs.restore(affixFor(user.roles.includes("PLATFORM_ADMIN")), path => {
+  const resolved = router.resolve(path);
+  return canAccessRoute(resolved.meta, user.roles, user.user?.dataScope);
+});
+
+watch(
+  () => route.path,
+  () => {
+    const componentName = route.meta.componentName;
+    const titleKey = route.meta.title;
+    if (!componentName || !titleKey || route.meta.noTab) return;
+    const affix = affixFor(user.roles.includes("PLATFORM_ADMIN"));
+    tabs.open({
+      path: route.path,
+      titleKey,
+      affix: route.path === affix.path,
+      componentName
+    });
+  },
+  { immediate: true }
+);
 
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
@@ -211,9 +237,12 @@ onBeforeUnmount(() => {
           </el-dropdown>
         </div>
       </el-header>
+      <TabBar />
       <el-main class="layout__main">
         <RouterView v-slot="{ Component }">
-          <component :is="Component" :key="viewKey" />
+          <KeepAlive :include="tabs.include">
+            <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
+          </KeepAlive>
         </RouterView>
       </el-main>
     </el-container>
