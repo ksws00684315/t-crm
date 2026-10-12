@@ -177,6 +177,10 @@ const zhCN = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  copy: {
+    done: "已复制 {text}",
+    failed: "复制失败，请手动复制"
+  },
   search: {
     expand: "展开",
     collapse: "收起",

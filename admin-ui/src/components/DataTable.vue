@@ -23,12 +23,14 @@ export interface DataColumn {
   minWidth?: number | string;
   mono?: boolean;
   amount?: boolean;
+  /** Keeps the previous overflow tooltip on long remark and request columns. */
+  tooltip?: boolean;
 }
 
 const props = withDefaults(
   defineProps<{
     tableId: string;
-    rows: readonly Record<string, unknown>[];
+    rows: readonly object[];
     columns: DataColumn[];
     loading?: boolean;
     total: number;
@@ -38,8 +40,10 @@ const props = withDefaults(
     paged?: boolean;
     filterCount?: number;
     rowKey?: string;
+    /** Drawers and dialogs keep the table rules without the list toolbar. */
+    plain?: boolean;
   }>(),
-  { loading: false, page: 1, size: 20, paged: true, filterCount: 0, rowKey: "id" }
+  { loading: false, page: 1, size: 20, paged: true, filterCount: 0, rowKey: "id", plain: false }
 );
 
 const emit = defineEmits<{
@@ -165,8 +169,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
 </script>
 
 <template>
-  <section class="data-table" :class="{ 'is-fullscreen': fullscreen }">
-    <header class="data-table__toolbar">
+  <section class="data-table" :class="{ 'is-fullscreen': fullscreen, 'is-plain': plain }">
+    <header v-if="!plain" class="data-table__toolbar">
       <span class="data-table__total">{{ t("table.total", { total }) }}</span>
       <div class="data-table__tools">
         <el-segmented
@@ -244,6 +248,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
             column.key === 'actions' ? 'right' : column.key === columns[0]?.key ? 'left' : undefined
           "
           :align="column.amount ? 'right' : undefined"
+          :show-overflow-tooltip="column.tooltip"
           :class-name="column.mono ? 'tcrm-mono' : column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
@@ -295,6 +300,13 @@ function canMove(index: number, delta: -1 | 1): boolean {
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.data-table.is-plain {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 .data-table.is-fullscreen {
   position: fixed;

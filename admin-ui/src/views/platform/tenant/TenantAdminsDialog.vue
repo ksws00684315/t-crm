@@ -10,6 +10,8 @@ import {
   type TenantAdminVO,
   type TenantVO
 } from "@/api/platform/tenant";
+import CopyText from "@/components/CopyText.vue";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
@@ -31,6 +33,19 @@ const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>
 const title = computed(() => t("tenantAdmin.title", { name: props.tenant?.name ?? "" }));
 const loading = ref(false);
 const rows = ref<TenantAdminVO[]>([]);
+
+function asAdmin(row: object): TenantAdminVO {
+  return row as TenantAdminVO;
+}
+
+const columns = computed<DataColumn[]>(() => [
+  { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
+  { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
+  { key: "email", label: t("common.email"), minWidth: 180, mono: true },
+  { key: "status", label: t("common.status"), width: 90 },
+  { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180, mono: true },
+  { key: "actions", label: t("common.actions"), width: 110 }
+]);
 const createVisible = ref(false);
 const resetVisible = ref(false);
 const resettingAdmin = ref<TenantAdminVO | null>(null);
@@ -155,30 +170,28 @@ async function submitReset() {
     <div class="actions">
       <el-button type="primary" @click="openCreate">{{ t("tenantAdmin.create") }}</el-button>
     </div>
-    <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="username" :label="t('common.username')" min-width="130" />
-      <el-table-column prop="nickname" :label="t('common.nickname')" min-width="120" />
-      <el-table-column prop="email" :label="t('common.email')" min-width="180" />
-      <el-table-column :label="t('common.status')" width="90">
-        <template #default="{ row }">
-          <el-tag :type="(row as TenantAdminVO).status === 1 ? 'success' : 'info'">
-            {{ (row as TenantAdminVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('tenantAdmin.lastLogin')" width="180">
-        <template #default="{ row }">
-          {{ formatInstant((row as TenantAdminVO).lastLoginTime) }}
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('common.actions')" width="110" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="warning" @click="openReset(row as TenantAdminVO)">
-            {{ t("tenantAdmin.resetPassword") }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <DataTable
+      plain
+      table-id="tenant-admins"
+      :rows="rows"
+      :columns="columns"
+      :loading="loading"
+      :total="rows.length"
+      :paged="false"
+    >
+      <template #cell-email="{ row }"><CopyText :value="asAdmin(row).email" /></template>
+      <template #cell-status="{ row }">
+        <el-tag :type="asAdmin(row).status === 1 ? 'success' : 'info'">
+          {{ asAdmin(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
+        </el-tag>
+      </template>
+      <template #cell-lastLogin="{ row }">{{ formatInstant(asAdmin(row).lastLoginTime) }}</template>
+      <template #actions="{ row }">
+        <el-button v-if="asAdmin(row).id" link type="warning" @click="openReset(asAdmin(row))">
+          {{ t("tenantAdmin.resetPassword") }}
+        </el-button>
+      </template>
+    </DataTable>
     <template #footer>
       <el-button @click="close">{{ t("common.close") }}</el-button>
     </template>

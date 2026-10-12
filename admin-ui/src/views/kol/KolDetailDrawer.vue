@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getKol } from "@/api/kol/kol";
 import type { BdHistoryVO, KolDetailVO } from "@/api/types";
+import CopyText from "@/components/CopyText.vue";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { formatRate } from "@/utils/rate";
@@ -37,6 +39,16 @@ watch(
 function bdName(row: BdHistoryVO): string {
   return row.bdUserName ?? (row.bdUserId ? row.bdUserId : t("common.unassigned"));
 }
+
+function asHistory(row: object): BdHistoryVO {
+  return row as BdHistoryVO;
+}
+
+const historyColumns = computed<DataColumn[]>(() => [
+  { key: "bd", label: t("kol.bdColumn"), minWidth: 120 },
+  { key: "startedAt", label: t("kol.startedAt"), width: 170, mono: true },
+  { key: "endedAt", label: t("kol.endedAt"), width: 170, mono: true }
+]);
 </script>
 
 <template>
@@ -49,9 +61,13 @@ function bdName(row: BdHistoryVO): string {
     <div v-loading="loading">
       <template v-if="detail">
         <el-descriptions :column="1" border>
-          <el-descriptions-item :label="t('kol.code')">{{ detail.kolCode }}</el-descriptions-item>
+          <el-descriptions-item :label="t('kol.code')">
+            <CopyText :value="detail.kolCode" />
+          </el-descriptions-item>
           <el-descriptions-item :label="t('common.name')">{{ detail.name }}</el-descriptions-item>
-          <el-descriptions-item :label="t('common.email')">{{ detail.email }}</el-descriptions-item>
+          <el-descriptions-item :label="t('common.email')">
+            <CopyText :value="detail.email" />
+          </el-descriptions-item>
           <el-descriptions-item :label="t('common.country')">{{
             detail.country
           }}</el-descriptions-item>
@@ -74,6 +90,7 @@ function bdName(row: BdHistoryVO): string {
               <a v-if="account.url" :href="account.url" target="_blank" rel="noopener noreferrer">
                 {{ t("kol.homepage") }}
               </a>
+              <CopyText v-if="account.url" :value="account.url" />
             </div>
           </el-descriptions-item>
           <el-descriptions-item :label="t('common.remark')">{{
@@ -84,25 +101,22 @@ function bdName(row: BdHistoryVO): string {
           </el-descriptions-item>
         </el-descriptions>
         <h4 class="title">{{ t("kol.bdHistory") }}</h4>
-        <el-table :data="detail.bdHistory" border size="small">
-          <el-table-column :label="t('kol.bdColumn')" min-width="120">
-            <template #default="{ row }">{{ bdName(row as BdHistoryVO) }}</template>
-          </el-table-column>
-          <el-table-column :label="t('kol.startedAt')" width="170">
-            <template #default="{ row }">
-              {{ formatInstant((row as BdHistoryVO).startTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column :label="t('kol.endedAt')" width="170">
-            <template #default="{ row }">
-              {{
-                (row as BdHistoryVO).endTime
-                  ? formatInstant((row as BdHistoryVO).endTime)
-                  : t("kol.current")
-              }}
-            </template>
-          </el-table-column>
-        </el-table>
+        <DataTable
+          plain
+          table-id="kol-bd-history"
+          :rows="detail.bdHistory"
+          :columns="historyColumns"
+          :total="detail.bdHistory.length"
+          :paged="false"
+        >
+          <template #cell-bd="{ row }">{{ bdName(asHistory(row)) }}</template>
+          <template #cell-startedAt="{ row }">{{
+            formatInstant(asHistory(row).startTime)
+          }}</template>
+          <template #cell-endedAt="{ row }">
+            {{ asHistory(row).endTime ? formatInstant(asHistory(row).endTime) : t("kol.current") }}
+          </template>
+        </DataTable>
       </template>
     </div>
   </el-drawer>

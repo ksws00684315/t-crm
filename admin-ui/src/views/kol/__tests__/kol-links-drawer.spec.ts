@@ -1,9 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage } from "element-plus";
+import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as linkApi from "@/api/link/link";
 import { i18n } from "@/locales";
 import type { LinkVO } from "@/api/types";
+import { truncateCopy } from "@/utils/copy";
 import KolLinksDrawer from "../KolLinksDrawer.vue";
 
 vi.mock("@/api/link/link");
@@ -46,7 +48,16 @@ async function mountDrawer() {
   });
   await wrapper.setProps({ modelValue: true });
   await flushPromises();
+  await nextTick();
+  await nextTick();
   return wrapper;
+}
+
+function linkCopy(wrapper: ReturnType<typeof mount>, url: string) {
+  const row = wrapper.findAll("tr").find(item => item.text().includes(url));
+  if (!row) throw new Error(`row not found for ${url}`);
+  const copies = row.findAll('[data-test="copy"]');
+  return copies[copies.length - 1];
 }
 
 describe("KOL links drawer", () => {
@@ -76,10 +87,10 @@ describe("KOL links drawer", () => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const wrapper = await mountDrawer();
-    await wrapper.findAll('[data-test="copy"]')[0].trigger("click");
+    await linkCopy(wrapper, available.linkUrl).trigger("click");
     await flushPromises();
     expect(writeText).toHaveBeenCalledWith("https://t.example.com/t/KOL0001/P000001");
-    expect(ElMessage.success).toHaveBeenCalledWith("已复制链接");
+    expect(ElMessage.success).toHaveBeenCalledWith(`已复制 ${truncateCopy(available.linkUrl)}`);
   });
 
   it("reports a failed copy", async () => {
@@ -87,9 +98,9 @@ describe("KOL links drawer", () => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
     const wrapper = await mountDrawer();
-    await wrapper.findAll('[data-test="copy"]')[1].trigger("click");
+    await linkCopy(wrapper, unavailable.linkUrl).trigger("click");
     await flushPromises();
-    expect(ElMessage.error).toHaveBeenCalledWith("复制失败，请手动选择链接复制");
+    expect(ElMessage.error).toHaveBeenCalledWith("复制失败，请手动复制");
   });
 
   it("filters by exact product code from the first page", async () => {

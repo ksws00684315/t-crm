@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listLinks } from "@/api/link/link";
 import type { LinkVO } from "@/api/types";
+import CopyText from "@/components/CopyText.vue";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { notifyError } from "@/utils/notify";
+import { readPageSize } from "@/utils/table-prefs";
 
 defineOptions({ name: "KolLinksDrawer" });
 
@@ -22,7 +24,20 @@ const title = computed(() => {
 const loading = ref(false);
 const rows = ref<LinkVO[]>([]);
 const total = ref(0);
-const query = reactive({ page: 1, size: 20, productCode: "" });
+const query = reactive({ page: 1, size: readPageSize("kol-links", 20), productCode: "" });
+
+function asLink(row: object): LinkVO {
+  return row as LinkVO;
+}
+
+const columns = computed<DataColumn[]>(() => [
+  { key: "productCode", label: t("link.productCode"), width: 140, mono: true },
+  { key: "productName", label: t("link.productName"), prop: "productName", minWidth: 120 },
+  { key: "weidianItemId", label: t("link.exclusiveId"), width: 150, mono: true },
+  { key: "linkUrl", label: t("link.trackingLink"), minWidth: 260, mono: true },
+  { key: "status", label: t("common.status"), width: 150 },
+  { key: "clicks", label: t("link.clicks"), width: 130 }
+]);
 
 async function load() {
   if (!props.kolCode) return;
@@ -53,6 +68,15 @@ function reset() {
   search();
 }
 
+function onPage(page: number): void {
+  query.page = page;
+  void load();
+}
+
+function onSize(size: number): void {
+  query.size = size;
+}
+
 watch(
   () => [props.modelValue, props.kolCode] as const,
   ([open, code]) => {
@@ -74,15 +98,6 @@ function reasonText(row: LinkVO): string {
     })
     .join(t("link.separator"));
 }
-
-async function copy(row: LinkVO) {
-  try {
-    await navigator.clipboard.writeText(row.linkUrl);
-    ElMessage.success(t("link.copied"));
-  } catch {
-    ElMessage.error(t("link.copyFailed"));
-  }
-}
 </script>
 
 <template>
@@ -92,7 +107,7 @@ async function copy(row: LinkVO) {
     size="960px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form :inline="true" :model="query" @submit.prevent>
+    <el-form :inline="true" :model="query" @submit.prevent="search">
       <el-form-item :label="t('link.productCode')">
         <el-input
           v-model="query.productCode"
@@ -100,69 +115,52 @@ async function copy(row: LinkVO) {
           maxlength="32"
           :placeholder="t('link.exact')"
           data-test="link-product-code"
-          @keyup.enter="search"
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" data-test="link-search" @click="search">{{
+        <el-button type="primary" data-test="link-search" native-type="submit">{{
           t("common.search")
         }}</el-button>
-        <el-button @click="reset">{{ t("common.reset") }}</el-button>
+        <el-button native-type="button" @click="reset">{{ t("common.reset") }}</el-button>
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="loading" :data="rows" row-key="kolItemId" border>
-      <el-table-column prop="productCode" :label="t('link.productCode')" width="120" />
-      <el-table-column prop="productName" :label="t('link.productName')" min-width="120" />
-      <el-table-column prop="weidianItemId" :label="t('link.exclusiveId')" width="130" />
-      <el-table-column :label="t('link.trackingLink')" min-width="260">
-        <template #default="{ row }">
-          <span class="link">{{ (row as LinkVO).linkUrl }}</span>
-          <el-button link type="primary" data-test="copy" @click="copy(row as LinkVO)">
-            {{ t("common.copy") }}
-          </el-button>
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('common.status')" width="150">
-        <template #default="{ row }">
-          <el-tag v-if="(row as LinkVO).available" type="success" data-test="status">{{
-            t("link.available")
-          }}</el-tag>
-          <el-tooltip v-else :content="reasonText(row as LinkVO)" placement="top">
-            <el-tag type="danger" data-test="status">{{
-              t("link.unavailable", { reason: reasonText(row as LinkVO) })
-            }}</el-tag>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('link.clicks')" width="130">
-        <template #default="{ row }">
-          {{ (row as LinkVO).clicks30d }} / {{ (row as LinkVO).validClicks30d }}
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination
-      v-model:current-page="query.page"
-      v-model:page-size="query.size"
-      class="pager"
-      background
-      layout="total, sizes, prev, pager, next"
-      :page-sizes="[10, 20, 50, 100]"
+    <DataTable
+      plain
+      table-id="kol-links"
+      row-key="kolItemId"
+      :rows="rows"
+      :columns="columns"
+      :loading="loading"
       :total="total"
-      @current-change="load"
-      @size-change="search"
-    />
+      :page="query.page"
+      :size="query.size"
+      @update:page="onPage"
+      @update:size="onSize"
+      @refresh="load"
+    >
+      <template #cell-productCode="{ row }">
+        <CopyText :value="asLink(row).productCode" />
+      </template>
+      <template #cell-weidianItemId="{ row }">
+        <CopyText :value="asLink(row).weidianItemId" />
+      </template>
+      <template #cell-linkUrl="{ row }">
+        <CopyText :value="asLink(row).linkUrl" />
+      </template>
+      <template #cell-status="{ row }">
+        <el-tag v-if="asLink(row).available" type="success" data-test="status">{{
+          t("link.available")
+        }}</el-tag>
+        <el-tooltip v-else :content="reasonText(asLink(row))" placement="top">
+          <el-tag type="danger" data-test="status">{{
+            t("link.unavailable", { reason: reasonText(asLink(row)) })
+          }}</el-tag>
+        </el-tooltip>
+      </template>
+      <template #cell-clicks="{ row }">
+        {{ asLink(row).clicks30d }} / {{ asLink(row).validClicks30d }}
+      </template>
+    </DataTable>
   </el-drawer>
 </template>
-
-<style scoped>
-.link {
-  margin-right: 8px;
-  word-break: break-all;
-}
-.pager {
-  margin-top: 16px;
-  justify-content: flex-end;
-}
-</style>

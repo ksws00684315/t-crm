@@ -4,6 +4,9 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { createShop, editShop, listShops, updateShopStatus } from "@/api/product/shop";
 import type { ShopVO } from "@/api/types";
+import CopyText from "@/components/CopyText.vue";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import ListSearch from "@/components/ListSearch.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -21,6 +24,24 @@ const formVisible = ref(false);
 const editing = ref<ShopVO | null>(null);
 const form = reactive({ shopName: "", weidianShopId: "", remark: "" });
 const saving = ref(false);
+
+function asShop(row: object): ShopVO {
+  return row as ShopVO;
+}
+
+const columns = computed<DataColumn[]>(() => {
+  const list: DataColumn[] = [
+    { key: "shopName", label: t("shop.name"), prop: "shopName", minWidth: 140 },
+    { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140, mono: true },
+    { key: "status", label: t("common.status"), width: 90 },
+    { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 160, tooltip: true },
+    { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
+  ];
+  if (abilities.value.canManageShop) {
+    list.push({ key: "actions", label: t("common.actions"), width: 160 });
+  }
+  return list;
+});
 
 async function load() {
   loading.value = true;
@@ -103,53 +124,49 @@ onMounted(() => void load());
 
 <template>
   <el-card shadow="never">
-    <div class="toolbar">
-      <span class="hint">{{ t("shop.hint") }}</span>
-      <el-button
-        v-if="abilities.canManageShop"
-        type="primary"
-        data-test="create"
-        @click="openCreate"
-      >
-        {{ t("shop.create") }}
-      </el-button>
-    </div>
+    <ListSearch @search="load" @reset="load">
+      <template #primary>
+        <span class="hint">{{ t("shop.hint") }}</span>
+      </template>
+      <template v-if="abilities.canManageShop" #actions>
+        <el-button type="primary" data-test="create" @click="openCreate">
+          {{ t("shop.create") }}
+        </el-button>
+      </template>
+    </ListSearch>
 
-    <el-table v-loading="loading" :data="rows" row-key="id" border>
-      <el-table-column prop="shopName" :label="t('shop.name')" min-width="140" />
-      <el-table-column prop="weidianShopId" :label="t('shop.weidianId')" min-width="140" />
-      <el-table-column :label="t('common.status')" width="90">
-        <template #default="{ row }">
-          <el-tag :type="(row as ShopVO).status === 1 ? 'success' : 'info'">
-            {{ (row as ShopVO).status === 1 ? t("common.enabled") : t("common.disabled") }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="remark" :label="t('common.remark')" min-width="160" />
-      <el-table-column :label="t('common.updatedAt')" width="170">
-        <template #default="{ row }">{{ formatInstant((row as ShopVO).updateTime) }}</template>
-      </el-table-column>
-      <el-table-column
-        v-if="abilities.canManageShop"
-        :label="t('common.actions')"
-        width="160"
-        fixed="right"
-      >
-        <template #default="{ row }">
-          <el-button link type="primary" data-test="edit" @click="openEdit(row as ShopVO)">
-            {{ t("common.edit") }}
-          </el-button>
-          <el-button
-            link
-            :type="(row as ShopVO).status === 1 ? 'danger' : 'success'"
-            data-test="status"
-            @click="toggleStatus(row as ShopVO)"
-          >
-            {{ (row as ShopVO).status === 1 ? t("common.disabled") : t("common.enabled") }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <DataTable
+      table-id="shops"
+      :rows="rows"
+      :columns="columns"
+      :loading="loading"
+      :total="rows.length"
+      :paged="false"
+      @refresh="load"
+    >
+      <template #cell-weidianShopId="{ row }">
+        <CopyText :value="asShop(row).weidianShopId" />
+      </template>
+      <template #cell-status="{ row }">
+        <el-tag :type="asShop(row).status === 1 ? 'success' : 'info'">
+          {{ asShop(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
+        </el-tag>
+      </template>
+      <template #cell-updatedAt="{ row }">{{ formatInstant(asShop(row).updateTime) }}</template>
+      <template v-if="abilities.canManageShop" #actions="{ row }">
+        <el-button link type="primary" data-test="edit" @click="openEdit(asShop(row))">
+          {{ t("common.edit") }}
+        </el-button>
+        <el-button
+          link
+          :type="asShop(row).status === 1 ? 'danger' : 'success'"
+          data-test="status"
+          @click="toggleStatus(asShop(row))"
+        >
+          {{ asShop(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+        </el-button>
+      </template>
+    </DataTable>
 
     <el-dialog
       v-model="formVisible"
@@ -182,14 +199,8 @@ onMounted(() => void load());
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
 .hint {
-  color: var(--el-text-color-secondary);
+  color: var(--tcrm-color-text-secondary);
   font-size: 13px;
 }
 </style>

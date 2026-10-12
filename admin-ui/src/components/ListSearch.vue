@@ -34,8 +34,16 @@ const expanded = ref(false);
       <div class="list-search__row">
         <slot name="primary" />
         <div class="list-search__actions">
-          <el-button type="primary" native-type="submit">{{ t("common.search") }}</el-button>
-          <el-button native-type="button" @click="emit('reset')">{{ t("common.reset") }}</el-button>
+          <el-button
+            type="primary"
+            native-type="button"
+            data-test="search"
+            @click="emit('search')"
+            >{{ t("common.search") }}</el-button
+          >
+          <el-button native-type="button" data-test="reset" @click="emit('reset')">{{
+            t("common.reset")
+          }}</el-button>
           <el-button
             v-if="hasMore"
             text

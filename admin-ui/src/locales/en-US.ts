@@ -174,6 +174,10 @@ const enUS: MessageSchema = {
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
   },
+  copy: {
+    done: "Copied {text}",
+    failed: "Could not copy. Select the text and copy it manually."
+  },
   search: {
     expand: "Expand",
     collapse: "Collapse",
