@@ -21,6 +21,12 @@ public class RedirectController {
     return redirects.redirect(kolCode, productCode, request);
   }
 
+  @GetMapping("/i/{weidianItemId}")
+  public ResponseEntity<Void> redirectItem(
+      @PathVariable String weidianItemId, HttpServletRequest request) {
+    return redirects.redirectItem(weidianItemId, request);
+  }
+
   @GetMapping("/healthz")
   public ResponseEntity<Void> health() {
     return redirects.health();

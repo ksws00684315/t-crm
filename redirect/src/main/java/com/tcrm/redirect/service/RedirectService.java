@@ -6,8 +6,10 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,9 +47,29 @@ public class RedirectService {
     if (!kolCode.matches("^KOL\\d{4,8}$") || !productCode.matches("^[A-Za-z0-9_-]{1,32}$")) {
       return ResponseEntity.notFound().build();
     }
+    return resolve(
+        () -> redis.lookup(kolCode, productCode),
+        Map.of("kolCode", kolCode, "productCode", productCode),
+        request);
+  }
+
+  /** Redirects by copied Weidian item ID ({@code /i/{weidianItemId}}, ADR-019). */
+  public ResponseEntity<Void> redirectItem(String weidianItemId, HttpServletRequest request) {
+    if (!weidianItemId.matches("^[0-9]{1,20}$")) {
+      return redirectTo(fallback);
+    }
+    return resolve(() -> redis.lookupItem(weidianItemId), Map.of(), request);
+  }
+
+  /**
+   * Looks up one index value and redirects to its target, recording the click; any failure, miss,
+   * malformed or inactive value redirects to the fallback without a click.
+   */
+  private ResponseEntity<Void> resolve(
+      Supplier<String> lookup, Map<String, String> linkFields, HttpServletRequest request) {
     String value;
     try {
-      value = redis.lookup(kolCode, productCode);
+      value = lookup.get();
     } catch (RuntimeException e) {
       LOG.error("Link lookup failed", e);
       return redirectTo(fallback);
@@ -62,24 +84,13 @@ public class RedirectService {
     if (target == null) {
       return redirectTo(fallback);
     }
-    var event =
-        Map.of(
-            "kolItemId",
-            entry.get().kolItemId(),
-            "kolCode",
-            kolCode,
-            "productCode",
-            productCode,
-            "ts",
-            Long.toString(System.currentTimeMillis()),
-            "ipHash",
-            hash(clientIps.resolve(request)),
-            "ua",
-            header(request, "User-Agent", 512),
-            "ref",
-            header(request, "Referer", 512),
-            "country",
-            header(request, "CF-IPCountry", 8));
+    var event = new HashMap<>(linkFields);
+    event.put("kolItemId", entry.get().kolItemId());
+    event.put("ts", Long.toString(System.currentTimeMillis()));
+    event.put("ipHash", hash(clientIps.resolve(request)));
+    event.put("ua", header(request, "User-Agent", 512));
+    event.put("ref", header(request, "Referer", 512));
+    event.put("country", header(request, "CF-IPCountry", 8));
     try {
       redis.append(event);
     } catch (RuntimeException e) {

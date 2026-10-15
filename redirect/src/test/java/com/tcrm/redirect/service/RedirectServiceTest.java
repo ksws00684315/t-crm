@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.redirect.config.ClientIpResolver;
@@ -165,5 +166,78 @@ class RedirectServiceTest {
           .isEqualTo("https://example.com/fallback");
     }
     verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldUseFallbackWithoutLookup_whenItemIdIsNotOneToTwentyAsciiDigits() {
+    var redis = mock(ClickRedis.class);
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    for (String id :
+        new String[] {
+          "", "1".repeat(21), "12a", "-1", "+1", "1.0", " 1", "\u0661\u0662", "\uFF11\uFF12"
+        }) {
+      var response = service.redirectItem(id, new MockHttpServletRequest());
+      assertThat(response.getStatusCode().value()).as(id).isEqualTo(302);
+      assertThat(response.getHeaders().getLocation().toString())
+          .as(id)
+          .isEqualTo("https://example.com/fallback");
+      assertThat(response.getHeaders().getCacheControl()).as(id).isEqualTo("no-store");
+    }
+    verifyNoInteractions(redis);
+  }
+
+  @Test
+  void shouldLookUpIdAsGiven_whenItemIdHasOneToTwentyDigits() {
+    var redis = mock(ClickRedis.class);
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    for (String id : new String[] {"0", "7", "007", "7849640325", "9".repeat(20)}) {
+      service.redirectItem(id, new MockHttpServletRequest());
+      verify(redis).lookupItem(id);
+    }
+  }
+
+  @Test
+  void shouldUseFallback_whenItemLookupFails() {
+    var redis = mock(ClickRedis.class);
+    when(redis.lookupItem(anyString())).thenThrow(new IllegalStateException("unit-failure"));
+    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    assertThat(
+            service
+                .redirectItem("7849640325", new MockHttpServletRequest())
+                .getHeaders()
+                .getLocation()
+                .toString())
+        .isEqualTo("https://example.com/fallback");
+    verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldRecordSameClickFieldsAsCodeLink_whenItemLinkIsActive() throws Exception {
+    var redis = mock(ClickRedis.class);
+    when(redis.lookupItem("7849640325"))
+        .thenReturn("{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":1}");
+    var request = new MockHttpServletRequest();
+    request.setRemoteAddr("10.1.2.3");
+    request.addHeader("X-Forwarded-For", "192.0.2.77, 198.51.100.1");
+    request.addHeader("User-Agent", "a".repeat(600));
+    request.addHeader("Referer", "https://example.com/source");
+    request.addHeader("CF-IPCountry", "X".repeat(20));
+    long before = System.currentTimeMillis();
+    var response =
+        new RedirectService(redis, IPS, "https://example.com/fallback", SALT)
+            .redirectItem("7849640325", request);
+    assertThat(response.getHeaders().getLocation().toString()).isEqualTo("https://example.com/p");
+    var events = org.mockito.ArgumentCaptor.forClass(Map.class);
+    verify(redis).append(events.capture());
+    Map<?, ?> event = events.getValue();
+    assertThat(event.keySet().stream().map(String::valueOf).toList())
+        .containsExactlyInAnyOrder("kolItemId", "ts", "ipHash", "ua", "ref", "country");
+    assertThat(event.get("kolItemId")).isEqualTo("77");
+    assertThat(Long.parseLong(event.get("ts").toString()))
+        .isBetween(before, System.currentTimeMillis());
+    assertThat(event.get("ipHash")).isEqualTo(sha256(SALT + "198.51.100.1"));
+    assertThat(event.get("ua")).isEqualTo("a".repeat(512));
+    assertThat(event.get("ref")).isEqualTo("https://example.com/source");
+    assertThat(event.get("country")).isEqualTo("X".repeat(8));
   }
 }
