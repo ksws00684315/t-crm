@@ -189,8 +189,9 @@ class SystemIT {
             ORDER BY t.table_name
             """,
             String.class);
+    // Design §3.4 exceptions; crm_fx_rate holds the platform-level reference rate (§7.5).
     assertThat(without)
-        .contains("sys_tenant", "crm_link_index_outbox", "flyway_schema_history")
+        .contains("sys_tenant", "crm_link_index_outbox", "crm_fx_rate", "flyway_schema_history")
         .doesNotContain("crm_kol", "crm_click_log", "sys_user");
     assertThat(
             jdbc.queryForObject(
