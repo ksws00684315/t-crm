@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.controller;
 
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -11,4 +12,5 @@ public record EditUserRequest(
     @NotBlank @Size(max = 64) String nickname,
     @Email @Size(max = 254) String email,
     @NotNull @CompanyRole Role role,
-    @NotNull DataScope dataScope) {}
+    PostTemplate postTemplate,
+    DataScope dataScope) {}

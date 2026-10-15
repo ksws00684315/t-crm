@@ -60,7 +60,10 @@ class ValidationMessagesTest {
   }
 
   private MockMvc mvc(Validator validator) {
-    return MockMvcBuilders.standaloneSetup(new UserController(mock(UserService.class)))
+    return MockMvcBuilders.standaloneSetup(
+            new UserController(
+                mock(UserService.class),
+                mock(com.tcrm.admin.system.service.UserPermissionService.class)))
         .setControllerAdvice(new GlobalExceptionHandler())
         .setValidator(validator)
         .setLocaleResolver(new SupportedLocaleResolver())

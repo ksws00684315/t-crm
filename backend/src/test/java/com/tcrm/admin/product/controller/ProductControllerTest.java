@@ -2,7 +2,6 @@ package com.tcrm.admin.product.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -18,8 +17,6 @@ import com.tcrm.admin.product.service.ProductService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
-import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -65,7 +62,7 @@ class ProductControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldList_whenAnyRoleReads(Role role, DataScope scope) throws Exception {
     when(products.page(any())).thenReturn(new PageResult<>(List.of(sample()), 1, 1, 20));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
@@ -78,7 +75,7 @@ class ProductControllerTest {
   void shouldEdit_whenOperatorAll() throws Exception {
     mvc.perform(
             put(BASE + "/1")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.ALL))
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"name\":\"鞋\",\"category\":null,\"imageUrl\":null,\"price\":\"12.50\",\"rate\":null}"))
@@ -87,8 +84,10 @@ class ProductControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenFinanceWrites() throws Exception {
-    String token = as(Role.FINANCE, DataScope.ALL);
+  void shouldReturn403_whenStaffLacksProductEdit() throws Exception {
+    String token =
+        AdminMvcSupport.actAs(
+            current, 1L, Role.STAFF, DataScope.ALL, java.util.Set.of("product:view"));
     mvc.perform(
             put(BASE + "/1")
                 .header(AdminMvcSupport.TOKEN_HEADER, token)
@@ -99,14 +98,16 @@ class ProductControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenServiceRejectsOwnOperator() throws Exception {
-    doThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN)).when(products).update(eq(1L), any());
+  void shouldEdit_whenStaffOwnHasProductEdit() throws Exception {
     mvc.perform(
             put(BASE + "/1")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.OWN))
+                .header(
+                    AdminMvcSupport.TOKEN_HEADER,
+                    AdminMvcSupport.actAs(
+                        current, 1L, Role.STAFF, DataScope.OWN, java.util.Set.of("product:edit")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"鞋\",\"price\":\"1.00\"}"))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+        .andExpect(status().isOk());
+    verify(products).update(eq(1L), any());
   }
 }

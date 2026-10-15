@@ -42,7 +42,7 @@ class ShopControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldList_whenAnyRoleReads(Role role, DataScope scope) throws Exception {
     when(shops.list())
         .thenReturn(
@@ -82,7 +82,7 @@ class ShopControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"STAFF, ALL", "STAFF, OWN"})
   void shouldReturn403_whenNonSuperAdminWrites(Role role, DataScope scope) throws Exception {
     String token = as(role, scope);
     mvc.perform(

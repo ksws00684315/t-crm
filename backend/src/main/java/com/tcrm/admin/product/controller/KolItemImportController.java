@@ -1,7 +1,6 @@
 package com.tcrm.admin.product.controller;
 
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.product.service.MappingImportService;
 import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.AuditLog;
@@ -25,12 +24,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Kol item mapping Excel import (task 05 §4.3). OWN and FINANCE are denied by the service. */
+/** Kol item mapping Excel import (task 05 §4.3). Requires product:edit. */
 @RestController
 @RequestMapping("/admin-api/product/kol-item-imports")
-@SaCheckRole(
-    value = {"SUPER_ADMIN", "OPERATOR"},
-    mode = SaMode.OR)
+@SaCheckPermission("product:edit")
 public class KolItemImportController {
   static final String TEMPLATE_NAME_KEY = "import.mapping.template-name";
   private final MappingImportService imports;

@@ -72,7 +72,7 @@ class LinkServiceTest {
 
   @Test
   void shouldReturnLinksWithStatusAndCounts() {
-    actAs(1L, Role.FINANCE, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "A", true, 7L));
     when(items.pageCurrentLinksByKol(10L, null, 1, 20))
         .thenReturn(
@@ -137,7 +137,7 @@ class LinkServiceTest {
 
   @Test
   void shouldNotCountClicks_whenPageIsEmpty() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "A", true, 9L));
     when(items.pageCurrentLinksByKol(eq(10L), isNull(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(), 0, 1, 20));
@@ -158,7 +158,7 @@ class LinkServiceTest {
   @ParameterizedTest
   @CsvSource({"7, true", "8, false"})
   void shouldApplyBdScope(long userId, boolean allowed) {
-    actAs(userId, Role.OPERATOR, DataScope.OWN);
+    actAs(userId, Role.STAFF, DataScope.OWN);
     when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "A", true, 7L));
     when(items.pageCurrentLinksByKol(anyLong(), any(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(), 0, 1, 20));
@@ -176,7 +176,7 @@ class LinkServiceTest {
 
   @Test
   void shouldForbidBd_whenKolHasNoBd() {
-    actAs(7L, Role.OPERATOR, DataScope.OWN);
+    actAs(7L, Role.STAFF, DataScope.OWN);
     when(kols.getByCode("KOL0001")).thenReturn(new KolRefDTO(10L, "KOL0001", "A", true, null));
     assertThatThrownBy(() -> service.page(new LinkFilterDTO("KOL0001", null, 1, 20)))
         .isInstanceOf(BusinessException.class);
