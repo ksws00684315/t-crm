@@ -1,18 +1,16 @@
 package com.tcrm.admin.integration.mapper;
 
-import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.integration.model.FxRateDO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
 /**
- * {@code crm_fx_rate} is platform-level reference data without {@code tenant_id} (design §3.4
- * exception), so the company predicate is never added: the table holds no company data and is read
- * from company-scoped requests.
+ * {@code crm_fx_rate} is platform-level reference data without {@code tenant_id} (design §3.4,
+ * ADR-020). {@code CompanyTenantLineHandler} always ignores the table, so company-scoped requests
+ * can read it.
  */
 @Mapper
-@InterceptorIgnore(tenantLine = "true")
 public interface FxRateMapper {
   /** Inserts the row unless its rate date is already stored; returns 1 when inserted, else 0. */
   @Insert(

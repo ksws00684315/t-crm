@@ -33,6 +33,16 @@ class EcbRateClientTest {
   }
 
   @Test
+  void shouldParseTheRealEcbFile_whenItListsEveryCurrency() throws IOException {
+    // Unmodified ECB file downloaded on 2026-10-15 (29 currencies, single-quoted attributes).
+    EcbRate rate = EcbRateClient.parse(fixture("ecb-real-2026-10-15.xml"));
+
+    // 1.1208 USD/EUR ÷ 7.4993 CNY/EUR = 0.149453948... → 0.14945395
+    assertThat(rate.date()).isEqualTo(LocalDate.of(2026, 10, 15));
+    assertThat(rate.cnyToUsd()).isEqualByComparingTo("0.14945395");
+  }
+
+  @Test
   void shouldRoundHalfUpAtTheEighthDecimal_whenTheQuotientEndsInFive() {
     // 1.000000005 ÷ 1 = 1.000000005 → 1.00000001 with HALF_UP (HALF_EVEN would give 1.00000000)
     EcbRate rate =
