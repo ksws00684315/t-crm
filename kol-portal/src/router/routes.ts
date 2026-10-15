@@ -1,6 +1,19 @@
 import type { RouteRecordRaw } from "vue-router";
 
 export const routes: RouteRecordRaw[] = [
+  ...(["activate", "reset"] as const).map(mode => ({
+    path: `/${mode}`,
+    name: mode,
+    component: () => import("@/views/password-link/index.vue"),
+    props: { mode },
+    meta: { title: `route.${mode}`, public: true }
+  })),
+  {
+    path: "/forgot",
+    name: "Forgot",
+    component: () => import("@/views/forgot/index.vue"),
+    meta: { title: "route.forgot", public: true }
+  },
   {
     path: "/login",
     name: "Login",
@@ -11,6 +24,12 @@ export const routes: RouteRecordRaw[] = [
     path: "/",
     component: () => import("@/layout/index.vue"),
     children: [
+      {
+        path: "account",
+        name: "Account",
+        component: () => import("@/views/account/index.vue"),
+        meta: { title: "route.account" }
+      },
       {
         path: "",
         name: "Home",

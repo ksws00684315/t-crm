@@ -2,8 +2,7 @@ import { enUS, translate } from "@/locales";
 
 /**
  * Error-code text for users, taken from the `errors.*` keys of the message packs in the current
- * language; the backend `msg` is never shown (spec 02 section 7). Creator-specific codes are
- * added together with the creator API in later tasks.
+ * language; the backend `msg` is never shown (spec 02 section 7). Creator authentication codes follow the task 12a/12b contract.
  */
 
 // UPPER_SNAKE_CASE keys of the pack are backend error codes; lowercase ones (generic, network,

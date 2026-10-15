@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from "vue";
+import { logout } from "@/api/auth";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
@@ -9,10 +11,20 @@ defineOptions({ name: "AppLayout" });
 const { t } = useI18n();
 const router = useRouter();
 const session = useSessionStore();
+const signingOut = ref(false);
 
 async function signOut() {
-  session.clearSession();
-  await router.replace("/login");
+  if (signingOut.value) return;
+  signingOut.value = true;
+  try {
+    await logout();
+  } catch {
+    // Local logout must finish even if the server is unavailable.
+  } finally {
+    session.clearSession();
+    signingOut.value = false;
+    await router.replace("/login");
+  }
 }
 </script>
 
@@ -22,7 +34,18 @@ async function signOut() {
       <span class="shell__brand">{{ t("app.title") }}</span>
       <div class="shell__actions">
         <LocaleSwitch />
-        <el-button size="small" @click="signOut">{{ t("common.signOut") }}</el-button>
+        <span v-if="session.kol" class="shell__identity"
+          >{{ session.kol.name }} · {{ session.kol.tenantName }}</span
+        >
+        <details class="user-menu">
+          <summary>{{ t("account.title") }}</summary>
+          <nav :aria-label="t('account.title')">
+            <RouterLink to="/account">{{ t("account.title") }}</RouterLink>
+            <el-button :loading="signingOut" :disabled="signingOut" @click="signOut">{{
+              t("common.signOut")
+            }}</el-button>
+          </nav>
+        </details>
       </div>
     </header>
     <main class="shell__main">
@@ -54,6 +77,53 @@ async function signOut() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.shell__identity {
+  overflow-wrap: anywhere;
+}
+.user-menu {
+  position: relative;
+}
+.user-menu summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.user-menu nav {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  background: white;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  min-width: 160px;
+  display: grid;
+  gap: 8px;
+}
+.user-menu a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.user-menu .el-button {
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  .shell__header {
+    flex-wrap: wrap;
+  }
+  .shell__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .shell__identity {
+    flex: 1;
+    min-width: 80px;
+  }
 }
 .shell__main {
   width: 100%;

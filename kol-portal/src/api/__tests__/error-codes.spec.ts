@@ -17,7 +17,7 @@ describe("error-code text", () => {
   });
 
   it("returns English text for a known code by default", () => {
-    expect(messageForErrorCode("AUTH_INVALID_CREDENTIALS")).toBe("Incorrect account or password.");
+    expect(messageForErrorCode("AUTH_INVALID_CREDENTIALS")).toBe("Incorrect email or password.");
     expect(messageForErrorCode("AUTH_UNAUTHORIZED")).toBe(
       "Your session has expired. Please sign in again."
     );
@@ -25,7 +25,7 @@ describe("error-code text", () => {
 
   it("returns Chinese text for the same code after switching languages", () => {
     useLocaleStore().setLocale("zh-CN");
-    expect(messageForErrorCode("AUTH_INVALID_CREDENTIALS")).toBe("账号或密码错误。");
+    expect(messageForErrorCode("AUTH_INVALID_CREDENTIALS")).toBe("邮箱或密码错误。");
     expect(messageForErrorCode("AUTH_UNAUTHORIZED")).toBe("登录已失效，请重新登录。");
   });
 

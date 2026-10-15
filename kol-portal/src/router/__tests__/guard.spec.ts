@@ -55,6 +55,24 @@ describe("installGuard with the real route table", () => {
   });
 });
 
+describe("auth route access", () => {
+  it.each(["/activate?token=test", "/reset?token=test", "/forgot"])(
+    "opens public %s without a session",
+    async path => {
+      const router = createRouter({ history: createMemoryHistory(), routes });
+      installGuard(router, () => ({ isLoggedIn: false }));
+      await router.push(path);
+      expect(router.currentRoute.value.fullPath).toBe(path);
+    }
+  );
+  it("requires a session for the account page", async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    installGuard(router, () => ({ isLoggedIn: false }));
+    await router.push("/account");
+    expect(router.currentRoute.value.fullPath).toBe("/login?redirect=/account");
+  });
+});
+
 describe("document title", () => {
   beforeEach(() => {
     localStorage.clear();

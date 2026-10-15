@@ -1,4 +1,4 @@
-import { loadSession } from "@/utils/session";
+import { useSessionStore } from "@/stores/session";
 import { createHttp } from "@/utils/http";
 import type { ApiError } from "@/utils/http/error";
 import { useLocaleStore } from "@/stores/locale";
@@ -12,7 +12,9 @@ export function setUnauthorizedHandler(handler: (error: ApiError) => void): void
 
 /** The only axios instance. Pages and stores go through the functions in `api/`. */
 export const http = createHttp({
-  getToken: () => loadSession()?.token ?? null,
+  getToken: () => {
+    return useSessionStore().getToken();
+  },
   getLanguage: () => useLocaleStore().locale,
   onUnauthorized: error => unauthorizedHandler(error)
 });

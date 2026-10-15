@@ -1,6 +1,9 @@
-/** What survives a page reload. The creator login arrives with a later task. */
+import type { KolProfile } from "@/api/auth";
+
+/** What survives a page reload. */
 export interface StoredSession {
   token: string;
+  kol?: KolProfile;
   /** Epoch milliseconds after which the token is considered expired locally. */
   expiresAt: number;
 }

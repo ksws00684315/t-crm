@@ -1,16 +1,18 @@
 # T-CRM 达人端（kol-portal）
 
-面向达人的前端：Vite + Vue 3 + TypeScript + Element Plus（英文语言包），**界面全英文**，适配手机宽度。
+面向达人的前端：Vite + Vue 3 + TypeScript + Element Plus，默认英文、支持中英文切换，适配手机宽度。
 
-本阶段只提供骨架：`/login` 与 `/` 占位页、路由守卫、请求封装。达人登录接口和业务页面由后续任务提供。
+已提供邮箱密码登录与公司选择、激活、找回及重置密码、本人资料与修改密码。首页继续保留占位内容，业务页面由后续任务提供。
+
+公开路由：`/login`、`/activate?token=`、`/forgot`、`/reset?token=`。`/` 和 `/account` 需要登录。激活成功直接登录；重置成功返回登录并显示提示。
 
 ## 目录结构（规范 01 第 6 节）
 
 ```
 src/
 ├── api/          请求函数与接口类型；api/constants.ts 集中定义 baseURL（/kol-api）与达人令牌请求头名称
-├── views/        页面（login、home、error）
-├── components/   可复用组件（暂无）
+├── views/        页面（login、password-link、forgot、account、home、error）
+├── components/   语言切换与公开账号页面布局
 ├── layout/       顶栏 + 内容区布局（移动端优先）
 ├── stores/       Pinia 状态（本地登录态）
 ├── router/       路由与守卫
@@ -20,11 +22,11 @@ src/
 
 ## 约定
 
-- 请求封装与管理端一致：响应信封 `{code, msg, data, errorCode, traceId}`；按 `errorCode` 显示**英文**文案，不展示后台 `msg`；未知错误码显示通用提示并附 `traceId`；HTTP 401 清除登录态并回到 `/login`。
-- 达人令牌请求头名称暂定为 `X-Kol-Token`（见 `src/api/constants.ts`），**待达人登录任务确认**；该任务同时补充达人侧的错误码文案。
-- 路由守卫以本地登录态（`localStorage` 中未过期的令牌）判断：未登录访问任何受保护页面跳转 `/login`；已登录访问 `/login` 回到 `/`。目前没有登录入口，因此页面只能看到登录占位页。
+- 请求封装与管理端一致：响应信封 `{code, msg, data, errorCode, traceId}`；按 `errorCode` 显示当前语言的文案，不展示后台 `msg`；未知错误码显示通用提示并附 `traceId`；HTTP 401 清除登录态并回到 `/login?redirect=<当前完整路径>`，登录页上的 401 在页面内提示。
+- 达人请求使用 `X-Kol-Token` 与当前语言的 `Accept-Language`；会话由 Pinia 管理，通过 `utils/session.ts` 保存令牌、到期时间与本人资料。改密成功后替换新会话；退出调用服务端接口，失败也清除本地会话。
+- 路由守卫以本地登录态（`localStorage` 中未过期的令牌）判断：未登录访问任何受保护页面跳转 `/login`；已登录访问 `/login` 回到 `/`。登录成功仅接受站内 redirect 路径。
 - 开发时 `/kol-api` 由 Vite 代理到 `http://localhost:8080`（环境变量 `VITE_KOL_API_TARGET` 可修改）；生产由 Nginx 转发。
-- **ECharts 暂未安装**：任务提示词要求安装，但 ECharts 6.1.0 的传递依赖 `tslib@2.3.0`（经 `zrender`）采用 0BSD，不在规范 07 第 3 节运行时许可证白名单内，且扩充白名单须由项目负责人决定并记录 ADR。获批后执行 `pnpm add --save-exact echarts@6.1.0 && pnpm notices` 即可。
+- 密码统一校验 10～72 位可打印 ASCII，两次新密码须一致；表格外链只允许 HTTP(S)。
 
 ## 命令
 

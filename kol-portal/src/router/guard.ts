@@ -11,7 +11,7 @@ export interface AuthState {
 /**
  * Decides whether a navigation may proceed. Returns `true` to allow it, or the location to go to:
  * signed-out users are sent to /login (remembering where they wanted to go) and signed-in users
- * skip the login page. Sign-in state is local only until the creator login API exists.
+ * skip the login page.
  */
 export function resolveAccess(
   to: Pick<RouteLocationNormalized, "path" | "fullPath" | "meta">,
