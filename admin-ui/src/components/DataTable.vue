@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { FullScreen, Refresh, ScaleToOriginal, Setting } from "@element-plus/icons-vue";
+import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@element-plus/icons-vue";
+import type { TableInstance } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -42,8 +43,27 @@ const props = withDefaults(
     rowKey?: string;
     /** Drawers and dialogs keep the table rules without the list toolbar. */
     plain?: boolean;
+    /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
+    exportable?: boolean;
+    exporting?: boolean;
+    /** Adds a current-page selection column (P0-2). Selection never spans pages. */
+    selectable?: boolean;
+    /** Rows that may not be selected (e.g. the signed-in account). */
+    selectableRow?: (row: object) => boolean;
   }>(),
-  { loading: false, page: 1, size: 20, paged: true, filterCount: 0, rowKey: "id", plain: false }
+  {
+    loading: false,
+    page: 1,
+    size: 20,
+    paged: true,
+    filterCount: 0,
+    rowKey: "id",
+    plain: false,
+    exportable: false,
+    exporting: false,
+    selectable: false,
+    selectableRow: undefined
+  }
 );
 
 const emit = defineEmits<{
@@ -51,7 +71,36 @@ const emit = defineEmits<{
   "update:size": [size: number];
   refresh: [];
   clearFilters: [];
+  export: [];
+  selectionChange: [rows: object[]];
 }>();
+
+const tableRef = ref<TableInstance>();
+const selected = ref<object[]>([]);
+
+function onSelection(rows: object[]): void {
+  selected.value = rows;
+  emit("selectionChange", rows);
+}
+
+function clearSelection(): void {
+  tableRef.value?.clearSelection();
+  if (selected.value.length) onSelection([]);
+}
+
+/** New page, new filter or refresh: a selection only ever covers rows on screen. */
+watch(
+  () => props.rows,
+  () => {
+    if (selected.value.length) onSelection([]);
+  }
+);
+
+function canSelect(row: object): boolean {
+  return props.selectableRow ? props.selectableRow(row) : true;
+}
+
+defineExpose({ clearSelection });
 
 const { t } = useI18n();
 const fullscreen = ref(false);
@@ -171,7 +220,17 @@ function canMove(index: number, delta: -1 | 1): boolean {
 <template>
   <section class="data-table" :class="{ 'is-fullscreen': fullscreen, 'is-plain': plain }">
     <header v-if="!plain" class="data-table__toolbar">
-      <span class="data-table__total">{{ t("table.total", { total }) }}</span>
+      <div v-if="selectable && selected.length" class="data-table__batch" data-test="batch-bar">
+        <span class="data-table__batch-count">{{
+          t("table.selected", { n: selected.length })
+        }}</span>
+        <span class="data-table__batch-hint">{{ t("table.selectedPageOnly") }}</span>
+        <slot name="batch" :rows="selected" />
+        <el-button text data-test="batch-clear" @click="clearSelection">{{
+          t("table.clearSelection")
+        }}</el-button>
+      </div>
+      <span v-else class="data-table__total">{{ t("table.total", { total }) }}</span>
       <div class="data-table__tools">
         <el-segmented
           :model-value="prefs.density"
@@ -179,6 +238,17 @@ function canMove(index: number, delta: -1 | 1): boolean {
           size="small"
           @update:model-value="setDensity($event as TableDensity)"
         />
+        <el-button
+          v-if="exportable"
+          class="data-table__export"
+          :loading="exporting"
+          :disabled="total === 0"
+          data-test="export"
+          @click="emit('export')"
+        >
+          <el-icon v-if="!exporting"><Download /></el-icon>
+          <span>{{ t("table.export") }}</span>
+        </el-button>
         <el-button text :aria-label="t('table.refresh')" @click="emit('refresh')">
           <el-icon><Refresh /></el-icon>
         </el-button>
@@ -237,13 +307,22 @@ function canMove(index: number, delta: -1 | 1): boolean {
     </header>
     <div class="data-table__body">
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="rows"
         :row-key="rowKey"
         :size="tableSize"
         :height="plain ? undefined : '100%'"
         border
+        @selection-change="onSelection"
       >
+        <el-table-column
+          v-if="selectable && !plain"
+          type="selection"
+          width="44"
+          fixed="left"
+          :selectable="canSelect"
+        />
         <el-table-column
           v-for="column in visibleColumns"
           :key="column.key"
@@ -308,6 +387,20 @@ function canMove(index: number, delta: -1 | 1): boolean {
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.data-table__batch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
+}
+.data-table__batch-count {
+  font-weight: 600;
+  color: var(--tcrm-color-primary-text, var(--el-color-primary));
+}
+.data-table__batch-hint {
+  font-size: 12px;
+  color: var(--tcrm-color-text-secondary);
 }
 .data-table.is-plain {
   flex: initial;

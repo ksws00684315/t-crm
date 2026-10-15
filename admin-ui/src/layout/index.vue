@@ -1,12 +1,22 @@
 <script setup lang="ts">
-import { ArrowDown, Expand, Fold, FullScreen, Refresh, Search } from "@element-plus/icons-vue";
+import {
+  ArrowDown,
+  Expand,
+  Fold,
+  FullScreen,
+  Lock,
+  Refresh,
+  Search
+} from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { routes } from "@/router/routes";
+import { useIdleLock } from "@/composables/useIdleLock";
 import { useLocaleStore } from "@/stores/locale";
+import { useLockStore } from "@/stores/lock";
 import { useMenuSearchStore } from "@/stores/menu-search";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
@@ -15,6 +25,7 @@ import { useUserStore } from "@/stores/user";
 import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
 import { buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
+import { LOCK_IDLE_OPTIONS, type LockIdleMinutes } from "@/utils/lock";
 import { affixFor } from "@/utils/tabs";
 import {
   isMacPlatform,
@@ -22,6 +33,7 @@ import {
   saveSidebarCollapsed,
   subscribeNarrow
 } from "@/utils/sidebar";
+import LockScreen from "./LockScreen.vue";
 import MenuSearch from "./MenuSearch.vue";
 import ReauthDialog from "./ReauthDialog.vue";
 import SideMenu from "./SideMenu.vue";
@@ -38,6 +50,12 @@ const theme = useThemeStore();
 const menuSearch = useMenuSearchStore();
 const reauth = useReauthStore();
 const tabs = useTabsStore();
+const lockStore = useLockStore();
+useIdleLock();
+
+function idleLabel(minutes: LockIdleMinutes): string {
+  return minutes === 0 ? t("lock.idleOff") : t("lock.idleMinutes", { n: minutes });
+}
 
 const collapsed = ref(loadSidebarCollapsed());
 const narrow = ref(false);
@@ -120,7 +138,11 @@ function onFullscreenChange(): void {
 }
 
 async function onCommand(command: string) {
-  if (command === "password") {
+  if (command === "lock") {
+    lockStore.lock();
+  } else if (command.startsWith("idle:")) {
+    lockStore.setIdleMinutes(Number(command.slice(5)) as LockIdleMinutes);
+  } else if (command === "password") {
     await router.push("/account/password");
   } else if (command === "logout") {
     reauth.close();
@@ -186,6 +208,8 @@ onBeforeUnmount(() => {
   <el-container
     class="layout"
     :class="{ 'is-collapsed': collapsed && !narrow, 'is-narrow': narrow }"
+    :inert="lockStore.locked || undefined"
+    data-test="layout-root"
   >
     <el-aside v-if="!narrow" :width="asideWidth" class="layout__aside">
       <SideMenu
@@ -254,6 +278,15 @@ onBeforeUnmount(() => {
           </el-button>
           <el-button
             text
+            data-test="lock"
+            :aria-label="t('lock.lockNow')"
+            :title="t('lock.lockNow')"
+            @click="lockStore.lock()"
+          >
+            <el-icon><Lock /></el-icon>
+          </el-button>
+          <el-button
+            text
             class="layout__theme"
             data-test="theme"
             :aria-label="t('theme.cycle')"
@@ -270,7 +303,21 @@ onBeforeUnmount(() => {
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="password">{{
+                <el-dropdown-item command="lock">{{ t("lock.lockNow") }}</el-dropdown-item>
+                <el-dropdown-item disabled class="layout__menu-heading">{{
+                  t("lock.autoLock")
+                }}</el-dropdown-item>
+                <el-dropdown-item
+                  v-for="minutes in LOCK_IDLE_OPTIONS"
+                  :key="minutes"
+                  :command="`idle:${minutes}`"
+                  :data-test="`lock-idle-${minutes}`"
+                >
+                  <span :class="{ 'layout__menu-current': lockStore.idleMinutes === minutes }">
+                    {{ lockStore.idleMinutes === minutes ? "✓ " : "" }}{{ idleLabel(minutes) }}
+                  </span>
+                </el-dropdown-item>
+                <el-dropdown-item command="password" divided>{{
                   t("layout.changePassword")
                 }}</el-dropdown-item>
                 <el-dropdown-item command="logout" divided>{{
@@ -303,6 +350,7 @@ onBeforeUnmount(() => {
     </el-container>
     <MenuSearch />
     <ReauthDialog />
+    <LockScreen />
   </el-container>
 </template>
 

@@ -10,6 +10,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -117,6 +118,34 @@ function clearResults() {
   total.value = 0;
 }
 
+function appliedQuery() {
+  return {
+    kolCode: applied.value.kolCode || undefined,
+    productCode: applied.value.productCode || undefined,
+    shopId: applied.value.shopId || undefined,
+    weidianItemId: applied.value.weidianItemId || undefined,
+    current: !applied.value.includeHistory
+  };
+}
+
+const { exporting, exportCsv } = useListExport<KolItemVO>({
+  fileBase: () => t("export.fileMapping"),
+  fetchPage: (page, size) => listKolItems({ page, size, ...appliedQuery() }),
+  columns: () => [
+    { label: t("mapping.kolCode"), value: row => row.kolCode },
+    { label: t("mapping.kolName"), value: row => row.kolName },
+    { label: t("mapping.productCode"), value: row => row.productCode },
+    { label: t("mapping.productName"), value: row => row.productName },
+    { label: t("mapping.shop"), value: row => row.shopName },
+    { label: t("mapping.exclusiveId"), value: row => row.weidianItemId },
+    { label: t("mapping.validFrom"), value: row => formatInstant(row.validFrom) },
+    {
+      label: t("mapping.validTo"),
+      value: row => (row.validTo ? formatInstant(row.validTo) : t("mapping.current"))
+    }
+  ]
+});
+
 async function load() {
   if (!hasPrecisionFilter()) {
     ElMessage.warning(t("mapping.searchTip"));
@@ -128,11 +157,7 @@ async function load() {
     const page = await listKolItems({
       page: query.page,
       size: query.size,
-      kolCode: applied.value.kolCode || undefined,
-      productCode: applied.value.productCode || undefined,
-      shopId: applied.value.shopId || undefined,
-      weidianItemId: applied.value.weidianItemId || undefined,
-      current: !applied.value.includeHistory
+      ...appliedQuery()
     });
     hasQueried.value = true;
     rows.value = page.items;
@@ -302,6 +327,9 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
+      exportable
+      :exporting="exporting"
+      @export="exportCsv"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"

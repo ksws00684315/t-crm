@@ -15,6 +15,8 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import { useBatchAction } from "@/composables/useBatchAction";
+import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -108,16 +110,63 @@ const importVisible = ref(false);
 const importTitle = computed(() => t("product.importTitle"));
 const importLimitHint = computed(() => t("product.limitHint"));
 
+function appliedQuery() {
+  return {
+    keyword: applied.value.keyword || undefined,
+    shopId: applied.value.shopId || undefined,
+    status: applied.value.status,
+    category: applied.value.category || undefined
+  };
+}
+
+const { exporting, exportCsv } = useListExport<ProductVO>({
+  fileBase: () => t("export.fileProduct"),
+  fetchPage: (page, size) => listProducts({ page, size, ...appliedQuery() }),
+  columns: () => [
+    { label: t("product.code"), value: row => row.productCode },
+    { label: t("product.name"), value: row => row.name },
+    { label: t("product.shop"), value: row => row.shopName },
+    { label: t("product.weidianItemId"), value: row => row.weidianItemId },
+    { label: t("product.category"), value: row => row.category },
+    { label: t("product.price"), value: row => row.price },
+    { label: t("product.rate"), value: row => formatRate(row.rate) },
+    {
+      label: t("common.status"),
+      value: row => (row.status === 1 ? t("product.onSale") : t("product.offShelf"))
+    },
+    { label: t("common.updatedAt"), value: row => formatInstant(row.updateTime) }
+  ]
+});
+
+const selection = ref<ProductVO[]>([]);
+const batch = useBatchAction();
+
+function batchStatus(target: 0 | 1): void {
+  const targets = selection.value.filter(row => row.status !== target);
+  if (targets.length === 0) {
+    ElMessage.info(t("batch.nothingToChange"));
+    return;
+  }
+  void batch.run({
+    rows: targets,
+    title: target === 0 ? t("product.offTitle") : t("product.onTitle"),
+    message:
+      target === 0
+        ? t("batch.confirmOff", { n: targets.length })
+        : t("batch.confirmOn", { n: targets.length }),
+    label: row => row.productCode,
+    action: row => updateProductStatus(row.id, target),
+    after: load
+  });
+}
+
 async function load() {
   loading.value = true;
   try {
     const page = await listProducts({
       page: query.page,
       size: query.size,
-      keyword: applied.value.keyword || undefined,
-      shopId: applied.value.shopId || undefined,
-      status: applied.value.status,
-      category: applied.value.category || undefined
+      ...appliedQuery()
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -296,6 +345,11 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
+      exportable
+      :exporting="exporting"
+      :selectable="abilities.canWriteProduct"
+      @export="exportCsv"
+      @selection-change="selection = $event as ProductVO[]"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
@@ -306,6 +360,26 @@ onMounted(() => {
       </template>
       <template #cell-weidianItemId="{ row }">
         <CopyText :value="asProduct(row).weidianItemId" />
+      </template>
+      <template #batch>
+        <el-button
+          type="success"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-enable"
+          @click="batchStatus(1)"
+          >{{ t("batch.on") }}</el-button
+        >
+        <el-button
+          type="danger"
+          plain
+          size="small"
+          :loading="batch.running.value"
+          data-test="batch-disable"
+          @click="batchStatus(0)"
+          >{{ t("batch.off") }}</el-button
+        >
       </template>
       <template #cell-price="{ row }">{{ asProduct(row).price }}</template>
       <template #cell-rate="{ row }">{{ formatRate(asProduct(row).rate) }}</template>
