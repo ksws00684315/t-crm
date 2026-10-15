@@ -1,11 +1,12 @@
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import { useLockStore } from "@/stores/lock";
 import {
   isIdle,
   loadLastActive,
   LOCK_KEY,
   LOCK_LAST_ACTIVE_KEY,
-  maybeSaveLastActive
+  maybeSaveLastActive,
+  saveLastActive
 } from "@/utils/lock";
 
 const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"] as const;
@@ -15,6 +16,9 @@ const CHECK_INTERVAL_MS = 15_000;
  * Locks the screen after the configured inactivity (layout only).
  * lastActive is shared via localStorage (throttled writes) so a background tab that has gone idle
  * does not lock the screen while another tab is still being used.
+ *
+ * Unlock (this tab or via storage from another tab) resets lastActive immediately and bypasses the
+ * write throttle, otherwise the next check still sees the pre-lock timestamp and re-locks.
  */
 export function useIdleLock(): void {
   const lock = useLockStore();
@@ -36,6 +40,14 @@ export function useIdleLock(): void {
     if (isIdle(lastActive, Date.now(), lock.idleMinutes)) lock.lock();
   }
 
+  /** After unlock, treat "now" as activity so the next check does not re-lock from the stale stamp. */
+  function resetLastActiveOnUnlock(): void {
+    const now = Date.now();
+    lastActive = now;
+    saveLastActive(now);
+    lastWrite = now;
+  }
+
   function onStorage(event: StorageEvent): void {
     if (event.key === null || event.key === LOCK_KEY) {
       lock.syncFromStorage();
@@ -45,6 +57,13 @@ export function useIdleLock(): void {
       if (Number.isFinite(shared) && shared > lastActive) lastActive = shared;
     }
   }
+
+  watch(
+    () => lock.locked,
+    (locked, wasLocked) => {
+      if (wasLocked === true && locked === false) resetLastActiveOnUnlock();
+    }
+  );
 
   onMounted(() => {
     lock.syncFromStorage();
