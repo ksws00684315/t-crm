@@ -27,6 +27,8 @@ const me: UserVO = {
   nickname: "Root",
   email: null,
   role: "SUPER_ADMIN",
+  postTemplate: null,
+  permissions: [],
   dataScope: "ALL",
   tenantId: "1",
   tenantName: "Default",

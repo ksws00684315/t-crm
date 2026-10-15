@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import * as authApi from "@/api/auth";
-import type { Role, UserVO } from "@/api/types";
+import type { PermissionCode, UserVO } from "@/api/types";
 import { useLockStore } from "@/stores/lock";
 import { useReauthStore } from "@/stores/reauth";
+import { accessOf, type AccessProfile } from "@/utils/permission";
 import { clearStoredSession, loadSession, saveSession } from "@/utils/session";
 
 export const useUserStore = defineStore("user", () => {
@@ -14,7 +15,15 @@ export const useUserStore = defineStore("user", () => {
 
   /** Signed in means a token that has not expired locally; the backend has the final word (401). */
   const isLoggedIn = computed(() => !!token.value && !!user.value && expiresAt.value > Date.now());
-  const roles = computed<Role[]>(() => (user.value && isLoggedIn.value ? [user.value.role] : []));
+  /** Permission view of the signed-in account. Empty when the session is missing or expired. */
+  const access = computed<AccessProfile>(() => accessOf(isLoggedIn.value ? user.value : null));
+  const isSuperAdmin = computed(() => access.value.isSuperAdmin);
+  const isOwnScope = computed(() => access.value.isOwnScope);
+  const isPlatformAdmin = computed(() => access.value.isPlatformAdmin);
+
+  function can(code: PermissionCode): boolean {
+    return access.value.can(code);
+  }
 
   function setSession(next: { token: string; expiresAt: number; user: UserVO }) {
     token.value = next.token;
@@ -87,7 +96,11 @@ export const useUserStore = defineStore("user", () => {
     user,
     token,
     isLoggedIn,
-    roles,
+    access,
+    isSuperAdmin,
+    isOwnScope,
+    isPlatformAdmin,
+    can,
     login,
     loginReplacingToken,
     logout,

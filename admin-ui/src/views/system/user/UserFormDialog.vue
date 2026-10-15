@@ -3,10 +3,15 @@ import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { createUser, editUser } from "@/api/system/user";
-import type { CompanyRole, DataScope, UserVO } from "@/api/types";
+import {
+  createUser,
+  editUser,
+  getPermissionCatalog,
+  type PermissionCatalogVO
+} from "@/api/system/user";
+import type { CompanyRole, DataScope, PostTemplate, UserVO } from "@/api/types";
 import { notifyError } from "@/utils/notify";
-import { roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
+import { POST_TEMPLATES, postLabel, roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
 import {
   rule,
   serverFieldErrors,
@@ -15,6 +20,7 @@ import {
   validateNickname,
   validateUsername
 } from "@/utils/validation";
+import PermissionPicker from "./PermissionPicker.vue";
 
 defineOptions({ name: "UserFormDialog" });
 
@@ -39,43 +45,103 @@ const editing = computed(() => props.user !== null);
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
+const catalog = ref<PermissionCatalogVO | null>(null);
 const form = reactive({
   username: "",
   password: "",
   nickname: "",
   email: "",
-  role: "OPERATOR" as CompanyRole,
-  dataScope: "ALL" as DataScope
+  role: "STAFF" as CompanyRole,
+  postTemplate: "" as PostTemplate | "",
+  dataScope: "ALL" as DataScope,
+  permissions: [] as string[]
 });
+let catalogSeq = 0;
 
 const rules = computed<FormRules>(() => ({
   username: editing.value ? [] : [rule(validateUsername)],
   password: editing.value ? [] : [rule(validateNewPassword)],
   nickname: [rule(validateNickname)],
-  email: [rule(validateEmail)]
+  email: [rule(validateEmail)],
+  postTemplate: [
+    {
+      validator: (_rule, value: string, callback: (error?: Error) => void) => {
+        if (form.role === "STAFF" && !value) callback(new Error(t("user.templateRequired")));
+        else callback();
+      },
+      trigger: "change"
+    }
+  ]
 }));
+
+const showPermissions = computed(
+  () => !editing.value && form.role === "STAFF" && form.postTemplate !== "" && catalog.value != null
+);
 
 watch(
   () => props.modelValue,
   open => {
-    if (!open) return;
+    if (!open) {
+      catalogSeq += 1;
+      return;
+    }
     serverErrors.value = {};
     const current = props.user;
     form.username = current?.username ?? "";
     form.password = "";
     form.nickname = current?.nickname ?? "";
     form.email = current?.email ?? "";
-    form.role = current?.role === "PLATFORM_ADMIN" ? "OPERATOR" : (current?.role ?? "OPERATOR");
+    form.role = current?.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "STAFF";
+    form.postTemplate = current?.role === "STAFF" ? (current.postTemplate ?? "") : "";
     form.dataScope = current?.dataScope ?? "ALL";
+    form.permissions = [];
+    catalog.value = null;
     formRef.value?.clearValidate();
+    if (!current) void loadCatalog();
   }
 );
 
-function close() {
+watch(
+  () => form.postTemplate,
+  template => {
+    if (editing.value) return;
+    if (!template) {
+      form.permissions = [];
+      return;
+    }
+    applyTemplate(template);
+  }
+);
+
+watch(catalog, () => {
+  if (editing.value || !form.postTemplate || form.permissions.length > 0) return;
+  applyTemplate(form.postTemplate);
+});
+
+async function loadCatalog(): Promise<void> {
+  const seq = ++catalogSeq;
+  try {
+    const result = await getPermissionCatalog();
+    if (seq !== catalogSeq || !props.modelValue) return;
+    catalog.value = result;
+  } catch (error) {
+    if (seq !== catalogSeq) return;
+    notifyError(error);
+  }
+}
+
+function applyTemplate(code: string): void {
+  const template = catalog.value?.templates.find(item => item.code === code);
+  if (!template) return;
+  form.permissions = [...template.permissions];
+  form.dataScope = template.dataScope;
+}
+
+function close(): void {
   emit("update:modelValue", false);
 }
 
-async function submit() {
+async function submit(): Promise<void> {
   serverErrors.value = {};
   if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return;
   saving.value = true;
@@ -86,7 +152,15 @@ async function submit() {
         nickname: form.nickname,
         email,
         role: form.role,
-        dataScope: form.dataScope
+        postTemplate: form.role === "STAFF" ? form.postTemplate || null : null
+      });
+    } else if (form.role === "SUPER_ADMIN") {
+      await createUser({
+        username: form.username,
+        password: form.password,
+        nickname: form.nickname,
+        email,
+        role: "SUPER_ADMIN"
       });
     } else {
       await createUser({
@@ -94,8 +168,10 @@ async function submit() {
         password: form.password,
         nickname: form.nickname,
         email,
-        role: form.role,
-        dataScope: form.dataScope
+        role: "STAFF",
+        postTemplate: form.postTemplate || null,
+        dataScope: form.dataScope,
+        permissions: [...form.permissions]
       });
     }
     ElMessage.success(props.user ? t("user.saved") : t("user.created"));
@@ -108,7 +184,9 @@ async function submit() {
       "nickname",
       "email",
       "role",
-      "dataScope"
+      "postTemplate",
+      "dataScope",
+      "permissions"
     ]);
     notifyError(error);
   } finally {
@@ -121,12 +199,12 @@ async function submit() {
   <el-dialog
     :model-value="modelValue"
     :title="editing ? t('user.editTitle') : t('user.createTitle')"
-    width="480px"
+    :width="editing ? '480px' : '640px'"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" @submit.prevent>
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent>
       <el-form-item :label="t('common.username')" prop="username" :error="serverErrors.username">
-        <el-input v-model="form.username" :disabled="editing" maxlength="64" />
+        <el-input v-model="form.username" :disabled="editing" maxlength="64" data-test="username" />
       </el-form-item>
       <el-form-item
         v-if="!editing"
@@ -140,16 +218,17 @@ async function submit() {
           show-password
           autocomplete="new-password"
           maxlength="72"
+          data-test="password"
         />
       </el-form-item>
       <el-form-item :label="t('common.nickname')" prop="nickname" :error="serverErrors.nickname">
-        <el-input v-model="form.nickname" maxlength="64" />
+        <el-input v-model="form.nickname" maxlength="64" data-test="nickname" />
       </el-form-item>
       <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
-        <el-input v-model="form.email" maxlength="254" />
+        <el-input v-model="form.email" maxlength="254" data-test="email" />
       </el-form-item>
       <el-form-item :label="t('user.role')" prop="role" :error="serverErrors.role">
-        <el-select v-model="form.role">
+        <el-select v-model="form.role" data-test="account-type">
           <el-option
             v-for="role in SELECTABLE_ROLES"
             :key="role"
@@ -158,20 +237,59 @@ async function submit() {
           />
         </el-select>
       </el-form-item>
-      <el-form-item :label="t('user.dataScope')" prop="dataScope" :error="serverErrors.dataScope">
-        <el-select v-model="form.dataScope">
+      <el-form-item
+        v-if="form.role === 'STAFF'"
+        :label="t('user.postTemplate')"
+        prop="postTemplate"
+        :error="serverErrors.postTemplate"
+      >
+        <el-select v-model="form.postTemplate" data-test="post-template">
           <el-option
-            v-for="scope in dataScopes"
-            :key="scope.value"
-            :label="scope.label"
-            :value="scope.value"
+            v-for="post in POST_TEMPLATES"
+            :key="post"
+            :label="postLabel(post)"
+            :value="post"
           />
         </el-select>
       </el-form-item>
+      <p v-if="form.role === 'SUPER_ADMIN'" class="all-permissions" data-test="all-permissions">
+        {{ t("user.allPermissions") }}
+      </p>
+      <p v-else-if="editing" class="perm-note" data-test="permissions-separate">
+        {{ t("user.permissionsSeparate") }}
+      </p>
+      <template v-if="showPermissions">
+        <div class="perm-scroll" data-test="permission-area">
+          <PermissionPicker v-model="form.permissions" :items="catalog?.permissions ?? []" />
+        </div>
+        <el-form-item :label="t('user.dataScope')" prop="dataScope" :error="serverErrors.dataScope">
+          <el-radio-group v-model="form.dataScope" data-test="data-scope">
+            <el-radio v-for="scope in dataScopes" :key="scope.value" :value="scope.value">
+              {{ scope.label }}
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </template>
     </el-form>
     <template #footer>
       <el-button @click="close">{{ t("common.cancel") }}</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">{{ t("common.save") }}</el-button>
+      <el-button type="primary" data-test="save-user" :loading="saving" @click="submit">
+        {{ t("common.save") }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.all-permissions,
+.perm-note {
+  margin: 0 0 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.perm-scroll {
+  max-height: 360px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+</style>
