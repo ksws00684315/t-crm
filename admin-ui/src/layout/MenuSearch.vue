@@ -33,7 +33,7 @@ let previousFocus: HTMLElement | null = null;
 
 const entries = computed(() => {
   void localeStore.locale;
-  return flattenMenu(buildMenu(routes, user.roles, user.user?.dataScope));
+  return flattenMenu(buildMenu(routes, user.access));
 });
 
 const results = computed(() => {

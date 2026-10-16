@@ -23,7 +23,7 @@ import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
-import { buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
+import { accessOf, accountLabel, buildMenu, canAccessRoute } from "@/utils/permission";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
 import { LOCK_IDLE_OPTIONS, type LockIdleMinutes } from "@/utils/lock";
 import { affixFor } from "@/utils/tabs";
@@ -66,13 +66,14 @@ const fullscreenEnabled = ref(
 );
 const mac = isMacPlatform();
 
+const access = computed(() => accessOf(user.user));
 const menu = computed(() => {
   void localeStore.locale;
-  return buildMenu(routes, user.roles, user.user?.dataScope);
+  return buildMenu(routes, access.value);
 });
-const roleText = computed(() => (user.user ? roleLabel(user.user.role) : ""));
+const roleText = computed(() => (user.user ? accountLabel(user.user) : ""));
 const tenantLabel = computed(() => {
-  if (user.user?.role === "PLATFORM_ADMIN") return t("common.platformScope");
+  if (access.value.isPlatformAdmin) return t("common.platformScope");
   return user.user?.tenantName || "";
 });
 const userLabel = computed(() =>
@@ -153,11 +154,8 @@ async function onCommand(command: string) {
 }
 
 tabs.restore(
-  affixFor(user.roles.includes("PLATFORM_ADMIN")),
-  path => {
-    const resolved = router.resolve(path);
-    return canAccessRoute(resolved.meta, user.roles, user.user?.dataScope);
-  },
+  affixFor(access.value.isPlatformAdmin),
+  path => canAccessRoute(router.resolve(path).meta, access.value),
   user.user?.id ?? null
 );
 
@@ -168,7 +166,7 @@ watch(
     const componentName = route.meta.componentName;
     const titleKey = route.meta.title;
     if (!componentName || !titleKey || route.meta.noTab) return;
-    const affix = affixFor(user.roles.includes("PLATFORM_ADMIN"));
+    const affix = affixFor(access.value.isPlatformAdmin);
     tabs.open({
       path: route.path,
       titleKey,

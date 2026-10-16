@@ -1,8 +1,9 @@
 import type { RouteRecordRaw } from "vue-router";
 
 /**
- * Static routes. Access is decided here, in `meta.roles`; the menu is derived from the same data
- * and nothing is fetched from the backend. The backend enforces the same roles independently.
+ * Static routes. Access is `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
+ * The menu is derived from the same data; nothing is fetched from the backend.
+ * Company home has no permission code: every company account may open it.
  */
 export const routes: RouteRecordRaw[] = [
   {
@@ -23,7 +24,6 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.home",
           icon: "HomeFilled",
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
           componentName: "HomePage"
         }
       },
@@ -34,7 +34,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.tenants",
           icon: "OfficeBuilding",
-          roles: ["PLATFORM_ADMIN"],
+          platformAdmin: true,
           componentName: "PlatformTenantPage"
         }
       },
@@ -45,7 +45,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.kols",
           icon: "Avatar",
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+          permission: "kol:view",
           componentName: "KolListPage"
         }
       },
@@ -56,8 +56,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.products",
           icon: "Goods",
-          menuGroup: true,
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"]
+          menuGroup: true
         },
         children: [
           {
@@ -66,7 +65,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/product/shop/index.vue"),
             meta: {
               title: "route.shops",
-              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              permission: "product:view",
               componentName: "ShopListPage"
             }
           },
@@ -76,7 +75,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/product/product/index.vue"),
             meta: {
               title: "route.product",
-              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              permission: "product:view",
               componentName: "ProductListPage"
             }
           },
@@ -86,7 +85,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/product/kol-item/index.vue"),
             meta: {
               title: "route.mappings",
-              roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
+              permission: "product:view",
               hideForOwn: true,
               componentName: "KolItemListPage"
             }
@@ -100,7 +99,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.users",
           icon: "UserFilled",
-          roles: ["SUPER_ADMIN"],
+          superAdmin: true,
           componentName: "SystemUserPage"
         }
       },
@@ -111,7 +110,7 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.auditLogs",
           icon: "Document",
-          roles: ["SUPER_ADMIN"],
+          superAdmin: true,
           componentName: "SystemOperLogPage"
         }
       },

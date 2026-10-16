@@ -1,7 +1,6 @@
 package com.tcrm.admin.kol.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,12 +15,12 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
-import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -33,8 +32,9 @@ class KolImportServiceTest {
   private final KolMapper kols = mock(KolMapper.class);
   private final KolWriter writer = mock(KolWriter.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
+  private final LinkTemplateService templates = mock(LinkTemplateService.class);
   private final KolImportService service =
-      new KolImportService(imports, current, kols, writer, bdUsers);
+      new KolImportService(imports, current, kols, writer, bdUsers, templates);
   private final ImportFileDTO file = new ImportFileDTO("k.xlsx", "x", new byte[] {1});
 
   private void actAs(long id, Role role, DataScope scope) {
@@ -53,8 +53,8 @@ class KolImportServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldCaptureBdSubmitter_whenBdImports() {
-    actAs(5L, Role.OPERATOR, DataScope.OWN);
-    when(imports.submitImport(any(), any(), any(), any(), anyInt())).thenReturn(42L);
+    actAs(5L, Role.STAFF, DataScope.OWN);
+    when(imports.submitImport(any(), any(), any(), any(), any(), anyInt())).thenReturn(42L);
     assertThat(service.submit(file)).isEqualTo(42L);
     ArgumentCaptor<Supplier<ImportRowProcessor>> processor =
         ArgumentCaptor.forClass(Supplier.class);
@@ -62,10 +62,11 @@ class KolImportServiceTest {
         .submitImport(
             eq(TaskType.KOL_IMPORT),
             eq(KolImportColumn.headerKeys()),
+            eq(KolImportColumn.legacyHeaderKeys()),
             eq(file),
             processor.capture(),
             eq(TaskType.KOL_IMPORT.maxRows()));
-    List<String> row = new java.util.ArrayList<>(List.of("", "A", "a@x.io", "US", "ghost"));
+    List<String> row = new ArrayList<>(List.of("", "A", "a@x.io", "US", "ghost"));
     while (row.size() < KolImportColumn.values().length) {
       row.add("");
     }
@@ -77,9 +78,9 @@ class KolImportServiceTest {
   }
 
   @Test
-  void shouldReturn403_whenFinanceImports() {
-    actAs(1L, Role.FINANCE, DataScope.ALL);
-    assertThatThrownBy(() -> service.submit(file)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
-    verifyNoInteractions(imports);
+  void shouldSubmit_whenStaffWithAllScopeImports() {
+    actAs(1L, Role.STAFF, DataScope.ALL);
+    when(imports.submitImport(any(), any(), any(), any(), any(), anyInt())).thenReturn(7L);
+    assertThat(service.submit(file)).isEqualTo(7L);
   }
 }

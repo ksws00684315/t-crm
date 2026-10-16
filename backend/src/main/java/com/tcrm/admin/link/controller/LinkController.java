@@ -1,7 +1,7 @@
 package com.tcrm.admin.link.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.link.service.LinkRebuildService;
 import com.tcrm.admin.link.service.LinkService;
 import com.tcrm.admin.shared.AuditLog;
@@ -17,8 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Tracking links and the Redis link index (task 06 §5). Roles are checked here; the BD data scope
- * (OPERATOR + OWN sees only their own KOLs, 403 otherwise) is enforced by the service.
+ * Tracking links and the Redis link index (task 06 §5). Listing requires product:view. A staff
+ * account with OWN scope can list only KOLs assigned to them. Rebuilding the index is super-admin
+ * only.
  */
 @RestController
 @RequestMapping("/admin-api/link")
@@ -33,9 +34,7 @@ public class LinkController {
 
   /** Links of one KOL ordered by original product code, with 30-day click counts. */
   @GetMapping("/links")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:view")
   public R<PageResult<LinkVO>> list(@Valid @ModelAttribute LinkQuery q) {
     return R.ok(links.page(q.toFilter()).map(LinkVO::from));
   }

@@ -9,8 +9,7 @@ installGuard(router, () => {
   const user = useUserStore();
   return {
     isLoggedIn: user.isLoggedIn,
-    roles: user.roles,
-    dataScope: user.user?.dataScope
+    ...user.access
   };
 });
 

@@ -27,7 +27,7 @@ server {
     ssl_reject_handshake on;
 }
 
-# ---- t.<domain>: redirect service (only /t/... and /healthz are exposed) ----
+# ---- t.<domain>: redirect service (only /t/..., /i/... and /healthz are exposed) ----
 server {
     listen 443 ssl;
     http2 on;
@@ -36,6 +36,14 @@ server {
     include /etc/nginx/snippets/security-headers.conf;
 
     location /t/ {
+        limit_req zone=tcrm_redirect burst=60 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-redirect:8081;
+    }
+
+    # Links written by the customer's sheet script: /i/{copied Weidian item ID} (ADR-019).
+    location /i/ {
         limit_req zone=tcrm_redirect burst=60 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;

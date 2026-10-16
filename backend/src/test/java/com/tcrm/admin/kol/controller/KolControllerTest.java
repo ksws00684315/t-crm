@@ -62,12 +62,18 @@ class KolControllerTest {
         "Alice",
         "alice@example.com",
         "US",
-        List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L)),
+        List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L, false)),
         5L,
         "bd5",
         new BigDecimal("0.155"),
         1,
         null,
+        "+12345678",
+        77L,
+        "kakobuy",
+        "aff-01",
+        "https://docs.google.com/spreadsheets/d/1/edit",
+        1,
         Instant.parse("2026-10-05T00:00:00Z"),
         Instant.parse("2026-10-05T00:00:01Z"));
   }
@@ -81,7 +87,7 @@ class KolControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldListWithStringIdsAndFourDecimalRate_whenAnyRoleReads(Role role, DataScope scope)
       throws Exception {
     when(kols.page(any())).thenReturn(new PageResult<>(List.of(kol()), 1, 1, 20));
@@ -106,7 +112,7 @@ class KolControllerTest {
                 .param("country", "us")
                 .param("status", "1")
                 .param("bdUserId", "5")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.OWN)))
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isOk());
     verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, 1, 20));
   }
@@ -136,7 +142,7 @@ class KolControllerTest {
                         Instant.parse("2026-10-01T00:00:00Z"),
                         Instant.parse("2026-10-02T00:00:00Z")))));
     mvc.perform(
-            get(BASE + "/11").header(AdminMvcSupport.TOKEN_HEADER, as(Role.FINANCE, DataScope.ALL)))
+            get(BASE + "/11").header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
         .andExpect(jsonPath("$.data.kol").doesNotExist())
@@ -150,8 +156,7 @@ class KolControllerTest {
   void shouldReturn403_whenServiceDeniesBdAccessToAnotherKol() throws Exception {
     when(kols.get(11L)).thenThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN));
     mvc.perform(
-            get(BASE + "/11")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.OWN)))
+            get(BASE + "/11").header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
   }
@@ -161,9 +166,14 @@ class KolControllerTest {
     when(kols.create(any())).thenReturn(kol());
     mvc.perform(
             json(post(BASE), VALID)
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.ALL)))
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"));
+        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.whatsapp").value("+12345678"))
+        .andExpect(jsonPath("$.data.linkTemplateId").value("77"))
+        .andExpect(jsonPath("$.data.linkTemplateName").value("kakobuy"))
+        .andExpect(jsonPath("$.data.inviteCode").value("aff-01"))
+        .andExpect(jsonPath("$.data.registerSource").value(1));
     var command = ArgumentCaptor.forClass(CreateKolCommand.class);
     verify(kols).create(command.capture());
     org.assertj.core.api.Assertions.assertThat(command.getValue())
@@ -172,10 +182,59 @@ class KolControllerTest {
                 "Alice",
                 "alice@example.com",
                 "US",
-                List.of(new SocialAccountDTO("TikTok", "@a", "https://t.example/a", 12000L)),
+                List.of(new SocialAccountDTO("TikTok", "@a", "https://t.example/a", 12000L, false)),
                 5L,
                 new BigDecimal("0.155"),
-                "VIP"));
+                "VIP",
+                null,
+                null,
+                null,
+                null));
+  }
+
+  @Test
+  void shouldConvertProfileFields_whenCreateCarriesThem() throws Exception {
+    when(kols.create(any())).thenReturn(kol());
+    mvc.perform(
+            json(
+                    post(BASE),
+                    "{\"name\":\"A\",\"email\":\"a@x.io\",\"whatsapp\":\"+12345678\","
+                        + "\"linkTemplateId\":\"77\",\"inviteCode\":\"aff-01\","
+                        + "\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1\","
+                        + "\"socialAccounts\":[{\"platform\":\"T\",\"handle\":\"h\",\"primary\":true}]}")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk());
+    var command = ArgumentCaptor.forClass(CreateKolCommand.class);
+    verify(kols).create(command.capture());
+    org.assertj.core.api.Assertions.assertThat(command.getValue())
+        .isEqualTo(
+            new CreateKolCommand(
+                "A",
+                "a@x.io",
+                null,
+                List.of(new SocialAccountDTO("T", "h", null, null, true)),
+                null,
+                null,
+                null,
+                "+12345678",
+                77L,
+                "aff-01",
+                "https://docs.google.com/spreadsheets/d/1"));
+  }
+
+  @Test
+  void shouldReturn400_whenTwoSocialAccountsClaimPrimary() throws Exception {
+    when(kols.create(any())).thenReturn(kol());
+    mvc.perform(
+            json(
+                    post(BASE),
+                    "{\"name\":\"A\",\"email\":\"a@x.io\","
+                        + "\"socialAccounts\":[{\"platform\":\"T\",\"handle\":\"h\",\"primary\":true},"
+                        + "{\"platform\":\"I\",\"handle\":\"i\",\"primary\":true}]}")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("KOL_MULTIPLE_PRIMARY"));
+    verifyNoInteractions(kols);
   }
 
   @ParameterizedTest
@@ -242,7 +301,10 @@ class KolControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(kols)
-        .update(11L, new EditKolCommand("A", "a@x.io", "gb", List.of(), new BigDecimal("0"), null));
+        .update(
+            11L,
+            new EditKolCommand(
+                "A", "a@x.io", "gb", List.of(), new BigDecimal("0"), null, null, null, null, null));
     mvc.perform(
             json(put(BASE + "/11/status"), "{\"status\":0}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
@@ -271,8 +333,9 @@ class KolControllerTest {
   }
 
   @Test
-  void shouldReturn403WithoutCallingService_whenFinanceWrites() throws Exception {
-    String token = as(Role.FINANCE, DataScope.ALL);
+  void shouldReturn403WithoutCallingService_whenStaffLacksKolEdit() throws Exception {
+    String token =
+        AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL, java.util.Set.of("kol:view"));
     mvc.perform(json(post(BASE), VALID).header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
     mvc.perform(json(put(BASE + "/11"), VALID).header(AdminMvcSupport.TOKEN_HEADER, token))
@@ -285,7 +348,30 @@ class KolControllerTest {
             json(put(BASE + "/11/bd-user"), "{\"bdUserId\":null}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
+    mvc.perform(post(BASE + "/11/invite").header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isForbidden());
     verifyNoInteractions(kols);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
+  void shouldResendInvite_whenWriterCalls(Role role, DataScope scope) throws Exception {
+    String token = as(role, scope);
+    mvc.perform(post(BASE + "/11/invite").header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk());
+    verify(kols).resendInvite(11L);
+  }
+
+  @Test
+  void shouldMapConflict_whenKolIsAlreadyActivated() throws Exception {
+    org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.KOL_ALREADY_ACTIVATED))
+        .when(kols)
+        .resendInvite(anyLong());
+    mvc.perform(
+            post(BASE + "/11/invite")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("KOL_ALREADY_ACTIVATED"));
   }
 
   @Test
@@ -296,7 +382,7 @@ class KolControllerTest {
     org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN))
         .when(kols)
         .updateStatus(anyLong(), anyInt());
-    String token = as(Role.OPERATOR, DataScope.OWN);
+    String token = as(Role.STAFF, DataScope.OWN);
     mvc.perform(
             json(put(BASE + "/11/bd-user"), "{\"bdUserId\":\"5\"}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))

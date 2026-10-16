@@ -76,10 +76,25 @@ public class ImportTaskService implements ImportTaskApi {
       ImportFileDTO file,
       Supplier<ImportRowProcessor> processor,
       int maxRows) {
+    return submitImport(type, headerKeys, List.of(), file, processor, maxRows);
+  }
+
+  @Override
+  public Long submitImport(
+      TaskType type,
+      List<String> headerKeys,
+      List<String> legacyHeaderKeys,
+      ImportFileDTO file,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows) {
     excel.check(file);
     // The file must carry one full template language; the worker later re-reads the same variant.
-    ExcelFiles.SheetData sheet =
-        excel.read(file.content(), variants(headerKeys, AppLocale.ZH_CN, AppLocale.EN_US), maxRows);
+    List<List<String>> variants =
+        new ArrayList<>(variants(headerKeys, AppLocale.ZH_CN, AppLocale.EN_US));
+    if (legacyHeaderKeys != null && !legacyHeaderKeys.isEmpty()) {
+      variants.addAll(variants(legacyHeaderKeys, AppLocale.ZH_CN, AppLocale.EN_US));
+    }
+    ExcelFiles.SheetData sheet = excel.read(file.content(), List.copyOf(variants), maxRows);
     int total = sheet.rows().size();
     TaskDO task = new TaskDO();
     task.setTaskType(type);

@@ -30,6 +30,7 @@ class CompanyTenantLineHandlerTest {
     assertThat(CompanyTenantLineHandler.normalize("\"Public\".Sys_Tenant")).isEqualTo("sys_tenant");
     assertThat(handler.ignoreTable("public.sys_tenant")).isTrue();
     assertThat(handler.ignoreTable("\"crm_link_index_outbox\"")).isTrue();
+    assertThat(handler.ignoreTable("crm_fx_rate")).isTrue();
     assertThat(handler.ignoreTable("crm_kol")).isFalse();
     assertThat(handler.ignoreTable(null)).isFalse();
   }

@@ -18,6 +18,8 @@ const admin: UserVO = {
   nickname: "Root",
   email: null,
   role: "SUPER_ADMIN",
+  postTemplate: null,
+  permissions: [],
   dataScope: "ALL",
   tenantId: "1",
   tenantName: "默认公司",
@@ -32,7 +34,7 @@ function appWithSession() {
   setActivePinia(createPinia()); // a fresh store reads the saved session, like a page reload
   const store = useUserStore();
   const router = createRouter({ history: createMemoryHistory(), routes });
-  installGuard(router, () => ({ isLoggedIn: store.isLoggedIn, roles: store.roles }));
+  installGuard(router, () => ({ isLoggedIn: store.isLoggedIn, ...store.access }));
   setupHttp(router);
   return { store, router };
 }
@@ -138,6 +140,7 @@ describe("stored session", () => {
   it("restores a valid session into the store", () => {
     const { store } = appWithSession();
     expect(store.isLoggedIn).toBe(true);
-    expect(store.roles).toEqual(["SUPER_ADMIN"]);
+    expect(store.isSuperAdmin).toBe(true);
+    expect(store.access.can("kol:view")).toBe(true);
   });
 });

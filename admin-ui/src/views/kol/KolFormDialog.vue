@@ -27,7 +27,7 @@ const props = defineProps<{
   modelValue: boolean;
   /** The KOL being edited; null creates a new one. */
   kol: KolVO | null;
-  /** Show the BD picker (SUPER_ADMIN and OPERATOR + ALL, create only). */
+  /** Show the BD picker when creating (super administrator, or kol:edit outside OWN). */
   canPickBd: boolean;
   bdUsers: BdUserVO[];
 }>();
@@ -176,6 +176,7 @@ async function submit() {
       </el-form-item>
       <el-form-item
         v-if="!editing && canPickBd"
+        data-test="assign-bd"
         :label="t('kol.bd')"
         prop="bdUserId"
         :error="serverErrors.bdUserId"

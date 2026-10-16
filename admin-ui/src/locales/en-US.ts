@@ -46,12 +46,98 @@ const enUS: MessageSchema = {
   role: {
     PLATFORM_ADMIN: "Platform Admin",
     SUPER_ADMIN: "Super Admin",
+    STAFF: "Staff"
+  },
+  post: {
     OPERATOR: "Operator",
-    FINANCE: "Finance"
+    BD: "BD",
+    none: "—"
+  },
+  permissionGroup: {
+    KOL: "Creators",
+    PRODUCT: "Products",
+    ORDER: "Orders",
+    FUNDS: "Funds",
+    DASHBOARD: "Dashboards",
+    OTHER: "Other"
+  },
+  permission: {
+    "kol:view": {
+      name: "View creators",
+      desc: "View the creator list, details, and BD history"
+    },
+    "kol:edit": {
+      name: "Edit creators",
+      desc: "Create, edit, enable or disable creators, set rates and purchasing details, and import"
+    },
+    "kol:register-link": {
+      name: "Registration links",
+      desc: "Manage your own creator registration links"
+    },
+    "kol:copy-token": {
+      name: "Copy tokens",
+      desc: "Issue or revoke a creator's copy token"
+    },
+    "product:view": {
+      name: "View products",
+      desc: "View shops, source products, mappings, and tracking links"
+    },
+    "product:edit": {
+      name: "Edit products",
+      desc: "Import and edit source products, and import mappings"
+    },
+    "product:status": {
+      name: "Shelf status",
+      desc: "Put source products on or off the shelf"
+    },
+    "order:view": {
+      name: "View orders",
+      desc: "View orders and line items"
+    },
+    "order:manage": {
+      name: "Manage orders",
+      desc: "Import orders, sync them manually, and match them by hand"
+    },
+    "commission:view": {
+      name: "View commission",
+      desc: "View the commission ledger, balances, withdrawals, and prepay"
+    },
+    "commission:freeze": {
+      name: "Freeze withdrawals",
+      desc: "Freeze or unfreeze a creator's withdrawals"
+    },
+    "payout-account:review": {
+      name: "Review payout accounts",
+      desc: "Approve or reject a creator's payout account"
+    },
+    "withdrawal:review": {
+      name: "Review withdrawals",
+      desc: "Approve or reject a creator's withdrawal request"
+    },
+    "prepay:apply": {
+      name: "Apply for prepay",
+      desc: "Submit or withdraw a prepay request for a creator"
+    },
+    "dashboard:shop": {
+      name: "Shop dashboard",
+      desc: "View the shop and product dashboards"
+    },
+    "dashboard:team": {
+      name: "Team dashboard",
+      desc: "View the BD dashboard"
+    },
+    "dashboard:kol": {
+      name: "Creator dashboard",
+      desc: "View a creator's dashboard on their behalf"
+    },
+    "data:export": {
+      name: "Export data",
+      desc: "Export lists you are allowed to view"
+    }
   },
   scope: {
-    ALL: "All Data",
-    OWN: "Own Data Only (Operator)",
+    ALL: "All data",
+    OWN: "Only creators I manage",
     allShort: "All",
     ownShort: "Own only"
   },
@@ -88,11 +174,20 @@ const enUS: MessageSchema = {
     TENANT_CODE_EXISTS: "This company code already exists.",
     USER_CANNOT_DISABLE_SELF: "You cannot disable your own account.",
     USER_CANNOT_REMOVE_SELF_ROLE: "You cannot remove your own Super Admin role.",
-    USER_INVALID_DATA_SCOPE: "Own Data Only applies to the Operator role.",
+    USER_INVALID_DATA_SCOPE: "Own Data Only applies only to a staff account.",
+    USER_PERMISSION_INVALID: "Those permissions are not valid. Choose them again.",
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
     KOL_EMAIL_EXISTS: "This email is already used by another creator.",
     KOL_CODE_EXISTS: "This creator code already exists.",
-    KOL_INVALID_BD_USER: "BD must be an enabled Operator account with Own Data Only.",
+    KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
+    KOL_AUTH_TOKEN_INVALID: "The invitation or reset link is invalid, expired, or already used.",
+    KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
+    KOL_INVALID_BD_USER:
+      "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
+    KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
+    LINK_TEMPLATE_INVALID: "The agent template must be an enabled template of this company.",
+    LINK_TEMPLATE_NOT_FOUND: "The agent template was not found.",
+    LINK_TEMPLATE_CODE_EXISTS: "This template code already exists.",
     TASK_QUEUE_FULL: "Too many tasks are waiting. Please try again later.",
     TASK_FILE_INVALID: "The file format is not valid. Upload an .xlsx Excel file.",
     TASK_FILE_TOO_LARGE: "The file is larger than 20MB. Split it and upload again.",
@@ -298,8 +393,24 @@ const enUS: MessageSchema = {
     create: "Create User",
     editTitle: "Edit User",
     createTitle: "Create User",
-    role: "Role",
-    dataScope: "Data Scope",
+    role: "Account type",
+    post: "Post",
+    postTemplate: "Post template",
+    permissionCount: "Permissions",
+    permissionItems: "{n} items",
+    allPermissions: "Has every permission",
+    allPermissionsShort: "All",
+    permissionsTitle: "Permissions",
+    permissionsSaved: "Permissions saved.",
+    permissionsSeparate: "Permissions are saved separately from Permissions in the list.",
+    currentPost: "Current post: {post}",
+    selectAll: "Select all",
+    resetTemplate: "Reset from template",
+    exclusiveTitle: "Super Admin only. These cannot be granted.",
+    exclusiveItems:
+      "Users and permissions, system settings, the audit log, prepay approval, marking a withdrawal as paid, and transferring creators.",
+    templateRequired: "Choose a post template",
+    dataScope: "Data scope",
     lastLogin: "Last sign-in",
     initialPassword: "Initial password",
     resetPassword: "Reset Password",

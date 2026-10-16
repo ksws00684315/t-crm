@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Permission;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -14,6 +16,8 @@ import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,12 +32,17 @@ public class UserService {
   private final SysUserMapper users;
   private final BCryptPasswordEncoder passwords;
   private final CurrentUserContext current;
+  private final UserPermissionService permissions;
 
   public UserService(
-      SysUserMapper users, BCryptPasswordEncoder passwords, CurrentUserContext current) {
+      SysUserMapper users,
+      BCryptPasswordEncoder passwords,
+      CurrentUserContext current,
+      UserPermissionService permissions) {
     this.users = users;
     this.passwords = passwords;
     this.current = current;
+    this.permissions = permissions;
   }
 
   public PageResult<UserDTO> page(
@@ -46,15 +55,20 @@ public class UserService {
             .eq(status != null, SysUserDO::getStatus, status)
             .orderByDesc(SysUserDO::getCreateTime, SysUserDO::getId);
     var result = users.selectPage(new Page<>(page, size), query);
+    Map<Long, List<String>> stored =
+        permissions.storedCodes(result.getRecords().stream().map(SysUserDO::getId).toList());
     return new PageResult<>(
-        result.getRecords().stream().map(UserDTO::from).toList(),
+        result.getRecords().stream()
+            .map(user -> UserDTO.from(user, visible(user, stored)))
+            .toList(),
         result.getTotal(),
         (int) page,
         (int) size);
   }
 
+  @Transactional(rollbackFor = Exception.class)
   public UserDTO create(CreateUserCommand r) {
-    validateScope(r.role(), r.dataScope());
+    Resolved resolved = resolve(r.role(), r.postTemplate(), r.dataScope(), r.permissions(), true);
     if (TenantScope.callSystem(
         "username uniqueness", () -> users.countByUsername(r.username()) > 0)) {
       throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
@@ -64,8 +78,9 @@ public class UserService {
     user.setPasswordHash(passwords.encode(r.password()));
     user.setNickname(r.nickname());
     user.setEmail(r.email());
-    user.setRole(r.role());
-    user.setDataScope(r.dataScope());
+    user.setRole(resolved.role());
+    user.setDataScope(resolved.dataScope());
+    user.setPostTemplate(resolved.postTemplate());
     user.setStatus(1);
     user.setDeleted(false);
     try {
@@ -74,17 +89,20 @@ public class UserService {
       // Only username has a unique key on sys_user; see uk_sys_user_username.
       throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
     }
-    return UserDTO.from(user);
+    if (resolved.role() == Role.STAFF) {
+      permissions.grant(user.getId(), current.user().tenantId(), resolved.codes());
+    }
+    return UserDTO.from(user, visible(user, Map.of(user.getId(), resolved.codes())));
   }
 
   @Transactional(rollbackFor = Exception.class)
   public void update(Long id, EditUserCommand r) {
-    validateScope(r.role(), r.dataScope());
+    Resolved resolved = resolve(r.role(), r.postTemplate(), r.dataScope(), null, false);
     SysUserDO target = require(id);
-    if (id.equals(current.id()) && r.role() != Role.SUPER_ADMIN) {
+    if (id.equals(current.id()) && resolved.role() != Role.SUPER_ADMIN) {
       throw new BusinessException(ErrorCode.USER_CANNOT_REMOVE_SELF_ROLE);
     }
-    if (target.getRole() == Role.SUPER_ADMIN && r.role() != Role.SUPER_ADMIN) {
+    if (target.getRole() == Role.SUPER_ADMIN && resolved.role() != Role.SUPER_ADMIN) {
       requireAnotherSuperAdmin(id);
     }
     write(
@@ -92,8 +110,14 @@ public class UserService {
         new LambdaUpdateWrapper<SysUserDO>()
             .set(SysUserDO::getNickname, r.nickname())
             .set(SysUserDO::getEmail, r.email())
-            .set(SysUserDO::getRole, r.role())
-            .set(SysUserDO::getDataScope, r.dataScope()));
+            .set(SysUserDO::getRole, resolved.role())
+            .set(SysUserDO::getDataScope, resolved.dataScope())
+            .set(SysUserDO::getPostTemplate, resolved.postTemplate()));
+    if (target.getRole() != Role.STAFF && resolved.role() == Role.STAFF) {
+      permissions.grant(id, target.getTenantId(), resolved.codes());
+    } else if (resolved.role() != Role.STAFF) {
+      permissions.clear(id);
+    }
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -150,17 +174,46 @@ public class UserService {
     return user;
   }
 
-  private void validateScope(Role role, DataScope scope) {
-    if (role == Role.PLATFORM_ADMIN) {
+  /**
+   * Super administrators ignore a supplied template and permission list. A staff account requires a
+   * template. An omitted data scope uses the template default, or ALL for a super administrator.
+   * OWN is rejected for anyone who is not staff.
+   */
+  private Resolved resolve(
+      Role role, PostTemplate template, DataScope scope, List<String> requested, boolean creating) {
+    if (role == null || role == Role.PLATFORM_ADMIN) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    if (scope == DataScope.OWN && role != Role.OPERATOR) {
-      throw new BusinessException(ErrorCode.USER_INVALID_DATA_SCOPE);
+    if (role == Role.SUPER_ADMIN) {
+      if (scope == DataScope.OWN) {
+        throw new BusinessException(ErrorCode.USER_INVALID_DATA_SCOPE);
+      }
+      return new Resolved(Role.SUPER_ADMIN, scope == null ? DataScope.ALL : scope, null, List.of());
     }
+    if (template == null) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    DataScope dataScope = scope == null ? template.dataScope() : scope;
+    List<String> codes =
+        creating && requested != null
+            ? permissions.canonical(requested)
+            : template.permissionCodes();
+    return new Resolved(Role.STAFF, dataScope, template, codes);
+  }
+
+  private static List<String> visible(SysUserDO user, Map<Long, List<String>> stored) {
+    return switch (user.getRole()) {
+      case SUPER_ADMIN -> Permission.codes();
+      case STAFF -> stored.getOrDefault(user.getId(), List.of());
+      default -> List.of();
+    };
   }
 
   /** Escapes LIKE wildcards and the escape character itself (PostgreSQL default escape "\"). */
   private static String escapeLike(String value) {
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
+
+  private record Resolved(
+      Role role, DataScope dataScope, PostTemplate postTemplate, List<String> codes) {}
 }

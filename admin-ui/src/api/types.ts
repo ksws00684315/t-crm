@@ -24,10 +24,37 @@ export interface FieldErrorVO {
   message: string;
 }
 
-export type Role = "PLATFORM_ADMIN" | "SUPER_ADMIN" | "OPERATOR" | "FINANCE";
-/** Roles that company administrators may assign to another company user. */
+export type Role = "PLATFORM_ADMIN" | "SUPER_ADMIN" | "STAFF";
+/** Roles that a company super administrator may assign to another company user. */
 export type CompanyRole = Exclude<Role, "PLATFORM_ADMIN">;
 export type DataScope = "ALL" | "OWN";
+
+/**
+ * Post chosen when a sub-account is created. It only pre-fills permissions (ADR-018);
+ * it is not itself a role.
+ */
+export type PostTemplate = "OPERATOR" | "BD";
+
+/** The 18 permission codes in design §3.1. The API may also return codes this build does not know. */
+export type PermissionCode =
+  | "kol:view"
+  | "kol:edit"
+  | "kol:register-link"
+  | "kol:copy-token"
+  | "product:view"
+  | "product:edit"
+  | "product:status"
+  | "order:view"
+  | "order:manage"
+  | "commission:view"
+  | "commission:freeze"
+  | "payout-account:review"
+  | "withdrawal:review"
+  | "prepay:apply"
+  | "dashboard:shop"
+  | "dashboard:team"
+  | "dashboard:kol"
+  | "data:export";
 
 /** `UserVO`. Ids are strings (backend Long), time stamps are ISO 8601 instants. */
 export interface UserVO {
@@ -36,6 +63,13 @@ export interface UserVO {
   nickname: string;
   email: string | null;
   role: Role;
+  /** Null for a super administrator and the platform administrator. */
+  postTemplate: PostTemplate | null;
+  /**
+   * Granted codes. A super administrator still receives the field; `can()` does not consult it.
+   * Typed as strings so a code this build does not know yet is shown as-is and does not throw.
+   */
+  permissions: string[];
   dataScope: DataScope;
   /** Null for the platform administrator; optional at runtime for older backend responses. */
   tenantId: string | null;
@@ -88,7 +122,7 @@ export interface KolDetailVO extends KolVO {
   bdHistory: BdHistoryVO[];
 }
 
-/** `BdUserVO`: a selectable BD (enabled OPERATOR with OWN data scope). */
+/** `BdUserVO`: a selectable BD (enabled staff the backend accepts as a creator owner). */
 export interface BdUserVO {
   id: string;
   username: string;

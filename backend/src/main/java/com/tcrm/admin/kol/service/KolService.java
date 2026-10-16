@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -10,8 +11,6 @@ import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -34,8 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * KOL management with BD data scope (task 04 §4.2, §4.3; design §3). Scope is enforced here, never
- * by the client: an OPERATOR with OWN scope (a BD) sees and changes only the KOLs assigned to them
- * and gets 403 for any other KOL; FINANCE is read-only.
+ * by the client: a staff account with OWN scope sees and changes only the KOLs assigned to them and
+ * gets 403 for any other KOL. Write access is declared on the controller.
  */
 @Service
 public class KolService {
@@ -43,35 +42,36 @@ public class KolService {
   private final KolBdHistoryMapper history;
   private final KolWriter writer;
   private final BdUserApi bdUsers;
+  private final LinkTemplateService templates;
   private final CurrentUserContext current;
   private final TransactionTemplate tx;
   private final ApplicationEventPublisher events;
+  private final KolInvites invites;
 
   public KolService(
       KolMapper kols,
       KolBdHistoryMapper history,
       KolWriter writer,
       BdUserApi bdUsers,
+      LinkTemplateService templates,
       CurrentUserContext current,
       TransactionTemplate tx,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      KolInvites invites) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
     this.bdUsers = bdUsers;
+    this.templates = templates;
     this.current = current;
     this.tx = tx;
     this.events = events;
-  }
-
-  /** True for a BD: OPERATOR with OWN data scope (OWN is only valid for OPERATOR). */
-  static boolean own(AccountDTO user) {
-    return user.role() == Role.OPERATOR && user.dataScope() == DataScope.OWN;
+    this.invites = invites;
   }
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
     AccountDTO user = current.user();
-    Long bd = own(user) ? user.id() : filter.bdUserId();
+    Long bd = user.ownScope() ? user.id() : filter.bdUserId();
     String keyword = filter.keyword() == null ? "" : filter.keyword().strip();
     String pattern = "%" + escapeLike(keyword) + "%";
     var query =
@@ -91,8 +91,10 @@ public class KolService {
             .orderByDesc(KolDO::getCreateTime, KolDO::getId);
     var result = kols.selectPage(new Page<>(filter.page(), filter.size()), query);
     Map<Long, String> names = bdNames(result.getRecords().stream().map(KolDO::getBdUserId));
+    Map<Long, String> templates =
+        templateNames(result.getRecords().stream().map(KolDO::getLinkTemplateId));
     return new PageResult<>(
-        result.getRecords().stream().map(kol -> toDto(kol, names)).toList(),
+        result.getRecords().stream().map(kol -> toDto(kol, names, templates)).toList(),
         result.getTotal(),
         filter.page(),
         filter.size());
@@ -110,7 +112,7 @@ public class KolService {
             Stream.concat(
                 Stream.of(kol.getBdUserId()), periods.stream().map(KolBdHistoryDO::getBdUserId)));
     return new KolDetailDTO(
-        toDto(kol, names),
+        toDto(kol, names, templateNames(Stream.of(kol.getLinkTemplateId()))),
         periods.stream()
             .map(
                 p ->
@@ -123,8 +125,9 @@ public class KolService {
   }
 
   public KolDTO create(CreateKolCommand c) {
-    AccountDTO user = requireWriter();
-    Long bd = own(user) ? user.id() : usableBd(c.bdUserId());
+    AccountDTO user = current.user();
+    Long bd = user.ownScope() ? user.id() : usableBd(c.bdUserId());
+    Long templateId = usableTemplate(c.linkTemplateId());
     String email = normalizeEmail(c.email());
     if (emailTaken(email, null)) {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
@@ -132,52 +135,91 @@ public class KolService {
     KolDO kol = new KolDO();
     kol.setName(c.name().strip());
     kol.setEmail(email);
-    kol.setCountry(c.country().strip().toUpperCase(Locale.ROOT));
+    kol.setCountry(country(c.country()));
     kol.setSocialAccounts(SocialAccountsJson.write(c.socialAccounts()));
     kol.setBdUserId(bd);
     kol.setDefaultRate(c.defaultRate());
     kol.setStatus(1);
     kol.setRemark(blankToNull(c.remark()));
+    kol.setWhatsapp(blankToNull(c.whatsapp()));
+    kol.setLinkTemplateId(templateId);
+    kol.setInviteCode(blankToNull(c.inviteCode()));
+    kol.setSheetUrl(blankToNull(c.sheetUrl()));
+    kol.setRegisterSource(1);
     writer.insert(kol, null, user.id());
     // Re-read so timestamps match later reads (the database keeps milliseconds).
     KolDO saved = kols.selectById(kol.getId());
-    return toDto(saved == null ? kol : saved, bdNames(Stream.of(bd)));
+    // The invitation mail is sent after the row is committed (KolWriter commits its own
+    // transaction); a transport failure is a WARN and the back office can resend (task 12a §4.4).
+    // Excel imports bypass this method and never auto-invite.
+    invites.issueAndSend(kol.getId());
+    return toDto(
+        saved == null ? kol : saved, bdNames(Stream.of(bd)), templateNames(Stream.of(templateId)));
+  }
+
+  /**
+   * Resends the invitation: every unused invitation token is invalidated first, so only the newest
+   * link stays usable. 409 for an already-activated KOL (task 12a §4.3).
+   */
+  public void resendInvite(Long id) {
+    AccountDTO user = current.user();
+    KolDO kol = requireVisible(id, user);
+    if (Integer.valueOf(1).equals(kol.getAccountStatus())) {
+      throw new BusinessException(ErrorCode.KOL_ALREADY_ACTIVATED);
+    }
+    invites.issueAndSend(id);
   }
 
   /**
    * Updates editable KOL fields only. Uses a column whitelist so a concurrent {@link #updateBdUser}
-   * cannot be overwritten with a stale {@code bd_user_id} (never set here).
+   * cannot be overwritten with a stale {@code bd_user_id} (never set here). A change of the link
+   * target inputs (template or invite code) publishes {@link KolLinkTargetChangedEvent} in the same
+   * transaction, registering a link index refresh (task 11 §4.4; ADR-013).
    */
   public void update(Long id, EditKolCommand c) {
-    AccountDTO user = requireWriter();
-    requireVisible(id, user);
+    AccountDTO user = current.user();
+    KolDO existing = requireVisible(id, user);
+    Long templateId = usableTemplate(c.linkTemplateId());
     String email = normalizeEmail(c.email());
     if (emailTaken(email, id)) {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
     Instant now = Instant.now();
-    int updated;
-    try {
-      updated =
-          kols.update(
-              null,
-              scoped(id, user)
-                  .set(KolDO::getName, c.name().strip())
-                  .set(KolDO::getEmail, email)
-                  .set(KolDO::getCountry, c.country().strip().toUpperCase(Locale.ROOT))
-                  .set(
-                      KolDO::getSocialAccounts,
-                      SocialAccountsJson.write(c.socialAccounts()),
-                      "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
-                  .set(KolDO::getDefaultRate, c.defaultRate())
-                  .set(KolDO::getRemark, blankToNull(c.remark()))
-                  .set(KolDO::getUpdateBy, user.id())
-                  .set(KolDO::getUpdateTime, now));
-    } catch (DuplicateKeyException e) {
-      // Only uk_crm_kol_email can be violated by an edit; the code never changes here.
-      throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
-    }
-    requireUpdated(updated, user);
+    tx.executeWithoutResult(
+        txStatus -> {
+          int updated;
+          try {
+            updated =
+                kols.update(
+                    null,
+                    scoped(id, user)
+                        .set(KolDO::getName, c.name().strip())
+                        .set(KolDO::getEmail, email)
+                        .set(KolDO::getCountry, country(c.country()))
+                        .set(
+                            KolDO::getSocialAccounts,
+                            SocialAccountsJson.write(c.socialAccounts()),
+                            "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
+                        .set(KolDO::getDefaultRate, c.defaultRate())
+                        .set(KolDO::getRemark, blankToNull(c.remark()))
+                        .set(KolDO::getWhatsapp, blankToNull(c.whatsapp()))
+                        .set(KolDO::getLinkTemplateId, templateId)
+                        .set(KolDO::getInviteCode, blankToNull(c.inviteCode()))
+                        .set(KolDO::getSheetUrl, blankToNull(c.sheetUrl()))
+                        .set(KolDO::getUpdateBy, user.id())
+                        .set(KolDO::getUpdateTime, now));
+          } catch (DuplicateKeyException e) {
+            // Only uk_crm_kol_email can be violated by an edit; the code never changes here.
+            throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
+          }
+          requireUpdated(updated, user);
+          boolean targetChanged =
+              !Objects.equals(existing.getLinkTemplateId(), templateId)
+                  || !Objects.equals(existing.getInviteCode(), blankToNull(c.inviteCode()));
+          if (targetChanged) {
+            TransactionalEvents.publish(events, new KolLinkTargetChangedEvent(id));
+          }
+        });
   }
 
   /**
@@ -186,7 +228,7 @@ public class KolService {
    * applied afterwards (task 06b).
    */
   public void updateStatus(Long id, int status) {
-    AccountDTO user = requireWriter();
+    AccountDTO user = current.user();
     requireVisible(id, user);
     Instant now = Instant.now();
     tx.executeWithoutResult(
@@ -208,8 +250,8 @@ public class KolService {
    * ownership period closed and a new one opened, including changes to or from "unassigned".
    */
   public void updateBdUser(Long id, Long bdUserId) {
-    AccountDTO user = requireWriter();
-    if (own(user)) {
+    AccountDTO user = current.user();
+    if (user.ownScope()) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     Long bd = usableBd(bdUserId);
@@ -248,14 +290,14 @@ public class KolService {
   private static LambdaUpdateWrapper<KolDO> scoped(Long id, AccountDTO user) {
     return new LambdaUpdateWrapper<KolDO>()
         .eq(KolDO::getId, id)
-        .eq(own(user), KolDO::getBdUserId, user.id());
+        .eq(user.ownScope(), KolDO::getBdUserId, user.id());
   }
 
   /** No row updated: the KOL left the BD's scope meanwhile (403), or no longer exists (404). */
   private static void requireUpdated(int updated, AccountDTO user) {
     if (updated == 0) {
       throw new BusinessException(
-          own(user) ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
+          user.ownScope() ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
     }
   }
 
@@ -271,21 +313,13 @@ public class KolService {
     return bd.id();
   }
 
-  private AccountDTO requireWriter() {
-    AccountDTO user = current.user();
-    if (user.role() == Role.FINANCE) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    return user;
-  }
-
   /** 404 when missing; 403 when a BD asks for a KOL assigned to someone else (task 04 §4.3). */
   private KolDO requireVisible(Long id, AccountDTO user) {
     KolDO kol = kols.selectById(id);
     if (kol == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    if (own(user) && !user.id().equals(kol.getBdUserId())) {
+    if (user.ownScope() && !user.id().equals(kol.getBdUserId())) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return kol;
@@ -309,7 +343,7 @@ public class KolService {
     return names;
   }
 
-  private static KolDTO toDto(KolDO kol, Map<Long, String> names) {
+  private static KolDTO toDto(KolDO kol, Map<Long, String> bdNames, Map<Long, String> templates) {
     return new KolDTO(
         kol.getId(),
         kol.getKolCode(),
@@ -318,12 +352,37 @@ public class KolService {
         kol.getCountry(),
         SocialAccountsJson.read(kol.getSocialAccounts()),
         kol.getBdUserId(),
-        kol.getBdUserId() == null ? null : names.get(kol.getBdUserId()),
+        kol.getBdUserId() == null ? null : bdNames.get(kol.getBdUserId()),
         kol.getDefaultRate(),
         kol.getStatus(),
         kol.getRemark(),
+        kol.getWhatsapp(),
+        kol.getLinkTemplateId(),
+        kol.getLinkTemplateId() == null ? null : templates.get(kol.getLinkTemplateId()),
+        kol.getInviteCode(),
+        kol.getSheetUrl(),
+        kol.getRegisterSource(),
         kol.getCreateTime(),
         kol.getUpdateTime());
+  }
+
+  /**
+   * Upper-cases a country code; null or blank stays null (the column is optional since task 11,
+   * self-registration may skip it until the BD completes the profile).
+   */
+  private static String country(String value) {
+    return value == null || value.isBlank() ? null : value.strip().toUpperCase(Locale.ROOT);
+  }
+
+  /** Validated template id: an enabled template of this company, or null (task 11 §4.3). */
+  private Long usableTemplate(Long templateId) {
+    return templateId == null ? null : templates.usableTemplate(templateId).id();
+  }
+
+  private Map<Long, String> templateNames(Stream<Long> ids) {
+    Set<Long> wanted = new HashSet<>();
+    ids.filter(Objects::nonNull).forEach(wanted::add);
+    return templates.namesByIds(wanted);
   }
 
   static String normalizeEmail(String email) {

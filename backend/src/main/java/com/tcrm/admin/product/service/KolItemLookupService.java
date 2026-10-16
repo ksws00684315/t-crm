@@ -12,13 +12,18 @@ import com.tcrm.admin.product.model.KolItemLinkRow;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.shared.PageResult;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 
 /** Kol item mapping facade for other modules (task 06 link index, link list, click attribution). */
 @Service
 public class KolItemLookupService implements KolItemApi {
+  /** Exclusive-item ID lookups per query; a rebuild sweep bucket can hold tens of thousands. */
+  private static final int ITEM_CHECK_BATCH = 500;
+
   private final KolItemMapper items;
   private final ProductMapper products;
 
@@ -73,6 +78,31 @@ public class KolItemLookupService implements KolItemApi {
   public String getProductCode(Long productId) {
     ProductDO product = products.selectById(productId);
     return product == null ? null : product.getProductCode();
+  }
+
+  @Override
+  public List<String> listItemIdsByKolProduct(Long kolId, Long productId) {
+    return items.listItemIdsByKolProduct(kolId, productId);
+  }
+
+  @Override
+  public List<String> listItemIdsByKol(Long kolId) {
+    return items.listItemIdsByKol(kolId);
+  }
+
+  @Override
+  public Set<String> filterCurrentItemIds(Collection<String> weidianItemIds) {
+    if (weidianItemIds == null || weidianItemIds.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> current = new HashSet<>();
+    List<String> all = List.copyOf(weidianItemIds);
+    for (int from = 0; from < all.size(); from += ITEM_CHECK_BATCH) {
+      current.addAll(
+          items.filterCurrentItemIds(
+              all.subList(from, Math.min(all.size(), from + ITEM_CHECK_BATCH))));
+    }
+    return current;
   }
 
   @Override

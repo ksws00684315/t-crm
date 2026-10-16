@@ -68,7 +68,7 @@ class LinkControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"STAFF, ALL", "STAFF, OWN"})
   void shouldReturn403_whenNonSuperAdminTriggersRebuild(Role role, DataScope scope)
       throws Exception {
     mvc.perform(
@@ -104,7 +104,7 @@ class LinkControllerTest {
 
   /** Task 06 §4.7: every role may call the list; the BD data scope is enforced by the service. */
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN", "FINANCE, ALL"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldListLinks_forEveryRole(Role role, DataScope scope) throws Exception {
     when(links.page(any())).thenReturn(onePage());
 
@@ -133,7 +133,7 @@ class LinkControllerTest {
                 .param("productCode", "P000001")
                 .param("page", "2")
                 .param("size", "50")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.ALL)))
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk());
 
     ArgumentCaptor<LinkFilterDTO> filter = ArgumentCaptor.forClass(LinkFilterDTO.class);
@@ -161,7 +161,7 @@ class LinkControllerTest {
     mvc.perform(
             get("/admin-api/link/links")
                 .param("kolCode", "KOL0002")
-                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.OWN)))
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isForbidden());
   }
 

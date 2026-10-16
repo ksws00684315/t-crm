@@ -3,6 +3,7 @@ package com.tcrm.admin.product.api;
 import com.tcrm.admin.shared.PageResult;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Read access to kol item mappings for other modules (task 06): the {@code link} module builds the
@@ -87,4 +88,25 @@ public interface KolItemApi {
    * @param kolItemIds {@code crm_kol_item.id} values
    */
   List<KolItemRefDTO> listRefsByIds(Collection<Long> kolItemIds);
+
+  /**
+   * Exclusive item IDs of every mapping (current and closed) of the KOL and original product (task
+   * 11 §4.4). The link index drops a {@code linkitem} field for each of them before writing the
+   * current one, so a replaced or closed mapping leaves no stale field.
+   */
+  List<String> listItemIdsByKolProduct(Long kolId, Long productId);
+
+  /**
+   * Exclusive item IDs of every mapping (current and closed) of the KOL (task 11 §4.4). The link
+   * index drops all of the KOL's {@code linkitem} fields before rewriting the current ones.
+   */
+  List<String> listItemIdsByKol(Long kolId);
+
+  /**
+   * The subset of exclusive item IDs that still has a current mapping of any KOL (task 11 §4.4).
+   * The full rebuild checks every orphan candidate against the database before deleting, so a
+   * mapping committed while the rebuild runs is never dropped. An empty collection returns an empty
+   * set without querying.
+   */
+  Set<String> filterCurrentItemIds(Collection<String> weidianItemIds);
 }

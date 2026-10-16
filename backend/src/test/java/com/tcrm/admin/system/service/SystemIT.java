@@ -17,6 +17,7 @@ import com.tcrm.admin.system.mapper.SysUserMapper;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -72,6 +73,7 @@ class SystemIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
+    r.add("crm.kol-portal.base-url", () -> "https://kol.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
     WeidianTestProperties.register(r);
   }
@@ -162,8 +164,10 @@ class SystemIT {
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
             "crm_kol:NO",
+            "crm_kol_auth_token:NO",
             "crm_kol_bd_history:NO",
             "crm_kol_item:NO",
+            "crm_link_template:NO",
             "crm_product:NO",
             "crm_shop:NO",
             "crm_task:NO",
@@ -171,7 +175,8 @@ class SystemIT {
             "crm_weidian_app:NO",
             "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
-            "sys_user:YES");
+            "sys_user:YES",
+            "sys_user_permission:NO");
     var without =
         jdbc.queryForList(
             """
@@ -189,8 +194,9 @@ class SystemIT {
             ORDER BY t.table_name
             """,
             String.class);
+    // Design §3.4 exceptions; crm_fx_rate holds the platform-level reference rate (§7.5).
     assertThat(without)
-        .contains("sys_tenant", "crm_link_index_outbox", "flyway_schema_history")
+        .contains("sys_tenant", "crm_link_index_outbox", "crm_fx_rate", "flyway_schema_history")
         .doesNotContain("crm_kol", "crm_click_log", "sys_user");
     assertThat(
             jdbc.queryForObject(
@@ -270,17 +276,15 @@ class SystemIT {
   }
 
   @Test
-  void shouldRejectProtectedLists_whenRoleIsOperatorOrFinance() throws Exception {
+  void shouldRejectProtectedLists_whenRoleIsStaff() throws Exception {
     String admin = companyAdmin();
-    for (var role : java.util.List.of(Role.OPERATOR, Role.FINANCE)) {
-      String username = randomName();
-      create(admin, username, role);
-      String token = login(username, PASSWORD);
-      for (var path : java.util.List.of("/admin-api/system/users", "/admin-api/system/oper-logs")) {
-        mvc.perform(get(path).header("X-Admin-Token", token))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
-      }
+    String username = randomName();
+    create(admin, username, Role.STAFF);
+    String token = login(username, PASSWORD);
+    for (var path : java.util.List.of("/admin-api/system/users", "/admin-api/system/oper-logs")) {
+      mvc.perform(get(path).header("X-Admin-Token", token))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
     }
   }
 
@@ -288,7 +292,7 @@ class SystemIT {
   void shouldInvalidateTokens_whenAccountIsDisabled() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     String token = login(username, PASSWORD);
     mvc.perform(
             put("/admin-api/system/users/" + id + "/status")
@@ -305,7 +309,7 @@ class SystemIT {
   void shouldInvalidateAllTokens_whenAdministratorResetsPassword() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     String token = login(username, PASSWORD);
     mvc.perform(
             put("/admin-api/system/users/" + id + "/password")
@@ -325,7 +329,7 @@ class SystemIT {
             post("/admin-api/system/users")
                 .header("X-Admin-Token", admin)
                 .contentType("application/json")
-                .content(createBody("BOOTSTRAP", Role.OPERATOR)))
+                .content(createBody("BOOTSTRAP", Role.STAFF)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value("USER_USERNAME_EXISTS"));
   }
@@ -334,7 +338,7 @@ class SystemIT {
   void shouldPreserveInstant_whenOrmRoundTripsUtcTimestamp() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    Long id = Long.valueOf(create(admin, username, Role.OPERATOR));
+    Long id = Long.valueOf(create(admin, username, Role.STAFF));
     Instant instant = Instant.parse("2026-10-04T04:30:12.123Z");
     var user = TenantScope.callCompany(1L, () -> users.selectById(id));
     user.setLastLoginTime(instant);
@@ -347,7 +351,7 @@ class SystemIT {
   @Test
   void shouldHideLogicalDeletion_whenDeletingThroughMapper() throws Exception {
     String admin = companyAdmin();
-    Long id = Long.valueOf(create(admin, randomName(), Role.OPERATOR));
+    Long id = Long.valueOf(create(admin, randomName(), Role.STAFF));
     assertThat(TenantScope.callCompany(1L, () -> users.deleteById(id))).isEqualTo(1);
     assertThat(TenantScope.callCompany(1L, () -> users.selectById(id))).isNull();
     assertThat(jdbc.queryForObject("SELECT is_deleted FROM sys_user WHERE id=?", Boolean.class, id))
@@ -358,7 +362,7 @@ class SystemIT {
   void shouldFindUppercaseSearchAndPagingMetadata_whenListingUsers() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     mvc.perform(
             get("/admin-api/system/users")
                 .header("X-Admin-Token", admin)
@@ -376,7 +380,7 @@ class SystemIT {
   void shouldRedactPasswordInAudit_whenCreatingUser() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    create(admin, username, Role.OPERATOR);
+    create(admin, username, Role.STAFF);
     org.awaitility.Awaitility.await()
         .atMost(java.time.Duration.ofSeconds(5))
         .untilAsserted(
@@ -412,18 +416,18 @@ class SystemIT {
   }
 
   private String createBody(String username, Role role) {
-    return json.writeValueAsString(
-        Map.of(
-            "username",
-            username,
-            "password",
-            PASSWORD,
-            "nickname",
-            "Test",
-            "role",
-            role.name(),
-            "dataScope",
-            role == Role.OPERATOR ? "OWN" : "ALL"));
+    var body = new LinkedHashMap<String, Object>();
+    body.put("username", username);
+    body.put("password", PASSWORD);
+    body.put("nickname", "Test");
+    body.put("role", role.name());
+    if (role == Role.STAFF) {
+      body.put("postTemplate", "BD");
+      body.put("dataScope", "OWN");
+    } else {
+      body.put("dataScope", "ALL");
+    }
+    return json.writeValueAsString(body);
   }
 
   private String create(String admin, String username, Role role) throws Exception {
@@ -460,7 +464,7 @@ class SystemIT {
   void shouldRejectTokenIssuedDuringConcurrentPasswordReset() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     String[] issued = new String[1];
     // The reset queues first; the login has checked the old password and waits to record the
     // login time, then issues its token after the reset (and its logout) committed.
@@ -480,7 +484,7 @@ class SystemIT {
   void shouldRejectOldToken_whenCredentialVersionChangedWithoutLogout() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     String token = login(username, PASSWORD);
     // A password change whose Redis logout failed: the version moved on, the session remains.
     jdbc.update(
@@ -504,7 +508,8 @@ class SystemIT {
     Long firstId =
         jdbc.queryForObject("SELECT id FROM sys_user WHERE username='company-admin'", Long.class);
     Map<String, String> demote =
-        Map.of("nickname", "Demoted", "role", "FINANCE", "dataScope", "ALL");
+        Map.of(
+            "nickname", "Demoted", "role", "STAFF", "postTemplate", "OPERATOR", "dataScope", "ALL");
     int[] codes = new int[2];
     runAfterQueuedOnRowLocks(
         List.of(firstId, Long.valueOf(other)),
@@ -534,7 +539,7 @@ class SystemIT {
   @Test
   void shouldTreatWildcardsLiterally_whenSearchingUsernames() throws Exception {
     String admin = companyAdmin();
-    create(admin, randomName(), Role.OPERATOR);
+    create(admin, randomName(), Role.STAFF);
     for (String keyword : new String[] {"%", "_", "o_", "\\"}) {
       mvc.perform(
               get("/admin-api/system/users")
@@ -549,7 +554,7 @@ class SystemIT {
   void shouldKeepConcurrentDisable_whenAnotherAdministratorEditsTheSameUser() throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     // The disable commits first; the edit has already read the row (status 1) and must not write
     // that stale status back.
     runAfterQueuedOnRowLock(
@@ -572,7 +577,7 @@ class SystemIT {
       throws Exception {
     String admin = companyAdmin();
     String username = randomName();
-    String id = create(admin, username, Role.OPERATOR);
+    String id = create(admin, username, Role.STAFF);
     String newPassword = UUID.randomUUID().toString();
     runAfterQueuedOnRowLock(
         Long.valueOf(id),
@@ -654,7 +659,7 @@ class SystemIT {
   }
 
   private Map<String, String> editBody() {
-    return Map.of("nickname", "Edited", "role", "OPERATOR", "dataScope", "OWN");
+    return Map.of("nickname", "Edited", "role", "STAFF", "postTemplate", "BD", "dataScope", "OWN");
   }
 
   private String companyAdmin() throws Exception {

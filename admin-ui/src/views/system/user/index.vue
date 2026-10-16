@@ -11,8 +11,17 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
+import {
+  canExport,
+  isStaff,
+  isSuperAdminAccount,
+  permissionText,
+  postLabel,
+  roleLabel,
+  SELECTABLE_ROLES
+} from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
+import PermissionsDialog from "./PermissionsDialog.vue";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
 
@@ -20,6 +29,7 @@ defineOptions({ name: "SystemUserPage" });
 
 const { t } = useI18n();
 const me = useUserStore();
+const exportAllowed = computed(() => canExport(me.user));
 const loading = ref(false);
 const rows = ref<UserVO[]>([]);
 const total = ref(0);
@@ -42,12 +52,14 @@ function asUser(row: object): UserVO {
 const columns = computed<DataColumn[]>(() => [
   { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
   { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
-  { key: "role", label: t("user.role"), width: 110 },
-  { key: "dataScope", label: t("user.dataScope"), width: 100 },
+  { key: "role", label: t("user.role"), width: 120 },
+  { key: "post", label: t("user.post"), width: 90 },
+  { key: "permissions", label: t("user.permissionCount"), width: 100 },
+  { key: "dataScope", label: t("user.dataScope"), width: 110 },
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170, mono: true },
   { key: "createdAt", label: t("common.createdAt"), width: 170, mono: true },
-  { key: "actions", label: t("common.actions"), width: 230 }
+  { key: "actions", label: t("common.actions"), width: 300 }
 ]);
 
 const applied = ref({
@@ -77,6 +89,12 @@ const formVisible = ref(false);
 const editingUser = ref<UserVO | null>(null);
 const resetVisible = ref(false);
 const resetUser = ref<UserVO | null>(null);
+const permissionsVisible = ref(false);
+const permissionsUser = ref<UserVO | null>(null);
+
+function permissionEntries(row: UserVO): { code: string; name: string }[] {
+  return (row.permissions ?? []).map(code => ({ code, name: permissionText(code, "name") }));
+}
 
 function appliedQuery() {
   return {
@@ -93,6 +111,14 @@ const { exporting, exportCsv } = useListExport<UserVO>({
     { label: t("common.username"), value: row => row.username },
     { label: t("common.nickname"), value: row => row.nickname },
     { label: t("user.role"), value: row => (row.role ? roleLabel(row.role) : "") },
+    { label: t("user.post"), value: row => postLabel(row.postTemplate) },
+    {
+      label: t("user.permissionCount"),
+      value: row =>
+        isSuperAdminAccount(row)
+          ? t("user.allPermissionsShort")
+          : t("user.permissionItems", { n: row.permissions?.length ?? 0 })
+    },
     {
       label: t("user.dataScope"),
       value: row => (row.dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort"))
@@ -199,6 +225,11 @@ function openReset(row: UserVO) {
   resetVisible.value = true;
 }
 
+function openPermissions(row: UserVO) {
+  permissionsUser.value = row;
+  permissionsVisible.value = true;
+}
+
 async function toggleStatus(row: UserVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
@@ -275,7 +306,7 @@ onMounted(load);
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
-      exportable
+      :exportable="exportAllowed"
       :exporting="exporting"
       selectable
       :selectable-row="selectableUser"
@@ -309,6 +340,26 @@ onMounted(load);
       <template #cell-role="{ row }">
         {{ asUser(row).role ? roleLabel(asUser(row).role) : "" }}
       </template>
+      <template #cell-post="{ row }">
+        {{ postLabel(asUser(row).postTemplate) }}
+      </template>
+      <template #cell-permissions="{ row }">
+        <el-tooltip v-if="!isSuperAdminAccount(asUser(row))" placement="top">
+          <template #content>
+            <div
+              v-for="entry in permissionEntries(asUser(row))"
+              :key="entry.code"
+              data-test="perm-name"
+            >
+              {{ entry.name }}
+            </div>
+          </template>
+          <span data-test="perm-count">{{
+            t("user.permissionItems", { n: asUser(row).permissions?.length ?? 0 })
+          }}</span>
+        </el-tooltip>
+        <span v-else data-test="perm-count">{{ t("user.allPermissionsShort") }}</span>
+      </template>
       <template #cell-dataScope="{ row }">
         {{ asUser(row).dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort") }}
       </template>
@@ -324,6 +375,15 @@ onMounted(load);
           t("common.edit")
         }}</el-button>
         <el-button
+          v-if="isStaff(asUser(row))"
+          link
+          type="primary"
+          data-test="permissions"
+          @click="openPermissions(asUser(row))"
+        >
+          {{ t("user.permissionsTitle") }}
+        </el-button>
+        <el-button
           link
           :type="asUser(row).status === 1 ? 'danger' : 'success'"
           :disabled="asUser(row).id === me.user?.id"
@@ -338,6 +398,7 @@ onMounted(load);
     </DataTable>
 
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
+    <PermissionsDialog v-model="permissionsVisible" :user="permissionsUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
   </div>
 </template>

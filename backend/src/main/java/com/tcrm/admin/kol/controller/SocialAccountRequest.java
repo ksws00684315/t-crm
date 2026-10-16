@@ -8,14 +8,22 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** One social account; {@code url} must be https when given, {@code followers} is optional. */
+/**
+ * One social account; {@code url} must be https when given, {@code followers} is optional. {@code
+ * primary} marks the main platform (主阵地); at most one account of a KOL may set it.
+ */
 public record SocialAccountRequest(
     @NotBlank @Size(max = KolRules.MAX_PLATFORM) String platform,
     @NotBlank @Size(max = KolRules.MAX_HANDLE) String handle,
     @Size(max = KolRules.MAX_URL) @Pattern(regexp = KolRules.HTTPS_URL_PATTERN) String url,
-    @Min(0) @Max(999_999_999_999_999L) Long followers) {
+    @Min(0) @Max(999_999_999_999_999L) Long followers,
+    Boolean primary) {
   SocialAccountDTO toDto() {
     return new SocialAccountDTO(
-        platform.strip(), handle.strip(), url == null || url.isBlank() ? null : url, followers);
+        platform.strip(),
+        handle.strip(),
+        url == null || url.isBlank() ? null : url,
+        followers,
+        Boolean.TRUE.equals(primary));
   }
 }
