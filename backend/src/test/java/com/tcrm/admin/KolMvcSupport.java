@@ -38,7 +38,9 @@ public final class KolMvcSupport {
     new CommonConfiguration().jsonCustomizer().customize(builder);
     return MockMvcBuilders.standaloneSetup(controllers)
         .setControllerAdvice(new GlobalExceptionHandler())
-        .setMessageConverters(new JacksonJsonHttpMessageConverter(builder.build()))
+        .setMessageConverters(
+            new org.springframework.http.converter.ByteArrayHttpMessageConverter(),
+            new JacksonJsonHttpMessageConverter(builder.build()))
         .addInterceptors(
             new org.springframework.web.servlet.handler.MappedInterceptor(
                 new String[] {"/kol-api/**"},

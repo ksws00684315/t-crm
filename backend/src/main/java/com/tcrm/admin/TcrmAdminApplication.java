@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
       "com.tcrm.admin.task",
       "com.tcrm.admin.kol",
       "com.tcrm.admin.product",
+      "com.tcrm.admin.commission",
       "com.tcrm.admin.integration",
       "com.tcrm.admin.link",
       "com.tcrm.admin.order"

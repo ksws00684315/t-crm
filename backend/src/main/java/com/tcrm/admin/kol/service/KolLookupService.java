@@ -81,6 +81,16 @@ public class KolLookupService implements KolApi {
         .toList();
   }
 
+  @Override
+  public List<KolRefDTO> listByBdUserId(Long bdUserId) {
+    return toDto(kols.selectList(new LambdaQueryWrapper<KolDO>().eq(KolDO::getBdUserId, bdUserId)));
+  }
+
+  @Override
+  public boolean lockKol(long kolId) {
+    return kols.lockById(kolId) != null;
+  }
+
   private List<KolRefDTO> toDto(List<KolDO> rows) {
     Map<Long, LinkTemplateDO> byId = templatesByIds(rows.stream().map(KolDO::getLinkTemplateId));
     return rows.stream()

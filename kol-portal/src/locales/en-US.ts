@@ -127,6 +127,12 @@ const enUS = {
       "This link is invalid or expired. Please contact your representative for a new link.",
     AUTH_OLD_PASSWORD_INCORRECT: "Your current password is incorrect.",
     KOL_LOGIN_SELECTION_INVALID: "Company selection has expired. Please sign in again.",
+    PAYOUT_ACCOUNT_LIMIT: "You can keep at most 5 active payout accounts.",
+    PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",
+    PAYOUT_ACCOUNT_NOT_APPROVED: "Only approved accounts can be the default.",
+    FILE_INVALID: "The file must be a PNG or JPEG image.",
+    FILE_TOO_LARGE: "The file is larger than 2 MB.",
+    FILE_IN_USE: "This file is already used by another account.",
     KOL_EMAIL_EXISTS: "This email is already registered. Please sign in.",
     KOL_REGISTER_CODE_INVALID:
       "This registration link is invalid or has expired. Please contact your representative for a new link.",
