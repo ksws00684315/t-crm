@@ -179,6 +179,9 @@ const enUS: MessageSchema = {
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
     KOL_EMAIL_EXISTS: "This email is already used by another creator.",
     KOL_CODE_EXISTS: "This creator code already exists.",
+    KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
+    KOL_AUTH_TOKEN_INVALID: "The invitation or reset link is invalid, expired, or already used.",
+    KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",

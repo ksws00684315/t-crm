@@ -52,9 +52,9 @@ mybatis-plus:
       logic-not-delete-value: false
 sa-token:
   token-name: X-Admin-Token
-  # Absolute token lifetime 8 h; a token unused for 2 h also expires (OWASP ASVS L2 session
-  # inactivity timeout). Applies to every Sa-Token login type, including the future KOL login;
-  # see design document §3.3.
+  # Absolute administrator token lifetime 8 h; a token unused for 2 h also expires (OWASP ASVS L2
+  # session inactivity timeout). Administrator namespace only: the KOL namespace overrides these
+  # values with its own config (crm.kol-auth.*, design document §3.3).
   timeout: 28800
   active-timeout: 7200
   is-read-cookie: false
@@ -69,6 +69,27 @@ crm:
       enabled: true
       # Captchas one client IP may request per minute (owner decision on PR #35); 429 above it.
       issue-per-minute: 120
+  # Independent KOL token namespace (task 12a §4.2, design §3.3): read only from the X-Kol-Token
+  # header, 7-day absolute lifetime, 3-day idle timeout, at most 10 tokens per KOL. The KOL portal
+  # login has no image captcha (owner decision 2026-10-16; protection comes from ADR-008 locking
+  # and Nginx rate limiting).
+  kol-auth:
+    token-name: X-Kol-Token
+    timeout: 604800
+    active-timeout: 259200
+    max-login-count: 10
+  # Mail transport (task 12a §4.5, design §7.3): Resend when an API key is configured, otherwise a
+  # logging fallback for local development. A key without a sender address aborts startup.
+  mail:
+    api-key: ${TCRM_MAIL_API_KEY:}
+    from: ${TCRM_MAIL_FROM:}
+    # Logs invitation/reset links so a local developer can open them. The links set or reset a KOL
+    # password: NEVER enable in production.
+    log-links: false
+  # Public base of the KOL portal: https, no trailing slash (prod: https://kol.<domain>). Required;
+  # startup fails when it is missing or malformed. Invitation and reset links point here.
+  kol-portal:
+    base-url: ${TCRM_KOL_PORTAL_BASE_URL}
   bootstrap:
     username: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:}
     password: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:}

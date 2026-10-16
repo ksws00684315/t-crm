@@ -65,6 +65,7 @@ class FxRateIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.test");
+    r.add("crm.kol-portal.base-url", () -> "https://kol.example.test");
     r.add("crm.link.click-consumer.enabled", () -> "false");
     r.add(
         "crm.fx.ecb-url",

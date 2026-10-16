@@ -46,6 +46,15 @@ class LoginFailuresTest {
   }
 
   @Test
+  void shouldUseSeparateKeys_whenKolPrefixIsConfigured() {
+    LoginFailures kolFailures = new LoginFailures(redis, "kol:auth");
+    kolFailures.fail("kol@example.com", "198.51.100.8");
+    assertThat(counterKeysOfFailure())
+        .extracting(k -> k.getFirst())
+        .allSatisfy(key -> assertThat(key).startsWith("kol:auth:fail:"));
+  }
+
+  @Test
   void shouldPassScopeLimitsToScript_whenAttemptFails() {
     failures.fail("operator", "198.51.100.8");
     var args = ArgumentCaptor.forClass(Object[].class);

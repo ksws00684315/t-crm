@@ -64,6 +64,7 @@ class PermissionIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
+    r.add("crm.kol-portal.base-url", () -> "https://kol.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
     WeidianTestProperties.register(r);
   }

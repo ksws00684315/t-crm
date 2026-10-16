@@ -87,7 +87,11 @@ class AuthControllerTest {
     when(current.user()).thenReturn(actor);
     when(current.roleNames(any())).thenReturn(List.of("STAFF"));
     when(current.permissionNames(any())).thenReturn(List.of());
-    var security = new SecurityConfiguration(current);
+    var security =
+        new SecurityConfiguration(
+            current,
+            new com.tcrm.admin.security.api.CurrentKolContext(
+                mock(com.tcrm.admin.security.api.KolAccountStore.class)));
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
     token = StpUtil.createLoginSession(1L);

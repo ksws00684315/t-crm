@@ -1,5 +1,6 @@
 package com.tcrm.admin.security.service;
 
+import com.tcrm.admin.security.api.LoginFailureCounter;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -9,6 +10,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -24,9 +27,13 @@ import org.springframework.stereotype.Component;
  *   <li>username: 50 failures from any IPs locks the account everywhere, bounding distributed
  *       guessing at the cost of a deliberate, much more expensive lock-out.
  * </ul>
+ *
+ * <p>Administrators and KOLs each get their own instance with a distinct key prefix, so neither
+ * namespace's counters affect the other (task 12a §4.4).
  */
 @Component
-public class LoginFailures {
+@Primary
+public class LoginFailures implements LoginFailureCounter {
   static final int PAIR_LIMIT = 5;
   static final int IP_LIMIT = 20;
   static final int ACCOUNT_LIMIT = 50;
@@ -50,12 +57,22 @@ public class LoginFailures {
           """,
           Long.class);
   private final StringRedisTemplate redis;
+  private final String keyPrefix;
 
+  /** Administrator namespace ({@code auth:fail:*}); the KOL bean uses the two-argument factory. */
+  @Autowired
   public LoginFailures(StringRedisTemplate redis) {
+    this(redis, "auth");
+  }
+
+  /** Shared core; {@code keyPrefix} separates the administrator and KOL namespaces. */
+  public LoginFailures(StringRedisTemplate redis, String keyPrefix) {
     this.redis = redis;
+    this.keyPrefix = keyPrefix;
   }
 
   /** Throws AUTH_ACCOUNT_LOCKED (429) while any scope of this attempt is locked. */
+  @Override
   public void check(String username, String ip) {
     for (Scope scope : scopes(username, ip)) {
       if (Boolean.TRUE.equals(redis.hasKey(scope.key() + ":lock"))) {
@@ -67,6 +84,7 @@ public class LoginFailures {
   /**
    * Records a failed attempt on every scope; throws AUTH_ACCOUNT_LOCKED when one reaches its limit.
    */
+  @Override
   public void fail(String username, String ip) {
     boolean locked = false;
     for (Scope scope : scopes(username, ip)) {
@@ -95,13 +113,13 @@ public class LoginFailures {
 
   private record Scope(String key, int limit) {}
 
-  private static List<Scope> scopes(String username, String ip) {
+  private List<Scope> scopes(String username, String ip) {
     String user = digest(username.toLowerCase(Locale.ROOT));
     String address = digest(ip);
     return List.of(
-        new Scope("auth:fail:user-ip:" + user + ":" + address, PAIR_LIMIT),
-        new Scope("auth:fail:ip:" + address, IP_LIMIT),
-        new Scope("auth:fail:user:" + user, ACCOUNT_LIMIT));
+        new Scope(keyPrefix + ":fail:user-ip:" + user + ":" + address, PAIR_LIMIT),
+        new Scope(keyPrefix + ":fail:ip:" + address, IP_LIMIT),
+        new Scope(keyPrefix + ":fail:user:" + user, ACCOUNT_LIMIT));
   }
 
   private static String digest(String value) {

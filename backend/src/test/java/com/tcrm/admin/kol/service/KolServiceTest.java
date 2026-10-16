@@ -62,9 +62,18 @@ class KolServiceTest {
   private final LinkTemplateService templates = mock(LinkTemplateService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+  private final KolInvites invites = mock(KolInvites.class);
   private final KolService service =
       new KolService(
-          kols, history, writer, bdUsers, templates, current, TestTransactions.template(), events);
+          kols,
+          history,
+          writer,
+          bdUsers,
+          templates,
+          current,
+          TestTransactions.template(),
+          events,
+          invites);
 
   @org.junit.jupiter.api.BeforeEach
   void noTemplateNames() {

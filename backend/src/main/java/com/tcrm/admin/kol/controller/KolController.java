@@ -73,4 +73,13 @@ public class KolController {
     kols.updateBdUser(id, r.bdUserId());
     return R.ok(null);
   }
+
+  /** Same permission as editing a KOL (task 12a §4.3); 409 when already activated. */
+  @PostMapping("/{id}/invite")
+  @SaCheckPermission("kol:edit")
+  @AuditLog(module = "KOL", action = "Resend invite")
+  public R<Void> invite(@PathVariable @Min(1) Long id) {
+    kols.resendInvite(id);
+    return R.ok(null);
+  }
 }

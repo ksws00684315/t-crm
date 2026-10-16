@@ -28,6 +28,30 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 3. 构建前端静态文件：`deploy/scripts/build-static.sh`（需要 Node.js 与 pnpm），输出到 `TCRM_STATIC_DIR`（默认 `deploy/www`）。
 4. 启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`。
 5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
+6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
+
+## 邮件服务（Resend）
+
+达人邀请与重置密码邮件经 Resend（`https://resend.com`）发送（设计说明书 §7.3）。免费额度 3,000 封/月、100 封/天，合同规模远低于上限。相关环境变量（见 `.env.example`）：
+
+| 变量 | 说明 |
+|---|---|
+| `TCRM_MAIL_API_KEY` | Resend API Key；**为空时使用日志兜底**：邮件只写后台日志、不真正发出（仅限本机开发） |
+| `TCRM_MAIL_FROM` | 发件人，例如 `T-CRM <no-reply@你的域名>`；配置了 Key 却没配本项时后台启动失败 |
+| `TCRM_KOL_PORTAL_BASE_URL` | 必填，无末尾斜杠的 HTTPS 达人端地址（生产为 `https://kol.<域名>`）；缺失或格式不对时后台启动失败。邀请邮件链接 `{该地址}/activate?token=…`，重置邮件链接 `{该地址}/reset?token=…` |
+
+配置步骤：
+
+1. 注册 Resend 并在控制台 **Domains → Add Domain** 添加发件域名（用主域名或子域如 `mail.你的域名`），按控制台给出的记录值在域名 DNS 中添加：
+   - **SPF**：一条 TXT 记录（如 `resend._domainkey` 之外的控制台指定的 `v=spf1 include:…`）；
+   - **DKIM**：控制台给出的 TXT 记录（`resend._domainkey.你的域名.`，值为 `p=` 开头的公钥）；
+   - **DMARC**：`_dmarc.你的域名.` TXT 记录，值建议 `v=DMARC1; p=quarantine; rua=mailto:你的邮箱`（先 `p=none` 观察再收紧）。
+   在 Resend 控制台点 Verify 确认全部通过（DNS 生效可能需要几分钟到数小时）。
+2. **API Keys → Create API Key**，权限 Full Access 即可，把 `re_` 开头的值填入 `.env` 的 `TCRM_MAIL_API_KEY`；`TCRM_MAIL_FROM` 填 `展示名 <no-reply@你的发件域名>`（域名必须是上一步验证过的）。
+3. 用后台「新建达人」触发一封邀请邮件到你的邮箱，确认收到、链接可打开；再走一遍「忘记密码」确认重置邮件。
+4. 发送失败只记 `WARN` 不回滚（可用重发邀请补发）；不要把 API Key 写入仓库或日志。`crm.mail.log-links`（默认 false）只在本机开发时用于把邮件里的链接打到日志里排查，**生产禁止开启**。
+
+## 资源与 Redis 容量
 
 资源限制按设计说明书 §10：PostgreSQL 2G（`shared_buffers=512MB`）、Redis 1.5G（`maxmemory 1280mb`、`noeviction`）、crm-admin 2G、crm-redirect 512M。只有 nginx 映射 80/443；PostgreSQL、Redis、后台、跳转服务只在 compose 网络内可达。
 
