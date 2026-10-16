@@ -13,11 +13,14 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.TransactionalEvents;
+import com.tcrm.admin.system.api.StaffDisabledEvent;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,16 +36,19 @@ public class UserService {
   private final BCryptPasswordEncoder passwords;
   private final CurrentUserContext current;
   private final UserPermissionService permissions;
+  private final ApplicationEventPublisher events;
 
   public UserService(
       SysUserMapper users,
       BCryptPasswordEncoder passwords,
       CurrentUserContext current,
-      UserPermissionService permissions) {
+      UserPermissionService permissions,
+      ApplicationEventPublisher events) {
     this.users = users;
     this.passwords = passwords;
     this.current = current;
     this.permissions = permissions;
+    this.events = events;
   }
 
   public PageResult<UserDTO> page(
@@ -126,11 +132,20 @@ public class UserService {
       throw new BusinessException(ErrorCode.USER_CANNOT_DISABLE_SELF);
     }
     SysUserDO target = require(id);
+    if (target.getRole() == Role.STAFF) {
+      if (users.lockById(id) == null) {
+        throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      }
+      target = require(id);
+    }
     if (target.getRole() == Role.SUPER_ADMIN && status == 0) {
       requireAnotherSuperAdmin(id);
     }
     write(id, new LambdaUpdateWrapper<SysUserDO>().set(SysUserDO::getStatus, status));
     if (status == 0) {
+      if (target.getRole() == Role.STAFF) {
+        TransactionalEvents.publish(events, new StaffDisabledEvent(target.getTenantId(), id));
+      }
       StpUtil.kickout(id);
     }
   }

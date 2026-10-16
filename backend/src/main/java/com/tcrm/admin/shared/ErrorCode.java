@@ -27,6 +27,8 @@ public enum ErrorCode {
   KOL_ALREADY_ACTIVATED(409, "KOL has already activated the account"),
   KOL_AUTH_TOKEN_INVALID(400, "Invitation or reset token is invalid, expired, or already used"),
   KOL_LOGIN_SELECTION_INVALID(400, "Company selection credential is invalid or expired"),
+  KOL_TRANSFER_EXISTS(409, "KOL already has a scheduled BD transfer"),
+  KOL_TRANSFER_NOT_SCHEDULED(409, "Only scheduled BD transfers can be cancelled"),
   KOL_INVALID_BD_USER(422, "BD must be an enabled STAFF account with OWN data scope and kol:edit"),
   KOL_REGISTER_CODE_INVALID(404, "Register link is invalid or no longer usable"),
   KOL_EMAIL_CODE_TOO_FREQUENT(429, "Email verification code was requested too recently"),

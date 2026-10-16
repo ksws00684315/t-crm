@@ -21,6 +21,7 @@ import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
+import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -50,6 +51,8 @@ class KolServiceTest {
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolDO.class);
     TableInfoHelper.initTableInfo(
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdHistoryDO.class);
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdTransferDO.class);
   }
 
   private static final long BD = 5L;
@@ -73,18 +76,28 @@ class KolServiceTest {
           current,
           TestTransactions.template(),
           events,
-          invites);
+          invites,
+          new BdTransferService(
+              kols,
+              history,
+              mock(com.tcrm.admin.kol.mapper.KolBdTransferMapper.class),
+              bdUsers,
+              current,
+              TestTransactions.template(),
+              mock(com.tcrm.admin.system.api.ExternalAuditApi.class),
+              new com.tcrm.admin.shared.AuditSanitizer(new tools.jackson.databind.ObjectMapper())));
 
   @org.junit.jupiter.api.BeforeEach
   void noTemplateNames() {
     when(templates.namesByIds(any())).thenReturn(java.util.Map.of());
+    when(bdUsers.lockById(any())).thenAnswer(i -> bdUsers.getById(i.getArgument(0)));
   }
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
         .thenReturn(
             new AccountDTO(
-                id, "u" + id, null, "U", null, role, scope, 1, null, null, 0, null, null, true));
+                id, "u" + id, null, "U", null, role, scope, 1, null, null, 0, 1L, "Test", true));
   }
 
   private static KolDO kol(Long bd) {

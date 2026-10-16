@@ -1,0 +1,455 @@
+package com.tcrm.admin.kol.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
+import com.tcrm.admin.kol.mapper.KolBdTransferMapper;
+import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.model.BdTransferStatus;
+import com.tcrm.admin.kol.model.KolBdHistoryDO;
+import com.tcrm.admin.kol.model.KolBdTransferDO;
+import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.shared.AuditSanitizer;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.system.api.BdUserApi;
+import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.system.api.ExternalAuditApi;
+import com.tcrm.admin.system.api.StaffDisabledEvent;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** Ownership transitions only; order snapshots are maintained separately by task 13. */
+@Service
+public class BdTransferService {
+  private static final Logger LOG = LoggerFactory.getLogger(BdTransferService.class);
+  private final KolMapper kols;
+  private final KolBdHistoryMapper history;
+  private final KolBdTransferMapper transfers;
+  private final BdUserApi bds;
+  private final CurrentUserContext current;
+  private final TransactionTemplate tx;
+  private final ExternalAuditApi audit;
+  private final AuditSanitizer sanitizer;
+  private final Clock clock;
+
+  @Autowired
+  public BdTransferService(
+      KolMapper kols,
+      KolBdHistoryMapper history,
+      KolBdTransferMapper transfers,
+      BdUserApi bds,
+      CurrentUserContext current,
+      TransactionTemplate tx,
+      ExternalAuditApi audit,
+      AuditSanitizer sanitizer) {
+    this(kols, history, transfers, bds, current, tx, audit, sanitizer, Clock.systemUTC());
+  }
+
+  BdTransferService(
+      KolMapper kols,
+      KolBdHistoryMapper history,
+      KolBdTransferMapper transfers,
+      BdUserApi bds,
+      CurrentUserContext current,
+      TransactionTemplate tx,
+      ExternalAuditApi audit,
+      AuditSanitizer sanitizer,
+      Clock clock) {
+    this.kols = kols;
+    this.history = history;
+    this.transfers = transfers;
+    this.bds = bds;
+    this.current = current;
+    this.tx = tx;
+    this.audit = audit;
+    this.sanitizer = sanitizer;
+    this.clock = clock;
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public BdTransferResultDTO create(BdTransferCommand command) {
+    requireSuperAdmin();
+    validate(command);
+    return tx.execute(status -> createInTransaction(command));
+  }
+
+  /** Legacy PUT retains its existing service scope guard and uses the same immediate path. */
+  void updateOne(Long kolId, Long target) {
+    tx.executeWithoutResult(
+        status ->
+            createInTransaction(new BdTransferCommand(List.of(kolId), null, target, null, null)));
+  }
+
+  private BdTransferResultDTO createInTransaction(BdTransferCommand c) {
+    // User row before KOL rows: serialize target disable with every assignment (design §4.13).
+    requireTarget(c.toBdUserId());
+    if (c.fromBdUserId() != null && bds.getById(c.fromBdUserId()) == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    List<Long> ids =
+        c.kolIds() != null
+            ? c.kolIds().stream().distinct().sorted().toList()
+            : kols
+                .selectList(
+                    new LambdaQueryWrapper<KolDO>()
+                        .select(KolDO::getId)
+                        .eq(KolDO::getBdUserId, c.fromBdUserId())
+                        .orderByAsc(KolDO::getId))
+                .stream()
+                .map(KolDO::getId)
+                .toList();
+    List<KolDO> locked = new ArrayList<>();
+    for (Long id : ids) {
+      KolDO kol = lockKol(id);
+      if (c.fromBdUserId() == null || Objects.equals(kol.getBdUserId(), c.fromBdUserId())) {
+        locked.add(kol);
+      }
+    }
+    // Capture now after obtaining all locks so immediate periods cannot predate another writer.
+    Instant now = now();
+    boolean scheduled = c.effectiveAt() != null && c.effectiveAt().isAfter(now);
+    Instant effective = scheduled ? c.effectiveAt().truncatedTo(ChronoUnit.MILLIS) : now;
+    if (scheduled) {
+      List<String> conflicts =
+          locked.stream()
+              .filter(
+                  kol ->
+                      transfers.selectCount(scheduled().eq(KolBdTransferDO::getKolId, kol.getId()))
+                          > 0)
+              .map(KolDO::getKolCode)
+              .toList();
+      if (!conflicts.isEmpty()) {
+        throw new BdTransferExistsException(conflicts);
+      }
+    }
+    int skipped = 0;
+    for (KolDO kol : locked) {
+      if (!scheduled && Objects.equals(kol.getBdUserId(), c.toBdUserId())) {
+        skipped++;
+        continue;
+      }
+      KolBdTransferDO row = new KolBdTransferDO();
+      row.setKolId(kol.getId());
+      row.setFromBdUserId(kol.getBdUserId());
+      row.setToBdUserId(c.toBdUserId());
+      row.setEffectiveAt(effective);
+      row.setStatus(scheduled ? BdTransferStatus.SCHEDULED : BdTransferStatus.DONE);
+      row.setDeleted(false);
+      if (!scheduled) {
+        changeOwnership(kol, c.toBdUserId(), now, current.user().id());
+        row.setExecutedAt(now);
+        cancelForKol(kol.getId(), "被立即转移取代", current.user().id());
+      }
+      transfers.insert(row);
+    }
+    record(
+        "Create BD transfer",
+        "POST",
+        new TransferAuditDTO(
+            locked.size(),
+            c.fromBdUserId(),
+            c.toBdUserId(),
+            effective,
+            c.reason(),
+            locked.stream().map(KolDO::getBdUserId).distinct().toList()));
+    int changed = locked.size() - skipped;
+    return new BdTransferResultDTO(scheduled ? 0 : changed, scheduled ? changed : 0, skipped);
+  }
+
+  public PageResult<BdTransferDTO> page(BdTransferFilterDTO f) {
+    requireSuperAdmin();
+    var query =
+        new LambdaQueryWrapper<KolBdTransferDO>()
+            .eq(f.status() != null, KolBdTransferDO::getStatus, f.status())
+            .eq(f.fromBdUserId() != null, KolBdTransferDO::getFromBdUserId, f.fromBdUserId())
+            .eq(f.toBdUserId() != null, KolBdTransferDO::getToBdUserId, f.toBdUserId())
+            .orderByDesc(KolBdTransferDO::getEffectiveAt, KolBdTransferDO::getId);
+    if (f.kolCode() != null && !f.kolCode().isBlank()) {
+      KolDO kol =
+          kols.selectOne(
+              new LambdaQueryWrapper<KolDO>()
+                  .select(KolDO::getId)
+                  .eq(KolDO::getKolCode, f.kolCode().strip()));
+      if (kol == null) {
+        return new PageResult<>(List.of(), 0, f.page(), f.size());
+      }
+      query.eq(KolBdTransferDO::getKolId, kol.getId());
+    }
+    var result = transfers.selectPage(new Page<>(f.page(), f.size()), query);
+    return new PageResult<>(
+        result.getRecords().stream().map(BdTransferDTO::from).toList(),
+        result.getTotal(),
+        f.page(),
+        f.size());
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public void cancel(Long id) {
+    requireSuperAdmin();
+    tx.executeWithoutResult(
+        status -> {
+          KolBdTransferDO before = requireTransfer(id);
+          lockKol(before.getKolId());
+          int changed =
+              transfers.update(
+                  null,
+                  scheduledUpdate(current.user().id())
+                      .eq(KolBdTransferDO::getId, id)
+                      .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+                      .set(KolBdTransferDO::getCancelReason, "手动取消"));
+          if (changed != 1) {
+            throw new BusinessException(ErrorCode.KOL_TRANSFER_NOT_SCHEDULED);
+          }
+          record("Cancel BD transfer", "DELETE", new CancelAuditDTO(id));
+        });
+  }
+
+  /** One independent transaction per due record. A reread under the KOL lock makes retries safe. */
+  @Transactional(rollbackFor = Exception.class)
+  public void executeDue(Long id) {
+    tx.executeWithoutResult(
+        status -> {
+          KolBdTransferDO candidate = transfers.selectById(id);
+          if (candidate == null || candidate.getStatus() != BdTransferStatus.SCHEDULED) {
+            return;
+          }
+          BdUserDTO target =
+              candidate.getToBdUserId() == null ? null : bds.lockById(candidate.getToBdUserId());
+          KolDO kol = lockKol(candidate.getKolId());
+          KolBdTransferDO row = requireTransfer(id);
+          if (row.getStatus() != BdTransferStatus.SCHEDULED
+              || row.getEffectiveAt().isAfter(now())) {
+            return;
+          }
+          if (!Objects.equals(kol.getBdUserId(), row.getFromBdUserId())) {
+            cancelExecution(row, "执行时归属已变化");
+          } else if (row.getToBdUserId() != null && (target == null || !target.usable())) {
+            cancelExecution(row, "目标商务不可用");
+            LOG.warn("BD transfer {} cancelled: target unavailable", id);
+          } else {
+            changeOwnership(kol, row.getToBdUserId(), row.getEffectiveAt(), null);
+            transfers.update(
+                null,
+                scheduledUpdate(null)
+                    .eq(KolBdTransferDO::getId, id)
+                    .set(KolBdTransferDO::getStatus, BdTransferStatus.DONE)
+                    .set(KolBdTransferDO::getExecutedAt, now()));
+          }
+        });
+  }
+
+  /** At most 200 records per company per minute; the job holds the distributed lock. */
+  public void executeDueBatch() {
+    var rows =
+        transfers.selectList(
+            scheduled()
+                .select(KolBdTransferDO::getId)
+                .le(KolBdTransferDO::getEffectiveAt, now())
+                .orderByAsc(KolBdTransferDO::getEffectiveAt, KolBdTransferDO::getId)
+                .last("LIMIT 200"));
+    for (KolBdTransferDO row : rows) {
+      try {
+        executeDue(row.getId());
+      } catch (RuntimeException e) {
+        LOG.error(
+            "BD transfer {} failed; retained for retry ({})",
+            row.getId(),
+            e.getClass().getSimpleName());
+      }
+    }
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+  public void onStaffDisabled(StaffDisabledEvent event) {
+    // Explicit company scope: the event may be published by another module in its transaction.
+    TenantScope.runCompany(event.tenantId(), () -> unassignDisabled(event.userId()));
+  }
+
+  private void unassignDisabled(long userId) {
+    List<KolDO> rows =
+        kols.selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(KolDO::getId)
+                .eq(KolDO::getBdUserId, userId)
+                .orderByAsc(KolDO::getId));
+    int count = 0;
+    for (KolDO row : rows) {
+      KolDO kol = lockKol(row.getId());
+      if (Objects.equals(kol.getBdUserId(), userId)) {
+        changeOwnership(kol, null, now(), current.user().id());
+        count++;
+      }
+    }
+    transfers.update(
+        null,
+        scheduledUpdate(current.user().id())
+            .eq(KolBdTransferDO::getFromBdUserId, userId)
+            .set(KolBdTransferDO::getFromBdUserId, null));
+    transfers.update(
+        null,
+        scheduledUpdate(current.user().id())
+            .eq(KolBdTransferDO::getToBdUserId, userId)
+            .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+            .set(KolBdTransferDO::getCancelReason, "目标商务已停用"));
+    record("Unassign disabled staff KOLs", "SYSTEM", new DisabledAuditDTO(userId, count));
+  }
+
+  /**
+   * Caller must hold the KOL row lock. See design §4.13: use the agreed time, clamped to current
+   * history.
+   */
+  private void changeOwnership(KolDO kol, Long target, Instant effective, Long actor) {
+    KolBdHistoryDO period =
+        history.selectOne(
+            new LambdaQueryWrapper<KolBdHistoryDO>()
+                .eq(KolBdHistoryDO::getKolId, kol.getId())
+                .isNull(KolBdHistoryDO::getEndTime));
+    if (period != null && period.getStartTime().isAfter(effective)) {
+      LOG.warn("BD transfer history time clamped for KOL {}", kol.getId());
+      effective = period.getStartTime();
+    }
+    kols.update(
+        null,
+        new LambdaUpdateWrapper<KolDO>()
+            .eq(KolDO::getId, kol.getId())
+            .set(KolDO::getBdUserId, target)
+            .set(KolDO::getUpdateBy, actor)
+            .set(KolDO::getUpdateTime, now()));
+    history.closeCurrent(kol.getId(), effective, actor);
+    KolBdHistoryDO next = new KolBdHistoryDO();
+    next.setKolId(kol.getId());
+    next.setBdUserId(target);
+    next.setStartTime(effective);
+    next.setCreateBy(actor);
+    next.setUpdateBy(actor);
+    next.setDeleted(false);
+    history.insert(next);
+  }
+
+  private void cancelExecution(KolBdTransferDO row, String reason) {
+    transfers.update(
+        null,
+        scheduledUpdate(null)
+            .eq(KolBdTransferDO::getId, row.getId())
+            .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+            .set(KolBdTransferDO::getCancelReason, reason));
+  }
+
+  private void cancelForKol(Long kolId, String reason, Long actor) {
+    transfers.update(
+        null,
+        scheduledUpdate(actor)
+            .eq(KolBdTransferDO::getKolId, kolId)
+            .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+            .set(KolBdTransferDO::getCancelReason, reason));
+  }
+
+  private LambdaUpdateWrapper<KolBdTransferDO> scheduledUpdate(Long actor) {
+    return new LambdaUpdateWrapper<KolBdTransferDO>()
+        .eq(KolBdTransferDO::getStatus, BdTransferStatus.SCHEDULED)
+        .set(KolBdTransferDO::getUpdateBy, actor)
+        .set(KolBdTransferDO::getUpdateTime, now());
+  }
+
+  private static LambdaQueryWrapper<KolBdTransferDO> scheduled() {
+    return new LambdaQueryWrapper<KolBdTransferDO>()
+        .eq(KolBdTransferDO::getStatus, BdTransferStatus.SCHEDULED);
+  }
+
+  private KolDO lockKol(Long id) {
+    if (kols.lockById(id) == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return kols.selectById(id);
+  }
+
+  private KolBdTransferDO requireTransfer(Long id) {
+    KolBdTransferDO row = transfers.selectById(id);
+    if (row == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return row;
+  }
+
+  private void requireTarget(Long id) {
+    if (id == null) {
+      return;
+    }
+    BdUserDTO bd = bds.lockById(id);
+    if (bd == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (!bd.usable()) {
+      throw new BusinessException(ErrorCode.KOL_INVALID_BD_USER);
+    }
+  }
+
+  private void requireSuperAdmin() {
+    if (current.user().role() != Role.SUPER_ADMIN || current.user().ownScope()) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+  }
+
+  private void validate(BdTransferCommand c) {
+    boolean ids = c.kolIds() != null;
+    if (ids == (c.fromBdUserId() != null)
+        || (ids
+            && (c.kolIds().isEmpty()
+                || c.kolIds().size() > 500
+                || c.kolIds().stream().anyMatch(id -> id == null || id <= 0)))
+        || (c.fromBdUserId() != null && c.fromBdUserId() <= 0)
+        || (c.toBdUserId() != null && c.toBdUserId() <= 0)
+        || (c.reason() != null && c.reason().length() > 255)
+        || (c.effectiveAt() != null
+            && c.effectiveAt().isAfter(now().atZone(ZoneOffset.UTC).plusYears(1).toInstant()))) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+  }
+
+  private void record(String action, String method, Object params) {
+    var user = current.user();
+    audit.recordTenantWriteOperation(
+        user.tenantId(),
+        user.id(),
+        "KOL",
+        action,
+        method,
+        "/admin-api/kol/bd-transfers",
+        sanitizer.sanitize(params));
+  }
+
+  private Instant now() {
+    return clock.instant().truncatedTo(ChronoUnit.MILLIS);
+  }
+
+  private record TransferAuditDTO(
+      int kolCount,
+      Long fromBdUserId,
+      Long toBdUserId,
+      Instant effectiveAt,
+      String reason,
+      List<Long> sourceBdUserIds) {}
+
+  private record DisabledAuditDTO(long disabledUserId, int kolCount) {}
+
+  private record CancelAuditDTO(Long transferId) {}
+}

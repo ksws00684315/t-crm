@@ -183,6 +183,8 @@ const enUS: MessageSchema = {
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
     KOL_AUTH_TOKEN_INVALID: "The invitation or reset link is invalid, expired, or already used.",
     KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
+    KOL_TRANSFER_EXISTS: "Some KOLs already have a scheduled BD transfer. Cancel it first.",
+    KOL_TRANSFER_NOT_SCHEDULED: "Only scheduled BD transfers can be cancelled.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
     KOL_REGISTER_CODE_INVALID: "The registration link is invalid or has expired.",

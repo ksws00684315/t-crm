@@ -187,6 +187,8 @@ const zhCN = {
     KOL_ALREADY_ACTIVATED: "该达人已激活账号，无需再次邀请",
     KOL_AUTH_TOKEN_INVALID: "邀请或重置链接无效、已过期或已使用",
     KOL_LOGIN_SELECTION_INVALID: "登录选择凭据无效或已过期，请重新登录",
+    KOL_TRANSFER_EXISTS: "部分达人已有预约转移，请先取消预约",
+    KOL_TRANSFER_NOT_SCHEDULED: "只能取消预约中的商务转移",
     KOL_INVALID_BD_USER: "负责商务必须是已启用的子账号（仅本人数据，且有达人编辑权限）",
     KOL_REGISTER_CODE_INVALID: "注册链接无效或已失效",
     KOL_EMAIL_CODE_TOO_FREQUENT: "验证码发送过于频繁，请稍后再试",

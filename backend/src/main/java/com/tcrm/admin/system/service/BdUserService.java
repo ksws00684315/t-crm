@@ -33,6 +33,11 @@ public class BdUserService implements BdUserApi {
   }
 
   @Override
+  public BdUserDTO lockById(Long id) {
+    return users.lockById(id) == null ? null : getById(id);
+  }
+
+  @Override
   public BdUserDTO getByUsername(String username) {
     if (username == null || username.isBlank()) {
       return null;
