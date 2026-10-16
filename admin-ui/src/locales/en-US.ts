@@ -184,6 +184,11 @@ const enUS: MessageSchema = {
     KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
+    KOL_REGISTER_CODE_INVALID: "The registration link is invalid or has expired.",
+    KOL_EMAIL_CODE_TOO_FREQUENT:
+      "A verification code was sent too recently. Please wait and try again.",
+    KOL_EMAIL_CODE_INVALID: "The verification code is wrong, expired, or already used.",
+    KOL_REGISTER_TOO_FREQUENT: "Too many registration attempts. Please try again later.",
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
     LINK_TEMPLATE_INVALID: "The agent template must be an enabled template of this company.",
     LINK_TEMPLATE_NOT_FOUND: "The agent template was not found.",

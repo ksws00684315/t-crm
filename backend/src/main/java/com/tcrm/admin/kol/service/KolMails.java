@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 /**
  * Sends the KOL auth mails off the request thread. A transport failure is a WARN, never a rollback
  * (task 12a §4.4): the invitation token stays valid and the back office can resend it. Message
- * content (subject aside) is not logged, so links never reach the logs.
+ * content (subject aside) is not logged, so links and verification codes never reach the logs. A
+ * transport failure names the template and a masked recipient, never the full address.
  */
 @Component
 public class KolMails {
@@ -37,6 +38,12 @@ public class KolMails {
     send(templates.reset(to, links));
   }
 
+  /** Six-digit registration code; async like the other KOL mails. The code stays in the message. */
+  @Async
+  public void sendRegisterCode(String to, String company, String code) {
+    send(templates.registerCode(to, company, code));
+  }
+
   private void send(MailMessage message) {
     try {
       sender.send(message);
@@ -44,8 +51,20 @@ public class KolMails {
       LOG.warn(
           "Failed to send mail template {} to {}: {}",
           message.template(),
-          message.to(),
+          mask(message.to()),
           e.getMessage());
     }
+  }
+
+  /** Keeps the domain so a failure can be told apart, and drops the local part. */
+  static String mask(String email) {
+    if (email == null || email.isBlank()) {
+      return "email#redacted";
+    }
+    int at = email.indexOf('@');
+    if (at <= 0) {
+      return "email#redacted";
+    }
+    return email.charAt(0) + "***" + email.substring(at);
   }
 }
