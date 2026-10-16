@@ -123,6 +123,7 @@ describe("buildMenu", () => {
       "原商品",
       "对应关系",
       "用户管理",
+      "代购平台模板",
       "操作日志"
     ]);
     const items = buildMenu(routes, accessOf(superAdmin));
@@ -136,6 +137,7 @@ describe("buildMenu", () => {
       "/product/products",
       "/product/kol-items",
       "/system/users",
+      "/system/link-templates",
       "/system/oper-logs"
     ]);
   });
@@ -187,31 +189,43 @@ describe("kolAbilities", () => {
       canWrite: false,
       canChangeBd: false,
       canAssignBd: false,
-      canFilterBd: false
+      canFilterBd: false,
+      canRegisterLink: false
     });
     expect(kolAbilities(superAdmin)).toEqual({
       canWrite: true,
       canChangeBd: true,
       canAssignBd: true,
-      canFilterBd: true
+      canFilterBd: true,
+      canRegisterLink: true
     });
     expect(kolAbilities(staff("ALL", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
       canChangeBd: false,
       canAssignBd: true,
-      canFilterBd: true
+      canFilterBd: true,
+      canRegisterLink: false
     });
     expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
       canChangeBd: false,
       canAssignBd: false,
-      canFilterBd: false
+      canFilterBd: false,
+      canRegisterLink: false
     });
     expect(kolAbilities(staff("ALL", ["kol:view"]))).toEqual({
       canWrite: false,
       canChangeBd: false,
       canAssignBd: false,
-      canFilterBd: true
+      canFilterBd: true,
+      canRegisterLink: false
+    });
+    expect(kolAbilities(staff("OWN", ["kol:register-link"]))).toEqual({
+      canWrite: false,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false,
+      canRegisterLink: true
     });
   });
 });

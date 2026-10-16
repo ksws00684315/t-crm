@@ -23,6 +23,7 @@ describe("cacheable route component names", () => {
         "PlatformTenantPage",
         "ProductListPage",
         "ShopListPage",
+        "SystemLinkTemplatePage",
         "SystemOperLogPage",
         "SystemUserPage"
       ].sort()

@@ -104,6 +104,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "system/link-templates",
+        name: "SystemLinkTemplates",
+        component: () => import("@/views/system/link-template/index.vue"),
+        meta: {
+          title: "route.linkTemplates",
+          icon: "Link",
+          superAdmin: true,
+          componentName: "SystemLinkTemplatePage"
+        }
+      },
+      {
         path: "system/oper-logs",
         name: "SystemOperLogs",
         component: () => import("@/views/system/oper-log/index.vue"),

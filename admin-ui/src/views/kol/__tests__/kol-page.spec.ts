@@ -1,18 +1,21 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
+import * as templateApi from "@/api/link/template";
 import * as bdApi from "@/api/system/bd-user";
 import type { DataScope, KolVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
+import { ApiError } from "@/utils/http/error";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
 vi.mock("@/api/link/link");
+vi.mock("@/api/link/template");
 vi.mock("@/api/system/bd-user");
 
 const row: KolVO = {
@@ -27,6 +30,13 @@ const row: KolVO = {
   defaultRate: "0.1550",
   status: 1,
   remark: null,
+  whatsapp: "+8613800000000",
+  linkTemplateId: "7",
+  linkTemplateName: "AgentOne",
+  inviteCode: "ABC123",
+  sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+  registerSource: 1,
+  accountStatus: 0,
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
@@ -49,8 +59,8 @@ function signIn(role: Role, dataScope: DataScope, permissions: string[] = []) {
   };
 }
 
-async function mountPage(total = "1") {
-  vi.mocked(kolApi.listKols).mockResolvedValue({ items: [row], total, page: 1, size: 20 });
+async function mountPage(total = "1", items: KolVO[] = [row]) {
+  vi.mocked(kolApi.listKols).mockResolvedValue({ items, total, page: 1, size: 20 });
   vi.mocked(bdApi.listBdUsers).mockResolvedValue([
     { id: "5", username: "bd5", nickname: "BD Five" }
   ]);
@@ -65,6 +75,9 @@ async function mountPage(total = "1") {
 describe("KOL list page", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    localStorage.removeItem("tcrm.admin.table.kol");
+    localStorage.removeItem("tcrm.admin.locale");
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue([]);
     setActivePinia(createPinia());
   });
 
@@ -193,5 +206,113 @@ describe("KOL list page", () => {
     );
     expect(wrapper.text()).toContain("applied");
     expect(wrapper.text()).not.toContain("typed-only");
+  });
+
+  it("shows the platform, the sheet link and the account, and can hide the platform column", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    const link = wrapper.get('[data-test="sheet-link"]');
+    expect(link.attributes("href")).toBe(row.sheetUrl);
+    expect(link.attributes("target")).toBe("_blank");
+    expect(link.attributes("rel")).toBe("noopener noreferrer");
+    expect(wrapper.get('[data-test="account"]').text()).toContain("未激活");
+    expect(wrapper.text()).toContain("AgentOne");
+    await wrapper.get('[data-test="column-settings"]').trigger("click");
+    await nextTick();
+    const box = [...document.body.querySelectorAll(".el-checkbox")].find(element =>
+      element.textContent?.includes("代购平台")
+    );
+    box?.querySelector("input")?.click();
+    await nextTick();
+    expect(wrapper.text()).not.toContain("AgentOne");
+    wrapper.unmount();
+  });
+
+  it("shows invite only for an inactive creator entered in the admin console", async () => {
+    signIn("STAFF", "ALL", ["kol:view"]);
+    const viewer = await mountPage();
+    expect(viewer.find('[data-test="invite"]').exists()).toBe(false);
+    viewer.unmount();
+
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+    const activated = await mountPage("1", [{ ...row, accountStatus: 1 }]);
+    expect(activated.find('[data-test="invite"]').exists()).toBe(false);
+    expect(activated.get('[data-test="account"]').text()).toContain("已激活");
+    activated.unmount();
+
+    const selfRegistered = await mountPage("1", [{ ...row, registerSource: 2 }]);
+    expect(selfRegistered.find('[data-test="invite"]').exists()).toBe(false);
+    selfRegistered.unmount();
+
+    const missing = await mountPage("1", [{ ...row, accountStatus: undefined }]);
+    expect(missing.find('[data-test="invite"]').exists()).toBe(false);
+    expect(missing.find('[data-test="account"]').exists()).toBe(false);
+    expect(missing.text()).toContain("-");
+    missing.unmount();
+  });
+
+  it("sends an invite and reloads the list after success or 409", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+    vi.mocked(kolApi.inviteKol).mockResolvedValue(null);
+    const sent = await mountPage();
+    await sent.get('[data-test="invite"]').trigger("click");
+    await flushPromises();
+    expect(kolApi.inviteKol).toHaveBeenCalledWith(row.id);
+    expect(success).toHaveBeenCalledWith("邀请邮件已发送");
+    expect(kolApi.listKols).toHaveBeenCalledTimes(2);
+    sent.unmount();
+
+    vi.mocked(kolApi.listKols).mockClear();
+    vi.mocked(kolApi.inviteKol).mockRejectedValue(
+      new ApiError({ status: 409, errorCode: "KOL_ALREADY_ACTIVATED", traceId: "trace-1" })
+    );
+    const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
+    const conflict = await mountPage();
+    vi.mocked(kolApi.listKols).mockClear();
+    await conflict.get('[data-test="invite"]').trigger("click");
+    await flushPromises();
+    expect(error).toHaveBeenCalledWith("该达人已激活账号，无需再次邀请");
+    expect(kolApi.listKols).toHaveBeenCalledTimes(1);
+    conflict.unmount();
+  });
+
+  it("shows the registration link only with kol:register-link and rotates it after confirmation", async () => {
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+    const writer = await mountPage();
+    expect(writer.find('[data-test="register-link"]').exists()).toBe(false);
+    writer.unmount();
+
+    signIn("STAFF", "OWN", ["kol:view", "kol:register-link"]);
+    vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
+      code: "old-code",
+      url: "https://kol.example/register?c=old-code",
+      status: 1
+    });
+    vi.mocked(kolApi.rotateRegisterCode).mockResolvedValue({
+      code: "new-code",
+      url: "https://kol.example/register?c=new-code",
+      status: 1
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
+    await wrapper.get('[data-test="register-link"]').trigger("click");
+    await flushPromises();
+    expect(document.body.textContent).toContain("https://kol.example/register?c=old-code");
+    expect(document.body.textContent).toContain("把链接发给达人，达人注册后自动归属到你名下。");
+
+    vi.spyOn(ElMessageBox, "confirm").mockRejectedValueOnce("cancel");
+    document.body.querySelector<HTMLButtonElement>('[data-test="rotate-link"]')!.click();
+    await flushPromises();
+    expect(kolApi.rotateRegisterCode).not.toHaveBeenCalled();
+
+    vi.spyOn(ElMessageBox, "confirm").mockResolvedValueOnce("confirm" as never);
+    vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+    document.body.querySelector<HTMLButtonElement>('[data-test="rotate-link"]')!.click();
+    await flushPromises();
+    expect(kolApi.rotateRegisterCode).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain("https://kol.example/register?c=new-code");
+    expect(ElMessage.success).toHaveBeenCalledWith("已生成新的注册链接");
+    wrapper.unmount();
   });
 });

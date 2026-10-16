@@ -238,19 +238,28 @@ export interface KolAbilities {
   canAssignBd: boolean;
   /** Filter the list by BD. kol:view outside OWN. */
   canFilterBd: boolean;
+  /** Show and rotate the caller's creator registration link. */
+  canRegisterLink: boolean;
 }
 
 export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilities {
   const access = accessOf(user);
   if (!user) {
-    return { canWrite: false, canChangeBd: false, canAssignBd: false, canFilterBd: false };
+    return {
+      canWrite: false,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false,
+      canRegisterLink: false
+    };
   }
   const canEdit = access.can("kol:edit");
   return {
     canWrite: canEdit,
     canChangeBd: access.isSuperAdmin,
     canAssignBd: access.isSuperAdmin || (canEdit && !access.isOwnScope),
-    canFilterBd: access.can("kol:view") && !access.isOwnScope
+    canFilterBd: access.can("kol:view") && !access.isOwnScope,
+    canRegisterLink: access.can("kol:register-link")
   };
 }
 

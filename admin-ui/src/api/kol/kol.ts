@@ -12,22 +12,35 @@ export interface KolQuery {
   bdUserId?: string;
 }
 
-/** `SocialAccountRequest`. */
+/** `SocialAccountRequest`. At most one account may set `primary`. */
 export interface SocialAccountRequest {
   platform: string;
   handle: string;
   url?: string | null;
   followers?: string | null;
+  primary: boolean;
 }
 
 /** `EditKolRequest`. `defaultRate` is a fraction string with up to 4 decimals, or null. */
 export interface EditKolRequest {
   name: string;
   email: string;
-  country: string;
+  /** Null clears the country. */
+  country: string | null;
   socialAccounts: SocialAccountRequest[];
   defaultRate: string | null;
   remark: string | null;
+  whatsapp: string | null;
+  linkTemplateId: string | null;
+  inviteCode: string | null;
+  sheetUrl: string | null;
+}
+
+/** `GET` / `POST /kol/register-code`. `url` is the full creator-portal link. */
+export interface RegisterCodeVO {
+  code: string;
+  url: string;
+  status: 0 | 1;
 }
 
 /** `CreateKolRequest`. `bdUserId` is ignored for a BD (the KOL is always assigned to them). */
@@ -70,6 +83,21 @@ export function changeKolBd(id: string, bdUserId: string | null): Promise<null> 
 
 export function downloadKolTemplate(): Promise<DownloadedFile> {
   return http.download({ method: "get", url: "/kol/kol-imports/template" });
+}
+
+/** Resends the activation email. 409 `KOL_ALREADY_ACTIVATED` when the account is already active. */
+export function inviteKol(id: string): Promise<null> {
+  return http.request<null>({ method: "post", url: `/kol/kols/${id}/invite` });
+}
+
+/** Current registration link. The backend creates one when the caller has none. */
+export function getRegisterCode(): Promise<RegisterCodeVO> {
+  return http.request<RegisterCodeVO>({ method: "get", url: "/kol/register-code" });
+}
+
+/** Revokes the current registration link and returns a new one. */
+export function rotateRegisterCode(): Promise<RegisterCodeVO> {
+  return http.request<RegisterCodeVO>({ method: "post", url: "/kol/register-code" });
 }
 
 export function uploadKolImport(file: File): Promise<KolImportVO> {
