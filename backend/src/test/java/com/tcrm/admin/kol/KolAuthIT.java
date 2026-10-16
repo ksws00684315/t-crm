@@ -162,7 +162,7 @@ class KolAuthIT {
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version ="
-                    + " '202610171200'",
+                    + " '202610171400'",
                 Integer.class))
         .isEqualTo(1);
     // ck_crm_kol_account_password: activating without a hash is rejected, and so is clearing the
