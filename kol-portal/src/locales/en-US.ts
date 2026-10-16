@@ -73,7 +73,42 @@ const enUS = {
     reset: "Reset password",
     forgot: "Forgot password",
     account: "My account",
+    register: "Create account",
     notFound: "Page not found"
+  },
+  register: {
+    title: "Create your account",
+    join: "Join {company}",
+    invalidLink:
+      "This registration link is invalid or has expired. Please contact your representative for a new link.",
+    emailExists: "This email is already registered. Please sign in.",
+    goToLogin: "Sign in",
+    sendCode: "Send code",
+    resendIn: "Resend in {seconds}s",
+    emailCode: "Verification code",
+    emailCodeInvalid: "Enter the 6-digit verification code.",
+    whatsapp: "WhatsApp",
+    whatsappInvalid: "Enter a WhatsApp number starting with + and 8–15 digits.",
+    platformLabel: "Primary platform",
+    platformPlaceholder: "Select a platform",
+    platformRequired: "Select your primary platform.",
+    platforms: {
+      TikTok: "TikTok",
+      Instagram: "Instagram",
+      YouTube: "YouTube",
+      X: "X",
+      Facebook: "Facebook",
+      Other: "Other"
+    },
+    handle: "Account name",
+    handleRequired: "Enter your account name (up to 64 characters).",
+    profileUrl: "Profile URL (optional)",
+    urlInvalid: "Profile URL must start with https://.",
+    more: "More (optional)",
+    name: "Name",
+    country: "Country",
+    countryInvalid: "Use a 2-letter country code, or leave it blank.",
+    submit: "Create account"
   },
   errors: {
     COMMON_VALIDATION_FAILED:
@@ -98,6 +133,13 @@ const enUS = {
     FILE_INVALID: "The file must be a PNG or JPEG image.",
     FILE_TOO_LARGE: "The file is larger than 2 MB.",
     FILE_IN_USE: "This file is already used by another account.",
+    KOL_EMAIL_EXISTS: "This email is already registered. Please sign in.",
+    KOL_REGISTER_CODE_INVALID:
+      "This registration link is invalid or has expired. Please contact your representative for a new link.",
+    KOL_EMAIL_CODE_TOO_FREQUENT:
+      "A verification code was sent too recently. Please wait and try again.",
+    KOL_EMAIL_CODE_INVALID: "The verification code is wrong, expired, or already used.",
+    KOL_REGISTER_TOO_FREQUENT: "Too many registration attempts. Please try again later.",
     generic: "The operation failed. Please try again later.",
     network: "Network error. Please check your connection and try again.",
     field: "This field is not valid."

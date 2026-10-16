@@ -56,7 +56,7 @@ describe("installGuard with the real route table", () => {
 });
 
 describe("auth route access", () => {
-  it.each(["/activate?token=test", "/reset?token=test", "/forgot"])(
+  it.each(["/activate?token=test", "/reset?token=test", "/forgot", "/register?c=test"])(
     "opens public %s without a session",
     async path => {
       const router = createRouter({ history: createMemoryHistory(), routes });
@@ -65,6 +65,13 @@ describe("auth route access", () => {
       expect(router.currentRoute.value.fullPath).toBe(path);
     }
   );
+  it("lets a signed-in user open a register link", async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    installGuard(router, () => ({ isLoggedIn: true }));
+    await router.push("/register?c=test");
+    expect(router.currentRoute.value.fullPath).toBe("/register?c=test");
+  });
+
   it("requires a session for the account page", async () => {
     const router = createRouter({ history: createMemoryHistory(), routes });
     installGuard(router, () => ({ isLoggedIn: false }));

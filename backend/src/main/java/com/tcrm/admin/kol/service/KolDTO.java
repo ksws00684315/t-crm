@@ -23,5 +23,6 @@ public record KolDTO(
     String inviteCode,
     String sheetUrl,
     Integer registerSource,
+    Integer accountStatus,
     Instant createTime,
     Instant updateTime) {}

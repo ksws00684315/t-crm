@@ -35,6 +35,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "productName", label: t("link.productName"), prop: "productName", minWidth: 120 },
   { key: "weidianItemId", label: t("link.exclusiveId"), width: 150, mono: true },
   { key: "linkUrl", label: t("link.trackingLink"), minWidth: 260, mono: true },
+  { key: "targetUrl", label: t("link.targetUrl"), minWidth: 280, mono: true },
   { key: "status", label: t("common.status"), width: 150 },
   { key: "clicks", label: t("link.clicks"), width: 130 }
 ]);
@@ -147,6 +148,9 @@ function reasonText(row: LinkVO): string {
       </template>
       <template #cell-linkUrl="{ row }">
         <CopyText :value="asLink(row).linkUrl" />
+      </template>
+      <template #cell-targetUrl="{ row }">
+        <CopyText :value="asLink(row).targetUrl" />
       </template>
       <template #cell-status="{ row }">
         <el-tag v-if="asLink(row).available" type="success" data-test="status">{{

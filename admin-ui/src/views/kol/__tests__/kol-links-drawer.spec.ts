@@ -54,10 +54,9 @@ async function mountDrawer() {
 }
 
 function linkCopy(wrapper: ReturnType<typeof mount>, url: string) {
-  const row = wrapper.findAll("tr").find(item => item.text().includes(url));
-  if (!row) throw new Error(`row not found for ${url}`);
-  const copies = row.findAll('[data-test="copy"]');
-  return copies[copies.length - 1];
+  const block = wrapper.findAll(".copy-text").find(item => item.text().includes(url));
+  if (!block) throw new Error(`copy block not found for ${url}`);
+  return block.find('[data-test="copy"]');
 }
 
 describe("KOL links drawer", () => {
@@ -76,6 +75,8 @@ describe("KOL links drawer", () => {
     });
     const text = document.body.textContent ?? "";
     expect(text).toContain("https://t.example.com/t/KOL0001/P000001");
+    expect(text).toContain("https://weidian.com/item.html?itemID=9001");
+    expect(text).toContain("目标地址");
     expect(text).toContain("可用");
     expect(text).toContain("不可用：达人停用、商品下架、店铺停用");
     expect(text).toContain("12 / 7");

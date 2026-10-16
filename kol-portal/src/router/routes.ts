@@ -39,6 +39,12 @@ export const routes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: "/register",
+    name: "Register",
+    component: () => import("@/views/register/index.vue"),
+    meta: { title: "route.register", public: true }
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/views/error/404.vue"),

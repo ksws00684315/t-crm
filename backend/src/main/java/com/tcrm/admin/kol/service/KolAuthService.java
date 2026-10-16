@@ -308,6 +308,18 @@ public class KolAuthService {
         usable.stream().map(a -> new CompanyChoice(a.tenantId(), a.tenantName())).toList());
   }
 
+  /**
+   * Signs in a KOL this request just created and activated. The payload matches a password login.
+   * Callers must already have checked that the account exists and is usable.
+   */
+  public LoginResult loginEstablished(long kolId) {
+    KolAccountDTO kol = accounts.getById(kolId);
+    if (kol == null) {
+      throw new BusinessException(ErrorCode.AUTH_ACCOUNT_DISABLED);
+    }
+    return logIn(requireUsable(kol));
+  }
+
   /** Signs the account in and binds the credential version read before this call. */
   private LoginResult logIn(KolAccountDTO kol) {
     accounts.updateLastLoginTime(kol.id(), Instant.now());

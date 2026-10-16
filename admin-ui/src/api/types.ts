@@ -81,12 +81,13 @@ export interface UserVO {
   createTime: string;
 }
 
-/** `SocialAccountVO`; `followers` is a string (backend Long). */
+/** `SocialAccountVO`; `followers` is a string (backend Long). `primary` is the main platform. */
 export interface SocialAccountVO {
   platform: string;
   handle: string;
   url: string | null;
   followers: string | null;
+  primary: boolean;
 }
 
 /** `KolVO`. `defaultRate` is a fraction with 4 decimals ("0.1550" = 15.5%), null when not set. */
@@ -95,8 +96,8 @@ export interface KolVO {
   kolCode: string;
   name: string;
   email: string;
-  /** ISO 3166-1 alpha-2, upper case. */
-  country: string;
+  /** ISO 3166-1 alpha-2, upper case. Null when unset. */
+  country: string | null;
   socialAccounts: SocialAccountVO[];
   /** Null means "no BD assigned". */
   bdUserId: string | null;
@@ -105,8 +106,31 @@ export interface KolVO {
   /** 1 = enabled, 0 = disabled. */
   status: 0 | 1;
   remark: string | null;
+  whatsapp: string | null;
+  /** Enabled template id, or a disabled one still stored on the creator. */
+  linkTemplateId: string | null;
+  linkTemplateName: string | null;
+  inviteCode: string | null;
+  sheetUrl: string | null;
+  /** 1 entered in the admin console, 2 self-registered. */
+  registerSource: 1 | 2;
+  /**
+   * 0 not activated, 1 activated. Task 12c adds this to `KolVO`; until then the field may be absent.
+   */
+  accountStatus?: 0 | 1;
   createTime: string;
   updateTime: string;
+}
+
+/** `LinkTemplateVO`. `status` 1 enabled, 0 disabled. `channelCode` is always WEIDIAN. */
+export interface LinkTemplateVO {
+  id: string;
+  templateCode: string;
+  templateName: string;
+  templateUrl: string;
+  channelCode: string;
+  sortOrder: number;
+  status: 0 | 1;
 }
 
 /** `BdHistoryVO`: one ownership period; null `bdUserId` = unassigned, null `endTime` = current. */

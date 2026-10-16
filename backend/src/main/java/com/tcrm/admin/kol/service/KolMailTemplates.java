@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 public class KolMailTemplates {
   public static final String INVITE_TEMPLATE = "kol-invite";
   public static final String RESET_TEMPLATE = "kol-reset";
+  public static final String REGISTER_TEMPLATE = "kol-register-code";
 
   private final KolPortalUrls links;
 
@@ -108,6 +109,49 @@ public class KolMailTemplates {
     text.append("如果这不是您本人的操作，请忽略这封邮件。\n");
     html.append("<p>如果这不是您本人的操作，请忽略这封邮件。</p>");
     return new MailMessage(to, RESET_TEMPLATE, subject, text.toString(), html.toString());
+  }
+
+  /**
+   * Email verification code for self-registration. English first, then Chinese; the code is valid
+   * for 10 minutes. The code is secret material and reaches a log only when {@code
+   * crm.mail.log-links} is on.
+   */
+  public MailMessage registerCode(String to, String company, String code) {
+    String subject = "[" + company + "] Your verification code / 您的验证码";
+    String text =
+        "Hello,\n\n"
+            + "Your verification code for joining "
+            + company
+            + " on T-CRM is:\n\n"
+            + code
+            + "\n\n"
+            + "The code is valid for 10 minutes and can be used once.\n\n"
+            + "If you were not expecting this email, you can ignore it.\n\n"
+            + "----\n"
+            + "您好，\n\n"
+            + "您加入 "
+            + company
+            + "（T-CRM）的验证码是：\n\n"
+            + code
+            + "\n\n"
+            + "验证码 10 分钟内有效，仅可使用一次。\n\n"
+            + "如果您没有预期收到这封邮件，请忽略它。\n";
+    String html =
+        "<p>Hello,</p><p>Your verification code for joining <strong>"
+            + escape(company)
+            + "</strong> on T-CRM is:</p><p><strong>"
+            + escape(code)
+            + "</strong></p>"
+            + "<p>The code is valid for 10 minutes and can be used once.</p>"
+            + "<p>If you were not expecting this email, you can ignore it.</p><hr>"
+            + "<p>您好，</p><p>您加入 <strong>"
+            + escape(company)
+            + "</strong>（T-CRM）的验证码是：</p><p><strong>"
+            + escape(code)
+            + "</strong></p>"
+            + "<p>验证码 10 分钟内有效，仅可使用一次。</p>"
+            + "<p>如果您没有预期收到这封邮件，请忽略它。</p>";
+    return new MailMessage(to, REGISTER_TEMPLATE, subject, text, html);
   }
 
   private static String escape(String value) {

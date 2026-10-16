@@ -12,6 +12,9 @@ const EMAIL_PATTERN =
 const COUNTRY_PATTERN = /^[A-Za-z]{2}$/;
 const HTTPS_URL_PATTERN = /^https:\/\/[^\s/?#]+\S*$/;
 const COUNT_PATTERN = /^\d{1,15}$/;
+const WHATSAPP_PATTERN = /^\+[0-9]{8,15}$/;
+const INVITE_CODE_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const SHEET_URL_PATTERN = /^https:\/\/docs\.google\.com\/spreadsheets\/.*$/;
 
 /** Length in Unicode characters, as the backend counts it. */
 const length = (value: string) => [...value].length;
@@ -31,9 +34,31 @@ export function validateKolEmail(value: string): string | null {
   return null;
 }
 
+/** Optional. A non-blank value must be two letters; the backend also checks the ISO list. */
 export function validateCountry(value: string): string | null {
-  if (blank(value)) return translate("validation.countryRequired");
+  if (blank(value)) return null;
   if (!COUNTRY_PATTERN.test(value.trim())) return translate("validation.countryPattern");
+  return null;
+}
+
+export function validateWhatsapp(value: string): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  if (length(text) > 32 || !WHATSAPP_PATTERN.test(text)) return translate("validation.whatsapp");
+  return null;
+}
+
+export function validateInviteCode(value: string): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  if (!INVITE_CODE_PATTERN.test(text)) return translate("validation.inviteCode");
+  return null;
+}
+
+export function validateSheetUrl(value: string): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  if (length(text) > 512 || !SHEET_URL_PATTERN.test(text)) return translate("validation.sheetUrl");
   return null;
 }
 
@@ -46,6 +71,16 @@ export interface SocialAccountInput {
   handle: string;
   url: string;
   followers: string;
+  primary: boolean;
+}
+
+/** Selects one row, or clears it when that row is already the primary. */
+export function withPrimary(
+  rows: readonly SocialAccountInput[],
+  index: number
+): SocialAccountInput[] {
+  const turnOn = rows[index] ? !rows[index].primary : false;
+  return rows.map((row, i) => ({ ...row, primary: turnOn && i === index }));
 }
 
 /** First problem of one social account row, or null. */

@@ -4,14 +4,19 @@ import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { createKol, editKol } from "@/api/kol/kol";
-import type { BdUserVO, KolVO } from "@/api/types";
+import { listLinkTemplates } from "@/api/link/template";
+import type { BdUserVO, KolVO, LinkTemplateVO } from "@/api/types";
 import {
   type SocialAccountInput,
   validateCountry,
+  validateInviteCode,
   validateKolEmail,
   validateKolName,
   validateRemark,
-  validateSocialAccount
+  validateSheetUrl,
+  validateSocialAccount,
+  validateWhatsapp,
+  withPrimary
 } from "@/utils/kol-validation";
 import { notifyError } from "@/utils/notify";
 import { percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
@@ -42,6 +47,8 @@ const title = computed(() =>
 );
 const formRef = ref<FormInstance>();
 const saving = ref(false);
+const templatesLoading = ref(false);
+const templates = ref<LinkTemplateVO[]>([]);
 const serverErrors = ref<Record<string, string>>({});
 const socialError = ref("");
 const form = reactive({
@@ -51,6 +58,10 @@ const form = reactive({
   bdUserId: null as string | null,
   percent: "",
   remark: "",
+  whatsapp: "",
+  linkTemplateId: null as string | null,
+  inviteCode: "",
+  sheetUrl: "",
   socialAccounts: [] as SocialAccountInput[]
 });
 
@@ -59,8 +70,21 @@ const rules: FormRules = {
   email: [rule(validateKolEmail)],
   country: [rule(validateCountry)],
   percent: [rule(validatePercent)],
-  remark: [rule(validateRemark)]
+  remark: [rule(validateRemark)],
+  whatsapp: [rule(validateWhatsapp)],
+  inviteCode: [rule(validateInviteCode)],
+  sheetUrl: [rule(validateSheetUrl)]
 };
+
+const templateOptions = computed(() => {
+  const enabled = templates.value.filter(item => item.status === 1);
+  const options = enabled.map(item => ({ id: item.id, label: item.templateName }));
+  const currentId = form.linkTemplateId;
+  if (!currentId || enabled.some(item => item.id === currentId)) return options;
+  const known = templates.value.find(item => item.id === currentId);
+  const name = known?.templateName || props.kol?.linkTemplateName || currentId;
+  return [...options, { id: currentId, label: t("kol.templateDisabled", { name }) }];
+});
 
 watch(
   () => props.modelValue,
@@ -75,22 +99,45 @@ watch(
     form.bdUserId = null;
     form.percent = rateToPercent(current?.defaultRate);
     form.remark = current?.remark ?? "";
+    form.whatsapp = current?.whatsapp ?? "";
+    form.linkTemplateId = current?.linkTemplateId ?? null;
+    form.inviteCode = current?.inviteCode ?? "";
+    form.sheetUrl = current?.sheetUrl ?? "";
     form.socialAccounts = (current?.socialAccounts ?? []).map(account => ({
       platform: account.platform,
       handle: account.handle,
       url: account.url ?? "",
-      followers: account.followers ?? ""
+      followers: account.followers ?? "",
+      primary: account.primary === true
     }));
     formRef.value?.clearValidate();
+    void loadTemplates();
   }
 );
 
+async function loadTemplates() {
+  templatesLoading.value = true;
+  try {
+    templates.value = await listLinkTemplates();
+  } catch (error) {
+    templates.value = [];
+    notifyError(error);
+  } finally {
+    templatesLoading.value = false;
+  }
+}
+
 function addSocialAccount() {
-  form.socialAccounts.push({ platform: "", handle: "", url: "", followers: "" });
+  form.socialAccounts.push({ platform: "", handle: "", url: "", followers: "", primary: false });
 }
 
 function removeSocialAccount(index: number) {
   form.socialAccounts.splice(index, 1);
+}
+
+function togglePrimary(index: number) {
+  const next = withPrimary(form.socialAccounts, index);
+  form.socialAccounts.splice(0, form.socialAccounts.length, ...next);
 }
 
 function close() {
@@ -98,6 +145,11 @@ function close() {
 }
 
 function checkSocialAccounts(): boolean {
+  const primaryCount = form.socialAccounts.filter(account => account.primary).length;
+  if (primaryCount > 1) {
+    socialError.value = t("errors.KOL_MULTIPLE_PRIMARY");
+    return false;
+  }
   for (const [index, account] of form.socialAccounts.entries()) {
     const message = validateSocialAccount(account);
     if (message) {
@@ -117,15 +169,20 @@ async function submit() {
   const body = {
     name: form.name.trim(),
     email: form.email.trim(),
-    country: form.country.trim().toUpperCase(),
+    country: form.country.trim() ? form.country.trim().toUpperCase() : null,
     socialAccounts: form.socialAccounts.map(account => ({
       platform: account.platform.trim(),
       handle: account.handle.trim(),
       url: account.url.trim() || null,
-      followers: account.followers.trim() || null
+      followers: account.followers.trim() || null,
+      primary: account.primary
     })),
     defaultRate: percentToRate(form.percent),
-    remark: form.remark.trim() || null
+    remark: form.remark.trim() || null,
+    whatsapp: form.whatsapp.trim() || null,
+    linkTemplateId: form.linkTemplateId,
+    inviteCode: form.inviteCode.trim() || null,
+    sheetUrl: form.sheetUrl.trim() || null
   };
   try {
     if (props.kol) {
@@ -143,7 +200,11 @@ async function submit() {
       "country",
       "bdUserId",
       "defaultRate",
-      "remark"
+      "remark",
+      "whatsapp",
+      "linkTemplateId",
+      "inviteCode",
+      "sheetUrl"
     ]);
     if (serverErrors.value.defaultRate) serverErrors.value.percent = serverErrors.value.defaultRate;
     notifyError(error);
@@ -157,7 +218,7 @@ async function submit() {
   <el-dialog
     :model-value="modelValue"
     :title="title"
-    width="720px"
+    width="860px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent>
@@ -204,6 +265,49 @@ async function submit() {
           <template #append>%</template>
         </el-input>
       </el-form-item>
+
+      <h4 class="section">{{ t("kol.contactTitle") }}</h4>
+      <el-form-item :label="t('kol.whatsapp')" prop="whatsapp" :error="serverErrors.whatsapp">
+        <el-input
+          v-model="form.whatsapp"
+          data-test="whatsapp"
+          maxlength="32"
+          :placeholder="t('kol.whatsappPlaceholder')"
+        />
+      </el-form-item>
+      <el-form-item
+        :label="t('kol.agentPlatform')"
+        prop="linkTemplateId"
+        :error="serverErrors.linkTemplateId"
+      >
+        <el-select
+          v-model="form.linkTemplateId"
+          data-test="template-select"
+          clearable
+          filterable
+          :loading="templatesLoading"
+          :placeholder="t('kol.templatePlaceholder')"
+        >
+          <el-option
+            v-for="item in templateOptions"
+            :key="item.id"
+            :label="item.label"
+            :value="item.id"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item :label="t('kol.inviteCode')" prop="inviteCode" :error="serverErrors.inviteCode">
+        <el-input v-model="form.inviteCode" data-test="invite-code" maxlength="64" />
+      </el-form-item>
+      <el-form-item :label="t('kol.sheetUrl')" prop="sheetUrl" :error="serverErrors.sheetUrl">
+        <el-input
+          v-model="form.sheetUrl"
+          data-test="sheet-url"
+          maxlength="512"
+          :placeholder="t('kol.sheetUrlPlaceholder')"
+        />
+      </el-form-item>
+
       <el-form-item :label="t('kol.social')" :error="socialError">
         <div class="social">
           <div v-for="(account, index) in form.socialAccounts" :key="index" class="social__row">
@@ -227,6 +331,14 @@ async function submit() {
               :placeholder="t('kol.followersPlaceholder')"
               maxlength="15"
             />
+            <el-radio
+              data-test="primary"
+              :model-value="account.primary"
+              :value="true"
+              @click.prevent="togglePrimary(index)"
+            >
+              {{ t("kol.primary") }}
+            </el-radio>
             <el-button link type="danger" @click="removeSocialAccount(index)">{{
               t("common.delete")
             }}</el-button>
@@ -245,12 +357,19 @@ async function submit() {
     </el-form>
     <template #footer>
       <el-button @click="close">{{ t("common.cancel") }}</el-button>
-      <el-button type="primary" :loading="saving" @click="submit">{{ t("common.save") }}</el-button>
+      <el-button type="primary" data-test="kol-save" :loading="saving" @click="submit">{{
+        t("common.save")
+      }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <style scoped>
+.section {
+  margin: 4px 0 12px;
+  font-weight: 600;
+}
+
 .social {
   display: flex;
   flex-direction: column;
@@ -260,7 +379,8 @@ async function submit() {
 
 .social__row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1.6fr 1fr auto;
+  grid-template-columns: 0.9fr 1fr 1.3fr 0.8fr auto auto;
   gap: 8px;
+  align-items: center;
 }
 </style>

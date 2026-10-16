@@ -119,8 +119,9 @@ describe("installGuard with the real route table", () => {
     expect(route.query.redirect).toBe("/system/users");
   });
 
-  it("denies the user list and the audit log to a sub-account", async () => {
+  it("denies the user list, link templates and the audit log to a sub-account", async () => {
     expect((await navigate(viewer, "/system/users")).path).toBe("/403");
+    expect((await navigate(viewer, "/system/link-templates")).path).toBe("/403");
     expect((await navigate(viewer, "/system/oper-logs")).path).toBe("/403");
   });
 
@@ -128,8 +129,9 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(productAll, "/kol/kols")).path).toBe("/403");
   });
 
-  it("opens the user list and the audit log for the super administrator", async () => {
+  it("opens the user list, link templates and the audit log for the super administrator", async () => {
     expect((await navigate(superAdmin, "/system/users")).name).toBe("SystemUsers");
+    expect((await navigate(superAdmin, "/system/link-templates")).name).toBe("SystemLinkTemplates");
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
@@ -168,6 +170,7 @@ describe("installGuard with the real route table", () => {
       ["kol/kols", "kol:view", false, false, false],
       ["product", null, false, false, false],
       ["system/users", null, true, false, false],
+      ["system/link-templates", null, true, false, false],
       ["system/oper-logs", null, true, false, false],
       ["account/password", null, false, false, false],
       ["403", null, false, false, false]
