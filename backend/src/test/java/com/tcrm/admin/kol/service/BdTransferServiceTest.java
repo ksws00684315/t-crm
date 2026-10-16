@@ -132,6 +132,7 @@ class BdTransferServiceTest {
     assertThat(row.getValue().getToBdUserId()).isEqualTo(6L);
     assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.DONE);
     assertThat(row.getValue().getExecutedAt()).isEqualTo(NOW);
+    assertThat(row.getValue().getReason()).isEqualTo("handover");
     verify(history).closeCurrent(11L, NOW, 1L);
     var params = ArgumentCaptor.forClass(String.class);
     verify(audit)
@@ -175,7 +176,17 @@ class BdTransferServiceTest {
     assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.SCHEDULED);
     assertThat(row.getValue().getToBdUserId()).isNull();
     assertThat(row.getValue().getEffectiveAt()).isEqualTo(time);
+    assertThat(row.getValue().getReason()).isNull();
     verifyNoInteractions(history);
+  }
+
+  @Test
+  void shouldKeepReasonEmpty_whenLegacyPutTransfersOneKol() {
+    service.updateOne(11L, 6L);
+    var row = ArgumentCaptor.forClass(KolBdTransferDO.class);
+    verify(transfers).insert(row.capture());
+    assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.DONE);
+    assertThat(row.getValue().getReason()).isNull();
   }
 
   @Test
@@ -331,18 +342,68 @@ class BdTransferServiceTest {
   }
 
   @Test
-  void shouldPageWithDefaults_whenListing() {
+  void shouldResolveDisplayFieldsWithFixedQueries_whenListing() {
+    var done = new KolBdTransferDO();
+    done.setId(22L);
+    done.setKolId(11L);
+    done.setFromBdUserId(5L);
+    done.setToBdUserId(6L);
+    done.setEffectiveAt(NOW);
+    done.setStatus(BdTransferStatus.DONE);
+    done.setExecutedAt(NOW);
+    done.setReason("handover");
+    var unassigned = new KolBdTransferDO();
+    unassigned.setId(23L);
+    unassigned.setKolId(11L);
+    unassigned.setEffectiveAt(NOW);
+    unassigned.setStatus(BdTransferStatus.SCHEDULED);
     when(transfers.selectPage(any(), any()))
         .thenAnswer(
             i -> {
               Page<KolBdTransferDO> p = i.getArgument(0);
-              p.setRecords(List.of(reservation(NOW)));
-              p.setTotal(1);
+              p.setRecords(List.of(done, unassigned));
+              p.setTotal(2);
               return p;
             });
+    var kol = new KolDO();
+    kol.setId(11L);
+    kol.setKolCode("KOL0011");
+    kol.setName("Alice");
+    when(kols.selectList(any())).thenReturn(List.of(kol));
+    when(bds.listByIds(any()))
+        .thenReturn(
+            List.of(
+                new BdUserDTO(5L, "source-login", "Source Nick", false),
+                new BdUserDTO(6L, "target-login", "  ", false)));
     var result = service.page(new BdTransferFilterDTO(null, null, 5L, 6L, 1, 20));
-    assertThat(result.total()).isEqualTo(1);
-    assertThat(result.items().getFirst().id()).isEqualTo(21L);
+    var first = result.items().get(0);
+    assertThat(first.id()).isEqualTo(22L);
+    assertThat(first.kolCode()).isEqualTo("KOL0011");
+    assertThat(first.kolName()).isEqualTo("Alice");
+    assertThat(first.fromBdUserName()).isEqualTo("Source Nick");
+    assertThat(first.toBdUserName()).isEqualTo("target-login");
+    assertThat(first.reason()).isEqualTo("handover");
+    var second = result.items().get(1);
+    assertThat(second.fromBdUserName()).isNull();
+    assertThat(second.toBdUserName()).isNull();
+    verify(kols, times(1)).selectList(any());
+    verify(bds, times(1)).listByIds(any());
+  }
+
+  @Test
+  void shouldSkipDisplayQueries_whenPageIsEmpty() {
+    when(transfers.selectPage(any(), any()))
+        .thenAnswer(
+            i -> {
+              Page<KolBdTransferDO> p = i.getArgument(0);
+              p.setRecords(List.of());
+              p.setTotal(0);
+              return p;
+            });
+    var result = service.page(new BdTransferFilterDTO(null, null, null, null, 1, 20));
+    assertThat(result.items()).isEmpty();
+    verify(kols, never()).selectList(any());
+    verify(bds, never()).listByIds(any());
   }
 
   @Test

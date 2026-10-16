@@ -216,6 +216,16 @@ class BdTransferIT {
                 Integer.class))
         .isEqualTo(1);
     assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM flyway_schema_history WHERE version = '202610172100' AND success",
+                Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT is_nullable FROM information_schema.columns WHERE table_name = 'crm_kol_bd_transfer' AND column_name = 'reason'",
+                String.class))
+        .isEqualTo("YES");
+    assertThat(
             jdbc.queryForList(
                 "SELECT a.attname FROM pg_attribute a WHERE a.attrelid = 'crm_kol_bd_transfer'::regclass AND a.attnum > 0 AND NOT a.attisdropped AND col_description(a.attrelid, a.attnum) IS NULL",
                 String.class))
@@ -436,6 +446,36 @@ class BdTransferIT {
                 "SELECT count(*) FROM sys_oper_log WHERE action = 'Cancel BD transfer'",
                 Integer.class))
         .isEqualTo(1);
+  }
+
+  @Test
+  void shouldReturnDisplayFieldsAndReason_whenListing() throws Exception {
+    jdbc.update("UPDATE sys_user SET nickname = '源商务' WHERE id = ?", source);
+    jdbc.update("UPDATE sys_user SET nickname = '' WHERE id = ?", target);
+    create(Map.of("kolIds", List.of(11L), "toBdUserId", target, "reason", "离职交接"));
+    mvc.perform(
+            put("/admin-api/kol/kols/12/bd-user")
+                .header(TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("bdUserId", target))))
+        .andExpect(status().isOk());
+    schedule(12L, null, future());
+    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL1011"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL1011"))
+        .andExpect(jsonPath("$.data.items[0].kolName").value("Test"))
+        .andExpect(jsonPath("$.data.items[0].fromBdUserName").value("源商务"))
+        .andExpect(jsonPath("$.data.items[0].toBdUserName").value("target-bd"))
+        .andExpect(jsonPath("$.data.items[0].reason").value("离职交接"));
+    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL1012"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].reason").value("handover"))
+        .andExpect(
+            jsonPath("$.data.items[0].toBdUserName").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.items[1].reason").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.items[1].fromBdUserName").value("源商务"));
   }
 
   @Test

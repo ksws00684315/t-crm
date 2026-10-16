@@ -26,8 +26,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -153,6 +159,7 @@ public class BdTransferService {
       row.setToBdUserId(c.toBdUserId());
       row.setEffectiveAt(effective);
       row.setStatus(scheduled ? BdTransferStatus.SCHEDULED : BdTransferStatus.DONE);
+      row.setReason(c.reason());
       row.setDeleted(false);
       if (!scheduled) {
         changeOwnership(kol, c.toBdUserId(), now, current.user().id());
@@ -195,11 +202,66 @@ public class BdTransferService {
       query.eq(KolBdTransferDO::getKolId, kol.getId());
     }
     var result = transfers.selectPage(new Page<>(f.page(), f.size()), query);
+    List<KolBdTransferDO> records = result.getRecords();
+    if (records.isEmpty()) {
+      return new PageResult<>(List.of(), result.getTotal(), f.page(), f.size());
+    }
+    // Fixed per-page cost (task 16b 4.1): one batched KOL query and one batched BD query.
+    Map<Long, KolDO> kolsById =
+        kols
+            .selectList(
+                new LambdaQueryWrapper<KolDO>()
+                    .select(KolDO::getId, KolDO::getKolCode, KolDO::getName)
+                    .in(
+                        KolDO::getId,
+                        records.stream().map(KolBdTransferDO::getKolId).distinct().toList()))
+            .stream()
+            .collect(Collectors.toMap(KolDO::getId, Function.identity()));
+    Map<Long, String> bdNames = bdNames(records);
     return new PageResult<>(
-        result.getRecords().stream().map(BdTransferDTO::from).toList(),
+        records.stream().map(row -> toDto(row, kolsById, bdNames)).toList(),
         result.getTotal(),
         f.page(),
         f.size());
+  }
+
+  /** Nickname preferred, username otherwise (task 16b 4.1). */
+  private Map<Long, String> bdNames(List<KolBdTransferDO> records) {
+    Set<Long> ids = new HashSet<>();
+    for (KolBdTransferDO row : records) {
+      if (row.getFromBdUserId() != null) {
+        ids.add(row.getFromBdUserId());
+      }
+      if (row.getToBdUserId() != null) {
+        ids.add(row.getToBdUserId());
+      }
+    }
+    Map<Long, String> names = new HashMap<>();
+    for (BdUserDTO bd : bds.listByIds(ids)) {
+      String nickname = bd.nickname();
+      names.put(bd.id(), nickname == null || nickname.isBlank() ? bd.username() : nickname);
+    }
+    return names;
+  }
+
+  private static BdTransferDTO toDto(
+      KolBdTransferDO row, Map<Long, KolDO> kolsById, Map<Long, String> bdNames) {
+    KolDO kol = kolsById.get(row.getKolId());
+    return new BdTransferDTO(
+        row.getId(),
+        row.getKolId(),
+        kol == null ? null : kol.getKolCode(),
+        kol == null ? null : kol.getName(),
+        row.getFromBdUserId(),
+        row.getFromBdUserId() == null ? null : bdNames.get(row.getFromBdUserId()),
+        row.getToBdUserId(),
+        row.getToBdUserId() == null ? null : bdNames.get(row.getToBdUserId()),
+        row.getEffectiveAt(),
+        row.getStatus(),
+        row.getExecutedAt(),
+        row.getReason(),
+        row.getCancelReason(),
+        row.getCreateTime());
   }
 
   @Transactional(rollbackFor = Exception.class)
