@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: T-CRM order API
+  version: 1.0.0
+  description: >-
+    Task 13 static contract. Company comes from the login session; OWN scope uses
+    the order's payment-time BD snapshot. No buyer data is returned.
+    Existing springdoc integration is deferred (engineering gap I6).
+security:
+  - AdminToken: []
+paths:
+  /admin-api/order/orders:
+    get:
+      operationId: listOrders
+      summary: Query orders, items and completed refund totals
+      x-permission: order:view
+      parameters:
+        - {$ref: '#/components/parameters/shopId'}
+        - {$ref: '#/components/parameters/payFrom'}
+        - {$ref: '#/components/parameters/payTo'}
+        - {$ref: '#/components/parameters/page'}
+        - {$ref: '#/components/parameters/size'}
+        - name: kolCode
+          in: query
+          schema: {type: string, maxLength: 16}
+          example: KOL0100
+        - name: orderStatus
+          in: query
+          schema: {$ref: '#/components/schemas/OrderStatus'}
+        - name: attributionStatus
+          in: query
+          schema: {$ref: '#/components/schemas/AttributionStatus'}
+      responses:
+        '200': {$ref: '#/components/responses/Orders'}
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/unmatched:
+    get:
+      operationId: listUnmatchedOrders
+      summary: Query CONFLICT and UNMATCHED orders with items
+      description: Accepts the same query fields as listOrders; the pool condition always applies.
+      x-permission: order:manage
+      parameters:
+        - {$ref: '#/components/parameters/shopId'}
+        - {$ref: '#/components/parameters/payFrom'}
+        - {$ref: '#/components/parameters/payTo'}
+        - {$ref: '#/components/parameters/page'}
+        - {$ref: '#/components/parameters/size'}
+        - {name: kolCode, in: query, schema: {type: string, maxLength: 16}}
+        - {name: orderStatus, in: query, schema: {$ref: '#/components/schemas/OrderStatus'}}
+        - {name: attributionStatus, in: query, schema: {$ref: '#/components/schemas/AttributionStatus'}}
+      responses:
+        '200': {$ref: '#/components/responses/Orders'}
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/syncs:
+    post:
+      operationId: synchronizeOrders
+      summary: Start background synchronization after acquiring the shop lock
+      x-permission: order:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shopId]
+              properties:
+                shopId: {$ref: '#/components/schemas/Id'}
+            example: {shopId: '10'}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: 'SHOP_NOT_FOUND: shop is absent or belongs to another company'}
+        '409': {description: 'ORDER_SYNC_RUNNING: shop synchronization is already running'}
+        '422': {description: 'SHOP_DISABLED or WEIDIAN_SHOP_NOT_AUTHORIZED'}
+  /admin-api/order/orders/{id}/attribution:
+    put:
+      operationId: assignOrderAttribution
+      summary: Assign the whole order to a company KOL or mark it non-KOL
+      description: Requires a paid order and a reason; records an audit entry and the BD snapshot.
+      x-permission: order:manage
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                kolId: {$ref: '#/components/schemas/Id'}
+                nonKol: {type: boolean}
+                reason: {type: string, minLength: 1, maxLength: 255, pattern: '\S'}
+              oneOf:
+                - required: [kolId]
+                  properties:
+                    nonKol: {type: boolean, enum: [false]}
+                - required: [nonKol]
+                  properties:
+                    nonKol: {type: boolean, enum: [true]}
+                  not: {required: [kolId]}
+            examples:
+              kol: {value: {kolId: '100', reason: 'Operator confirmed the creator'}}
+              nonKol: {value: {nonKol: true, reason: 'Direct store sale'}}
+      responses:
+        '200': {$ref: '#/components/responses/Ok'}
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: 'COMMON_NOT_FOUND: order or KOL is absent or belongs to another company'}
+        '409': {description: 'COMMON_CONFLICT: unpaid order'}
+  /admin-api/order/orders/{id}/reattribution:
+    post:
+      operationId: reattributeOrder
+      summary: Clear old decisions and automatically attribute using payment-time mappings
+      x-permission: order:manage
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+      responses:
+        '200': {$ref: '#/components/responses/Ok'}
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: 'COMMON_NOT_FOUND: order is absent or belongs to another company'}
+components:
+  securitySchemes:
+    AdminToken: {type: apiKey, in: header, name: X-Admin-Token}
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/Id'}
+      example: '2110000000000000001'
+    shopId: {name: shopId, in: query, schema: {$ref: '#/components/schemas/Id'}, example: '10'}
+    payFrom:
+      name: payFrom
+      in: query
+      description: Inclusive UTC ISO 8601 instant; must precede payTo.
+      schema: {type: string, format: date-time}
+      example: '2026-10-16T00:00:00Z'
+    payTo:
+      name: payTo
+      in: query
+      description: Exclusive UTC ISO 8601 instant.
+      schema: {type: string, format: date-time}
+      example: '2026-10-17T00:00:00Z'
+    page: {name: page, in: query, schema: {type: integer, minimum: 1, maximum: 10000, default: 1}}
+    size: {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+  schemas:
+    Id: {type: string, pattern: '^[1-9][0-9]*$', example: '2110000000000000001'}
+    Money: {type: string, pattern: '^[0-9]+\.[0-9]{2}$', example: '12.50', description: CNY yuan}
+    OrderStatus: {type: string, enum: [UNPAID, PAID, SHIPPED, RECEIVED, COMPLETED, CLOSED, UNKNOWN]}
+    AttributionStatus: {type: string, enum: [PENDING, ATTRIBUTED, NON_KOL, CONFLICT, UNMATCHED]}
+    Envelope:
+      type: object
+      properties:
+        code: {type: integer, example: 0}
+        msg: {type: string, example: Success}
+        data: {nullable: true}
+        errorCode: {type: string, nullable: true}
+        traceId: {type: string, nullable: true}
+    Order:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        shopId: {$ref: '#/components/schemas/Id'}
+        weidianOrderId: {type: string}
+        kolId: {type: string, nullable: true}
+        bdUserId: {type: string, nullable: true}
+        orderStatus: {$ref: '#/components/schemas/OrderStatus'}
+        attributionStatus: {$ref: '#/components/schemas/AttributionStatus'}
+        orderTime: {type: string, format: date-time}
+        payTime: {type: string, format: date-time, nullable: true}
+        totalAmount: {$ref: '#/components/schemas/Money'}
+        payAmount: {$ref: '#/components/schemas/Money'}
+        refundAmount: {$ref: '#/components/schemas/Money'}
+        items: {type: array, items: {$ref: '#/components/schemas/OrderItem'}}
+    OrderItem:
+      type: object
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        subOrderId: {type: string}
+        weidianItemId: {type: string}
+        skuId: {type: string}
+        itemName: {type: string}
+        skuName: {type: string}
+        quantity: {type: integer, minimum: 1}
+        payAmount: {$ref: '#/components/schemas/Money'}
+        refundAmount: {$ref: '#/components/schemas/Money'}
+        kolId: {type: string, nullable: true}
+        productId: {type: string, nullable: true}
+        kolItemId: {type: string, nullable: true}
+        attributionType: {type: integer, enum: [0, 1, 2, 3, 4]}
+        manualReason: {type: string, nullable: true}
+  responses:
+    Ok:
+      description: Successful operation; data is null.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Envelope'}
+          example: {code: 0, msg: Success, data: null, errorCode: null, traceId: example-trace}
+    Accepted:
+      description: Shop lock acquired; synchronization continues in the background.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Envelope'}
+          example: {code: 0, msg: Success, data: null, errorCode: null, traceId: example-trace}
+    Orders:
+      description: Orders in the current company and allowed BD scope.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: '#/components/schemas/Envelope'}
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items: {type: array, items: {$ref: '#/components/schemas/Order'}}
+                      total: {type: string, pattern: '^[0-9]+$', example: '0'}
+                      page: {type: integer}
+                      size: {type: integer}
+          example: {code: 0, msg: Success, data: {items: [], total: '0', page: 1, size: 20}, errorCode: null, traceId: example-trace}
+    Invalid: {description: 'COMMON_VALIDATION_FAILED: invalid query, path, target or blank/oversized reason'}
+    Unauthorized: {description: 'AUTH_UNAUTHORIZED or AUTH_ACCOUNT_DISABLED: invalid administrator session'}
+    Forbidden: {description: 'AUTH_FORBIDDEN: missing permission, platform account, or order outside OWN scope'}

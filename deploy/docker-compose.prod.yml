@@ -61,6 +61,8 @@ services:
       TCRM_ADMIN_BASE_URL: ${TCRM_ADMIN_BASE_URL}
       # Required 32-byte Base64 AES-256-GCM key for encrypted integration credentials.
       TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}
+      # Shared with crm-redirect: buyer ID hashes use the same protected salt.
+      TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
       # Resend API key for KOL invitation / reset mails; empty means the logging fallback.
       TCRM_MAIL_API_KEY: ${TCRM_MAIL_API_KEY:-}
       # Sender address; REQUIRED when TCRM_MAIL_API_KEY is set (startup fails otherwise).
