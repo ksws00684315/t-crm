@@ -101,6 +101,67 @@ class RedirectIT {
     mvc.perform(get("/healthz")).andExpect(status().isOk());
   }
 
+  @BeforeEach
+  void clearItems() {
+    redis.delete("linkitem:25");
+  }
+
+  @Test
+  void shouldItemLinkWriteSameStreamEvent_whenActive() throws Exception {
+    item("{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
+    mvc.perform(
+            get("/i/7849640325").header("User-Agent", "Test-Agent").header("CF-IPCountry", "US"))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", "https://example.com/item"))
+        .andExpect(header().string("Cache-Control", "no-store"));
+    var event =
+        redis
+            .opsForStream()
+            .range("stream:click", org.springframework.data.domain.Range.unbounded())
+            .getFirst()
+            .getValue();
+    assertThat(event.keySet())
+        .containsExactlyInAnyOrder("kolItemId", "ts", "ipHash", "ua", "ref", "country");
+    assertThat(event.get("kolItemId")).isEqualTo("1");
+    assertThat(event.get("ua")).isEqualTo("Test-Agent");
+    assertThat(event.get("country")).isEqualTo("US");
+    assertThat(event.get("ipHash").toString()).matches("[0-9a-f]{64}");
+  }
+
+  @Test
+  void shouldItemMissUseFallback_whenNotIndexed() throws Exception {
+    itemFallback("/i/7849640325");
+  }
+
+  @Test
+  void shouldItemUseFallback_whenInactive() throws Exception {
+    item("{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":0}");
+    itemFallback("/i/7849640325");
+  }
+
+  @Test
+  void shouldItemUseFallback_whenValueIsNotJson() throws Exception {
+    item("{broken");
+    itemFallback("/i/7849640325");
+  }
+
+  @Test
+  void shouldInvalidItemIdUseFallback_whenRequested() throws Exception {
+    itemFallback("/i/12a");
+  }
+
+  private void item(String value) {
+    redis.opsForHash().put("linkitem:25", "7849640325", value);
+  }
+
+  private void itemFallback(String path) throws Exception {
+    mvc.perform(get(path))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", "https://example.com/unavailable"))
+        .andExpect(header().string("Cache-Control", "no-store"));
+    assertThat(Boolean.TRUE.equals(redis.hasKey("stream:click"))).isFalse();
+  }
+
   private void link(String status) {
     redis
         .opsForHash()

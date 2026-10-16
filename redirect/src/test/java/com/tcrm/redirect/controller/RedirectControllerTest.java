@@ -133,6 +133,94 @@ class RedirectControllerTest {
     verify(redis, never()).append(anyMap());
   }
 
+  @Test
+  void shouldItemLinkRedirectAndAppendHashedEvent_whenActive() throws Exception {
+    when(redis.lookupItem("7849640325")).thenReturn(ITEM);
+    mvc.perform(
+            get("/i/7849640325")
+                .header("CF-Connecting-IP", "203.0.113.1")
+                .header("X-Forwarded-For", "198.51.100.1")
+                .header("CF-IPCountry", "US")
+                .header("User-Agent", "Test-Agent")
+                .header("Referer", "https://example.com/source"))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", "https://example.com/item"))
+        .andExpect(header().string("Cache-Control", "no-store"));
+    var event = ArgumentCaptor.forClass(Map.class);
+    verify(redis).append(event.capture());
+    Map<?, ?> fields = event.getValue();
+    assertThat(fields.keySet().stream().map(String::valueOf).toList())
+        .containsExactlyInAnyOrder("kolItemId", "ts", "ipHash", "ua", "ref", "country");
+    assertThat(fields.get("kolItemId")).isEqualTo("1");
+    assertThat(fields.get("country")).isEqualTo("US");
+    assertThat(fields.get("ua")).isEqualTo("Test-Agent");
+    assertThat(fields.get("ref")).isEqualTo("https://example.com/source");
+    String expected =
+        java.util.HexFormat.of()
+            .formatHex(
+                java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(
+                        "unit-test-salt0123456789abcdef01203.0.113.1"
+                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    assertThat(fields.get("ipHash")).isEqualTo(expected);
+  }
+
+  @Test
+  void shouldItemMissUseFallbackWithoutEvent_whenNotIndexed() throws Exception {
+    itemFallback("/i/7849640325");
+    verify(redis).lookupItem("7849640325");
+    verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldItemUseFallbackWithoutEvent_whenInactive() throws Exception {
+    when(redis.lookupItem(anyString()))
+        .thenReturn(
+            "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":0}");
+    itemFallback("/i/7849640325");
+    verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldItemUseFallbackWithoutEvent_whenValueIsMalformedOrUnsafe() throws Exception {
+    for (String value :
+        new String[] {
+          "bad",
+          "{\"kolItemId\":\"1\",\"targetUrl\":\"javascript:alert(1)\",\"status\":1}",
+          "{\"kolItemId\":\"\",\"targetUrl\":\"https://example.com\",\"status\":1}",
+          "1|https://example.com/item|1"
+        }) {
+      when(redis.lookupItem(anyString())).thenReturn(value);
+      itemFallback("/i/7849640325");
+    }
+    verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldInvalidItemIdUseFallbackWithoutRedisLookup_whenRequested() throws Exception {
+    for (String path :
+        new String[] {"/i/abc", "/i/12a", "/i/" + "1".repeat(21), "/i/1.0", "/i/%D9%A1"}) {
+      itemFallback(path);
+    }
+    verifyNoInteractions(redis);
+  }
+
+  @Test
+  void shouldItemStreamFailureStillRedirectToTarget_whenRequested() throws Exception {
+    when(redis.lookupItem(anyString())).thenReturn(ITEM);
+    doThrow(new IllegalStateException("simulated failure")).when(redis).append(anyMap());
+    mvc.perform(get("/i/7849640325"))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", "https://example.com/item"));
+  }
+
+  private void itemFallback(String path) throws Exception {
+    mvc.perform(get(path))
+        .andExpect(status().isFound())
+        .andExpect(header().string("Location", "https://example.com/unavailable"))
+        .andExpect(header().string("Cache-Control", "no-store"));
+  }
+
   private void fallback() throws Exception {
     mvc.perform(get("/t/KOL0001/P000001"))
         .andExpect(status().isFound())
