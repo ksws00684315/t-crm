@@ -21,10 +21,45 @@ const enUS = {
   },
   login: {
     title: "T-CRM Creator Portal",
-    account: "Account",
+    account: "Email",
     password: "Password",
     submit: "Sign in",
-    hint: "Creator sign-in will be available in a later release."
+    forgot: "Forgot password?",
+    selectCompany: "Choose your company",
+    chooseCompany: "Please choose a company.",
+    continue: "Continue"
+  },
+  auth: {
+    email: "Email",
+    emailInvalid: "Please enter a valid email address.",
+    passwordRule: "Use 10–72 printable ASCII characters for your password.",
+    passwordMismatch: "The passwords do not match.",
+    newPassword: "New password",
+    confirmPassword: "Confirm password",
+    backToLogin: "Back to sign in",
+    activateTitle: "Activate your account",
+    activateSubmit: "Activate and sign in",
+    forgotTitle: "Forgot password",
+    sendReset: "Send reset email",
+    forgotSent: "If this email is registered, we have sent a password reset email.",
+    resetTitle: "Reset password",
+    resetSubmit: "Reset password",
+    resetSuccess: "Your password has been reset. Please sign in."
+  },
+  account: {
+    title: "My account",
+    kolCode: "Creator code",
+    name: "Name",
+    email: "Email",
+    country: "Country",
+    tenantName: "Company",
+    unavailable: "Not provided",
+    sheet: "Promotion sheet",
+    openSheet: "Open promotion sheet",
+    changePassword: "Change password",
+    oldPassword: "Current password",
+    passwordChanged: "Your password has been changed.",
+    retry: "Retry"
   },
   home: {
     title: "Welcome",
@@ -34,6 +69,10 @@ const enUS = {
   route: {
     login: "Sign in",
     home: "Home",
+    activate: "Activate account",
+    reset: "Reset password",
+    forgot: "Forgot password",
+    account: "My account",
     notFound: "Page not found"
   },
   errors: {
@@ -45,10 +84,14 @@ const enUS = {
     COMMON_INTERNAL_ERROR: "Something went wrong on our side. Please try again later.",
     AUTH_UNAUTHORIZED: "Your session has expired. Please sign in again.",
     AUTH_FORBIDDEN: "You do not have permission to do this.",
-    AUTH_INVALID_CREDENTIALS: "Incorrect account or password.",
+    AUTH_INVALID_CREDENTIALS: "Incorrect email or password.",
     AUTH_ACCOUNT_LOCKED: "Too many failed sign-in attempts. Please try again later.",
     AUTH_ACCOUNT_DISABLED: "This account is disabled or unavailable.",
     /** Text for error codes without a key above, for network failures and for rejected fields. */
+    KOL_AUTH_TOKEN_INVALID:
+      "This link is invalid or expired. Please contact your representative for a new link.",
+    AUTH_OLD_PASSWORD_INCORRECT: "Your current password is incorrect.",
+    KOL_LOGIN_SELECTION_INVALID: "Company selection has expired. Please sign in again.",
     generic: "The operation failed. Please try again later.",
     network: "Network error. Please check your connection and try again.",
     field: "This field is not valid."

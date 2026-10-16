@@ -5,6 +5,6 @@ import { routes } from "./routes";
 
 const router = createRouter({ history: createWebHistory(), routes });
 
-installGuard(router, () => ({ isLoggedIn: useSessionStore().isLoggedIn }));
+installGuard(router, () => ({ isLoggedIn: !!useSessionStore().getToken() }));
 
 export default router;

@@ -5,6 +5,7 @@ import { installGuard } from "@/router/guard";
 import { routes } from "@/router/routes";
 import { useSessionStore } from "@/stores/session";
 import { loadSession, saveSession, SESSION_KEY } from "@/utils/session";
+import { ApiError } from "@/utils/http/error";
 import { setupHttp } from "../setup";
 import { http } from "../http";
 
@@ -20,6 +21,54 @@ function appWithSession() {
 
 describe("401 handling", () => {
   beforeEach(() => localStorage.clear());
+
+  it("keeps the full account target when a 401 expires the session", async () => {
+    const { store, router } = appWithSession();
+    await router.push("/account?tab=password#form");
+    http.instance.defaults.adapter = async config => ({
+      data: {
+        code: 401,
+        msg: "never display",
+        data: null,
+        errorCode: "AUTH_UNAUTHORIZED",
+        traceId: "test"
+      },
+      status: 401,
+      statusText: "",
+      headers: {},
+      config
+    });
+    const error = await http.request({ url: "/me" }).catch(error => error);
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/login"));
+    expect(router.currentRoute.value.query.redirect).toBe("/account?tab=password#form");
+    expect(store.kol).toBeNull();
+    if (!(error instanceof ApiError)) throw new Error("Expected ApiError");
+    expect(error.handled).toBe(true);
+  });
+
+  it("leaves a login 401 available for inline feedback", async () => {
+    const { store, router } = appWithSession();
+    store.clearSession();
+    await router.push("/login?redirect=/account");
+    http.instance.defaults.adapter = async config => ({
+      data: {
+        code: 401,
+        msg: "never display",
+        data: null,
+        errorCode: "AUTH_INVALID_CREDENTIALS",
+        traceId: "test"
+      },
+      status: 401,
+      statusText: "",
+      headers: {},
+      config
+    });
+    const error = await http.request({ url: "/auth/login" }).catch(error => error);
+    if (!(error instanceof ApiError)) throw new Error("Expected ApiError");
+    expect(error.handled).toBe(false);
+    expect(error.displayMessage).toContain("Incorrect");
+    expect(router.currentRoute.value.fullPath).toBe("/login?redirect=/account");
+  });
 
   it("clears the sign-in state and returns to /login", async () => {
     const { store, router } = appWithSession();
