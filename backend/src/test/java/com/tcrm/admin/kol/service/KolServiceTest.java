@@ -21,6 +21,7 @@ import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
+import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -50,6 +51,8 @@ class KolServiceTest {
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolDO.class);
     TableInfoHelper.initTableInfo(
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdHistoryDO.class);
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdTransferDO.class);
   }
 
   private static final long BD = 5L;
