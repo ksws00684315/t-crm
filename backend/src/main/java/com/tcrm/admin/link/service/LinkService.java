@@ -99,7 +99,7 @@ public class LinkService {
         link.productName(),
         link.weidianItemId(),
         urls.linkUrl(kol.kolCode(), link.productCode()),
-        LinkUrls.targetUrl(link.weidianItemId()),
+        LinkUrls.targetUrl(kol, link.weidianItemId()),
         reasons.isEmpty(),
         reasons,
         count == null ? 0 : count.getTotal(),

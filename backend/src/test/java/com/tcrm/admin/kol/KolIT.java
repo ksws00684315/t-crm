@@ -41,6 +41,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -404,10 +405,10 @@ class KolIT {
     List<Map<Integer, String>> sheet =
         FastExcel.read(new ByteArrayInputStream(errors)).sheet(0).headRowNumber(0).doReadSync();
     assertThat(sheet).hasSize(3);
-    assertThat(sheet.get(0).get(10)).isEqualTo("错误原因");
+    assertThat(sheet.get(0).get(14)).isEqualTo("错误原因");
     assertThat(sheet.get(1).get(1)).isEqualTo("Eve Again");
-    assertThat(sheet.get(1).get(10)).isEqualTo("达人编号在文件中重复；邮箱在文件中重复");
-    assertThat(sheet.get(2).get(10)).startsWith("达人编号已存在；邮箱已存在；国家应为");
+    assertThat(sheet.get(1).get(14)).isEqualTo("达人编号在文件中重复；邮箱在文件中重复");
+    assertThat(sheet.get(2).get(14)).startsWith("达人编号已存在；邮箱已存在；国家应为");
 
     // Only the submitter or a super administrator may read the task.
     createBd(admin, "bd-other");
@@ -483,9 +484,137 @@ class KolIT {
             .sheet(0)
             .headRowNumber(0)
             .doReadSync();
-    assertThat(sheet.get(0).get(10)).isEqualTo("Error");
-    assertThat(sheet.get(1).get(10))
+    assertThat(sheet.get(0).get(14)).isEqualTo("Error");
+    assertThat(sheet.get(1).get(14))
         .isEqualTo("Invalid KOL code; it must be KOL followed by 4 to 8 digits");
+  }
+
+  /** Task 11 §4.3: files built with the pre-task-11 ten-column template keep importing. */
+  @Test
+  void shouldImportLegacyTenColumnFiles() throws Exception {
+    String admin = companyAdmin();
+    List<List<String>> rows =
+        List.of(
+            new ArrayList<>(List.of("", "Hank", "hank@x.io", "US")),
+            new ArrayList<>(List.of("", "Ivy", "ivy@x.io", "")));
+    rows.forEach(
+        row -> row.addAll(Collections.nCopies(KolImportColumn.LEGACY_COLUMNS - row.size(), "")));
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    FastExcel.write(out)
+        .head(
+            com.tcrm.admin.TestTemplates.render(KolImportColumn.legacyHeaderKeys()).stream()
+                .map(List::of)
+                .toList())
+        .sheet("Sheet1")
+        .doWrite(rows);
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "old.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, out.toByteArray());
+
+    String taskId =
+        json.readTree(
+                mvc.perform(multipart("/admin-api/kol/kol-imports").file(file).header(TOKEN, admin))
+                    .andExpect(status().isAccepted())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/taskId")
+            .asText();
+
+    var task = waitForTask(admin, taskId);
+    assertThat(task.at("/status").asText()).isEqualTo("SUCCESS");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT country FROM crm_kol WHERE email IN ('hank@x.io','ivy@x.io') ORDER BY email",
+                String.class))
+        .containsExactly("US", null);
+  }
+
+  /**
+   * Task 11 §4.3: the four new columns import; the template code must be usable in this company.
+   */
+  @Test
+  void shouldImportNewProfileColumns_withAgentTemplateCode() throws Exception {
+    String admin = companyAdmin();
+    long templateId =
+        Long.parseLong(
+            json.readTree(
+                    mvc.perform(
+                            post("/admin-api/link/templates")
+                                .header(TOKEN, admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                    "{\"templateCode\":\"kakobuy\",\"templateName\":\"kakobuy\","
+                                        + "\"templateUrl\":\"https://item.kakobuy.com/i/{PRODUCT_ID}\","
+                                        + "\"sortOrder\":0}"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString())
+                .at("/data/id")
+                .asText());
+    List<List<String>> rows =
+        List.of(
+            row(
+                "",
+                "Jack",
+                "jack@x.io",
+                "US",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "+12345678",
+                "kakobuy",
+                "aff_01",
+                "https://docs.google.com/spreadsheets/d/1/edit"),
+            row("", "Kate", "kate@x.io", "US", "", "", "", "", "", "", "+12345678", "ghost"));
+
+    String taskId =
+        json.readTree(
+                mvc.perform(
+                        multipart("/admin-api/kol/kol-imports")
+                            .file(
+                                new MockMultipartFile(
+                                    "file",
+                                    "new.xlsx",
+                                    ImportTaskApi.XLSX_CONTENT_TYPE,
+                                    workbook(rows)))
+                            .header(TOKEN, admin)
+                            .header("Accept-Language", "zh-CN"))
+                    .andExpect(status().isAccepted())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/taskId")
+            .asText();
+
+    var task = waitForTask(admin, taskId);
+    assertThat(task.at("/status").asText()).isEqualTo("PARTIAL");
+    assertThat(task.at("/failed").asInt()).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT whatsapp || '|' || link_template_id || '|' || invite_code || '|' ||"
+                    + " coalesce(sheet_url, '') FROM crm_kol WHERE email = 'jack@x.io'",
+                String.class))
+        .isEqualTo(
+            "+12345678|" + templateId + "|aff_01|https://docs.google.com/spreadsheets/d/1/edit");
+
+    byte[] errors =
+        mvc.perform(get("/admin-api/task/tasks/" + taskId + "/error-file").header(TOKEN, admin))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    List<Map<Integer, String>> sheet =
+        FastExcel.read(new java.io.ByteArrayInputStream(errors))
+            .sheet(0)
+            .headRowNumber(0)
+            .doReadSync();
+    assertThat(sheet.get(1).get(11)).isEqualTo("ghost");
+    assertThat(sheet.get(1).get(14)).isEqualTo("代购平台编码不存在或已停用");
   }
 
   private static List<String> row(String... cells) {

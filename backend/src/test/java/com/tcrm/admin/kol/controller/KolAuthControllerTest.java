@@ -46,7 +46,9 @@ class KolAuthControllerTest {
         Instant.EPOCH,
         2L,
         "Acme",
-        true);
+        true,
+        "+15550001111",
+        "https://docs.google.com/spreadsheets/d/abc");
   }
 
   private static KolAuthService.LoginResult login() {
@@ -170,7 +172,9 @@ class KolAuthControllerTest {
     mvc.perform(get("/kol-api/me").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
-        .andExpect(jsonPath("$.data.tenantName").value("Acme"));
+        .andExpect(jsonPath("$.data.tenantName").value("Acme"))
+        .andExpect(jsonPath("$.data.whatsapp").value("+15550001111"))
+        .andExpect(jsonPath("$.data.sheetUrl").value("https://docs.google.com/spreadsheets/d/abc"));
     mvc.perform(post("/kol-api/auth/logout").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(auth).logout();

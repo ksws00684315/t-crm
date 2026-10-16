@@ -32,6 +32,23 @@ public interface ImportTaskApi {
       int maxRows);
 
   /**
+   * Same as {@link #submitImport(TaskType, List, ImportFileDTO, Supplier, int)} but also accepts
+   * files built with an older, shorter template: {@code legacyHeaderKeys} renders one extra Chinese
+   * and one extra accepted header variant (task 11 §4.3: KOL files without the four new columns
+   * keep working). The matched variant's column count tells the row processor which template the
+   * file used. Empty when the template never changed.
+   *
+   * @param legacyHeaderKeys header keys of the previous template, in its column order
+   */
+  Long submitImport(
+      TaskType type,
+      List<String> headerKeys,
+      List<String> legacyHeaderKeys,
+      ImportFileDTO file,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows);
+
+  /**
    * Returns an .xlsx workbook containing only the header row, rendered in the request language.
    *
    * @param headerKeys template header message keys ("import.*") in column order

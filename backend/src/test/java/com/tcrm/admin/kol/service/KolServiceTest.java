@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -58,12 +59,26 @@ class KolServiceTest {
   private final KolBdHistoryMapper history = mock(KolBdHistoryMapper.class);
   private final KolWriter writer = mock(KolWriter.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
+  private final LinkTemplateService templates = mock(LinkTemplateService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final KolInvites invites = mock(KolInvites.class);
   private final KolService service =
       new KolService(
-          kols, history, writer, bdUsers, current, TestTransactions.template(), events, invites);
+          kols,
+          history,
+          writer,
+          bdUsers,
+          templates,
+          current,
+          TestTransactions.template(),
+          events,
+          invites);
+
+  @org.junit.jupiter.api.BeforeEach
+  void noTemplateNames() {
+    when(templates.namesByIds(any())).thenReturn(java.util.Map.of());
+  }
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())
@@ -187,7 +202,11 @@ class KolServiceTest {
         List.of(new SocialAccountDTO("TikTok", "@alice", null, 10L)),
         bd,
         new BigDecimal("0.1550"),
-        " ");
+        " ",
+        null,
+        null,
+        null,
+        null);
   }
 
   @Test
@@ -265,7 +284,8 @@ class KolServiceTest {
   }
 
   private static EditKolCommand edit() {
-    return new EditKolCommand("Alice B", "ALICE@example.com", "gb", List.of(), null, "VIP");
+    return new EditKolCommand(
+        "Alice B", "ALICE@example.com", "gb", List.of(), null, "VIP", null, null, null, null);
   }
 
   @Test
@@ -489,6 +509,127 @@ class KolServiceTest {
     service.updateStatus(11L, 0);
 
     verify(events).publishEvent(new KolStatusChangedEvent(11L));
+  }
+
+  @Test
+  void shouldReject400_whenTemplateIsMissingOrDisabled() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(templates.usableTemplate(77L))
+        .thenThrow(new BusinessException(ErrorCode.LINK_TEMPLATE_INVALID));
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+
+    assertThatThrownBy(() -> service.create(create(null, 77L)))
+        .hasMessage(ErrorCode.LINK_TEMPLATE_INVALID.message());
+    assertThatThrownBy(() -> service.update(11L, edit(null, 77L, null)))
+        .hasMessage(ErrorCode.LINK_TEMPLATE_INVALID.message());
+    verifyNoInteractions(writer);
+  }
+
+  @Test
+  void shouldStoreProfileFieldsAndRegisterSource_whenCreatingWithTemplate() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(templates.usableTemplate(77L)).thenReturn(template());
+
+    service.create(create(null, 77L));
+
+    var saved = ArgumentCaptor.forClass(KolDO.class);
+    verify(writer).insert(saved.capture(), isNull(), eq(1L));
+    assertThat(saved.getValue().getRegisterSource()).isEqualTo(1);
+    assertThat(saved.getValue().getLinkTemplateId()).isEqualTo(77L);
+    assertThat(saved.getValue().getWhatsapp()).isEqualTo("+12345678");
+    assertThat(saved.getValue().getInviteCode()).isEqualTo("aff-01");
+    assertThat(saved.getValue().getSheetUrl())
+        .isEqualTo("https://docs.google.com/spreadsheets/d/1/edit");
+  }
+
+  @Test
+  void shouldPublishLinkTargetEvent_whenTemplateOrInviteCodeChanges() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    KolDO existing = kol(BD);
+    existing.setLinkTemplateId(77L);
+    existing.setInviteCode("old");
+    when(kols.selectById(11L)).thenReturn(existing);
+    when(kols.update(isNull(), any())).thenReturn(1);
+    when(templates.usableTemplate(77L)).thenReturn(template());
+
+    service.update(11L, edit(null, 77L, "new"));
+
+    verify(events).publishEvent(new KolLinkTargetChangedEvent(11L));
+  }
+
+  @Test
+  void shouldNotPublishLinkTargetEvent_whenTargetInputsAreUnchanged() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    KolDO existing = kol(BD);
+    existing.setLinkTemplateId(77L);
+    existing.setInviteCode("same");
+    when(kols.selectById(11L)).thenReturn(existing);
+    when(kols.update(isNull(), any())).thenReturn(1);
+    when(templates.usableTemplate(77L)).thenReturn(template());
+
+    service.update(11L, edit(null, 77L, "same"));
+
+    verify(events, never()).publishEvent(any());
+  }
+
+  private static LinkTemplateDTO template() {
+    return new LinkTemplateDTO(
+        77L,
+        "kakobuy",
+        "kakobuy",
+        "https://item.kakobuy.com/i/{PRODUCT_ID}?aff={INVITE_CODE}",
+        "WEIDIAN",
+        0,
+        1);
+  }
+
+  @Test
+  void shouldClearCountry_whenEditOmitsIt() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    service.update(
+        11L,
+        new EditKolCommand(
+            "Alice B", "alice@example.com", null, List.of(), null, "VIP", null, null, null, null));
+
+    var wrapper = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), wrapper.capture());
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                    wrapper.getValue())
+                .getSqlSet())
+        .contains("country=");
+  }
+
+  private static CreateKolCommand create(Long bd, Long templateId) {
+    return new CreateKolCommand(
+        " Alice ",
+        " Alice@Example.COM ",
+        "us",
+        List.of(new SocialAccountDTO("TikTok", "@alice", null, 10L)),
+        bd,
+        new BigDecimal("0.1550"),
+        " ",
+        " +12345678 ",
+        templateId,
+        " aff-01 ",
+        " https://docs.google.com/spreadsheets/d/1/edit ");
+  }
+
+  private static EditKolCommand edit(Long bdUnused, Long templateId, String inviteCode) {
+    return new EditKolCommand(
+        "Alice B",
+        "ALICE@example.com",
+        "gb",
+        List.of(),
+        null,
+        "VIP",
+        null,
+        templateId,
+        inviteCode,
+        null);
   }
 
   @Test

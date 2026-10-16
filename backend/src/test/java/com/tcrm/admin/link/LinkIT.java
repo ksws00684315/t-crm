@@ -171,9 +171,11 @@ class LinkIT {
     jdbc.update("DELETE FROM crm_shop");
     jdbc.update("DELETE FROM crm_kol_bd_history");
     jdbc.update("DELETE FROM crm_kol");
+    jdbc.update("DELETE FROM crm_link_template");
     jdbc.update("DELETE FROM crm_task_file");
     jdbc.update("DELETE FROM crm_task");
     Set<String> keys = redis.keys("link:*");
+    keys.addAll(redis.keys("linkitem:*"));
     keys.addAll(redis.keys("click:last:*"));
     keys.add("stream:click");
     redis.delete(keys);
@@ -348,6 +350,216 @@ class LinkIT {
     assertThat(overlapped).isTrue();
     assertThat(field(kolCode, productCode)).contains(newItem).contains("itemID=9802");
     assertThat(outboxCount()).isZero();
+  }
+
+  @Test
+  void shouldWriteBothHashesWithTemplateTarget_andFollowTargetInputChanges() throws Exception {
+    long shopId = createShop("店T", "1030");
+    long templateId =
+        createTemplate(
+            "kakobuy",
+            "https://item.kakobuy.com/item/details?url=x&affcode={INVITE_CODE}&item={PRODUCT_ID}");
+    String kolCode = createKolWithTemplate("Tina", "tina@example.com", templateId, "aff-01", true);
+    String productCode = importProduct(shopId, "2301", "裙");
+    importMapping("1030", "9301", kolCode, productCode);
+    syncIndex();
+
+    String expected =
+        "{\"kolItemId\":\""
+            + currentKolItemId(kolCode, productCode)
+            + "\",\"targetUrl\":\"https://item.kakobuy.com/item/details?url=x&affcode=aff-01&item=9301\",\"status\":1}";
+    assertThat(field(kolCode, productCode)).isEqualTo(expected);
+    assertThat(itemField("9301")).isEqualTo(expected);
+
+    // A new invite code changes every target URL of the KOL; both hashes follow within seconds
+    // through the outbox (ADR-013).
+    editKol(kolCode, templateId, "aff-02");
+    assertThat(outboxCount()).isEqualTo(1);
+    syncIndex();
+    String newTarget = expected.replace("aff-01", "aff-02");
+    assertThat(field(kolCode, productCode)).isEqualTo(newTarget);
+    assertThat(itemField("9301")).isEqualTo(newTarget);
+
+    // A disabled template falls every KOL of it back to the Weidian page.
+    mvc.perform(
+            put("/admin-api/link/templates/" + templateId + "/status")
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":0}"))
+        .andExpect(status().isOk());
+    assertThat(outboxCount()).isEqualTo(1);
+    syncIndex();
+    String weidian =
+        "{\"kolItemId\":\""
+            + currentKolItemId(kolCode, productCode)
+            + "\",\"targetUrl\":\"https://weidian.com/item.html?itemID=9301\",\"status\":1}";
+    assertThat(field(kolCode, productCode)).isEqualTo(weidian);
+    assertThat(itemField("9301")).isEqualTo(weidian);
+
+    // The link list shows the same computed target.
+    mvc.perform(get("/admin-api/link/links").param("kolCode", kolCode).header(TOKEN, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.items[0].targetUrl")
+                .value("https://weidian.com/item.html?itemID=9301"));
+  }
+
+  @Test
+  void shouldDropItemField_whenMappingIsReplacedOrClosed() throws Exception {
+    long shopId = createShop("店U", "1031");
+    String kolCode = createKol("Uma", "uma@example.com");
+    String productCode = importProduct(shopId, "2401", "袜");
+    importMapping("1031", "9401", kolCode, productCode);
+    syncIndex();
+    assertThat(itemField("9401")).isNotNull();
+
+    // Replacing the mapping moves the item field to the new exclusive item.
+    importMapping("1031", "9402", kolCode, productCode);
+    syncIndex();
+    assertThat(itemField("9401")).isNull();
+    assertThat(itemField("9402")).contains("itemID=9402");
+    assertThat(redis.opsForHash().keys("link:" + kolCode)).containsExactly(productCode);
+  }
+
+  @Test
+  void shouldRegisterEveryKolOfTheTemplate_whenItsUrlChanges() throws Exception {
+    long shopId = createShop("店V", "1032");
+    long templateId =
+        createTemplate("cnfans", "https://cnfans.com/product/?shop_type=weidian&id={PRODUCT_ID}");
+    String one = createKolWithTemplate("Vera", "vera@example.com", templateId, null, true);
+    String two = createKolWithTemplate("Vic", "vic@example.com", templateId, null, true);
+    String p1 = importProduct(shopId, "2501", "鞋");
+    String p2 = importProduct(shopId, "2502", "靴");
+    importMapping("1032", "9501", one, p1);
+    importMapping("1032", "9502", two, p2);
+    syncIndex();
+    assertThat(field(one, p1)).contains("cnfans.com/product/?shop_type=weidian&id=9501");
+    assertThat(field(two, p2)).contains("cnfans.com/product/?shop_type=weidian&id=9502");
+
+    mvc.perform(
+            put("/admin-api/link/templates/" + templateId)
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"templateName\":\"cnfans\",\"templateUrl\":"
+                        + "\"https://cnfans.com/purchase/?shop_type=weidian&id={PRODUCT_ID}\","
+                        + "\"sortOrder\":0}"))
+        .andExpect(status().isOk());
+
+    assertThat(outboxCount()).isEqualTo(2);
+    syncIndex();
+    assertThat(field(one, p1)).contains("cnfans.com/purchase/?shop_type=weidian&id=9501");
+    assertThat(field(two, p2)).contains("cnfans.com/purchase/?shop_type=weidian&id=9502");
+    assertThat(itemField("9501")).contains("cnfans.com/purchase");
+    assertThat(itemField("9502")).contains("cnfans.com/purchase");
+  }
+
+  @Test
+  void shouldRebuildItemBuckets_deletingOrphansButKeepingLiveMappings() throws Exception {
+    long shopId = createShop("店W", "1033");
+    String kolCode = createKol("Wes", "wes@example.com");
+    String productCode = importProduct(shopId, "2601", "带");
+    importMapping("1033", "9601", kolCode, productCode);
+    syncIndex();
+    String good = itemField("9601");
+    // Orphans: an unknown item and a stale field of the KOL.
+    redis.opsForHash().put("linkitem:01", "7701", "stale");
+    redis.opsForHash().put("linkitem:99", "999999", "stale");
+
+    TenantScope.runSystem("test rebuild of every company", index::rebuildAll);
+
+    assertThat(itemField("9601")).isEqualTo(good);
+    assertThat(redis.opsForHash().hasKey("linkitem:01", "7701")).isFalse();
+    assertThat(redis.opsForHash().hasKey("linkitem:99", "999999")).isFalse();
+  }
+
+  @Test
+  void shouldNotDeleteItemField_ofMappingCommittedDuringRebuild() throws Exception {
+    long shopId = createShop("店X", "1034");
+    String kolCode = createKol("Xiu", "xiu@example.com");
+    String productCode = importProduct(shopId, "2701", "针");
+    importMapping("1034", "9701", kolCode, productCode);
+    syncIndex();
+
+    CountDownLatch snapshotTaken = new CountDownLatch(1);
+    CountDownLatch releaseRename = new CountDownLatch(1);
+    store.setBeforeRename(
+        () -> {
+          snapshotTaken.countDown();
+          try {
+            if (!releaseRename.await(30, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("rebuild was not released");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+        });
+    AtomicReference<Throwable> rebuildError = new AtomicReference<>();
+    Thread rebuild =
+        new Thread(
+            () -> {
+              try {
+                TenantScope.runSystem("test rebuild of every company", index::rebuildAll);
+              } catch (Throwable error) {
+                rebuildError.set(error);
+              }
+            },
+            "link-it-rebuild");
+    rebuild.start();
+    assertThat(snapshotTaken.await(15, TimeUnit.SECONDS)).isTrue();
+
+    // A mapping committed while the rebuild holds its snapshot: its item field must survive the
+    // orphan sweep thanks to the database re-check.
+    importMapping("1034", "9702", kolCode, productCode);
+    releaseRename.countDown();
+    assertThat(rebuild.join(Duration.ofSeconds(30))).isTrue();
+    assertThat(rebuildError.get()).isNull();
+    syncIndex();
+    assertThat(itemField("9701")).isNull();
+    assertThat(itemField("9702")).contains("itemID=9702");
+    assertThat(field(kolCode, productCode)).contains("itemID=9702");
+    assertThat(outboxCount()).isZero();
+  }
+
+  @Test
+  void shouldHideAndRejectOtherCompaniesTemplates() throws Exception {
+    var other = CompanySessions.openCompany(mvc, json, PASSWORD, "tpl-co", "tpl-admin");
+    MvcResult created =
+        mvc.perform(
+                post("/admin-api/link/templates")
+                    .header(TOKEN, other.token())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"templateCode\":\"secret\",\"templateName\":\"secret\","
+                            + "\"templateUrl\":\"https://secret.example/i/{PRODUCT_ID}\","
+                            + "\"sortOrder\":0}"))
+            .andExpect(status().isOk())
+            .andReturn();
+    long otherTemplateId =
+        Long.parseLong(
+            json.readTree(created.getResponse().getContentAsString())
+                .path("data")
+                .path("id")
+                .asText());
+
+    // Invisible in the list of the default company...
+    mvc.perform(get("/admin-api/link/templates").header(TOKEN, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[?(@.templateCode == 'secret')]").isEmpty());
+
+    // ...and unusable for the default company's KOLs.
+    mvc.perform(
+            post("/admin-api/kol/kols")
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Zoe\",\"email\":\"zoe@example.com\",\"country\":\"US\","
+                        + "\"linkTemplateId\":\""
+                        + otherTemplateId
+                        + "\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("LINK_TEMPLATE_INVALID"));
   }
 
   @Test
@@ -639,6 +851,12 @@ class LinkIT {
     return (String) redis.opsForHash().get("link:" + kolCode, productCode);
   }
 
+  /** Field of {@code HASH linkitem:{last two digits}} keyed by the exclusive item ID. */
+  private String itemField(String weidianItemId) {
+    String suffix = weidianItemId.substring(weidianItemId.length() - 2);
+    return (String) redis.opsForHash().get("linkitem:" + suffix, weidianItemId);
+  }
+
   private long id(String sql, String arg) {
     return jdbc.queryForObject(sql, Long.class, arg);
   }
@@ -677,23 +895,83 @@ class LinkIT {
   }
 
   private String createKol(String name, String email) throws Exception {
+    return createKolWithTemplate(name, email, null, null, false);
+  }
+
+  /** KOL with the agent platform profile fields (task 11 §4.3); country omitted when minimal. */
+  private String createKolWithTemplate(
+      String name, String email, Long templateId, String inviteCode, boolean fullProfile)
+      throws Exception {
+    StringBuilder body = new StringBuilder();
+    body.append("{\"name\":\"").append(name).append("\",\"email\":\"").append(email).append('"');
+    if (fullProfile) {
+      body.append(",\"country\":\"US\",\"socialAccounts\":[]")
+          .append(",\"whatsapp\":\"+12345678\"")
+          .append(",\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1/edit\"");
+    }
+    if (templateId != null) {
+      body.append(",\"linkTemplateId\":\"").append(templateId).append('"');
+    }
+    if (inviteCode != null) {
+      body.append(",\"inviteCode\":\"").append(inviteCode).append('"');
+    }
+    body.append('}');
     MvcResult result =
         mvc.perform(
                 post("/admin-api/kol/kols")
                     .header(TOKEN, adminToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(
-                        "{\"name\":\""
-                            + name
-                            + "\",\"email\":\""
-                            + email
-                            + "\",\"country\":\"US\",\"socialAccounts\":[]}"))
+                    .content(body.toString()))
             .andExpect(status().isOk())
             .andReturn();
     return json.readTree(result.getResponse().getContentAsString())
         .path("data")
         .path("kolCode")
         .asText();
+  }
+
+  /** Edits the KOL's link target inputs through the API (task 11 §4.3). */
+  private void editKol(String kolCode, Long templateId, String inviteCode) throws Exception {
+    long kolId = id("SELECT id FROM crm_kol WHERE kol_code = ?", kolCode);
+    String email =
+        jdbc.queryForObject("SELECT email FROM crm_kol WHERE kol_code = ?", String.class, kolCode);
+    StringBuilder body = new StringBuilder();
+    body.append("{\"name\":\"Name\",\"email\":\"")
+        .append(email)
+        .append("\",\"country\":\"US\",\"socialAccounts\":[]");
+    if (templateId != null) {
+      body.append(",\"linkTemplateId\":\"").append(templateId).append('"');
+    }
+    if (inviteCode != null) {
+      body.append(",\"inviteCode\":\"").append(inviteCode).append('"');
+    }
+    body.append('}');
+    mvc.perform(
+            put("/admin-api/kol/kols/" + kolId)
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString()))
+        .andExpect(status().isOk());
+  }
+
+  private long createTemplate(String code, String url) throws Exception {
+    MvcResult result =
+        mvc.perform(
+                post("/admin-api/link/templates")
+                    .header(TOKEN, adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"templateCode\":\""
+                            + code
+                            + "\",\"templateName\":\""
+                            + code
+                            + "\",\"templateUrl\":\""
+                            + url
+                            + "\",\"sortOrder\":0}"))
+            .andExpect(status().isOk())
+            .andReturn();
+    return Long.parseLong(
+        json.readTree(result.getResponse().getContentAsString()).path("data").path("id").asText());
   }
 
   private String importProduct(long shopId, String itemId, String name) throws Exception {

@@ -2,6 +2,7 @@ package com.tcrm.admin.link.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.link.model.LinkUnavailableReason;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 class LinkRulesTest {
+  /** KOL without agent platform settings: the target falls back to the Weidian page. */
+  private static final KolRefDTO PLAIN_KOL = new KolRefDTO(10L, "KOL0001", "Alice", true, null);
+
   private static KolItemLinkDTO link(boolean onSale, boolean shopEnabled) {
     return new KolItemLinkDTO(
         1234567890123L, 10L, 20L, "P000123", "鞋", 1L, "9001", onSale, shopEnabled);
@@ -46,7 +50,7 @@ class LinkRulesTest {
   @Test
   void shouldWriteRedirectCompatibleJson_whenLinkActive() {
     JsonNode node =
-        JsonMapper.builder().build().readTree(LinkRules.indexValue(true, link(true, true)));
+        JsonMapper.builder().build().readTree(LinkRules.indexValue(PLAIN_KOL, link(true, true)));
     assertThat(node.size()).isEqualTo(3);
     assertThat(node.path("kolItemId").isString()).isTrue();
     assertThat(node.path("kolItemId").asString()).isEqualTo("1234567890123");
@@ -59,7 +63,14 @@ class LinkRulesTest {
   @Test
   void shouldWriteStatusZero_whenProductOffShelf() {
     JsonNode node =
-        JsonMapper.builder().build().readTree(LinkRules.indexValue(true, link(false, true)));
+        JsonMapper.builder().build().readTree(LinkRules.indexValue(PLAIN_KOL, link(false, true)));
     assertThat(node.path("status").asInt()).isZero();
+  }
+
+  @Test
+  void shouldBucketItems_byLastTwoDigits_zeroPadded() {
+    assertThat(LinkRules.itemBucket("9001")).isEqualTo("01");
+    assertThat(LinkRules.itemBucket("7")).isEqualTo("07");
+    assertThat(LinkRules.itemBucket("12345678901234567890")).isEqualTo("90");
   }
 }

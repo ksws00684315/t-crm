@@ -3,6 +3,7 @@ package com.tcrm.admin.link.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,6 +44,11 @@ class LinkIndexServiceTest {
               invocation.getArgument(3, Runnable.class).run();
               return true;
             });
+    when(items.listItemIdsByKolProduct(anyLong(), anyLong())).thenReturn(List.of());
+    when(items.listItemIdsByKol(anyLong())).thenReturn(List.of());
+    when(items.filterCurrentItemIds(anyCollection())).thenReturn(Set.of());
+    when(store.listItemFields(anyString())).thenReturn(List.of());
+    when(store.deleteStagingKeys()).thenReturn(0);
   }
 
   private static KolItemLinkDTO link(long id, long kolId, String code, String item) {
@@ -56,8 +62,15 @@ class LinkIndexServiceTest {
     return fields.getValue();
   }
 
+  @SuppressWarnings("unchecked")
+  private Map<String, String> itemFieldsWritten() {
+    ArgumentCaptor<Map<String, String>> fields = ArgumentCaptor.forClass(Map.class);
+    verify(store).putItemFields(fields.capture());
+    return fields.getValue();
+  }
+
   @Test
-  void shouldWriteField_whenMappingIsCurrent() {
+  void shouldWriteBothHashes_whenMappingIsCurrent() {
     when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
     when(items.getCurrentLink(10L, 20L)).thenReturn(link(5L, 10L, "P000001", "9002"));
 
@@ -67,17 +80,34 @@ class LinkIndexServiceTest {
         .contains("\"kolItemId\":\"5\"")
         .contains("itemID=9002")
         .contains("\"status\":1");
+    assertThat(itemFieldsWritten().get("9002")).isEqualTo(fieldsWritten("KOL0001").get("P000001"));
+    verify(store, never()).removeItemFields(anyCollection());
   }
 
   @Test
-  void shouldDeleteField_whenMappingNoLongerCurrent() {
+  void shouldDropStaleItemField_whenMappingWasReplaced() {
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
+    when(items.getCurrentLink(10L, 20L)).thenReturn(link(6L, 10L, "P000001", "9003"));
+    when(items.listItemIdsByKolProduct(10L, 20L)).thenReturn(List.of("9002", "9003"));
+
+    assertThat(service.refreshMapping(10L, 20L)).isEqualTo(1);
+
+    verify(store).removeItemFields(List.of("9002"));
+    assertThat(itemFieldsWritten()).containsOnlyKeys("9003");
+  }
+
+  @Test
+  void shouldDeleteBothHashes_whenMappingNoLongerCurrent() {
     when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
     when(items.getProductCode(20L)).thenReturn("P000001");
+    when(items.listItemIdsByKolProduct(10L, 20L)).thenReturn(List.of("9002"));
 
     assertThat(service.refreshMapping(10L, 20L)).isZero();
 
     verify(store).remove("KOL0001", "P000001");
+    verify(store).removeItemFields(List.of("9002"));
     verify(store, never()).putAll(anyString(), anyMap());
+    verify(store, never()).putItemFields(anyMap());
   }
 
   @Test
@@ -99,6 +129,19 @@ class LinkIndexServiceTest {
     Map<String, String> fields = fieldsWritten("KOL0002");
     assertThat(fields).containsOnlyKeys("P1", "P2");
     assertThat(fields.values()).allSatisfy(v -> assertThat(v).contains("\"status\":0"));
+    assertThat(itemFieldsWritten()).containsOnlyKeys("91", "92");
+  }
+
+  @Test
+  void shouldDropKolHistoryInItemBuckets_thenRewriteCurrent_whenRefreshingKol() {
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
+    when(items.listCurrentLinksByKol(10L)).thenReturn(List.of(link(5L, 10L, "P1", "9002")));
+    when(items.listItemIdsByKol(10L)).thenReturn(List.of("9001", "9002", "9003"));
+
+    service.refreshKol(10L);
+
+    verify(store).removeItemFields(List.of("9001", "9002", "9003"));
+    assertThat(itemFieldsWritten()).containsOnlyKeys("9002");
   }
 
   @Test
@@ -131,13 +174,35 @@ class LinkIndexServiceTest {
     assertThat(result.kols()).isEqualTo(2);
     assertThat(result.fields()).isEqualTo(2);
     assertThat(result.orphanKeys()).isEqualTo(1);
+    assertThat(result.itemFields()).isEqualTo(2);
+    assertThat(result.orphanItemFields()).isZero();
+  }
+
+  @Test
+  void shouldDeleteOrphanItemFields_afterRecheckingTheDatabase() {
+    when(kols.listAll()).thenReturn(List.of(ALICE));
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(ALICE));
+    when(items.listCurrentLinksByKol(10L)).thenReturn(List.of(link(1L, 10L, "P1", "91")));
+    // Buckets sweep in order 00..99: bucket "00" first, bucket "91" later.
+    when(store.listItemFields("00")).thenReturn(List.of("100", "200"));
+    when(store.listItemFields("91")).thenReturn(List.of("91", "1901", "2991"));
+    // 1901 gained a current mapping while the rebuild ran; 2991, 100 and 200 are real orphans.
+    when(items.filterCurrentItemIds(anyCollection()))
+        .thenReturn(Set.of())
+        .thenReturn(Set.of("1901"));
+
+    LinkIndexService.RebuildResult result = service.rebuildAll();
+
+    verify(store).removeItemFields(List.of("100", "200"));
+    verify(store).removeItemFields(List.of("2991"));
+    assertThat(result.itemFields()).isEqualTo(1);
+    assertThat(result.orphanItemFields()).isEqualTo(3);
   }
 
   @Test
   void shouldDeleteKey_whenKolDisappearsBeforeRebuildWrites() {
     when(kols.listAll()).thenReturn(List.of(ALICE));
     when(kols.listByIds(List.of(10L))).thenReturn(List.of());
-    when(store.deleteStagingKeys()).thenReturn(0);
     when(store.listIndexedKolCodes()).thenReturn(Set.of());
 
     service.rebuildAll();

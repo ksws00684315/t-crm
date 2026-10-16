@@ -108,11 +108,24 @@ public class KolAuthController {
   /** Company choice for a multi-company login (§4.8). */
   public record KolCompanyVO(String tenantId, String tenantName) {}
 
-  /** {@code kol} mirrors GET /kol-api/me (§4.8); task 11 later adds whatsapp and sheetUrl. */
+  /** {@code kol} mirrors GET /kol-api/me (§4.8), including the task 11 profile fields. */
   public record KolMeVO(
-      String kolCode, String name, String email, String country, String tenantName) {
+      String kolCode,
+      String name,
+      String email,
+      String country,
+      String tenantName,
+      String whatsapp,
+      String sheetUrl) {
     static KolMeVO from(KolAccountDTO kol) {
-      return new KolMeVO(kol.kolCode(), kol.name(), kol.email(), kol.country(), kol.tenantName());
+      return new KolMeVO(
+          kol.kolCode(),
+          kol.name(),
+          kol.email(),
+          kol.country(),
+          kol.tenantName(),
+          kol.whatsapp(),
+          kol.sheetUrl());
     }
   }
 

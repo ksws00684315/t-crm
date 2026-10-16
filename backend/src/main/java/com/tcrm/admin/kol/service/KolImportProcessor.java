@@ -7,9 +7,13 @@ import static com.tcrm.admin.kol.service.KolImportColumn.DEFAULT_RATE;
 import static com.tcrm.admin.kol.service.KolImportColumn.EMAIL;
 import static com.tcrm.admin.kol.service.KolImportColumn.FOLLOWERS;
 import static com.tcrm.admin.kol.service.KolImportColumn.HANDLE;
+import static com.tcrm.admin.kol.service.KolImportColumn.INVITE_CODE;
 import static com.tcrm.admin.kol.service.KolImportColumn.NAME;
 import static com.tcrm.admin.kol.service.KolImportColumn.PLATFORM;
 import static com.tcrm.admin.kol.service.KolImportColumn.REMARK;
+import static com.tcrm.admin.kol.service.KolImportColumn.SHEET_URL;
+import static com.tcrm.admin.kol.service.KolImportColumn.TEMPLATE_CODE;
+import static com.tcrm.admin.kol.service.KolImportColumn.WHATSAPP;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -28,9 +32,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Imports KOL rows (task 04 §4.5): insert only, one transaction per row. Reasons are message keys
- * (rendered per task language) in column order; a value repeated in the file fails on its second
- * and later occurrences.
+ * Imports KOL rows (task 04 §4.5; task 11 §4.3 added the four profile columns): insert only, one
+ * transaction per row. Reasons are message keys (rendered per task language) in column order; a
+ * value repeated in the file fails on its second and later occurrences. Rows from a pre-task-11
+ * file simply have empty cells for the new columns.
  */
 class KolImportProcessor implements ImportRowProcessor {
   static final String CODE_FORMAT = "import.kol.error.code-format";
@@ -43,7 +48,6 @@ class KolImportProcessor implements ImportRowProcessor {
   static final String EMAIL_FORMAT = "import.kol.error.email-format";
   static final String EMAIL_DUPLICATE = "import.kol.error.email-duplicate";
   static final String EMAIL_EXISTS = "import.kol.error.email-exists";
-  static final String COUNTRY_REQUIRED = "import.kol.error.country-required";
   static final String COUNTRY_FORMAT = "import.kol.error.country-format";
   static final String BD_INVALID = "import.kol.error.bd-invalid";
   static final String RATE_FORMAT = "import.kol.error.rate-format";
@@ -53,19 +57,30 @@ class KolImportProcessor implements ImportRowProcessor {
   static final String FOLLOWERS_FORMAT = "import.kol.error.followers-format";
   static final String FOLLOWERS_WITHOUT_HANDLE = "import.kol.error.followers-without-handle";
   static final String REMARK_LENGTH = "import.kol.error.remark-length";
+  static final String WHATSAPP_FORMAT = "import.kol.error.whatsapp-format";
+  static final String TEMPLATE_INVALID = "import.kol.error.template-invalid";
+  static final String INVITE_CODE_FORMAT = "import.kol.error.invite-code-format";
+  static final String SHEET_URL_FORMAT = "import.kol.error.sheet-url-format";
 
   private final ImportActor actor;
   private final KolMapper kols;
   private final KolWriter writer;
   private final BdUserApi bdUsers;
+  private final LinkTemplateService templates;
   private final Set<String> seenCodes = new HashSet<>();
   private final Set<String> seenEmails = new HashSet<>();
 
-  KolImportProcessor(ImportActor actor, KolMapper kols, KolWriter writer, BdUserApi bdUsers) {
+  KolImportProcessor(
+      ImportActor actor,
+      KolMapper kols,
+      KolWriter writer,
+      BdUserApi bdUsers,
+      LinkTemplateService templates) {
     this.actor = actor;
     this.kols = kols;
     this.writer = writer;
     this.bdUsers = bdUsers;
+    this.templates = templates;
   }
 
   @Override
@@ -79,12 +94,7 @@ class KolImportProcessor implements ImportRowProcessor {
       errors.add(ImportReason.of(NAME_LENGTH));
     }
     String email = email(EMAIL.of(row).toLowerCase(Locale.ROOT), errors);
-    String country = COUNTRY.of(row).toUpperCase(Locale.ROOT);
-    if (country.isEmpty()) {
-      errors.add(ImportReason.of(COUNTRY_REQUIRED));
-    } else if (country.length() != 2 || !KolRules.isCountry(country)) {
-      errors.add(ImportReason.of(COUNTRY_FORMAT));
-    }
+    String country = country(COUNTRY.of(row), errors);
     Long bd = bd(BD_USERNAME.of(row), errors);
     BigDecimal rate = null;
     if (!DEFAULT_RATE.of(row).isEmpty()) {
@@ -98,18 +108,36 @@ class KolImportProcessor implements ImportRowProcessor {
     if (KolRules.length(remark) > KolRules.MAX_REMARK) {
       errors.add(ImportReason.of(REMARK_LENGTH));
     }
+    String whatsapp = WHATSAPP.of(row);
+    if (!whatsapp.isEmpty() && !whatsapp.matches(KolRules.WHATSAPP_PATTERN)) {
+      errors.add(ImportReason.of(WHATSAPP_FORMAT));
+    }
+    Long templateId = templateId(TEMPLATE_CODE.of(row), errors);
+    String inviteCode = INVITE_CODE.of(row);
+    if (!inviteCode.isEmpty() && !inviteCode.matches(KolRules.INVITE_CODE_PATTERN)) {
+      errors.add(ImportReason.of(INVITE_CODE_FORMAT));
+    }
+    String sheetUrl = SHEET_URL.of(row);
+    if (!sheetUrl.isEmpty() && !sheetUrl.matches(KolRules.SHEET_URL_PATTERN)) {
+      errors.add(ImportReason.of(SHEET_URL_FORMAT));
+    }
     if (!errors.isEmpty()) {
       return errors;
     }
     KolDO kol = new KolDO();
     kol.setName(name);
     kol.setEmail(email);
-    kol.setCountry(country);
+    kol.setCountry(country.isEmpty() ? null : country);
     kol.setSocialAccounts(SocialAccountsJson.write(social));
     kol.setBdUserId(bd);
     kol.setDefaultRate(rate);
     kol.setStatus(1);
     kol.setRemark(remark.isEmpty() ? null : remark);
+    kol.setWhatsapp(whatsapp.isEmpty() ? null : whatsapp);
+    kol.setLinkTemplateId(templateId);
+    kol.setInviteCode(inviteCode.isEmpty() ? null : inviteCode);
+    kol.setSheetUrl(sheetUrl.isEmpty() ? null : sheetUrl);
+    kol.setRegisterSource(1);
     try {
       writer.insert(kol, code, actor.id());
     } catch (BusinessException e) {
@@ -153,6 +181,15 @@ class KolImportProcessor implements ImportRowProcessor {
     return email;
   }
 
+  /** Optional since task 11 (self-registration may skip it); two letters when given. */
+  private static String country(String raw, List<ImportReason> errors) {
+    String country = raw.toUpperCase(Locale.ROOT);
+    if (!country.isEmpty() && (country.length() != 2 || !KolRules.isCountry(country))) {
+      errors.add(ImportReason.of(COUNTRY_FORMAT));
+    }
+    return country;
+  }
+
   /** A BD's own imports are always assigned to them; the column is then ignored (§4.2). */
   private Long bd(String username, List<ImportReason> errors) {
     if (actor.own()) {
@@ -167,6 +204,19 @@ class KolImportProcessor implements ImportRowProcessor {
       return null;
     }
     return bd.id();
+  }
+
+  /** Template id for the agent template code; empty clears, unknown or disabled fails the row. */
+  private Long templateId(String code, List<ImportReason> errors) {
+    if (code.isEmpty()) {
+      return null;
+    }
+    LinkTemplateDTO template = templates.usableTemplateByCode(code);
+    if (template == null) {
+      errors.add(ImportReason.of(TEMPLATE_INVALID));
+      return null;
+    }
+    return template.id();
   }
 
   private static List<SocialAccountDTO> social(List<String> row, List<ImportReason> errors) {

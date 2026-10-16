@@ -5,7 +5,12 @@ import com.tcrm.admin.kol.service.KolRules;
 import java.time.Instant;
 import java.util.List;
 
-/** {@code defaultRate} is a fraction with 4 decimals ("0.1550"), null when not set. */
+/**
+ * {@code defaultRate} is a fraction with 4 decimals ("0.1550"), null when not set. The 2026-10-16
+ * profile fields (task 11 §4.3): {@code whatsapp}, {@code linkTemplateId} with {@code
+ * linkTemplateName}, {@code inviteCode}, {@code sheetUrl}, and {@code registerSource} (1 entered in
+ * admin, 2 self-registered).
+ */
 public record KolVO(
     Long id,
     String kolCode,
@@ -18,6 +23,12 @@ public record KolVO(
     String defaultRate,
     Integer status,
     String remark,
+    String whatsapp,
+    Long linkTemplateId,
+    String linkTemplateName,
+    String inviteCode,
+    String sheetUrl,
+    Integer registerSource,
     Instant createTime,
     Instant updateTime) {
   static KolVO from(KolDTO k) {
@@ -33,6 +44,12 @@ public record KolVO(
         KolRules.rateText(k.defaultRate()),
         k.status(),
         k.remark(),
+        k.whatsapp(),
+        k.linkTemplateId(),
+        k.linkTemplateName(),
+        k.inviteCode(),
+        k.sheetUrl(),
+        k.registerSource(),
         k.createTime(),
         k.updateTime());
   }

@@ -17,7 +17,42 @@ public record KolAccountDTO(
     Instant lastLoginTime,
     Long tenantId,
     String tenantName,
-    boolean tenantEnabled) {
+    boolean tenantEnabled,
+    String whatsapp,
+    String sheetUrl) {
+
+  /** Snapshot without the profile fields shown on GET /kol-api/me (whatsapp, sheetUrl). */
+  public KolAccountDTO(
+      Long id,
+      String kolCode,
+      String name,
+      String email,
+      String country,
+      String passwordHash,
+      Integer status,
+      Integer accountStatus,
+      int credentialVersion,
+      Instant lastLoginTime,
+      Long tenantId,
+      String tenantName,
+      boolean tenantEnabled) {
+    this(
+        id,
+        kolCode,
+        name,
+        email,
+        country,
+        passwordHash,
+        status,
+        accountStatus,
+        credentialVersion,
+        lastLoginTime,
+        tenantId,
+        tenantName,
+        tenantEnabled,
+        null,
+        null);
+  }
 
   /** KOL row status (design §5.2): 1 enabled, anything else disabled. */
   public boolean enabled() {
@@ -44,6 +79,8 @@ public record KolAccountDTO(
         lastLoginTime,
         tenantId,
         tenantName,
-        tenantEnabled);
+        tenantEnabled,
+        whatsapp,
+        sheetUrl);
   }
 }

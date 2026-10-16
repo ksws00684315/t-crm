@@ -184,6 +184,10 @@ const enUS: MessageSchema = {
     KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
+    KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
+    LINK_TEMPLATE_INVALID: "The agent template must be an enabled template of this company.",
+    LINK_TEMPLATE_NOT_FOUND: "The agent template was not found.",
+    LINK_TEMPLATE_CODE_EXISTS: "This template code already exists.",
     TASK_QUEUE_FULL: "Too many tasks are waiting. Please try again later.",
     TASK_FILE_INVALID: "The file format is not valid. Upload an .xlsx Excel file.",
     TASK_FILE_TOO_LARGE: "The file is larger than 20MB. Split it and upload again.",
