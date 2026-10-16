@@ -87,6 +87,9 @@ crm:
     api-base-url: https://api.vdian.com/api
     oauth-base-url: https://oauth.open.weidian.com
     qps: 5
+  fx:
+    # ECB daily reference rates (design §7.5); public, no key. Tests point it at a local stub.
+    ecb-url: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
   http:
     # Forwarding headers are honoured only when the direct peer matches trusted-proxies (CIDR list).
     trusted-proxies: ${TCRM_TRUSTED_PROXIES:}
