@@ -31,6 +31,9 @@ const { t } = useI18n();
 const me = useUserStore();
 /** Button visibility only; the backend enforces the same rules (task 10b §4.3). */
 const abilities = computed(() => kolAbilities(me.user));
+// Creating creators in the console (single and Excel) is hidden for now: creators join through
+// their BD's register link (owner decision 2026-10-16). The backend endpoints stay in place.
+const KOL_CREATE_ENABLED = false;
 const links = computed(() => linkAbilities(me.user));
 const exportAllowed = computed(() => canExport(me.user));
 const needsBdList = computed(
@@ -370,10 +373,19 @@ onMounted(() => {
         >
           {{ t("kol.registerLink") }}
         </el-button>
-        <el-button v-if="abilities.canWrite" type="success" data-test="create" @click="openCreate">
+        <el-button
+          v-if="KOL_CREATE_ENABLED && abilities.canWrite"
+          type="success"
+          data-test="create"
+          @click="openCreate"
+        >
           {{ t("kol.create") }}
         </el-button>
-        <el-button v-if="abilities.canWrite" data-test="import" @click="importVisible = true">
+        <el-button
+          v-if="KOL_CREATE_ENABLED && abilities.canWrite"
+          data-test="import"
+          @click="importVisible = true"
+        >
           {{ t("kol.import") }}
         </el-button>
       </template>
