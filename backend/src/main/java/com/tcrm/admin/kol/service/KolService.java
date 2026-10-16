@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -47,6 +48,7 @@ public class KolService {
   private final TransactionTemplate tx;
   private final ApplicationEventPublisher events;
   private final KolInvites invites;
+  private final BdTransferService transfers;
 
   public KolService(
       KolMapper kols,
@@ -57,7 +59,8 @@ public class KolService {
       CurrentUserContext current,
       TransactionTemplate tx,
       ApplicationEventPublisher events,
-      KolInvites invites) {
+      KolInvites invites,
+      BdTransferService transfers) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
@@ -67,6 +70,7 @@ public class KolService {
     this.tx = tx;
     this.events = events;
     this.invites = invites;
+    this.transfers = transfers;
   }
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
@@ -249,37 +253,13 @@ public class KolService {
    * Changes or clears the BD (task 04 §4.2): in one transaction the KOL row is locked, the current
    * ownership period closed and a new one opened, including changes to or from "unassigned".
    */
+  @Transactional(rollbackFor = Exception.class)
   public void updateBdUser(Long id, Long bdUserId) {
     AccountDTO user = current.user();
     if (user.ownScope()) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
-    Long bd = usableBd(bdUserId);
-    tx.executeWithoutResult(
-        status -> {
-          if (kols.lockById(id) == null) {
-            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-          }
-          KolDO kol = kols.selectById(id);
-          if (Objects.equals(kol.getBdUserId(), bd)) {
-            return;
-          }
-          Instant now = Instant.now();
-          kols.update(
-              null,
-              new LambdaUpdateWrapper<KolDO>()
-                  .eq(KolDO::getId, id)
-                  .set(KolDO::getBdUserId, bd)
-                  .set(KolDO::getUpdateBy, user.id())
-                  .set(KolDO::getUpdateTime, now));
-          history.closeCurrent(id, now, user.id());
-          KolBdHistoryDO period = new KolBdHistoryDO();
-          period.setKolId(id);
-          period.setBdUserId(bd);
-          period.setStartTime(now);
-          period.setDeleted(false);
-          history.insert(period);
-        });
+    transfers.updateOne(id, bdUserId);
   }
 
   /**

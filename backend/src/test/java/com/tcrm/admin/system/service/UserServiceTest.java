@@ -26,14 +26,18 @@ import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TestTransactions;
+import com.tcrm.admin.system.api.StaffDisabledEvent;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -48,11 +52,19 @@ class UserServiceTest {
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final UserPermissionService permissions = mock(UserPermissionService.class);
-  private final UserService service = new UserService(users, passwords, current, permissions);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+  private final UserService service =
+      new UserService(users, passwords, current, permissions, events);
+
+  @BeforeEach
+  void lockStaffRow() {
+    when(users.lockById(7L)).thenReturn(7L);
+  }
 
   private SysUserDO user() {
     var u = new SysUserDO();
     u.setId(7L);
+    u.setTenantId(1L);
     u.setUsername("operator");
     u.setNickname("Operator");
     u.setRole(Role.STAFF);
@@ -105,6 +117,7 @@ class UserServiceTest {
             i -> {
               SysUserDO u = i.getArgument(0);
               u.setId(7L);
+              u.setTenantId(1L);
               return 1;
             })
         .when(users)
@@ -225,11 +238,12 @@ class UserServiceTest {
     when(current.id()).thenReturn(8L);
     when(users.selectById(7L)).thenReturn(user());
     try (var stp = mockStatic(StpUtil.class)) {
-      service.updateStatus(7L, 0);
+      TestTransactions.template().executeWithoutResult(tx -> service.updateStatus(7L, 0));
       assertThat(updatedColumns())
           .contains("status=")
           .doesNotContain("password_hash", "role", "nickname");
       stp.verify(() -> StpUtil.kickout(7L));
+      verify(events).publishEvent(new StaffDisabledEvent(1L, 7L));
     }
   }
 
@@ -238,8 +252,9 @@ class UserServiceTest {
     when(current.id()).thenReturn(8L);
     when(users.selectById(7L)).thenReturn(user());
     try (var stp = mockStatic(StpUtil.class)) {
-      service.updateStatus(7L, 1);
+      TestTransactions.template().executeWithoutResult(tx -> service.updateStatus(7L, 1));
       stp.verifyNoInteractions();
+      verifyNoInteractions(events);
     }
   }
 
