@@ -5,8 +5,11 @@ declare module "vue-router" {
   interface RouteMeta {
     /** Locale key for the page title; also the menu label (for example "route.home"). */
     title?: string;
-    /** Permission code required to open the route. A super administrator passes every code. */
-    permission?: PermissionCode;
+    /**
+     * Permission code required to open the route; an array means any one code suffices. A super
+     * administrator passes every code.
+     */
+    permission?: PermissionCode | readonly PermissionCode[];
     /** Super-administrator only (user management, audit log). */
     superAdmin?: boolean;
     /** Platform-administrator only (company management). */

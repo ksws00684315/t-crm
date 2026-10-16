@@ -7,6 +7,8 @@ function walk(list: readonly RouteRecordRaw[]): RouteRecordRaw[] {
 }
 
 describe("cacheable route component names", () => {
+  // Loading every page module (the first one pays for the full Element Plus bundle) no longer
+  // fits the 5s default with an eleventh page; the assertions are unchanged.
   it("matches the page component's name option", async () => {
     const cacheable = walk(routes).filter(
       route =>
@@ -20,6 +22,7 @@ describe("cacheable route component names", () => {
         "HomePage",
         "KolItemListPage",
         "KolListPage",
+        "PayoutAccountReviewPage",
         "PlatformTenantPage",
         "ProductListPage",
         "ShopListPage",
@@ -32,5 +35,5 @@ describe("cacheable route component names", () => {
       const loaded = await (route.component as () => Promise<{ default: { name?: string } }>)();
       expect(loaded.default.name).toBe(route.meta?.componentName);
     }
-  });
+  }, 20000);
 });
