@@ -314,6 +314,23 @@ export function linkAbilities(user: AbilitySubject | null | undefined): LinkAbil
   };
 }
 
+/** Order page button visibility. The backend enforces the same rules. */
+export interface OrderAbilities {
+  /** Sync status, manual sync and the import entries. Requires order:manage. */
+  canManage: boolean;
+  /** Open a creator detail drawer from an order row. Requires kol:view. */
+  canViewKol: boolean;
+}
+
+export function orderAbilities(user: AbilitySubject | null | undefined): OrderAbilities {
+  const access = accessOf(user);
+  if (!user) return { canManage: false, canViewKol: false };
+  return {
+    canManage: access.can("order:manage"),
+    canViewKol: access.can("kol:view")
+  };
+}
+
 /** List export button. */
 export function canExport(user: AbilitySubject | null | undefined): boolean {
   return accessOf(user).can("data:export");

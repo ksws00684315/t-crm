@@ -2,6 +2,11 @@ import type { RouteRecordRaw } from "vue-router";
 import { describe, expect, it } from "vitest";
 import { routes } from "../routes";
 
+// The order pages pull in the shared drawers and API modules; import them here so that cost
+// stays outside the 5s test timeout, like the login view in guard.spec.
+import "@/views/order/index.vue";
+import "@/views/order/unmatched.vue";
+
 function walk(list: readonly RouteRecordRaw[]): RouteRecordRaw[] {
   return list.flatMap(route => [route, ...(route.children ? walk(route.children) : [])]);
 }
@@ -20,6 +25,8 @@ describe("cacheable route component names", () => {
         "HomePage",
         "KolItemListPage",
         "KolListPage",
+        "OrderListPage",
+        "OrderUnmatchedPage",
         "PlatformTenantPage",
         "ProductListPage",
         "ShopListPage",

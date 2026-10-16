@@ -93,6 +93,38 @@ export const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: "order",
+        name: "OrderGroup",
+        redirect: "/order/orders",
+        meta: {
+          title: "route.orders",
+          icon: "List",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "orders",
+            name: "OrderList",
+            component: () => import("@/views/order/index.vue"),
+            meta: {
+              title: "route.orderList",
+              permission: "order:view",
+              componentName: "OrderListPage"
+            }
+          },
+          {
+            path: "unmatched",
+            name: "OrderUnmatched",
+            component: () => import("@/views/order/unmatched.vue"),
+            meta: {
+              title: "route.orderUnmatched",
+              permission: "order:manage",
+              componentName: "OrderUnmatchedPage"
+            }
+          }
+        ]
+      },
+      {
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),

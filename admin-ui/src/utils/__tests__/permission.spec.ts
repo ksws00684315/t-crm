@@ -11,6 +11,7 @@ import {
   isSuperAdminAccount,
   kolAbilities,
   linkAbilities,
+  orderAbilities,
   permissionGroupLabel,
   permissionText,
   POST_TEMPLATES,
@@ -122,6 +123,9 @@ describe("buildMenu", () => {
       "店铺管理",
       "原商品",
       "对应关系",
+      "订单",
+      "订单列表",
+      "人工匹配池",
       "用户管理",
       "代购平台模板",
       "操作日志"
@@ -136,6 +140,8 @@ describe("buildMenu", () => {
       "/product/shops",
       "/product/products",
       "/product/kol-items",
+      "/order/orders",
+      "/order/unmatched",
       "/system/users",
       "/system/link-templates",
       "/system/oper-logs"
@@ -156,6 +162,16 @@ describe("buildMenu", () => {
       "对应关系"
     ]);
     expect(titles(staff("OWN", ["product:view"]))).toEqual(["首页", "商品", "店铺管理", "原商品"]);
+  });
+
+  it("shows the order list but not the matching pool without order:manage", () => {
+    expect(titles(staff("ALL", ["order:view"]))).toEqual(["首页", "订单", "订单列表"]);
+    expect(titles(staff("ALL", ["order:view", "order:manage"]))).toEqual([
+      "首页",
+      "订单",
+      "订单列表",
+      "人工匹配池"
+    ]);
   });
 
   it("shows only company management to the platform administrator", () => {
@@ -290,6 +306,25 @@ describe("linkAbilities", () => {
     expect(linkAbilities(staff("OWN", ["kol:view"]))).toEqual({
       canViewLinks: false,
       canRebuildIndex: false
+    });
+  });
+});
+
+describe("orderAbilities", () => {
+  it("follows the permission matrix for orders and the creator drawer", () => {
+    expect(orderAbilities(null)).toEqual({ canManage: false, canViewKol: false });
+    expect(orderAbilities(superAdmin)).toEqual({ canManage: true, canViewKol: true });
+    expect(orderAbilities(staff("ALL", ["order:view"]))).toEqual({
+      canManage: false,
+      canViewKol: false
+    });
+    expect(orderAbilities(staff("ALL", ["order:view", "order:manage"]))).toEqual({
+      canManage: true,
+      canViewKol: false
+    });
+    expect(orderAbilities(staff("OWN", ["order:view", "order:manage", "kol:view"]))).toEqual({
+      canManage: true,
+      canViewKol: true
     });
   });
 });

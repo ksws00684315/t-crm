@@ -169,6 +169,7 @@ describe("installGuard with the real route table", () => {
       ["platform/tenants", null, false, true, false],
       ["kol/kols", "kol:view", false, false, false],
       ["product", null, false, false, false],
+      ["order", null, false, false, false],
       ["system/users", null, true, false, false],
       ["system/link-templates", null, true, false, false],
       ["system/oper-logs", null, true, false, false],
@@ -186,6 +187,17 @@ describe("installGuard with the real route table", () => {
       ["shops", "product:view", false],
       ["products", "product:view", false],
       ["kol-items", "product:view", true]
+    ]);
+    const order = layout?.children?.find(route => route.path === "order");
+    expect(
+      order?.children?.map(route => [
+        route.path,
+        route.meta?.permission ?? null,
+        route.meta?.hideForOwn === true
+      ])
+    ).toEqual([
+      ["orders", "order:view", false],
+      ["unmatched", "order:manage", false]
     ]);
     for (const route of layout?.children ?? []) {
       expect(route.meta).not.toHaveProperty("roles");
