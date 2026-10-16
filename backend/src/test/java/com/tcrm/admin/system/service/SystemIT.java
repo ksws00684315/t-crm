@@ -165,6 +165,7 @@ class SystemIT {
             "crm_kol:NO",
             "crm_kol_bd_history:NO",
             "crm_kol_item:NO",
+            "crm_link_template:NO",
             "crm_product:NO",
             "crm_shop:NO",
             "crm_task:NO",

@@ -95,7 +95,20 @@ class KolRulesTest {
   void shouldExposeTemplateHeadersInDocumentedOrder() {
     assertThat(com.tcrm.admin.TestTemplates.render(KolImportColumn.headerKeys()))
         .containsExactly(
-            "达人编号", "姓名", "邮箱", "国家", "负责商务用户名", "默认佣金比例(%)", "社媒平台", "社媒账号", "粉丝数", "备注");
+            "达人编号",
+            "姓名",
+            "邮箱",
+            "国家",
+            "负责商务用户名",
+            "默认佣金比例(%)",
+            "社媒平台",
+            "社媒账号",
+            "粉丝数",
+            "备注",
+            "WhatsApp",
+            "代购平台编码",
+            "邀请码",
+            "推广表格地址");
     assertThat(
             com.tcrm.admin.TestTemplates.render(
                 KolImportColumn.headerKeys(), java.util.Locale.ENGLISH))
@@ -109,7 +122,15 @@ class KolRulesTest {
             "Social Platform",
             "Social Handle",
             "Followers",
-            "Remark");
+            "Remark",
+            "WhatsApp",
+            "Agent Template Code",
+            "Invite Code",
+            "Promotion Sheet URL");
+    // The pre-task-11 variant stays accepted for files built with the old template.
+    assertThat(com.tcrm.admin.TestTemplates.render(KolImportColumn.legacyHeaderKeys()))
+        .containsExactly(
+            "达人编号", "姓名", "邮箱", "国家", "负责商务用户名", "默认佣金比例(%)", "社媒平台", "社媒账号", "粉丝数", "备注");
   }
 
   @Test

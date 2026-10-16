@@ -24,4 +24,15 @@ public interface KolApi {
    * design capacity is a few hundred KOLs.
    */
   List<KolRefDTO> listAll();
+
+  /**
+   * Pages the IDs of undeleted KOLs that use the link template, in ascending id order (task 11
+   * §4.4). Used to register link index refreshes for every KOL of a template whose URL or status
+   * changed; like the rebuild, it must run in system scope to cover every company.
+   *
+   * @param templateId crm_link_template.id
+   * @param afterKolId exclusive lower bound; null starts at the first id
+   * @param limit maximum number of ids (positive)
+   */
+  List<Long> pageKolIdsWithTemplate(Long templateId, Long afterKolId, int limit);
 }

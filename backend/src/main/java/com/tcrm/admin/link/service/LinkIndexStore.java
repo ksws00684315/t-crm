@@ -2,9 +2,11 @@ package com.tcrm.admin.link.service;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -15,11 +17,17 @@ import org.springframework.stereotype.Component;
 
 /**
  * Redis side of the link index (design §7.4): {@code HASH link:{kolCode}}, field = original product
- * code, value = JSON from {@link LinkRules#indexValue}. Large writes are pipelined in chunks.
+ * code, and {@code HASH linkitem:{last two digits}} (task 11 §4.4), field = exclusive item ID; both
+ * values are the same JSON from {@link LinkRules#indexValue}. Large writes are pipelined in chunks.
  */
 @Component
 public class LinkIndexStore {
   static final String KEY_PREFIX = "link:";
+
+  /** Item index buckets; shares the {@code link:} prefix, e.g. {@code link:KOL0001}. */
+  static final String ITEM_KEY_PREFIX = "linkitem:";
+
+  static final int ITEM_BUCKETS = 100;
 
   /**
    * Rebuild staging keys; outside {@code link:*} so the redirect service and SCAN never see them.
@@ -45,8 +53,8 @@ public class LinkIndexStore {
   }
 
   /**
-   * The next {@link #putAll}, {@link #remove} or {@link #replace} throws this exception once, then
-   * writes normally. Null clears a pending failure.
+   * The next write ({@code link:*} or {@code linkitem:*}) throws this exception once, then writes
+   * normally. Null clears a pending failure.
    */
   public void failNextWrite(RuntimeException failure) {
     this.writeFailure = failure;
@@ -64,6 +72,55 @@ public class LinkIndexStore {
   public void remove(String kolCode, String productCode) {
     checkWriteFailure();
     redis.opsForHash().delete(KEY_PREFIX + kolCode, productCode);
+  }
+
+  /**
+   * Sets the given exclusive-item fields of their {@code linkitem:{nn}} bucket; other fields of the
+   * bucket are left untouched (task 11 §4.4).
+   *
+   * @param itemFields exclusive item ID to index value, all buckets merged
+   */
+  public void putItemFields(Map<String, String> itemFields) {
+    checkWriteFailure();
+    byBucket(itemFields.keySet())
+        .forEach((bucket, fields) -> write(ITEM_KEY_PREFIX + bucket, pick(itemFields, fields)));
+  }
+
+  /**
+   * Removes the exclusive-item fields from their {@code linkitem:{nn}} buckets.
+   *
+   * @param weidianItemIds exclusive item IDs whose fields no longer exist
+   */
+  public void removeItemFields(Collection<String> weidianItemIds) {
+    checkWriteFailure();
+    if (weidianItemIds == null || weidianItemIds.isEmpty()) {
+      return;
+    }
+    byBucket(weidianItemIds)
+        .forEach(
+            (bucket, fields) ->
+                redis.opsForHash().delete(ITEM_KEY_PREFIX + bucket, fields.toArray()));
+  }
+
+  /** Field names of one item bucket in HSCAN order; the rebuild sweep uses them all. */
+  public List<String> listItemFields(String bucket) {
+    List<String> fields = new ArrayList<>();
+    try (var cursor =
+        redis
+            .opsForHash()
+            .scan(ITEM_KEY_PREFIX + bucket, ScanOptions.scanOptions().count(1000).build())) {
+      cursor.forEachRemaining(entry -> fields.add(String.valueOf(entry.getKey())));
+    }
+    return fields;
+  }
+
+  /** Every item bucket name, {@code "00"} to {@code "99"}. */
+  public static List<String> itemBuckets() {
+    List<String> buckets = new ArrayList<>(ITEM_BUCKETS);
+    for (int i = 0; i < ITEM_BUCKETS; i++) {
+      buckets.add(String.format(Locale.ROOT, "%02d", i));
+    }
+    return buckets;
   }
 
   /**
@@ -151,5 +208,22 @@ public class LinkIndexStore {
       cursor.forEachRemaining(keys::add);
     }
     return keys;
+  }
+
+  /** Groups exclusive item IDs by their bucket suffix, keeping encounter order. */
+  private static Map<String, List<String>> byBucket(Collection<String> weidianItemIds) {
+    Map<String, List<String>> byBucket = new LinkedHashMap<>();
+    for (String itemId : weidianItemIds) {
+      byBucket.computeIfAbsent(LinkRules.itemBucket(itemId), b -> new ArrayList<>()).add(itemId);
+    }
+    return byBucket;
+  }
+
+  private static Map<String, String> pick(Map<String, String> values, List<String> keys) {
+    Map<String, String> picked = new LinkedHashMap<>(keys.size() * 2);
+    for (String key : keys) {
+      picked.put(key, values.get(key));
+    }
+    return picked;
   }
 }

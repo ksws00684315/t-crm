@@ -62,12 +62,18 @@ class KolControllerTest {
         "Alice",
         "alice@example.com",
         "US",
-        List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L)),
+        List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L, false)),
         5L,
         "bd5",
         new BigDecimal("0.155"),
         1,
         null,
+        "+12345678",
+        77L,
+        "kakobuy",
+        "aff-01",
+        "https://docs.google.com/spreadsheets/d/1/edit",
+        1,
         Instant.parse("2026-10-05T00:00:00Z"),
         Instant.parse("2026-10-05T00:00:01Z"));
   }
@@ -162,7 +168,12 @@ class KolControllerTest {
             json(post(BASE), VALID)
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"));
+        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.whatsapp").value("+12345678"))
+        .andExpect(jsonPath("$.data.linkTemplateId").value("77"))
+        .andExpect(jsonPath("$.data.linkTemplateName").value("kakobuy"))
+        .andExpect(jsonPath("$.data.inviteCode").value("aff-01"))
+        .andExpect(jsonPath("$.data.registerSource").value(1));
     var command = ArgumentCaptor.forClass(CreateKolCommand.class);
     verify(kols).create(command.capture());
     org.assertj.core.api.Assertions.assertThat(command.getValue())
@@ -171,10 +182,59 @@ class KolControllerTest {
                 "Alice",
                 "alice@example.com",
                 "US",
-                List.of(new SocialAccountDTO("TikTok", "@a", "https://t.example/a", 12000L)),
+                List.of(new SocialAccountDTO("TikTok", "@a", "https://t.example/a", 12000L, false)),
                 5L,
                 new BigDecimal("0.155"),
-                "VIP"));
+                "VIP",
+                null,
+                null,
+                null,
+                null));
+  }
+
+  @Test
+  void shouldConvertProfileFields_whenCreateCarriesThem() throws Exception {
+    when(kols.create(any())).thenReturn(kol());
+    mvc.perform(
+            json(
+                    post(BASE),
+                    "{\"name\":\"A\",\"email\":\"a@x.io\",\"whatsapp\":\"+12345678\","
+                        + "\"linkTemplateId\":\"77\",\"inviteCode\":\"aff-01\","
+                        + "\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1\","
+                        + "\"socialAccounts\":[{\"platform\":\"T\",\"handle\":\"h\",\"primary\":true}]}")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk());
+    var command = ArgumentCaptor.forClass(CreateKolCommand.class);
+    verify(kols).create(command.capture());
+    org.assertj.core.api.Assertions.assertThat(command.getValue())
+        .isEqualTo(
+            new CreateKolCommand(
+                "A",
+                "a@x.io",
+                null,
+                List.of(new SocialAccountDTO("T", "h", null, null, true)),
+                null,
+                null,
+                null,
+                "+12345678",
+                77L,
+                "aff-01",
+                "https://docs.google.com/spreadsheets/d/1"));
+  }
+
+  @Test
+  void shouldReturn400_whenTwoSocialAccountsClaimPrimary() throws Exception {
+    when(kols.create(any())).thenReturn(kol());
+    mvc.perform(
+            json(
+                    post(BASE),
+                    "{\"name\":\"A\",\"email\":\"a@x.io\","
+                        + "\"socialAccounts\":[{\"platform\":\"T\",\"handle\":\"h\",\"primary\":true},"
+                        + "{\"platform\":\"I\",\"handle\":\"i\",\"primary\":true}]}")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("KOL_MULTIPLE_PRIMARY"));
+    verifyNoInteractions(kols);
   }
 
   @ParameterizedTest
@@ -241,7 +301,10 @@ class KolControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(kols)
-        .update(11L, new EditKolCommand("A", "a@x.io", "gb", List.of(), new BigDecimal("0"), null));
+        .update(
+            11L,
+            new EditKolCommand(
+                "A", "a@x.io", "gb", List.of(), new BigDecimal("0"), null, null, null, null, null));
     mvc.perform(
             json(put(BASE + "/11/status"), "{\"status\":0}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))

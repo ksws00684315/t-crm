@@ -36,19 +36,31 @@ class KolImportProcessorTest {
 
   private static final long ADMIN = 1L;
   private static final long BD = 5L;
+  private static final long TEMPLATE = 77L;
 
   private final KolMapper kols = mock(KolMapper.class);
   private final KolWriter writer = mock(KolWriter.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
+  private final LinkTemplateService templates = mock(LinkTemplateService.class);
 
   private KolImportProcessor processor(boolean own) {
-    return new KolImportProcessor(new ImportActor(own ? BD : ADMIN, own), kols, writer, bdUsers);
+    return new KolImportProcessor(
+        new ImportActor(own ? BD : ADMIN, own), kols, writer, bdUsers, templates);
   }
 
   /** Row in template order: code, name, email, country, BD, rate, platform, handle, followers. */
   private static List<String> row(String... cells) {
     List<String> row = new ArrayList<>(List.of(cells));
     while (row.size() < KolImportColumn.values().length) {
+      row.add("");
+    }
+    return row;
+  }
+
+  /** Row of a pre-task-11 file: the first ten columns only. */
+  private static List<String> legacyRow(String... cells) {
+    List<String> row = new ArrayList<>(List.of(cells));
+    while (row.size() < KolImportColumn.LEGACY_COLUMNS) {
       row.add("");
     }
     return row;
@@ -80,8 +92,98 @@ class KolImportProcessorTest {
     assertThat(kol.getDefaultRate()).isEqualByComparingTo("0.1550");
     assertThat(kol.getStatus()).isEqualTo(1);
     assertThat(kol.getRemark()).isEqualTo("VIP");
+    assertThat(kol.getRegisterSource()).isEqualTo(1);
     assertThat(SocialAccountsJson.read(kol.getSocialAccounts()))
         .containsExactly(new SocialAccountDTO("TikTok", "@alice", null, 12_000L));
+  }
+
+  @Test
+  void shouldImportLegacyFile_whenRowHasOnlyTenColumns() {
+    assertThat(processor(false).process(legacyRow("", "Alice", "alice@example.com", ""))).isEmpty();
+    KolDO kol = saved(null, ADMIN);
+    assertThat(kol.getCountry()).isNull();
+    assertThat(kol.getWhatsapp()).isNull();
+    assertThat(kol.getLinkTemplateId()).isNull();
+    assertThat(kol.getInviteCode()).isNull();
+    assertThat(kol.getSheetUrl()).isNull();
+  }
+
+  @Test
+  void shouldStoreProfileColumns_whenTemplateCodeIsUsable() {
+    when(templates.usableTemplateByCode("kakobuy"))
+        .thenReturn(
+            new LinkTemplateDTO(
+                TEMPLATE,
+                "kakobuy",
+                "kakobuy",
+                "https://item.kakobuy.com/i/{PRODUCT_ID}",
+                "WEIDIAN",
+                0,
+                1));
+    assertThat(
+            processor(false)
+                .process(
+                    row(
+                        "",
+                        "Alice",
+                        "alice@example.com",
+                        "US",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "+12345678",
+                        "kakobuy",
+                        "aff_01",
+                        "https://docs.google.com/spreadsheets/d/1/edit")))
+        .isEmpty();
+    KolDO kol = saved(null, ADMIN);
+    assertThat(kol.getWhatsapp()).isEqualTo("+12345678");
+    assertThat(kol.getLinkTemplateId()).isEqualTo(TEMPLATE);
+    assertThat(kol.getInviteCode()).isEqualTo("aff_01");
+    assertThat(kol.getSheetUrl()).isEqualTo("https://docs.google.com/spreadsheets/d/1/edit");
+  }
+
+  @Test
+  void shouldReportEveryProfileProblem_inColumnOrder() {
+    var p = processor(false);
+    assertThat(
+            p.process(
+                row(
+                    "",
+                    "Alice",
+                    "alice@example.com",
+                    "US",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "12345",
+                    "kakobuy",
+                    "aff code!",
+                    "http://example.com/sheet")))
+        .containsExactly(
+            ImportReason.of(KolImportProcessor.WHATSAPP_FORMAT),
+            ImportReason.of(KolImportProcessor.TEMPLATE_INVALID),
+            ImportReason.of(KolImportProcessor.INVITE_CODE_FORMAT),
+            ImportReason.of(KolImportProcessor.SHEET_URL_FORMAT));
+    verify(writer, never()).insert(any(), any(), any());
+  }
+
+  @Test
+  void shouldReportTemplate_whenCodeIsUnknownOrDisabled() {
+    // The service returns null for unknown codes and disabled templates alike.
+    when(templates.usableTemplateByCode("ghost")).thenReturn(null);
+    when(templates.usableTemplateByCode("off")).thenReturn(null);
+    var p = processor(false);
+    assertThat(p.process(row("", "A", "a@x.io", "US", "", "", "", "", "", "", "", "ghost")))
+        .containsExactly(ImportReason.of(KolImportProcessor.TEMPLATE_INVALID));
+    assertThat(p.process(row("", "A", "b@x.io", "US", "", "", "", "", "", "", "", "off")))
+        .containsExactly(ImportReason.of(KolImportProcessor.TEMPLATE_INVALID));
   }
 
   @Test
@@ -137,14 +239,13 @@ class KolImportProcessorTest {
   }
 
   @Test
-  void shouldReportRequiredAndLengthLimits() {
+  void shouldReportLengthLimits_andAllowMissingCountry() {
     var p = processor(false);
+    String longEmail = "a".repeat(120) + "@example.com";
     assertThat(p.process(row("", "x".repeat(65), "", "")))
         .containsExactly(
             ImportReason.of(KolImportProcessor.NAME_LENGTH),
-            ImportReason.of(KolImportProcessor.EMAIL_REQUIRED),
-            ImportReason.of(KolImportProcessor.COUNTRY_REQUIRED));
-    String longEmail = "a".repeat(120) + "@example.com";
+            ImportReason.of(KolImportProcessor.EMAIL_REQUIRED));
     assertThat(p.process(row("", "A", longEmail, "USA", "", "", "p".repeat(33), "h".repeat(129))))
         .containsExactly(
             ImportReason.of(KolImportProcessor.EMAIL_LENGTH),
