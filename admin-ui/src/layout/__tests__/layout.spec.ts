@@ -15,12 +15,24 @@ import Layout from "../index.vue";
 const storeState = vi.hoisted(() => ({ user: null as Record<string, unknown> | null }));
 
 vi.mock("@/stores/user", () => ({
-  useUserStore: () => ({
-    user: storeState.user,
-    roles: storeState.user ? [storeState.user.role] : [],
-    refreshProfile: vi.fn().mockResolvedValue(undefined),
-    logout: vi.fn()
-  })
+  useUserStore: () => {
+    const current = storeState.user;
+    const role = typeof current?.role === "string" ? current.role : "";
+    const dataScope = current?.dataScope === "OWN" ? "OWN" : "ALL";
+    const permissions = Array.isArray(current?.permissions) ? current.permissions : [];
+    const isSuperAdmin = role === "SUPER_ADMIN";
+    return {
+      user: current,
+      access: {
+        isSuperAdmin,
+        isOwnScope: role === "STAFF" && dataScope === "OWN",
+        isPlatformAdmin: role === "PLATFORM_ADMIN",
+        can: (code: string) => isSuperAdmin || permissions.includes(code)
+      },
+      refreshProfile: vi.fn().mockResolvedValue(undefined),
+      logout: vi.fn()
+    };
+  }
 }));
 
 describe("layout tenant label", () => {
@@ -38,6 +50,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "北美公司",
@@ -61,6 +75,8 @@ describe("layout tenant label", () => {
       nickname: "Platform",
       email: null,
       role: "PLATFORM_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: null,
       tenantName: null,
@@ -82,7 +98,9 @@ describe("layout tenant label", () => {
       username: "legacy",
       nickname: "Legacy",
       email: null,
-      role: "OPERATOR",
+      role: "STAFF",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: null,
       status: 1,
@@ -105,6 +123,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "North America",
@@ -138,6 +158,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "北美公司",
@@ -168,6 +190,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "北美公司",
@@ -197,6 +221,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "北美公司",
@@ -230,6 +256,8 @@ describe("layout tenant label", () => {
       nickname: "Alice",
       email: null,
       role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
       dataScope: "ALL",
       tenantId: "1",
       tenantName: "北美公司",

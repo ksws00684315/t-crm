@@ -50,12 +50,98 @@ const zhCN = {
   role: {
     PLATFORM_ADMIN: "平台管理员",
     SUPER_ADMIN: "超级管理员",
+    STAFF: "子账号"
+  },
+  post: {
     OPERATOR: "运营",
-    FINANCE: "财务"
+    BD: "商务",
+    none: "—"
+  },
+  permissionGroup: {
+    KOL: "达人",
+    PRODUCT: "商品",
+    ORDER: "订单",
+    FUNDS: "资金",
+    DASHBOARD: "看板",
+    OTHER: "其他"
+  },
+  permission: {
+    "kol:view": {
+      name: "查看达人",
+      desc: "查看达人列表、详情和商务归属历史"
+    },
+    "kol:edit": {
+      name: "编辑达人",
+      desc: "新建、编辑、启停达人，设置佣金比例、代购信息并导入"
+    },
+    "kol:register-link": {
+      name: "注册链接",
+      desc: "管理本人的达人注册链接"
+    },
+    "kol:copy-token": {
+      name: "复制令牌",
+      desc: "为达人生成或作废复制令牌"
+    },
+    "product:view": {
+      name: "查看商品",
+      desc: "查看店铺、原商品、对应关系和中转链接"
+    },
+    "product:edit": {
+      name: "编辑商品",
+      desc: "导入和编辑原商品，导入对应关系"
+    },
+    "product:status": {
+      name: "上下架",
+      desc: "原商品上架、下架"
+    },
+    "order:view": {
+      name: "查看订单",
+      desc: "查看订单与明细"
+    },
+    "order:manage": {
+      name: "管理订单",
+      desc: "订单导入、手动同步和人工匹配"
+    },
+    "commission:view": {
+      name: "查看佣金",
+      desc: "查看佣金台账、达人余额、提现与预付记录"
+    },
+    "commission:freeze": {
+      name: "冻结提现",
+      desc: "冻结或解冻达人提现"
+    },
+    "payout-account:review": {
+      name: "审核收款账户",
+      desc: "审核或驳回达人收款账户"
+    },
+    "withdrawal:review": {
+      name: "审核提现",
+      desc: "审核或驳回达人提现申请"
+    },
+    "prepay:apply": {
+      name: "申请预付",
+      desc: "为达人提交或撤回预付申请"
+    },
+    "dashboard:shop": {
+      name: "总店看板",
+      desc: "查看总店看板和商品看板"
+    },
+    "dashboard:team": {
+      name: "商务看板",
+      desc: "查看商务看板"
+    },
+    "dashboard:kol": {
+      name: "达人看板",
+      desc: "代看达人看板"
+    },
+    "data:export": {
+      name: "导出数据",
+      desc: "导出有权查看的列表"
+    }
   },
   scope: {
     ALL: "全部数据",
-    OWN: "仅本人数据（限运营）",
+    OWN: "仅本人负责的达人",
     allShort: "全部",
     ownShort: "仅本人"
   },
@@ -93,7 +179,7 @@ const zhCN = {
     USER_CANNOT_DISABLE_SELF: "不能停用自己的账号",
     USER_CANNOT_REMOVE_SELF_ROLE: "不能取消自己的超级管理员角色",
     USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于子账号",
-    USER_PERMISSION_INVALID: "权限码无效",
+    USER_PERMISSION_INVALID: "权限无效，请重新勾选",
     USER_LAST_SUPER_ADMIN: "系统至少需要保留一个启用的超级管理员",
     KOL_EMAIL_EXISTS: "该邮箱已被其他达人使用",
     KOL_CODE_EXISTS: "该达人编号已存在",
@@ -302,7 +388,22 @@ const zhCN = {
     create: "新增用户",
     editTitle: "编辑用户",
     createTitle: "新增用户",
-    role: "角色",
+    role: "账号类型",
+    post: "岗位",
+    postTemplate: "岗位模板",
+    permissionCount: "权限数",
+    permissionItems: "{n} 项",
+    allPermissions: "拥有全部权限",
+    allPermissionsShort: "全部",
+    permissionsTitle: "权限设置",
+    permissionsSaved: "权限已保存",
+    permissionsSeparate: "权限在列表的「权限设置」中单独保存。",
+    currentPost: "当前岗位：{post}",
+    selectAll: "全选",
+    resetTemplate: "按模板重置",
+    exclusiveTitle: "超管专属，不可授予。",
+    exclusiveItems: "用户与权限、系统配置、操作日志、审批预付、标记打款、转移达人。",
+    templateRequired: "请选择岗位模板",
     dataScope: "数据范围",
     lastLogin: "最近登录",
     initialPassword: "初始密码",

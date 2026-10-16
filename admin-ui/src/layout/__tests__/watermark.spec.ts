@@ -18,6 +18,8 @@ const userFixture: UserVO = {
   nickname: "Ada",
   email: null,
   role: "SUPER_ADMIN",
+  postTemplate: null,
+  permissions: [],
   dataScope: "ALL",
   tenantId: "1",
   tenantName: "北美公司",

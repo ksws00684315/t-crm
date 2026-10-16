@@ -15,14 +15,24 @@ import MenuSearch from "../MenuSearch.vue";
 const storeState = vi.hoisted(() => ({ user: null as UserVO | null }));
 
 vi.mock("@/stores/user", () => ({
-  useUserStore: () => ({
-    user: storeState.user,
-    roles: storeState.user ? [storeState.user.role] : [],
-    refreshProfile: vi.fn().mockResolvedValue(undefined),
-    logout: vi.fn(),
-    login: vi.fn(),
-    loginReplacingToken: vi.fn()
-  })
+  useUserStore: () => {
+    const current = storeState.user;
+    const isSuperAdmin = current?.role === "SUPER_ADMIN";
+    const permissions = current?.permissions ?? [];
+    return {
+      user: current,
+      access: {
+        isSuperAdmin,
+        isOwnScope: current?.role === "STAFF" && current.dataScope === "OWN",
+        isPlatformAdmin: current?.role === "PLATFORM_ADMIN",
+        can: (code: string) => isSuperAdmin || permissions.includes(code)
+      },
+      refreshProfile: vi.fn().mockResolvedValue(undefined),
+      logout: vi.fn(),
+      login: vi.fn(),
+      loginReplacingToken: vi.fn()
+    };
+  }
 }));
 
 vi.mock("@/api/auth", () => ({
@@ -43,6 +53,8 @@ const me: UserVO = {
   nickname: "Root",
   email: null,
   role: "SUPER_ADMIN",
+  postTemplate: null,
+  permissions: [],
   dataScope: "ALL",
   tenantId: "1",
   tenantName: "Default",
@@ -106,7 +118,7 @@ describe("lock keyboard isolation", () => {
         {
           path: "/home",
           component: { template: "<div />" },
-          meta: { titleKey: "route.home", roles: ["SUPER_ADMIN"] }
+          meta: { titleKey: "route.home" }
         }
       ]
     });

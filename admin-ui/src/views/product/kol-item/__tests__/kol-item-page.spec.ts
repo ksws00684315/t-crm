@@ -30,13 +30,15 @@ const row: KolItemVO = {
   validTo: null
 };
 
-function signIn(role: Role, dataScope: DataScope) {
+function signIn(role: Role, dataScope: DataScope, permissions: string[] = []) {
   useUserStore().user = {
     id: "1",
     username: "me",
     nickname: "Me",
     email: null,
     role,
+    postTemplate: role === "STAFF" ? "OPERATOR" : null,
+    permissions,
     dataScope,
     tenantId: "1",
     tenantName: "默认公司",
@@ -85,7 +87,7 @@ describe("Kol item mapping page", () => {
   });
 
   it("tips and skips the request when search has no precision filter", async () => {
-    signIn("OPERATOR", "ALL");
+    signIn("STAFF", "ALL", ["product:view"]);
     const wrapper = await mountPage();
     await wrapper.find('[data-test="search"]').trigger("click");
     await flushPromises();
@@ -95,7 +97,7 @@ describe("Kol item mapping page", () => {
   });
 
   it("queries when a precision filter is set and shows page total", async () => {
-    signIn("FINANCE", "ALL");
+    signIn("STAFF", "ALL", ["product:view"]);
     const wrapper = await mountPage();
     await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
     await wrapper.find('[data-test="search"]').trigger("click");
@@ -128,14 +130,42 @@ describe("Kol item mapping page", () => {
     expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
   });
 
-  it.each([
-    ["SUPER_ADMIN", "ALL", true],
-    ["OPERATOR", "ALL", false],
-    ["FINANCE", "ALL", false]
-  ] as const)("%s + %s: rebuild link index button %s", async (role, scope, visible) => {
-    signIn(role, scope);
-    const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="rebuild-index"]').exists()).toBe(visible);
+  it("shows rebuild only to the super administrator", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(true);
+  });
+
+  it("hides rebuild from a sub-account that can edit or only view mappings", async () => {
+    signIn("STAFF", "ALL", ["product:view", "product:edit"]);
+    expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(false);
+    signIn("STAFF", "ALL", ["product:view"]);
+    expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(false);
+  });
+
+  it("shows mapping import for product:edit and hides it without that code", async () => {
+    signIn("STAFF", "ALL", ["product:edit"]);
+    expect((await mountPage()).find('[data-test="import"]').exists()).toBe(true);
+    signIn("STAFF", "ALL", ["product:view"]);
+    expect((await mountPage()).find('[data-test="import"]').exists()).toBe(false);
+  });
+
+  async function search(wrapper: Awaited<ReturnType<typeof mountPage>>) {
+    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
+    await wrapper.find('[data-test="search"]').trigger("click");
+    await flushPromises();
+  }
+
+  it("shows export after a query only when the account has data:export", async () => {
+    signIn("STAFF", "ALL", ["product:view", "data:export"]);
+    const allowed = await mountPage();
+    expect(allowed.find('[data-test="export"]').exists()).toBe(false);
+    await search(allowed);
+    expect(allowed.find('[data-test="export"]').exists()).toBe(true);
+
+    signIn("STAFF", "ALL", ["product:view"]);
+    const denied = await mountPage();
+    await search(denied);
+    expect(denied.find('[data-test="export"]').exists()).toBe(false);
   });
 
   it("starts a rebuild after confirmation", async () => {
