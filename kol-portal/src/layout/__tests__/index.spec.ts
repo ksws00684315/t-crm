@@ -9,6 +9,7 @@ import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import AppLayout from "../index.vue";
+import { NAV_ITEMS } from "../nav";
 
 function mountLayout() {
   const pinia = createPinia();
@@ -25,6 +26,8 @@ describe("layout header", () => {
     expect(wrapper.find(".shell__brand").text()).toBe("T-CRM Creator Portal");
     expect(wrapper.find("button").text()).toContain("Sign out");
     expect(wrapper.findComponent(LocaleSwitch).exists()).toBe(true);
+    expect(NAV_ITEMS.map(item => item.title)).toContain("nav.orders");
+    expect(wrapper.find('a[href="/orders"]').text()).toBe("My orders");
   });
 
   it("shows Chinese brand and sign out after switching the language", async () => {

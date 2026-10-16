@@ -63,11 +63,49 @@ const zhCN: MessageSchema = {
   },
   home: {
     title: "欢迎",
-    body: "门户正在建设中，您的销售、佣金与提现概览将在此展示。"
+    body: "门户正在建设中，您的销售、佣金与提现概览将在此展示。",
+    viewOrders: "查看我的订单"
+  },
+  nav: {
+    home: "首页",
+    payoutAccounts: "收款账户",
+    orders: "我的订单",
+    menu: "菜单"
+  },
+  orders: {
+    title: "我的订单",
+    dateRange: "时间范围",
+    last7Days: "最近 7 天",
+    last30Days: "最近 30 天",
+    last90Days: "最近 90 天",
+    customRange: "自定义区间",
+    fromDate: "开始日期",
+    toDate: "结束日期",
+    allStatuses: "全部状态",
+    status: "状态",
+    orderNo: "订单号",
+    payTime: "支付时间",
+    payAmount: "实付",
+    refundAmount: "退款",
+    item: "商品",
+    sku: "规格",
+    quantity: "数量",
+    empty: "还没有订单。把你的专属链接分享出去后，订单会显示在这里。",
+    loadFailed: "订单加载失败，请重试。",
+    statuses: {
+      UNPAID: "未支付",
+      PAID: "已支付",
+      SHIPPED: "已发货",
+      RECEIVED: "已收货",
+      COMPLETED: "已完成",
+      CLOSED: "已关闭",
+      UNKNOWN: "未知"
+    }
   },
   route: {
     login: "登录",
     home: "首页",
+    orders: "我的订单",
     activate: "激活账号",
     reset: "重置密码",
     forgot: "找回密码",

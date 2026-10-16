@@ -12,5 +12,6 @@ const { t } = useI18n();
     <p>
       {{ t("home.body") }}
     </p>
+    <RouterLink to="/orders">{{ t("home.viewOrders") }}</RouterLink>
   </el-card>
 </template>

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useSessionStore } from "@/stores/session";
+import { NAV_ITEMS } from "./nav";
 
 defineOptions({ name: "AppLayout" });
 
@@ -32,7 +33,28 @@ async function signOut() {
   <div class="shell">
     <header class="shell__header">
       <span class="shell__brand">{{ t("app.title") }}</span>
+      <nav class="primary-nav" :aria-label="t('nav.menu')">
+        <RouterLink
+          v-for="item in NAV_ITEMS"
+          :key="item.name"
+          :to="item.path"
+          exact-active-class="is-current"
+          >{{ t(item.title) }}</RouterLink
+        >
+      </nav>
       <div class="shell__actions">
+        <details class="mobile-nav">
+          <summary>{{ t("nav.menu") }}</summary>
+          <nav :aria-label="t('nav.menu')">
+            <RouterLink
+              v-for="item in NAV_ITEMS"
+              :key="item.name"
+              :to="item.path"
+              exact-active-class="is-current"
+              >{{ t(item.title) }}</RouterLink
+            >
+          </nav>
+        </details>
         <LocaleSwitch />
         <span v-if="session.kol" class="shell__identity"
           >{{ session.kol.name }} · {{ session.kol.tenantName }}</span
@@ -77,6 +99,50 @@ async function signOut() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.primary-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.primary-nav a,
+.mobile-nav nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.primary-nav .is-current,
+.mobile-nav .is-current {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+.mobile-nav {
+  display: none;
+  position: relative;
+}
+.mobile-nav summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.mobile-nav nav {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  min-width: 150px;
+  padding: 8px;
+  display: grid;
+  background: #fff;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+}
+.mobile-nav nav a {
+  white-space: nowrap;
 }
 .shell__identity {
   overflow-wrap: anywhere;
@@ -123,6 +189,17 @@ async function signOut() {
   .shell__identity {
     flex: 1;
     min-width: 80px;
+  }
+}
+@media (max-width: 767px) {
+  .primary-nav {
+    display: none;
+  }
+  .mobile-nav {
+    display: block;
+  }
+  .shell__header {
+    gap: 8px;
   }
 }
 .shell__main {
