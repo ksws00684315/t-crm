@@ -1,6 +1,7 @@
 package com.tcrm.admin;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import cn.dev33.satoken.SaManager;
@@ -10,8 +11,10 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.spring.SaTokenContextForSpringInJakartaServlet;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.security.api.AccountDTO;
+import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.security.config.SecurityConfiguration;
 import com.tcrm.admin.shared.CommonConfiguration;
@@ -42,7 +45,8 @@ public final class AdminMvcSupport {
             .setIsPrint(false));
     SaManager.setSaTokenDao(new SaTokenDaoDefaultImpl());
     SaManager.setSaTokenContext(new SaTokenContextForSpringInJakartaServlet());
-    var security = new SecurityConfiguration(current);
+    var security =
+        new SecurityConfiguration(current, new CurrentKolContext(mock(KolAccountStore.class)));
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
     var builder = JsonMapper.builder();

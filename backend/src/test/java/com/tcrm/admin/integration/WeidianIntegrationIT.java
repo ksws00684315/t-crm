@@ -99,6 +99,7 @@ class WeidianIntegrationIT {
     registry.add("crm.bootstrap.username", () -> "bootstrap");
     registry.add("crm.bootstrap.password", () -> PASSWORD);
     registry.add("crm.link.base-url", () -> "https://t.example.test");
+    registry.add("crm.kol-portal.base-url", () -> "https://kol.example.com");
     registry.add("crm.link.click-consumer.enabled", () -> "false");
     registry.add("crm.weidian.qps", () -> "2");
     WeidianTestProperties.register(registry, BASE_URL + "/api", BASE_URL);

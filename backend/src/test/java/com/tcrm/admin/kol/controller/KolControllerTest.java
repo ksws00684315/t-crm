@@ -285,7 +285,30 @@ class KolControllerTest {
             json(put(BASE + "/11/bd-user"), "{\"bdUserId\":null}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
+    mvc.perform(post(BASE + "/11/invite").header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isForbidden());
     verifyNoInteractions(kols);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN"})
+  void shouldResendInvite_whenWriterCalls(Role role, DataScope scope) throws Exception {
+    String token = as(role, scope);
+    mvc.perform(post(BASE + "/11/invite").header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk());
+    verify(kols).resendInvite(11L);
+  }
+
+  @Test
+  void shouldMapConflict_whenKolIsAlreadyActivated() throws Exception {
+    org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.KOL_ALREADY_ACTIVATED))
+        .when(kols)
+        .resendInvite(anyLong());
+    mvc.perform(
+            post(BASE + "/11/invite")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("KOL_ALREADY_ACTIVATED"));
   }
 
   @Test

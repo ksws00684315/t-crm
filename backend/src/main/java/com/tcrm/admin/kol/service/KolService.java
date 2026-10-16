@@ -46,6 +46,7 @@ public class KolService {
   private final CurrentUserContext current;
   private final TransactionTemplate tx;
   private final ApplicationEventPublisher events;
+  private final KolInvites invites;
 
   public KolService(
       KolMapper kols,
@@ -54,7 +55,8 @@ public class KolService {
       BdUserApi bdUsers,
       CurrentUserContext current,
       TransactionTemplate tx,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      KolInvites invites) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
@@ -62,6 +64,7 @@ public class KolService {
     this.current = current;
     this.tx = tx;
     this.events = events;
+    this.invites = invites;
   }
 
   /** True for a BD: OPERATOR with OWN data scope (OWN is only valid for OPERATOR). */
@@ -141,7 +144,24 @@ public class KolService {
     writer.insert(kol, null, user.id());
     // Re-read so timestamps match later reads (the database keeps milliseconds).
     KolDO saved = kols.selectById(kol.getId());
+    // The invitation mail is sent after the row is committed (KolWriter commits its own
+    // transaction); a transport failure is a WARN and the back office can resend (task 12a §4.4).
+    // Excel imports bypass this method and never auto-invite.
+    invites.issueAndSend(kol.getId());
     return toDto(saved == null ? kol : saved, bdNames(Stream.of(bd)));
+  }
+
+  /**
+   * Resends the invitation: every unused invitation token is invalidated first, so only the newest
+   * link stays usable. 409 for an already-activated KOL (task 12a §4.3).
+   */
+  public void resendInvite(Long id) {
+    AccountDTO user = requireWriter();
+    KolDO kol = requireVisible(id, user);
+    if (Integer.valueOf(1).equals(kol.getAccountStatus())) {
+      throw new BusinessException(ErrorCode.KOL_ALREADY_ACTIVATED);
+    }
+    invites.issueAndSend(id);
   }
 
   /**

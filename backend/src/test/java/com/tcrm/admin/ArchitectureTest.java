@@ -5,12 +5,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.DirectPublishFixture;
 import com.tcrm.admin.shared.PublicEndpoint;
 import com.tcrm.admin.shared.TransactionalEvents;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -115,12 +118,24 @@ class ArchitectureTest {
                       type.isAnnotatedWith(SaCheckRole.class)
                           || type.isAnnotatedWith(PublicEndpoint.class)
                           || method.isAnnotatedWith(SaCheckRole.class)
-                          || method.isAnnotatedWith(PublicEndpoint.class);
+                          || method.isAnnotatedWith(PublicEndpoint.class)
+                          || declaresKolLogin(method);
                   events.add(new SimpleConditionEvent(method, declared, method.getFullName()));
                 }
               }
             })
         .check(classes);
+  }
+
+  /**
+   * KOL endpoints declare access with {@code @SaCheckLogin(type = "kol")} (task 12a §4.2): the
+   * annotation both documents the requirement and is enforced by the /kol-api/** interceptor.
+   */
+  private static boolean declaresKolLogin(JavaMethod method) {
+    return method
+        .tryGetAnnotationOfType(SaCheckLogin.class)
+        .map(annotation -> StpKolUtil.TYPE.equals(annotation.type()))
+        .orElse(false);
   }
 
   @Test

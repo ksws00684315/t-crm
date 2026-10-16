@@ -60,8 +60,10 @@ class KolServiceTest {
   private final BdUserApi bdUsers = mock(BdUserApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+  private final KolInvites invites = mock(KolInvites.class);
   private final KolService service =
-      new KolService(kols, history, writer, bdUsers, current, TestTransactions.template(), events);
+      new KolService(
+          kols, history, writer, bdUsers, current, TestTransactions.template(), events, invites);
 
   private void actAs(long id, Role role, DataScope scope) {
     when(current.user())

@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.service;
 
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
@@ -41,5 +42,31 @@ public class ExternalAuditService implements ExternalAuditApi {
     row.setOperTime(Instant.now());
     TenantScope.runSystem(
         "append public OAuth callback audit with explicit tenant", () -> logs.insert(row));
+  }
+
+  @Override
+  public void recordKolOperation(
+      long tenantId,
+      String email,
+      String module,
+      String action,
+      String requestUri,
+      String ip,
+      String safeParams) {
+    SysOperLogDO row = new SysOperLogDO();
+    // No sys_user is involved: the KOL email identifies the actor, the user id stays unset.
+    row.setUsername(email);
+    row.setTenantId(tenantId);
+    row.setModule(module);
+    row.setAction(action);
+    row.setMethod("POST");
+    row.setRequestUri(requestUri);
+    row.setRequestParams(safeParams);
+    row.setIp(AuditSanitizer.truncate(ip, 45));
+    row.setResult("SUCCESS");
+    row.setCostMs(0L);
+    row.setOperTime(Instant.now());
+    TenantScope.runSystem(
+        "append KOL self-service audit with explicit tenant", () -> logs.insert(row));
   }
 }

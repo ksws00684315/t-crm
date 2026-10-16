@@ -72,6 +72,7 @@ class SystemIT {
     r.add("crm.bootstrap.username", () -> "bootstrap");
     r.add("crm.bootstrap.password", () -> PASSWORD);
     r.add("crm.link.base-url", () -> "https://t.example.com");
+    r.add("crm.kol-portal.base-url", () -> "https://kol.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
     WeidianTestProperties.register(r);
   }
@@ -162,6 +163,7 @@ class SystemIT {
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
             "crm_kol:NO",
+            "crm_kol_auth_token:NO",
             "crm_kol_bd_history:NO",
             "crm_kol_item:NO",
             "crm_product:NO",
