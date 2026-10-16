@@ -97,12 +97,18 @@ public class BizFileService {
     if (file.getBizId() != null) {
       throw new BusinessException(ErrorCode.FILE_IN_USE);
     }
-    files.update(
-        null,
-        new LambdaUpdateWrapper<BizFileDO>()
-            .eq(BizFileDO::getId, fileId)
-            .isNull(BizFileDO::getBizId)
-            .set(BizFileDO::getBizId, accountId));
+    // The IS NULL guard makes the claim atomic: when two accounts race for the same file only one
+    // update matches a row; the loser sees 0 rows and rolls its transaction back.
+    int updated =
+        files.update(
+            null,
+            new LambdaUpdateWrapper<BizFileDO>()
+                .eq(BizFileDO::getId, fileId)
+                .isNull(BizFileDO::getBizId)
+                .set(BizFileDO::getBizId, accountId));
+    if (updated == 0) {
+      throw new BusinessException(ErrorCode.FILE_IN_USE);
+    }
   }
 
   private static FileDTO toDto(BizFileDO file) {

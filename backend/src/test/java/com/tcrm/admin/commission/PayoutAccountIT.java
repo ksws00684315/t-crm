@@ -254,6 +254,32 @@ class PayoutAccountIT {
     }
   }
 
+  /** Reads the current submission stamp of the account, as the reviewer UI would. */
+  private String lastSubmittedOf(String token, long id) throws Exception {
+    return mvc.perform(
+            get("/admin-api/commission/payout-accounts/" + id).header(ADMIN_TOKEN, token))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString()
+        .transform(body -> json.readTree(body).at("/data/lastSubmittedAt").asText());
+  }
+
+  private void review(String token, long id, String action, String reason, String stamp)
+      throws Exception {
+    StringBuilder body = new StringBuilder("{\"action\":\"").append(action).append("\"");
+    if (reason != null) {
+      body.append(",\"reason\":\"").append(reason).append("\"");
+    }
+    body.append(",\"lastSubmittedAt\":\"").append(stamp).append("\"}");
+    mvc.perform(
+            put("/admin-api/commission/payout-accounts/" + id + "/review")
+                .header(ADMIN_TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString()))
+        .andExpect(status().isOk());
+  }
+
   private long createPaypal(LoggedKol kol, String account) throws Exception {
     String body =
         mvc.perform(
@@ -339,13 +365,42 @@ class PayoutAccountIT {
         .andExpect(jsonPath("$.data.account").value("alice.pay@example.com"));
     assertThat(awaitAuditRows("View detail")).isEqualTo(1);
 
-    // Approve locks the account; only approved accounts can become the default.
+    // Approving with the stamp of a version the reviewer never saw (the KOL edited in between) is
+    // a 409 and the account stays PENDING with the new content; refreshing and retrying works.
+    String staleStamp = lastSubmittedOf(reviewer, paypalId);
+    mvc.perform(
+            put("/kol-api/payout-accounts/" + paypalId)
+                .header(KOL_TOKEN, kol.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"accountType\":\"PAYPAL\",\"account\":\"resubmitted@example.com\","
+                        + "\"holderName\":\"Alice D\"}"))
+        .andExpect(status().isOk());
     mvc.perform(
             put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
                 .header(ADMIN_TOKEN, reviewer)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"APPROVE\"}"))
-        .andExpect(status().isOk());
+                .content("{\"action\":\"APPROVE\",\"lastSubmittedAt\":\"" + staleStamp + "\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT status FROM crm_payout_account WHERE id = ?", String.class, paypalId))
+        .isEqualTo("PENDING");
+
+    // Approve locks the account; only approved accounts can become the default.
+    review(reviewer, paypalId, "APPROVE", null, lastSubmittedOf(reviewer, paypalId));
+    // A second review with the consumed stamp is the "two reviewers at once" case: 409.
+    mvc.perform(
+            put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
+                .header(ADMIN_TOKEN, reviewer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"action\":\"APPROVE\",\"lastSubmittedAt\":\""
+                        + lastSubmittedOf(reviewer, paypalId)
+                        + "\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
     mvc.perform(
             put("/kol-api/payout-accounts/" + paypalId)
                 .header(KOL_TOKEN, kol.token())
@@ -367,12 +422,7 @@ class PayoutAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"action\":\"REJECT\"}"))
         .andExpect(status().isBadRequest());
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + third + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"REJECT\",\"reason\":\"wrong holder name\"}"))
-        .andExpect(status().isOk());
+    review(reviewer, third, "REJECT", "wrong holder name", lastSubmittedOf(reviewer, third));
     mvc.perform(get("/kol-api/payout-accounts").header(KOL_TOKEN, kol.token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[?(@.id == '" + third + "')].status").value("REJECTED"))
@@ -402,17 +452,15 @@ class PayoutAccountIT {
             put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
                 .header(ADMIN_TOKEN, reviewer)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"APPROVE\"}"))
+                .content(
+                    "{\"action\":\"APPROVE\",\"lastSubmittedAt\":\""
+                        + lastSubmittedOf(reviewer, paypalId)
+                        + "\"}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
 
     // Approve the USDT account and switch the default: exactly one remains.
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + usdtId + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"APPROVE\"}"))
-        .andExpect(status().isOk());
+    review(reviewer, usdtId, "APPROVE", null, lastSubmittedOf(reviewer, usdtId));
     mvc.perform(
             put("/kol-api/payout-accounts/" + usdtId + "/default").header(KOL_TOKEN, kol.token()))
         .andExpect(status().isOk());

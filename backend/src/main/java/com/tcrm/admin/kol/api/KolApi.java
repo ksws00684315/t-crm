@@ -44,4 +44,13 @@ public interface KolApi {
    * @param bdUserId sys_user.id of the BD
    */
   List<KolRefDTO> listByBdUserId(Long bdUserId);
+
+  /**
+   * Locks the KOL row for the rest of the current transaction ({@code FOR UPDATE}), so sibling
+   * writes that run under the same lock serialize (task 15a review: counting a KOL's payout
+   * accounts then inserting must be atomic). Returns false when the KOL does not exist.
+   *
+   * @param kolId crm_kol.id
+   */
+  boolean lockKol(long kolId);
 }

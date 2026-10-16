@@ -101,6 +101,7 @@ class BizFileServiceTest {
 
   @Test
   void shouldClaimOnlyOwnUnusedQrUpload() {
+    when(files.update(isNull(), any())).thenReturn(1);
     when(files.selectById(55L)).thenReturn(file(null, "KOL", KOL));
     service.claimQrFile(KOL, 55L, 77L);
     var wrapper = ArgumentCaptor.forClass(Wrapper.class);
@@ -127,6 +128,13 @@ class BizFileServiceTest {
         .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
 
     when(files.selectById(55L)).thenReturn(file(99L, "KOL", KOL));
+    assertThatThrownBy(() -> service.claimQrFile(KOL, 55L, 77L))
+        .hasMessage(ErrorCode.FILE_IN_USE.message());
+
+    // Two accounts racing for the same free file: the conditional update matches one row only;
+    // the loser sees 0 rows and fails with FILE_IN_USE so its transaction rolls back.
+    when(files.selectById(55L)).thenReturn(file(null, "KOL", KOL));
+    when(files.update(isNull(), any())).thenReturn(0);
     assertThatThrownBy(() -> service.claimQrFile(KOL, 55L, 77L))
         .hasMessage(ErrorCode.FILE_IN_USE.message());
   }

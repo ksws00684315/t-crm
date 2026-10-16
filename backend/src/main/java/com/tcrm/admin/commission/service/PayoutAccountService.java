@@ -137,11 +137,12 @@ public class PayoutAccountService {
         .toList();
   }
 
-  /** New account: PENDING, encrypted, with the QR file claimed in the same transaction. */
+  /**
+   * New account: PENDING, encrypted, with the QR file claimed in the same transaction. The KOL row
+   * is locked first, so counting the live accounts and inserting happen atomically per KOL and two
+   * concurrent creates cannot both pass the limit (task 15a review).
+   */
   public KolAccountDTO create(long kolId, SaveCommand c, KolAudit auditContext) {
-    if (activeCount(kolId) >= MAX_ACCOUNTS) {
-      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LIMIT);
-    }
     PayoutAccountDO account = new PayoutAccountDO();
     account.setKolId(kolId);
     account.setStatus(PayoutAccountStatus.PENDING);
@@ -150,6 +151,12 @@ public class PayoutAccountService {
     account.setLastSubmittedAt(Instant.now());
     tx.executeWithoutResult(
         status -> {
+          if (!kols.lockKol(kolId)) {
+            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+          }
+          if (activeCount(kolId) >= MAX_ACCOUNTS) {
+            throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LIMIT);
+          }
           accounts.insert(account);
           if (c.qrFileId() != null) {
             files.claimQrFile(kolId, c.qrFileId(), account.getId());
@@ -171,22 +178,32 @@ public class PayoutAccountService {
     Instant now = Instant.now();
     tx.executeWithoutResult(
         status -> {
-          accounts.update(
-              null,
-              scoped(accountId)
-                  .set(PayoutAccountDO::getAccountType, c.type())
-                  .set(PayoutAccountDO::getAccountCipher, cipher.encrypt(c.account()))
-                  .set(PayoutAccountDO::getAccountMasked, AccountMasker.mask(c.account()))
-                  .set(PayoutAccountDO::getHolderName, holderOf(c))
-                  .set(PayoutAccountDO::getUsdtNetwork, networkOf(c))
-                  .set(PayoutAccountDO::getQrFileId, c.qrFileId())
-                  .set(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
-                  .set(PayoutAccountDO::getRejectReason, null)
-                  .set(PayoutAccountDO::getReviewedBy, null)
-                  .set(PayoutAccountDO::getReviewedTime, null)
-                  .set(PayoutAccountDO::getLastSubmittedAt, now)
-                  .set(PayoutAccountDO::getUpdateBy, kolId)
-                  .set(PayoutAccountDO::getUpdateTime, now));
+          // The status condition makes the read above advisory: a review that committed in between
+          // stops this update (0 rows) instead of overwriting APPROVED back to PENDING.
+          int updated =
+              accounts.update(
+                  null,
+                  scoped(accountId)
+                      .in(
+                          PayoutAccountDO::getStatus,
+                          PayoutAccountStatus.PENDING,
+                          PayoutAccountStatus.REJECTED)
+                      .set(PayoutAccountDO::getAccountType, c.type())
+                      .set(PayoutAccountDO::getAccountCipher, cipher.encrypt(c.account()))
+                      .set(PayoutAccountDO::getAccountMasked, AccountMasker.mask(c.account()))
+                      .set(PayoutAccountDO::getHolderName, holderOf(c))
+                      .set(PayoutAccountDO::getUsdtNetwork, networkOf(c))
+                      .set(PayoutAccountDO::getQrFileId, c.qrFileId())
+                      .set(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
+                      .set(PayoutAccountDO::getRejectReason, null)
+                      .set(PayoutAccountDO::getReviewedBy, null)
+                      .set(PayoutAccountDO::getReviewedTime, null)
+                      .set(PayoutAccountDO::getLastSubmittedAt, now)
+                      .set(PayoutAccountDO::getUpdateBy, kolId)
+                      .set(PayoutAccountDO::getUpdateTime, now));
+          if (updated == 0) {
+            throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LOCKED);
+          }
           claimQrOnEdit(kolId, accountId, existing.getQrFileId(), c.qrFileId());
         });
     auditKol(auditContext, kolId, accountId, "Edit", AccountMasker.mask(c.account()));
@@ -209,12 +226,19 @@ public class PayoutAccountService {
                   .set(PayoutAccountDO::getIsDefault, false)
                   .set(PayoutAccountDO::getUpdateBy, kolId)
                   .set(PayoutAccountDO::getUpdateTime, now));
-          accounts.update(
-              null,
-              scoped(accountId)
-                  .set(PayoutAccountDO::getIsDefault, true)
-                  .set(PayoutAccountDO::getUpdateBy, kolId)
-                  .set(PayoutAccountDO::getUpdateTime, now));
+          // The status guard keeps a concurrent disable from tripping the database CHECK with a
+          // 500: 0 rows here means the account stopped being APPROVED in between.
+          int updated =
+              accounts.update(
+                  null,
+                  scoped(accountId)
+                      .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
+                      .set(PayoutAccountDO::getIsDefault, true)
+                      .set(PayoutAccountDO::getUpdateBy, kolId)
+                      .set(PayoutAccountDO::getUpdateTime, now));
+          if (updated == 0) {
+            throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_NOT_APPROVED);
+          }
         });
     auditKol(auditContext, kolId, accountId, "Set default", account.getAccountMasked());
   }
@@ -236,8 +260,8 @@ public class PayoutAccountService {
                     .set(PayoutAccountDO::getRejectReason, null)
                     .set(PayoutAccountDO::getUpdateBy, kolId)
                     .set(PayoutAccountDO::getUpdateTime, now)));
-    // Task 16 checkpoint: once withdrawals exist, refuse to disable an account referenced by a
-    // withdrawal still awaiting review or payment (task 15a §4.2.6).
+    // Withdrawal-task checkpoint (batch 3, number pending): once withdrawals exist, refuse to
+    // disable an account referenced by a withdrawal still awaiting review or payment (§4.2.6).
     auditKol(auditContext, kolId, accountId, "Disable", account.getAccountMasked());
   }
 
@@ -293,26 +317,39 @@ public class PayoutAccountService {
         account.getReviewedTime());
   }
 
-  /** Review of a PENDING account: APPROVE locks it, REJECT returns it to the KOL with a reason. */
-  public void review(AccountDTO admin, long id, ReviewAction action, String reason) {
+  /**
+   * Review of a PENDING account: APPROVE locks it, REJECT returns it to the KOL with a reason. The
+   * caller passes the {@code lastSubmittedAt} it saw; the update only matches the very version, so
+   * a KOL edit or another review that landed in between changes 0 rows and returns 409 instead of
+   * approving content the reviewer never saw (task 15a review).
+   */
+  public void review(
+      AccountDTO admin, long id, ReviewAction action, String reason, Instant lastSubmittedAt) {
     PayoutAccountDO account = requireAdminAccount(admin, id);
     if (account.getStatus() != PayoutAccountStatus.PENDING) {
       throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING);
     }
     Instant now = Instant.now();
-    accounts.update(
-        null,
-        scoped(id)
-            .set(
-                PayoutAccountDO::getStatus,
-                action == ReviewAction.APPROVE
-                    ? PayoutAccountStatus.APPROVED
-                    : PayoutAccountStatus.REJECTED)
-            .set(PayoutAccountDO::getRejectReason, action == ReviewAction.REJECT ? reason : null)
-            .set(PayoutAccountDO::getReviewedBy, admin.id())
-            .set(PayoutAccountDO::getReviewedTime, now)
-            .set(PayoutAccountDO::getUpdateBy, admin.id())
-            .set(PayoutAccountDO::getUpdateTime, now));
+    int updated =
+        accounts.update(
+            null,
+            scoped(id)
+                .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
+                .eq(PayoutAccountDO::getLastSubmittedAt, lastSubmittedAt)
+                .set(
+                    PayoutAccountDO::getStatus,
+                    action == ReviewAction.APPROVE
+                        ? PayoutAccountStatus.APPROVED
+                        : PayoutAccountStatus.REJECTED)
+                .set(
+                    PayoutAccountDO::getRejectReason, action == ReviewAction.REJECT ? reason : null)
+                .set(PayoutAccountDO::getReviewedBy, admin.id())
+                .set(PayoutAccountDO::getReviewedTime, now)
+                .set(PayoutAccountDO::getUpdateBy, admin.id())
+                .set(PayoutAccountDO::getUpdateTime, now));
+    if (updated == 0) {
+      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING);
+    }
   }
 
   /** Pending accounts the admin may review; the count backs a future menu badge (task 15a §4.5). */

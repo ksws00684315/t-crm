@@ -69,7 +69,7 @@ public class AdminPayoutAccountController {
   @SaCheckPermission("payout-account:review")
   @AuditLog(module = "PayoutAccount", action = "Review")
   public R<Void> review(@PathVariable @Min(1) Long id, @Valid @RequestBody ReviewRequest r) {
-    accounts.review(current.user(), id, r.toAction(), r.normalizedReason());
+    accounts.review(current.user(), id, r.toAction(), r.normalizedReason(), r.lastSubmittedAt());
     return R.ok(null);
   }
 

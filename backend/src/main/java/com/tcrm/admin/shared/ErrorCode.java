@@ -55,7 +55,7 @@ public enum ErrorCode {
   LINK_REBUILD_RUNNING(409, "A link index rebuild is already running"),
   PAYOUT_ACCOUNT_LIMIT(422, "At most 5 active payout accounts are allowed"),
   PAYOUT_ACCOUNT_LOCKED(409, "Approved payout accounts cannot be changed; create a new one"),
-  PAYOUT_ACCOUNT_NOT_PENDING(409, "Only pending payout accounts can be reviewed"),
+  PAYOUT_ACCOUNT_NOT_PENDING(409, "Account was changed or already reviewed; refresh and try again"),
   PAYOUT_ACCOUNT_NOT_APPROVED(422, "Only approved payout accounts can be the default"),
   FILE_INVALID(400, "File must be a PNG or JPEG image"),
   FILE_TOO_LARGE(400, "File exceeds 2 MB"),

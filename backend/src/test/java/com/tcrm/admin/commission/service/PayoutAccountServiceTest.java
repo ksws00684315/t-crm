@@ -29,6 +29,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.SecretCipher;
 import com.tcrm.admin.shared.TestTransactions;
 import com.tcrm.admin.system.api.ExternalAuditApi;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -51,6 +52,7 @@ class PayoutAccountServiceTest {
 
   private static final long KOL = 10L;
   private static final long ACCOUNT_ID = 77L;
+  private static final Instant SUBMITTED = Instant.parse("2026-10-17T00:00:00.000Z");
   private static final PayoutAccountService.KolAudit AUDIT =
       new PayoutAccountService.KolAudit(2L, "kol@example.com", "127.0.0.1", "/kol-api/x");
 
@@ -63,6 +65,7 @@ class PayoutAccountServiceTest {
 
   @BeforeEach
   void insertAssignsId() {
+    when(kols.lockKol(KOL)).thenReturn(true);
     when(accounts.insert(any(PayoutAccountDO.class)))
         .thenAnswer(
             invocation -> {
@@ -90,6 +93,7 @@ class PayoutAccountServiceTest {
     account.setAccountMasked("al***@example.com");
     account.setStatus(status);
     account.setIsDefault(false);
+    account.setLastSubmittedAt(SUBMITTED);
     return account;
   }
 
@@ -218,6 +222,7 @@ class PayoutAccountServiceTest {
     PayoutAccountDO approved = account(PayoutAccountStatus.APPROVED);
     approved.setIsDefault(false);
     when(accounts.selectById(ACCOUNT_ID)).thenReturn(approved);
+    when(accounts.update(isNull(), any())).thenReturn(1);
 
     service.setDefault(KOL, ACCOUNT_ID, AUDIT);
 
@@ -256,7 +261,11 @@ class PayoutAccountServiceTest {
     assertThatThrownBy(
             () ->
                 service.review(
-                    superAdmin(), ACCOUNT_ID, PayoutAccountService.ReviewAction.APPROVE, null))
+                    superAdmin(),
+                    ACCOUNT_ID,
+                    PayoutAccountService.ReviewAction.APPROVE,
+                    null,
+                    SUBMITTED))
         .hasMessage(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING.message());
   }
 
@@ -266,7 +275,8 @@ class PayoutAccountServiceTest {
     when(accounts.selectById(ACCOUNT_ID)).thenReturn(pending);
     when(accounts.update(isNull(), any())).thenReturn(1);
 
-    service.review(superAdmin(), ACCOUNT_ID, PayoutAccountService.ReviewAction.REJECT, "wrong zip");
+    service.review(
+        superAdmin(), ACCOUNT_ID, PayoutAccountService.ReviewAction.REJECT, "wrong zip", SUBMITTED);
 
     var wrapper = ArgumentCaptor.forClass(Wrapper.class);
     verify(accounts).update(isNull(), wrapper.capture());
@@ -458,6 +468,7 @@ class PayoutAccountServiceTest {
     PayoutAccountDO existing = account(PayoutAccountStatus.REJECTED);
     existing.setQrFileId(55L);
     when(accounts.selectById(ACCOUNT_ID)).thenReturn(existing);
+    when(accounts.update(isNull(), any())).thenReturn(1);
 
     service.update(KOL, ACCOUNT_ID, usdt(55L), AUDIT);
     verify(files, never()).claimQrFile(anyLong(), anyLong(), anyLong());
@@ -476,6 +487,57 @@ class PayoutAccountServiceTest {
         .thenReturn(new BizFileService.AttachedFile(FileBizType.PAYOUT_QR, ACCOUNT_ID, download));
     when(accounts.selectById(ACCOUNT_ID)).thenReturn(null);
     assertThatThrownBy(() -> service.fileForAdmin(superAdmin(), 55L))
+        .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
+  }
+
+  @Test
+  void shouldRejectReviewWhenTheVersionWasSeenBeforeAKolEdit() {
+    when(accounts.selectById(ACCOUNT_ID)).thenReturn(account(PayoutAccountStatus.PENDING));
+    // The conditional update matches nothing when the KOL resubmitted (new lastSubmittedAt).
+    when(accounts.update(isNull(), any())).thenReturn(0);
+
+    assertThatThrownBy(
+            () ->
+                service.review(
+                    superAdmin(),
+                    ACCOUNT_ID,
+                    PayoutAccountService.ReviewAction.APPROVE,
+                    null,
+                    SUBMITTED))
+        .hasMessage(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING.message());
+  }
+
+  @Test
+  void shouldRefuseEditWhenAReviewCommittedInBetween() {
+    when(accounts.selectById(ACCOUNT_ID)).thenReturn(account(PayoutAccountStatus.REJECTED));
+    when(accounts.update(isNull(), any())).thenReturn(0);
+
+    assertThatThrownBy(() -> service.update(KOL, ACCOUNT_ID, paypal("new@example.com"), AUDIT))
+        .hasMessage(ErrorCode.PAYOUT_ACCOUNT_LOCKED.message());
+    verify(files, never()).claimQrFile(anyLong(), anyLong(), anyLong());
+  }
+
+  @Test
+  void shouldRefuseDefaultWhenTheAccountWasDisabledInBetween() {
+    PayoutAccountDO approved = account(PayoutAccountStatus.APPROVED);
+    when(accounts.selectById(ACCOUNT_ID)).thenReturn(approved);
+    when(accounts.update(isNull(), any())).thenReturn(0, 0);
+
+    assertThatThrownBy(() -> service.setDefault(KOL, ACCOUNT_ID, AUDIT))
+        .hasMessage(ErrorCode.PAYOUT_ACCOUNT_NOT_APPROVED.message());
+  }
+
+  @Test
+  void shouldCheckTheLimitUnderTheKolRowLock() {
+    when(kols.lockKol(KOL)).thenReturn(true);
+    when(accounts.selectCount(any())).thenReturn((long) PayoutAccountService.MAX_ACCOUNTS);
+
+    assertThatThrownBy(() -> service.create(KOL, paypal("new@example.com"), AUDIT))
+        .hasMessage(ErrorCode.PAYOUT_ACCOUNT_LIMIT.message());
+    verify(accounts, never()).insert(any(PayoutAccountDO.class));
+
+    when(kols.lockKol(KOL)).thenReturn(false);
+    assertThatThrownBy(() -> service.create(KOL, paypal("new@example.com"), AUDIT))
         .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
   }
 

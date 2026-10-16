@@ -158,38 +158,58 @@ class AdminPayoutAccountControllerTest {
   }
 
   @Test
-  void shouldReviewWithReasonOnReject() throws Exception {
+  void shouldReviewWithReasonStampAndReject() throws Exception {
     String token = reviewer();
+    String stamp = ",\"lastSubmittedAt\":\"2026-10-17T00:00:00Z\"";
     mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isOk());
-    verify(accounts).review(any(), eq(77L), eq(PayoutAccountService.ReviewAction.APPROVE), any());
-
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isBadRequest());
-    // Only the first (approve) call reached the service; the blank-reason reject was a 400.
-    verify(accounts, org.mockito.Mockito.times(1)).review(any(), anyLong(), any(), any());
-
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\",\"reason\":\" blurry image \"}")
+            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"" + stamp + "}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(accounts)
-        .review(any(), eq(77L), eq(PayoutAccountService.ReviewAction.REJECT), eq("blurry image"));
+        .review(
+            any(),
+            eq(77L),
+            eq(PayoutAccountService.ReviewAction.APPROVE),
+            any(),
+            eq(Instant.parse("2026-10-17T00:00:00Z")));
+
+    // The submission stamp is required: the reviewer must name the version it saw.
+    mvc.perform(
+            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"}")
+                .header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isBadRequest());
 
     mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"NOPE\"}")
+            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"" + stamp + "}")
+                .header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isBadRequest());
+    // Only the first (approve) call reached the service; the blank-reason reject was a 400.
+    verify(accounts, org.mockito.Mockito.times(1)).review(any(), anyLong(), any(), any(), any());
+
+    mvc.perform(
+            json(
+                    put(BASE + "/77/review"),
+                    "{\"action\":\"REJECT\",\"reason\":\" blurry image \"" + stamp + "}")
+                .header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk());
+    verify(accounts)
+        .review(
+            any(),
+            eq(77L),
+            eq(PayoutAccountService.ReviewAction.REJECT),
+            eq("blurry image"),
+            eq(Instant.parse("2026-10-17T00:00:00Z")));
+
+    mvc.perform(
+            json(put(BASE + "/77/review"), "{\"action\":\"NOPE\"" + stamp + "}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isBadRequest());
     mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"}")
+            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"" + stamp + "}")
                 .header(AdminMvcSupport.TOKEN_HEADER, viewer()))
         .andExpect(status().isForbidden());
     mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"}")
+            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"" + stamp + "}")
                 .header(AdminMvcSupport.TOKEN_HEADER, noAccess()))
         .andExpect(status().isForbidden());
   }

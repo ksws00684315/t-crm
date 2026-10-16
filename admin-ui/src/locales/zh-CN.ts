@@ -220,7 +220,7 @@ const zhCN = {
     LINK_REBUILD_RUNNING: "链接索引正在重建，请稍后再试",
     PAYOUT_ACCOUNT_LIMIT: "收款账户最多 5 个（不含已停用）",
     PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个",
-    PAYOUT_ACCOUNT_NOT_PENDING: "只能审核待审核的账户",
+    PAYOUT_ACCOUNT_NOT_PENDING: "账户已被修改或已审核，请刷新后重试",
     PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认",
     FILE_INVALID: "文件必须是 PNG 或 JPEG 图片",
     FILE_TOO_LARGE: "文件超过 2MB",

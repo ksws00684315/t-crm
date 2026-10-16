@@ -219,7 +219,8 @@ const enUS: MessageSchema = {
     LINK_REBUILD_RUNNING: "A tracking-link index rebuild is already running. Try again later.",
     PAYOUT_ACCOUNT_LIMIT: "At most 5 active payout accounts are allowed.",
     PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",
-    PAYOUT_ACCOUNT_NOT_PENDING: "Only pending accounts can be reviewed.",
+    PAYOUT_ACCOUNT_NOT_PENDING:
+      "The account was changed or already reviewed. Refresh and try again.",
     PAYOUT_ACCOUNT_NOT_APPROVED: "Only approved accounts can be the default.",
     FILE_INVALID: "The file must be a PNG or JPEG image.",
     FILE_TOO_LARGE: "The file is larger than 2 MB.",
