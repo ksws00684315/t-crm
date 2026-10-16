@@ -17,13 +17,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Batch task progress and error files. Any administrator role may call; the service allows only the
+ * Batch task progress and error files. Any company account may call; the service allows only the
  * submitter or a super administrator (403 otherwise, 404 when missing).
  */
 @RestController
 @RequestMapping("/admin-api/task/tasks")
 @SaCheckRole(
-    value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
+    value = {"SUPER_ADMIN", "STAFF"},
     mode = SaMode.OR)
 public class TaskController {
   private final TaskService tasks;

@@ -1,6 +1,6 @@
 package com.tcrm.admin.security.api;
 
-/** ALL grants the role-wide scope; OWN is valid only for an operator. */
+/** ALL is company-wide; OWN is valid only for a staff account. */
 public enum DataScope {
   ALL,
   OWN

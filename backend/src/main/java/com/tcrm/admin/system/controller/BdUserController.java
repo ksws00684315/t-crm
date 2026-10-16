@@ -1,7 +1,6 @@
 package com.tcrm.admin.system.controller;
 
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.system.service.BdUserService;
 import java.util.List;
@@ -10,14 +9,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Selectable BDs (enabled OPERATOR + OWN) for pickers. SUPER_ADMIN and OPERATOR + ALL; an OPERATOR
- * with OWN scope gets AUTH_FORBIDDEN from the service.
+ * Selectable BDs: enabled staff accounts with OWN scope and kol:edit. Callers need kol:view,
+ * including a staff account whose own scope is OWN.
  */
 @RestController
 @RequestMapping("/admin-api/system/bd-users")
-@SaCheckRole(
-    value = {"SUPER_ADMIN", "OPERATOR"},
-    mode = SaMode.OR)
+@SaCheckPermission("kol:view")
 public class BdUserController {
   private final BdUserService bdUsers;
 

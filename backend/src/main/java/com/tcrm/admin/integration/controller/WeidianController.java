@@ -1,7 +1,7 @@
 package com.tcrm.admin.integration.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.integration.api.WeidianAppRequest;
 import com.tcrm.admin.integration.api.WeidianAppView;
 import com.tcrm.admin.integration.api.WeidianAuthorizeView;
@@ -50,9 +50,7 @@ public class WeidianController {
   }
 
   @GetMapping("/shops")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:view")
   public R<List<WeidianShopView>> shops() {
     return R.ok(integration.shops());
   }

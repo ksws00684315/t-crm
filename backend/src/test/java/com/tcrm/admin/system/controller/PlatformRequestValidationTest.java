@@ -34,7 +34,14 @@ class PlatformRequestValidationTest {
   void shouldRejectPlatformRole_andKeepCompanyRoles() {
     var platform =
         new CreateUserRequest(
-            "operator", "password123", "Nick", null, Role.PLATFORM_ADMIN, DataScope.ALL);
+            "operator",
+            "password123",
+            "Nick",
+            null,
+            Role.PLATFORM_ADMIN,
+            null,
+            DataScope.ALL,
+            null);
     assertThat(validator.validate(platform))
         .anyMatch(
             violation ->
@@ -42,15 +49,16 @@ class PlatformRequestValidationTest {
                     && violation.getMessage().equals("must be a company role"));
     var company =
         new CreateUserRequest(
-            "operator", "password123", "Nick", null, Role.OPERATOR, DataScope.OWN);
+            "operator", "password123", "Nick", null, Role.STAFF, null, DataScope.OWN, null);
     assertThat(validator.validate(company)).isEmpty();
     var missing =
-        new CreateUserRequest("operator", "password123", "Nick", null, null, DataScope.ALL);
+        new CreateUserRequest(
+            "operator", "password123", "Nick", null, null, null, DataScope.ALL, null);
     assertThat(validator.validate(missing))
         .anyMatch(violation -> violation.getPropertyPath().toString().equals("role"));
     assertThat(new CompanyRole.Validator().isValid(null, null)).isTrue();
     assertThat(new CompanyRole.Validator().isValid(Role.PLATFORM_ADMIN, null)).isFalse();
-    assertThat(new CompanyRole.Validator().isValid(Role.FINANCE, null)).isTrue();
+    assertThat(new CompanyRole.Validator().isValid(Role.STAFF, null)).isTrue();
   }
 
   @Test

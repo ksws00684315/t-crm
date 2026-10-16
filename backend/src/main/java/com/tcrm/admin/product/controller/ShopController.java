@@ -1,7 +1,7 @@
 package com.tcrm.admin.product.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.product.service.ShopService;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.R;
@@ -27,9 +27,7 @@ public class ShopController {
   }
 
   @GetMapping
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:view")
   public R<List<ShopVO>> list() {
     return R.ok(shops.list().stream().map(ShopVO::from).toList());
   }

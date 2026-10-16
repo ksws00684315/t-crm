@@ -12,7 +12,6 @@ import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -26,9 +25,9 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
 /**
- * Kol item mapping query (task 05 §4.3, §4.4). SUPER_ADMIN, OPERATOR+ALL and FINANCE may read;
- * OPERATOR+OWN gets 403. List requires at least one of kolCode / productCode / weidianItemId
- * (shopId and current only combine with those) to avoid full-table COUNT at design capacity.
+ * Kol item mapping query (task 05 §4.3, §4.4). A staff account with OWN scope is rejected. List
+ * requires at least one of kolCode / productCode / weidianItemId (shopId and current only combine
+ * with those) to avoid full-table COUNT at design capacity.
  */
 @Service
 public class KolItemService {
@@ -103,15 +102,7 @@ public class KolItemService {
 
   AccountDTO requireReader() {
     AccountDTO user = current.user();
-    if (ProductService.own(user)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    return user;
-  }
-
-  AccountDTO requireWriter() {
-    AccountDTO user = current.user();
-    if (user.role() == Role.FINANCE || ProductService.own(user)) {
+    if (user.ownScope()) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return user;

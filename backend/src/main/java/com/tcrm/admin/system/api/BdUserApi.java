@@ -3,7 +3,10 @@ package com.tcrm.admin.system.api;
 import java.util.Collection;
 import java.util.List;
 
-/** BD lookups for other modules; a BD is an enabled OPERATOR account with OWN data scope. */
+/**
+ * BD lookups for other modules. A usable BD is an enabled staff account with OWN scope and {@code
+ * kol:edit}.
+ */
 public interface BdUserApi {
   /**
    * Returns the administrator with this ID, or null when it does not exist (or is deleted).

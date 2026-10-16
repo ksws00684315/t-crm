@@ -8,8 +8,6 @@ import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -25,8 +23,8 @@ import org.springframework.stereotype.Service;
 /**
  * Link list of one KOL (task 06 §5): current mappings ordered by original product code, with link
  * status and click counts of the last 30 days for the current page only. Counts belong to the link
- * (KOL + original product), so they survive a change of the exclusive item. A BD (OPERATOR + OWN)
- * sees only the KOLs assigned to them (403 otherwise).
+ * (KOL + original product), so they survive a change of the exclusive item. A staff account with
+ * OWN scope sees only the KOLs assigned to them (403 otherwise).
  */
 @Service
 public class LinkService {
@@ -70,7 +68,7 @@ public class LinkService {
     if (kol == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    if (own(user) && !user.id().equals(kol.bdUserId())) {
+    if (user.ownScope() && !user.id().equals(kol.bdUserId())) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     String productCode =
@@ -81,10 +79,6 @@ public class LinkService {
         kolItems.pageCurrentLinksByKol(kol.id(), productCode, filter.page(), filter.size());
     Map<Long, ClickCountRow> counts = counts(kol.id(), links.items());
     return links.map(link -> toDto(kol, link, counts.get(link.productId())));
-  }
-
-  private static boolean own(AccountDTO user) {
-    return user.role() == Role.OPERATOR && user.dataScope() == DataScope.OWN;
   }
 
   /** Counts keyed by original product ID; a KOL has at most one current link per product. */

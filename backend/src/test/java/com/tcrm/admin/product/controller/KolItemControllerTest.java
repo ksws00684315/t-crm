@@ -45,7 +45,7 @@ class KolItemControllerTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "FINANCE, ALL"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL"})
   void shouldList_whenAllowedRoleReadsWithKolCode(Role role, DataScope scope) throws Exception {
     when(items.page(any())).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
     mvc.perform(list(as(role, scope)).param("kolCode", "KOL0001")).andExpect(status().isOk());
@@ -55,7 +55,7 @@ class KolItemControllerTest {
   @Test
   void shouldReturn403_whenOwnOperatorReads() throws Exception {
     doThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN)).when(items).page(any());
-    mvc.perform(list(as(Role.OPERATOR, DataScope.OWN)).param("kolCode", "KOL0001"))
+    mvc.perform(list(as(Role.STAFF, DataScope.OWN)).param("kolCode", "KOL0001"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
   }
@@ -86,7 +86,7 @@ class KolItemControllerTest {
   @Test
   void shouldReturn400_whenNoPrecisionFiltersProvided() throws Exception {
     doThrow(new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED)).when(items).page(any());
-    mvc.perform(list(as(Role.OPERATOR, DataScope.ALL)))
+    mvc.perform(list(as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
   }

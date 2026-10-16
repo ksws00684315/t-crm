@@ -1,7 +1,9 @@
 package com.tcrm.admin.system.service;
 
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
+import java.util.List;
 
 public record CreateUserCommand(
     String username,
@@ -9,4 +11,6 @@ public record CreateUserCommand(
     String nickname,
     String email,
     Role role,
-    DataScope dataScope) {}
+    PostTemplate postTemplate,
+    DataScope dataScope,
+    List<String> permissions) {}

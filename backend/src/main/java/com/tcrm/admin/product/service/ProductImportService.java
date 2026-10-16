@@ -2,7 +2,6 @@ package com.tcrm.admin.product.service;
 
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
-import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
@@ -20,7 +19,6 @@ public class ProductImportService {
   private final KolItemMapper kolItems;
   private final ProductCodeGenerator codes;
   private final TransactionTemplate tx;
-  private final ProductService productService;
 
   public ProductImportService(
       ImportTaskApi imports,
@@ -29,8 +27,7 @@ public class ProductImportService {
       ProductMapper products,
       KolItemMapper kolItems,
       ProductCodeGenerator codes,
-      TransactionTemplate tx,
-      ProductService productService) {
+      TransactionTemplate tx) {
     this.imports = imports;
     this.current = current;
     this.shops = shops;
@@ -38,7 +35,6 @@ public class ProductImportService {
     this.kolItems = kolItems;
     this.codes = codes;
     this.tx = tx;
-    this.productService = productService;
   }
 
   public byte[] template() {
@@ -46,8 +42,7 @@ public class ProductImportService {
   }
 
   public Long submit(ImportFileDTO file) {
-    AccountDTO user = productService.requireWriter();
-    Long actorId = user.id();
+    Long actorId = current.id();
     return imports.submitImport(
         TaskType.PRODUCT_IMPORT,
         ProductImportColumn.headerKeys(),
