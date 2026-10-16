@@ -228,4 +228,40 @@ class OrderWriterTest {
     verify(refunds, org.mockito.Mockito.times(3)).insert(saved.capture());
     assertThat(saved.getAllValues()).allSatisfy(f -> assertThat(f.getOrderItemId()).isNull());
   }
+
+  @Test
+  void shouldInsertImportedRefund_andRefreshItemTotals() {
+    var existing = order();
+    when(orders.selectOne(any())).thenReturn(existing);
+    var line = item(20, "sub", "sku");
+    line.setRefundAmount(BigDecimal.ZERO);
+    when(items.selectList(any())).thenReturn(List.of(line), List.of(line));
+    when(refunds.selectList(any()))
+        .thenAnswer(
+            inv -> {
+              var saved = new RefundDO();
+              saved.setOrderItemId(20L);
+              saved.setAmount(new BigDecimal("1.25"));
+              saved.setRawStatus("10");
+              return List.of(saved);
+            });
+    var row = new RefundDO();
+    row.setWeidianRefundNo("R-IMP");
+    row.setAmount(new BigDecimal("1.25"));
+    row.setRefundTime(Instant.parse("2026-10-16T01:00:00Z"));
+    row.setFinishTime(Instant.parse("2026-10-16T02:00:00Z"));
+    assertThat(writer.saveImportedRefund(5L, "100", "sub", row)).isTrue();
+    assertThat(row.getRawStatus()).isEqualTo("10");
+    assertThat(row.getOrderId()).isEqualTo(10L);
+    assertThat(row.getOrderItemId()).isEqualTo(20L);
+    verify(refunds).insert(row);
+    assertThat(line.getRefundAmount()).isEqualByComparingTo("1.25");
+  }
+
+  @Test
+  void shouldReturnFalse_whenImportedRefundOrderMissing() {
+    when(orders.selectOne(any())).thenReturn(null);
+    assertThat(writer.saveImportedRefund(5L, "missing", "", new RefundDO())).isFalse();
+    verify(refunds, never()).insert(any(RefundDO.class));
+  }
 }

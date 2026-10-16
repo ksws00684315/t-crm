@@ -3,7 +3,7 @@ info:
   title: T-CRM order API
   version: 1.0.0
   description: >-
-    Task 13 static contract. Company comes from the login session; OWN scope uses
+    Task 13 + task 18 (order/refund Excel import) static contract. Company comes from the login session; OWN scope uses
     the order's payment-time BD snapshot. No buyer data is returned.
     Existing springdoc integration is deferred (engineering gap I6).
 security:
@@ -128,6 +128,72 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {description: 'COMMON_NOT_FOUND: order is absent or belongs to another company'}
+  /admin-api/order/order-imports/template:
+    get:
+      operationId: downloadOrderImportTemplate
+      summary: Download the order import workbook template
+      x-permission: order:manage
+      responses:
+        '200':
+          description: XLSX template whose header row follows Accept-Language
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/order-imports:
+    post:
+      operationId: submitOrderImport
+      summary: Queue an order Excel import; progress via /admin-api/task/tasks/{id}
+      x-permission: order:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202': {$ref: '#/components/responses/ImportAccepted'}
+        '400': {description: 'TASK_FILE_*: invalid workbook, header, size or row count'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {description: 'TASK_QUEUE_FULL'}
+  /admin-api/order/refund-imports/template:
+    get:
+      operationId: downloadRefundImportTemplate
+      summary: Download the refund import workbook template
+      x-permission: order:manage
+      responses:
+        '200':
+          description: XLSX template whose header row follows Accept-Language
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/refund-imports:
+    post:
+      operationId: submitRefundImport
+      summary: Queue a refund Excel import; progress via /admin-api/task/tasks/{id}
+      x-permission: order:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202': {$ref: '#/components/responses/ImportAccepted'}
+        '400': {description: 'TASK_FILE_*: invalid workbook, header, size or row count'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {description: 'TASK_QUEUE_FULL'}
 components:
   securitySchemes:
     AdminToken: {type: apiKey, in: header, name: X-Admin-Token}
@@ -212,6 +278,21 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Envelope'}
           example: {code: 0, msg: Success, data: null, errorCode: null, traceId: example-trace}
+    ImportAccepted:
+      description: Import task queued; poll /admin-api/task/tasks/{taskId}.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: '#/components/schemas/Envelope'}
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    required: [taskId]
+                    properties:
+                      taskId: {$ref: '#/components/schemas/Id'}
+          example: {code: 0, msg: Success, data: {taskId: '2110000000000000001'}, errorCode: null, traceId: example-trace}
     Orders:
       description: Orders in the current company and allowed BD scope.
       content:
