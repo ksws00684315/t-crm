@@ -1,23 +1,35 @@
 <script setup lang="ts">
+import { ElMessage } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { getKol } from "@/api/kol/kol";
+import { getKol, inviteKol } from "@/api/kol/kol";
 import type { BdHistoryVO, KolDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
+import { kolAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 
 defineOptions({ name: "KolDetailDrawer" });
 
 const { t } = useI18n();
+const me = useUserStore();
 
 const props = defineProps<{ modelValue: boolean; kolId: string | null }>();
 const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
 
 const loading = ref(false);
+const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
+
+const inviteVisible = computed(() => {
+  const kol = detail.value;
+  if (!kol || !kolAbilities(me.user).canWrite) return false;
+  return kol.accountStatus === 0 && kol.registerSource === 1;
+});
 
 watch(
   () => [props.modelValue, props.kolId] as const,
@@ -44,6 +56,44 @@ function asHistory(row: object): BdHistoryVO {
   return row as BdHistoryVO;
 }
 
+function sourceText(source: 1 | 2 | undefined): string {
+  if (source === 2) return t("kol.sourceSelf");
+  if (source === 1) return t("kol.sourceAdmin");
+  return "-";
+}
+
+function accountText(status: 0 | 1 | undefined): string {
+  if (status === 0) return t("kol.accountInactive");
+  if (status === 1) return t("kol.accountActive");
+  return "-";
+}
+
+async function reload() {
+  if (!props.kolId) return;
+  detail.value = await getKol(props.kolId);
+}
+
+async function sendInvite() {
+  if (!props.kolId) return;
+  inviting.value = true;
+  try {
+    await inviteKol(props.kolId);
+    ElMessage.success(t("kol.inviteSent"));
+    await reload();
+  } catch (error) {
+    notifyError(error);
+    if (error instanceof ApiError && error.errorCode === "KOL_ALREADY_ACTIVATED") {
+      try {
+        await reload();
+      } catch (reloadError) {
+        notifyError(reloadError);
+      }
+    }
+  } finally {
+    inviting.value = false;
+  }
+}
+
 const historyColumns = computed<DataColumn[]>(() => [
   { key: "bd", label: t("kol.bdColumn"), minWidth: 120 },
   { key: "startedAt", label: t("kol.startedAt"), width: 170, mono: true },
@@ -55,7 +105,7 @@ const historyColumns = computed<DataColumn[]>(() => [
   <el-drawer
     :model-value="modelValue"
     :title="t('kol.detailTitle')"
-    size="560px"
+    size="640px"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div v-loading="loading">
@@ -69,8 +119,48 @@ const historyColumns = computed<DataColumn[]>(() => [
             <CopyText :value="detail.email" />
           </el-descriptions-item>
           <el-descriptions-item :label="t('common.country')">{{
-            detail.country
+            detail.country || "-"
           }}</el-descriptions-item>
+          <el-descriptions-item :label="t('kol.whatsapp')">
+            <CopyText v-if="detail.whatsapp" :value="detail.whatsapp" />
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.agentPlatform')">
+            {{ detail.linkTemplateName || "-" }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.inviteCode')">
+            <CopyText v-if="detail.inviteCode" :value="detail.inviteCode" />
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.sheetUrl')">
+            <template v-if="detail.sheetUrl">
+              <a
+                data-test="detail-sheet"
+                :href="detail.sheetUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ detail.sheetUrl }}</a
+              >
+              <CopyText :value="detail.sheetUrl" />
+            </template>
+            <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.registerSource')">
+            {{ sourceText(detail.registerSource) }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.account')">
+            <span data-test="account-status">{{ accountText(detail.accountStatus) }}</span>
+            <el-button
+              v-if="inviteVisible"
+              type="primary"
+              link
+              data-test="detail-invite"
+              :loading="inviting"
+              @click="sendInvite"
+            >
+              {{ t("kol.invite") }}
+            </el-button>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('kol.bd')">
             {{ detail.bdUserName ?? t("common.unassigned") }}
           </el-descriptions-item>
@@ -84,6 +174,9 @@ const historyColumns = computed<DataColumn[]>(() => [
             <div v-if="detail.socialAccounts.length === 0">-</div>
             <div v-for="(account, index) in detail.socialAccounts" :key="index">
               {{ account.platform }}: {{ account.handle }}
+              <el-tag v-if="account.primary" size="small" data-test="primary-tag">{{
+                t("kol.primaryTag")
+              }}</el-tag>
               <template v-if="account.followers">{{
                 t("kol.followers", { count: account.followers })
               }}</template>

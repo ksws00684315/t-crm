@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { Link } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { listKols, updateKolStatus } from "@/api/kol/kol";
+import { inviteKol, listKols, updateKolStatus } from "@/api/kol/kol";
 import { listBdUsers } from "@/api/system/bd-user";
 import type { BdUserVO, KolVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
@@ -12,6 +13,7 @@ import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { canExport, kolAbilities, linkAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
@@ -21,6 +23,7 @@ import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
 import KolLinksDrawer from "./KolLinksDrawer.vue";
+import RegisterLinkDialog from "./RegisterLinkDialog.vue";
 
 defineOptions({ name: "KolListPage" });
 
@@ -56,11 +59,14 @@ const columns = computed<DataColumn[]>(() => [
   { key: "name", label: t("common.name"), prop: "name", minWidth: 120 },
   { key: "email", label: t("common.email"), minWidth: 200, mono: true },
   { key: "country", label: t("common.country"), prop: "country", width: 80 },
+  { key: "platform", label: t("kol.agentPlatform"), minWidth: 120 },
+  { key: "sheet", label: t("kol.sheet"), width: 70 },
   { key: "bd", label: t("kol.bd"), minWidth: 110 },
   { key: "rate", label: t("kol.defaultRate"), width: 110, amount: true },
   { key: "status", label: t("common.status"), width: 90 },
+  { key: "account", label: t("kol.account"), width: 100 },
   { key: "createdAt", label: t("common.createdAt"), width: 180, mono: true },
-  { key: "actions", label: t("common.actions"), width: 280 }
+  { key: "actions", label: t("common.actions"), width: 360 }
 ]);
 
 /** Chips and empty-state filter-count reflect the last applied search, not in-progress typing. */
@@ -106,6 +112,18 @@ const detailId = ref<string | null>(null);
 const importVisible = ref(false);
 const linksVisible = ref(false);
 const linksKol = ref<KolVO | null>(null);
+const registerVisible = ref(false);
+const invitingId = ref<string | null>(null);
+
+function accountText(status: 0 | 1 | undefined): string {
+  if (status === 0) return t("kol.accountInactive");
+  if (status === 1) return t("kol.accountActive");
+  return "";
+}
+
+function showInvite(row: KolVO): boolean {
+  return abilities.value.canWrite && row.accountStatus === 0 && row.registerSource === 1;
+}
 
 async function load() {
   loading.value = true;
@@ -140,13 +158,16 @@ const { exporting, exportCsv } = useListExport<KolVO>({
     { label: t("kol.code"), value: row => row.kolCode },
     { label: t("common.name"), value: row => row.name },
     { label: t("common.email"), value: row => row.email },
-    { label: t("common.country"), value: row => row.country },
+    { label: t("common.country"), value: row => row.country ?? "" },
+    { label: t("kol.agentPlatform"), value: row => row.linkTemplateName ?? "" },
+    { label: t("kol.sheet"), value: row => row.sheetUrl ?? "" },
     { label: t("kol.bd"), value: row => row.bdUserName ?? t("common.unassigned") },
     { label: t("kol.defaultRate"), value: row => formatRate(row.defaultRate) },
     {
       label: t("common.status"),
       value: row => (row.status === 1 ? t("common.enabled") : t("common.disabled"))
     },
+    { label: t("kol.account"), value: row => accountText(row.accountStatus) },
     { label: t("common.createdAt"), value: row => formatInstant(row.createTime) }
   ]
 });
@@ -247,6 +268,20 @@ function openLinks(row: KolVO) {
   linksVisible.value = true;
 }
 
+async function sendInvite(row: KolVO) {
+  invitingId.value = row.id;
+  try {
+    await inviteKol(row.id);
+    ElMessage.success(t("kol.inviteSent"));
+    await load();
+  } catch (error) {
+    notifyError(error);
+    if (error instanceof ApiError && error.errorCode === "KOL_ALREADY_ACTIVATED") await load();
+  } finally {
+    invitingId.value = null;
+  }
+}
+
 async function toggleStatus(row: KolVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
@@ -327,13 +362,20 @@ onMounted(() => {
           </el-select>
         </el-form-item>
       </template>
-      <template v-if="abilities.canWrite" #actions>
-        <el-button type="success" data-test="create" @click="openCreate">{{
-          t("kol.create")
-        }}</el-button>
-        <el-button data-test="import" @click="importVisible = true">{{
-          t("kol.import")
-        }}</el-button>
+      <template v-if="abilities.canWrite || abilities.canRegisterLink" #actions>
+        <el-button
+          v-if="abilities.canRegisterLink"
+          data-test="register-link"
+          @click="registerVisible = true"
+        >
+          {{ t("kol.registerLink") }}
+        </el-button>
+        <el-button v-if="abilities.canWrite" type="success" data-test="create" @click="openCreate">
+          {{ t("kol.create") }}
+        </el-button>
+        <el-button v-if="abilities.canWrite" data-test="import" @click="importVisible = true">
+          {{ t("kol.import") }}
+        </el-button>
       </template>
     </ListSearch>
 
@@ -378,12 +420,36 @@ onMounted(() => {
       </template>
       <template #cell-kolCode="{ row }"><CopyText :value="asKol(row).kolCode" /></template>
       <template #cell-email="{ row }"><CopyText :value="asKol(row).email" /></template>
+      <template #cell-platform="{ row }">{{ asKol(row).linkTemplateName || "-" }}</template>
+      <template #cell-sheet="{ row }">
+        <a
+          v-if="asKol(row).sheetUrl"
+          data-test="sheet-link"
+          :href="asKol(row).sheetUrl ?? ''"
+          target="_blank"
+          rel="noopener noreferrer"
+          :aria-label="t('kol.openSheet')"
+        >
+          <el-icon><Link /></el-icon>
+        </a>
+        <span v-else>-</span>
+      </template>
       <template #cell-bd="{ row }">{{ asKol(row).bdUserName ?? t("common.unassigned") }}</template>
       <template #cell-rate="{ row }">{{ formatRate(asKol(row).defaultRate) }}</template>
       <template #cell-status="{ row }">
         <el-tag :type="asKol(row).status === 1 ? 'success' : 'info'">
           {{ asKol(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
         </el-tag>
+      </template>
+      <template #cell-account="{ row }">
+        <el-tag
+          v-if="asKol(row).accountStatus === 0 || asKol(row).accountStatus === 1"
+          data-test="account"
+          :type="asKol(row).accountStatus === 1 ? 'success' : 'info'"
+        >
+          {{ accountText(asKol(row).accountStatus) }}
+        </el-tag>
+        <span v-else>-</span>
       </template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asKol(row).createTime) }}</template>
       <template #actions="{ row }">
@@ -398,6 +464,16 @@ onMounted(() => {
           @click="openLinks(asKol(row))"
         >
           {{ t("kol.links") }}
+        </el-button>
+        <el-button
+          v-if="showInvite(asKol(row))"
+          link
+          type="primary"
+          data-test="invite"
+          :loading="invitingId === asKol(row).id"
+          @click="sendInvite(asKol(row))"
+        >
+          {{ t("kol.invite") }}
         </el-button>
         <template v-if="abilities.canWrite">
           <el-button link type="primary" data-test="edit" @click="openEdit(asKol(row))">
@@ -439,5 +515,6 @@ onMounted(() => {
       :kol-code="linksKol?.kolCode ?? null"
       :kol-name="linksKol?.name"
     />
+    <RegisterLinkDialog v-model="registerVisible" />
   </div>
 </template>
