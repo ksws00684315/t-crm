@@ -83,8 +83,9 @@ crm:
   mail:
     api-key: ${TCRM_MAIL_API_KEY:}
     from: ${TCRM_MAIL_FROM:}
-    # Logs invitation/reset links so a local developer can open them. The links set or reset a KOL
-    # password: NEVER enable in production.
+    # Logs invitation/reset links and registration codes so a local developer can use them. Those
+    # values set or prove a KOL password: NEVER enable in production. Off, the mail log has neither
+    # the recipient nor the body.
     log-links: false
   # Public base of the KOL portal: https, no trailing slash (prod: https://kol.<domain>). Required;
   # startup fails when it is missing or malformed. Invitation and reset links point here.

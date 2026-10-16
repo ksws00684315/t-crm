@@ -75,6 +75,7 @@ class KolControllerTest {
         "aff-01",
         "https://docs.google.com/spreadsheets/d/1/edit",
         1,
+        0,
         Instant.parse("2026-10-05T00:00:00Z"),
         Instant.parse("2026-10-05T00:00:01Z"));
   }
@@ -101,6 +102,7 @@ class KolControllerTest {
         .andExpect(jsonPath("$.data.items[0].defaultRate").value("0.1550"))
         .andExpect(
             jsonPath("$.data.items[0].socialAccounts[0].followers").value("9007199254740993"))
+        .andExpect(jsonPath("$.data.items[0].accountStatus").value(0))
         .andExpect(jsonPath("$.data.items[0].createTime").value("2026-10-05T00:00:00Z"));
   }
 
@@ -146,6 +148,7 @@ class KolControllerTest {
             get(BASE + "/11").header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.accountStatus").value(0))
         .andExpect(jsonPath("$.data.kol").doesNotExist())
         .andExpect(jsonPath("$.data.bdHistory[0].bdUserName").value("bd5"))
         .andExpect(jsonPath("$.data.bdHistory[0].endTime").doesNotExist())
@@ -174,7 +177,8 @@ class KolControllerTest {
         .andExpect(jsonPath("$.data.linkTemplateId").value("77"))
         .andExpect(jsonPath("$.data.linkTemplateName").value("kakobuy"))
         .andExpect(jsonPath("$.data.inviteCode").value("aff-01"))
-        .andExpect(jsonPath("$.data.registerSource").value(1));
+        .andExpect(jsonPath("$.data.registerSource").value(1))
+        .andExpect(jsonPath("$.data.accountStatus").value(0));
     var command = ArgumentCaptor.forClass(CreateKolCommand.class);
     verify(kols).create(command.capture());
     org.assertj.core.api.Assertions.assertThat(command.getValue())

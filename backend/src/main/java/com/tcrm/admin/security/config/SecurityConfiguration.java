@@ -141,11 +141,6 @@ public class SecurityConfiguration implements WebMvcConfigurer {
                   currentKol.kol();
                 }))
         .addPathPatterns("/kol-api/**")
-        .excludePathPatterns(
-            "/kol-api/auth/login",
-            "/kol-api/auth/login/select",
-            "/kol-api/auth/activate",
-            "/kol-api/auth/forgot",
-            "/kol-api/auth/reset");
+        .excludePathPatterns(KolApiInterceptor.PUBLIC_PATHS);
   }
 }

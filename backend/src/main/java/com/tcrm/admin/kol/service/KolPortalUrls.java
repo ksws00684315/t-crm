@@ -28,6 +28,11 @@ public class KolPortalUrls {
     return baseUrl + "/reset?token=" + token;
   }
 
+  /** {@code {base}/register?c=...} for a BD's register link (task 12c). The code is Base62. */
+  public String registerUrl(String code) {
+    return baseUrl + "/register?c=" + code;
+  }
+
   /** Returns the value unchanged when it is a valid base URL; throws naming the variable. */
   static String validate(String value) {
     if (value != null && !value.isBlank() && !value.endsWith("/") && isValid(value)) {

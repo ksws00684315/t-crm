@@ -55,6 +55,23 @@ class KolMailTemplatesTest {
   }
 
   @Test
+  void shouldRenderTheRegistrationCodeInBothLanguages() {
+    MailMessage mail = templates.registerCode("kol@example.com", "Acme & Co", "654321");
+    assertThat(mail.template()).isEqualTo("kol-register-code");
+    assertThat(mail.subject()).isEqualTo("[Acme & Co] Your verification code / 您的验证码");
+    assertThat(mail.text().indexOf("Hello,")).isLessThan(mail.text().indexOf("您好，"));
+    assertThat(mail.text())
+        .contains("Your verification code for joining Acme & Co on T-CRM is:")
+        .contains("654321")
+        .contains("valid for 10 minutes")
+        .contains("您加入 Acme & Co（T-CRM）的验证码是：")
+        .contains("验证码 10 分钟内有效，仅可使用一次。");
+    assertThat(mail.html())
+        .contains("<strong>Acme &amp; Co</strong>")
+        .contains("<strong>654321</strong>");
+  }
+
+  @Test
   void shouldRefuseResetMailWithoutLinks() {
     assertThatThrownBy(() -> templates.reset("kol@example.com", List.of()))
         .isInstanceOf(IllegalArgumentException.class);

@@ -362,6 +362,7 @@ public class KolService {
         kol.getInviteCode(),
         kol.getSheetUrl(),
         kol.getRegisterSource(),
+        kol.getAccountStatus() == null ? 0 : kol.getAccountStatus(),
         kol.getCreateTime(),
         kol.getUpdateTime());
   }
