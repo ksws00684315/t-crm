@@ -14,6 +14,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import JoinMemberDialog from "./JoinMemberDialog.vue";
 import {
   rule,
   serverFieldErrors,
@@ -47,6 +48,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "actions", label: t("common.actions"), width: 110 }
 ]);
 const createVisible = ref(false);
+const joinVisible = ref(false);
 const resetVisible = ref(false);
 const resettingAdmin = ref<TenantAdminVO | null>(null);
 const resetTitle = computed(() =>
@@ -169,6 +171,9 @@ async function submitReset() {
   >
     <div class="actions">
       <el-button type="primary" @click="openCreate">{{ t("tenantAdmin.create") }}</el-button>
+      <el-button data-test="join-member" @click="joinVisible = true">{{
+        t("tenantAdmin.join")
+      }}</el-button>
     </div>
     <DataTable
       plain
@@ -196,6 +201,8 @@ async function submitReset() {
       <el-button @click="close">{{ t("common.close") }}</el-button>
     </template>
   </el-dialog>
+
+  <JoinMemberDialog v-model="joinVisible" :tenant="tenant" @joined="load" />
 
   <el-dialog v-model="createVisible" :title="t('tenantAdmin.createTitle')" width="500px">
     <el-form

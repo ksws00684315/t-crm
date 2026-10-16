@@ -56,6 +56,13 @@ export type PermissionCode =
   | "dashboard:kol"
   | "data:export";
 
+/** One company the signed-in account belongs to (`companies` of `/auth/me`, ADR-022). */
+export interface CompanyVO {
+  tenantId: string;
+  tenantName: string;
+  role: CompanyRole;
+}
+
 /** `UserVO`. Ids are strings (backend Long), time stamps are ISO 8601 instants. */
 export interface UserVO {
   id: string;
@@ -79,6 +86,13 @@ export interface UserVO {
   status: 0 | 1;
   lastLoginTime: string | null;
   createTime: string;
+  /**
+   * `/auth/me` and login only: the companies this account may switch to, sorted by name; empty for
+   * the platform administrator. Optional at runtime for older backend responses.
+   */
+  companies?: CompanyVO[];
+  /** `/system/users` rows only: how many companies this person belongs to. */
+  companyCount?: number;
 }
 
 /** `SocialAccountVO`; `followers` is a string (backend Long). `primary` is the main platform. */

@@ -228,6 +228,11 @@ const enUS: MessageSchema = {
     FILE_INVALID: "The file must be a PNG or JPEG image.",
     FILE_TOO_LARGE: "The file is larger than 2 MB.",
     FILE_IN_USE: "The file is already used by another record.",
+    AUTH_COMPANY_NOT_MEMBER: "You are no longer a member of this company, or it has been disabled.",
+    AUTH_COMPANY_SWITCHED: "The current company was switched in another tab. The page will reload.",
+    USER_MULTI_COMPANY_LOCKED:
+      "This account also belongs to other companies. Only the platform administrator can change its name, email or password.",
+    USER_ALREADY_MEMBER: "This account is already a member of this company.",
     generic: "The operation failed. Please try again later.",
     network: "Network error. Check your connection and try again.",
     field: "This field is not valid.",
@@ -303,6 +308,11 @@ const enUS: MessageSchema = {
     exitFullscreen: "Exit full screen",
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
+  },
+  company: {
+    switchTitle: "Switch Company",
+    switched: "Switched to {name}.",
+    switchedElsewhere: "The current company was switched in another tab. The page will reload."
   },
   version: {
     message: "The system has been updated. Refresh to use the new version. Open tabs are kept.",
@@ -449,13 +459,18 @@ const enUS: MessageSchema = {
     disableTitle: "Disable user",
     enableTitle: "Enable user",
     disabled: "Disabled",
-    enabled: "Enabled"
+    enabled: "Enabled",
+    multiCompany: "Multi-company",
+    multiCompanyHint:
+      "This account also belongs to other companies. Only the platform administrator can change its name, email or password.",
+    usernameExistsHint:
+      "{message} To add an account of another company to this company, contact the platform administrator."
   },
   tenant: {
     create: "Create Company",
     code: "Company Code",
     name: "Company Name",
-    admins: "Super Admin",
+    admins: "Members",
     confirmDisable:
       "After the company is disabled, none of its administrators can sign in. Signed-in administrators are signed out on their next action. Tracking links are not affected.",
     confirmEnable: "Enable company {name}?",
@@ -473,14 +488,43 @@ const enUS: MessageSchema = {
   tenantAdmin: {
     created: "Super Admin created.",
     signedOut: "This administrator has been signed out on every device.",
-    title: "Super Admin: {name}",
+    title: "Members: {name}",
     resetTitle: "Reset Password: {username}",
     create: "Create Super Admin",
     createTitle: "Create Super Admin",
     lastLogin: "Last sign-in",
     initialPassword: "Initial password",
     resetPassword: "Reset Password",
-    newPassword: "New password"
+    newPassword: "New password",
+    join: "Add Existing Account"
+  },
+  member: {
+    joinTitle: "Add Existing Account: {name}",
+    usernamePlaceholder: "Full username",
+    lookup: "Look Up",
+    notFound: "No account has the username {username} (exact match only).",
+    companies: "Companies",
+    noCompanies: "Not in any company yet",
+    alreadyMember: "This account is already a member of this company.",
+    role: "Role in this company",
+    dataScopeDefault: "Template default",
+    submit: "Add",
+    joined: "Added to {name}.",
+    accountActions: "Account actions (apply to every company of this account)",
+    editAccount: "Edit Name and Email",
+    editTitle: "Edit Name and Email: {username}",
+    accountSaved: "Account saved.",
+    resetPassword: "Reset Password",
+    resetTitle: "Reset Password: {username}",
+    confirmReset: "After the reset, this account is signed out of every company. Continue?",
+    resetDone: "Password reset. The account has been signed out of every company.",
+    disableAccount: "Disable Account",
+    enableAccount: "Enable Account",
+    confirmDisable:
+      "{username} will no longer be able to sign in to any company, and open sessions will end. Disable?",
+    confirmEnable: "{username} will be able to sign in to every company it belongs to. Enable?",
+    accountDisabled: "Account disabled.",
+    accountEnabled: "Account enabled."
   },
   kol: {
     keywordPlaceholder: "Code / name / email",

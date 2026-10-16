@@ -5,8 +5,10 @@ import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import { LOGIN_PATH } from "@/router/guard";
+import { translate } from "@/locales";
+import { shownCompanyId, singleFlight } from "@/utils/company";
 import { decideUnauthorized } from "@/utils/reauth";
-import { setUnauthorizedHandler } from "./http";
+import { setCompanyIdSource, setCompanySwitchedHandler, setUnauthorizedHandler } from "./http";
 
 /**
  * A 401 for the signed-in user opens the reauth dialog and keeps the page.
@@ -14,6 +16,23 @@ import { setUnauthorizedHandler } from "./http";
  * Account lockout is HTTP 429 and is handled inside ReauthDialog, not here.
  */
 export function setupHttp(router: Router): void {
+  // From the in-memory store, not localStorage: the stored session already holds the company a
+  // sibling tab switched to, while this tab may still be showing the previous one.
+  setCompanyIdSource(() => {
+    const user = useUserStore();
+    return user.isLoggedIn ? shownCompanyId(user.user) : null;
+  });
+  // The layout reacts to the new company (tabs, cache, home); see useCompanySync.
+  const reloadCompany = singleFlight(async () => {
+    ElMessage.warning(translate("company.switchedElsewhere"));
+    await useUserStore()
+      .refreshProfile()
+      .catch(() => undefined);
+  });
+  setCompanySwitchedHandler(error => {
+    error.handled = true;
+    void reloadCompany();
+  });
   setUnauthorizedHandler(error => {
     const user = useUserStore();
     const reauth = useReauthStore();

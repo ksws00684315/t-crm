@@ -228,6 +228,10 @@ const zhCN = {
     FILE_INVALID: "文件必须是 PNG 或 JPEG 图片",
     FILE_TOO_LARGE: "文件超过 2MB",
     FILE_IN_USE: "文件已被其他记录使用",
+    AUTH_COMPANY_NOT_MEMBER: "你已不是该公司的成员，或该公司已停用",
+    AUTH_COMPANY_SWITCHED: "当前公司已在其他标签页切换，页面将刷新",
+    USER_MULTI_COMPANY_LOCKED: "该账号还属于其他公司；姓名、邮箱、密码只能由平台管理员修改",
+    USER_ALREADY_MEMBER: "该账号已是这家公司的成员",
     generic: "操作失败，请稍后重试",
     network: "网络异常，请检查网络连接后重试",
     field: "该字段格式不正确",
@@ -301,6 +305,11 @@ const zhCN = {
     exitFullscreen: "退出全屏",
     shortcutMac: "⌘ K",
     shortcutOther: "Ctrl K"
+  },
+  company: {
+    switchTitle: "切换公司",
+    switched: "已切换到 {name}",
+    switchedElsewhere: "当前公司已在其他标签页切换，页面将刷新"
   },
   version: {
     message: "系统已更新，刷新页面以使用新版本。已打开的标签会保留。",
@@ -446,13 +455,16 @@ const zhCN = {
     disableTitle: "停用用户",
     enableTitle: "启用用户",
     disabled: "已停用",
-    enabled: "已启用"
+    enabled: "已启用",
+    multiCompany: "多公司",
+    multiCompanyHint: "该账号还属于其他公司；姓名、邮箱、密码只能由平台管理员修改",
+    usernameExistsHint: "{message}。如需让其他公司的账号加入本公司，请联系平台管理员"
   },
   tenant: {
     create: "新建公司",
     code: "公司编码",
     name: "公司名称",
-    admins: "超级管理员",
+    admins: "成员",
     confirmDisable:
       "停用后，该公司所有管理员将无法登录，已登录的会在下一次操作时退出；中转链接不受影响。",
     confirmEnable: "确定启用公司 {name} 吗？",
@@ -469,14 +481,42 @@ const zhCN = {
   tenantAdmin: {
     created: "超级管理员已创建",
     signedOut: "该管理员已在所有设备上退出",
-    title: "超级管理员：{name}",
+    title: "成员：{name}",
     resetTitle: "重置密码：{username}",
     create: "新建超级管理员",
     createTitle: "新建超级管理员",
     lastLogin: "最近登录",
     initialPassword: "初始密码",
     resetPassword: "重置密码",
-    newPassword: "新密码"
+    newPassword: "新密码",
+    join: "加入已有账号"
+  },
+  member: {
+    joinTitle: "加入已有账号：{name}",
+    usernamePlaceholder: "输入完整用户名",
+    lookup: "查找",
+    notFound: "没有用户名为 {username} 的账号（只支持完整匹配）",
+    companies: "已加入的公司",
+    noCompanies: "尚未加入任何公司",
+    alreadyMember: "该账号已是这家公司的成员",
+    role: "在本公司的角色",
+    dataScopeDefault: "按岗位模板默认",
+    submit: "加入",
+    joined: "已加入 {name}",
+    accountActions: "账号操作（作用于该账号所属的所有公司）",
+    editAccount: "修改姓名和邮箱",
+    editTitle: "修改姓名和邮箱：{username}",
+    accountSaved: "账号已保存",
+    resetPassword: "重置密码",
+    resetTitle: "重置密码：{username}",
+    confirmReset: "重置后，该账号在所有公司的登录都会失效。确定继续吗？",
+    resetDone: "密码已重置，该账号已在所有公司退出",
+    disableAccount: "停用账号",
+    enableAccount: "启用账号",
+    confirmDisable: "停用后，{username} 在所有公司都无法登录，已登录的会被退出。确定停用吗？",
+    confirmEnable: "启用后，{username} 可以登录其所属的所有公司。确定启用吗？",
+    accountDisabled: "账号已停用",
+    accountEnabled: "账号已启用"
   },
   kol: {
     keywordPlaceholder: "编号 / 姓名 / 邮箱",

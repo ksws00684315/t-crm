@@ -4,6 +4,13 @@ import { ApiError, NETWORK_ERROR } from "./error";
 
 /** Request header carrying the Sa-Token session token (backend `sa-token.token-name`). */
 export const TOKEN_HEADER = "X-Admin-Token";
+/**
+ * Company the page is showing (ADR-022). The backend only compares it with the session's current
+ * company and answers 409 AUTH_COMPANY_SWITCHED on a mismatch; it never selects the company.
+ */
+export const COMPANY_HEADER = "X-Company-Id";
+/** Answer to a request sent with a stale {@link COMPANY_HEADER}. */
+export const COMPANY_SWITCHED = "AUTH_COMPANY_SWITCHED";
 /** All admin endpoints live under this prefix; the dev server and Nginx proxy it to the backend. */
 export const BASE_URL = "/admin-api";
 
@@ -15,6 +22,10 @@ export interface HttpOptions {
   getLanguage: () => string;
   /** Called on every HTTP 401, before the error is thrown. */
   onUnauthorized: (error: ApiError) => void;
+  /** Company shown in this tab, or null for the platform administrator and when signed out. */
+  getCompanyId?: () => string | null;
+  /** Called on 409 {@link COMPANY_SWITCHED}, before the error is thrown. */
+  onCompanySwitched?: (error: ApiError) => void;
   /** Test hook. */
   adapter?: AxiosAdapter;
 }
@@ -98,8 +109,15 @@ export function createHttp(options: HttpOptions): Http {
     const token = options.getToken();
     if (token) config.headers.set(TOKEN_HEADER, token);
     config.headers.set("Accept-Language", options.getLanguage());
+    const companyId = options.getCompanyId?.() ?? null;
+    if (companyId) config.headers.set(COMPANY_HEADER, companyId);
     return config;
   });
+
+  function notify(status: number, error: ApiError): void {
+    if (status === 401) options.onUnauthorized(error);
+    if (status === 409 && error.errorCode === COMPANY_SWITCHED) options.onCompanySwitched?.(error);
+  }
 
   async function request<T>(config: AxiosRequestConfig): Promise<T> {
     let status: number;
@@ -115,7 +133,7 @@ export function createHttp(options: HttpOptions): Http {
       return body.data as T;
     }
     const error = toApiError(status, body);
-    if (status === 401) options.onUnauthorized(error);
+    notify(status, error);
     throw error;
   }
 
@@ -136,7 +154,7 @@ export function createHttp(options: HttpOptions): Http {
       return { blob: body, fileName: fileNameFromDisposition(disposition) };
     }
     const error = toApiError(status, await blobBody(body));
-    if (status === 401) options.onUnauthorized(error);
+    notify(status, error);
     throw error;
   }
 
