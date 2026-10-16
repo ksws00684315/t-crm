@@ -34,6 +34,26 @@ public class KolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String remark;
 
+  /** WhatsApp number, E.164; nullable and clearable (task 11 §4.3). */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String whatsapp;
+
+  /** Agent platform template; never written by entity updates after creation. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Long linkTemplateId;
+
+  /** Invite code on the agent platform; nullable and clearable. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String inviteCode;
+
+  /** Promotion sheet URL; nullable and clearable. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String sheetUrl;
+
+  /** 1 entered in admin, 2 self-registered; fixed after creation. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private Integer registerSource;
+
   /** Owning company. Updates never write this column. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long tenantId;
@@ -108,6 +128,46 @@ public class KolDO extends BaseEntity {
 
   public void setRemark(String value) {
     this.remark = value;
+  }
+
+  public String getWhatsapp() {
+    return whatsapp;
+  }
+
+  public void setWhatsapp(String value) {
+    this.whatsapp = value;
+  }
+
+  public Long getLinkTemplateId() {
+    return linkTemplateId;
+  }
+
+  public void setLinkTemplateId(Long value) {
+    this.linkTemplateId = value;
+  }
+
+  public String getInviteCode() {
+    return inviteCode;
+  }
+
+  public void setInviteCode(String value) {
+    this.inviteCode = value;
+  }
+
+  public String getSheetUrl() {
+    return sheetUrl;
+  }
+
+  public void setSheetUrl(String value) {
+    this.sheetUrl = value;
+  }
+
+  public Integer getRegisterSource() {
+    return registerSource;
+  }
+
+  public void setRegisterSource(Integer value) {
+    this.registerSource = value;
   }
 
   public Long getTenantId() {

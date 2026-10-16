@@ -15,19 +15,37 @@ import java.util.List;
 
 /**
  * New KOL. {@code defaultRate} is a fraction (0.1550 = 15.5%); {@code bdUserId} is ignored for a BD
- * (OWN) caller and may be null (unassigned).
+ * (OWN) caller and may be null (unassigned). The 2026-10-16 profile fields are optional (task 11
+ * §4.3): {@code country}, {@code whatsapp}, {@code inviteCode} and {@code sheetUrl} may be null;
+ * {@code linkTemplateId} must be an enabled template of this company when given.
  */
 public record CreateKolRequest(
     @NotBlank @Size(max = KolRules.MAX_NAME) String name,
     @NotBlank @Size(max = KolRules.MAX_EMAIL) @Pattern(regexp = KolRules.EMAIL_PATTERN)
         String email,
-    @NotBlank @CountryCode String country,
+    @CountryCode String country,
     @Size(max = KolRules.MAX_SOCIAL_ACCOUNTS) List<@Valid SocialAccountRequest> socialAccounts,
     @Min(1) Long bdUserId,
     @DecimalMin("0") @DecimalMax("1") @Digits(integer = 1, fraction = 4) BigDecimal defaultRate,
-    @Size(max = KolRules.MAX_REMARK) String remark) {
+    @Size(max = KolRules.MAX_REMARK) String remark,
+    @Size(max = KolRules.MAX_WHATSAPP) @Pattern(regexp = KolRules.WHATSAPP_PATTERN) String whatsapp,
+    @Min(1) Long linkTemplateId,
+    @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
+        String inviteCode,
+    @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_PATTERN)
+        String sheetUrl) {
   CreateKolCommand toCommand() {
     return new CreateKolCommand(
-        name, email, country, KolRequests.social(socialAccounts), bdUserId, defaultRate, remark);
+        name,
+        email,
+        country,
+        KolRequests.social(socialAccounts),
+        bdUserId,
+        defaultRate,
+        remark,
+        KolRequests.text(whatsapp),
+        linkTemplateId,
+        KolRequests.text(inviteCode),
+        KolRequests.text(sheetUrl));
   }
 }

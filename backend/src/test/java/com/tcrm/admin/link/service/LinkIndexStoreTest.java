@@ -137,4 +137,51 @@ class LinkIndexStoreTest {
     store.delete("KOL0009");
     verify(redis).delete("link:KOL0009");
   }
+
+  @Test
+  public void shouldGroupItemFieldsByBucket_whenPutting() {
+    store.putItemFields(Map.of("9001", "a", "9012", "b", "7", "c"));
+
+    // Three buckets: 01 for 9001, 12 for 9012 and 07 for the single digit 7.
+    ArgumentCaptor<byte[]> keys = ArgumentCaptor.forClass(byte[].class);
+    RedisHashCommands hashes = mock(RedisHashCommands.class);
+    ArgumentCaptor<RedisCallback<Object>> callback = ArgumentCaptor.forClass(RedisCallback.class);
+    verify(redis, times(3)).executePipelined(callback.capture());
+    RedisConnection connection = mock(RedisConnection.class);
+    when(connection.hashCommands()).thenReturn(hashes);
+    for (RedisCallback<Object> one : callback.getAllValues()) {
+      one.doInRedis(connection);
+    }
+    verify(hashes, times(3)).hMSet(keys.capture(), anyMap());
+    assertThat(keys.getAllValues())
+        .extracting(k -> new String(k, StandardCharsets.UTF_8))
+        .containsExactlyInAnyOrder("linkitem:01", "linkitem:12", "linkitem:07");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void shouldGroupItemDeletesByBucket_whenRemoving() {
+    HashOperations<String, Object, Object> hash = mock(HashOperations.class);
+    when(redis.opsForHash()).thenReturn(hash);
+
+    store.removeItemFields(List.of("9001", "9012", "8001"));
+
+    // 9001 and 8001 share bucket "01" (last two digits); 9012 lands in "12".
+    verify(hash).delete("linkitem:01", new Object[] {"9001", "8001"});
+    verify(hash).delete("linkitem:12", new Object[] {"9012"});
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void shouldSkipRedis_whenNoItemIdsToRemove() {
+    store.removeItemFields(List.of());
+    verify(redis, never()).opsForHash();
+  }
+
+  @Test
+  public void shouldExposeAllHundredBuckets() {
+    assertThat(LinkIndexStore.itemBuckets()).hasSize(100);
+    assertThat(LinkIndexStore.itemBuckets().getFirst()).isEqualTo("00");
+    assertThat(LinkIndexStore.itemBuckets().getLast()).isEqualTo("99");
+  }
 }

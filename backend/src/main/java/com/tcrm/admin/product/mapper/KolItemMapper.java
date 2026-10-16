@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
+import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -120,4 +121,41 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
       Page<KolItemLinkRow> page,
       @Param("kolId") Long kolId,
       @Param("productCode") String productCode);
+
+  /**
+   * Exclusive item IDs of every mapping (current and closed) of the KOL and original product (task
+   * 11 §4.4). Used to drop stale {@code linkitem} fields after a mapping was replaced or closed;
+   * uses {@code uk_crm_kol_item_kol_product} (index columns only, so closed rows are covered too).
+   */
+  @Select(
+      """
+      SELECT weidian_item_id FROM crm_kol_item
+      WHERE kol_id = #{kolId} AND product_id = #{productId}
+      """)
+  List<String> listItemIdsByKolProduct(
+      @Param("kolId") Long kolId, @Param("productId") Long productId);
+
+  /**
+   * Exclusive item IDs of every mapping (current and closed) of the KOL. Used to drop the KOL's
+   * stale {@code linkitem} fields before rewriting its current ones; uses {@code
+   * idx_crm_kol_item_kol}.
+   */
+  @Select("SELECT weidian_item_id FROM crm_kol_item WHERE kol_id = #{kolId}")
+  List<String> listItemIdsByKol(@Param("kolId") Long kolId);
+
+  /**
+   * The subset of exclusive item IDs that still has a current mapping of any KOL (task 11 §4.4).
+   * The rebuild's orphan sweep checks each candidate before deleting so a mapping added while the
+   * rebuild runs is never dropped; uses {@code idx_crm_kol_item_item_shop_from} on the leading
+   * {@code weidian_item_id}. The list must be small (one sweep batch).
+   */
+  @Select(
+      "<script>"
+          + "SELECT DISTINCT weidian_item_id FROM crm_kol_item"
+          + " WHERE valid_to IS NULL AND weidian_item_id IN"
+          + " <foreach collection='itemIds' item='itemId' open='(' separator=',' close=')'>"
+          + "#{itemId}"
+          + "</foreach>"
+          + "</script>")
+  List<String> filterCurrentItemIds(@Param("itemIds") Collection<String> itemIds);
 }

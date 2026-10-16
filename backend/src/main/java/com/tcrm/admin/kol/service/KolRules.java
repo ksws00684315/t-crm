@@ -19,6 +19,15 @@ public final class KolRules {
   /** Social profile URL: https with a host. */
   public static final String HTTPS_URL_PATTERN = "https://[^\\s/?#]+\\S*";
 
+  /** WhatsApp number, E.164: a plus followed by 8 to 15 digits (task 11 §4.3). */
+  public static final String WHATSAPP_PATTERN = "\\+[0-9]{8,15}";
+
+  /** Invite code on the agent platform, 1 to 64 URL-safe characters (task 11 §4.3). */
+  public static final String INVITE_CODE_PATTERN = "[A-Za-z0-9_-]{1,64}";
+
+  /** Promotion sheet URL prefix, same as the database CHECK (task 11 §4.3). */
+  public static final String SHEET_URL_PATTERN = "https://docs\\.google\\.com/spreadsheets/.*";
+
   public static final int MAX_NAME = 64;
   public static final int MAX_EMAIL = 128;
   public static final int MAX_PLATFORM = 32;
@@ -26,6 +35,9 @@ public final class KolRules {
   public static final int MAX_URL = 512;
   public static final int MAX_REMARK = 500;
   public static final int MAX_SOCIAL_ACCOUNTS = 10;
+  public static final int MAX_WHATSAPP = 32;
+  public static final int MAX_INVITE_CODE = 64;
+  public static final int MAX_SHEET_URL = 512;
 
   private static final Pattern CODE = Pattern.compile(CODE_PATTERN);
   private static final Pattern EMAIL = Pattern.compile(EMAIL_PATTERN);
