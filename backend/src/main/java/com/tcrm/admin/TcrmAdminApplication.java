@@ -16,7 +16,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
       "com.tcrm.admin.kol",
       "com.tcrm.admin.product",
       "com.tcrm.admin.integration",
-      "com.tcrm.admin.link"
+      "com.tcrm.admin.link",
+      "com.tcrm.admin.order"
     },
     annotationClass = org.apache.ibatis.annotations.Mapper.class)
 @SpringBootApplication

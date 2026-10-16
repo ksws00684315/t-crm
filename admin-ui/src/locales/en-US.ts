@@ -210,6 +210,7 @@ const enUS: MessageSchema = {
     PRODUCT_WEIDIAN_ID_EXISTS: "This Weidian item ID already exists in the shop.",
     PRODUCT_CODE_IMMUTABLE: "The product code cannot be changed after it is created.",
     PRODUCT_IS_EXCLUSIVE_ITEM: "This Weidian item ID is an exclusive item and cannot be a product.",
+    ORDER_SYNC_RUNNING: "Order synchronization is already running for this shop.",
     LINK_REBUILD_RUNNING: "A tracking-link index rebuild is already running. Try again later.",
     generic: "The operation failed. Please try again later.",
     network: "Network error. Check your connection and try again.",

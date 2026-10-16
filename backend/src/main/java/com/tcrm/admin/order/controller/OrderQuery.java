@@ -1,0 +1,38 @@
+package com.tcrm.admin.order.controller;
+
+import com.tcrm.admin.order.service.OrderFilterDTO;
+import com.tcrm.admin.shared.PageResult;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import java.time.Instant;
+import org.springframework.format.annotation.DateTimeFormat;
+
+/** Payment interval is inclusive from, exclusive to; IDs never select another company. */
+public record OrderQuery(
+    @Positive Long shopId,
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant payFrom,
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant payTo,
+    @Size(max = 16) String kolCode,
+    @Pattern(regexp = "UNPAID|PAID|SHIPPED|RECEIVED|COMPLETED|CLOSED|UNKNOWN") String orderStatus,
+    @Pattern(regexp = "PENDING|ATTRIBUTED|NON_KOL|CONFLICT|UNMATCHED") String attributionStatus,
+    @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
+    @Min(1) @Max(100) Integer size) {
+  public OrderQuery {
+    page = page == null ? 1 : page;
+    size = size == null ? 20 : size;
+  }
+
+  @AssertTrue
+  public boolean isValidPeriod() {
+    return payFrom == null || payTo == null || payFrom.isBefore(payTo);
+  }
+
+  OrderFilterDTO filter() {
+    return new OrderFilterDTO(
+        shopId, payFrom, payTo, kolCode, orderStatus, attributionStatus, page, size);
+  }
+}

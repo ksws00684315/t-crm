@@ -17,6 +17,7 @@ public final class WeidianTestProperties {
   public static void register(
       DynamicPropertyRegistry registry, String apiBaseUrl, String oauthBaseUrl) {
     registry.add("crm.weidian.secret-key", () -> SECRET_KEY);
+    registry.add("TCRM_IP_HASH_SALT", () -> SECRET_KEY);
     registry.add("crm.weidian.admin-base-url", () -> "https://admin.example.test");
     registry.add("crm.weidian.api-base-url", () -> apiBaseUrl);
     registry.add("crm.weidian.oauth-base-url", () -> oauthBaseUrl);

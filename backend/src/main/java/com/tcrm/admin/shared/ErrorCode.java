@@ -48,6 +48,7 @@ public enum ErrorCode {
   PRODUCT_WEIDIAN_ID_EXISTS(409, "Weidian item ID already exists in this shop"),
   PRODUCT_CODE_IMMUTABLE(422, "Product code cannot be changed"),
   PRODUCT_IS_EXCLUSIVE_ITEM(422, "Exclusive item cannot be registered as an original product"),
+  ORDER_SYNC_RUNNING(409, "Order synchronization is already running for this shop"),
   LINK_REBUILD_RUNNING(409, "A link index rebuild is already running"),
   WEIDIAN_APP_NOT_CONFIGURED(422, "Weidian service application is not configured"),
   WEIDIAN_SHOP_NOT_AUTHORIZED(422, "Weidian shop is not connected"),

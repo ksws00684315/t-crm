@@ -212,6 +212,7 @@ const zhCN = {
     PRODUCT_WEIDIAN_ID_EXISTS: "该店铺下微店商品 ID 已存在",
     PRODUCT_CODE_IMMUTABLE: "原商品编码创建后不可修改",
     PRODUCT_IS_EXCLUSIVE_ITEM: "该微店商品 ID 已是专属商品，不能登记为原商品",
+    ORDER_SYNC_RUNNING: "该店铺的订单同步正在进行，请稍后重试。",
     LINK_REBUILD_RUNNING: "链接索引正在重建，请稍后再试",
     generic: "操作失败，请稍后重试",
     network: "网络异常，请检查网络连接后重试",
