@@ -1,5 +1,6 @@
 package com.tcrm.admin.kol.controller;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -260,6 +261,29 @@ class KolControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+    verifyNoInteractions(kols);
+  }
+
+  @Test
+  void shouldReportBodyFieldNames_whenEditBodyIsInvalid() throws Exception {
+    // The constrained path variable (@Min id) switches Spring to method validation; the body's
+    // field errors must still be reported by field, not as the parameter name "r".
+    mvc.perform(
+            json(put(BASE + "/11"), "{\"name\":\"\",\"email\":\"bad\",\"country\":\"US\"}")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.data[*].field").value(containsInAnyOrder("email", "name")));
+    verifyNoInteractions(kols);
+  }
+
+  @Test
+  void shouldReportPathParameterName_whenIdIsBelowMinimum() throws Exception {
+    mvc.perform(
+            json(put(BASE + "/0"), VALID)
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.data[0].field").value("id"));
     verifyNoInteractions(kols);
   }
 

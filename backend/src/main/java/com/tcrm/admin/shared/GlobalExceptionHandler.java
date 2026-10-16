@@ -5,11 +5,14 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Comparator;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -78,6 +81,11 @@ public class GlobalExceptionHandler {
                     .toList()));
   }
 
+  /**
+   * Method validation runs when any parameter carries a constraint (for example {@code @Min} on a
+   * path variable); a {@code @Valid} request body then reports through {@link ParameterErrors},
+   * whose field errors keep the body's field names. Simple parameters report their own name.
+   */
   @ExceptionHandler(HandlerMethodValidationException.class)
   public ResponseEntity<R<?>> parameters(HandlerMethodValidationException e) {
     return ResponseEntity.badRequest()
@@ -85,16 +93,19 @@ public class GlobalExceptionHandler {
             R.error(
                 ErrorCode.COMMON_VALIDATION_FAILED,
                 e.getParameterValidationResults().stream()
-                    .flatMap(
-                        r ->
-                            r.getResolvableErrors().stream()
-                                .map(
-                                    error ->
-                                        new FieldErrorVO(
-                                            r.getMethodParameter().getParameterName(),
-                                            error.getDefaultMessage())))
+                    .flatMap(GlobalExceptionHandler::fieldErrors)
                     .sorted(FIELD_ORDER)
                     .toList()));
+  }
+
+  private static Stream<FieldErrorVO> fieldErrors(ParameterValidationResult result) {
+    if (result instanceof ParameterErrors errors) {
+      return errors.getFieldErrors().stream()
+          .map(f -> new FieldErrorVO(f.getField(), f.getDefaultMessage()));
+    }
+    String name = result.getMethodParameter().getParameterName();
+    return result.getResolvableErrors().stream()
+        .map(error -> new FieldErrorVO(name, error.getDefaultMessage()));
   }
 
   /** Uploads above spring.servlet.multipart.max-file-size never reach the controller. */
