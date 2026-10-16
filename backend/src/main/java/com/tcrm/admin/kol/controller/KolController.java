@@ -1,7 +1,7 @@
 package com.tcrm.admin.kol.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.kol.service.KolService;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KOL management (task 04 §4.3, §5). Roles are checked here; data scope (a BD sees only their own
- * KOLs, 403 for others) and FINANCE read-only are enforced by the service.
+ * KOL management (task 04 §4.3, §5). Permission codes are checked here. A staff account with OWN
+ * scope sees only KOLs assigned to them; changing the BD is super-admin only.
  */
 @RestController
 @RequestMapping("/admin-api/kol/kols")
@@ -31,34 +31,26 @@ public class KolController {
   }
 
   @GetMapping
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:view")
   public R<PageResult<KolVO>> list(@Valid @ModelAttribute KolQuery q) {
     return R.ok(kols.page(q.toFilter()).map(KolVO::from));
   }
 
   @GetMapping("/{id}")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:view")
   public R<KolDetailVO> get(@PathVariable @Min(1) Long id) {
     return R.ok(KolDetailVO.from(kols.get(id)));
   }
 
   @PostMapping
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:edit")
   @AuditLog(module = "KOL", action = "Create")
   public R<KolVO> create(@Valid @RequestBody CreateKolRequest r) {
     return R.ok(KolVO.from(kols.create(r.toCommand())));
   }
 
   @PutMapping("/{id}")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:edit")
   @AuditLog(module = "KOL", action = "Edit")
   public R<Void> edit(@PathVariable @Min(1) Long id, @Valid @RequestBody EditKolRequest r) {
     kols.update(id, r.toCommand());
@@ -66,20 +58,16 @@ public class KolController {
   }
 
   @PutMapping("/{id}/status")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:edit")
   @AuditLog(module = "KOL", action = "Change status")
   public R<Void> status(@PathVariable @Min(1) Long id, @Valid @RequestBody KolStatusRequest r) {
     kols.updateStatus(id, r.status());
     return R.ok(null);
   }
 
-  /** SUPER_ADMIN and OPERATOR + ALL only; a BD (OWN) gets 403 from the service. */
+  /** Super administrator only. The service still rejects a staff account with OWN scope. */
   @PutMapping("/{id}/bd-user")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckRole("SUPER_ADMIN")
   @AuditLog(module = "KOL", action = "Change BD")
   public R<Void> bdUser(@PathVariable @Min(1) Long id, @Valid @RequestBody ChangeBdUserRequest r) {
     kols.updateBdUser(id, r.bdUserId());
@@ -88,9 +76,7 @@ public class KolController {
 
   /** Same permission as editing a KOL (task 12a §4.3); 409 when already activated. */
   @PostMapping("/{id}/invite")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:edit")
   @AuditLog(module = "KOL", action = "Resend invite")
   public R<Void> invite(@PathVariable @Min(1) Long id) {
     kols.resendInvite(id);

@@ -461,7 +461,8 @@ class TenantIsolationIT {
     long other = createUser(tokenA, otherName, "SUPER_ADMIN");
     String otherToken = CompanySessions.login(mvc, json, otherName, PASSWORD);
     Map<String, String> demote =
-        Map.of("nickname", "Demoted", "role", "FINANCE", "dataScope", "ALL");
+        Map.of(
+            "nickname", "Demoted", "role", "STAFF", "postTemplate", "OPERATOR", "dataScope", "ALL");
     int[] codes = new int[2];
     runAfterQueuedOnRowLocks(
         List.of(adminA, other),
@@ -565,7 +566,7 @@ class TenantIsolationIT {
   }
 
   private Map<String, String> userEdit() {
-    return Map.of("nickname", "Nope", "role", "OPERATOR", "dataScope", "OWN");
+    return Map.of("nickname", "Nope", "role", "STAFF", "postTemplate", "BD", "dataScope", "OWN");
   }
 
   private String shopBody(String name, String weidianId) throws Exception {
@@ -582,7 +583,9 @@ class TenantIsolationIT {
             "nickname",
             username,
             "role",
-            "OPERATOR",
+            "STAFF",
+            "postTemplate",
+            "BD",
             "dataScope",
             "OWN"));
   }

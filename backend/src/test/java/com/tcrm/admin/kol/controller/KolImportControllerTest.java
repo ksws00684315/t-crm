@@ -49,7 +49,7 @@ class KolImportControllerTest {
       new MockMultipartFile("file", "达人.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, new byte[] {1, 2});
 
   @ParameterizedTest
-  @CsvSource({"SUPER_ADMIN, ALL", "OPERATOR, ALL", "OPERATOR, OWN"})
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldAcceptUploadWith202AndTaskId_whenImporterSubmits(Role role, DataScope scope)
       throws Exception {
     when(imports.submit(any())).thenReturn(9007199254740993L);
@@ -65,8 +65,9 @@ class KolImportControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenFinanceUploadsOrDownloadsTemplate() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 1L, Role.FINANCE, DataScope.ALL);
+  void shouldReturn403_whenStaffLacksKolEdit() throws Exception {
+    String token =
+        AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL, java.util.Set.of("kol:view"));
     mvc.perform(multipart(BASE).file(file).header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
     mvc.perform(get(BASE + "/template").header(AdminMvcSupport.TOKEN_HEADER, token))
@@ -119,7 +120,7 @@ class KolImportControllerTest {
   @Test
   void shouldDownloadEnglishTemplateName_whenRequestIsEnglish() throws Exception {
     when(imports.template()).thenReturn(new byte[] {'P', 'K'});
-    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.OWN);
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.OWN);
     mvc.perform(
             get(BASE + "/template")
                 .header(AdminMvcSupport.TOKEN_HEADER, token)
@@ -140,7 +141,7 @@ class KolImportControllerTest {
   @Test
   void shouldDownloadChineseTemplateName_whenRequestIsChinese() throws Exception {
     when(imports.template()).thenReturn(new byte[] {'P', 'K'});
-    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.OWN);
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.OWN);
     // Non-ASCII file names are sent as the RFC 5987 filename* parameter.
     String encoded =
         java.net.URLEncoder.encode("达人导入模板.xlsx", java.nio.charset.StandardCharsets.UTF_8);

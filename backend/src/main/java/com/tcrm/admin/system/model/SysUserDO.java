@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BaseEntity;
 import java.time.Instant;
@@ -17,6 +18,7 @@ public class SysUserDO extends BaseEntity {
   private String email;
   private Role role;
   private DataScope dataScope;
+  private PostTemplate postTemplate;
   private Integer status;
   private Instant lastLoginTime;
   private Integer credentialVersion;
@@ -71,6 +73,14 @@ public class SysUserDO extends BaseEntity {
 
   public void setDataScope(DataScope value) {
     this.dataScope = value;
+  }
+
+  public PostTemplate getPostTemplate() {
+    return postTemplate;
+  }
+
+  public void setPostTemplate(PostTemplate value) {
+    this.postTemplate = value;
   }
 
   public Integer getStatus() {

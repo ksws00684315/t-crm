@@ -1,7 +1,6 @@
 package com.tcrm.admin.product.controller;
 
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.product.service.ProductService;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
@@ -17,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Original products (task 05 §4.2, §5). Roles checked here; OPERATOR+OWN and FINANCE write denial
- * is enforced by the service.
+ * Original products (task 05 §4.2, §5). Read, edit and status each declare their own permission
+ * code.
  */
 @RestController
 @RequestMapping("/admin-api/product/products")
@@ -30,25 +29,19 @@ public class ProductController {
   }
 
   @GetMapping
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:view")
   public R<PageResult<ProductVO>> list(@Valid @ModelAttribute ProductQuery q) {
     return R.ok(products.page(q.toFilter()).map(ProductVO::from));
   }
 
   @GetMapping("/{id}")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR", "FINANCE"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:view")
   public R<ProductVO> get(@PathVariable @Min(1) Long id) {
     return R.ok(ProductVO.from(products.get(id)));
   }
 
   @PutMapping("/{id}")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:edit")
   @AuditLog(module = "PRODUCT", action = "Edit product")
   public R<Void> edit(@PathVariable @Min(1) Long id, @Valid @RequestBody EditProductRequest r) {
     products.update(id, r.toCommand());
@@ -56,9 +49,7 @@ public class ProductController {
   }
 
   @PutMapping("/{id}/status")
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("product:status")
   @AuditLog(module = "PRODUCT", action = "Change product status")
   public R<Void> status(@PathVariable @Min(1) Long id, @Valid @RequestBody ProductStatusRequest r) {
     products.updateStatus(id, r.status());

@@ -3,9 +3,6 @@ package com.tcrm.admin.kol.service;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.Role;
-import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
@@ -38,13 +35,10 @@ public class KolImportService {
     return imports.template(KolImportColumn.headerKeys());
   }
 
-  /** Validates and queues the file; returns the task ID. FINANCE may not import (403). */
+  /** Validates and queues the file; returns the task ID. */
   public Long submit(ImportFileDTO file) {
     AccountDTO user = current.user();
-    if (user.role() == Role.FINANCE) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    ImportActor actor = new ImportActor(user.id(), KolService.own(user));
+    ImportActor actor = new ImportActor(user.id(), user.ownScope());
     return imports.submitImport(
         TaskType.KOL_IMPORT,
         KolImportColumn.headerKeys(),

@@ -10,13 +10,15 @@ import { saveSession } from "@/utils/session";
 import { rememberRecentMenu } from "@/utils/menu-search";
 import MenuSearch from "../MenuSearch.vue";
 
-function signIn(role: UserVO["role"], id = "1"): void {
+function signIn(role: UserVO["role"], id = "1", permissions: string[] = []): void {
   const user: UserVO = {
     id,
     username: "me",
     nickname: "Me",
     email: null,
     role,
+    postTemplate: role === "STAFF" ? "BD" : null,
+    permissions,
     dataScope: "ALL",
     tenantId: "1",
     tenantName: "默认公司",
@@ -82,7 +84,7 @@ describe("menu search dialog", () => {
   });
 
   it("lists only menus the signed-in user may open", async () => {
-    signIn("FINANCE");
+    signIn("STAFF", "1", ["kol:view"]);
     setActivePinia(createPinia());
     const { wrapper } = await mountDialog();
     useMenuSearchStore().open();

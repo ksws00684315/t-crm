@@ -1,5 +1,6 @@
 import { createMemoryHistory, createRouter } from "vue-router";
 import { describe, expect, it } from "vitest";
+import { accessOf, type AbilitySubject } from "@/utils/permission";
 import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
 
@@ -7,12 +8,36 @@ import { routes } from "../routes";
 // locale packs. Import it here so that cost stays outside the 5s test timeout.
 import "@/views/login/index.vue";
 
-const signedOut: AuthState = { isLoggedIn: false, roles: [] };
-const operator: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "ALL" };
-const operatorOwn: AuthState = { isLoggedIn: true, roles: ["OPERATOR"], dataScope: "OWN" };
-const superAdmin: AuthState = { isLoggedIn: true, roles: ["SUPER_ADMIN"], dataScope: "ALL" };
-const finance: AuthState = { isLoggedIn: true, roles: ["FINANCE"], dataScope: "ALL" };
-const platformAdmin: AuthState = { isLoggedIn: true, roles: ["PLATFORM_ADMIN"] };
+function session(user: AbilitySubject | null): AuthState {
+  return { isLoggedIn: user !== null, ...accessOf(user) };
+}
+
+const signedOut = session(null);
+const viewer: AbilitySubject = {
+  role: "STAFF",
+  dataScope: "ALL",
+  permissions: ["kol:view"],
+  postTemplate: "OPERATOR"
+};
+const productAll: AbilitySubject = {
+  role: "STAFF",
+  dataScope: "ALL",
+  permissions: ["product:view"],
+  postTemplate: "OPERATOR"
+};
+const productOwn: AbilitySubject = { ...productAll, dataScope: "OWN", postTemplate: "BD" };
+const superAdmin: AbilitySubject = {
+  role: "SUPER_ADMIN",
+  dataScope: "ALL",
+  permissions: [],
+  postTemplate: null
+};
+const platformAdmin: AbilitySubject = {
+  role: "PLATFORM_ADMIN",
+  dataScope: null,
+  permissions: [],
+  postTemplate: null
+};
 
 function target(path: string, meta: Record<string, unknown> = {}) {
   return { path, fullPath: path, meta };
@@ -20,7 +45,7 @@ function target(path: string, meta: Record<string, unknown> = {}) {
 
 describe("resolveAccess", () => {
   it("redirects a signed-out user to /login and remembers the target", () => {
-    expect(resolveAccess(target("/system/users", { roles: ["SUPER_ADMIN"] }), signedOut)).toEqual({
+    expect(resolveAccess(target("/system/users", { superAdmin: true }), signedOut)).toEqual({
       path: "/login",
       query: { redirect: "/system/users" }
     });
@@ -35,76 +60,72 @@ describe("resolveAccess", () => {
   });
 
   it("sends a signed-in user away from the login page", () => {
-    expect(resolveAccess(target("/login", { public: true }), operator)).toBe("/");
+    expect(resolveAccess(target("/login", { public: true }), session(viewer))).toBe("/");
   });
 
   it("sends a platform administrator from login and home to company management", () => {
-    expect(resolveAccess(target("/login", { public: true }), platformAdmin)).toBe(
+    expect(resolveAccess(target("/login", { public: true }), session(platformAdmin))).toBe(
       "/platform/tenants"
     );
-    expect(
-      resolveAccess(
-        target("/home", { roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] }),
-        platformAdmin
-      )
-    ).toBe("/platform/tenants");
+    expect(resolveAccess(target("/home"), session(platformAdmin))).toBe("/platform/tenants");
   });
 
-  it("rejects a role that is not allowed with the 403 page", () => {
-    expect(resolveAccess(target("/system/users", { roles: ["SUPER_ADMIN"] }), operator)).toBe(
+  it("rejects a route the account cannot open with the 403 page", () => {
+    expect(resolveAccess(target("/system/users", { superAdmin: true }), session(viewer))).toBe(
       "/403"
     );
+    expect(
+      resolveAccess(target("/kol/kols", { permission: "kol:view" }), session(productAll))
+    ).toBe("/403");
   });
 
-  it("allows a matching role", () => {
-    expect(resolveAccess(target("/system/users", { roles: ["SUPER_ADMIN"] }), superAdmin)).toBe(
+  it("allows a super administrator onto a super-admin route", () => {
+    expect(resolveAccess(target("/system/users", { superAdmin: true }), session(superAdmin))).toBe(
       true
     );
   });
 
-  it("allows any signed-in role when the route declares no roles", () => {
-    expect(resolveAccess(target("/home", { title: "首页" }), operator)).toBe(true);
+  it("allows any signed-in company account when the route declares no permission", () => {
+    expect(resolveAccess(target("/home", { title: "首页" }), session(viewer))).toBe(true);
   });
 
-  it("rejects OPERATOR+OWN on hideForOwn routes (same as the menu)", () => {
+  it("rejects OWN on hideForOwn routes (same as the menu)", () => {
     expect(
       resolveAccess(
-        target("/product/kol-items", {
-          roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"],
-          hideForOwn: true
-        }),
-        operatorOwn
+        target("/product/kol-items", { permission: "product:view", hideForOwn: true }),
+        session(productOwn)
       )
     ).toBe("/403");
   });
 
-  it("allows OPERATOR+ALL and FINANCE on hideForOwn routes", () => {
-    const meta = {
-      roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const,
-      hideForOwn: true
-    };
-    expect(resolveAccess(target("/product/kol-items", meta), operator)).toBe(true);
-    expect(resolveAccess(target("/product/kol-items", meta), finance)).toBe(true);
+  it("allows a non-OWN account that has product:view on hideForOwn routes", () => {
+    const meta = { permission: "product:view" as const, hideForOwn: true };
+    expect(resolveAccess(target("/product/kol-items", meta), session(productAll))).toBe(true);
+    expect(resolveAccess(target("/product/kol-items", meta), session(superAdmin))).toBe(true);
   });
 });
 
 describe("installGuard with the real route table", () => {
-  async function navigate(auth: AuthState, path: string) {
+  async function navigate(user: AbilitySubject | null, path: string) {
     const router = createRouter({ history: createMemoryHistory(), routes });
-    installGuard(router, () => auth);
+    installGuard(router, () => session(user));
     await router.push(path);
     return router.currentRoute.value;
   }
 
   it("keeps a signed-out user on the login page with a redirect query", async () => {
-    const route = await navigate(signedOut, "/system/users");
+    const route = await navigate(null, "/system/users");
     expect(route.path).toBe("/login");
     expect(route.query.redirect).toBe("/system/users");
   });
 
-  it("denies the user list and the audit log to an operator", async () => {
-    expect((await navigate(operator, "/system/users")).path).toBe("/403");
-    expect((await navigate(operator, "/system/oper-logs")).path).toBe("/403");
+  it("denies the user list and the audit log to a sub-account", async () => {
+    expect((await navigate(viewer, "/system/users")).path).toBe("/403");
+    expect((await navigate(viewer, "/system/oper-logs")).path).toBe("/403");
+  });
+
+  it("denies a route whose permission code is missing", async () => {
+    expect((await navigate(productAll, "/kol/kols")).path).toBe("/403");
   });
 
   it("opens the user list and the audit log for the super administrator", async () => {
@@ -112,12 +133,12 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
-  it("redirects OPERATOR+OWN away from /product/kol-items to 403", async () => {
-    expect((await navigate(operatorOwn, "/product/kol-items")).path).toBe("/403");
+  it("redirects OWN away from /product/kol-items to 403", async () => {
+    expect((await navigate(productOwn, "/product/kol-items")).path).toBe("/403");
   });
 
-  it("opens /product/kol-items for OPERATOR+ALL", async () => {
-    expect((await navigate(operator, "/product/kol-items")).name).toBe("KolItemList");
+  it("opens /product/kol-items for a non-OWN account with product:view", async () => {
+    expect((await navigate(productAll, "/product/kol-items")).name).toBe("KolItemList");
   });
 
   it("routes platform home to company management and blocks business pages", async () => {
@@ -132,18 +153,39 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/platform/tenants")).path).toBe("/403");
   });
 
-  it("restricts the system pages to SUPER_ADMIN and opens KOL management to every role", () => {
+  it("declares access with a permission code, superAdmin or platformAdmin", () => {
     const layout = routes.find(route => route.path === "/");
-    const restricted = (layout?.children ?? [])
-      .filter(route => route.meta?.roles?.length)
-      .map(route => [route.path, route.meta?.roles]);
-    expect(restricted).toEqual([
-      ["home", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
-      ["platform/tenants", ["PLATFORM_ADMIN"]],
-      ["kol/kols", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
-      ["product", ["SUPER_ADMIN", "OPERATOR", "FINANCE"]],
-      ["system/users", ["SUPER_ADMIN"]],
-      ["system/oper-logs", ["SUPER_ADMIN"]]
+    const flags = (layout?.children ?? []).map(route => [
+      route.path,
+      route.meta?.permission ?? null,
+      route.meta?.superAdmin === true,
+      route.meta?.platformAdmin === true,
+      route.meta?.hideForOwn === true
     ]);
+    expect(flags).toEqual([
+      ["home", null, false, false, false],
+      ["platform/tenants", null, false, true, false],
+      ["kol/kols", "kol:view", false, false, false],
+      ["product", null, false, false, false],
+      ["system/users", null, true, false, false],
+      ["system/oper-logs", null, true, false, false],
+      ["account/password", null, false, false, false],
+      ["403", null, false, false, false]
+    ]);
+    const product = layout?.children?.find(route => route.path === "product");
+    expect(
+      product?.children?.map(route => [
+        route.path,
+        route.meta?.permission ?? null,
+        route.meta?.hideForOwn === true
+      ])
+    ).toEqual([
+      ["shops", "product:view", false],
+      ["products", "product:view", false],
+      ["kol-items", "product:view", true]
+    ]);
+    for (const route of layout?.children ?? []) {
+      expect(route.meta).not.toHaveProperty("roles");
+    }
   });
 });

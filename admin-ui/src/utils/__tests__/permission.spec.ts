@@ -1,35 +1,121 @@
 import { describe, expect, it } from "vitest";
 import { routes } from "@/router/routes";
 import {
+  accessOf,
+  accountLabel,
   buildMenu,
   canAccessRoute,
-  hasAnyRole,
+  canExport,
+  groupPermissions,
+  isStaff,
+  isSuperAdminAccount,
   kolAbilities,
   linkAbilities,
-  productAbilities
+  permissionGroupLabel,
+  permissionText,
+  POST_TEMPLATES,
+  productAbilities,
+  SELECTABLE_ROLES,
+  type AbilitySubject
 } from "../permission";
 
-describe("hasAnyRole", () => {
-  it("allows everyone when no roles are required", () => {
-    expect(hasAnyRole(undefined, ["FINANCE"])).toBe(true);
-    expect(hasAnyRole([], [])).toBe(true);
+function staff(dataScope: "ALL" | "OWN", permissions: readonly string[]): AbilitySubject {
+  return { role: "STAFF", dataScope, permissions, postTemplate: "OPERATOR" };
+}
+
+const superAdmin: AbilitySubject = {
+  role: "SUPER_ADMIN",
+  dataScope: "ALL",
+  permissions: [],
+  postTemplate: null
+};
+
+const platformAdmin: AbilitySubject = {
+  role: "PLATFORM_ADMIN",
+  dataScope: null,
+  permissions: [],
+  postTemplate: null
+};
+
+function titles(user: AbilitySubject | null): string[] {
+  return buildMenu(routes, accessOf(user)).flatMap(item =>
+    item.children?.length ? [item.title, ...item.children.map(child => child.title)] : [item.title]
+  );
+}
+
+describe("accessOf", () => {
+  it("grants every code to a super administrator and ignores the permissions array", () => {
+    const access = accessOf({ ...superAdmin, permissions: [] });
+    expect(access.isSuperAdmin).toBe(true);
+    expect(access.isOwnScope).toBe(false);
+    expect(access.can("kol:view")).toBe(true);
+    expect(access.can("commission:freeze")).toBe(true);
   });
 
-  it("requires at least one matching role", () => {
-    expect(hasAnyRole(["SUPER_ADMIN"], ["OPERATOR"])).toBe(false);
-    expect(hasAnyRole(["SUPER_ADMIN", "FINANCE"], ["FINANCE"])).toBe(true);
-    expect(hasAnyRole(["SUPER_ADMIN"], [])).toBe(false);
+  it("grants a sub-account only the codes it holds", () => {
+    const access = accessOf(staff("ALL", ["kol:view"]));
+    expect(access.isSuperAdmin).toBe(false);
+    expect(access.can("kol:view")).toBe(true);
+    expect(access.can("kol:edit")).toBe(false);
+  });
+
+  it("treats OWN scope as staff plus OWN, never a super administrator", () => {
+    expect(accessOf(staff("OWN", ["kol:view"])).isOwnScope).toBe(true);
+    expect(accessOf(staff("ALL", ["kol:view"])).isOwnScope).toBe(false);
+    expect(accessOf({ ...superAdmin, dataScope: "OWN" }).isOwnScope).toBe(false);
+  });
+
+  it("gives the platform administrator no company permission", () => {
+    const access = accessOf(platformAdmin);
+    expect(access.isPlatformAdmin).toBe(true);
+    expect(access.can("kol:view")).toBe(false);
+    expect(accessOf(null).can("data:export")).toBe(false);
+  });
+});
+
+describe("labels", () => {
+  it("shows the post name for a sub-account and the account type otherwise", () => {
+    expect(accountLabel(staff("OWN", []))).toBe("运营");
+    expect(accountLabel({ ...staff("ALL", []), postTemplate: "BD" })).toBe("商务");
+    expect(accountLabel({ ...staff("ALL", []), postTemplate: null })).toBe("子账号");
+    expect(accountLabel(superAdmin)).toBe("超级管理员");
+    expect(accountLabel(platformAdmin)).toBe("平台管理员");
+  });
+
+  it("keeps platform administrator out of the company account types", () => {
+    expect(SELECTABLE_ROLES).toEqual(["SUPER_ADMIN", "STAFF"]);
+    expect(POST_TEMPLATES).toEqual(["OPERATOR", "BD"]);
+    expect(isStaff(staff("ALL", []))).toBe(true);
+    expect(isStaff(superAdmin)).toBe(false);
+    expect(isSuperAdminAccount(superAdmin)).toBe(true);
+    expect(isSuperAdminAccount(staff("ALL", []))).toBe(false);
+  });
+});
+
+describe("permission text", () => {
+  it("reads the language pack and shows an unknown code as itself", () => {
+    expect(permissionText("kol:view", "name")).toBe("查看达人");
+    expect(permissionText("kol:view", "desc").length).toBeGreaterThan(0);
+    expect(permissionText("future:extra", "name")).toBe("future:extra");
+    expect(permissionText("future:extra", "desc")).toBe("");
+    expect(permissionGroupLabel("KOL")).toBe("达人");
+    expect(permissionGroupLabel("NEWGROUP")).toBe("NEWGROUP");
+  });
+
+  it("keeps known groups first and appends a group the API adds", () => {
+    expect(
+      groupPermissions([
+        { code: "data:export", group: "OTHER" },
+        { code: "kol:view", group: "KOL" },
+        { code: "future:extra", group: "NEWGROUP" }
+      ]).map(group => group.group)
+    ).toEqual(["KOL", "OTHER", "NEWGROUP"]);
   });
 });
 
 describe("buildMenu", () => {
-  const titles = (roles: Parameters<typeof buildMenu>[1], scope: "ALL" | "OWN" = "ALL") =>
-    buildMenu(routes, roles, scope).flatMap(item =>
-      item.children?.length ? [item.title, ...item.children.map(c => c.title)] : [item.title]
-    );
-
-  it("shows user management and the audit log only to the super administrator", () => {
-    expect(titles(["SUPER_ADMIN"])).toEqual([
+  it("shows every company page to the super administrator", () => {
+    expect(titles(superAdmin)).toEqual([
       "首页",
       "达人管理",
       "商品",
@@ -39,36 +125,9 @@ describe("buildMenu", () => {
       "用户管理",
       "操作日志"
     ]);
-    expect(titles(["OPERATOR"])).toEqual([
-      "首页",
-      "达人管理",
-      "商品",
-      "店铺管理",
-      "原商品",
-      "对应关系"
-    ]);
-    expect(titles(["FINANCE"])).toEqual([
-      "首页",
-      "达人管理",
-      "商品",
-      "店铺管理",
-      "原商品",
-      "对应关系"
-    ]);
-  });
-
-  it("hides mapping menu for an OWN operator", () => {
-    expect(titles(["OPERATOR"], "OWN")).toEqual(["首页", "达人管理", "商品", "店铺管理", "原商品"]);
-  });
-
-  it("shows only company management to the platform administrator", () => {
-    expect(titles(["PLATFORM_ADMIN"])).toEqual(["公司管理"]);
-  });
-
-  it("builds absolute paths and hides the login, password and error pages", () => {
-    const items = buildMenu(routes, ["SUPER_ADMIN"]);
+    const items = buildMenu(routes, accessOf(superAdmin));
     const paths = items.flatMap(item =>
-      item.children?.length ? item.children.map(c => c.path) : [item.path]
+      item.children?.length ? item.children.map(child => child.path) : [item.path]
     );
     expect(paths).toEqual([
       "/home",
@@ -80,103 +139,152 @@ describe("buildMenu", () => {
       "/system/oper-logs"
     ]);
   });
-});
 
-describe("kolAbilities", () => {
-  it("lets FINANCE only read and keeps BD management from a BD", () => {
-    expect(kolAbilities({ role: "SUPER_ADMIN", dataScope: "ALL" })).toEqual({
-      canWrite: true,
-      canManageBd: true
-    });
-    expect(kolAbilities({ role: "OPERATOR", dataScope: "ALL" })).toEqual({
-      canWrite: true,
-      canManageBd: true
-    });
-    expect(kolAbilities({ role: "OPERATOR", dataScope: "OWN" })).toEqual({
-      canWrite: true,
-      canManageBd: false
-    });
-    expect(kolAbilities({ role: "FINANCE", dataScope: "ALL" })).toEqual({
-      canWrite: false,
-      canManageBd: false
-    });
-    expect(kolAbilities(null)).toEqual({ canWrite: false, canManageBd: false });
+  it("shows only home and creators to a sub-account that has kol:view", () => {
+    expect(titles(staff("ALL", ["kol:view"]))).toEqual(["首页", "达人管理"]);
+    expect(titles(staff("OWN", ["kol:view"]))).toEqual(["首页", "达人管理"]);
   });
 
-  it("shows the KOL menu to every role", () => {
-    for (const role of ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const) {
-      expect(buildMenu(routes, [role]).map(item => item.title)).toContain("达人管理");
-    }
+  it("hides mapping for an OWN sub-account that can view products", () => {
+    expect(titles(staff("ALL", ["product:view"]))).toEqual([
+      "首页",
+      "商品",
+      "店铺管理",
+      "原商品",
+      "对应关系"
+    ]);
+    expect(titles(staff("OWN", ["product:view"]))).toEqual(["首页", "商品", "店铺管理", "原商品"]);
   });
-});
 
-describe("productAbilities", () => {
-  it("matches the task 05 permission matrix", () => {
-    expect(productAbilities({ role: "SUPER_ADMIN", dataScope: "ALL" })).toEqual({
-      canManageShop: true,
-      canWriteProduct: true,
-      canViewMapping: true,
-      canImportMapping: true
-    });
-    expect(productAbilities({ role: "OPERATOR", dataScope: "ALL" })).toEqual({
-      canManageShop: false,
-      canWriteProduct: true,
-      canViewMapping: true,
-      canImportMapping: true
-    });
-    expect(productAbilities({ role: "OPERATOR", dataScope: "OWN" })).toEqual({
-      canManageShop: false,
-      canWriteProduct: false,
-      canViewMapping: false,
-      canImportMapping: false
-    });
-    expect(productAbilities({ role: "FINANCE", dataScope: "ALL" })).toEqual({
-      canManageShop: false,
-      canWriteProduct: false,
-      canViewMapping: true,
-      canImportMapping: false
-    });
+  it("shows only company management to the platform administrator", () => {
+    expect(titles(platformAdmin)).toEqual(["公司管理"]);
   });
 });
 
 describe("canAccessRoute", () => {
-  const mappingMeta = {
-    roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] as const,
-    hideForOwn: true
-  };
-
-  it("matches buildMenu: OWN operator cannot open mapping", () => {
-    expect(canAccessRoute(mappingMeta, ["OPERATOR"], "OWN")).toBe(false);
-    expect(canAccessRoute(mappingMeta, ["OPERATOR"], "ALL")).toBe(true);
-    expect(canAccessRoute(mappingMeta, ["FINANCE"], "ALL")).toBe(true);
+  it("matches the menu: OWN cannot open mapping, a missing code cannot open the page", () => {
+    const mapping = { permission: "product:view" as const, hideForOwn: true };
+    expect(canAccessRoute(mapping, accessOf(staff("OWN", ["product:view"])))).toBe(false);
+    expect(canAccessRoute(mapping, accessOf(staff("ALL", ["product:view"])))).toBe(true);
+    expect(canAccessRoute(mapping, accessOf(staff("ALL", [])))).toBe(false);
+    expect(canAccessRoute({ superAdmin: true }, accessOf(staff("ALL", ["kol:view"])))).toBe(false);
+    expect(canAccessRoute({ superAdmin: true }, accessOf(superAdmin))).toBe(true);
   });
 
-  it("still rejects roles that are not allowed", () => {
-    expect(canAccessRoute({ roles: ["SUPER_ADMIN"] }, ["OPERATOR"], "ALL")).toBe(false);
+  it("limits platform administrators to platform pages and hidden account pages", () => {
+    expect(canAccessRoute({ platformAdmin: true }, accessOf(platformAdmin))).toBe(true);
+    expect(canAccessRoute({ platformAdmin: true }, accessOf(superAdmin))).toBe(false);
+    expect(canAccessRoute({ permission: "kol:view" }, accessOf(platformAdmin))).toBe(false);
+    expect(canAccessRoute({}, accessOf(platformAdmin))).toBe(false);
+    expect(canAccessRoute({ hideInMenu: true }, accessOf(platformAdmin))).toBe(true);
+    expect(canAccessRoute({}, accessOf(staff("ALL", [])))).toBe(true);
   });
+});
 
-  it("limits platform administrators to platform pages and roleless account/error pages", () => {
-    expect(canAccessRoute({ roles: ["PLATFORM_ADMIN"] }, ["PLATFORM_ADMIN"], null)).toBe(true);
+describe("kolAbilities", () => {
+  it("follows the permission matrix for creators", () => {
+    expect(kolAbilities(null)).toEqual({
+      canWrite: false,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false
+    });
+    expect(kolAbilities(superAdmin)).toEqual({
+      canWrite: true,
+      canChangeBd: true,
+      canAssignBd: true,
+      canFilterBd: true
+    });
+    expect(kolAbilities(staff("ALL", ["kol:view", "kol:edit"]))).toEqual({
+      canWrite: true,
+      canChangeBd: false,
+      canAssignBd: true,
+      canFilterBd: true
+    });
+    expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"]))).toEqual({
+      canWrite: true,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false
+    });
+    expect(kolAbilities(staff("ALL", ["kol:view"]))).toEqual({
+      canWrite: false,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: true
+    });
+  });
+});
+
+describe("productAbilities", () => {
+  it("follows the permission matrix for shops, products and mappings", () => {
+    expect(productAbilities(null)).toEqual({
+      canManageShop: false,
+      canEditProduct: false,
+      canChangeStatus: false,
+      canViewMapping: false,
+      canImportMapping: false
+    });
+    expect(productAbilities(superAdmin)).toEqual({
+      canManageShop: true,
+      canEditProduct: true,
+      canChangeStatus: true,
+      canViewMapping: true,
+      canImportMapping: true
+    });
     expect(
-      canAccessRoute({ roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] }, ["PLATFORM_ADMIN"], null)
-    ).toBe(false);
-    expect(canAccessRoute({}, ["PLATFORM_ADMIN"], null)).toBe(true);
+      productAbilities(staff("ALL", ["product:view", "product:edit", "product:status"]))
+    ).toEqual({
+      canManageShop: false,
+      canEditProduct: true,
+      canChangeStatus: true,
+      canViewMapping: true,
+      canImportMapping: true
+    });
+    expect(productAbilities(staff("OWN", ["product:view", "product:edit"]))).toEqual({
+      canManageShop: false,
+      canEditProduct: true,
+      canChangeStatus: false,
+      canViewMapping: false,
+      canImportMapping: true
+    });
+    expect(productAbilities(staff("ALL", ["product:view"]))).toEqual({
+      canManageShop: false,
+      canEditProduct: false,
+      canChangeStatus: false,
+      canViewMapping: true,
+      canImportMapping: false
+    });
+    expect(productAbilities(staff("ALL", ["product:status"]))).toEqual({
+      canManageShop: false,
+      canEditProduct: false,
+      canChangeStatus: true,
+      canViewMapping: false,
+      canImportMapping: false
+    });
   });
 });
 
 describe("linkAbilities", () => {
-  it("lets every role view links and only SUPER_ADMIN rebuild the index", () => {
+  it("requires product:view to see links and super administrator to rebuild the index", () => {
     expect(linkAbilities(null)).toEqual({ canViewLinks: false, canRebuildIndex: false });
-    expect(linkAbilities({ role: "SUPER_ADMIN", dataScope: "ALL" })).toEqual({
+    expect(linkAbilities(superAdmin)).toEqual({ canViewLinks: true, canRebuildIndex: true });
+    expect(linkAbilities(staff("ALL", ["product:view"]))).toEqual({
       canViewLinks: true,
-      canRebuildIndex: true
+      canRebuildIndex: false
     });
-    for (const user of [
-      { role: "OPERATOR", dataScope: "ALL" },
-      { role: "OPERATOR", dataScope: "OWN" },
-      { role: "FINANCE", dataScope: "ALL" }
-    ] as const) {
-      expect(linkAbilities(user)).toEqual({ canViewLinks: true, canRebuildIndex: false });
-    }
+    expect(linkAbilities(staff("OWN", ["kol:view"]))).toEqual({
+      canViewLinks: false,
+      canRebuildIndex: false
+    });
+  });
+});
+
+describe("canExport", () => {
+  it("shows export only when the account has data:export", () => {
+    expect(canExport(superAdmin)).toBe(true);
+    expect(canExport(staff("ALL", ["data:export"]))).toBe(true);
+    expect(canExport(staff("OWN", ["kol:view"]))).toBe(false);
+    expect(canExport(null)).toBe(false);
   });
 });

@@ -75,7 +75,7 @@ class AuthControllerTest {
             "test-hash",
             "Operator",
             null,
-            Role.OPERATOR,
+            Role.STAFF,
             DataScope.OWN,
             1,
             null,
@@ -85,7 +85,8 @@ class AuthControllerTest {
             null,
             true);
     when(current.user()).thenReturn(actor);
-    when(current.roleNames(any())).thenReturn(List.of("OPERATOR"));
+    when(current.roleNames(any())).thenReturn(List.of("STAFF"));
+    when(current.permissionNames(any())).thenReturn(List.of());
     var security =
         new SecurityConfiguration(
             current,
@@ -98,7 +99,8 @@ class AuthControllerTest {
     new CommonConfiguration().jsonCustomizer().customize(builder);
     mvc =
         MockMvcBuilders.standaloneSetup(
-                new UserController(users),
+                new UserController(
+                    users, mock(com.tcrm.admin.system.service.UserPermissionService.class)),
                 new AuthController(
                     auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For"), captchas),
                 new ErrorController())
@@ -191,7 +193,8 @@ class AuthControllerTest {
   void shouldReturnIdentity_whenOperatorIsAuthenticated() throws Exception {
     mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.role").value("OPERATOR"));
+        .andExpect(jsonPath("$.data.role").value("STAFF"))
+        .andExpect(jsonPath("$.data.permissions").isArray());
   }
 
   @Test
@@ -248,7 +251,7 @@ class AuthControllerTest {
                     .contentType("application/json")
                     .content("{}"))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.data.length()").value(5))
+            .andExpect(jsonPath("$.data.length()").value(4))
             .andExpect(header().string("X-Content-Type-Options", "nosniff"))
             .andReturn();
     var node = JsonMapper.builder().build().readTree(result.getResponse().getContentAsString());

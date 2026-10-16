@@ -112,14 +112,14 @@ class KolServiceTest {
 
   @Test
   void shouldForceOwnBdFilter_whenBdListsWithAnotherBdUserId() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     String query = pageQuery(new KolFilterDTO(null, null, null, OTHER_BD, 1, 20));
     assertThat(query).contains("bd_user_id =").contains("[" + BD + "]").doesNotContain("6");
   }
 
   @Test
   void shouldApplyAllFilters_whenOperatorWithAllScopeLists() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     String query = pageQuery(new KolFilterDTO(" 50%_\\a ", "us", 1, OTHER_BD, 2, 10));
     assertThat(query)
         .contains("(kol_code ILIKE", "OR name ILIKE", "OR email ILIKE")
@@ -142,7 +142,7 @@ class KolServiceTest {
 
   @Test
   void shouldReturnDetailWithHistory_whenBdOwnsKol() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     when(kols.selectById(11L)).thenReturn(kol(BD));
     Instant t1 = Instant.parse("2026-10-01T00:00:00Z");
     Instant t2 = Instant.parse("2026-10-02T00:00:00Z");
@@ -166,7 +166,7 @@ class KolServiceTest {
 
   @Test
   void shouldReturn403_whenBdReadsAnotherBdsKol() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     assertThatThrownBy(() -> service.get(11L)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
     when(kols.selectById(11L)).thenReturn(kol(null));
@@ -175,7 +175,7 @@ class KolServiceTest {
 
   @Test
   void shouldReturn404_whenKolIsMissing() {
-    actAs(1L, Role.FINANCE, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     assertThatThrownBy(() -> service.get(11L)).hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
   }
 
@@ -192,7 +192,7 @@ class KolServiceTest {
 
   @Test
   void shouldAssignBdToSelfAndIgnoreRequest_whenBdCreates() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     var result = service.create(create(OTHER_BD));
     var saved = ArgumentCaptor.forClass(KolDO.class);
     verify(writer).insert(saved.capture(), isNull(), eq(BD));
@@ -220,7 +220,7 @@ class KolServiceTest {
 
   @Test
   void shouldAssignRequestedBd_whenBdIsUsable() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(bdUsers.getById(BD)).thenReturn(new BdUserDTO(BD, "bd5", "BD", true));
     when(bdUsers.listByIds(any())).thenReturn(List.of(new BdUserDTO(BD, "bd5", "BD", true)));
     assertThat(service.create(create(BD)).bdUserName()).isEqualTo("bd5");
@@ -247,17 +247,9 @@ class KolServiceTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"create", "update", "status", "bd"})
-  void shouldReturn403_whenFinanceWrites(String operation) {
-    actAs(1L, Role.FINANCE, DataScope.ALL);
-    assertThatThrownBy(() -> write(operation)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
-    verifyNoInteractions(kols, writer, history);
-  }
-
-  @ParameterizedTest
   @CsvSource({"update", "status"})
   void shouldReturn403_whenBdWritesAnotherBdsKol(String operation) {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     assertThatThrownBy(() -> write(operation)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
     verify(kols, never()).updateById(any(KolDO.class));
@@ -279,7 +271,7 @@ class KolServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldRejectBdEdit_whenKolLeftTheirScopeBeforeTheUpdate() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     when(kols.selectById(11L)).thenReturn(kol(BD));
     // Transferred to another BD after the visibility check: the scoped UPDATE matches no row.
     when(kols.update(isNull(), any())).thenReturn(0);
@@ -295,7 +287,7 @@ class KolServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldUpdateEditableFieldsOnly_whenBdEditsOwnKol() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     KolDO kol = kol(BD);
     kol.setDefaultRate(new BigDecimal("0.1"));
     when(kols.selectById(11L)).thenReturn(kol);
@@ -341,7 +333,7 @@ class KolServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldChangeStatus_whenAdminDisablesKol() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     when(kols.update(isNull(), any())).thenReturn(1);
 
@@ -364,7 +356,7 @@ class KolServiceTest {
 
   @Test
   void shouldReturn403_whenBdChangesBd() {
-    actAs(BD, Role.OPERATOR, DataScope.OWN);
+    actAs(BD, Role.STAFF, DataScope.OWN);
     assertThatThrownBy(() -> service.updateBdUser(11L, null))
         .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
     verifyNoInteractions(kols, history);
@@ -406,7 +398,7 @@ class KolServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldRecordUnassignedPeriod_whenBdIsCleared() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.lockById(11L)).thenReturn(11L);
     when(kols.selectById(11L)).thenReturn(kol(BD));
     when(kols.update(isNull(), any())).thenReturn(1);
@@ -490,7 +482,7 @@ class KolServiceTest {
 
   @Test
   void shouldPublishStatusEvent_whenStatusChanges() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     when(kols.update(isNull(), any())).thenReturn(1);
 
@@ -502,7 +494,7 @@ class KolServiceTest {
   @Test
   @SuppressWarnings("unchecked")
   void shouldNotWriteBdUserId_whenChangingStatus() {
-    actAs(1L, Role.OPERATOR, DataScope.ALL);
+    actAs(1L, Role.STAFF, DataScope.ALL);
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     when(kols.update(isNull(), any())).thenReturn(1);
 

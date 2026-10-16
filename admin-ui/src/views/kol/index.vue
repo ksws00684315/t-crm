@@ -13,7 +13,7 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { kolAbilities, linkAbilities } from "@/utils/permission";
+import { canExport, kolAbilities, linkAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
 import ChangeBdDialog from "./ChangeBdDialog.vue";
@@ -26,9 +26,13 @@ defineOptions({ name: "KolListPage" });
 
 const { t } = useI18n();
 const me = useUserStore();
-/** Button visibility only; the backend enforces the same rules (task 04 §4.3). */
+/** Button visibility only; the backend enforces the same rules (task 10b §4.3). */
 const abilities = computed(() => kolAbilities(me.user));
 const links = computed(() => linkAbilities(me.user));
+const exportAllowed = computed(() => canExport(me.user));
+const needsBdList = computed(
+  () => abilities.value.canFilterBd || abilities.value.canAssignBd || abilities.value.canChangeBd
+);
 
 const loading = ref(false);
 const rows = ref<KolVO[]>([]);
@@ -125,7 +129,7 @@ function appliedQuery() {
     keyword: applied.value.keyword || undefined,
     country: applied.value.country || undefined,
     status: applied.value.status,
-    bdUserId: abilities.value.canManageBd ? applied.value.bdUserId || undefined : undefined
+    bdUserId: abilities.value.canFilterBd ? applied.value.bdUserId || undefined : undefined
   };
 }
 
@@ -170,7 +174,7 @@ function batchStatus(target: 0 | 1): void {
 }
 
 async function loadBdUsers() {
-  if (!abilities.value.canManageBd) return;
+  if (!needsBdList.value) return;
   try {
     bdUsers.value = await listBdUsers();
   } catch (error) {
@@ -183,7 +187,7 @@ function snapshotFilters(): void {
     keyword: query.keyword.trim(),
     country: query.country.trim().toUpperCase(),
     status: query.status,
-    bdUserId: abilities.value.canManageBd ? query.bdUserId : undefined
+    bdUserId: abilities.value.canFilterBd ? query.bdUserId : undefined
   };
 }
 
@@ -306,7 +310,7 @@ onMounted(() => {
             <el-option :label="t('common.disabled')" :value="0" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="abilities.canManageBd" :label="t('kol.bd')" data-test="bd-filter">
+        <el-form-item v-if="abilities.canFilterBd" :label="t('kol.bd')" data-test="bd-filter">
           <el-select
             v-model="query.bdUserId"
             clearable
@@ -342,7 +346,7 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
-      exportable
+      :exportable="exportAllowed"
       :exporting="exporting"
       :selectable="abilities.canWrite"
       @export="exportCsv"
@@ -409,7 +413,7 @@ onMounted(() => {
           </el-button>
         </template>
         <el-button
-          v-if="abilities.canManageBd"
+          v-if="abilities.canChangeBd"
           link
           type="warning"
           data-test="change-bd"
@@ -423,7 +427,7 @@ onMounted(() => {
     <KolFormDialog
       v-model="formVisible"
       :kol="editingKol"
-      :can-pick-bd="abilities.canManageBd"
+      :can-pick-bd="abilities.canAssignBd"
       :bd-users="bdUsers"
       @saved="load"
     />

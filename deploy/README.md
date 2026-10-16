@@ -59,7 +59,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 ## Nginx 说明
 
-- `t.<域名>` 只转发 `/t/…` 与 `/healthz` 到 crm-redirect，其余返回 404。`/t/` 按客户端 IP 限速 30 次/秒、突发 60，超出返回 429；`/healthz` 不限速。阈值偏松，是为了不误伤移动网络中大量用户共用出口 IP（CGNAT）的情况。边缘层（Cloudflare 频率限制规则）是主要防线，Nginx 限速是源站兜底；阈值可按实际流量调整。
+- `t.<域名>` 只转发 `/t/…`、`/i/…`（客户表格脚本写入的按复制商品 ID 中转链接，ADR-019）与 `/healthz` 到 crm-redirect，其余返回 404。`/t/` 与 `/i/` 共用同一限速区，按客户端 IP 限速 30 次/秒、突发 60，超出返回 429；`/healthz` 不限速。阈值偏松，是为了不误伤移动网络中大量用户共用出口 IP（CGNAT）的情况。边缘层（Cloudflare 频率限制规则）是主要防线，Nginx 限速是源站兜底；阈值可按实际流量调整。
 - `kol.<域名>` / `admin.<域名>`：静态资源 + 单页应用回退；`/kol-api/`、`/admin-api/` 转发到 crm-admin；登录接口有 10 次/分钟（突发 5）的频率限制；登录验证码签发接口 `/admin-api/auth/captchas` 有 120 次/分钟（突发 30）的频率限制，后台另按每 IP 每分钟 120 张限制（`crm.auth.captcha.issue-per-minute`，ADR-017）。
 - 响应头（规范 06）：`X-Content-Type-Options`、`Referrer-Policy`、HSTS（一年）、`X-Frame-Options`，两个前端另加 `Content-Security-Policy`。
 - 客户端 IP：本模板用 `proxy.conf` 把转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` **一律重写为 `$remote_addr`**，客户端自带的转发头到不了应用（这是防伪造的实际手段）。`cloudflare-real-ip.conf` 的 `set_real_ip_from` 只决定对哪些对端采用 `CF-Connecting-IP` 来解析 `$remote_addr`，**并不限制谁可以连上 Nginx**。compose 网络固定 `172.30.0.0/24`，生产中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已写死为该网段。
