@@ -14,7 +14,7 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
-const email = ref("");
+const email = ref(typeof route.query.email === "string" ? route.query.email : "");
 const password = ref("");
 const selection = shallowRef<CompanySelection | null>(null);
 const tenantId = ref("");
