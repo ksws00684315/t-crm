@@ -5,9 +5,8 @@ import com.tcrm.admin.product.api.KolItemRefDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.model.KolItemDO;
-import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,7 +18,7 @@ public class OrderMappingLookup implements OrderMappingApi {
   }
 
   @Override
-  public KolItemRefDTO findAt(Long shopId, String itemId, Instant paidAt) {
+  public List<KolItemRefDTO> findAt(Long shopId, String itemId, Instant paidAt) {
     var found =
         items.selectList(
             new LambdaQueryWrapper<KolItemDO>()
@@ -28,13 +27,11 @@ public class OrderMappingLookup implements OrderMappingApi {
                 .le(KolItemDO::getValidFrom, paidAt)
                 .and(q -> q.isNull(KolItemDO::getValidTo).or().gt(KolItemDO::getValidTo, paidAt))
                 .last("LIMIT 2"));
-    if (found.size() > 1) {
-      throw new BusinessException(ErrorCode.COMMON_CONFLICT);
-    }
-    if (found.isEmpty()) {
-      return null;
-    }
-    var row = found.getFirst();
-    return new KolItemRefDTO(row.getId(), row.getKolId(), row.getProductId(), row.getTenantId());
+    return found.stream()
+        .map(
+            row ->
+                new KolItemRefDTO(
+                    row.getId(), row.getKolId(), row.getProductId(), row.getTenantId()))
+        .toList();
   }
 }

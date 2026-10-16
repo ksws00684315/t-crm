@@ -7,11 +7,14 @@ import com.tcrm.admin.product.api.OrderMappingApi;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /** Order-wide attribution and payment-time BD snapshot; see design §4.6 and task 13 §4.4. */
 @Service
 public class OrderAttribution {
+  private static final Logger LOG = LoggerFactory.getLogger(OrderAttribution.class);
   private final OrderMappingApi mappings;
   private final KolOwnershipApi ownership;
 
@@ -42,8 +45,16 @@ public class OrderAttribution {
       if (item.getAttributionType() != 0) {
         continue;
       }
-      var mapping = mappings.findAt(order.getShopId(), item.getWeidianItemId(), order.getPayTime());
-      if (mapping != null) {
+      var candidates =
+          mappings.findAt(order.getShopId(), item.getWeidianItemId(), order.getPayTime());
+      if (candidates.size() > 1) {
+        LOG.warn(
+            "Overlapping order mapping: order={} item={}",
+            order.getWeidianOrderId(),
+            item.getWeidianItemId());
+      }
+      if (candidates.size() == 1) {
+        var mapping = candidates.getFirst();
         item.setKolId(mapping.kolId());
         item.setProductId(mapping.productId());
         item.setKolItemId(mapping.kolItemId());

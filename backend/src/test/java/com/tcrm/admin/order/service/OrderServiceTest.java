@@ -279,7 +279,8 @@ class OrderServiceTest {
     i.setManualReason("old decision");
     when(orders.selectOne(any())).thenReturn(o);
     when(items.selectList(any())).thenReturn(List.of(i));
-    when(mappings.findAt(5L, "90", PAID)).thenReturn(new KolItemRefDTO(300L, 100L, 200L, 1L));
+    when(mappings.findAt(5L, "90", PAID))
+        .thenReturn(List.of(new KolItemRefDTO(300L, 100L, 200L, 1L)));
     when(ownership.bdAt(100L, PAID)).thenReturn(null);
     service.reattribute(10L);
     assertThat(o.getKolId()).isEqualTo(100L);

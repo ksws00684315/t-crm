@@ -128,7 +128,6 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {description: 'COMMON_NOT_FOUND: order is absent or belongs to another company'}
-        '409': {description: 'COMMON_CONFLICT: overlapping historical mappings'}
 components:
   securitySchemes:
     AdminToken: {type: apiKey, in: header, name: X-Admin-Token}

@@ -250,11 +250,13 @@ class OrderIT {
     TenantScope.runCompany(
         1,
         () -> {
-          assertThat(mappings.findAt(10L, "90", PAID).kolId()).isEqualTo(100);
-          assertThat(mappings.findAt(10L, "91", PAID)).isNull();
-          assertThat(mappings.findAt(10L, "92", PAID)).isNull();
+          assertThat(mappings.findAt(10L, "90", PAID))
+              .singleElement()
+              .satisfies(mapping -> assertThat(mapping.kolId()).isEqualTo(100L));
+          assertThat(mappings.findAt(10L, "91", PAID)).isEmpty();
+          assertThat(mappings.findAt(10L, "92", PAID)).isEmpty();
         });
-    TenantScope.runCompany(2, () -> assertThat(mappings.findAt(10L, "90", PAID)).isNull());
+    TenantScope.runCompany(2, () -> assertThat(mappings.findAt(10L, "90", PAID)).isEmpty());
   }
 
   @Test

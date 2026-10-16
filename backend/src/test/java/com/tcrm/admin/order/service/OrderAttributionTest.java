@@ -37,7 +37,7 @@ class OrderAttributionTest {
 
   private void match(String id, long kol) {
     when(mappings.findAt(eq(1L), eq(id), any()))
-        .thenReturn(new KolItemRefDTO(kol + 100, kol, 10L, 1L));
+        .thenReturn(List.of(new KolItemRefDTO(kol + 100, kol, 10L, 1L)));
   }
 
   @Test

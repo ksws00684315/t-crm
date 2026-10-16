@@ -80,10 +80,13 @@ public class OrderSync {
       state.setOrderCursor(previousOrderCursor);
       state.setRefundCursor(previousRefundCursor);
       state.setLastSuccessAt(previousSuccess);
-      state.setLastError(
-          error instanceof BusinessException business
-              ? "Order synchronization failed: " + business.getErrorCode().name()
-              : "Weidian order synchronization failed; inspect API status logs");
+      Throwable cause = error instanceof OrderFailure ? error.getCause() : error;
+      String context = error instanceof OrderFailure failed ? " for order " + failed.orderId : "";
+      String category =
+          cause instanceof BusinessException business
+              ? business.getErrorCode().name()
+              : "inspect API status logs";
+      state.setLastError("Order synchronization failed" + context + ": " + category);
       states.updateById(state);
       LOG.warn("Order synchronization failed for shop {}", shopId);
       return false;
@@ -144,12 +147,25 @@ public class OrderSync {
   }
 
   private void saveDetail(long shopId, String id, Instant updatedAt) {
-    var detail =
-        api.orderDetail(shopId, new WeidianBusinessApi.OrderDetailRequest(Long.valueOf(id)));
-    if (!Objects.equals(id, detail.orderId())) {
-      throw new IllegalStateException("Order identity mismatch");
+    try {
+      var detail =
+          api.orderDetail(shopId, new WeidianBusinessApi.OrderDetailRequest(Long.valueOf(id)));
+      if (!Objects.equals(id, detail.orderId())) {
+        throw new IllegalStateException("Order identity mismatch");
+      }
+      writer.save(normalizer.normalize(shopId, detail, updatedAt));
+    } catch (RuntimeException error) {
+      throw new OrderFailure(id, error);
     }
-    writer.save(normalizer.normalize(shopId, detail, updatedAt));
+  }
+
+  private static final class OrderFailure extends RuntimeException {
+    private final String orderId;
+
+    private OrderFailure(String orderId, RuntimeException cause) {
+      super("Order synchronization failed", cause);
+      this.orderId = orderId != null && orderId.matches("[0-9]{1,32}") ? orderId : "unknown";
+    }
   }
 
   private void refunds(long shopId, Instant from, Instant end) {
