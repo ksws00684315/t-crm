@@ -183,6 +183,8 @@ const enUS: MessageSchema = {
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
     KOL_AUTH_TOKEN_INVALID: "The invitation or reset link is invalid, expired, or already used.",
     KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
+    KOL_TRANSFER_EXISTS: "Some KOLs already have a scheduled BD transfer. Cancel it first.",
+    KOL_TRANSFER_NOT_SCHEDULED: "Only scheduled BD transfers can be cancelled.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
     KOL_REGISTER_CODE_INVALID: "The registration link is invalid or has expired.",
@@ -216,6 +218,7 @@ const enUS: MessageSchema = {
     PRODUCT_WEIDIAN_ID_EXISTS: "This Weidian item ID already exists in the shop.",
     PRODUCT_CODE_IMMUTABLE: "The product code cannot be changed after it is created.",
     PRODUCT_IS_EXCLUSIVE_ITEM: "This Weidian item ID is an exclusive item and cannot be a product.",
+    ORDER_SYNC_RUNNING: "Order synchronization is already running for this shop.",
     LINK_REBUILD_RUNNING: "A tracking-link index rebuild is already running. Try again later.",
     PAYOUT_ACCOUNT_LIMIT: "At most 5 active payout accounts are allowed.",
     PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",

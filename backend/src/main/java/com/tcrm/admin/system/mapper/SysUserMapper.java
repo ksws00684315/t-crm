@@ -18,6 +18,10 @@ public interface SysUserMapper extends BaseMapper<SysUserDO> {
           + " ORDER BY id FOR UPDATE")
   List<Long> lockEnabledSuperAdmins();
 
+  /** Locks one live account within the current company. */
+  @Select("SELECT id FROM sys_user WHERE id = #{id} AND is_deleted = FALSE FOR UPDATE")
+  Long lockById(@Param("id") Long id);
+
   /**
    * Every row with this login name, including disabled and deleted accounts. Callers must run in
    * system scope: the unique index is global, and a company filter would hide other companies.

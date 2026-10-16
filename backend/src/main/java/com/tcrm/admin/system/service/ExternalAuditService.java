@@ -27,6 +27,18 @@ public class ExternalAuditService implements ExternalAuditApi {
       String action,
       String requestUri,
       String safeParams) {
+    recordTenantWriteOperation(tenantId, userId, module, action, "GET", requestUri, safeParams);
+  }
+
+  @Override
+  public void recordTenantWriteOperation(
+      long tenantId,
+      long userId,
+      String module,
+      String action,
+      String method,
+      String requestUri,
+      String safeParams) {
     var actor = current.account(userId);
     SysOperLogDO row = new SysOperLogDO();
     row.setUserId(userId);
@@ -34,14 +46,13 @@ public class ExternalAuditService implements ExternalAuditApi {
     row.setTenantId(tenantId);
     row.setModule(module);
     row.setAction(action);
-    row.setMethod("GET");
+    row.setMethod(method);
     row.setRequestUri(requestUri);
     row.setRequestParams(safeParams);
     row.setResult("SUCCESS");
     row.setCostMs(0L);
     row.setOperTime(Instant.now());
-    TenantScope.runSystem(
-        "append public OAuth callback audit with explicit tenant", () -> logs.insert(row));
+    TenantScope.runSystem("append company audit with explicit tenant", () -> logs.insert(row));
   }
 
   @Override

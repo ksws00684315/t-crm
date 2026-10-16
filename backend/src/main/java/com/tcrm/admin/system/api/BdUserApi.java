@@ -16,6 +16,15 @@ public interface BdUserApi {
   BdUserDTO getById(Long id);
 
   /**
+   * Locks this company's administrator row until the caller's transaction ends, then returns its
+   * current usability. Missing or cross-company IDs return null. Requires an active transaction.
+   * Used to serialize assigning a BD with disabling that account.
+   *
+   * @param id positive administrator ID
+   */
+  BdUserDTO lockById(Long id);
+
+  /**
    * Returns the administrator with this login name (case-insensitive), or null when none exists.
    *
    * @param username login name as typed; blank returns null
