@@ -99,7 +99,7 @@ describe("KOL list page", () => {
     expect(text).toContain("Creator Code");
     expect(text).toContain("Unassigned");
     expect(text).toContain("Enabled");
-    expect(text).toContain("Bulk Import");
+    expect(text).toContain("My registration link");
   });
 
   it("converts the string total before handing it to el-pagination", async () => {
@@ -113,8 +113,9 @@ describe("KOL list page", () => {
   it("shows write, BD change, BD filter, links and export to the super administrator", async () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="import"]').exists()).toBe(true);
+    // Creating creators is hidden for now (owner decision 2026-10-16).
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(true);
@@ -128,8 +129,8 @@ describe("KOL list page", () => {
   it("lets a non-OWN editor write, filter and assign, but not change BD", async () => {
     signIn("STAFF", "ALL", ["kol:view", "kol:edit", "product:view", "data:export"]);
     const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="import"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(false);
@@ -137,17 +138,14 @@ describe("KOL list page", () => {
     expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="export"]').exists()).toBe(true);
     expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
-    await wrapper.find('[data-test="create"]').trigger("click");
-    await nextTick();
-    await flushPromises();
-    expect(document.body.querySelector('[data-test="assign-bd"]')).not.toBeNull();
     wrapper.unmount();
   });
 
   it("hides BD filter, BD assign and export for an OWN editor", async () => {
     signIn("STAFF", "OWN", ["kol:view", "kol:edit", "product:view"]);
     const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(false);
@@ -155,11 +153,6 @@ describe("KOL list page", () => {
     expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="export"]').exists()).toBe(false);
     expect(bdApi.listBdUsers).not.toHaveBeenCalled();
-    await wrapper.find('[data-test="create"]').trigger("click");
-    await nextTick();
-    await flushPromises();
-    expect(document.body.querySelector('[data-test="assign-bd"]')).toBeNull();
-    expect(document.body.textContent).toContain("新增达人");
     wrapper.unmount();
   });
 
