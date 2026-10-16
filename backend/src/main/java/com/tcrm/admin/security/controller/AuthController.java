@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Login and captcha issuing are public; other operations accept all administrator roles. Errors
+ * Login and captcha issuing are public; other operations accept every administrator role. Errors
  * AUTH_* and validation 400.
  */
 @RestController
@@ -65,7 +65,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "STAFF"},
       mode = SaMode.OR)
   @PostMapping("/logout")
   @AuditLog(module = "Auth", action = "Logout")
@@ -75,7 +75,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "STAFF"},
       mode = SaMode.OR)
   @GetMapping("/me")
   public R<UserVO> me() {
@@ -83,7 +83,7 @@ public class AuthController {
   }
 
   @SaCheckRole(
-      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "OPERATOR", "FINANCE"},
+      value = {"PLATFORM_ADMIN", "SUPER_ADMIN", "STAFF"},
       mode = SaMode.OR)
   @PutMapping("/password")
   @AuditLog(module = "Auth", action = "Change password")

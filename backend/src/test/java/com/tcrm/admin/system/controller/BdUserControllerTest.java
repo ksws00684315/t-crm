@@ -14,6 +14,7 @@ import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.service.BdUserService;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,7 +25,7 @@ class BdUserControllerTest {
 
   @Test
   void shouldReturnIdUsernameAndNicknameOnly_whenOperatorCalls() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.ALL);
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL);
     when(bdUsers.listSelectable())
         .thenReturn(List.of(new BdUserDTO(9007199254740993L, "bd1", "BD One", true)));
     mvc.perform(get("/admin-api/system/bd-users").header(AdminMvcSupport.TOKEN_HEADER, token))
@@ -36,8 +37,8 @@ class BdUserControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenFinanceCalls() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 1L, Role.FINANCE, DataScope.ALL);
+  void shouldReturn403_whenStaffLacksKolView() throws Exception {
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL, Set.of());
     mvc.perform(get("/admin-api/system/bd-users").header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
     verifyNoInteractions(bdUsers);

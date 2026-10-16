@@ -27,6 +27,8 @@ const me: UserVO = {
   nickname: "Root",
   email: null,
   role: "SUPER_ADMIN",
+  postTemplate: null,
+  permissions: [],
   dataScope: "ALL",
   tenantId: "1",
   tenantName: "默认公司",
@@ -35,7 +37,14 @@ const me: UserVO = {
   createTime: "2026-10-05T00:00:00Z"
 };
 
-const other: UserVO = { ...me, id: "2", username: "other", role: "OPERATOR" };
+const other: UserVO = {
+  ...me,
+  id: "2",
+  username: "other",
+  role: "STAFF",
+  postTemplate: "BD",
+  permissions: ["kol:view"]
+};
 
 const Host = defineComponent({
   components: { ReauthDialog },
@@ -71,12 +80,12 @@ describe("reauth dialog", () => {
         {
           path: "/home",
           component: { template: "<div />" },
-          meta: { roles: ["SUPER_ADMIN", "OPERATOR", "FINANCE"] }
+          meta: {}
         },
         {
           path: "/system/users",
           component: { template: "<div />" },
-          meta: { roles: ["SUPER_ADMIN"] }
+          meta: { superAdmin: true }
         }
       ]
     });

@@ -42,7 +42,7 @@ public class SecurityConfiguration implements WebMvcConfigurer {
     return new StpInterface() {
       @Override
       public List<String> getPermissionList(Object id, String type) {
-        return List.of();
+        return "admin".equals(type) ? current.permissionNames(id) : List.of();
       }
 
       @Override
@@ -54,9 +54,9 @@ public class SecurityConfiguration implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(InterceptorRegistry registry) {
-    // Company status is checked before @SaCheckRole. SaInterceptor runs annotations first, so a
-    // disabled company whose role list is empty would otherwise be 403. This interceptor runs
-    // first and answers 401, matching a disabled account.
+    // Company status is checked before @SaCheckRole / @SaCheckPermission. SaInterceptor runs
+    // annotations first, so a disabled company whose role list is empty would otherwise be 403.
+    // This interceptor runs first and answers 401, matching a disabled account.
     registry
         .addInterceptor(
             new HandlerInterceptor() {

@@ -31,6 +31,28 @@ class ClickRedisTest {
   }
 
   @Test
+  void shouldBucketByLastTwoDigits_whenBuildingItemKey() {
+    assertThat(ClickRedis.itemKey("7")).isEqualTo("linkitem:07");
+    assertThat(ClickRedis.itemKey("0")).isEqualTo("linkitem:00");
+    assertThat(ClickRedis.itemKey("10")).isEqualTo("linkitem:10");
+    assertThat(ClickRedis.itemKey("05")).isEqualTo("linkitem:05");
+    assertThat(ClickRedis.itemKey("7849640325")).isEqualTo("linkitem:25");
+    assertThat(ClickRedis.itemKey("12345678901234567800")).isEqualTo("linkitem:00");
+  }
+
+  @Test
+  void shouldReadItemIndexByBucketAndId_whenLookingUpItem() {
+    var redis = mock(StringRedisTemplate.class);
+    HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+    when(redis.opsForHash()).thenReturn(hashes);
+    when(hashes.get("linkitem:25", "7849640325"))
+        .thenReturn(
+            "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
+    assertThat(new ClickRedis(redis, 1000).lookupItem("7849640325"))
+        .isEqualTo("{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
+  }
+
+  @Test
   void shouldAppendClickFieldsToStream_whenRecordingEvent() {
     var redis = mock(StringRedisTemplate.class);
     StreamOperations<String, Object, Object> streams = mock(StreamOperations.class);

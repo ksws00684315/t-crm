@@ -74,7 +74,7 @@ class TaskControllerTest {
 
   @Test
   void shouldReturn403_whenServiceDeniesAccess() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 2L, Role.OPERATOR, DataScope.OWN);
+    String token = AdminMvcSupport.actAs(current, 2L, Role.STAFF, DataScope.OWN);
     when(tasks.get(5L)).thenThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN));
 
     mvc.perform(get("/admin-api/task/tasks/5").header(AdminMvcSupport.TOKEN_HEADER, token))
@@ -98,7 +98,7 @@ class TaskControllerTest {
 
   @Test
   void shouldDownloadAttachment_whenErrorFileExists() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.ALL);
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL);
     when(tasks.getErrorFile(5L))
         .thenReturn(
             new TaskFileDTO(
@@ -117,7 +117,7 @@ class TaskControllerTest {
 
   @Test
   void shouldReturnJson404_whenErrorFileMissing() throws Exception {
-    String token = AdminMvcSupport.actAs(current, 1L, Role.OPERATOR, DataScope.ALL);
+    String token = AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL);
     when(tasks.getErrorFile(anyLong()))
         .thenThrow(new BusinessException(ErrorCode.COMMON_NOT_FOUND));
 

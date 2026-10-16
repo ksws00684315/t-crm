@@ -648,11 +648,18 @@ class KolIT {
     String body =
         json.writeValueAsString(
             Map.of(
-                "username", username,
-                "password", PASSWORD,
-                "nickname", username,
-                "role", "OPERATOR",
-                "dataScope", "OWN"));
+                "username",
+                username,
+                "password",
+                PASSWORD,
+                "nickname",
+                username,
+                "role",
+                "STAFF",
+                "postTemplate",
+                "BD",
+                "dataScope",
+                "OWN"));
     return json.readTree(
             mvc.perform(
                     post("/admin-api/system/users")

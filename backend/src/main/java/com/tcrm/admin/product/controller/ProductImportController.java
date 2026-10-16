@@ -1,7 +1,6 @@
 package com.tcrm.admin.product.controller;
 
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.product.service.ProductImportService;
 import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.AuditLog;
@@ -25,12 +24,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Original-product Excel import (task 05 §4.2). OWN and FINANCE are denied by the service. */
+/** Original-product Excel import (task 05 §4.2). Requires product:edit. */
 @RestController
 @RequestMapping("/admin-api/product/product-imports")
-@SaCheckRole(
-    value = {"SUPER_ADMIN", "OPERATOR"},
-    mode = SaMode.OR)
+@SaCheckPermission("product:edit")
 public class ProductImportController {
   static final String TEMPLATE_NAME_KEY = "import.product.template-name";
   private final ProductImportService imports;

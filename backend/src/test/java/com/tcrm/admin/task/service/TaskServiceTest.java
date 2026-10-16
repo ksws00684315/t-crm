@@ -67,7 +67,7 @@ class TaskServiceTest {
 
   @Test
   void shouldReturnProgress_whenSubmitterAsks() {
-    actAs(SUBMITTER, Role.OPERATOR, DataScope.OWN);
+    actAs(SUBMITTER, Role.STAFF, DataScope.OWN);
     when(files.selectCount(any())).thenReturn(1L);
 
     TaskDTO task = service.get(1L);
@@ -87,14 +87,14 @@ class TaskServiceTest {
 
   @Test
   void shouldRejectWith403_whenAnotherOperatorAsks() {
-    actAs(8L, Role.OPERATOR, DataScope.ALL);
+    actAs(8L, Role.STAFF, DataScope.ALL);
     assertError(() -> service.get(1L), ErrorCode.AUTH_FORBIDDEN);
     assertError(() -> service.getErrorFile(1L), ErrorCode.AUTH_FORBIDDEN);
   }
 
   @Test
   void shouldRejectWith403_whenFinanceAsksForSomeoneElsesTask() {
-    actAs(9L, Role.FINANCE, DataScope.ALL);
+    actAs(9L, Role.STAFF, DataScope.ALL);
     assertError(() -> service.get(1L), ErrorCode.AUTH_FORBIDDEN);
   }
 
@@ -106,7 +106,7 @@ class TaskServiceTest {
 
   @Test
   void shouldReturnErrorFile_whenSubmitterDownloads() {
-    actAs(SUBMITTER, Role.OPERATOR, DataScope.ALL);
+    actAs(SUBMITTER, Role.STAFF, DataScope.ALL);
     TaskFileDO file = new TaskFileDO();
     file.setFileName("task-1-errors.xlsx");
     file.setContentType("application/x");
@@ -121,14 +121,14 @@ class TaskServiceTest {
 
   @Test
   void shouldReturnExpired_whenFinishedTaskLostItsErrorFile() {
-    actAs(SUBMITTER, Role.OPERATOR, DataScope.ALL);
+    actAs(SUBMITTER, Role.STAFF, DataScope.ALL);
     when(files.selectOne(any())).thenReturn(null);
     assertError(() -> service.getErrorFile(1L), ErrorCode.TASK_FILE_EXPIRED);
   }
 
   @Test
   void shouldReturn404_whenSuccessfulTaskHasNoErrorFile() {
-    actAs(SUBMITTER, Role.OPERATOR, DataScope.ALL);
+    actAs(SUBMITTER, Role.STAFF, DataScope.ALL);
     TaskDO success = new TaskDO();
     success.setId(1L);
     success.setTaskType(TaskType.KOL_IMPORT);

@@ -14,7 +14,7 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { linkAbilities, productAbilities } from "@/utils/permission";
+import { canExport, linkAbilities, productAbilities } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
 
 defineOptions({ name: "KolItemListPage" });
@@ -23,6 +23,7 @@ const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 const links = computed(() => linkAbilities(me.user));
+const exportAllowed = computed(() => canExport(me.user));
 const rebuilding = ref(false);
 
 const loading = ref(false);
@@ -327,7 +328,7 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
-      exportable
+      :exportable="exportAllowed"
       :exporting="exporting"
       @export="exportCsv"
       @update:page="onPage"

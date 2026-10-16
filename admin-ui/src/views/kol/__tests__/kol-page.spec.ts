@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import ElementPlus from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,13 +31,15 @@ const row: KolVO = {
   updateTime: "2026-10-05T01:02:03Z"
 };
 
-function signIn(role: Role, dataScope: DataScope) {
+function signIn(role: Role, dataScope: DataScope, permissions: string[] = []) {
   useUserStore().user = {
     id: "1",
     username: "me",
     nickname: "Me",
     email: null,
     role,
+    postTemplate: role === "STAFF" ? "BD" : null,
+    permissions,
     dataScope,
     tenantId: "1",
     tenantName: "默认公司",
@@ -51,13 +54,19 @@ async function mountPage(total = "1") {
   vi.mocked(bdApi.listBdUsers).mockResolvedValue([
     { id: "5", username: "bd5", nickname: "BD Five" }
   ]);
-  const wrapper = mount(KolPage, { global: { plugins: [ElementPlus, i18n] } });
+  const wrapper = mount(KolPage, {
+    global: { plugins: [ElementPlus, i18n] },
+    attachTo: document.body
+  });
   await flushPromises();
   return wrapper;
 }
 
 describe("KOL list page", () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    setActivePinia(createPinia());
+  });
 
   it("renders rows with rate percentage and the unassigned BD in Chinese", async () => {
     signIn("SUPER_ADMIN", "ALL");
@@ -81,42 +90,82 @@ describe("KOL list page", () => {
   });
 
   it("converts the string total before handing it to el-pagination", async () => {
-    signIn("OPERATOR", "ALL");
+    signIn("STAFF", "ALL", ["kol:view"]);
     const wrapper = await mountPage("42");
     const pagination = wrapper.findComponent({ name: "ElPagination" });
     expect(pagination.props("total")).toBe(42);
     expect(wrapper.find(".el-pagination").exists()).toBe(true);
   });
 
-  it.each([
-    ["SUPER_ADMIN", "ALL", true, true],
-    ["OPERATOR", "ALL", true, true],
-    ["OPERATOR", "OWN", true, false],
-    ["FINANCE", "ALL", false, false]
-  ] as const)(
-    "%s + %s: write buttons %s, BD management %s",
-    async (role, scope, canWrite, canManageBd) => {
-      signIn(role, scope);
-      const wrapper = await mountPage();
-      expect(wrapper.find('[data-test="create"]').exists()).toBe(canWrite);
-      expect(wrapper.find('[data-test="import"]').exists()).toBe(canWrite);
-      expect(wrapper.find('[data-test="edit"]').exists()).toBe(canWrite);
-      expect(wrapper.find('[data-test="status"]').exists()).toBe(canWrite);
-      expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(canManageBd);
-      expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(canManageBd);
-      expect(wrapper.text()).toContain("详情");
-      // Links: every role; a BD only lists their own KOLs anyway (task 06 §4.7).
-      expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
-      if (canManageBd) {
-        expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
-      } else {
-        expect(bdApi.listBdUsers).not.toHaveBeenCalled();
-      }
-    }
-  );
+  it("shows write, BD change, BD filter, links and export to the super administrator", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="export"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("详情");
+    expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
+  });
 
-  it("never sends a BD filter for a BD", async () => {
-    signIn("OPERATOR", "OWN");
+  it("lets a non-OWN editor write, filter and assign, but not change BD", async () => {
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit", "product:view", "data:export"]);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="export"]').exists()).toBe(true);
+    expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
+    await wrapper.find('[data-test="create"]').trigger("click");
+    await nextTick();
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assign-bd"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("hides BD filter, BD assign and export for an OWN editor", async () => {
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit", "product:view"]);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="status"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="export"]').exists()).toBe(false);
+    expect(bdApi.listBdUsers).not.toHaveBeenCalled();
+    await wrapper.find('[data-test="create"]').trigger("click");
+    await nextTick();
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assign-bd"]')).toBeNull();
+    expect(document.body.textContent).toContain("新增达人");
+    wrapper.unmount();
+  });
+
+  it("shows the BD filter without write buttons when the account can only view creators", async () => {
+    signIn("STAFF", "ALL", ["kol:view"]);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="edit"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="status"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="change-bd"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="bd-filter"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="export"]').exists()).toBe(false);
+    expect(bdApi.listBdUsers).toHaveBeenCalledTimes(1);
+  });
+
+  it("never sends a BD filter for an OWN account", async () => {
+    signIn("STAFF", "OWN", ["kol:view"]);
     await mountPage();
     expect(kolApi.listKols).toHaveBeenCalledWith({
       page: 1,

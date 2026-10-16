@@ -6,6 +6,7 @@ import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.system.service.CreateUserCommand;
 import com.tcrm.admin.system.service.EditUserCommand;
+import com.tcrm.admin.system.service.UserPermissionService;
 import com.tcrm.admin.system.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -20,16 +21,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Super administrators manage accounts; validation 400, missing 404, duplicate 409, business rules
- * 422.
+ * 422. Permission replacement is audited on {@code PermissionChangeApplier}, which receives the
+ * previous and next code sets.
  */
 @RestController
 @RequestMapping("/admin-api/system/users")
 @SaCheckRole("SUPER_ADMIN")
 public class UserController {
   private final UserService users;
+  private final UserPermissionService permissions;
 
-  public UserController(UserService users) {
+  public UserController(UserService users, UserPermissionService permissions) {
     this.users = users;
+    this.permissions = permissions;
   }
 
   @GetMapping
@@ -50,13 +54,29 @@ public class UserController {
                     r.nickname(),
                     r.email(),
                     r.role(),
-                    r.dataScope()))));
+                    r.postTemplate(),
+                    r.dataScope(),
+                    r.permissions()))));
   }
 
   @PutMapping("/{id}")
   @AuditLog(module = "User", action = "Edit")
   public R<Void> edit(@PathVariable @Min(1) Long id, @Valid @RequestBody EditUserRequest r) {
-    users.update(id, new EditUserCommand(r.nickname(), r.email(), r.role(), r.dataScope()));
+    users.update(
+        id,
+        new EditUserCommand(r.nickname(), r.email(), r.role(), r.postTemplate(), r.dataScope()));
+    return R.ok(null);
+  }
+
+  @GetMapping("/{id}/permissions")
+  public R<UserPermissionVO> permissions(@PathVariable @Min(1) Long id) {
+    return R.ok(UserPermissionVO.from(permissions.get(id)));
+  }
+
+  @PutMapping("/{id}/permissions")
+  public R<Void> replacePermissions(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody ReplacePermissionsRequest r) {
+    permissions.replace(id, r.permissions(), r.dataScope());
     return R.ok(null);
   }
 

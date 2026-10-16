@@ -3,7 +3,7 @@ package com.tcrm.admin.product.service;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
-import com.tcrm.admin.security.api.AccountDTO;
+import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
@@ -15,7 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class MappingImportService {
   private final ImportTaskApi imports;
-  private final KolItemService kolItems;
+  private final CurrentUserContext current;
   private final ShopService shops;
   private final ProductService products;
   private final KolItemMapper items;
@@ -26,7 +26,7 @@ public class MappingImportService {
 
   public MappingImportService(
       ImportTaskApi imports,
-      KolItemService kolItems,
+      CurrentUserContext current,
       ShopService shops,
       ProductService products,
       KolItemMapper items,
@@ -35,7 +35,7 @@ public class MappingImportService {
       TransactionTemplate tx,
       ApplicationEventPublisher events) {
     this.imports = imports;
-    this.kolItems = kolItems;
+    this.current = current;
     this.shops = shops;
     this.products = products;
     this.items = items;
@@ -50,8 +50,7 @@ public class MappingImportService {
   }
 
   public Long submit(ImportFileDTO file) {
-    AccountDTO user = kolItems.requireWriter();
-    Long actorId = user.id();
+    Long actorId = current.id();
     return imports.submitImport(
         TaskType.MAPPING_IMPORT,
         MappingImportColumn.headerKeys(),

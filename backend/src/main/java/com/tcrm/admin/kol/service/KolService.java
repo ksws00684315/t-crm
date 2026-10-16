@@ -11,8 +11,6 @@ import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -35,8 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * KOL management with BD data scope (task 04 §4.2, §4.3; design §3). Scope is enforced here, never
- * by the client: an OPERATOR with OWN scope (a BD) sees and changes only the KOLs assigned to them
- * and gets 403 for any other KOL; FINANCE is read-only.
+ * by the client: a staff account with OWN scope sees and changes only the KOLs assigned to them and
+ * gets 403 for any other KOL. Write access is declared on the controller.
  */
 @Service
 public class KolService {
@@ -68,14 +66,9 @@ public class KolService {
     this.events = events;
   }
 
-  /** True for a BD: OPERATOR with OWN data scope (OWN is only valid for OPERATOR). */
-  static boolean own(AccountDTO user) {
-    return user.role() == Role.OPERATOR && user.dataScope() == DataScope.OWN;
-  }
-
   public PageResult<KolDTO> page(KolFilterDTO filter) {
     AccountDTO user = current.user();
-    Long bd = own(user) ? user.id() : filter.bdUserId();
+    Long bd = user.ownScope() ? user.id() : filter.bdUserId();
     String keyword = filter.keyword() == null ? "" : filter.keyword().strip();
     String pattern = "%" + escapeLike(keyword) + "%";
     var query =
@@ -129,8 +122,8 @@ public class KolService {
   }
 
   public KolDTO create(CreateKolCommand c) {
-    AccountDTO user = requireWriter();
-    Long bd = own(user) ? user.id() : usableBd(c.bdUserId());
+    AccountDTO user = current.user();
+    Long bd = user.ownScope() ? user.id() : usableBd(c.bdUserId());
     Long templateId = usableTemplate(c.linkTemplateId());
     String email = normalizeEmail(c.email());
     if (emailTaken(email, null)) {
@@ -164,7 +157,7 @@ public class KolService {
    * transaction, registering a link index refresh (task 11 §4.4; ADR-013).
    */
   public void update(Long id, EditKolCommand c) {
-    AccountDTO user = requireWriter();
+    AccountDTO user = current.user();
     KolDO existing = requireVisible(id, user);
     Long templateId = usableTemplate(c.linkTemplateId());
     String email = normalizeEmail(c.email());
@@ -215,7 +208,7 @@ public class KolService {
    * applied afterwards (task 06b).
    */
   public void updateStatus(Long id, int status) {
-    AccountDTO user = requireWriter();
+    AccountDTO user = current.user();
     requireVisible(id, user);
     Instant now = Instant.now();
     tx.executeWithoutResult(
@@ -237,8 +230,8 @@ public class KolService {
    * ownership period closed and a new one opened, including changes to or from "unassigned".
    */
   public void updateBdUser(Long id, Long bdUserId) {
-    AccountDTO user = requireWriter();
-    if (own(user)) {
+    AccountDTO user = current.user();
+    if (user.ownScope()) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     Long bd = usableBd(bdUserId);
@@ -277,14 +270,14 @@ public class KolService {
   private static LambdaUpdateWrapper<KolDO> scoped(Long id, AccountDTO user) {
     return new LambdaUpdateWrapper<KolDO>()
         .eq(KolDO::getId, id)
-        .eq(own(user), KolDO::getBdUserId, user.id());
+        .eq(user.ownScope(), KolDO::getBdUserId, user.id());
   }
 
   /** No row updated: the KOL left the BD's scope meanwhile (403), or no longer exists (404). */
   private static void requireUpdated(int updated, AccountDTO user) {
     if (updated == 0) {
       throw new BusinessException(
-          own(user) ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
+          user.ownScope() ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
     }
   }
 
@@ -300,21 +293,13 @@ public class KolService {
     return bd.id();
   }
 
-  private AccountDTO requireWriter() {
-    AccountDTO user = current.user();
-    if (user.role() == Role.FINANCE) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    return user;
-  }
-
   /** 404 when missing; 403 when a BD asks for a KOL assigned to someone else (task 04 §4.3). */
   private KolDO requireVisible(Long id, AccountDTO user) {
     KolDO kol = kols.selectById(id);
     if (kol == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    if (own(user) && !user.id().equals(kol.getBdUserId())) {
+    if (user.ownScope() && !user.id().equals(kol.getBdUserId())) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return kol;

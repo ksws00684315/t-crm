@@ -101,7 +101,7 @@ class LoginTenantResolverTest {
         "test-hash",
         "Operator",
         null,
-        Role.OPERATOR,
+        Role.STAFF,
         DataScope.OWN,
         1,
         null,

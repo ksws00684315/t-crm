@@ -20,7 +20,7 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { productAbilities } from "@/utils/permission";
+import { canExport, productAbilities } from "@/utils/permission";
 import { formatRate, percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
 
@@ -29,6 +29,10 @@ defineOptions({ name: "ProductListPage" });
 const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
+const exportAllowed = computed(() => canExport(me.user));
+const showActions = computed(
+  () => abilities.value.canEditProduct || abilities.value.canChangeStatus
+);
 
 const loading = ref(false);
 const rows = ref<ProductVO[]>([]);
@@ -59,7 +63,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 80 },
     { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
   ];
-  if (abilities.value.canWriteProduct) {
+  if (showActions.value) {
     list.push({ key: "actions", label: t("common.actions"), width: 140 });
   }
   return list;
@@ -329,7 +333,7 @@ onMounted(() => {
           <el-input v-model="query.category" clearable maxlength="64" />
         </el-form-item>
       </template>
-      <template v-if="abilities.canWriteProduct" #actions>
+      <template v-if="abilities.canEditProduct" #actions>
         <el-button data-test="import" @click="importVisible = true">
           {{ t("kol.import") }}
         </el-button>
@@ -345,9 +349,9 @@ onMounted(() => {
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
-      exportable
+      :exportable="exportAllowed"
       :exporting="exporting"
-      :selectable="abilities.canWriteProduct"
+      :selectable="abilities.canChangeStatus"
       @export="exportCsv"
       @selection-change="selection = $event as ProductVO[]"
       @update:page="onPage"
@@ -389,11 +393,18 @@ onMounted(() => {
         </el-tag>
       </template>
       <template #cell-updatedAt="{ row }">{{ formatInstant(asProduct(row).updateTime) }}</template>
-      <template v-if="abilities.canWriteProduct" #actions="{ row }">
-        <el-button link type="primary" data-test="edit" @click="openEdit(asProduct(row))">
+      <template v-if="showActions" #actions="{ row }">
+        <el-button
+          v-if="abilities.canEditProduct"
+          link
+          type="primary"
+          data-test="edit"
+          @click="openEdit(asProduct(row))"
+        >
           {{ t("common.edit") }}
         </el-button>
         <el-button
+          v-if="abilities.canChangeStatus"
           link
           :type="asProduct(row).status === 1 ? 'danger' : 'success'"
           data-test="status"

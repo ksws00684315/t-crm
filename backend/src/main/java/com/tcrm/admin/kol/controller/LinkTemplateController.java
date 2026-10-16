@@ -1,7 +1,7 @@
 package com.tcrm.admin.kol.controller;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.kol.service.LinkTemplateService;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.R;
@@ -38,9 +38,7 @@ public class LinkTemplateController {
 
   /** All templates of the current company, disabled included, ordered by sort then id. */
   @GetMapping
-  @SaCheckRole(
-      value = {"SUPER_ADMIN", "OPERATOR"},
-      mode = SaMode.OR)
+  @SaCheckPermission("kol:edit")
   public R<List<LinkTemplateVO>> list() {
     return R.ok(templates.list().stream().map(LinkTemplateVO::from).toList());
   }

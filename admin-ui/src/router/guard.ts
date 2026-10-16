@@ -1,24 +1,22 @@
 import type { RouteLocationNormalized, RouteLocationRaw, Router } from "vue-router";
 import NProgress from "nprogress";
-import type { Role } from "@/api/types";
-import { applyDocumentTitle } from "@/router/title";
+import type { AccessProfile } from "@/utils/permission";
 import { canAccessRoute } from "@/utils/permission";
+import { applyDocumentTitle } from "@/router/title";
 
 export const LOGIN_PATH = "/login";
 export const FORBIDDEN_PATH = "/403";
 export const HOME_PATH = "/";
 
-export interface AuthState {
+export interface AuthState extends AccessProfile {
   isLoggedIn: boolean;
-  roles: readonly Role[];
-  /** Data scope of the signed-in user; used with meta.hideForOwn (same as the side menu). */
-  dataScope?: "ALL" | "OWN" | null;
 }
 
 /**
  * Decides whether a navigation may proceed. Returns `true` to allow it, or the location to go to:
  * signed-out users are sent to the login page (remembering where they wanted to go), signed-in
- * users skip the login page, and users without a required role or data scope land on the 403 page.
+ * users skip the login page, and users without the required permission or data scope land on 403.
+ * A platform administrator who opens home is sent to company management.
  */
 export function resolveAccess(
   to: Pick<RouteLocationNormalized, "path" | "fullPath" | "meta">,
@@ -26,7 +24,7 @@ export function resolveAccess(
 ): true | RouteLocationRaw {
   if (to.meta.public) {
     return auth.isLoggedIn && to.path === LOGIN_PATH
-      ? auth.roles.includes("PLATFORM_ADMIN")
+      ? auth.isPlatformAdmin
         ? "/platform/tenants"
         : HOME_PATH
       : true;
@@ -35,8 +33,8 @@ export function resolveAccess(
     const redirect = to.fullPath === HOME_PATH ? undefined : to.fullPath;
     return { path: LOGIN_PATH, query: redirect ? { redirect } : undefined };
   }
-  if (!canAccessRoute(to.meta, auth.roles, auth.dataScope)) {
-    if (auth.roles.includes("PLATFORM_ADMIN") && (to.path === "/" || to.path === "/home")) {
+  if (!canAccessRoute(to.meta, auth)) {
+    if (auth.isPlatformAdmin && (to.path === "/" || to.path === "/home")) {
       return "/platform/tenants";
     }
     return FORBIDDEN_PATH;

@@ -18,8 +18,10 @@ import com.tcrm.admin.kol.service.LinkTemplateDTO;
 import com.tcrm.admin.kol.service.LinkTemplateService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.Role;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -40,6 +42,10 @@ class LinkTemplateControllerTest {
     return AdminMvcSupport.actAs(current, 1L, role, scope);
   }
 
+  private String staff(Set<String> permissions) {
+    return AdminMvcSupport.actAs(current, 1L, Role.STAFF, DataScope.ALL, permissions);
+  }
+
   private static LinkTemplateDTO dto() {
     return new LinkTemplateDTO(
         77L,
@@ -52,9 +58,9 @@ class LinkTemplateControllerTest {
   }
 
   @Test
-  void shouldListTemplates_whenRoleMayEditKols() throws Exception {
+  void shouldListTemplates_whenStaffHasKolEdit() throws Exception {
     when(templates.list()).thenReturn(List.of(dto()));
-    mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(Role.OPERATOR, DataScope.ALL)))
+    mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, staff(Set.of("kol:edit"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].id").value("77"))
         .andExpect(jsonPath("$.data[0].templateCode").value("kakobuy"))
@@ -64,8 +70,8 @@ class LinkTemplateControllerTest {
   }
 
   @Test
-  void shouldReturn403OnRead_whenFinance() throws Exception {
-    mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(Role.FINANCE, DataScope.ALL)))
+  void shouldReturn403OnRead_whenStaffLacksKolEdit() throws Exception {
+    mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, staff(Set.of("kol:view"))))
         .andExpect(status().isForbidden());
     verifyNoInteractions(templates);
   }
@@ -90,8 +96,9 @@ class LinkTemplateControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenOperatorWrites() throws Exception {
-    String token = as(Role.OPERATOR, DataScope.ALL);
+  void shouldReturn403_whenStaffWrites() throws Exception {
+    // Even every grantable code does not allow writing templates: super administrator only.
+    String token = staff(Set.copyOf(Permission.codes()));
     mvc.perform(
             post(BASE)
                 .header(AdminMvcSupport.TOKEN_HEADER, token)

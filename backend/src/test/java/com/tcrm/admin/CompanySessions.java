@@ -3,6 +3,8 @@ package com.tcrm.admin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -82,6 +84,45 @@ public final class CompanySessions {
             .getContentAsString();
     long userId = Long.parseLong(json.readTree(adminBody).at("/data/id").asText());
     return new OpenedCompany(tenantId, userId, username, login(mvc, json, username, password));
+  }
+
+  /**
+   * Creates a staff account in the caller's company. A null permission list grants the template; an
+   * empty list grants nothing. A null data scope uses the template default.
+   */
+  public static long createStaff(
+      MockMvc mvc,
+      ObjectMapper json,
+      String adminToken,
+      String password,
+      String username,
+      String postTemplate,
+      String dataScope,
+      List<String> permissions)
+      throws Exception {
+    var body = new LinkedHashMap<String, Object>();
+    body.put("username", username);
+    body.put("password", password);
+    body.put("nickname", username);
+    body.put("role", "STAFF");
+    body.put("postTemplate", postTemplate);
+    if (dataScope != null) {
+      body.put("dataScope", dataScope);
+    }
+    if (permissions != null) {
+      body.put("permissions", permissions);
+    }
+    String response =
+        mvc.perform(
+                post("/admin-api/system/users")
+                    .header("X-Admin-Token", adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(body)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return Long.parseLong(json.readTree(response).at("/data/id").asText());
   }
 
   public static String login(MockMvc mvc, ObjectMapper json, String username, String password)
