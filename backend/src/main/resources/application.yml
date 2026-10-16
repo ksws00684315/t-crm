@@ -109,6 +109,10 @@ crm:
     api-base-url: https://api.vdian.com/api
     oauth-base-url: https://oauth.open.weidian.com
     qps: 5
+  google:
+    # OAuth token endpoint and Sheets API for product source sheets (ADR-021). Tests use a stub.
+    token-uri: https://oauth2.googleapis.com/token
+    sheets-base-url: https://sheets.googleapis.com
   fx:
     # ECB daily reference rates (design §7.5); public, no key. Tests point it at a local stub.
     ecb-url: https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml

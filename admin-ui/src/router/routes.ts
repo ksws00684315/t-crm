@@ -89,6 +89,17 @@ export const routes: RouteRecordRaw[] = [
               hideForOwn: true,
               componentName: "KolItemListPage"
             }
+          },
+          {
+            path: "sheet-sources",
+            name: "SheetSourceList",
+            component: () => import("@/views/product/sheet-source/index.vue"),
+            meta: {
+              title: "route.sheetSources",
+              permission: "product:view",
+              hideForOwn: true,
+              componentName: "SheetSourcePage"
+            }
           }
         ]
       },

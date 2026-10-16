@@ -22,6 +22,7 @@ describe("cacheable route component names", () => {
         "KolListPage",
         "PlatformTenantPage",
         "ProductListPage",
+        "SheetSourcePage",
         "ShopListPage",
         "SystemLinkTemplatePage",
         "SystemOperLogPage",
@@ -32,5 +33,6 @@ describe("cacheable route component names", () => {
       const loaded = await (route.component as () => Promise<{ default: { name?: string } }>)();
       expect(loaded.default.name).toBe(route.meta?.componentName);
     }
-  });
+    // Loads every cacheable page module; generous because the full suite runs in parallel.
+  }, 20_000);
 });

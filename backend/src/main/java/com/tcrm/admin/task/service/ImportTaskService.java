@@ -127,6 +127,23 @@ public class ImportTaskService implements ImportTaskApi {
   }
 
   @Override
+  public Long submitRows(
+      TaskType type,
+      List<String> headerKeys,
+      String fileName,
+      List<List<String>> rows,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows) {
+    byte[] content = excel.write(render(headerKeys, List.of(), AppLocale.current()), rows);
+    return submitImport(
+        type,
+        headerKeys,
+        new ImportFileDTO(fileName, XLSX_CONTENT_TYPE, content),
+        processor,
+        maxRows);
+  }
+
+  @Override
   public byte[] template(List<String> headerKeys) {
     return excel.write(render(headerKeys, List.of(), AppLocale.current()), List.of());
   }

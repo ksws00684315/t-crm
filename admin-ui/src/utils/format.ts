@@ -13,3 +13,16 @@ export function formatInstant(value: string | null | undefined): string {
     hour12: false
   }).format(date);
 }
+
+const CURRENCY_SYMBOLS: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", GBP: "£" };
+
+/** Display price with its currency: "¥12.50", "$60.00", or "12.50 JPY" without a known symbol. */
+export function formatPrice(
+  price: string | null | undefined,
+  currency: string | null | undefined
+): string {
+  if (price === null || price === undefined || price === "") return "-";
+  const code = currency || "CNY";
+  const symbol = CURRENCY_SYMBOLS[code];
+  return symbol ? `${symbol}${price}` : `${price} ${code}`;
+}

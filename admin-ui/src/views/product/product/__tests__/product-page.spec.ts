@@ -23,6 +23,7 @@ const row: ProductVO = {
   category: null,
   imageUrl: null,
   price: "10.00",
+  priceCurrency: "CNY",
   rate: null,
   status: 1,
   createTime: "2026-10-05T00:00:00Z",

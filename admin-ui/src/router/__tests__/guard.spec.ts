@@ -185,7 +185,8 @@ describe("installGuard with the real route table", () => {
     ).toEqual([
       ["shops", "product:view", false],
       ["products", "product:view", false],
-      ["kol-items", "product:view", true]
+      ["kol-items", "product:view", true],
+      ["sheet-sources", "product:view", true]
     ]);
     for (const route of layout?.children ?? []) {
       expect(route.meta).not.toHaveProperty("roles");
