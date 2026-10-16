@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { inviteKol, listKols, updateKolStatus } from "@/api/kol/kol";
+import type { TransferTarget } from "@/api/kol/bd-transfer";
 import { listBdUsers } from "@/api/system/bd-user";
 import type { BdUserVO, KolVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
@@ -18,7 +19,7 @@ import { notifyError } from "@/utils/notify";
 import { canExport, kolAbilities, linkAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
-import ChangeBdDialog from "./ChangeBdDialog.vue";
+import BdTransferDialog from "./BdTransferDialog.vue";
 import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
@@ -108,8 +109,8 @@ const chips = computed<SearchChip[]>(() => {
 
 const formVisible = ref(false);
 const editingKol = ref<KolVO | null>(null);
-const bdVisible = ref(false);
-const bdKol = ref<KolVO | null>(null);
+const transferVisible = ref(false);
+const transferTarget = ref<TransferTarget | null>(null);
 const detailVisible = ref(false);
 const detailId = ref<string | null>(null);
 const importVisible = ref(false);
@@ -256,9 +257,16 @@ function openEdit(row: KolVO) {
   formVisible.value = true;
 }
 
+/** Batch toolbar entry: the selection never spans pages, so it stays far below the 500 cap. */
+function openTransferSelected() {
+  if (selection.value.length === 0) return;
+  transferTarget.value = { kolIds: selection.value.map(row => row.id) };
+  transferVisible.value = true;
+}
+
 function openBd(row: KolVO) {
-  bdKol.value = row;
-  bdVisible.value = true;
+  transferTarget.value = { kolIds: [row.id] };
+  transferVisible.value = true;
 }
 
 function openDetail(row: KolVO) {
@@ -365,13 +373,25 @@ onMounted(() => {
           </el-select>
         </el-form-item>
       </template>
-      <template v-if="abilities.canWrite || abilities.canRegisterLink" #actions>
+      <template
+        v-if="abilities.canWrite || abilities.canRegisterLink || abilities.canChangeBd"
+        #actions
+      >
         <el-button
           v-if="abilities.canRegisterLink"
           data-test="register-link"
           @click="registerVisible = true"
         >
           {{ t("kol.registerLink") }}
+        </el-button>
+        <el-button
+          v-if="abilities.canChangeBd"
+          type="warning"
+          data-test="transfer-bd"
+          :disabled="selection.length === 0"
+          @click="openTransferSelected"
+        >
+          {{ t("bdTransfer.action") }}
         </el-button>
         <el-button
           v-if="KOL_CREATE_ENABLED && abilities.canWrite"
@@ -501,7 +521,7 @@ onMounted(() => {
           </el-button>
         </template>
         <el-button
-          v-if="abilities.canChangeBd"
+          v-if="abilities.canChangeBd && asKol(row).id"
           link
           type="warning"
           data-test="change-bd"
@@ -519,7 +539,7 @@ onMounted(() => {
       :bd-users="bdUsers"
       @saved="load"
     />
-    <ChangeBdDialog v-model="bdVisible" :kol="bdKol" :bd-users="bdUsers" @saved="load" />
+    <BdTransferDialog v-model="transferVisible" :target="transferTarget" @saved="load" />
     <KolDetailDrawer v-model="detailVisible" :kol-id="detailId" />
     <KolImportDialog v-model="importVisible" @finished="search" />
     <KolLinksDrawer

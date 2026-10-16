@@ -18,6 +18,7 @@ describe("cacheable route component names", () => {
       [
         "AccountPasswordPage",
         "HomePage",
+        "KolBdTransferPage",
         "KolItemListPage",
         "KolListPage",
         "PlatformTenantPage",

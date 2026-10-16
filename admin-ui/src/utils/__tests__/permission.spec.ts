@@ -118,6 +118,7 @@ describe("buildMenu", () => {
     expect(titles(superAdmin)).toEqual([
       "首页",
       "达人管理",
+      "转移记录",
       "商品",
       "店铺管理",
       "原商品",
@@ -133,6 +134,7 @@ describe("buildMenu", () => {
     expect(paths).toEqual([
       "/home",
       "/kol/kols",
+      "/kol/bd-transfers",
       "/product/shops",
       "/product/products",
       "/product/kol-items",

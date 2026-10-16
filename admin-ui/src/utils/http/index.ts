@@ -77,7 +77,8 @@ function toApiError(status: number, body: unknown): ApiError {
       status,
       errorCode: body.errorCode,
       traceId: body.traceId,
-      fields: body.errorCode === "COMMON_VALIDATION_FAILED" ? fieldNames(body.data) : []
+      fields: body.errorCode === "COMMON_VALIDATION_FAILED" ? fieldNames(body.data) : [],
+      payload: body.data
     });
   }
   // Not an envelope (proxy error page, gateway timeout, ...).
