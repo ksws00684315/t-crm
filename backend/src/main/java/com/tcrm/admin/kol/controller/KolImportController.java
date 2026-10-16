@@ -1,7 +1,6 @@
 package com.tcrm.admin.kol.controller;
 
-import cn.dev33.satoken.annotation.SaCheckRole;
-import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.kol.service.KolImportService;
 import com.tcrm.admin.shared.AppLocale;
 import com.tcrm.admin.shared.AuditLog;
@@ -28,9 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 /** KOL Excel import (task 04 §4.5): template download and asynchronous upload. */
 @RestController
 @RequestMapping("/admin-api/kol/kol-imports")
-@SaCheckRole(
-    value = {"SUPER_ADMIN", "OPERATOR"},
-    mode = SaMode.OR)
+@SaCheckPermission("kol:edit")
 public class KolImportController {
   static final String TEMPLATE_NAME_KEY = "import.kol.template-name";
   private final KolImportService imports;

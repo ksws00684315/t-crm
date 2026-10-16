@@ -5,10 +5,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.tcrm.admin.shared.DirectPublishFixture;
 import com.tcrm.admin.shared.PublicEndpoint;
 import com.tcrm.admin.shared.TransactionalEvents;
+import com.tcrm.fixtures.UndeclaredEndpointFixture;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -99,11 +101,23 @@ class ArchitectureTest {
 
   @Test
   void shouldDeclareAccess_whenExposingEndpoints() {
-    classes()
+    endpointsDeclareAccess().check(classes);
+  }
+
+  @Test
+  void shouldRejectEndpoint_whenAccessIsNotDeclared() {
+    JavaClasses fixture = new ClassFileImporter().importClasses(UndeclaredEndpointFixture.class);
+    assertThatThrownBy(() -> endpointsDeclareAccess().check(fixture))
+        .isInstanceOf(AssertionError.class);
+  }
+
+  private static ArchRule endpointsDeclareAccess() {
+    return classes()
         .that()
         .areAnnotatedWith(RestController.class)
         .should(
-            new ArchCondition<JavaClass>("declare roles or public access for every endpoint") {
+            new ArchCondition<JavaClass>(
+                "declare a permission, a role or public access for every endpoint") {
               @Override
               public void check(JavaClass type, ConditionEvents events) {
                 for (var method : type.getMethods()) {
@@ -113,14 +127,15 @@ class ArchitectureTest {
                   }
                   boolean declared =
                       type.isAnnotatedWith(SaCheckRole.class)
+                          || type.isAnnotatedWith(SaCheckPermission.class)
                           || type.isAnnotatedWith(PublicEndpoint.class)
                           || method.isAnnotatedWith(SaCheckRole.class)
+                          || method.isAnnotatedWith(SaCheckPermission.class)
                           || method.isAnnotatedWith(PublicEndpoint.class);
                   events.add(new SimpleConditionEvent(method, declared, method.getFullName()));
                 }
               }
-            })
-        .check(classes);
+            });
   }
 
   @Test

@@ -77,6 +77,21 @@ public class CurrentUserContext {
     return List.of(user.role().name());
   }
 
+  /**
+   * Permission codes of the given account for Sa-Token. A super administrator receives every code,
+   * a staff account the granted codes, and anyone else none. Shares {@link #load(Long)} with {@link
+   * #user()} so one request does not read the account twice. Empty when the id is not numeric or
+   * the account is missing or disabled.
+   */
+  public List<String> permissionNames(Object loginId) {
+    Long id = toId(loginId);
+    AccountDTO user = id == null ? null : load(id);
+    if (user == null || !Integer.valueOf(1).equals(user.status()) || !user.tenantEnabled()) {
+      return List.of();
+    }
+    return user.effectivePermissions();
+  }
+
   private static Long toId(Object loginId) {
     try {
       return Long.valueOf(String.valueOf(loginId));

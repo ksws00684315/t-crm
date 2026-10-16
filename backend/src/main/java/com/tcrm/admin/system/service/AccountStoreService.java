@@ -7,9 +7,13 @@ import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
 import com.tcrm.admin.system.mapper.SysUserMapper;
+import com.tcrm.admin.system.mapper.SysUserPermissionMapper;
 import com.tcrm.admin.system.model.SysTenantDO;
 import com.tcrm.admin.system.model.SysUserDO;
+import com.tcrm.admin.system.model.SysUserPermissionDO;
 import java.time.Instant;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
@@ -21,10 +25,13 @@ import org.springframework.stereotype.Service;
 public class AccountStoreService implements AccountStore {
   private final SysUserMapper users;
   private final SysTenantMapper tenants;
+  private final SysUserPermissionMapper permissions;
 
-  public AccountStoreService(SysUserMapper users, SysTenantMapper tenants) {
+  public AccountStoreService(
+      SysUserMapper users, SysTenantMapper tenants, SysUserPermissionMapper permissions) {
     this.users = users;
     this.tenants = tenants;
+    this.permissions = permissions;
   }
 
   @Override
@@ -96,6 +103,22 @@ public class AccountStoreService implements AccountStore {
         user.getCredentialVersion() == null ? 0 : user.getCredentialVersion(),
         tenantId,
         tenantName,
-        tenantEnabled);
+        tenantEnabled,
+        permissionCodes(user.getId()),
+        user.getPostTemplate());
+  }
+
+  /**
+   * One query per account load. Runs in the caller's system scope, so it is not tenant-filtered.
+   */
+  private Set<String> permissionCodes(Long userId) {
+    return permissions
+        .selectList(
+            new LambdaQueryWrapper<SysUserPermissionDO>()
+                .select(SysUserPermissionDO::getPermissionCode)
+                .eq(SysUserPermissionDO::getUserId, userId))
+        .stream()
+        .map(SysUserPermissionDO::getPermissionCode)
+        .collect(Collectors.toSet());
   }
 }

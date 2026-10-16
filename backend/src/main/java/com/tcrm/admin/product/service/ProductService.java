@@ -9,10 +9,7 @@ import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
-import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -30,8 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Original product management (task 05 §4.2, §4.4). Writes require SUPER_ADMIN or OPERATOR+ALL;
- * everyone may read.
+ * Original product management (task 05 §4.2, §4.4). Who may read or write is declared on the
+ * controller with permission codes.
  */
 @Service
 public class ProductService {
@@ -55,11 +52,6 @@ public class ProductService {
     this.codes = codes;
     this.current = current;
     this.events = events;
-  }
-
-  /** True for a BD: OPERATOR with OWN data scope — no product writes or mapping access. */
-  static boolean own(AccountDTO user) {
-    return user.role() == Role.OPERATOR && user.dataScope() == DataScope.OWN;
   }
 
   public PageResult<ProductDTO> page(ProductFilterDTO filter) {
@@ -98,7 +90,6 @@ public class ProductService {
    * whitelist so concurrent status changes cannot be overwritten.
    */
   public void update(Long id, EditProductCommand c) {
-    requireWriter();
     require(id);
     Instant now = Instant.now();
     products.update(
@@ -120,7 +111,6 @@ public class ProductService {
    */
   @Transactional(rollbackFor = Exception.class)
   public void updateStatus(Long id, int status) {
-    requireWriter();
     require(id);
     Instant now = Instant.now();
     products.update(
@@ -139,14 +129,6 @@ public class ProductService {
       throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
     }
     return product;
-  }
-
-  AccountDTO requireWriter() {
-    AccountDTO user = current.user();
-    if (user.role() == Role.FINANCE || own(user)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    return user;
   }
 
   /** Used by import: reject when (shop, weidian item) is already an exclusive item. */

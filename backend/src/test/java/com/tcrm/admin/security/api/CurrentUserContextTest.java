@@ -29,7 +29,7 @@ class CurrentUserContextTest {
             "test-hash",
             "Operator",
             null,
-            Role.OPERATOR,
+            Role.STAFF,
             DataScope.OWN,
             1,
             null,
@@ -45,7 +45,7 @@ class CurrentUserContextTest {
       var current = new CurrentUserContext(accounts);
       assertThat(current.user()).isEqualTo(user);
       assertThat(current.id()).isEqualTo(7L);
-      assertThat(current.role()).isEqualTo(Role.OPERATOR);
+      assertThat(current.role()).isEqualTo(Role.STAFF);
       assertThat(current.dataScope()).isEqualTo(DataScope.OWN);
     }
   }
@@ -62,7 +62,7 @@ class CurrentUserContextTest {
                 "test-hash",
                 "Operator",
                 null,
-                Role.OPERATOR,
+                Role.STAFF,
                 DataScope.OWN,
                 0,
                 null,
@@ -109,7 +109,7 @@ class CurrentUserContextTest {
   @Test
   void shouldQueryStoreOnce_whenSeveralLookupsHappenInOneRequest() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 1));
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
     try (var stp = mockStatic(StpUtil.class)) {
@@ -120,6 +120,7 @@ class CurrentUserContextTest {
       current.id();
       current.role();
       current.dataScope();
+      current.permissionNames(7L);
       verify(accounts, times(1)).getById(7L);
     }
   }
@@ -127,7 +128,7 @@ class CurrentUserContextTest {
   @Test
   void shouldQueryStoreAgain_whenANewRequestStarts() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 1));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
@@ -144,7 +145,7 @@ class CurrentUserContextTest {
   @Test
   void shouldQueryStoreEveryTime_whenNoRequestIsBound() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 1));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
@@ -158,7 +159,7 @@ class CurrentUserContextTest {
   @Test
   void shouldKeepRejectingWithoutRequery_whenDisabledAccountIsRepeatedInOneRequest() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 0));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 0));
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
     try (var stp = mockStatic(StpUtil.class)) {
@@ -182,7 +183,7 @@ class CurrentUserContextTest {
                 "test-hash",
                 "User",
                 null,
-                Role.OPERATOR,
+                Role.STAFF,
                 DataScope.ALL,
                 1,
                 null,
@@ -214,7 +215,7 @@ class CurrentUserContextTest {
                 "test-hash",
                 "Operator",
                 null,
-                Role.OPERATOR,
+                Role.STAFF,
                 DataScope.OWN,
                 1,
                 null,
@@ -238,7 +239,7 @@ class CurrentUserContextTest {
   @Test
   void shouldRevokeToken_whenSessionHasNoCredentialVersion() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 1));
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("legacy-token");
@@ -254,7 +255,7 @@ class CurrentUserContextTest {
   @Test
   void shouldCheckCredentialVersionOnce_whenSeveralLookupsHappenInOneRequest() {
     var accounts = mock(AccountStore.class);
-    when(accounts.getById(7L)).thenReturn(account(7L, Role.OPERATOR, 1));
+    when(accounts.getById(7L)).thenReturn(account(7L, Role.STAFF, 1));
     RequestContextHolder.setRequestAttributes(
         new ServletRequestAttributes(new MockHttpServletRequest()));
     try (var stp = mockStatic(StpUtil.class)) {
