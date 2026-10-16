@@ -152,6 +152,7 @@ class OrderIT {
     }
     jdbc.update("DELETE FROM sys_user_permission");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     shop(10, 1);
     shop(20, 2);

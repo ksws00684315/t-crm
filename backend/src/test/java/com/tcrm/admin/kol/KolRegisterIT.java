@@ -123,6 +123,7 @@ class KolRegisterIT {
     jdbc.update("DELETE FROM crm_kol_register_code");
     jdbc.update("DELETE FROM sys_oper_log");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     jdbc.update("DELETE FROM sys_tenant WHERE id <> 1");
     jdbc.update("UPDATE sys_tenant SET status = 1 WHERE id = 1");
     CapturedMails.SENT.clear();

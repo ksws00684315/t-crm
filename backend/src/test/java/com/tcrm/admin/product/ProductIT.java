@@ -108,6 +108,7 @@ class ProductIT {
     jdbc.update("DELETE FROM crm_task_file");
     jdbc.update("DELETE FROM crm_task");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     adminToken = CompanySessions.companyAdmin(mvc, json, PASSWORD);
   }
 

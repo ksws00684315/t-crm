@@ -1,31 +1,27 @@
 package com.tcrm.admin.system.model;
 
-import com.baomidou.mybatisplus.annotation.FieldStrategy;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.PostTemplate;
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BaseEntity;
 import java.time.Instant;
 
+/**
+ * An account (the person). It belongs to no company; company roles live in {@link SysUserTenantDO}.
+ * The tenant line ignores this table (ADR-022).
+ */
 @TableName("sys_user")
 public class SysUserDO extends BaseEntity {
   private String username;
   @JsonIgnore private String passwordHash;
   private String nickname;
   private String email;
-  private Role role;
-  private DataScope dataScope;
-  private PostTemplate postTemplate;
+  private AccountType role;
   private Integer status;
   private Instant lastLoginTime;
   private Integer credentialVersion;
 
-  /** Owning company. Updates never write this column. */
-  @TableField(updateStrategy = FieldStrategy.NEVER)
-  private Long tenantId;
+  /** Company of the last login or switch; only picks the default company at login. */
+  private Long lastTenantId;
 
   public String getUsername() {
     return username;
@@ -59,28 +55,12 @@ public class SysUserDO extends BaseEntity {
     this.email = value;
   }
 
-  public Role getRole() {
+  public AccountType getRole() {
     return role;
   }
 
-  public void setRole(Role value) {
+  public void setRole(AccountType value) {
     this.role = value;
-  }
-
-  public DataScope getDataScope() {
-    return dataScope;
-  }
-
-  public void setDataScope(DataScope value) {
-    this.dataScope = value;
-  }
-
-  public PostTemplate getPostTemplate() {
-    return postTemplate;
-  }
-
-  public void setPostTemplate(PostTemplate value) {
-    this.postTemplate = value;
   }
 
   public Integer getStatus() {
@@ -107,11 +87,11 @@ public class SysUserDO extends BaseEntity {
     this.credentialVersion = value;
   }
 
-  public Long getTenantId() {
-    return tenantId;
+  public Long getLastTenantId() {
+    return lastTenantId;
   }
 
-  public void setTenantId(Long value) {
-    this.tenantId = value;
+  public void setLastTenantId(Long value) {
+    this.lastTenantId = value;
   }
 }

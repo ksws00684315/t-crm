@@ -8,7 +8,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysUserDO;
 import org.junit.jupiter.api.Test;
@@ -71,10 +70,9 @@ class BootstrapAdminTest {
     new BootstrapAdmin(users, passwords, "test-admin", "unit-test-password").run(null);
     var saved = org.mockito.ArgumentCaptor.forClass(SysUserDO.class);
     verify(users).insert(saved.capture());
-    assertThat(saved.getValue().getRole()).isEqualTo(Role.PLATFORM_ADMIN);
-    assertThat(saved.getValue().getTenantId()).isNull();
-    assertThat(saved.getValue().getDataScope())
-        .isEqualTo(com.tcrm.admin.security.api.DataScope.ALL);
+    assertThat(saved.getValue().getRole())
+        .isEqualTo(com.tcrm.admin.system.model.AccountType.PLATFORM_ADMIN);
+    assertThat(saved.getValue().getLastTenantId()).isNull();
     assertThat(passwords.matches("unit-test-password", saved.getValue().getPasswordHash()))
         .isTrue();
   }

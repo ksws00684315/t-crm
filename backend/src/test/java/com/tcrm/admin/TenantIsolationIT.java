@@ -19,7 +19,7 @@ import com.tcrm.admin.link.service.LinkIndexSyncJob;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.system.mapper.SysUserMapper;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -110,7 +110,7 @@ class TenantIsolationIT {
   private final ClickConsumer clicks;
   private final ClickStream clickStream;
   private final ClickPartitionJob partitions;
-  private final SysUserMapper users;
+  private final SysUserTenantMapper members;
   private final RequestMappingHandlerMapping mappings;
 
   private String tokenA;
@@ -129,7 +129,7 @@ class TenantIsolationIT {
       ClickConsumer clicks,
       ClickStream clickStream,
       ClickPartitionJob partitions,
-      SysUserMapper users,
+      SysUserTenantMapper members,
       @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
     this.mvc = mvc;
     this.jdbc = jdbc;
@@ -141,7 +141,7 @@ class TenantIsolationIT {
     this.clicks = clicks;
     this.clickStream = clickStream;
     this.partitions = partitions;
-    this.users = users;
+    this.members = members;
     this.mappings = mappings;
   }
 
@@ -158,6 +158,7 @@ class TenantIsolationIT {
     jdbc.update("DELETE FROM crm_task");
     jdbc.update("DELETE FROM sys_oper_log");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     jdbc.update("DELETE FROM sys_tenant WHERE id <> 1");
     Set<String> keys = redis.keys("link:*");
     keys.addAll(redis.keys("click:last:*"));
@@ -424,16 +425,21 @@ class TenantIsolationIT {
     mvc.perform(get("/admin-api/auth/me").header(TOKEN, companyB.token()))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.errorCode").value("AUTH_ACCOUNT_DISABLED"));
+    // Task 21a §4.3: with no usable company left the login answers AUTH_ACCOUNT_DISABLED (still
+    // 401, no token) instead of the wrong-password answer.
     String disabled =
         mvc.perform(
                 post("/admin-api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(loginBody(companyB.username(), PASSWORD)))
             .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.errorCode").value("AUTH_ACCOUNT_DISABLED"))
+            .andExpect(jsonPath("$.data").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertThat(withoutTrace(disabled)).isEqualTo(withoutTrace(wrong));
+    assertThat(withoutTrace(wrong)).contains("AUTH_INVALID_CREDENTIALS");
+    assertThat(disabled).doesNotContain("token");
     assertThat(field(kolB.code(), productB)).isEqualTo(link);
 
     mvc.perform(
@@ -454,7 +460,7 @@ class TenantIsolationIT {
   void shouldKeepLastSuperAdminInsideTheCompany() throws Exception {
     Long adminA =
         jdbc.queryForObject("SELECT id FROM sys_user WHERE username = 'company-admin'", Long.class);
-    List<Long> locked = TenantScope.callCompany(1L, users::lockEnabledSuperAdmins);
+    List<Long> locked = TenantScope.callCompany(1L, () -> members.lockEnabledSuperAdmins(1L));
     assertThat(locked).contains(adminA).doesNotContain(companyB.userId());
 
     String otherName = "second-" + UUID.randomUUID().toString().substring(0, 8);
@@ -471,13 +477,16 @@ class TenantIsolationIT {
     assertThat(codes).containsExactlyInAnyOrder(200, 422);
     assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE role = 'SUPER_ADMIN' AND status = 1"
-                    + " AND tenant_id = 1",
+                "SELECT COUNT(*) FROM sys_user_tenant WHERE role = 'SUPER_ADMIN' AND status = 1"
+                    + " AND tenant_id = 1 AND is_deleted = FALSE",
                 Integer.class))
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "SELECT role FROM sys_user WHERE id = ?", String.class, companyB.userId()))
+                "SELECT role FROM sys_user_tenant WHERE user_id = ? AND tenant_id = ?",
+                String.class,
+                companyB.userId(),
+                companyB.tenantId()))
         .isEqualTo("SUPER_ADMIN");
   }
 
@@ -790,10 +799,15 @@ class TenantIsolationIT {
     try (var lock = dataSource.getConnection()) {
       lock.setAutoCommit(false);
       for (Long userId : userIds) {
-        try (var statement =
-            lock.prepareStatement("SELECT id FROM sys_user WHERE id=? FOR UPDATE")) {
-          statement.setLong(1, userId);
-          statement.executeQuery().close();
+        // The account row (name) and its membership rows (role, status).
+        for (String sql :
+            List.of(
+                "SELECT id FROM sys_user WHERE id=? FOR UPDATE",
+                "SELECT id FROM sys_user_tenant WHERE user_id=? FOR UPDATE")) {
+          try (var statement = lock.prepareStatement(sql)) {
+            statement.setLong(1, userId);
+            statement.executeQuery().close();
+          }
         }
       }
       Future<?> firstDone = pool.submit(first);

@@ -4,114 +4,223 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.mapper.SysUserPermissionMapper;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
+import com.tcrm.admin.system.model.AccountType;
+import com.tcrm.admin.system.model.MembershipRow;
 import com.tcrm.admin.system.model.SysTenantDO;
 import com.tcrm.admin.system.model.SysUserDO;
 import com.tcrm.admin.system.model.SysUserPermissionDO;
+import com.tcrm.admin.system.model.SysUserTenantDO;
 import java.time.Instant;
+import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AccountStoreServiceTest {
+  private final SysUserMapper users = mock(SysUserMapper.class);
+  private final SysUserTenantMapper members = mock(SysUserTenantMapper.class);
+  private final SysTenantMapper tenants = mock(SysTenantMapper.class);
+  private final SysUserPermissionMapper permissions = mock(SysUserPermissionMapper.class);
+  private final AccountStoreService store =
+      new AccountStoreService(users, members, tenants, permissions);
+
   @BeforeAll
   static void tableInfo() {
-    TableInfoHelper.initTableInfo(
-        new MapperBuilderAssistant(new MybatisConfiguration(), ""), SysUserPermissionDO.class);
+    var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+    TableInfoHelper.initTableInfo(assistant, SysUserPermissionDO.class);
+    TableInfoHelper.initTableInfo(assistant, SysUserDO.class);
+    TableInfoHelper.initTableInfo(assistant, SysUserTenantDO.class);
+  }
+
+  private static SysUserDO member(long id, Long lastTenantId) {
+    var u = new SysUserDO();
+    u.setId(id);
+    u.setUsername("operator");
+    u.setPasswordHash("test-hash");
+    u.setRole(AccountType.MEMBER);
+    u.setStatus(1);
+    u.setCredentialVersion(2);
+    u.setLastTenantId(lastTenantId);
+    return u;
+  }
+
+  private static SysUserTenantDO membership(Role role, DataScope scope, int status) {
+    var m = new SysUserTenantDO();
+    m.setRole(role);
+    m.setDataScope(scope);
+    m.setPostTemplate(role == Role.STAFF ? PostTemplate.BD : null);
+    m.setStatus(status);
+    return m;
+  }
+
+  private static SysTenantDO tenant(long id, int status) {
+    var t = new SysTenantDO();
+    t.setId(id);
+    t.setName("Company " + id);
+    t.setStatus(status);
+    return t;
   }
 
   @Test
-  void shouldReturnAccountSnapshot_whenUserExists() {
-    var users = mock(SysUserMapper.class);
-    var u = new SysUserDO();
-    u.setId(7L);
-    u.setUsername("operator");
-    u.setPasswordHash("test-hash");
-    u.setRole(Role.STAFF);
-    u.setDataScope(DataScope.OWN);
-    u.setStatus(1);
+  void shouldReturnIdentityInLastCompany_whenLoadedByUsernameOrLegacyId() {
+    var u = member(7L, 2L);
     when(users.selectOne(any())).thenReturn(u);
     when(users.selectById(7L)).thenReturn(u);
-    var permissions = mock(SysUserPermissionMapper.class);
-    var store = new AccountStoreService(users, mock(SysTenantMapper.class), permissions);
+    when(members.selectOne(any())).thenReturn(membership(Role.STAFF, DataScope.OWN, 1));
+    when(tenants.selectById(2L)).thenReturn(tenant(2L, 1));
     var loaded = store.getByUsername("OPERATOR");
     assertThat(loaded.username()).isEqualTo("operator");
-    assertThat(loaded.tenantId()).isNull();
-    assertThat(loaded.tenantName()).isNull();
+    assertThat(loaded.role()).isEqualTo(Role.STAFF);
+    assertThat(loaded.dataScope()).isEqualTo(DataScope.OWN);
+    assertThat(loaded.postTemplate()).isEqualTo(PostTemplate.BD);
+    assertThat(loaded.tenantId()).isEqualTo(2L);
+    assertThat(loaded.tenantName()).isEqualTo("Company 2");
     assertThat(loaded.tenantEnabled()).isTrue();
+    assertThat(loaded.credentialVersion()).isEqualTo(2);
     assertThat(store.getById(7L).passwordHash()).isEqualTo("test-hash");
     assertThat(store.getById(8L)).isNull();
     verify(permissions, times(2)).selectList(any());
   }
 
   @Test
-  void shouldMarkCompanyDisabled_whenTenantIsMissingOrStopped() {
-    var users = mock(SysUserMapper.class);
-    var tenants = mock(SysTenantMapper.class);
-    var stopped = new SysTenantDO();
-    stopped.setId(2L);
-    stopped.setName("Stopped");
-    stopped.setStatus(0);
-    when(tenants.selectById(2L)).thenReturn(stopped);
-    var member = new SysUserDO();
-    member.setId(3L);
-    member.setUsername("member");
-    member.setRole(Role.SUPER_ADMIN);
-    member.setDataScope(DataScope.ALL);
-    member.setStatus(1);
-    member.setTenantId(2L);
-    member.setCredentialVersion(0);
-    var missing = new SysUserDO();
-    missing.setId(4L);
-    missing.setUsername("gone");
-    missing.setRole(Role.STAFF);
-    missing.setDataScope(DataScope.OWN);
-    missing.setStatus(1);
-    missing.setTenantId(9L);
-    missing.setCredentialVersion(0);
-    when(users.selectById(3L)).thenReturn(member);
-    when(users.selectById(4L)).thenReturn(missing);
-    var store = new AccountStoreService(users, tenants, mock(SysUserPermissionMapper.class));
-    assertThat(store.getById(3L).tenantEnabled()).isFalse();
-    assertThat(store.getById(3L).tenantName()).isEqualTo("Stopped");
-    assertThat(store.getById(4L).tenantEnabled()).isFalse();
-    assertThat(store.getById(4L).tenantName()).isNull();
+  void shouldReadRoleAndCodesOfRequestedCompany_whenLoadedWithCompany() {
+    when(users.selectById(7L)).thenReturn(member(7L, 2L));
+    when(members.selectOne(any())).thenReturn(membership(Role.SUPER_ADMIN, DataScope.ALL, 1));
+    when(tenants.selectById(3L)).thenReturn(tenant(3L, 1));
+    var loaded = store.getById(7L, 3L);
+    assertThat(loaded.tenantId()).isEqualTo(3L);
+    assertThat(loaded.role()).isEqualTo(Role.SUPER_ADMIN);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<SysUserPermissionDO>> codes = ArgumentCaptor.forClass(Wrapper.class);
+    verify(permissions).selectList(codes.capture());
+    // Codes are read for this account in this company only (ADR-022).
+    assertThat(((LambdaQueryWrapper<SysUserPermissionDO>) codes.getValue()).getSqlSegment())
+        .contains("user_id", "tenant_id");
+  }
+
+  @Test
+  void shouldMarkCompanyUnusable_whenMembershipOrTenantIsMissingOrStopped() {
+    when(users.selectById(3L)).thenReturn(member(3L, 2L));
+    when(tenants.selectById(2L)).thenReturn(tenant(2L, 0));
+    when(tenants.selectById(4L)).thenReturn(tenant(4L, 1));
+    when(members.selectOne(any()))
+        .thenReturn(
+            membership(Role.SUPER_ADMIN, DataScope.ALL, 1),
+            membership(Role.STAFF, DataScope.OWN, 0),
+            null);
+    var stoppedCompany = store.getById(3L, 2L);
+    assertThat(stoppedCompany.tenantEnabled()).isFalse();
+    assertThat(stoppedCompany.tenantName()).isEqualTo("Company 2");
+    assertThat(store.getById(3L, 4L).tenantEnabled()).isFalse();
+    var noMembership = store.getById(3L, 4L);
+    assertThat(noMembership.tenantEnabled()).isFalse();
+    assertThat(noMembership.role()).isNull();
+    assertThat(noMembership.permissions()).isEmpty();
+    assertThat(store.getById(3L, 9L).tenantName()).isNull();
+  }
+
+  @Test
+  void shouldHaveNoCompany_whenPlatformAdministrator() {
+    var admin = member(1L, null);
+    admin.setRole(AccountType.PLATFORM_ADMIN);
+    when(users.selectById(1L)).thenReturn(admin);
+    var loaded = store.getById(1L);
+    assertThat(loaded.role()).isEqualTo(Role.PLATFORM_ADMIN);
+    assertThat(loaded.tenantId()).isNull();
+    assertThat(loaded.tenantEnabled()).isTrue();
+    assertThat(loaded.effectivePermissions()).isEmpty();
+    verify(members, never()).selectOne(any());
+  }
+
+  @Test
+  void shouldListOnlyUsableCompaniesInNameOrder_whenAskedForCompanies() {
+    when(members.listMemberships(7L))
+        .thenReturn(
+            List.of(
+                row(1L, "A", 1, Role.SUPER_ADMIN, 1),
+                row(2L, "B", 0, Role.STAFF, 1),
+                row(3L, "C", 1, Role.STAFF, 0),
+                row(4L, "D", 1, Role.STAFF, 1)));
+    assertThat(store.companies(7L))
+        .containsExactly(
+            new CompanyDTO(1L, "A", Role.SUPER_ADMIN), new CompanyDTO(4L, "D", Role.STAFF));
+  }
+
+  private static MembershipRow row(
+      Long tenantId, String name, int tenantStatus, Role role, int status) {
+    var r = new MembershipRow();
+    r.setTenantId(tenantId);
+    r.setTenantName(name);
+    r.setTenantStatus(tenantStatus);
+    r.setRole(role);
+    r.setStatus(status);
+    return r;
   }
 
   @Test
   void shouldUpdateOnlyChangedAccountFields_whenRecordingLoginAndPassword() {
-    TableInfoHelper.initTableInfo(
-        new MapperBuilderAssistant(new MybatisConfiguration(), ""), SysUserDO.class);
-    var users = mock(SysUserMapper.class);
-    var store =
-        new AccountStoreService(
-            users, mock(SysTenantMapper.class), mock(SysUserPermissionMapper.class));
     var instant = Instant.parse("2026-10-04T04:00:00Z");
-    store.updateLastLoginTime(7L, instant);
-    var login = org.mockito.ArgumentCaptor.forClass(SysUserDO.class);
-    verify(users).updateById(login.capture());
-    assertThat(login.getValue().getLastLoginTime()).isEqualTo(instant);
-    assertThat(login.getValue().getPasswordHash()).isNull();
+    store.recordLogin(7L, 2L, instant);
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<SysUserDO>> account = ArgumentCaptor.forClass(Wrapper.class);
+    verify(users).update(isNull(), account.capture());
+    assertThat(((LambdaUpdateWrapper<SysUserDO>) account.getValue()).getSqlSet())
+        .contains("last_login_time=", "last_tenant_id=")
+        .doesNotContain("password_hash", "status");
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<SysUserTenantDO>> membership = ArgumentCaptor.forClass(Wrapper.class);
+    verify(members).update(isNull(), membership.capture());
+    var touched = (LambdaUpdateWrapper<SysUserTenantDO>) membership.getValue();
+    assertThat(touched.getSqlSet()).contains("last_login_time=").doesNotContain("status", "role");
+    assertThat(touched.getSqlSegment()).contains("user_id", "tenant_id");
 
     store.updatePassword(7L, "new-test-hash");
-    @SuppressWarnings("unchecked")
-    org.mockito.ArgumentCaptor<Wrapper<SysUserDO>> password =
-        org.mockito.ArgumentCaptor.forClass(Wrapper.class);
-    verify(users).update(isNull(), password.capture());
-    assertThat(((LambdaUpdateWrapper<SysUserDO>) password.getValue()).getSqlSet())
+    verify(users, times(2)).update(isNull(), account.capture());
+    assertThat(((LambdaUpdateWrapper<SysUserDO>) account.getValue()).getSqlSet())
         .contains("password_hash=", "credential_version = credential_version + 1")
         .doesNotContain("status", "role");
+  }
+
+  @Test
+  void shouldNotTouchMemberships_whenPlatformAdministratorLogsIn() {
+    store.recordLogin(1L, null, Instant.parse("2026-10-04T04:00:00Z"));
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<SysUserDO>> account = ArgumentCaptor.forClass(Wrapper.class);
+    verify(users).update(isNull(), account.capture());
+    assertThat(((LambdaUpdateWrapper<SysUserDO>) account.getValue()).getSqlSet())
+        .contains("last_login_time=")
+        .doesNotContain("last_tenant_id");
+    verify(members, never()).update(any(), any());
+  }
+
+  @Test
+  void shouldMoveLastCompany_whenSwitchIsRecorded() {
+    store.recordSwitch(7L, 3L, Instant.parse("2026-10-04T04:00:00Z"));
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<SysUserDO>> account = ArgumentCaptor.forClass(Wrapper.class);
+    verify(users).update(isNull(), account.capture());
+    assertThat(((LambdaUpdateWrapper<SysUserDO>) account.getValue()).getSqlSet())
+        .contains("last_tenant_id=")
+        .doesNotContain("last_login_time");
+    verify(members).update(isNull(), any());
   }
 }

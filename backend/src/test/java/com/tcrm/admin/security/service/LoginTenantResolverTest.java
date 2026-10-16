@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -56,6 +57,7 @@ class LoginTenantResolverTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::isLogin).thenReturn(true);
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      stp.when(StpUtil::getTokenSession).thenReturn(mock(SaSession.class));
       when(accounts.getById(7L)).thenReturn(account(9L), account(null), null);
       assertThat(resolver.currentLoginTenantId()).isEqualTo(9L);
       assertThat(resolver.currentLoginTenantId()).isNull();
@@ -83,10 +85,25 @@ class LoginTenantResolverTest {
   }
 
   @Test
+  void shouldUseTheTokensCompany_notTheLastCompany() {
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::isLogin).thenReturn(true);
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      var session = mock(SaSession.class);
+      when(session.get(CurrentUserContext.CURRENT_TENANT)).thenReturn(4L);
+      stp.when(StpUtil::getTokenSession).thenReturn(session);
+      when(accounts.getById(7L, 4L)).thenReturn(account(4L));
+      assertThat(resolver.currentLoginTenantId()).isEqualTo(4L);
+      verify(accounts, never()).getById(7L);
+    }
+  }
+
+  @Test
   void shouldPropagateAccountLookupFailures() {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::isLogin).thenReturn(true);
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      stp.when(StpUtil::getTokenSession).thenReturn(mock(SaSession.class));
       when(accounts.getById(7L)).thenThrow(new IllegalStateException("db"));
       assertThatThrownBy(resolver::currentLoginTenantId)
           .isInstanceOf(IllegalStateException.class)

@@ -111,6 +111,7 @@ class BdTransferIT {
     jdbc.update("DELETE FROM crm_kol");
     jdbc.update("DELETE FROM sys_user_permission");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     jdbc.update("DELETE FROM sys_tenant WHERE id <> 1");
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     source =

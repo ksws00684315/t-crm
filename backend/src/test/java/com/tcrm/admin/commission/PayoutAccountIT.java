@@ -118,6 +118,7 @@ class PayoutAccountIT {
             "crm_kol_bd_history",
             "crm_kol",
             "sys_user_permission",
+            "sys_user_tenant",
             "sys_user",
             "crm_task_file",
             "crm_task",

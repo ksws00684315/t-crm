@@ -2,6 +2,7 @@ package com.tcrm.admin.security.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.service.AuthService;
 import com.tcrm.admin.security.service.CaptchaService;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Login and captcha issuing are public; other operations accept every administrator role. Errors
- * AUTH_* and validation 400.
+ * AUTH_* and validation 400. These paths are exempt from the {@code X-Company-Id} check.
  */
 @RestController
 @RequestMapping("/admin-api/auth")
@@ -61,7 +62,10 @@ public class AuthController {
             r.username(), r.password(), r.captchaId(), r.captchaCode(), clientIps.resolve(request));
     return R.ok(
         new LoginVO(
-            result.tokenName(), result.token(), result.expiresIn(), UserVO.from(result.user())));
+            result.tokenName(),
+            result.token(),
+            result.expiresIn(),
+            UserVO.from(result.user(), result.companies())));
   }
 
   @SaCheckRole(
@@ -79,7 +83,25 @@ public class AuthController {
       mode = SaMode.OR)
   @GetMapping("/me")
   public R<UserVO> me() {
-    return R.ok(UserVO.from(current.user()));
+    return R.ok(me(current.user()));
+  }
+
+  /**
+   * Moves this token to another of the caller's companies; answers like {@code /me}. 403
+   * AUTH_COMPANY_NOT_MEMBER for a company the caller cannot enter, 403 AUTH_FORBIDDEN for a
+   * platform administrator, which has no company and is rejected by the role check. Audited in the
+   * target company by {@code CompanySwitchAudit}.
+   */
+  @SaCheckRole(
+      value = {"SUPER_ADMIN", "STAFF"},
+      mode = SaMode.OR)
+  @PostMapping("/company")
+  public R<UserVO> switchCompany(@Valid @RequestBody SwitchCompanyRequest r) {
+    return R.ok(me(auth.switchCompany(r.tenantId())));
+  }
+
+  private UserVO me(AccountDTO user) {
+    return UserVO.from(user, auth.companies(user));
   }
 
   @SaCheckRole(

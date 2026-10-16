@@ -5,14 +5,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
 import com.tcrm.admin.system.mapper.SysUserMapper;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
+import com.tcrm.admin.system.model.AccountType;
 import com.tcrm.admin.system.model.SysTenantDO;
 import com.tcrm.admin.system.model.SysUserDO;
+import com.tcrm.admin.system.model.SysUserTenantDO;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
@@ -21,23 +25,29 @@ import org.springframework.stereotype.Service;
 
 /**
  * Platform-administrator operations. Company rows live in {@code sys_tenant}, which the tenant line
- * ignores. Reads and writes of {@code sys_user} run in system scope and always name the path
- * company id; the caller's own company is null.
+ * ignores. Reads and writes of accounts and memberships run in system scope and always name the
+ * path company id; the caller's own company is null. Nothing here reads business data.
  */
 @Service
 public class PlatformService {
   private final SysTenantMapper tenants;
   private final SysUserMapper users;
+  private final SysUserTenantMapper members;
+  private final UserPermissionService permissions;
   private final BCryptPasswordEncoder passwords;
   private final CurrentUserContext current;
 
   public PlatformService(
       SysTenantMapper tenants,
       SysUserMapper users,
+      SysUserTenantMapper members,
+      UserPermissionService permissions,
       BCryptPasswordEncoder passwords,
       CurrentUserContext current) {
     this.tenants = tenants;
     this.users = users;
+    this.members = members;
+    this.permissions = permissions;
     this.passwords = passwords;
     this.current = current;
   }
@@ -96,13 +106,7 @@ public class PlatformService {
     return TenantScope.callSystem(
         "list company super administrators",
         () ->
-            users
-                .selectList(
-                    new LambdaQueryWrapper<SysUserDO>()
-                        .eq(SysUserDO::getTenantId, tenantId)
-                        .eq(SysUserDO::getRole, Role.SUPER_ADMIN)
-                        .orderByAsc(SysUserDO::getCreateTime, SysUserDO::getId))
-                .stream()
+            members.listByRole(tenantId, Role.SUPER_ADMIN).stream()
                 .map(TenantAdminDTO::from)
                 .toList());
   }
@@ -121,17 +125,17 @@ public class PlatformService {
           user.setPasswordHash(passwords.encode(password));
           user.setNickname(nickname.strip());
           user.setEmail(blankToNull(email));
-          user.setRole(Role.SUPER_ADMIN);
-          user.setDataScope(DataScope.ALL);
+          user.setRole(AccountType.MEMBER);
           user.setStatus(1);
-          user.setTenantId(tenantId);
+          user.setLastTenantId(tenantId);
           user.setDeleted(false);
           try {
             users.insert(user);
           } catch (DuplicateKeyException e) {
             throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
           }
-          return TenantAdminDTO.from(user);
+          insertMember(tenantId, user.getId(), MemberRole.resolve(Role.SUPER_ADMIN, null, null));
+          return TenantAdminDTO.from(members.getMember(user.getId(), tenantId));
         });
   }
 
@@ -141,22 +145,161 @@ public class PlatformService {
     TenantScope.runSystem(
         "reset company super administrator password",
         () -> {
-          int updated =
-              users.update(
-                  null,
-                  new LambdaUpdateWrapper<SysUserDO>()
-                      .eq(SysUserDO::getId, userId)
-                      .eq(SysUserDO::getTenantId, tenantId)
-                      .eq(SysUserDO::getRole, Role.SUPER_ADMIN)
-                      .set(SysUserDO::getPasswordHash, passwords.encode(password))
-                      .setSql("credential_version = credential_version + 1")
-                      .set(SysUserDO::getUpdateBy, current.id())
-                      .set(SysUserDO::getUpdateTime, Instant.now()));
-          if (updated == 0) {
+          var member = members.getMember(userId, tenantId);
+          if (member == null || member.getRole() != Role.SUPER_ADMIN) {
             throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
           }
-          StpUtil.logout(userId);
+          writePassword(userId, password);
         });
+  }
+
+  /**
+   * The account with exactly this login name (case-insensitive) and all its memberships, or null.
+   * No partial matching, so the platform cannot browse accounts.
+   */
+  public PlatformUserDTO findUser(String username) {
+    if (username == null || username.isBlank()) {
+      return null;
+    }
+    return TenantScope.callSystem(
+        "look up one account and its memberships by exact username",
+        () -> {
+          SysUserDO user =
+              users.selectOne(
+                  new LambdaQueryWrapper<SysUserDO>()
+                      .apply("lower(username) = lower({0})", username.strip()));
+          return user == null ? null : view(user);
+        });
+  }
+
+  /**
+   * Adds an existing company account to this company. A staff member starts from the template's
+   * codes and data scope (ADR-018). 409 USER_ALREADY_MEMBER when a live membership exists; 404 for
+   * an unknown company or account; 400 for a platform administrator account.
+   */
+  public PlatformUserDTO addMember(
+      Long tenantId, Long userId, Role role, PostTemplate template, DataScope scope) {
+    MemberRole resolved = MemberRole.resolve(role, template, scope);
+    require(tenantId);
+    return TenantScope.callSystem(
+        "add an existing account to a company",
+        () -> {
+          SysUserDO user = requireUser(userId);
+          if (user.getRole() != AccountType.MEMBER) {
+            throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+          }
+          if (members.getMember(userId, tenantId) != null) {
+            throw new BusinessException(ErrorCode.USER_ALREADY_MEMBER);
+          }
+          try {
+            insertMember(tenantId, userId, resolved);
+          } catch (DuplicateKeyException e) {
+            // uk_sys_user_tenant_user_tenant: a concurrent request added the same membership.
+            throw new BusinessException(ErrorCode.USER_ALREADY_MEMBER);
+          }
+          if (resolved.role() == Role.STAFF) {
+            permissions.grant(userId, tenantId, resolved.codes());
+          }
+          return view(requireUser(userId));
+        });
+  }
+
+  /** Changes the name and e-mail of any account. */
+  public void updateUser(Long userId, String nickname, String email) {
+    TenantScope.runSystem(
+        "edit account name and e-mail",
+        () -> {
+          requireUser(userId);
+          users.update(
+              null,
+              new LambdaUpdateWrapper<SysUserDO>()
+                  .eq(SysUserDO::getId, userId)
+                  .set(SysUserDO::getNickname, nickname.strip())
+                  .set(SysUserDO::getEmail, blankToNull(email))
+                  .set(SysUserDO::getUpdateBy, current.id())
+                  .set(SysUserDO::getUpdateTime, Instant.now()));
+        });
+  }
+
+  /** Resets the password of any account; every token of the account becomes invalid. */
+  public void resetPassword(Long userId, String password) {
+    TenantScope.runSystem(
+        "reset account password",
+        () -> {
+          requireUser(userId);
+          writePassword(userId, password);
+        });
+  }
+
+  /**
+   * Enables or disables the whole account in every company. Disabling ends every token of the
+   * account. A platform administrator cannot disable itself.
+   */
+  public void updateUserStatus(Long userId, int status) {
+    if (status == 0 && userId.equals(current.id())) {
+      throw new BusinessException(ErrorCode.USER_CANNOT_DISABLE_SELF);
+    }
+    TenantScope.runSystem(
+        "change account status",
+        () -> {
+          requireUser(userId);
+          users.update(
+              null,
+              new LambdaUpdateWrapper<SysUserDO>()
+                  .eq(SysUserDO::getId, userId)
+                  .set(SysUserDO::getStatus, status)
+                  .set(SysUserDO::getUpdateBy, current.id())
+                  .set(SysUserDO::getUpdateTime, Instant.now()));
+        });
+    if (status == 0) {
+      StpUtil.logout(userId);
+    }
+  }
+
+  private void insertMember(Long tenantId, Long userId, MemberRole resolved) {
+    SysUserTenantDO member = new SysUserTenantDO();
+    member.setTenantId(tenantId);
+    member.setUserId(userId);
+    member.setRole(resolved.role());
+    member.setPostTemplate(resolved.postTemplate());
+    member.setDataScope(resolved.dataScope());
+    member.setStatus(1);
+    member.setDeleted(false);
+    members.insert(member);
+  }
+
+  private void writePassword(Long userId, String password) {
+    users.update(
+        null,
+        new LambdaUpdateWrapper<SysUserDO>()
+            .eq(SysUserDO::getId, userId)
+            .set(SysUserDO::getPasswordHash, passwords.encode(password))
+            .setSql("credential_version = credential_version + 1")
+            .set(SysUserDO::getUpdateBy, current.id())
+            .set(SysUserDO::getUpdateTime, Instant.now()));
+    StpUtil.logout(userId);
+  }
+
+  private PlatformUserDTO view(SysUserDO user) {
+    return new PlatformUserDTO(
+        user.getId(),
+        user.getUsername(),
+        user.getNickname(),
+        user.getStatus(),
+        members.listMemberships(user.getId()).stream()
+            .map(
+                m ->
+                    new PlatformUserDTO.Company(
+                        m.getTenantId(), m.getTenantName(), m.getRole(), m.getStatus()))
+            .toList());
+  }
+
+  private SysUserDO requireUser(Long userId) {
+    SysUserDO user = users.selectById(userId);
+    if (user == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return user;
   }
 
   private SysTenantDO require(Long id) {
