@@ -163,11 +163,13 @@ class SystemIT {
         .extracting(row -> row.get("table_name") + ":" + row.get("is_nullable"))
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
+            "crm_file:NO",
             "crm_kol:NO",
             "crm_kol_auth_token:NO",
             "crm_kol_bd_history:NO",
             "crm_kol_item:NO",
             "crm_link_template:NO",
+            "crm_payout_account:NO",
             "crm_product:NO",
             "crm_shop:NO",
             "crm_task:NO",

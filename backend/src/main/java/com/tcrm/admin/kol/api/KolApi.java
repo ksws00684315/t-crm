@@ -35,4 +35,13 @@ public interface KolApi {
    * @param limit maximum number of ids (positive)
    */
   List<Long> pageKolIdsWithTemplate(Long templateId, Long afterKolId, int limit);
+
+  /**
+   * Every undeleted KOL currently assigned to the BD in the caller's company, enabled or not (task
+   * 15a §4.4). Used by modules that apply the OWN data scope to a BD's KOLs; a BD has at most a few
+   * hundred.
+   *
+   * @param bdUserId sys_user.id of the BD
+   */
+  List<KolRefDTO> listByBdUserId(Long bdUserId);
 }

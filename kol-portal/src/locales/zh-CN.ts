@@ -88,6 +88,12 @@ const zhCN: MessageSchema = {
     KOL_AUTH_TOKEN_INVALID: "链接已失效，请联系您的商务重新发送。",
     AUTH_OLD_PASSWORD_INCORRECT: "当前密码错误。",
     KOL_LOGIN_SELECTION_INVALID: "公司选择凭据已失效，请重新登录。",
+    PAYOUT_ACCOUNT_LIMIT: "收款账户最多保留 5 个（不含已停用）。",
+    PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个。",
+    PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认。",
+    FILE_INVALID: "文件必须是 PNG 或 JPEG 图片。",
+    FILE_TOO_LARGE: "文件超过 2MB。",
+    FILE_IN_USE: "该文件已被其他账户使用。",
     generic: "操作失败，请稍后重试。",
     network: "网络异常，请检查网络连接后重试。",
     field: "该字段格式不正确。"
