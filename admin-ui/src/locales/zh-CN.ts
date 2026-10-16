@@ -159,7 +159,8 @@ const zhCN = {
     auditLogs: "操作日志",
     password: "修改密码",
     forbidden: "无权访问",
-    notFound: "页面不存在"
+    notFound: "页面不存在",
+    notifications: "站内消息"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试",
@@ -689,6 +690,28 @@ const zhCN = {
     uri: "请求地址",
     ip: "IP",
     cost: "耗时(ms)"
+  },
+  notification: {
+    open: "站内消息",
+    markAll: "全部已读",
+    viewAll: "查看全部",
+    unread: "未读",
+    empty: "暂无消息",
+    noPermission: "你没有查看该页面的权限",
+    justNow: "刚刚",
+    minutes: "{n} 分钟前",
+    hours: "{n} 小时前",
+    days: "{n} 天前",
+    type: {
+      PAYOUT_ACCOUNT_SUBMITTED: "达人 {kolCode} 提交了 {accountType} 收款账户，待审核",
+      ORDER_SYNC_FAILED: "店铺 {shopName} 的订单同步失败",
+      BD_TRANSFER_CANCELLED: "达人 {kolCode} 的预约转移已取消：{reason}",
+      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配"
+    },
+    reason: {
+      OWNERSHIP_CHANGED: "执行时归属已变化",
+      TARGET_UNAVAILABLE: "目标商务不可用"
+    }
   }
 };
 

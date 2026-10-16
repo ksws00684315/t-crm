@@ -3,6 +3,7 @@ package com.tcrm.admin.commission.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
@@ -16,12 +17,16 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,6 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class PayoutAccountService {
+  private static final Logger LOG = LoggerFactory.getLogger(PayoutAccountService.class);
   static final int MAX_ACCOUNTS = 5;
 
   /** KOL-side write payload after bean validation; one shape per account type. */
@@ -106,6 +112,7 @@ public class PayoutAccountService {
   private final SecretCipher cipher;
   private final TransactionTemplate tx;
   private final ExternalAuditApi audit;
+  private final ApplicationEventPublisher events;
 
   public PayoutAccountService(
       PayoutAccountMapper accounts,
@@ -113,13 +120,15 @@ public class PayoutAccountService {
       KolApi kols,
       SecretCipher cipher,
       TransactionTemplate tx,
-      ExternalAuditApi audit) {
+      ExternalAuditApi audit,
+      ApplicationEventPublisher events) {
     this.accounts = accounts;
     this.files = files;
     this.kols = kols;
     this.cipher = cipher;
     this.tx = tx;
     this.audit = audit;
+    this.events = events;
   }
 
   // --------------------------------------------------------------------- KOL side
@@ -161,6 +170,7 @@ public class PayoutAccountService {
           if (c.qrFileId() != null) {
             files.claimQrFile(kolId, c.qrFileId(), account.getId());
           }
+          publishSubmitted(kolId, account.getId(), c.type(), auditContext.tenantId());
         });
     auditKol(auditContext, kolId, account.getId(), "Create", account.getAccountMasked());
     return toKolDto(account, c.account());
@@ -205,8 +215,35 @@ public class PayoutAccountService {
             throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LOCKED);
           }
           claimQrOnEdit(kolId, accountId, existing.getQrFileId(), c.qrFileId());
+          publishSubmitted(kolId, accountId, c.type(), auditContext.tenantId());
         });
     auditKol(auditContext, kolId, accountId, "Edit", AccountMasker.mask(c.account()));
+  }
+
+  /**
+   * Notifies the creator's current BD and every enabled super admin. A missing creator code skips
+   * the event and does not fail the account save. Account numbers stay out of the event.
+   */
+  private void publishSubmitted(long kolId, Long accountId, PayoutAccountType type, long tenantId) {
+    if (accountId == null) {
+      return;
+    }
+    List<KolRefDTO> refs = kols.listByIds(List.of(kolId));
+    String kolCode = null;
+    if (refs != null) {
+      kolCode =
+          refs.stream()
+              .map(KolRefDTO::kolCode)
+              .filter(code -> code != null && !code.isBlank())
+              .findFirst()
+              .orElse(null);
+    }
+    if (kolCode == null) {
+      LOG.warn("Payout account {} has no creator code; notification skipped", accountId);
+      return;
+    }
+    TransactionalEvents.publish(
+        events, new PayoutAccountSubmittedEvent(tenantId, kolId, accountId, kolCode, type.name()));
   }
 
   /** Default account: only an APPROVED one, exactly one per KOL. */

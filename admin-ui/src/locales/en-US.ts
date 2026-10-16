@@ -155,7 +155,8 @@ const enUS: MessageSchema = {
     auditLogs: "Audit Log",
     password: "Change Password",
     forbidden: "Access denied",
-    notFound: "Page not found"
+    notFound: "Page not found",
+    notifications: "Notifications"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
@@ -699,6 +700,29 @@ const enUS: MessageSchema = {
     uri: "Request URL",
     ip: "IP",
     cost: "Duration (ms)"
+  },
+  notification: {
+    open: "Notifications",
+    markAll: "Mark all as read",
+    viewAll: "View all",
+    unread: "Unread",
+    empty: "No messages",
+    noPermission: "You do not have permission to view that page.",
+    justNow: "Just now",
+    minutes: "{n} minutes ago",
+    hours: "{n} hours ago",
+    days: "{n} days ago",
+    type: {
+      PAYOUT_ACCOUNT_SUBMITTED:
+        "Creator {kolCode} submitted a {accountType} payout account for review",
+      ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
+      BD_TRANSFER_CANCELLED: "Scheduled transfer for creator {kolCode} was cancelled: {reason}",
+      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned"
+    },
+    reason: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable"
+    }
   }
 };
 
