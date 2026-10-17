@@ -328,13 +328,13 @@ class OrderImportIT {
     assertThat(order.get("source")).isEqualTo(2);
     assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=?",
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=? AND is_deleted = FALSE",
                 Long.class,
                 order.get("id")))
         .isEqualTo(2L);
     List<String> importSubs =
         jdbc.query(
-            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? ORDER BY id",
+            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? AND is_deleted = FALSE ORDER BY id",
             (rs, i) -> rs.getString(1),
             order.get("id"));
     assertThat(importSubs).allSatisfy(s -> assertThat(s).startsWith("line-"));
@@ -382,10 +382,15 @@ class OrderImportIT {
     assertThat((java.math.BigDecimal) after.get("pay_amount")).isEqualByComparingTo("20.00");
     List<String> apiSubs =
         jdbc.query(
-            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? ORDER BY id",
+            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? AND is_deleted = FALSE ORDER BY id",
             (rs, i) -> rs.getString(1),
             order.get("id"));
     assertThat(apiSubs).containsExactly("wd-sub-a", "wd-sub-b");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=? AND is_deleted = TRUE AND sub_order_id LIKE 'line-%'",
+                Long.class, order.get("id")))
+        .isEqualTo(2L);
   }
 
   void shouldForbidImportWithoutPermission_andHideOtherCompanyShop() throws Exception {
