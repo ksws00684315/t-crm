@@ -75,6 +75,23 @@ describe("orders page", () => {
     wrapper.unmount();
   });
 
+  it("keeps cards with duplicate masked order numbers independently expandable", async () => {
+    vi.mocked(getKolOrders).mockResolvedValue({
+      items: [order, { ...order, payTime: "2026-10-14T12:00:00Z" }],
+      total: 2,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+
+    await wrapper.findAll(".order-card__summary")[0].trigger("click");
+
+    expect(wrapper.findAll(".order-card__details")).toHaveLength(1);
+    expect(wrapper.findAll(".order-card__summary")[0].attributes("aria-expanded")).toBe("true");
+    expect(wrapper.findAll(".order-card__summary")[1].attributes("aria-expanded")).toBe("false");
+    wrapper.unmount();
+  });
+
   it("shows the Chinese empty state when there are no orders", async () => {
     const wrapper = await mountPage("zh-CN");
     expect(wrapper.text()).toContain("还没有订单。把你的专属链接分享出去后，订单会显示在这里。");

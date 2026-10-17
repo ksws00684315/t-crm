@@ -23,7 +23,7 @@ const page = ref(1);
 const size = 20;
 const loading = ref(false);
 const error = ref(false);
-const expanded = ref(new Set<string>());
+const expanded = ref(new Set<number>());
 
 const statusOptions: OrderStatus[] = [
   "UNPAID",
@@ -65,6 +65,7 @@ async function loadOrders() {
     });
     orders.value = result.items;
     total.value = Number(result.total);
+    expanded.value = new Set();
   } catch {
     error.value = true;
   } finally {
@@ -92,10 +93,10 @@ function applyCustomDates(value: [Date, Date] | null) {
   page.value = 1;
 }
 
-function toggle(orderNo: string) {
+function toggle(index: number) {
   const next = new Set(expanded.value);
-  if (next.has(orderNo)) next.delete(orderNo);
-  else next.add(orderNo);
+  if (next.has(index)) next.delete(index);
+  else next.add(index);
   expanded.value = next;
 }
 
@@ -145,7 +146,7 @@ onMounted(loadOrders);
     <el-skeleton v-else-if="loading" :rows="4" animated />
 
     <template v-else>
-      <el-table class="orders-table" :data="orders" row-key="orderNo">
+      <el-table class="orders-table" :data="orders">
         <el-table-column type="expand">
           <template #default="{ row }">
             <OrderItems :items="row.items" :amount="amount" :labels="itemLabels" />
@@ -169,12 +170,12 @@ onMounted(loadOrders);
       </el-table>
 
       <div class="order-cards">
-        <article v-for="order in orders" :key="order.orderNo" class="order-card">
+        <article v-for="(order, index) in orders" :key="index" class="order-card">
           <button
             class="order-card__summary"
             type="button"
-            :aria-expanded="expanded.has(order.orderNo)"
-            @click="toggle(order.orderNo)"
+            :aria-expanded="expanded.has(index)"
+            @click="toggle(index)"
           >
             <span class="order-card__number">{{ order.orderNo }}</span>
             <span>{{ dateLabel(order.payTime) }}</span>
@@ -184,7 +185,7 @@ onMounted(loadOrders);
             <span>{{ t("orders.payAmount") }}: {{ amount(order.payAmount) }}</span>
             <span>{{ t("orders.refundAmount") }}: {{ amount(order.refundAmount) }}</span>
           </button>
-          <div v-if="expanded.has(order.orderNo)" class="order-card__details">
+          <div v-if="expanded.has(index)" class="order-card__details">
             <OrderItems :items="order.items" :amount="amount" :labels="itemLabels" />
           </div>
         </article>
