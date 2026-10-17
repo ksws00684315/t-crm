@@ -17,6 +17,7 @@ import {
   POST_TEMPLATES,
   productAbilities,
   SELECTABLE_ROLES,
+  togglePermission,
   type AbilitySubject
 } from "../permission";
 
@@ -111,6 +112,52 @@ describe("permission text", () => {
         { code: "future:extra", group: "NEWGROUP" }
       ]).map(group => group.group)
     ).toEqual(["KOL", "OTHER", "NEWGROUP"]);
+  });
+});
+
+describe("togglePermission", () => {
+  it("checks the required view permission together with an edit permission", () => {
+    expect(togglePermission(["kol:view"], "kol:edit", true)).toEqual(["kol:view", "kol:edit"]);
+    expect(togglePermission([], "product:status", true)).toEqual([
+      "product:status",
+      "product:view"
+    ]);
+    expect(togglePermission([], "order:manage", true)).toEqual(["order:manage", "order:view"]);
+    expect(togglePermission([], "payout-account:review", true)).toEqual([
+      "payout-account:review",
+      "commission:view"
+    ]);
+  });
+
+  it("clears every edit permission that depends on a cleared view permission", () => {
+    expect(
+      togglePermission(["product:view", "product:edit", "product:status"], "product:view", false)
+    ).toEqual([]);
+    expect(
+      togglePermission(
+        ["commission:view", "payout-account:review", "kol:view"],
+        "commission:view",
+        false
+      )
+    ).toEqual(["kol:view"]);
+  });
+
+  it("leaves codes without dependencies untouched in both directions", () => {
+    expect(togglePermission(["kol:view"], "mystery:code", true)).toEqual([
+      "kol:view",
+      "mystery:code"
+    ]);
+    expect(togglePermission(["mystery:code", "kol:view"], "mystery:code", false)).toEqual([
+      "kol:view"
+    ]);
+    // Clearing a view whose dependent is not in the set clears only the view.
+    expect(togglePermission(["kol:view", "mystery:other"], "kol:view", false)).toEqual([
+      "mystery:other"
+    ]);
+  });
+
+  it("does not duplicate codes already in the set", () => {
+    expect(togglePermission(["kol:view"], "kol:view", true)).toEqual(["kol:view"]);
   });
 });
 

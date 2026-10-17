@@ -118,4 +118,29 @@ describe("permissions dialog", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
     wrapper.unmount();
   });
+
+  it("checks kol:view together with kol:edit and explains the linkage", async () => {
+    const wrapper = await open(staff);
+    expect(document.body.textContent).toContain("勾选操作类权限会自动勾上它依赖的查看权限");
+
+    document.body.querySelector<HTMLInputElement>('[data-test="perm-kol:edit"] input')!.click();
+    await flushPromises();
+    expect(checked("kol:edit")).toBe(true);
+    expect(checked("kol:view")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("clears kol:edit when kol:view is cleared", async () => {
+    const wrapper = await open(staff);
+    // Both on: the saved set already has kol:view; add kol:edit first.
+    document.body.querySelector<HTMLInputElement>('[data-test="perm-kol:edit"] input')!.click();
+    await flushPromises();
+    expect(checked("kol:edit")).toBe(true);
+
+    document.body.querySelector<HTMLInputElement>('[data-test="perm-kol:view"] input')!.click();
+    await flushPromises();
+    expect(checked("kol:view")).toBe(false);
+    expect(checked("kol:edit")).toBe(false);
+    wrapper.unmount();
+  });
 });

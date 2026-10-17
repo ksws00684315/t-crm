@@ -31,6 +31,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 4. 启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`。
 5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
+7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
 
 ## 邮件服务（Resend）
 

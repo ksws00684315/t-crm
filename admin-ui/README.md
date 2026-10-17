@@ -49,7 +49,7 @@ src/
 
 ## 命令
 
-需要 Node.js `^22.13.0 || >=24`（CI 使用当前 LTS）和 pnpm 10。
+本地开发与测试使用 **Node.js 24**（CI 使用的版本）；**Node 20 下 vitest 会失败**。`package.json` 的 `engines` 同时接受 `^22.13.0`，但请以 Node 24 为准。包管理器用 pnpm 10。
 
 ```bash
 pnpm install --frozen-lockfile

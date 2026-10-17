@@ -458,6 +458,8 @@ const zhCN = {
     resetTemplate: "按模板重置",
     exclusiveTitle: "超管专属，不可授予。",
     exclusiveItems: "用户与权限、系统配置、操作日志、审批预付、标记打款、转移达人。",
+    permissionDependencies:
+      "勾选操作类权限会自动勾上它依赖的查看权限；取消查看权限会一并取消依赖它的操作类权限。",
     templateRequired: "请选择岗位模板",
     dataScope: "数据范围",
     lastLogin: "最近登录",

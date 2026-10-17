@@ -2,25 +2,27 @@ import type { RouteRecordRaw } from "vue-router";
 import { describe, expect, it } from "vitest";
 import { routes } from "../routes";
 
-// The order pages pull in the shared drawers and API modules; import them here so that cost
-// stays outside the 5s test timeout, like the login view in guard.spec.
-import "@/views/order/index.vue";
-import "@/views/order/unmatched.vue";
-
 function walk(list: readonly RouteRecordRaw[]): RouteRecordRaw[] {
   return list.flatMap(route => [route, ...(route.children ? walk(route.children) : [])]);
 }
 
+const cacheable = walk(routes).filter(
+  route =>
+    typeof route.meta?.componentName === "string" &&
+    !route.meta.noTab &&
+    typeof route.component === "function"
+);
+
+// Page modules load at module scope, outside every test timeout: the first page to pull the shared
+// element-plus / axios graph pays ~2s of inline transform per worker, and under the full parallel
+// suite on CI that cost made in-test loads overrun even a 20s budget. Loading in parallel here
+// keeps each page imported exactly once; the tests below only compare loaded names.
+const loaded = await Promise.all(
+  cacheable.map(route => (route.component as () => Promise<{ default: { name?: string } }>)())
+);
+
 describe("cacheable route component names", () => {
-  // Loading every page module (the first one pays for the full Element Plus bundle) no longer
-  // fits the 5s default with an eleventh page; the assertions are unchanged.
-  it("matches the page component's name option", async () => {
-    const cacheable = walk(routes).filter(
-      route =>
-        typeof route.meta?.componentName === "string" &&
-        !route.meta.noTab &&
-        typeof route.component === "function"
-    );
+  it("covers exactly the cacheable pages", () => {
     expect(cacheable.map(route => route.meta?.componentName).sort()).toEqual(
       [
         "AccountPasswordPage",
@@ -41,9 +43,11 @@ describe("cacheable route component names", () => {
         "SystemUserPage"
       ].sort()
     );
-    for (const route of cacheable) {
-      const loaded = await (route.component as () => Promise<{ default: { name?: string } }>)();
-      expect(loaded.default.name).toBe(route.meta?.componentName);
-    }
-  }, 20000);
+  });
+
+  for (const [index, route] of cacheable.entries()) {
+    it(`component of ${String(route.path)} is named ${String(route.meta?.componentName)}`, () => {
+      expect(loaded[index].default.name).toBe(route.meta?.componentName);
+    });
+  }
 });
