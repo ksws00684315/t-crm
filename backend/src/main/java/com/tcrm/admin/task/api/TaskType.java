@@ -7,7 +7,11 @@ public enum TaskType {
   /** Excel import of original products (task 05); row limit 20,000. */
   PRODUCT_IMPORT(20_000),
   /** Excel import of kol item mappings (task 05); row limit 20,000. */
-  MAPPING_IMPORT(20_000);
+  MAPPING_IMPORT(20_000),
+  /** Excel import of orders (task 18); row limit 20,000. */
+  ORDER_IMPORT(20_000),
+  /** Excel import of completed refunds (task 18); row limit 20,000. */
+  REFUND_IMPORT(20_000);
 
   private final int maxRows;
 

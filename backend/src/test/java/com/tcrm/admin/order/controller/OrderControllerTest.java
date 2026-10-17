@@ -17,10 +17,12 @@ import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.order.service.OrderFilterDTO;
 import com.tcrm.admin.order.service.OrderService;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
+import com.tcrm.admin.order.service.OrderSyncStateDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.PageResult;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -64,6 +66,28 @@ class OrderControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.page").value(2));
     verify(orders).page(any(), eq(true));
+  }
+
+  @Test
+  void shouldReturnEveryShopWithSyncStatus_whenQueryingSyncStates() throws Exception {
+    when(orders.listSyncStates())
+        .thenReturn(
+            List.of(
+                new OrderSyncStateDTO(
+                    10L, "Main shop", true, true, Instant.parse("2026-10-16T00:00:00Z"), null),
+                new OrderSyncStateDTO(20L, "Backup shop", false, false, null, null)));
+    mvc.perform(get("/admin-api/order/sync-states").header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].shopId").value("10"))
+        .andExpect(jsonPath("$.data[0].shopName").value("Main shop"))
+        .andExpect(jsonPath("$.data[0].enabled").value(true))
+        .andExpect(jsonPath("$.data[0].authorized").value(true))
+        .andExpect(jsonPath("$.data[0].lastSuccessAt").value("2026-10-16T00:00:00Z"))
+        .andExpect(jsonPath("$.data[1].shopId").value("20"))
+        .andExpect(jsonPath("$.data[1].lastSuccessAt").isEmpty())
+        .andExpect(jsonPath("$.data[1].lastError").isEmpty());
+    verify(orders).listSyncStates();
   }
 
   @Test
@@ -121,6 +145,7 @@ class OrderControllerTest {
         List.of(
             get("/admin-api/order/orders"),
             get("/admin-api/order/unmatched"),
+            get("/admin-api/order/sync-states"),
             post("/admin-api/order/syncs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shopId\":5}"),

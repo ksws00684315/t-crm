@@ -71,7 +71,16 @@ public enum ErrorCode {
   WEIDIAN_SHOP_NOT_AUTHORIZED(422, "Weidian shop is not connected"),
   WEIDIAN_CREDENTIAL_INVALID(422, "Weidian appkey or secret is invalid"),
   WEIDIAN_API_FAILED(502, "Weidian API request failed"),
-  WEIDIAN_RATE_LIMITED(429, "Weidian API rate limit wait timed out");
+  WEIDIAN_RATE_LIMITED(429, "Weidian API rate limit wait timed out"),
+  GOOGLE_CREDENTIAL_MISSING(422, "Google service account is not configured"),
+  GOOGLE_CREDENTIAL_INVALID(422, "Google service account key is invalid or revoked"),
+  GOOGLE_SHEET_FORBIDDEN(422, "The spreadsheet is not shared with the service account"),
+  GOOGLE_SHEET_NOT_FOUND(422, "Spreadsheet or sheet tab not found"),
+  GOOGLE_API_FAILED(502, "Google API request failed"),
+  SHEET_SOURCE_READING(409, "This source sheet is already being read"),
+  SHEET_SOURCE_DISABLED(409, "Source sheet is disabled"),
+  SHEET_SOURCE_EMPTY(422, "No product rows were found in the source sheet"),
+  SHEET_SOURCE_TOO_LARGE(422, "Source sheet has more than 50,000 product rows");
   private final int status;
   private final String message;
 

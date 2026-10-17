@@ -194,6 +194,35 @@ class ImportTaskServiceTest {
   }
 
   @Test
+  void shouldStoreGeneratedRowsAsTheInputWorkbook_whenRowsComeFromTheSystem() {
+    Long id =
+        service.submitRows(
+            TaskType.KOL_IMPORT,
+            HEADER_KEYS,
+            "源表.xlsx",
+            List.of(List.of("KOL0001", "a"), List.of("", "=b")),
+            () -> null,
+            TaskType.KOL_IMPORT.maxRows());
+
+    assertThat(id).isEqualTo(TASK_ID);
+    ArgumentCaptor<TaskDO> task = ArgumentCaptor.forClass(TaskDO.class);
+    verify(tasks).insert(task.capture());
+    assertThat(task.getValue().getTotal()).isEqualTo(2);
+    assertThat(inserted)
+        .singleElement()
+        .satisfies(
+            file -> {
+              assertThat(file.getFileName()).isEqualTo("源表.xlsx");
+              List<Map<Integer, String>> rows = readBack(file.getContent());
+              assertThat(rows.get(0).values()).containsExactlyElementsOf(headersZh);
+              assertThat(rows.get(1).values()).containsExactly("KOL0001", "a");
+              // Cells are escaped like any workbook the system writes.
+              assertThat(rows.get(2).get(1)).isEqualTo("'=b");
+            });
+    assertThat(queued).hasSize(1);
+  }
+
+  @Test
   void shouldStoreTaskLocale_whenRequestIsEnglish() {
     LocaleContextHolder.setLocale(Locale.ENGLISH);
     byte[] content = excel.write(headersEn, List.of(List.of("KOL0001", "a")));

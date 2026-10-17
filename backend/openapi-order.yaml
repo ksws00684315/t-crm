@@ -1,14 +1,73 @@
 openapi: 3.0.3
 info:
   title: T-CRM order API
-  version: 1.0.0
+  version: 1.1.0
   description: >-
-    Task 13 static contract. Company comes from the login session; OWN scope uses
-    the order's payment-time BD snapshot. No buyer data is returned.
-    Existing springdoc integration is deferred (engineering gap I6).
+    Task 13 static contract; task 18 added the order and refund Excel imports; task 19a added the
+    display names and the shop sync-state endpoint. Company comes from the login session; OWN
+    scope uses the order's payment-time BD snapshot. No buyer data is returned. Existing springdoc
+    integration is deferred (engineering gap I6).
 security:
   - AdminToken: []
 paths:
+  /kol-api/orders:
+    get:
+      operationId: listMyOrders
+      summary: List the authenticated KOL's attributed orders
+      description: >-
+        Read-only. Orders must have kol_id equal to the authenticated KOL and attribution_status
+        ATTRIBUTED. payFrom is inclusive and payTo exclusive in UTC. The order number is masked.
+        Response contains only this KOL's item amounts and never contains internal IDs, buyer data,
+        shop, BD, attribution details, manual reasons, or product IDs.
+      security:
+        - KolToken: []
+      x-authentication: KOL login
+      parameters:
+        - {$ref: '#/components/parameters/payFrom'}
+        - {$ref: '#/components/parameters/payTo'}
+        - name: orderStatus
+          in: query
+          schema: {$ref: '#/components/schemas/OrderStatus'}
+        - {$ref: '#/components/parameters/page'}
+        - name: size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 50, default: 20}
+      responses:
+        '200':
+          description: Current KOL's attributed orders, newest payment time first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Envelope'}
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items: {type: array, items: {$ref: '#/components/schemas/KolOrder'}}
+                          total: {type: string, pattern: '^[0-9]+$'}
+                          page: {type: integer}
+                          size: {type: integer, maximum: 50}
+              example:
+                code: 0
+                msg: Success
+                data:
+                  items:
+                    - orderNo: '2026****1234'
+                      payTime: '2026-10-16T08:00:00Z'
+                      orderStatus: PAID
+                      payAmount: '128.00'
+                      refundAmount: '8.00'
+                      items:
+                        - {itemName: 'Sample item', skuName: 'Blue / M', quantity: 2, payAmount: '128.00', refundAmount: '8.00'}
+                  total: '1'
+                  page: 1
+                  size: 20
+                errorCode: null
+                traceId: example-trace
+        '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
   /admin-api/order/orders:
     get:
       operationId: listOrders
@@ -53,6 +112,36 @@ paths:
       responses:
         '200': {$ref: '#/components/responses/Orders'}
         '400': {$ref: '#/components/responses/Invalid'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/sync-states:
+    get:
+      operationId: listOrderSyncStates
+      summary: List every shop of the company with its order-sync status
+      description: >-
+        Shops without a sync record still appear; lastSuccessAt and lastError are then null.
+        The order pages use this endpoint as the shop filter so accounts without product:view
+        can still pick a shop.
+      x-permission: order:view
+      responses:
+        '200':
+          description: Shop sync states in the current company.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Envelope'}
+                  - type: object
+                    properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/OrderSyncState'}}
+              example:
+                code: 0
+                msg: Success
+                data:
+                  - {shopId: '10', shopName: Main shop, enabled: true, authorized: true, lastSuccessAt: '2026-10-16T00:00:00Z', lastError: null}
+                  - {shopId: '20', shopName: Backup shop, enabled: false, authorized: false, lastSuccessAt: null, lastError: null}
+                errorCode: null
+                traceId: example-trace
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /admin-api/order/syncs:
@@ -128,9 +217,76 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {description: 'COMMON_NOT_FOUND: order is absent or belongs to another company'}
+  /admin-api/order/order-imports/template:
+    get:
+      operationId: downloadOrderImportTemplate
+      summary: Download the order import workbook template
+      x-permission: order:manage
+      responses:
+        '200':
+          description: XLSX template whose header row follows Accept-Language
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/order-imports:
+    post:
+      operationId: submitOrderImport
+      summary: Queue an order Excel import; progress via /admin-api/task/tasks/{id}
+      x-permission: order:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202': {$ref: '#/components/responses/ImportAccepted'}
+        '400': {description: 'TASK_FILE_*: invalid workbook, header, size or row count'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {description: 'TASK_QUEUE_FULL'}
+  /admin-api/order/refund-imports/template:
+    get:
+      operationId: downloadRefundImportTemplate
+      summary: Download the refund import workbook template
+      x-permission: order:manage
+      responses:
+        '200':
+          description: XLSX template whose header row follows Accept-Language
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /admin-api/order/refund-imports:
+    post:
+      operationId: submitRefundImport
+      summary: Queue a refund Excel import; progress via /admin-api/task/tasks/{id}
+      x-permission: order:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202': {$ref: '#/components/responses/ImportAccepted'}
+        '400': {description: 'TASK_FILE_*: invalid workbook, header, size or row count'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429': {description: 'TASK_QUEUE_FULL'}
 components:
   securitySchemes:
     AdminToken: {type: apiKey, in: header, name: X-Admin-Token}
+    KolToken: {type: apiKey, in: header, name: X-Kol-Token}
   parameters:
     id:
       name: id
@@ -157,6 +313,28 @@ components:
     Id: {type: string, pattern: '^[1-9][0-9]*$', example: '2110000000000000001'}
     Money: {type: string, pattern: '^[0-9]+\.[0-9]{2}$', example: '12.50', description: CNY yuan}
     OrderStatus: {type: string, enum: [UNPAID, PAID, SHIPPED, RECEIVED, COMPLETED, CLOSED, UNKNOWN]}
+    KolOrder:
+      type: object
+      required: [orderNo, payTime, orderStatus, payAmount, refundAmount, items]
+      properties:
+        orderNo:
+          type: string
+          description: More than 8 characters keeps the first and last 4 characters; otherwise only the last 2 remain.
+          example: '2026****1234'
+        payTime: {type: string, format: date-time}
+        orderStatus: {$ref: '#/components/schemas/OrderStatus'}
+        payAmount: {$ref: '#/components/schemas/Money'}
+        refundAmount: {$ref: '#/components/schemas/Money'}
+        items: {type: array, items: {$ref: '#/components/schemas/KolOrderItem'}}
+    KolOrderItem:
+      type: object
+      required: [itemName, skuName, quantity, payAmount, refundAmount]
+      properties:
+        itemName: {type: string}
+        skuName: {type: string}
+        quantity: {type: integer, minimum: 1}
+        payAmount: {$ref: '#/components/schemas/Money'}
+        refundAmount: {$ref: '#/components/schemas/Money'}
     AttributionStatus: {type: string, enum: [PENDING, ATTRIBUTED, NON_KOL, CONFLICT, UNMATCHED]}
     Envelope:
       type: object
@@ -171,9 +349,13 @@ components:
       properties:
         id: {$ref: '#/components/schemas/Id'}
         shopId: {$ref: '#/components/schemas/Id'}
+        shopName: {type: string, nullable: true, description: Display name; null when the shop was deleted.}
         weidianOrderId: {type: string}
         kolId: {type: string, nullable: true}
+        kolCode: {type: string, nullable: true, description: Present when the order has a KOL.}
+        kolName: {type: string, nullable: true}
         bdUserId: {type: string, nullable: true}
+        bdUserName: {type: string, nullable: true, description: Nickname first then username; null assigns the order to the company.}
         orderStatus: {$ref: '#/components/schemas/OrderStatus'}
         attributionStatus: {$ref: '#/components/schemas/AttributionStatus'}
         orderTime: {type: string, format: date-time}
@@ -195,10 +377,20 @@ components:
         payAmount: {$ref: '#/components/schemas/Money'}
         refundAmount: {$ref: '#/components/schemas/Money'}
         kolId: {type: string, nullable: true}
+        kolCode: {type: string, nullable: true}
         productId: {type: string, nullable: true}
         kolItemId: {type: string, nullable: true}
         attributionType: {type: integer, enum: [0, 1, 2, 3, 4]}
         manualReason: {type: string, nullable: true}
+    OrderSyncState:
+      type: object
+      properties:
+        shopId: {$ref: '#/components/schemas/Id'}
+        shopName: {type: string}
+        enabled: {type: boolean}
+        authorized: {type: boolean}
+        lastSuccessAt: {type: string, format: date-time, nullable: true}
+        lastError: {type: string, nullable: true, description: Safe English summary, at most 500 characters.}
   responses:
     Ok:
       description: Successful operation; data is null.
@@ -212,6 +404,21 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Envelope'}
           example: {code: 0, msg: Success, data: null, errorCode: null, traceId: example-trace}
+    ImportAccepted:
+      description: Import task queued; poll /admin-api/task/tasks/{taskId}.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: '#/components/schemas/Envelope'}
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    required: [taskId]
+                    properties:
+                      taskId: {$ref: '#/components/schemas/Id'}
+          example: {code: 0, msg: Success, data: {taskId: '2110000000000000001'}, errorCode: null, traceId: example-trace}
     Orders:
       description: Orders in the current company and allowed BD scope.
       content:

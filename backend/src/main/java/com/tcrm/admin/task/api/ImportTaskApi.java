@@ -49,6 +49,24 @@ public interface ImportTaskApi {
       int maxRows);
 
   /**
+   * Same as {@link #submitImport(TaskType, List, ImportFileDTO, Supplier, int)} for rows the system
+   * produced instead of a user upload (ADR-021: rows read from a product source sheet). The rows
+   * are written into a workbook under the template header in the request language and stored as the
+   * task's input file, so validation, progress, the error file and retention are identical to an
+   * upload of the same rows.
+   *
+   * @param fileName name of the stored input file, shown as the task's source
+   * @param rows data rows in template column order; must not be empty
+   */
+  Long submitRows(
+      TaskType type,
+      List<String> headerKeys,
+      String fileName,
+      List<List<String>> rows,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows);
+
+  /**
    * Returns an .xlsx workbook containing only the header row, rendered in the request language.
    *
    * @param headerKeys template header message keys ("import.*") in column order

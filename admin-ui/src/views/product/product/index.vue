@@ -18,7 +18,7 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatPrice } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { canExport, productAbilities } from "@/utils/permission";
 import { formatRate, percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
@@ -132,7 +132,7 @@ const { exporting, exportCsv } = useListExport<ProductVO>({
     { label: t("product.shop"), value: row => row.shopName },
     { label: t("product.weidianItemId"), value: row => row.weidianItemId },
     { label: t("product.category"), value: row => row.category },
-    { label: t("product.price"), value: row => row.price },
+    { label: t("product.price"), value: row => formatPrice(row.price, row.priceCurrency) },
     { label: t("product.rate"), value: row => formatRate(row.rate) },
     {
       label: t("common.status"),
@@ -385,7 +385,9 @@ onMounted(() => {
           >{{ t("batch.off") }}</el-button
         >
       </template>
-      <template #cell-price="{ row }">{{ asProduct(row).price }}</template>
+      <template #cell-price="{ row }">
+        {{ formatPrice(asProduct(row).price, asProduct(row).priceCurrency) }}
+      </template>
       <template #cell-rate="{ row }">{{ formatRate(asProduct(row).rate) }}</template>
       <template #cell-status="{ row }">
         <el-tag :type="asProduct(row).status === 1 ? 'success' : 'info'">
@@ -443,7 +445,9 @@ onMounted(() => {
           />
         </el-form-item>
         <el-form-item :label="t('product.price')" required>
-          <el-input v-model="form.price" :placeholder="t('product.pricePlaceholder')" />
+          <el-input v-model="form.price" :placeholder="t('product.pricePlaceholder')">
+            <template #append>{{ editing?.priceCurrency ?? "CNY" }}</template>
+          </el-input>
         </el-form-item>
         <el-form-item :label="t('product.rateLabel')">
           <el-input v-model="form.ratePercent" :placeholder="t('product.ratePlaceholder')" />
