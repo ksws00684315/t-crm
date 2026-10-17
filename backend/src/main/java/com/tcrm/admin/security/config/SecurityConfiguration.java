@@ -113,6 +113,13 @@ public class SecurityConfiguration implements WebMvcConfigurer {
             "/admin-api/auth/login",
             "/admin-api/auth/captchas",
             "/admin-api/integration/weidian/oauth/callback");
+    // The displayed-company check runs after the status check (so it sees a valid login) and
+    // before the role annotations, so a tab still showing the previous company gets 409 rather
+    // than a 403 computed for the new company.
+    registry
+        .addInterceptor(new CompanyHeaderInterceptor(current))
+        .addPathPatterns(CompanyHeaderInterceptor.PATTERNS)
+        .excludePathPatterns(CompanyHeaderInterceptor.EXCLUDED);
     registry
         .addInterceptor(
             new SaInterceptor(

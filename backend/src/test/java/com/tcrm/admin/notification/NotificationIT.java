@@ -93,6 +93,7 @@ class NotificationIT {
   @Test
   void shouldWriteAfterCommit_forTheBdAndSuperAdmins() throws Exception {
     OpenedCompany company = open("payout");
+    OpenedCompany other = open("elsewhere");
     long bd =
         CompanySessions.createStaff(
             mvc, json, company.token(), PASSWORD, "bd" + company.tenantId(), "BD", "OWN", null);
@@ -122,6 +123,14 @@ class NotificationIT {
                 company.tenantId(),
                 company.userId()))
         .isEqualTo(1L);
+    // ADR-022: the super administrator role is per company, so another company's administrator
+    // (enabled, opened before the publish) receives nothing.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_notification WHERE user_id = ?",
+                Long.class,
+                other.userId()))
+        .isZero();
   }
 
   @Test

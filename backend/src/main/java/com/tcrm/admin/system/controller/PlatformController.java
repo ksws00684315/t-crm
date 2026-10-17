@@ -65,6 +65,16 @@ public class PlatformController {
             platform.createAdmin(id, r.username(), r.password(), r.nickname(), r.email())));
   }
 
+  /** Adds an existing account to this company; 409 USER_ALREADY_MEMBER when it already is one. */
+  @PostMapping("/{id}/members")
+  @AuditLog(module = "Platform", action = "Add tenant member")
+  public R<PlatformUserVO> addMember(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody AddMemberRequest r) {
+    return R.ok(
+        PlatformUserVO.from(
+            platform.addMember(id, r.userId(), r.role(), r.postTemplate(), r.dataScope())));
+  }
+
   @PutMapping("/{id}/admins/{userId}/password")
   @AuditLog(module = "Platform", action = "Reset tenant administrator password")
   public R<Void> resetPassword(

@@ -44,7 +44,7 @@ public class CorsConfiguration implements WebMvcConfigurer {
           .addMapping("/admin-api/**")
           .allowedOrigins(origins)
           .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-          .allowedHeaders("Content-Type", "X-Admin-Token")
+          .allowedHeaders("Content-Type", "X-Admin-Token", "X-Company-Id")
           .exposedHeaders("X-Trace-Id");
     }
   }

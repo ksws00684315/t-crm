@@ -18,7 +18,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Converts OPERATOR and FINANCE accounts that already exist before {@code V202610171000}. A fresh
- * database has no such rows, so the migration is applied in two phases.
+ * database has no such rows, so the migration is applied in two phases, the second one up to that
+ * version only.
  */
 @Tag("docker")
 @Testcontainers
@@ -71,7 +72,9 @@ class ConfigurablePermissionsMigrationIT {
     insert(db, 9105, "PLATFORM_ADMIN", "ALL", false, null);
     insert(db, 9106, "OPERATOR", "OWN", true, 1L);
 
-    flyway(null).migrate();
+    // Stop at this migration: V202610172300 (ADR-022) later moves role, scope and template to
+    // sys_user_tenant; MultiCompanyMembershipMigrationIT covers that step.
+    flyway("202610171000").migrate();
 
     assertUser(db, 9101, "STAFF", "OPERATOR", "ALL");
     assertUser(db, 9102, "STAFF", "BD", "OWN");

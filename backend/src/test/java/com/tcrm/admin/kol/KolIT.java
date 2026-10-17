@@ -119,6 +119,7 @@ class KolIT {
     jdbc.update("DELETE FROM crm_task_file");
     jdbc.update("DELETE FROM crm_task");
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     try (var connection = redis.getConnectionFactory().getConnection()) {
       connection.serverCommands().flushDb();
     }

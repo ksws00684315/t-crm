@@ -1,8 +1,9 @@
 package com.tcrm.admin.system.service;
 
-import com.tcrm.admin.system.model.SysUserDO;
+import com.tcrm.admin.system.model.MemberRow;
 import java.time.Instant;
 
+/** A super administrator of one company; status and times are those of the membership. */
 public record TenantAdminDTO(
     Long id,
     String username,
@@ -11,14 +12,14 @@ public record TenantAdminDTO(
     Integer status,
     Instant lastLoginTime,
     Instant createTime) {
-  public static TenantAdminDTO from(SysUserDO user) {
+  public static TenantAdminDTO from(MemberRow member) {
     return new TenantAdminDTO(
-        user.getId(),
-        user.getUsername(),
-        user.getNickname(),
-        user.getEmail(),
-        user.getStatus(),
-        user.getLastLoginTime(),
-        user.getCreateTime());
+        member.getUserId(),
+        member.getUsername(),
+        member.getNickname(),
+        member.getEmail(),
+        member.getStatus(),
+        member.getLastLoginTime(),
+        member.getCreateTime());
   }
 }
