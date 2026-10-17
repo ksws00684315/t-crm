@@ -10,8 +10,10 @@ import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,11 @@ public class OrderWriter {
             .eq(OrderDO::getWeidianOrderId, remoteId));
   }
 
+  public RefundDO findRefund(String weidianRefundNo) {
+    return refunds.selectOne(
+        new LambdaQueryWrapper<RefundDO>().eq(RefundDO::getWeidianRefundNo, weidianRefundNo));
+  }
+
   @Transactional(rollbackFor = Exception.class)
   public void save(OrderPayloadDTO payload) {
     var next = payload.order();
@@ -50,6 +57,7 @@ public class OrderWriter {
                 .eq(OrderDO::getShopId, next.getShopId())
                 .eq(OrderDO::getWeidianOrderId, next.getWeidianOrderId())
                 .last("FOR UPDATE"));
+    Integer previousSource = existing == null ? null : existing.getSource();
     if (existing == null) {
       orders.insert(next);
     } else {
@@ -76,10 +84,33 @@ public class OrderWriter {
         items.insert(line);
       }
     }
+    // API sync after Excel import: payload is the full line set; drop import-only keys.
+    if (Integer.valueOf(2).equals(previousSource) && Integer.valueOf(1).equals(next.getSource())) {
+      Set<String> keep = new HashSet<>();
+      for (var line : payload.items()) {
+        keep.add(line.getSubOrderId());
+      }
+      for (var old : previous) {
+        if (!keep.contains(old.getSubOrderId())) {
+          detachRefundsFromItem(old.getId());
+          items.deleteById(old.getId());
+        }
+      }
+    }
     var all = listItems(next.getId());
     attribution.apply(next, all, false);
     orders.updateById(next);
     all.forEach(items::updateById);
+  }
+
+  private void detachRefundsFromItem(Long orderItemId) {
+    var linked =
+        refunds.selectList(
+            new LambdaQueryWrapper<RefundDO>().eq(RefundDO::getOrderItemId, orderItemId));
+    for (var refund : linked) {
+      refund.setOrderItemId(null);
+      refunds.updateById(refund);
+    }
   }
 
   public List<OrderItemDO> listItems(Long orderId) {
@@ -151,6 +182,44 @@ public class OrderWriter {
     } else {
       refunds.updateById(row);
     }
+    refreshCompletedRefundTotals(order, all);
+  }
+
+  /**
+   * Inserts one completed refund from Excel import ({@code raw_status = 10}). Resolves {@code
+   * order_item_id} when {@code subOrderId} uniquely matches a line; otherwise leaves it null.
+   *
+   * @return {@code false} when the order is missing in this shop
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public boolean saveImportedRefund(
+      long shopId, String weidianOrderId, String subOrderId, RefundDO row) {
+    var locked =
+        orders.selectOne(
+            new LambdaQueryWrapper<OrderDO>()
+                .eq(OrderDO::getShopId, shopId)
+                .eq(OrderDO::getWeidianOrderId, weidianOrderId)
+                .last("FOR UPDATE"));
+    if (locked == null) {
+      return false;
+    }
+    var all = listItems(locked.getId());
+    Long itemId = null;
+    if (subOrderId != null && !subOrderId.isBlank()) {
+      var matches = all.stream().filter(i -> i.getSubOrderId().equals(subOrderId)).toList();
+      if (matches.size() == 1) {
+        itemId = matches.getFirst().getId();
+      }
+    }
+    row.setOrderId(locked.getId());
+    row.setOrderItemId(itemId);
+    row.setRawStatus("10");
+    refunds.insert(row);
+    refreshCompletedRefundTotals(locked, listItems(locked.getId()));
+    return true;
+  }
+
+  private void refreshCompletedRefundTotals(OrderDO order, List<OrderItemDO> all) {
     var completed =
         refunds.selectList(
             new LambdaQueryWrapper<RefundDO>()

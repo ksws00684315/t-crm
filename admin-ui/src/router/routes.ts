@@ -50,6 +50,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "kol/bd-transfers",
+        name: "KolBdTransfers",
+        component: () => import("@/views/kol/bd-transfers/index.vue"),
+        meta: {
+          title: "route.bdTransfers",
+          icon: "Switch",
+          superAdmin: true,
+          componentName: "KolBdTransferPage"
+        }
+      },
+      {
         path: "product",
         name: "ProductGroup",
         redirect: "/product/shops",
@@ -155,6 +166,17 @@ export const routes: RouteRecordRaw[] = [
           icon: "Document",
           superAdmin: true,
           componentName: "SystemOperLogPage"
+        }
+      },
+      {
+        path: "notifications",
+        name: "Notifications",
+        component: () => import("@/views/notification/index.vue"),
+        meta: {
+          title: "route.notifications",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "NotificationPage"
         }
       },
       {

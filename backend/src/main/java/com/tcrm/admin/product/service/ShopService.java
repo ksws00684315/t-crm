@@ -151,6 +151,15 @@ public class ShopService implements ShopAccessApi {
   }
 
   @Override
+  public ShopAccessDTO findEnabledByWeidianShopId(String weidianShopId) {
+    ShopDO shop = findEnabledByWeidianId(weidianShopId);
+    return shop == null
+        ? null
+        : new ShopAccessDTO(
+            shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus());
+  }
+
+  @Override
   public List<ShopAccessDTO> listShops() {
     return shops.selectList(new LambdaQueryWrapper<ShopDO>().orderByAsc(ShopDO::getId)).stream()
         .map(

@@ -146,6 +146,7 @@ const enUS: MessageSchema = {
     home: "Home",
     tenants: "Companies",
     kols: "Creators",
+    bdTransfers: "BD Transfers",
     products: "Products",
     shops: "Shops",
     product: "Product",
@@ -158,7 +159,8 @@ const enUS: MessageSchema = {
     auditLogs: "Audit Log",
     password: "Change Password",
     forbidden: "Access denied",
-    notFound: "Page not found"
+    notFound: "Page not found",
+    notifications: "Notifications"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
@@ -449,6 +451,8 @@ const enUS: MessageSchema = {
     resetDone: "Password reset. The user must sign in with the new password.",
     confirmDisable: "Disable user {username}?",
     confirmEnable: "Enable user {username}?",
+    disableBdEffect:
+      "After disabling, the {n} creators under this account immediately become unassigned (company-owned), and scheduled transfers to this account are cancelled.",
     disableTitle: "Disable user",
     enableTitle: "Enable user",
     disabled: "Disabled",
@@ -552,11 +556,56 @@ const enUS: MessageSchema = {
     startedAt: "Start time",
     endedAt: "End time",
     current: "Current",
-    changeBdTitle: "Change BD",
-    changeBdSummary: "Creator {code} ({name}). Current BD: {bd}",
-    changeBdPlaceholder: "Leave empty to mark as unassigned",
-    changeBdDone: "BD updated.",
     bdOption: "{nickname} ({username})"
+  },
+  bdTransfer: {
+    action: "Transfer BD",
+    title: "Transfer BD",
+    target: "Transfer",
+    selectedKols: "{n} creators selected",
+    bdAllKols: "All creators of {name} (currently {n})",
+    newBd: "New BD",
+    newBdPlaceholder: "Select a BD",
+    newBdRequired: "Select a BD",
+    unassigned: "Unassigned (company)",
+    effectiveTime: "Effective",
+    now: "Immediately",
+    at: "At a time",
+    pickTimePlaceholder: "Pick date and time",
+    timezoneHint: "Time zone: {timezone} (UTC{offset})",
+    pickTime: "Choose an effective time",
+    timeFuture: "The effective time must be later than now",
+    timeRange: "The effective time must be within one year",
+    reason: "Reason",
+    reasonPlaceholder: "Optional, up to 255 characters",
+    tooMany: "At most {max} creators per transfer",
+    success:
+      "{immediate} transferred now, {scheduled} scheduled, {skipped} skipped (already with the new BD)",
+    conflicts: "These creators already have a scheduled transfer; cancel it first:",
+    transferKols: "Transfer creators",
+    noKols: "No creators under this account",
+    kol: "Creator",
+    kolCodePlaceholder: "e.g. KOL0001",
+    fromBd: "From BD",
+    toBd: "To BD",
+    effectiveAt: "Agreed effective time",
+    executedAt: "Executed at",
+    cancelReason: "Cancel reason",
+    cancelTitle: "Cancel reservation",
+    cancelConfirm: "Cancel this scheduled transfer of creator {code}?",
+    cancelled: "Reservation cancelled",
+    status: {
+      SCHEDULED: "Scheduled",
+      DONE: "Done",
+      CANCELLED: "Cancelled"
+    },
+    cancelReasons: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable",
+      TARGET_DISABLED: "The target BD was disabled",
+      REPLACED_BY_IMMEDIATE: "Replaced by an immediate transfer",
+      MANUAL: "Cancelled manually"
+    }
   },
   linkTemplate: {
     hint: "Every agent template of this company, including disabled ones, in sort order.",
@@ -785,6 +834,29 @@ const enUS: MessageSchema = {
     uri: "Request URL",
     ip: "IP",
     cost: "Duration (ms)"
+  },
+  notification: {
+    open: "Notifications",
+    markAll: "Mark all as read",
+    viewAll: "View all",
+    unread: "Unread",
+    empty: "No messages",
+    noPermission: "You do not have permission to view that page.",
+    justNow: "Just now",
+    minutes: "{n} minutes ago",
+    hours: "{n} hours ago",
+    days: "{n} days ago",
+    type: {
+      PAYOUT_ACCOUNT_SUBMITTED:
+        "Creator {kolCode} submitted a {accountType} payout account for review",
+      ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
+      BD_TRANSFER_CANCELLED: "Scheduled transfer for creator {kolCode} was cancelled: {reason}",
+      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned"
+    },
+    reason: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable"
+    }
   }
 };
 
