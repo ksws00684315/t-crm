@@ -118,3 +118,53 @@ describe("DataTable export and selection", () => {
     expect(wrapper.find(".el-table-column--selection").exists()).toBe(false);
   });
 });
+
+describe("DataTable expand rows", () => {
+  const rows = [
+    { id: "1", code: "KOL0001", name: "Ada" },
+    { id: "2", code: "KOL0002", name: "Bob" }
+  ];
+
+  it("renders the expand slot of a row after opening it", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "exp", rows, columns, total: 2, expandable: true },
+      slots: { expand: '<p data-test="detail">lines</p>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await nextTick();
+    expect(wrapper.find(".el-table__expand-column").exists()).toBe(true);
+    expect(wrapper.find("[data-test=detail]").exists()).toBe(false);
+    await wrapper.find(".el-table__expand-icon").trigger("click");
+    await nextTick();
+    await nextTick();
+    expect(wrapper.find("[data-test=detail]").exists()).toBe(true);
+    expect(wrapper.text()).toContain("lines");
+  });
+
+  it("opens every row without clicking when defaultExpandAll is set", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "exp-all",
+        rows,
+        columns,
+        total: 2,
+        expandable: true,
+        defaultExpandAll: true
+      },
+      slots: { expand: '<p data-test="detail">lines</p>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await nextTick();
+    expect(wrapper.findAll("[data-test=detail]")).toHaveLength(2);
+  });
+
+  it("has no expand column unless expandable", () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "noexp", rows, columns, total: 2 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(wrapper.find(".el-table__expand-column").exists()).toBe(false);
+  });
+});
