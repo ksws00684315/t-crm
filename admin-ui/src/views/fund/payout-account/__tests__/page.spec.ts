@@ -183,6 +183,34 @@ describe("payout account review page", () => {
     expect(wrapper.findComponent(ReviewDrawer).props("accountId")).toBe("9007199254740993");
   });
 
+  it("drops ?id= when the drawer closes so the same link can open it again", async () => {
+    const pinia = signIn("SUPER_ADMIN", []);
+    const { wrapper, router } = await mountPage(pinia, "?id=9007199254740993");
+    const drawer = () => wrapper.findComponent(ReviewDrawer);
+    expect(drawer().props("modelValue")).toBe(true);
+
+    drawer().vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(drawer().props("modelValue")).toBe(false);
+    expect(drawer().props("accountId")).toBeNull();
+    expect(router.currentRoute.value.query.id).toBeUndefined();
+    expect(router.currentRoute.value.path).toBe("/fund/payout-accounts");
+
+    // Clicking the same notification pushes the same URL again; it must be a real query change.
+    await router.push("/fund/payout-accounts?id=9007199254740993");
+    await flushPromises();
+    expect(drawer().props("modelValue")).toBe(true);
+    expect(drawer().props("accountId")).toBe("9007199254740993");
+  });
+
+  it("keeps other query parameters when dropping ?id=", async () => {
+    const pinia = signIn("SUPER_ADMIN", []);
+    const { wrapper, router } = await mountPage(pinia, "?id=9007199254740993&from=inbox");
+    wrapper.findComponent(ReviewDrawer).vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ from: "inbox" });
+  });
+
   it("does not open the drawer from ?id= without the review permission", async () => {
     const pinia = signIn("STAFF", ["commission:view"]);
     const { wrapper } = await mountPage(pinia, "?id=9007199254740993");

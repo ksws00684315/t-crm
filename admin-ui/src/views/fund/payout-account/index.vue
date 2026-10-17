@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { listPayoutAccounts, type PayoutAccountRowVO } from "@/api/commission/payout-account";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -18,6 +18,7 @@ defineOptions({ name: "PayoutAccountReviewPage" });
 
 const { t } = useI18n();
 const route = useRoute();
+const router = useRouter();
 const me = useUserStore();
 const payoutPending = usePayoutPendingStore();
 
@@ -150,6 +151,21 @@ function openDetail(row: PayoutAccountRowVO) {
   drawerVisible.value = true;
 }
 
+/**
+ * Closing the drawer also drops `?id=` from the URL. A push to an identical URL is not a
+ * navigation, so without this the same notification link could never reopen the drawer.
+ */
+function onDrawerVisible(visible: boolean): void {
+  drawerVisible.value = visible;
+  if (visible) return;
+  detailId.value = null;
+  if (route.query.id !== undefined) {
+    const rest = { ...route.query };
+    delete rest.id;
+    void router.replace({ query: rest });
+  }
+}
+
 /** Entering the page refreshes the pending count that feeds the menu badge. */
 function afterReview(): void {
   void load();
@@ -159,14 +175,10 @@ function afterReview(): void {
 onMounted(() => {
   void load();
   void payoutPending.refresh();
-  // Task 20 links here with ?id={accountId}; open that account's detail right away.
-  const wanted = typeof route.query.id === "string" ? route.query.id : "";
-  if (wanted && canReview.value) {
-    detailId.value = wanted;
-    drawerVisible.value = true;
-  }
 });
 
+// Task 20 links here with ?id={accountId}; open that account's detail right away, also when
+// the query changes while the page is already open (or kept alive in a background tab).
 watch(
   () => route.query.id,
   id => {
@@ -175,7 +187,8 @@ watch(
       detailId.value = wanted;
       drawerVisible.value = true;
     }
-  }
+  },
+  { immediate: true }
 );
 </script>
 
@@ -257,8 +270,9 @@ watch(
 
     <ReviewDrawer
       v-if="canReview"
-      v-model="drawerVisible"
+      :model-value="drawerVisible"
       :account-id="detailId"
+      @update:model-value="onDrawerVisible"
       @reviewed="afterReview"
     />
   </div>

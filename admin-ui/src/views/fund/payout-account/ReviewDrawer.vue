@@ -98,12 +98,9 @@ async function decide(action: "APPROVE" | "REJECT", reason?: string): Promise<vo
   } catch (error) {
     if (error instanceof ApiError && error.errorCode === "PAYOUT_ACCOUNT_NOT_PENDING") {
       ElMessage.warning(t("errors.PAYOUT_ACCOUNT_NOT_PENDING"));
-      try {
-        await load(props.accountId);
-        emit("reviewed");
-      } catch (reloadError) {
-        notifyError(reloadError);
-      }
+      // load() reports its own failure and closes the drawer; nothing to catch here.
+      await load(props.accountId);
+      emit("reviewed");
     } else {
       notifyError(error);
     }
