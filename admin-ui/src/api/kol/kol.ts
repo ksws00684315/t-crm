@@ -76,11 +76,6 @@ export function updateKolStatus(id: string, status: 0 | 1): Promise<null> {
   return http.request<null>({ method: "put", url: `/kol/kols/${id}/status`, data: { status } });
 }
 
-/** Changes the BD; null clears the assignment. */
-export function changeKolBd(id: string, bdUserId: string | null): Promise<null> {
-  return http.request<null>({ method: "put", url: `/kol/kols/${id}/bd-user`, data: { bdUserId } });
-}
-
 export function downloadKolTemplate(): Promise<DownloadedFile> {
   return http.download({ method: "get", url: "/kol/kol-imports/template" });
 }
@@ -106,7 +101,7 @@ export function uploadKolImport(file: File): Promise<KolImportVO> {
   return http.request<KolImportVO>({
     method: "post",
     url: "/kol/kol-imports",
-    // For FormData axios drops the JSON default so the browser sets multipart/form-data + boundary.
+    // The http interceptor drops the JSON default for FormData; the browser sets the boundary.
     data: form,
     timeout: 120000
   });
