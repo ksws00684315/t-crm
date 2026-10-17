@@ -8,6 +8,9 @@
 >
 > **并行说明**：与 25a（后端）同时进行，严格按 25a 提示词第 5 节的接口约定开发，不要求 25a 已合并。25a 合并后，创建或合并本 PR 之前把最新的 `main` 合入本分支（merge，不要 rebase），并用真实后端补做浏览器验证。
 
+>
+> **CI 说明（2026-10-18 起）**：GitHub Actions 暂停使用，**不要等待** `gh pr checks`。验收以本地全量检查为准：必须在本机实际跑完本提示词要求的全部检查（后端含 `mvn verify -Pdocker-it`，需要 Docker），并把命令、结果（测试数量、失败数）贴进 PR 描述和执行报告；本机缺 Docker 等条件时，在报告中写明哪些没跑，由架构负责人在本地补跑。
+
 ---
 
 ## 1. 背景与必读
@@ -25,7 +28,7 @@
 - **只修改 `admin-ui/`、`kol-portal/` 和你的执行报告。不新增依赖。**
 - Node 24：两个前端都执行 `pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm notices:check`，全部通过。
 - 本机验证（本机执行时）：管理端 Vite 8827、达人端 Vite 8828；需要本地后端时用后端 18261、PostgreSQL 55461、Redis 46461，Compose 项目名 `tcrm-25b`。避开 18081、8848、8849、55432、46391。验证完停掉进程并 `down -v`。
-- 推送分支，按 PR 模板创建 PR，`gh pr checks --watch` 等 CI 通过。**不要合并 PR，不要推送 `main`。**
+- 推送分支，按 PR 模板创建 PR，PR 描述中贴出本地检查结果。**不要合并 PR，不要推送 `main`。**
 
 ## 3. 要做的事
 

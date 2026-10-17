@@ -8,6 +8,9 @@
 >
 > **并行说明**：与 25a、25b 同时进行。25a 改达人表与编号格式，不改 `crm_kol_item`；本任务改 `crm_kol_item`。语言包、设计说明书冲突时保留双方。迁移版本号使用 `V202610181300`～`V202610181309`。
 
+>
+> **CI 说明（2026-10-18 起）**：GitHub Actions 暂停使用，**不要等待** `gh pr checks`。验收以本地全量检查为准：必须在本机实际跑完本提示词要求的全部检查（后端含 `mvn verify -Pdocker-it`，需要 Docker），并把命令、结果（测试数量、失败数）贴进 PR 描述和执行报告；本机缺 Docker 等条件时，在报告中写明哪些没跑，由架构负责人在本地补跑。
+
 ---
 
 ## 1. 背景与必读
@@ -29,10 +32,10 @@
 
 ## 2. 执行环境与交付
 
-- 后端 JDK 21：`mvn spotless:apply`、`mvn verify`、`mvn verify -Pdocker-it` 全部通过（本机没有 Docker 时以 CI 为准）。
+- 后端 JDK 21：`mvn spotless:apply`、`mvn verify`、`mvn verify -Pdocker-it` 全部通过（本机没有 Docker 时在报告中写明，由架构负责人本地补跑）。
 - 前端 Node 24：两个前端都执行 `pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm notices:check`。
 - 本机验证（本机执行时）：后端 18262、管理端 Vite 8829、达人端 Vite 8830、PostgreSQL 55462、Redis 46462，Compose 项目名 `tcrm-26`。避开 18081、8848、8849、55432、46391。
-- 推送分支，按 PR 模板创建 PR，`gh pr checks --watch` 等 CI 通过。**不要合并 PR，不要推送 `main`。不新增依赖**（XML 用 JDK 自带的 StAX，ZIP 用 `java.util.zip`）。
+- 推送分支，按 PR 模板创建 PR，PR 描述中贴出本地检查结果。**不要合并 PR，不要推送 `main`。不新增依赖**（XML 用 JDK 自带的 StAX，ZIP 用 `java.util.zip`）。
 
 ## 3. 已定的设计决定（不要自行改变）
 

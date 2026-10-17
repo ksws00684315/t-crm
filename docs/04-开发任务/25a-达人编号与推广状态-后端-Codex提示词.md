@@ -13,6 +13,9 @@
 >
 > 迁移版本号使用 `V202610181200`～`V202610181209`（可拆成多个脚本，按顺序编号）。
 
+>
+> **CI 说明（2026-10-18 起）**：GitHub Actions 暂停使用，**不要等待** `gh pr checks`。验收以本地全量检查为准：必须在本机实际跑完本提示词要求的全部检查（后端含 `mvn verify -Pdocker-it`，需要 Docker），并把命令、结果（测试数量、失败数）贴进 PR 描述和执行报告；本机缺 Docker 等条件时，在报告中写明哪些没跑，由架构负责人在本地补跑。
+
 ---
 
 ## 1. 背景
@@ -37,9 +40,9 @@
 
 ## 3. 执行环境与交付
 
-- JDK 21：`backend/`、`redirect/` 都执行 `mvn spotless:apply`、`mvn verify`、`mvn verify -Pdocker-it`，全部通过。本机没有 Docker 时在报告中写明，以 CI 为准，CI 必须通过。
+- JDK 21：`backend/`、`redirect/` 都执行 `mvn spotless:apply`、`mvn verify`、`mvn verify -Pdocker-it`，全部通过。本机没有 Docker 时在报告中写明，由架构负责人本地补跑。
 - 只修改 `backend/`、`redirect/`、设计说明书中本任务涉及的章节、两个前端的 `locales`（新增错误码文案）和你的执行报告。
-- 推送分支，按 PR 模板创建 PR，`gh pr checks --watch` 等 CI 通过。**不要合并 PR，不要推送 `main`。不新增依赖。**
+- 推送分支，按 PR 模板创建 PR，PR 描述中贴出本地检查结果。**不要合并 PR，不要推送 `main`。不新增依赖。**
 
 ## 4. 已定的设计决定（不要自行改变）
 
