@@ -18,6 +18,7 @@ import { useIdleLock } from "@/composables/useIdleLock";
 import { useLocaleStore } from "@/stores/locale";
 import { useLockStore } from "@/stores/lock";
 import { useMenuSearchStore } from "@/stores/menu-search";
+import { usePayoutPendingStore } from "@/stores/payout-pending";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
@@ -35,6 +36,7 @@ import {
 } from "@/utils/sidebar";
 import LockScreen from "./LockScreen.vue";
 import MenuSearch from "./MenuSearch.vue";
+import NotificationBell from "./NotificationBell.vue";
 import ReauthDialog from "./ReauthDialog.vue";
 import SideMenu from "./SideMenu.vue";
 import TabBar from "./TabBar.vue";
@@ -48,6 +50,7 @@ const user = useUserStore();
 const localeStore = useLocaleStore();
 const theme = useThemeStore();
 const menuSearch = useMenuSearchStore();
+const payoutPending = usePayoutPendingStore();
 const reauth = useReauthStore();
 const tabs = useTabsStore();
 const lockStore = useLockStore();
@@ -69,7 +72,18 @@ const mac = isMacPlatform();
 const access = computed(() => accessOf(user.user));
 const menu = computed(() => {
   void localeStore.locale;
-  return buildMenu(routes, access.value);
+  const items = buildMenu(routes, access.value);
+  // The pending-review badge rides on the review entry; zero renders no badge (task 15b §4.2.5).
+  const badge = payoutPending.count;
+  if (badge > 0) {
+    for (const item of items) {
+      for (const child of item.children ?? []) {
+        if (child.path === "/fund/payout-accounts") child.badge = badge;
+      }
+      if (item.path === "/fund/payout-accounts") item.badge = badge;
+    }
+  }
+  return items;
 });
 const roleText = computed(() => (user.user ? accountLabel(user.user) : ""));
 const tenantLabel = computed(() => {
@@ -192,11 +206,13 @@ watch(
 
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
+  payoutPending.start();
   document.addEventListener("fullscreenchange", onFullscreenChange);
   syncWatermarkColor();
 });
 
 onBeforeUnmount(() => {
+  payoutPending.stop();
   document.removeEventListener("fullscreenchange", onFullscreenChange);
   unsubscribeNarrow();
 });
@@ -292,6 +308,7 @@ onBeforeUnmount(() => {
           >
             <span class="layout__label">{{ t(`theme.${theme.mode}`) }}</span>
           </el-button>
+          <NotificationBell v-if="!access.isPlatformAdmin" />
           <LocaleSwitch />
           <el-dropdown trigger="click" @command="onCommand">
             <span class="layout__user">

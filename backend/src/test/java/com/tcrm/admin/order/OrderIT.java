@@ -608,6 +608,8 @@ class OrderIT {
         .andExpect(status().isOk());
     mvc.perform(get("/admin-api/order/unmatched").header("X-Admin-Token", token))
         .andExpect(status().isForbidden());
+    mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", token))
+        .andExpect(status().isOk());
     mvc.perform(
             post("/admin-api/order/syncs")
                 .header("X-Admin-Token", token)
@@ -625,6 +627,73 @@ class OrderIT {
         .andExpect(status().isForbidden());
     String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
     mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", platform))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void shouldDecorateRowsAndLinesWithDisplayNames_whenListingOrders() throws Exception {
+    long bd =
+        CompanySessions.createStaff(
+            mvc, json, admin, PASSWORD, "order-display-bd", "BD", "OWN", List.of("kol:edit"));
+    mapping(1, 100, "90", PAID.minusSeconds(1), null);
+    history(1, 100, bd, PAID.minusSeconds(1), null);
+    long unmatched = save("1001", PAID, line("92", "1"));
+    long attributed = save("1000", PAID, line("90", "1"));
+    mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(attributed)))
+        .andExpect(jsonPath("$.data.items[0].shopId").value("10"))
+        .andExpect(jsonPath("$.data.items[0].shopName").value("Test shop"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL0100"))
+        .andExpect(jsonPath("$.data.items[0].kolName").value("Test creator"))
+        .andExpect(jsonPath("$.data.items[0].bdUserName").value("order-display-bd"))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL0100"))
+        .andExpect(jsonPath("$.data.items[1].id").value(String.valueOf(unmatched)))
+        .andExpect(jsonPath("$.data.items[1].kolCode").isEmpty())
+        .andExpect(jsonPath("$.data.items[1].bdUserName").isEmpty())
+        .andExpect(jsonPath("$.data.items[1].items[0].kolCode").isEmpty());
+    mvc.perform(get("/admin-api/order/unmatched").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(unmatched)))
+        .andExpect(jsonPath("$.data.items[0].shopName").value("Test shop"));
+  }
+
+  @Test
+  void shouldListEveryCompanyShopWithSyncStatus_whenReadingSyncStates() throws Exception {
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time) VALUES(30,1,'Disabled shop','30',0,now(),now())");
+    jdbc.update(
+        "INSERT INTO crm_order_sync_state(id,tenant_id,shop_id,last_success_at,last_error,create_time,update_time) VALUES(10,1,10,?,'order detail failed for order 1000',now(),now())",
+        Timestamp.from(PAID));
+    var other =
+        CompanySessions.openCompany(mvc, json, PASSWORD, "order-states-co", "order-states-admin");
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,create_time,update_time) VALUES(40,?,'Other company shop','40',now(),now())",
+        other.tenantId());
+    mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].shopId").value("10"))
+        .andExpect(jsonPath("$.data[0].shopName").value("Test shop"))
+        .andExpect(jsonPath("$.data[0].enabled").value(true))
+        .andExpect(jsonPath("$.data[0].authorized").value(true))
+        .andExpect(jsonPath("$.data[0].lastSuccessAt").value("2026-10-16T00:00:00Z"))
+        .andExpect(jsonPath("$.data[0].lastError").value("order detail failed for order 1000"))
+        .andExpect(jsonPath("$.data[1].shopId").value("30"))
+        .andExpect(jsonPath("$.data[1].shopName").value("Disabled shop"))
+        .andExpect(jsonPath("$.data[1].enabled").value(false))
+        .andExpect(jsonPath("$.data[1].authorized").value(false))
+        .andExpect(jsonPath("$.data[1].lastSuccessAt").isEmpty())
+        .andExpect(jsonPath("$.data[1].lastError").isEmpty());
+    mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", other.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].shopId").value("40"))
+        .andExpect(jsonPath("$.data[0].lastSuccessAt").isEmpty());
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", platform))
         .andExpect(status().isForbidden());
   }
 }

@@ -15,10 +15,20 @@ export interface HttpOptions {
   adapter?: AxiosAdapter;
 }
 
+/** A file returned by a non-JSON endpoint (`Content-Disposition: attachment`). */
+export interface DownloadedFile {
+  blob: Blob;
+}
+
 export interface Http {
   instance: AxiosInstance;
   /** Resolves with `data` of a successful envelope, otherwise throws {@link ApiError}. */
   request<T>(config: AxiosRequestConfig): Promise<T>;
+  /**
+   * Fetches a file as a blob so the token stays in the header instead of the URL; failures carry
+   * the JSON envelope and throw {@link ApiError} like `request`.
+   */
+  download(config: AxiosRequestConfig): Promise<DownloadedFile>;
 }
 
 function isEnvelope(body: unknown): body is Envelope<unknown> {
@@ -43,6 +53,16 @@ function toApiError(status: number, body: unknown): ApiError {
   }
   // Not an envelope (proxy error page, gateway timeout, ...).
   return new ApiError({ status, errorCode: null, traceId: null });
+}
+
+/** Reads a JSON envelope out of an error response that was requested as a blob. */
+async function blobBody(data: unknown): Promise<unknown> {
+  if (!(data instanceof Blob)) return data;
+  try {
+    return JSON.parse(await data.text());
+  } catch {
+    return null;
+  }
 }
 
 export function createHttp(options: HttpOptions): Http {
@@ -80,5 +100,23 @@ export function createHttp(options: HttpOptions): Http {
     throw error;
   }
 
-  return { instance, request };
+  async function download(config: AxiosRequestConfig): Promise<DownloadedFile> {
+    let status: number;
+    let body: unknown;
+    try {
+      const response = await instance.request({ ...config, responseType: "blob" });
+      status = response.status;
+      body = response.data;
+    } catch {
+      throw new ApiError({ status: 0, errorCode: NETWORK_ERROR, traceId: null });
+    }
+    if (status >= 200 && status < 300 && body instanceof Blob) {
+      return { blob: body };
+    }
+    const error = toApiError(status, await blobBody(body));
+    if (status === 401) options.onUnauthorized(error);
+    throw error;
+  }
+
+  return { instance, request, download };
 }

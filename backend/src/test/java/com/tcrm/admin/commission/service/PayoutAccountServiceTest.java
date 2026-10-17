@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 class PayoutAccountServiceTest {
   /** Deterministic 32-byte key; only the format matters here. */
@@ -60,8 +62,10 @@ class PayoutAccountServiceTest {
   private final BizFileService files = mock(BizFileService.class);
   private final KolApi kols = mock(KolApi.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final PayoutAccountService service =
-      new PayoutAccountService(accounts, files, kols, CIPHER, TestTransactions.template(), audit);
+      new PayoutAccountService(
+          accounts, files, kols, CIPHER, TestTransactions.template(), audit, events);
 
   @BeforeEach
   void insertAssignsId() {
@@ -539,6 +543,56 @@ class PayoutAccountServiceTest {
     when(kols.lockKol(KOL)).thenReturn(false);
     assertThatThrownBy(() -> service.create(KOL, paypal("new@example.com"), AUDIT))
         .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
+  }
+
+  @Test
+  void shouldPublish_whenAccountIsCreated() {
+    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(KOL, "KOL0010", "Ada", true, 3L)));
+    service.create(KOL, paypal("alice@example.com"), AUDIT);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new PayoutAccountSubmittedEvent(2L, KOL, ACCOUNT_ID, "KOL0010", "PAYPAL"));
+  }
+
+  @Test
+  void shouldPublish_whenRejectedAccountIsResubmitted() {
+    when(accounts.selectById(ACCOUNT_ID)).thenReturn(account(PayoutAccountStatus.REJECTED));
+    when(accounts.update(isNull(), any())).thenReturn(1);
+    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(KOL, "KOL0010", "Ada", true, 3L)));
+    service.update(KOL, ACCOUNT_ID, usdt(null), AUDIT);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new PayoutAccountSubmittedEvent(2L, KOL, ACCOUNT_ID, "KOL0010", "USDT"));
+  }
+
+  @Test
+  void shouldNotPublish_whenCreatorCodeIsMissing() {
+    when(kols.listByIds(any())).thenReturn(List.of());
+    service.create(KOL, paypal("alice@example.com"), AUDIT);
+    verify(accounts).insert(any(PayoutAccountDO.class));
+    verify(events, never()).publishEvent(any());
+  }
+
+  @Test
+  void shouldNotPublish_whenCreateRollsBackBeforeTheEvent() {
+    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(KOL, "KOL0010", "Ada", true, 3L)));
+    org.mockito.Mockito.doThrow(new IllegalStateException("claim"))
+        .when(files)
+        .claimQrFile(anyLong(), anyLong(), anyLong());
+    assertThatThrownBy(() -> service.create(KOL, usdt(9L), AUDIT))
+        .isInstanceOf(IllegalStateException.class);
+    verify(events, never()).publishEvent(any());
+  }
+
+  @Test
+  void shouldNotPublish_whenUpdateMatchesNoRow() {
+    when(accounts.selectById(ACCOUNT_ID)).thenReturn(account(PayoutAccountStatus.REJECTED));
+    when(accounts.update(isNull(), any())).thenReturn(0);
+    assertThatThrownBy(() -> service.update(KOL, ACCOUNT_ID, paypal("new@example.com"), AUDIT))
+        .hasMessage(ErrorCode.PAYOUT_ACCOUNT_LOCKED.message());
+    verify(events, never()).publishEvent(any());
   }
 
   private static com.baomidou.mybatisplus.extension.plugins.pagination.Page<PayoutAccountDO>

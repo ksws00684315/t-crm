@@ -146,24 +146,37 @@ export function permissionGroupLabel(group: string): string {
  * account pages (password, 403) that are not company business pages.
  */
 export interface RouteAccessMeta {
-  permission?: PermissionCode;
+  /** Permission code required to open the route. A super administrator passes every code. */
+  permission?: PermissionCode | readonly PermissionCode[];
   superAdmin?: boolean;
   platformAdmin?: boolean;
   hideForOwn?: boolean;
   hideInMenu?: boolean;
+  /** Company business page that stays closed to the platform administrator. */
+  companyAccount?: boolean;
+}
+
+/** The permission codes a route asks for; empty when the route has none. */
+function requiredCodes(meta: RouteAccessMeta | undefined): readonly PermissionCode[] {
+  const permission = meta?.permission;
+  // typeof, not Array.isArray: the latter cannot narrow a readonly array out of the union.
+  return typeof permission === "string" ? [permission] : (permission ?? []);
 }
 
 /**
- * Whether a signed-in user may open a route. Company home has no permission code: every company
- * account may open it, and the platform administrator may not. OWN hides `hideForOwn` routes.
+ * Whether a signed-in user may open a route. An array `permission` means any one code suffices
+ * (task 15b §4.2.1). Company home has no permission code: every company account may open it, and
+ * the platform administrator may not. OWN hides `hideForOwn` routes.
  */
 export function canAccessRoute(meta: RouteAccessMeta | undefined, access: AccessProfile): boolean {
   if (meta?.platformAdmin) return access.isPlatformAdmin;
   if (access.isPlatformAdmin) {
+    if (meta?.companyAccount) return false;
     return !meta?.permission && !meta?.superAdmin && meta?.hideInMenu === true;
   }
   if (meta?.superAdmin && !access.isSuperAdmin) return false;
-  if (meta?.permission && !access.can(meta.permission)) return false;
+  const codes = requiredCodes(meta);
+  if (codes.length > 0 && !codes.some(code => access.can(code))) return false;
   if (meta?.hideForOwn && access.isOwnScope) return false;
   return true;
 }
@@ -173,6 +186,11 @@ export interface MenuItem {
   title: string;
   icon?: string;
   children?: MenuItem[];
+  /**
+   * Pending-work counter shown next to the label (task 15b: pending payout-account reviews).
+   * Only set by the layout; zero and undefined both render without a badge.
+   */
+  badge?: number;
 }
 
 /** Side menu entries the session may open, in route order. Supports one level of grouping. */
@@ -311,6 +329,23 @@ export function linkAbilities(user: AbilitySubject | null | undefined): LinkAbil
   return {
     canViewLinks: access.can("product:view"),
     canRebuildIndex: access.isSuperAdmin
+  };
+}
+
+/** Order page button visibility. The backend enforces the same rules. */
+export interface OrderAbilities {
+  /** Sync status, manual sync and the import entries. Requires order:manage. */
+  canManage: boolean;
+  /** Open a creator detail drawer from an order row. Requires kol:view. */
+  canViewKol: boolean;
+}
+
+export function orderAbilities(user: AbilitySubject | null | undefined): OrderAbilities {
+  const access = accessOf(user);
+  if (!user) return { canManage: false, canViewKol: false };
+  return {
+    canManage: access.can("order:manage"),
+    canViewKol: access.can("kol:view")
   };
 }
 

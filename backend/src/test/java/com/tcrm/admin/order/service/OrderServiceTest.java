@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,21 +13,28 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.KolItemRefDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.system.api.BdUserApi;
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
@@ -42,18 +50,32 @@ class OrderServiceTest {
   private final OrderMapper orders = mock(OrderMapper.class);
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
+  private final OrderSyncStateMapper syncStates = mock(OrderSyncStateMapper.class);
   private final KolApi kols = mock(KolApi.class);
+  private final ShopAccessApi shops = mock(ShopAccessApi.class);
+  private final BdUserApi bdUsers = mock(BdUserApi.class);
+  private final WeidianAuthorizationApi authorization = mock(WeidianAuthorizationApi.class);
   private final OrderMappingApi mappings = mock(OrderMappingApi.class);
   private final KolOwnershipApi ownership = mock(KolOwnershipApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final AccountDTO account = mock(AccountDTO.class);
   private final OrderService service =
       new OrderService(
-          orders, items, refunds, kols, new OrderAttribution(mappings, ownership), current);
+          orders,
+          items,
+          refunds,
+          syncStates,
+          kols,
+          shops,
+          bdUsers,
+          authorization,
+          new OrderAttribution(mappings, ownership),
+          current);
 
   @BeforeAll
   static void metadata() {
-    for (var type : List.of(OrderDO.class, OrderItemDO.class, RefundDO.class)) {
+    for (var type :
+        List.of(OrderDO.class, OrderItemDO.class, RefundDO.class, OrderSyncStateDO.class)) {
       TableInfoHelper.initTableInfo(
           new MapperBuilderAssistant(new MybatisConfiguration(), ""), type);
     }
@@ -63,6 +85,11 @@ class OrderServiceTest {
   void currentUser() {
     when(current.user()).thenReturn(account);
     when(account.id()).thenReturn(7L);
+    when(shops.listShops())
+        .thenReturn(
+            List.of(
+                new ShopAccessDTO(5L, "Main shop", "wd-5", 1),
+                new ShopAccessDTO(6L, "Backup shop", "wd-6", 0)));
   }
 
   private static OrderDO order(long id) {
@@ -148,12 +175,19 @@ class OrderServiceTest {
     b.setOrderId(10L);
     b.setAmount(new BigDecimal("0.75"));
     when(refunds.selectList(any())).thenReturn(List.of(a, b));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(bdUsers.listByIds(any()))
+        .thenReturn(List.of(new BdUserDTO(7L, "bd-login", "Test BD", true)));
 
     var result = service.page(filter("KOL0100"), true);
 
     assertThat(result.total()).isEqualTo(2);
     assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("2.00");
+    assertThat(result.items().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(result.items().getFirst().bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).refundAmount()).isEqualByComparingTo("0");
+    assertThat(result.items().get(1).bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).items()).isEmpty();
     assertThat(result.items().getFirst().items().getFirst())
         .isEqualTo(
@@ -168,6 +202,7 @@ class OrderServiceTest {
                 new BigDecimal("12.50"),
                 new BigDecimal("2.00"),
                 100L,
+                "KOL0100",
                 200L,
                 300L,
                 2,
@@ -310,5 +345,61 @@ class OrderServiceTest {
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("attribution_status");
     assertThat(query.getValue().getParamNameValuePairs().values()).contains("ATTRIBUTED");
+  }
+
+  @Test
+  void shouldDecorateDisplayNamesWithFixedLookups_whenPagingOrders() {
+    var attributed = order(10);
+    attributed.setKolId(100L);
+    var companyOwned = order(11);
+    companyOwned.setShopId(6L);
+    companyOwned.setBdUserId(null);
+    var usernameOnly = order(12);
+    usernameOnly.setBdUserId(8L);
+    when(orders.selectPage(any(), any()))
+        .thenAnswer(
+            call -> {
+              Page<OrderDO> page = call.getArgument(0);
+              page.setRecords(List.of(attributed, companyOwned, usernameOnly));
+              page.setTotal(3);
+              return page;
+            });
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(bdUsers.listByIds(any()))
+        .thenReturn(
+            List.of(
+                new BdUserDTO(7L, "bd-login", "Test BD", true),
+                new BdUserDTO(8L, "username-only", null, true)));
+
+    var result = service.page(filter(null), false);
+
+    var first = result.items().getFirst();
+    assertThat(first.shopName()).isEqualTo("Main shop");
+    assertThat(first.kolCode()).isEqualTo("KOL0100");
+    assertThat(first.kolName()).isEqualTo("Creator");
+    assertThat(first.bdUserName()).isEqualTo("Test BD");
+    assertThat(result.items().get(1).shopName()).isEqualTo("Backup shop");
+    assertThat(result.items().get(1).bdUserName()).isNull();
+    assertThat(result.items().get(2).bdUserName()).isEqualTo("username-only");
+    verify(shops, times(1)).listShops();
+    verify(kols, times(1)).listByIds(any());
+    verify(bdUsers, times(1)).listByIds(any());
+  }
+
+  @Test
+  void shouldListEveryShopWithSyncStatus_whenReadingSyncStates() {
+    var state = new OrderSyncStateDO();
+    state.setShopId(5L);
+    state.setLastSuccessAt(PAID);
+    state.setLastError("order detail failed for order 1000");
+    when(syncStates.selectList(any())).thenReturn(List.of(state));
+    when(authorization.authorizedShopIds()).thenReturn(List.of(5L));
+
+    assertThat(service.listSyncStates())
+        .containsExactly(
+            new OrderSyncStateDTO(
+                5L, "Main shop", true, true, PAID, "order detail failed for order 1000"),
+            new OrderSyncStateDTO(6L, "Backup shop", false, false, null, null));
   }
 }

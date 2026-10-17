@@ -8,9 +8,13 @@ import java.util.List;
 public record OrderDTO(
     Long id,
     Long shopId,
+    String shopName,
     String weidianOrderId,
     Long kolId,
+    String kolCode,
+    String kolName,
     Long bdUserId,
+    String bdUserName,
     String orderStatus,
     String attributionStatus,
     Instant orderTime,

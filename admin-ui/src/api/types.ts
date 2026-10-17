@@ -155,7 +155,8 @@ export interface BdUserVO {
 
 export type TaskStatus = "WAITING" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
 
-export type TaskType = "KOL_IMPORT" | "PRODUCT_IMPORT" | "MAPPING_IMPORT";
+export type TaskType =
+  "KOL_IMPORT" | "PRODUCT_IMPORT" | "MAPPING_IMPORT" | "ORDER_IMPORT" | "REFUND_IMPORT";
 
 /** `TaskVO`: progress of a batch task. `done` counts processed rows, failed ones included. */
 export interface TaskVO {
@@ -299,4 +300,68 @@ export interface LinkVO {
   unavailableReasons: LinkUnavailableReason[];
   clicks30d: string;
   validClicks30d: string;
+}
+
+/** Standardized Weidian order status (design §8.1). */
+export type OrderStatus =
+  "UNPAID" | "PAID" | "SHIPPED" | "RECEIVED" | "COMPLETED" | "CLOSED" | "UNKNOWN";
+
+/** Order attribution status (design §4.6). */
+export type AttributionStatus = "PENDING" | "ATTRIBUTED" | "NON_KOL" | "CONFLICT" | "UNMATCHED";
+
+/** How one order line was attributed: 0 unmatched, 1 product id, 2 manual, 3 non-KOL, 4 conflict. */
+export type ItemAttributionType = 0 | 1 | 2 | 3 | 4;
+
+/** `OrderItemDTO`. Amounts are strings; display names are null when the reference is gone. */
+export interface OrderItemVO {
+  id: string;
+  subOrderId: string | null;
+  weidianItemId: string;
+  skuId: string | null;
+  itemName: string | null;
+  skuName: string | null;
+  quantity: number | null;
+  payAmount: string | null;
+  refundAmount: string | null;
+  kolId: string | null;
+  kolCode: string | null;
+  productId: string | null;
+  kolItemId: string | null;
+  attributionType: ItemAttributionType | null;
+  manualReason: string | null;
+}
+
+/**
+ * `OrderDTO`. `bdUserName` is null when the payment-time snapshot assigns the order to the
+ * company; the response never contains buyer data.
+ */
+export interface OrderVO {
+  id: string;
+  shopId: string;
+  shopName: string | null;
+  weidianOrderId: string;
+  kolId: string | null;
+  kolCode: string | null;
+  kolName: string | null;
+  bdUserId: string | null;
+  bdUserName: string | null;
+  orderStatus: OrderStatus;
+  attributionStatus: AttributionStatus;
+  orderTime: string | null;
+  payTime: string | null;
+  totalAmount: string;
+  payAmount: string;
+  /** Completed refunds across the whole order; "0.00" when there are none. */
+  refundAmount: string;
+  items: OrderItemVO[];
+}
+
+/** `OrderSyncStateDTO`: one shop with its order-sync status; nulls when it never synced. */
+export interface OrderSyncStateVO {
+  shopId: string;
+  shopName: string;
+  enabled: boolean;
+  authorized: boolean;
+  lastSuccessAt: string | null;
+  lastError: string | null;
 }

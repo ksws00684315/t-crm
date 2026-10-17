@@ -35,11 +35,25 @@ const { t } = useI18n();
           </template>
           <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
             <span>{{ child.title }}</span>
+            <el-badge
+              v-if="child.badge"
+              class="side__badge"
+              :value="child.badge"
+              :max="99"
+              data-test="menu-badge"
+            />
           </el-menu-item>
         </el-sub-menu>
         <el-menu-item v-else :index="item.path">
           <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
           <span>{{ item.title }}</span>
+          <el-badge
+            v-if="item.badge"
+            class="side__badge"
+            :value="item.badge"
+            :max="99"
+            data-test="menu-badge"
+          />
         </el-menu-item>
       </template>
     </el-menu>
@@ -87,5 +101,13 @@ const { t } = useI18n();
   background: var(--tcrm-color-muted);
   color: var(--tcrm-color-primary-text);
   font-weight: 600;
+}
+.side__badge {
+  margin-left: auto;
+  transform: scale(0.9);
+  transform-origin: right center;
+}
+.is-collapsed .side__badge {
+  display: none;
 }
 </style>
