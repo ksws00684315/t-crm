@@ -12,7 +12,17 @@ const enUS = {
     language: "Language",
     signOut: "Sign out",
     backToHome: "Back to home",
-    comingSoon: "Coming soon"
+    comingSoon: "Coming soon",
+    cancel: "Cancel",
+    edit: "Edit",
+    copy: "Copy"
+  },
+  /** Header navigation (task 15b §4.3); keys are referenced by `layout/nav.ts`. */
+  nav: {
+    label: "Primary",
+    home: "Home",
+    payoutAccounts: "Payout accounts",
+    orders: "My orders"
   },
   /** Each language is named in itself and shows the same label in both languages. */
   locale: {
@@ -63,18 +73,108 @@ const enUS = {
   },
   home: {
     title: "Welcome",
-    body: "This portal is under construction. Your sales, commission and withdrawal overview will appear here."
+    body: "This portal is under construction. Your sales, commission and withdrawal overview will appear here.",
+    viewOrders: "View my orders",
+    payoutEntry: "Payout accounts"
+  },
+  orders: {
+    title: "My orders",
+    dateRange: "Date range",
+    last7Days: "Last 7 days",
+    last30Days: "Last 30 days",
+    last90Days: "Last 90 days",
+    customRange: "Custom range",
+    fromDate: "From date",
+    toDate: "To date",
+    allStatuses: "All statuses",
+    status: "Status",
+    orderNo: "Order number",
+    payTime: "Payment time",
+    payAmount: "Paid",
+    refundAmount: "Refund",
+    item: "Item",
+    sku: "SKU",
+    quantity: "Quantity",
+    empty: "No orders yet. Share your exclusive link and orders will appear here.",
+    loadFailed: "Orders could not be loaded. Please try again.",
+    statuses: {
+      UNPAID: "Unpaid",
+      PAID: "Paid",
+      SHIPPED: "Shipped",
+      RECEIVED: "Received",
+      COMPLETED: "Completed",
+      CLOSED: "Closed",
+      UNKNOWN: "Unknown"
+    }
   },
   /** Route `meta.title` values, translated when document.title is set. */
   route: {
     login: "Sign in",
     home: "Home",
+    orders: "My orders",
     activate: "Activate account",
     reset: "Reset password",
     forgot: "Forgot password",
     account: "My account",
+    payoutAccounts: "Payout accounts",
     register: "Create account",
     notFound: "Page not found"
+  },
+  payoutAccounts: {
+    title: "Payout accounts",
+    create: "Add payout account",
+    createTitle: "Add payout account",
+    editTitle: "Edit payout account",
+    empty: "Add a PayPal or USDT account; once approved it is used to pay you.",
+    limitReached: "You can keep at most 5 active payout accounts.",
+    submitted: "Submitted. Your representative will review it.",
+    account: "Account / address",
+    holder: "Receiver name",
+    submittedAt: "Submitted",
+    defaultTag: "Default",
+    setDefault: "Set as default",
+    defaultSet: "This account is now the default.",
+    disable: "Disable",
+    disableConfirm: "A disabled account cannot be restored and will no longer be shown.",
+    disabled: "The account has been disabled.",
+    rejectReason: "Rejection reason",
+    viewQr: "View QR code",
+    qrTitle: "QR code",
+    copied: "Copied.",
+    type: {
+      PAYPAL: "PayPal",
+      USDT: "USDT"
+    },
+    network: {
+      TRC20: "TRC20",
+      ERC20: "ERC20",
+      BEP20: "BEP20",
+      SOL: "SOL",
+      TON: "TON"
+    },
+    status: {
+      PENDING: "Under review",
+      APPROVED: "Approved",
+      REJECTED: "Rejected",
+      DISABLED: "Disabled"
+    },
+    form: {
+      type: "Type",
+      typeRequired: "Choose a type first.",
+      account: "PayPal email / USDT address",
+      accountPaypalHint: "Your PayPal email (up to 128 characters)",
+      accountUsdtHint: "Your wallet address, letters and digits only",
+      accountRange: "Enter 3–128 characters.",
+      accountPattern: "The address may contain letters and digits only.",
+      holderRange: "Enter the receiver name (1–64 characters).",
+      network: "Network",
+      networkRequired: "Choose the network.",
+      qr: "QR code (optional)",
+      qrAdd: "Upload QR code",
+      qrRemove: "Remove",
+      qrHint: "PNG or JPEG, up to 2 MB.",
+      submit: "Submit"
+    }
   },
   register: {
     title: "Create your account",

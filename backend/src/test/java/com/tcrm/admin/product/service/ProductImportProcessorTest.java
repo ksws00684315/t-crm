@@ -44,7 +44,7 @@ class ProductImportProcessorTest {
 
   @BeforeEach
   void setup() {
-    processor = new ProductImportProcessor(9L, shops, products, kolItems, codes, tx);
+    processor = new ProductImportProcessor(9L, null, shops, products, kolItems, codes, tx);
     shop = new ShopDO();
     shop.setId(1L);
     shop.setWeidianShopId("100");
@@ -98,6 +98,40 @@ class ProductImportProcessorTest {
     assertThat(processor.process(row("P000009", "100", "2001", "新名", "", "", "", ""))).isEmpty();
     verify(products).update(any(), any());
     verify(products, never()).insert(any(ProductDO.class));
+  }
+
+  @Test
+  void shouldLeaveTheCurrencyToTheDatabaseDefault_whenAnExcelUploadInserts() {
+    when(products.selectOne(any())).thenReturn(null);
+    processor.process(row("", "100", "2001", "鞋", "", "", "12.5", ""));
+    ArgumentCaptor<ProductDO> cap = ArgumentCaptor.forClass(ProductDO.class);
+    verify(products).insert(cap.capture());
+    assertThat(cap.getValue().getPriceCurrency()).isNull();
+  }
+
+  @Test
+  void shouldWriteTheSheetCurrency_onInsertAndOnPriceUpdates() {
+    var sheet = new ProductImportProcessor(9L, "USD", shops, products, kolItems, codes, tx);
+    when(products.selectOne(any())).thenReturn(null);
+    sheet.process(row("", "100", "2001", "Hoodie", "", "", "60", ""));
+    ArgumentCaptor<ProductDO> inserted = ArgumentCaptor.forClass(ProductDO.class);
+    verify(products).insert(inserted.capture());
+    assertThat(inserted.getValue().getPriceCurrency()).isEqualTo("USD");
+
+    ProductDO existing = new ProductDO();
+    existing.setId(7L);
+    existing.setProductCode("P000009");
+    when(products.selectOne(any())).thenReturn(existing);
+    sheet.process(row("", "100", "2002", "Hoodie", "", "", "61", ""));
+    sheet.process(row("", "100", "2003", "Hoodie", "", "", "", ""));
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProductDO>>
+        updates =
+            ArgumentCaptor.forClass(
+                com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
+    verify(products, org.mockito.Mockito.times(2)).update(any(), updates.capture());
+    assertThat(updates.getAllValues().get(0).getSqlSet()).contains("price_currency");
+    assertThat(updates.getAllValues().get(1).getSqlSet()).doesNotContain("price_currency");
   }
 
   @Test

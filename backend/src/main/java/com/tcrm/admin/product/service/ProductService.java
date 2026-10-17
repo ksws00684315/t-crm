@@ -171,6 +171,7 @@ public class ProductService {
         p.getCategory(),
         p.getImageUrl(),
         p.getPrice(),
+        p.getPriceCurrency(),
         p.getRate(),
         p.getStatus(),
         p.getCreateTime(),

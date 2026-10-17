@@ -100,6 +100,72 @@ export const routes: RouteRecordRaw[] = [
               hideForOwn: true,
               componentName: "KolItemListPage"
             }
+          },
+          {
+            path: "sheet-sources",
+            name: "SheetSourceList",
+            component: () => import("@/views/product/sheet-source/index.vue"),
+            meta: {
+              title: "route.sheetSources",
+              permission: "product:view",
+              hideForOwn: true,
+              componentName: "SheetSourcePage"
+            }
+          }
+        ]
+      },
+      {
+        path: "order",
+        name: "OrderGroup",
+        redirect: "/order/orders",
+        meta: {
+          title: "route.orders",
+          icon: "List",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "orders",
+            name: "OrderList",
+            component: () => import("@/views/order/index.vue"),
+            meta: {
+              title: "route.orderList",
+              permission: "order:view",
+              componentName: "OrderListPage"
+            }
+          },
+          {
+            path: "unmatched",
+            name: "OrderUnmatched",
+            component: () => import("@/views/order/unmatched.vue"),
+            meta: {
+              title: "route.orderUnmatched",
+              permission: "order:manage",
+              componentName: "OrderUnmatchedPage"
+            }
+          }
+        ]
+      },
+      {
+        path: "fund",
+        name: "FundGroup",
+        redirect: "/fund/payout-accounts",
+        meta: {
+          title: "route.fund",
+          icon: "Wallet",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "payout-accounts",
+            name: "PayoutAccountReview",
+            component: () => import("@/views/fund/payout-account/index.vue"),
+            meta: {
+              title: "route.payoutAccounts",
+              // Either code opens the page; the review drawer itself needs payout-account:review.
+              permission: ["payout-account:review", "commission:view"],
+              componentName: "PayoutAccountReviewPage"
+            }
           }
         ]
       },

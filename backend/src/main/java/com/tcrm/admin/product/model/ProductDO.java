@@ -32,6 +32,9 @@ public class ProductDO extends BaseEntity {
 
   private BigDecimal price;
 
+  /** ISO 4217; null on insert means the database default CNY, on update means unchanged. */
+  private String priceCurrency;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private BigDecimal rate;
 
@@ -87,6 +90,14 @@ public class ProductDO extends BaseEntity {
 
   public void setImageUrl(String value) {
     this.imageUrl = value;
+  }
+
+  public String getPriceCurrency() {
+    return priceCurrency;
+  }
+
+  public void setPriceCurrency(String value) {
+    priceCurrency = value;
   }
 
   public BigDecimal getPrice() {

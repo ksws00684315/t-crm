@@ -13,7 +13,17 @@ const zhCN: MessageSchema = {
     language: "语言",
     signOut: "退出登录",
     backToHome: "返回首页",
-    comingSoon: "即将上线"
+    comingSoon: "即将上线",
+    cancel: "取消",
+    edit: "修改",
+    copy: "复制"
+  },
+  /** 页头导航（任务 15b §4.3）；键由 `layout/nav.ts` 引用。 */
+  nav: {
+    label: "主导航",
+    home: "首页",
+    payoutAccounts: "收款账户",
+    orders: "我的订单"
   },
   locale: {
     "en-US": "English",
@@ -63,17 +73,107 @@ const zhCN: MessageSchema = {
   },
   home: {
     title: "欢迎",
-    body: "门户正在建设中，您的销售、佣金与提现概览将在此展示。"
+    body: "门户正在建设中，您的销售、佣金与提现概览将在此展示。",
+    viewOrders: "查看我的订单",
+    payoutEntry: "收款账户"
+  },
+  orders: {
+    title: "我的订单",
+    dateRange: "时间范围",
+    last7Days: "最近 7 天",
+    last30Days: "最近 30 天",
+    last90Days: "最近 90 天",
+    customRange: "自定义区间",
+    fromDate: "开始日期",
+    toDate: "结束日期",
+    allStatuses: "全部状态",
+    status: "状态",
+    orderNo: "订单号",
+    payTime: "支付时间",
+    payAmount: "实付",
+    refundAmount: "退款",
+    item: "商品",
+    sku: "规格",
+    quantity: "数量",
+    empty: "还没有订单。把你的专属链接分享出去后，订单会显示在这里。",
+    loadFailed: "订单加载失败，请重试。",
+    statuses: {
+      UNPAID: "未支付",
+      PAID: "已支付",
+      SHIPPED: "已发货",
+      RECEIVED: "已收货",
+      COMPLETED: "已完成",
+      CLOSED: "已关闭",
+      UNKNOWN: "未知"
+    }
   },
   route: {
     login: "登录",
     home: "首页",
+    orders: "我的订单",
     activate: "激活账号",
     reset: "重置密码",
     forgot: "找回密码",
     account: "我的账号",
+    payoutAccounts: "收款账户",
     register: "创建账号",
     notFound: "页面不存在"
+  },
+  payoutAccounts: {
+    title: "收款账户",
+    create: "添加收款账户",
+    createTitle: "添加收款账户",
+    editTitle: "修改收款账户",
+    empty: "添加 PayPal 或 USDT 账户，审核通过后用于收款。",
+    limitReached: "收款账户最多保留 5 个（不含已停用）。",
+    submitted: "已提交，等待商务审核。",
+    account: "账号 / 地址",
+    holder: "收款人",
+    submittedAt: "提交时间",
+    defaultTag: "默认",
+    setDefault: "设为默认",
+    defaultSet: "已将该账户设为默认。",
+    disable: "停用",
+    disableConfirm: "停用后该账户不能恢复，也不会再显示。",
+    disabled: "账户已停用。",
+    rejectReason: "驳回原因",
+    viewQr: "查看二维码",
+    qrTitle: "收款二维码",
+    copied: "已复制。",
+    type: {
+      PAYPAL: "PayPal",
+      USDT: "USDT"
+    },
+    network: {
+      TRC20: "TRC20",
+      ERC20: "ERC20",
+      BEP20: "BEP20",
+      SOL: "SOL",
+      TON: "TON"
+    },
+    status: {
+      PENDING: "待审核",
+      APPROVED: "已通过",
+      REJECTED: "已驳回",
+      DISABLED: "已停用"
+    },
+    form: {
+      type: "类型",
+      typeRequired: "请先选择类型。",
+      account: "PayPal 账号 / USDT 地址",
+      accountPaypalHint: "PayPal 账号（通常是邮箱，最多 128 字符）",
+      accountUsdtHint: "钱包地址，仅字母和数字",
+      accountRange: "请输入 3～128 个字符。",
+      accountPattern: "地址只能包含字母和数字。",
+      holderRange: "请填写收款人（1～64 字符）。",
+      network: "网络",
+      networkRequired: "请选择网络。",
+      qr: "二维码（可选）",
+      qrAdd: "上传二维码",
+      qrRemove: "移除",
+      qrHint: "PNG 或 JPEG，不超过 2MB。",
+      submit: "提交"
+    }
   },
   register: {
     title: "创建账号",

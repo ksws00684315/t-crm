@@ -3,6 +3,8 @@ package com.tcrm.admin.shared;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tcrm.admin.kol.service.KolImportColumn;
+import com.tcrm.admin.order.service.OrderImportColumn;
+import com.tcrm.admin.order.service.RefundImportColumn;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
 import com.tcrm.admin.task.service.ImportTaskService;
@@ -37,12 +39,16 @@ class MessageBundlesTest {
                 KolImportColumn.class,
                 ProductImportColumn.class,
                 MappingImportColumn.class,
+                OrderImportColumn.class,
+                RefundImportColumn.class,
                 ImportTaskService.class));
     for (String name :
         List.of(
             "com.tcrm.admin.kol.service.KolImportProcessor",
             "com.tcrm.admin.product.service.ProductImportProcessor",
-            "com.tcrm.admin.product.service.MappingImportProcessor")) {
+            "com.tcrm.admin.product.service.MappingImportProcessor",
+            "com.tcrm.admin.order.service.OrderImportProcessor",
+            "com.tcrm.admin.order.service.RefundImportProcessor")) {
       try {
         all.add(Class.forName(name));
       } catch (ClassNotFoundException e) {
@@ -117,7 +123,9 @@ class MessageBundlesTest {
         List.of(
             "import.kol.template-name",
             "import.product.template-name",
-            "import.mapping.template-name");
+            "import.mapping.template-name",
+            "import.order.template-name",
+            "import.refund.template-name");
     for (Locale locale : List.of(Locale.SIMPLIFIED_CHINESE, Locale.ENGLISH)) {
       for (String key : nameKeys) {
         assertThat(messages.getMessage(key, null, locale)).endsWith(".xlsx");

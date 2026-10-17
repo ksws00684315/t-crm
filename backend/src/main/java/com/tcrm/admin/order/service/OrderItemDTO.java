@@ -14,6 +14,7 @@ public record OrderItemDTO(
     BigDecimal payAmount,
     BigDecimal refundAmount,
     Long kolId,
+    String kolCode,
     Long productId,
     Long kolItemId,
     Integer attributionType,

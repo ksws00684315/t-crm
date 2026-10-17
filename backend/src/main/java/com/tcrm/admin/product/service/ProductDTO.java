@@ -14,6 +14,7 @@ public record ProductDTO(
     String category,
     String imageUrl,
     BigDecimal price,
+    String priceCurrency,
     BigDecimal rate,
     Integer status,
     Instant createTime,
