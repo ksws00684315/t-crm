@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.service;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * The KOL import template: column order and header message keys are defined here only (task 04
@@ -54,5 +55,10 @@ public enum KolImportColumn {
   /** Header keys of the pre-task-11 template, for the accepted legacy file variant. */
   public static List<String> legacyHeaderKeys() {
     return LEGACY_HEADER_KEYS;
+  }
+
+  /** Identifier columns that must stay text in the downloadable template. */
+  public static Set<Integer> textColumnIndexes() {
+    return Set.of(CODE.ordinal(), INVITE_CODE.ordinal());
   }
 }

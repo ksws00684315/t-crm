@@ -215,6 +215,7 @@ const enUS = {
       "Some of the information you entered is not valid. Please check and try again.",
     COMMON_NOT_FOUND: "The requested item does not exist.",
     COMMON_METHOD_NOT_ALLOWED: "This action is not supported.",
+    COMMON_UNSUPPORTED_MEDIA_TYPE: "This request format is not supported.",
     COMMON_CONFLICT: "The data has changed. Please refresh and try again.",
     COMMON_INTERNAL_ERROR: "Something went wrong on our side. Please try again later.",
     AUTH_UNAUTHORIZED: "Your session has expired. Please sign in again.",

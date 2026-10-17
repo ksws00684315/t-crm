@@ -151,6 +151,8 @@ class CaptchaLoginIT {
     var captcha = Captchas.solve(mvc, json);
     String key = "auth:captcha:" + captcha.captchaId();
     redis.expire(key, java.time.Duration.ofMillis(1));
+    // Redis TTL must elapse; there is no condition to poll until the key is gone reliably across
+    // clocks.
     Thread.sleep(20);
     assertThat(redis.hasKey(key)).isFalse();
     expectCaptchaInvalid(

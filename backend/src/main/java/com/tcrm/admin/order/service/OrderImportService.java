@@ -23,7 +23,7 @@ public class OrderImportService {
   }
 
   public byte[] template() {
-    return imports.template(OrderImportColumn.headerKeys());
+    return imports.template(OrderImportColumn.headerKeys(), OrderImportColumn.textColumnIndexes());
   }
 
   public Long submit(ImportFileDTO file) {

@@ -198,6 +198,7 @@ class WeidianIntegrationIT {
     String expiredState = startAuthorization(adminToken, shopId);
     String stateKey = "weidian:oauth:state:" + expiredState;
     assertThat(redis.expire(stateKey, Duration.ofMillis(1))).isTrue();
+    // Redis TTL must elapse before the state is treated as expired.
     Thread.sleep(20);
     assertReason(callback(expiredState, "code"), "STATE_INVALID");
 
@@ -342,6 +343,7 @@ class WeidianIntegrationIT {
     assertThat(authRow(shopId).get("status")).isEqualTo("AUTHORIZED");
 
     assertThat(redis.expire(key, Duration.ofMillis(1))).isTrue();
+    // Redis TTL must elapse before the refresh cooldown key disappears.
     Thread.sleep(20);
     SELF_TOKEN_RESPONSE.set(selfToken("self-access-after-cooldown"));
     WeidianToken refreshed =
@@ -380,6 +382,7 @@ class WeidianIntegrationIT {
                     1, () -> tokens.refreshAfterInvalid(shopId, "service-access-one"));
               });
       assertThat(passiveStarted.await(5, TimeUnit.SECONDS)).isTrue();
+      // Give the passive refresher time to enter the cooldown wait before releasing the lock.
       Thread.sleep(100);
       release.countDown();
       proactive.get(10, TimeUnit.SECONDS);

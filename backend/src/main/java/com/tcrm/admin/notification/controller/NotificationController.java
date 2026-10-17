@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The signed-in company account reads and marks only its own messages. These endpoints are not
- * audited. A platform administrator is rejected by the service.
+ * audited. A platform administrator is rejected by the role annotation (403).
  */
 @RestController
 @RequestMapping("/admin-api/notification/notifications")
 @SaCheckRole(
-    value = {"SUPER_ADMIN", "STAFF", "PLATFORM_ADMIN"},
+    value = {"SUPER_ADMIN", "STAFF"},
     mode = SaMode.OR)
 public class NotificationController {
   private final NotificationService notifications;

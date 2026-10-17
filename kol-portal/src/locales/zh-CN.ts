@@ -212,6 +212,7 @@ const zhCN: MessageSchema = {
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试。",
     COMMON_NOT_FOUND: "请求的内容不存在。",
     COMMON_METHOD_NOT_ALLOWED: "不支持该操作。",
+    COMMON_UNSUPPORTED_MEDIA_TYPE: "请求格式不受支持。",
     COMMON_CONFLICT: "数据已变更，请刷新后重试。",
     COMMON_INTERNAL_ERROR: "服务器出现异常，请稍后重试。",
     AUTH_UNAUTHORIZED: "登录已失效，请重新登录。",

@@ -2,6 +2,7 @@ package com.tcrm.admin.product.service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Original-product import template columns (task 05 §4.6); header message keys resolve per language
@@ -35,5 +36,10 @@ public enum ProductImportColumn {
 
   public static List<String> headerKeys() {
     return HEADER_KEYS;
+  }
+
+  /** 0-based columns that must stay text in the downloadable template. */
+  public static Set<Integer> textColumnIndexes() {
+    return Set.of(CODE.ordinal(), SHOP_ID.ordinal(), WEIDIAN_ITEM_ID.ordinal());
   }
 }

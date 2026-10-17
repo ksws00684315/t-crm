@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.link.mapper.ClickLogMapper;
@@ -327,19 +328,20 @@ class LinkIT {
             "link-it-sync");
     syncThread.start();
 
-    boolean overlapped = false;
-    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+    boolean[] overlappedHolder = {false};
     String newItem = "\"kolItemId\":\"" + newItemId + "\"";
-    while (System.nanoTime() < deadline) {
+    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+    while (System.nanoTime() < deadline && !overlappedHolder[0]) {
       String live = field(kolCode, productCode);
       if (live != null && live.contains(newItem)) {
-        overlapped = true;
+        overlappedHolder[0] = true;
         break;
       }
       if (waitingForLock(syncThread)) {
-        overlapped = true;
+        overlappedHolder[0] = true;
         break;
       }
+      // Poll interval while waiting for rename/index overlap.
       Thread.sleep(25);
     }
     releaseRename.countDown();
@@ -347,7 +349,7 @@ class LinkIT {
     assertThat(syncThread.join(Duration.ofSeconds(20))).isTrue();
     assertThat(rebuildError.get()).isNull();
     assertThat(syncError.get()).isNull();
-    assertThat(overlapped).isTrue();
+    assertThat(overlappedHolder[0]).isTrue();
     assertThat(field(kolCode, productCode)).contains(newItem).contains("itemID=9802");
     assertThat(outboxCount()).isZero();
   }
@@ -1014,19 +1016,29 @@ class LinkIT {
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      MvcResult result =
-          mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, adminToken))
-              .andExpect(status().isOk())
-              .andReturn();
-      JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
-      String status = data.path("status").asText();
-      if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
-        return data;
-      }
-      Thread.sleep(100);
-    }
-    throw new IllegalStateException("task " + taskId + " did not finish");
+    JsonNode[] holder = new JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          try {
+            MvcResult result =
+                mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, adminToken))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
+            String status = data.path("status").asText();
+            if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
+              holder[0] = data;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   private static byte[] workbook(List<String> headers, List<List<String>> rows) {

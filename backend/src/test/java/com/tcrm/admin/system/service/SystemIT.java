@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.Captchas;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.TenantScope;
@@ -665,16 +666,16 @@ class SystemIT {
     }
   }
 
-  private void awaitLockWaiters(int expected) throws InterruptedException {
-    for (int i = 0; i < 200; i++) {
-      Integer waiting =
-          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
-      if (waiting != null && waiting >= expected) {
-        return;
-      }
-      Thread.sleep(25);
-    }
-    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
+  private void awaitLockWaiters(int expected) {
+    TestWait.until(
+        java.time.Duration.ofSeconds(5),
+        java.time.Duration.ofMillis(25),
+        () -> {
+          Integer waiting =
+              jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+          return waiting != null && waiting >= expected;
+        },
+        "Expected " + expected + " requests waiting for the row lock");
   }
 
   private Void putJson(String token, String path, Map<String, ?> body) throws Exception {

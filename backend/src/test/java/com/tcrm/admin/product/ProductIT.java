@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.product.service.MappingImportColumn;
 import com.tcrm.admin.product.service.ProductImportColumn;
@@ -440,32 +441,42 @@ class ProductIT {
         .asText();
   }
 
-  private void awaitLockWaiters(int expected) throws InterruptedException {
-    for (int i = 0; i < 200; i++) {
-      Integer waiting =
-          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
-      if (waiting != null && waiting >= expected) {
-        return;
-      }
-      Thread.sleep(25);
-    }
-    throw new IllegalStateException("Expected " + expected + " imports waiting on the table lock");
+  private void awaitLockWaiters(int expected) {
+    TestWait.until(
+        java.time.Duration.ofSeconds(5),
+        java.time.Duration.ofMillis(25),
+        () -> {
+          Integer waiting =
+              jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+          return waiting != null && waiting >= expected;
+        },
+        "Expected " + expected + " imports waiting on the table lock");
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      MvcResult result =
-          mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, adminToken))
-              .andExpect(status().isOk())
-              .andReturn();
-      JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
-      String status = data.path("status").asText();
-      if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
-        return data;
-      }
-      Thread.sleep(100);
-    }
-    throw new IllegalStateException("task " + taskId + " did not finish");
+    JsonNode[] holder = new JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          try {
+            MvcResult result =
+                mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, adminToken))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
+            String status = data.path("status").asText();
+            if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
+              holder[0] = data;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   private static byte[] productWorkbook(List<List<String>> rows) {

@@ -13,8 +13,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -63,10 +65,16 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler({
     MethodArgumentTypeMismatchException.class,
-    HttpMessageNotReadableException.class
+    HttpMessageNotReadableException.class,
+    MissingServletRequestParameterException.class
   })
   public ResponseEntity<R<?>> invalid(Exception e) {
     return response(ErrorCode.COMMON_VALIDATION_FAILED);
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<R<?>> unsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+    return response(ErrorCode.COMMON_UNSUPPORTED_MEDIA_TYPE);
   }
 
   @ExceptionHandler(ConstraintViolationException.class)

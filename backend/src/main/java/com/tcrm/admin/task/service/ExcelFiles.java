@@ -5,6 +5,8 @@ import cn.idev.excel.context.AnalysisContext;
 import cn.idev.excel.event.AnalysisEventListener;
 import cn.idev.excel.exception.ExcelAnalysisStopException;
 import cn.idev.excel.support.ExcelTypeEnum;
+import cn.idev.excel.write.handler.SheetWriteHandler;
+import cn.idev.excel.write.handler.context.SheetWriteHandlerContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.task.api.ImportFileDTO;
@@ -12,10 +14,14 @@ import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.stereotype.Component;
 
 /**
@@ -106,12 +112,50 @@ public class ExcelFiles {
 
   /** Writes one sheet with a header row; every cell is escaped against formula injection. */
   public byte[] write(List<String> headers, List<List<String>> rows) {
+    return write(headers, rows, Set.of());
+  }
+
+  /**
+   * Same as {@link #write(List, List)} but marks {@code textColumns} (0-based) as Excel text format
+   * {@code @} so long IDs pasted by operators are not coerced to numbers.
+   */
+  public byte[] write(
+      List<String> headers, List<List<String>> rows, Collection<Integer> textColumns) {
     List<List<String>> head = headers.stream().map(h -> List.of(escape(h))).toList();
     List<List<String>> data =
         rows.stream().map(row -> row.stream().map(ExcelFiles::escape).toList()).toList();
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    FastExcel.write(out).excelType(ExcelTypeEnum.XLSX).head(head).sheet(SHEET).doWrite(data);
+    var writer = FastExcel.write(out).excelType(ExcelTypeEnum.XLSX).head(head);
+    if (textColumns != null && !textColumns.isEmpty()) {
+      writer.registerWriteHandler(new TextColumnHandler(textColumns));
+    }
+    writer.sheet(SHEET).doWrite(data);
     return out.toByteArray();
+  }
+
+  /**
+   * Sets the default column style of selected columns to Excel text format {@code @} so long IDs
+   * stay text when operators fill the template.
+   */
+  static final class TextColumnHandler implements SheetWriteHandler {
+    private final Set<Integer> columns;
+
+    TextColumnHandler(Collection<Integer> columns) {
+      this.columns = new HashSet<>(columns);
+    }
+
+    @Override
+    public void afterSheetCreate(SheetWriteHandlerContext context) {
+      var sheet = context.getWriteSheetHolder().getSheet();
+      Workbook workbook = sheet.getWorkbook();
+      CellStyle textStyle = workbook.createCellStyle();
+      textStyle.setDataFormat(workbook.createDataFormat().getFormat("@"));
+      for (Integer col : columns) {
+        if (col != null && col >= 0) {
+          sheet.setDefaultColumnStyle(col, textStyle);
+        }
+      }
+    }
   }
 
   /**

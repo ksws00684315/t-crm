@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.service.KolInvites;
@@ -465,6 +466,7 @@ class KolAuthIT {
           .andExpect(status().isOk());
     }
     awaitMail("kol-reset", 2);
+    // Must wait past the silent per-email mail budget window; cannot poll a condition.
     Thread.sleep(500);
     assertThat(CapturedMails.SENT).hasSize(2);
   }
@@ -599,16 +601,21 @@ class KolAuthIT {
     return awaitMail(template, 1);
   }
 
-  private MailMessage awaitMail(String template, int atLeast) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + 10_000;
-    while (System.currentTimeMillis() < deadline) {
-      List<MailMessage> matching =
-          CapturedMails.SENT.stream().filter(m -> m.template().equals(template)).toList();
-      if (matching.size() >= atLeast) {
-        return matching.getLast();
-      }
-      Thread.sleep(100);
-    }
-    throw new AssertionError("no " + template + " mail arrived (have " + CapturedMails.SENT + ")");
+  private MailMessage awaitMail(String template, int atLeast) {
+    MailMessage[] holder = new MailMessage[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(10),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          List<MailMessage> matching =
+              CapturedMails.SENT.stream().filter(m -> m.template().equals(template)).toList();
+          if (matching.size() >= atLeast) {
+            holder[0] = matching.getLast();
+            return true;
+          }
+          return false;
+        },
+        "no " + template + " mail arrived (have " + CapturedMails.SENT + ")");
+    return holder[0];
   }
 }

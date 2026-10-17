@@ -38,7 +38,8 @@ public class ProductImportService {
   }
 
   public byte[] template() {
-    return imports.template(ProductImportColumn.headerKeys());
+    return imports.template(
+        ProductImportColumn.headerKeys(), ProductImportColumn.textColumnIndexes());
   }
 
   public Long submit(ImportFileDTO file) {

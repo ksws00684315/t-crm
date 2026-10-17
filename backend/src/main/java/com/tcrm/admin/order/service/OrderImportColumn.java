@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Order import template columns (task 18 §4.2); header message keys resolve per language in
@@ -41,5 +42,15 @@ public enum OrderImportColumn {
 
   public static List<String> headerKeys() {
     return HEADER_KEYS;
+  }
+
+  /** 0-based columns that must stay text in the downloadable template. */
+  public static Set<Integer> textColumnIndexes() {
+    return Set.of(
+        SHOP_ID.ordinal(),
+        ORDER_NO.ordinal(),
+        SUB_ORDER_NO.ordinal(),
+        ITEM_ID.ordinal(),
+        SKU_ID.ordinal());
   }
 }

@@ -5,8 +5,7 @@ info:
   description: >-
     Task 13 static contract; task 18 added the order and refund Excel imports; task 19a added the
     display names and the shop sync-state endpoint. Company comes from the login session; OWN
-    scope uses the order's payment-time BD snapshot. No buyer data is returned. Existing springdoc
-    integration is deferred (engineering gap I6).
+    scope uses the order's payment-time BD snapshot. No buyer data is returned. 接口以设计说明书 §6.2 / §6.3 为准，由 ApiCatalogConsistencyTest 保证与代码一致；Existing springdoc integration is deferred (engineering gap I6).
 security:
   - AdminToken: []
 paths:

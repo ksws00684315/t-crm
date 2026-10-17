@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.service.SecureTokens;
 import com.tcrm.admin.shared.MailMessage;
@@ -689,15 +690,21 @@ class KolRegisterIT {
     return CapturedMails.SENT.stream().filter(mail -> mail.template().equals(template)).toList();
   }
 
-  private MailMessage awaitMail(String template, int atLeast) throws InterruptedException {
-    for (int i = 0; i < 50; i++) {
-      List<MailMessage> found = new ArrayList<>(mails(template));
-      if (found.size() >= atLeast) {
-        return found.get(found.size() - 1);
-      }
-      Thread.sleep(100);
-    }
-    throw new AssertionError("no " + template + " mail arrived (have " + CapturedMails.SENT + ")");
+  private MailMessage awaitMail(String template, int atLeast) {
+    MailMessage[] holder = new MailMessage[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(10),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          List<MailMessage> found = new ArrayList<>(mails(template));
+          if (found.size() >= atLeast) {
+            holder[0] = found.get(found.size() - 1);
+            return true;
+          }
+          return false;
+        },
+        "no " + template + " mail arrived (have " + CapturedMails.SENT + ")");
+    return holder[0];
   }
 
   private record Bd(long id, String token) {}

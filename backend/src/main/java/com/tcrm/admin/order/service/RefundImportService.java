@@ -20,7 +20,8 @@ public class RefundImportService {
   }
 
   public byte[] template() {
-    return imports.template(RefundImportColumn.headerKeys());
+    return imports.template(
+        RefundImportColumn.headerKeys(), RefundImportColumn.textColumnIndexes());
   }
 
   public Long submit(ImportFileDTO file) {

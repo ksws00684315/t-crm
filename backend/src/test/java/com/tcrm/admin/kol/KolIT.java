@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.Captchas;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.service.KolImportColumn;
@@ -336,16 +337,16 @@ class KolIT {
         .isEqualTo("Alice");
   }
 
-  private void awaitLockWaiters(int expected) throws InterruptedException {
-    for (int i = 0; i < 200; i++) {
-      Integer waiting =
-          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
-      if (waiting != null && waiting >= expected) {
-        return;
-      }
-      Thread.sleep(25);
-    }
-    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
+  private void awaitLockWaiters(int expected) {
+    TestWait.until(
+        java.time.Duration.ofSeconds(5),
+        java.time.Duration.ofMillis(25),
+        () -> {
+          Integer waiting =
+              jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+          return waiting != null && waiting >= expected;
+        },
+        "Expected " + expected + " requests waiting for the row lock");
   }
 
   @Test
@@ -420,23 +421,32 @@ class KolIT {
 
   private tools.jackson.databind.JsonNode waitForTask(String token, String taskId)
       throws Exception {
-    long deadline = System.currentTimeMillis() + 30_000;
-    while (true) {
-      var task =
-          json.readTree(
-                  mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, token))
-                      .andExpect(status().isOk())
-                      .andReturn()
-                      .getResponse()
-                      .getContentAsString())
-              .at("/data");
-      String status = task.at("/status").asText();
-      if (!"WAITING".equals(status) && !"RUNNING".equals(status)) {
-        return task;
-      }
-      assertThat(System.currentTimeMillis()).as("task finished in time").isLessThan(deadline);
-      Thread.sleep(200);
-    }
+    tools.jackson.databind.JsonNode[] holder = new tools.jackson.databind.JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(200),
+        () -> {
+          try {
+            var task =
+                json.readTree(
+                        mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, token))
+                            .andExpect(status().isOk())
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString())
+                    .at("/data");
+            String status = task.at("/status").asText();
+            if (!"WAITING".equals(status) && !"RUNNING".equals(status)) {
+              holder[0] = task;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   @Test

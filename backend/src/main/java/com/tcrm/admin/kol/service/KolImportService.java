@@ -35,7 +35,7 @@ public class KolImportService {
   }
 
   public byte[] template() {
-    return imports.template(KolImportColumn.headerKeys());
+    return imports.template(KolImportColumn.headerKeys(), KolImportColumn.textColumnIndexes());
   }
 
   /**

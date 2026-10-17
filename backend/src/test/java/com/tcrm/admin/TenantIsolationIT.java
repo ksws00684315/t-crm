@@ -712,19 +712,29 @@ class TenantIsolationIT {
   }
 
   private JsonNode awaitTask(String token, String taskId) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      MvcResult result =
-          mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, token))
-              .andExpect(status().isOk())
-              .andReturn();
-      JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
-      String state = data.path("status").asText();
-      if ("SUCCESS".equals(state) || "PARTIAL".equals(state) || "FAILED".equals(state)) {
-        return data;
-      }
-      Thread.sleep(100);
-    }
-    throw new IllegalStateException("task " + taskId + " did not finish");
+    JsonNode[] holder = new JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          try {
+            MvcResult result =
+                mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, token))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
+            String state = data.path("status").asText();
+            if ("SUCCESS".equals(state) || "PARTIAL".equals(state) || "FAILED".equals(state)) {
+              holder[0] = data;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   private String errorText(String token, String taskId) throws Exception {
@@ -822,16 +832,16 @@ class TenantIsolationIT {
     }
   }
 
-  private void awaitLockWaiters(int expected) throws InterruptedException {
-    for (int i = 0; i < 200; i++) {
-      Integer waiting =
-          jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
-      if (waiting != null && waiting >= expected) {
-        return;
-      }
-      Thread.sleep(25);
-    }
-    throw new IllegalStateException("Expected " + expected + " requests waiting for the row lock");
+  private void awaitLockWaiters(int expected) {
+    TestWait.until(
+        java.time.Duration.ofSeconds(5),
+        java.time.Duration.ofMillis(25),
+        () -> {
+          Integer waiting =
+              jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE NOT granted", Integer.class);
+          return waiting != null && waiting >= expected;
+        },
+        "Expected " + expected + " requests waiting for the row lock");
   }
 
   private record Kol(long id, String code) {}
