@@ -103,6 +103,10 @@ crm:
     click-stream-max-len: ${TCRM_CLICK_STREAM_MAXLEN:1000000}
   cors:
     allowed-origins: ${TCRM_CORS_ALLOWED_ORIGINS:}
+  # Copy-token defaults (task 17a §4.3). Company-level overrides wait for crm_config.
+  copy-token:
+    default-quota: 1000
+    default-valid-minutes: 1440
   weidian:
     secret-key: ${TCRM_SECRET_KEY:}
     admin-base-url: ${TCRM_ADMIN_BASE_URL:}

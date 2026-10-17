@@ -111,6 +111,16 @@ export const routes: RouteRecordRaw[] = [
               hideForOwn: true,
               componentName: "SheetSourcePage"
             }
+          },
+          {
+            path: "copy-tokens",
+            name: "CopyTokenList",
+            component: () => import("@/views/product/copy-token/index.vue"),
+            meta: {
+              title: "route.copyTokens",
+              permission: "kol:copy-token",
+              componentName: "CopyTokenPage"
+            }
           }
         ]
       },

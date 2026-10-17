@@ -172,6 +172,7 @@ describe("buildMenu", () => {
       "原商品",
       "对应关系",
       "商品源表",
+      "复制令牌",
       "订单",
       "订单列表",
       "人工匹配池",
@@ -193,6 +194,7 @@ describe("buildMenu", () => {
       "/product/products",
       "/product/kol-items",
       "/product/sheet-sources",
+      "/product/copy-tokens",
       "/order/orders",
       "/order/unmatched",
       "/fund/payout-accounts",
@@ -295,42 +297,56 @@ describe("kolAbilities", () => {
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: false
+      canRegisterLink: false,
+      canCopyToken: false
     });
     expect(kolAbilities(superAdmin)).toEqual({
       canWrite: true,
       canChangeBd: true,
       canAssignBd: true,
       canFilterBd: true,
-      canRegisterLink: true
+      canRegisterLink: true,
+      canCopyToken: true
     });
     expect(kolAbilities(staff("ALL", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
       canChangeBd: false,
       canAssignBd: true,
       canFilterBd: true,
-      canRegisterLink: false
+      canRegisterLink: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: false
+      canRegisterLink: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("ALL", ["kol:view"]))).toEqual({
       canWrite: false,
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: true,
-      canRegisterLink: false
+      canRegisterLink: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("OWN", ["kol:register-link"]))).toEqual({
       canWrite: false,
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: true
+      canRegisterLink: true,
+      canCopyToken: false
+    });
+    expect(kolAbilities(staff("OWN", ["kol:copy-token"]))).toEqual({
+      canWrite: false,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false,
+      canRegisterLink: false,
+      canCopyToken: true
     });
   });
 });

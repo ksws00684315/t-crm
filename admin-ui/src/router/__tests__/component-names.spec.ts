@@ -26,6 +26,7 @@ describe("cacheable route component names", () => {
     expect(cacheable.map(route => route.meta?.componentName).sort()).toEqual(
       [
         "AccountPasswordPage",
+        "CopyTokenPage",
         "HomePage",
         "KolBdTransferPage",
         "KolItemListPage",

@@ -297,6 +297,31 @@ export interface KolItemVO {
 }
 
 /** Why a tracking link is unusable (task 06 §4.3). */
+
+export type CopyTokenDisplayStatus = "ACTIVE" | "EXHAUSTED" | "EXPIRED" | "REVOKED";
+
+export interface CopyTokenVO {
+  id: string;
+  tokenHint: string;
+  kolId: string;
+  kolCode: string | null;
+  kolName: string | null;
+  targetChannel: string;
+  targetShopId: string | null;
+  targetShopName: string | null;
+  used: number;
+  quota: number;
+  validMinutes: number;
+  expiresAt: string;
+  displayStatus: CopyTokenDisplayStatus;
+  lastUsedAt: string | null;
+  createTime: string;
+}
+
+export interface CreatedCopyTokenVO extends CopyTokenVO {
+  token: string;
+}
+
 export type LinkUnavailableReason = "KOL_DISABLED" | "PRODUCT_OFF_SHELF" | "SHOP_DISABLED";
 
 /**
