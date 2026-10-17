@@ -50,6 +50,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "kol/bd-transfers",
+        name: "KolBdTransfers",
+        component: () => import("@/views/kol/bd-transfers/index.vue"),
+        meta: {
+          title: "route.bdTransfers",
+          icon: "Switch",
+          superAdmin: true,
+          componentName: "KolBdTransferPage"
+        }
+      },
+      {
         path: "product",
         name: "ProductGroup",
         redirect: "/product/shops",
@@ -88,6 +99,38 @@ export const routes: RouteRecordRaw[] = [
               permission: "product:view",
               hideForOwn: true,
               componentName: "KolItemListPage"
+            }
+          }
+        ]
+      },
+      {
+        path: "order",
+        name: "OrderGroup",
+        redirect: "/order/orders",
+        meta: {
+          title: "route.orders",
+          icon: "List",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "orders",
+            name: "OrderList",
+            component: () => import("@/views/order/index.vue"),
+            meta: {
+              title: "route.orderList",
+              permission: "order:view",
+              componentName: "OrderListPage"
+            }
+          },
+          {
+            path: "unmatched",
+            name: "OrderUnmatched",
+            component: () => import("@/views/order/unmatched.vue"),
+            meta: {
+              title: "route.orderUnmatched",
+              permission: "order:manage",
+              componentName: "OrderUnmatchedPage"
             }
           }
         ]
@@ -146,6 +189,17 @@ export const routes: RouteRecordRaw[] = [
           icon: "Document",
           superAdmin: true,
           componentName: "SystemOperLogPage"
+        }
+      },
+      {
+        path: "notifications",
+        name: "Notifications",
+        component: () => import("@/views/notification/index.vue"),
+        meta: {
+          title: "route.notifications",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "NotificationPage"
         }
       },
       {

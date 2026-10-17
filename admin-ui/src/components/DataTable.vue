@@ -50,6 +50,10 @@ const props = withDefaults(
     selectable?: boolean;
     /** Rows that may not be selected (e.g. the signed-in account). */
     selectableRow?: (row: object) => boolean;
+    /** Adds an expand column in front; the page fills the `expand` slot with the row detail. */
+    expandable?: boolean;
+    /** Opens every row's detail on render (the matching pool shows lines by default). */
+    defaultExpandAll?: boolean;
   }>(),
   {
     loading: false,
@@ -62,7 +66,9 @@ const props = withDefaults(
     exportable: false,
     exporting: false,
     selectable: false,
-    selectableRow: undefined
+    selectableRow: undefined,
+    expandable: false,
+    defaultExpandAll: false
   }
 );
 
@@ -313,9 +319,21 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :row-key="rowKey"
         :size="tableSize"
         :height="plain ? undefined : '100%'"
+        :default-expand-all="defaultExpandAll"
         border
         @selection-change="onSelection"
       >
+        <el-table-column
+          v-if="expandable"
+          type="expand"
+          width="40"
+          fixed="left"
+          class-name="tcrm-expand"
+        >
+          <template #default="{ row }">
+            <slot name="expand" :row="row" />
+          </template>
+        </el-table-column>
         <el-table-column
           v-if="selectable && !plain"
           type="selection"

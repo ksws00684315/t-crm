@@ -18,6 +18,8 @@ declare module "vue-router" {
     public?: boolean;
     /** Keep the route out of the side menu. */
     hideInMenu?: boolean;
+    /** Company accounts only. A platform administrator cannot open it, even when hidden from the menu. */
+    companyAccount?: boolean;
     /** Name of an Element Plus icon component. */
     icon?: string;
     /** Parent menu group (children listed under a sub-menu). */

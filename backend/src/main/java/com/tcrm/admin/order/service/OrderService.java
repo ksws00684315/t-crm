@@ -2,21 +2,32 @@ package com.tcrm.admin.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.system.api.BdUserApi;
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +38,11 @@ public class OrderService {
   private final OrderMapper orders;
   private final OrderItemMapper items;
   private final RefundMapper refunds;
+  private final OrderSyncStateMapper syncStates;
   private final KolApi kols;
+  private final ShopAccessApi shops;
+  private final BdUserApi bdUsers;
+  private final WeidianAuthorizationApi authorization;
   private final OrderAttribution attribution;
   private final CurrentUserContext current;
 
@@ -35,13 +50,21 @@ public class OrderService {
       OrderMapper orders,
       OrderItemMapper items,
       RefundMapper refunds,
+      OrderSyncStateMapper syncStates,
       KolApi kols,
+      ShopAccessApi shops,
+      BdUserApi bdUsers,
+      WeidianAuthorizationApi authorization,
       OrderAttribution attribution,
       CurrentUserContext current) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
+    this.syncStates = syncStates;
     this.kols = kols;
+    this.shops = shops;
+    this.bdUsers = bdUsers;
+    this.authorization = authorization;
     this.attribution = attribution;
     this.current = current;
   }
@@ -89,29 +112,96 @@ public class OrderService {
             .stream()
             .collect(Collectors.toMap(RefundDO::getOrderId, RefundDO::getAmount, BigDecimal::add));
     return new PageResult<>(
-        result.getRecords().stream()
-            .map(
-                o ->
-                    new OrderDTO(
-                        o.getId(),
-                        o.getShopId(),
-                        o.getWeidianOrderId(),
-                        o.getKolId(),
-                        o.getBdUserId(),
-                        o.getOrderStatus(),
-                        o.getAttributionStatus(),
-                        o.getOrderTime(),
-                        o.getPayTime(),
-                        o.getTotalAmount(),
-                        o.getPayAmount(),
-                        totals.getOrDefault(o.getId(), BigDecimal.ZERO.setScale(2)),
-                        lines.getOrDefault(o.getId(), List.of()).stream()
-                            .map(OrderService::line)
-                            .toList()))
-            .toList(),
+        decorate(result.getRecords(), lines, totals),
         result.getTotal(),
         filter.page(),
         filter.size());
+  }
+
+  /** Fills display names per page with a fixed number of batch lookups (task 19a §4.1.1). */
+  private List<OrderDTO> decorate(
+      List<OrderDO> records, Map<Long, List<OrderItemDO>> lines, Map<Long, BigDecimal> totals) {
+    Map<Long, String> shopNames =
+        shops.listShops().stream()
+            .collect(Collectors.toMap(ShopAccessDTO::id, ShopAccessDTO::name, (a, b) -> a));
+    Set<Long> kolIds = new HashSet<>();
+    for (var order : records) {
+      if (order.getKolId() != null) {
+        kolIds.add(order.getKolId());
+      }
+      for (var line : lines.getOrDefault(order.getId(), List.of())) {
+        if (line.getKolId() != null) {
+          kolIds.add(line.getKolId());
+        }
+      }
+    }
+    Map<Long, KolRefDTO> kolById =
+        kols.listByIds(kolIds).stream()
+            .collect(Collectors.toMap(KolRefDTO::id, Function.identity()));
+    Map<Long, BdUserDTO> bdById =
+        bdUsers
+            .listByIds(
+                records.stream()
+                    .map(OrderDO::getBdUserId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(BdUserDTO::id, Function.identity()));
+    return records.stream()
+        .map(
+            o -> {
+              var kol = o.getKolId() == null ? null : kolById.get(o.getKolId());
+              return new OrderDTO(
+                  o.getId(),
+                  o.getShopId(),
+                  o.getShopId() == null ? null : shopNames.get(o.getShopId()),
+                  o.getWeidianOrderId(),
+                  o.getKolId(),
+                  kol == null ? null : kol.kolCode(),
+                  kol == null ? null : kol.name(),
+                  o.getBdUserId(),
+                  displayName(bdById.get(o.getBdUserId())),
+                  o.getOrderStatus(),
+                  o.getAttributionStatus(),
+                  o.getOrderTime(),
+                  o.getPayTime(),
+                  o.getTotalAmount(),
+                  o.getPayAmount(),
+                  totals.getOrDefault(o.getId(), BigDecimal.ZERO.setScale(2)),
+                  lines.getOrDefault(o.getId(), List.of()).stream()
+                      .map(line -> line(line, kolById))
+                      .toList());
+            })
+        .toList();
+  }
+
+  /** Nickname first, then username; null when the snapshot assigns the order to the company. */
+  private static String displayName(BdUserDTO user) {
+    if (user == null) {
+      return null;
+    }
+    return user.nickname() == null || user.nickname().isBlank() ? user.username() : user.nickname();
+  }
+
+  /** Every shop of the current company with its sync status, including never-synced ones. */
+  public List<OrderSyncStateDTO> listSyncStates() {
+    var authorized = authorization.authorizedShopIds();
+    Map<Long, OrderSyncStateDO> states =
+        syncStates.selectList(new LambdaQueryWrapper<OrderSyncStateDO>()).stream()
+            .collect(Collectors.toMap(OrderSyncStateDO::getShopId, Function.identity()));
+    return shops.listShops().stream()
+        .map(
+            shop -> {
+              var state = states.get(shop.id());
+              return new OrderSyncStateDTO(
+                  shop.id(),
+                  shop.name(),
+                  Integer.valueOf(1).equals(shop.status()),
+                  authorized.contains(shop.id()),
+                  state == null ? null : state.getLastSuccessAt(),
+                  state == null ? null : state.getLastError());
+            })
+        .toList();
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -165,7 +255,8 @@ public class OrderService {
     lines.forEach(items::updateById);
   }
 
-  private static OrderItemDTO line(OrderItemDO i) {
+  private static OrderItemDTO line(OrderItemDO i, Map<Long, KolRefDTO> kolById) {
+    var kol = i.getKolId() == null ? null : kolById.get(i.getKolId());
     return new OrderItemDTO(
         i.getId(),
         i.getSubOrderId(),
@@ -177,6 +268,7 @@ public class OrderService {
         i.getPayAmount(),
         i.getRefundAmount(),
         i.getKolId(),
+        kol == null ? null : kol.kolCode(),
         i.getProductId(),
         i.getKolItemId(),
         i.getAttributionType(),

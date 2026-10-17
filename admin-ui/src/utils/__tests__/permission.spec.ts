@@ -11,6 +11,7 @@ import {
   isSuperAdminAccount,
   kolAbilities,
   linkAbilities,
+  orderAbilities,
   permissionGroupLabel,
   permissionText,
   POST_TEMPLATES,
@@ -118,10 +119,14 @@ describe("buildMenu", () => {
     expect(titles(superAdmin)).toEqual([
       "首页",
       "达人管理",
+      "转移记录",
       "商品",
       "店铺管理",
       "原商品",
       "对应关系",
+      "订单",
+      "订单列表",
+      "人工匹配池",
       "资金",
       "收款账户审核",
       "用户管理",
@@ -135,9 +140,12 @@ describe("buildMenu", () => {
     expect(paths).toEqual([
       "/home",
       "/kol/kols",
+      "/kol/bd-transfers",
       "/product/shops",
       "/product/products",
       "/product/kol-items",
+      "/order/orders",
+      "/order/unmatched",
       "/fund/payout-accounts",
       "/system/users",
       "/system/link-templates",
@@ -169,6 +177,19 @@ describe("buildMenu", () => {
 
   it("hides the payout-account review without either permission code", () => {
     expect(titles(staff("ALL", ["kol:view"]))).not.toContain("资金");
+  });
+
+  it("shows the order list but not the matching pool without order:manage", () => {
+    expect(titles(staff("ALL", ["order:view"]))).toEqual(["首页", "订单", "订单列表"]);
+    expect(titles(staff("ALL", ["order:view", "order:manage"]))).toEqual([
+      "首页",
+      "订单",
+      "订单列表",
+      "人工匹配池"
+    ]);
+  });
+
+  it("shows only company management to the platform administrator", () => {
     expect(titles(platformAdmin)).toEqual(["公司管理"]);
   });
 });
@@ -204,6 +225,15 @@ describe("canAccessRoute", () => {
     expect(canAccessRoute({ permission: "kol:view" }, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({}, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({ hideInMenu: true }, accessOf(platformAdmin))).toBe(true);
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(platformAdmin))
+    ).toBe(false);
+    expect(canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(superAdmin))).toBe(
+      true
+    );
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(staff("ALL", [])))
+    ).toBe(true);
     expect(canAccessRoute({}, accessOf(staff("ALL", [])))).toBe(true);
   });
 });
@@ -315,6 +345,25 @@ describe("linkAbilities", () => {
     expect(linkAbilities(staff("OWN", ["kol:view"]))).toEqual({
       canViewLinks: false,
       canRebuildIndex: false
+    });
+  });
+});
+
+describe("orderAbilities", () => {
+  it("follows the permission matrix for orders and the creator drawer", () => {
+    expect(orderAbilities(null)).toEqual({ canManage: false, canViewKol: false });
+    expect(orderAbilities(superAdmin)).toEqual({ canManage: true, canViewKol: true });
+    expect(orderAbilities(staff("ALL", ["order:view"]))).toEqual({
+      canManage: false,
+      canViewKol: false
+    });
+    expect(orderAbilities(staff("ALL", ["order:view", "order:manage"]))).toEqual({
+      canManage: true,
+      canViewKol: false
+    });
+    expect(orderAbilities(staff("OWN", ["order:view", "order:manage", "kol:view"]))).toEqual({
+      canManage: true,
+      canViewKol: true
     });
   });
 });

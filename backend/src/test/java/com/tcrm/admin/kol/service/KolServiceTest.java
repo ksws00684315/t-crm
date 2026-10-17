@@ -85,7 +85,8 @@ class KolServiceTest {
               current,
               TestTransactions.template(),
               mock(com.tcrm.admin.system.api.ExternalAuditApi.class),
-              new com.tcrm.admin.shared.AuditSanitizer(new tools.jackson.databind.ObjectMapper())));
+              new com.tcrm.admin.shared.AuditSanitizer(new tools.jackson.databind.ObjectMapper()),
+              events));
 
   @org.junit.jupiter.api.BeforeEach
   void noTemplateNames() {

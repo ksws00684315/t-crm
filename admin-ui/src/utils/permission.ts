@@ -152,6 +152,8 @@ export interface RouteAccessMeta {
   platformAdmin?: boolean;
   hideForOwn?: boolean;
   hideInMenu?: boolean;
+  /** Company business page that stays closed to the platform administrator. */
+  companyAccount?: boolean;
 }
 
 /** The permission codes a route asks for; empty when the route has none. */
@@ -169,6 +171,7 @@ function requiredCodes(meta: RouteAccessMeta | undefined): readonly PermissionCo
 export function canAccessRoute(meta: RouteAccessMeta | undefined, access: AccessProfile): boolean {
   if (meta?.platformAdmin) return access.isPlatformAdmin;
   if (access.isPlatformAdmin) {
+    if (meta?.companyAccount) return false;
     return !meta?.permission && !meta?.superAdmin && meta?.hideInMenu === true;
   }
   if (meta?.superAdmin && !access.isSuperAdmin) return false;
@@ -326,6 +329,23 @@ export function linkAbilities(user: AbilitySubject | null | undefined): LinkAbil
   return {
     canViewLinks: access.can("product:view"),
     canRebuildIndex: access.isSuperAdmin
+  };
+}
+
+/** Order page button visibility. The backend enforces the same rules. */
+export interface OrderAbilities {
+  /** Sync status, manual sync and the import entries. Requires order:manage. */
+  canManage: boolean;
+  /** Open a creator detail drawer from an order row. Requires kol:view. */
+  canViewKol: boolean;
+}
+
+export function orderAbilities(user: AbilitySubject | null | undefined): OrderAbilities {
+  const access = accessOf(user);
+  if (!user) return { canManage: false, canViewKol: false };
+  return {
+    canManage: access.can("order:manage"),
+    canViewKol: access.can("kol:view")
   };
 }
 
