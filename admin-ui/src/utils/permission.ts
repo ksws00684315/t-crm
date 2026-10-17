@@ -151,6 +151,8 @@ export interface RouteAccessMeta {
   platformAdmin?: boolean;
   hideForOwn?: boolean;
   hideInMenu?: boolean;
+  /** Company business page that stays closed to the platform administrator. */
+  companyAccount?: boolean;
 }
 
 /**
@@ -160,6 +162,7 @@ export interface RouteAccessMeta {
 export function canAccessRoute(meta: RouteAccessMeta | undefined, access: AccessProfile): boolean {
   if (meta?.platformAdmin) return access.isPlatformAdmin;
   if (access.isPlatformAdmin) {
+    if (meta?.companyAccount) return false;
     return !meta?.permission && !meta?.superAdmin && meta?.hideInMenu === true;
   }
   if (meta?.superAdmin && !access.isSuperAdmin) return false;

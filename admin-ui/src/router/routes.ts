@@ -126,6 +126,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "notifications",
+        name: "Notifications",
+        component: () => import("@/views/notification/index.vue"),
+        meta: {
+          title: "route.notifications",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "NotificationPage"
+        }
+      },
+      {
         path: "account/password",
         name: "AccountPassword",
         component: () => import("@/views/account/password.vue"),

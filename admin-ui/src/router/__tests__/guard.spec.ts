@@ -172,6 +172,7 @@ describe("installGuard with the real route table", () => {
       ["system/users", null, true, false, false],
       ["system/link-templates", null, true, false, false],
       ["system/oper-logs", null, true, false, false],
+      ["notifications", null, false, false, false],
       ["account/password", null, false, false, false],
       ["403", null, false, false, false]
     ]);

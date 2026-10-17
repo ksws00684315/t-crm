@@ -179,6 +179,15 @@ describe("canAccessRoute", () => {
     expect(canAccessRoute({ permission: "kol:view" }, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({}, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({ hideInMenu: true }, accessOf(platformAdmin))).toBe(true);
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(platformAdmin))
+    ).toBe(false);
+    expect(canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(superAdmin))).toBe(
+      true
+    );
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(staff("ALL", [])))
+    ).toBe(true);
     expect(canAccessRoute({}, accessOf(staff("ALL", [])))).toBe(true);
   });
 });

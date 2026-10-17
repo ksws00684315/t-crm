@@ -172,7 +172,8 @@ class BdTransferIT {
         context.getBean(TransactionTemplate.class),
         context.getBean(ExternalAuditApi.class),
         context.getBean(AuditSanitizer.class),
-        Clock.fixed(now, ZoneOffset.UTC));
+        Clock.fixed(now, ZoneOffset.UTC),
+        context);
   }
 
   private void execute(long id, Instant now) {

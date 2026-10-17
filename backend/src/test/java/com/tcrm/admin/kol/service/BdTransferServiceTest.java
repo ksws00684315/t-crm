@@ -16,6 +16,8 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
+import com.tcrm.admin.kol.api.KolsUnassignedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolBdTransferMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.ObjectMapper;
 
 class BdTransferServiceTest {
@@ -55,6 +58,7 @@ class BdTransferServiceTest {
   private final BdUserApi bds = mock(BdUserApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final BdTransferService service =
       new BdTransferService(
           kols,
@@ -65,7 +69,8 @@ class BdTransferServiceTest {
           TestTransactions.template(),
           audit,
           new AuditSanitizer(new ObjectMapper()),
-          Clock.fixed(NOW, ZoneOffset.UTC));
+          Clock.fixed(NOW, ZoneOffset.UTC),
+          events);
 
   @BeforeAll
   static void tables() {
@@ -313,7 +318,8 @@ class BdTransferServiceTest {
   @Test
   void shouldClearOwnershipAndPreserveSourceReservations_whenDisabled() {
     when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
-    service.onStaffDisabled(new StaffDisabledEvent(1L, 5L));
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(1L, 5L)));
     var next = ArgumentCaptor.forClass(KolBdHistoryDO.class);
     verify(history).insert(next.capture());
     assertThat(next.getValue().getBdUserId()).isNull();
@@ -375,6 +381,65 @@ class BdTransferServiceTest {
     assertThatThrownBy(() -> service.create(c))
         .hasMessage(ErrorCode.COMMON_VALIDATION_FAILED.message());
     verifyNoInteractions(kols, history, transfers);
+  }
+
+  @Test
+  void shouldPublish_whenExecutionCancelsBecauseOwnershipChanged() {
+    reservation(NOW.minusSeconds(1)).setTenantId(4L);
+    when(kols.selectById(11L)).thenReturn(kol(11L, null));
+    service.executeDue(21L);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new BdTransferCancelledEvent(4L, 11L, 21L, "KOL11", "OWNERSHIP_CHANGED"));
+  }
+
+  @Test
+  void shouldPublish_whenExecutionCancelsBecauseTargetIsUnavailable() {
+    reservation(NOW.minusSeconds(1)).setTenantId(4L);
+    when(bds.lockById(6L)).thenReturn(null);
+    service.executeDue(21L);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new BdTransferCancelledEvent(4L, 11L, 21L, "KOL11", "TARGET_UNAVAILABLE"));
+  }
+
+  @Test
+  void shouldNotPublish_whenCancelledManually() {
+    reservation(NOW.plusSeconds(1)).setTenantId(4L);
+    when(transfers.update(isNull(), any())).thenReturn(1);
+    service.cancel(21L);
+    verify(events, never()).publishEvent(any());
+  }
+
+  @Test
+  void shouldPublishUnassigned_whenDisabledStaffHasCreators() {
+    when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
+    when(bds.getById(5L)).thenReturn(new BdUserDTO(5L, "bd5", "Blake", false));
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(8L, 5L)));
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue()).isEqualTo(new KolsUnassignedEvent(8L, 5L, "Blake", 1));
+  }
+
+  @Test
+  void shouldPublishUnassignedWithBlankName_whenBdIsMissing() {
+    when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
+    when(bds.getById(5L)).thenReturn(null);
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(8L, 5L)));
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue()).isEqualTo(new KolsUnassignedEvent(8L, 5L, "", 1));
+  }
+
+  @Test
+  void shouldNotPublishUnassigned_whenDisabledStaffHasNoCreators() {
+    when(kols.selectList(any())).thenReturn(List.of());
+    service.onStaffDisabled(new StaffDisabledEvent(8L, 5L));
+    verify(events, never()).publishEvent(any());
   }
 
   @SuppressWarnings("unchecked")
