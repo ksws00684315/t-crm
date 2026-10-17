@@ -54,8 +54,9 @@ public class AuthService {
    * document §3.3, ADR-008 addendum), and the lock state cannot be probed without solving one.
    *
    * <p>A member enters its last company when that one is still usable, otherwise the first usable
-   * company by name (ADR-022). Without any usable company the login answers AUTH_ACCOUNT_DISABLED,
-   * counts as a failure, and no token is issued.
+   * company by name (ADR-022). Without any usable company the login answers
+   * AUTH_INVALID_CREDENTIALS like a wrong password, counts as a failure, and no token is issued: a
+   * correct password must not be distinguishable from a wrong one.
    */
   public LoginResult login(
       String username, String password, String captchaId, String captchaCode, String clientIp) {
@@ -76,9 +77,9 @@ public class AuthService {
       companies = users.companies(user.id());
       Long tenantId = chooseCompany(user.tenantId(), companies);
       if (tenantId == null) {
-        // Still counted, so the distinct answer cannot be probed faster than a wrong password.
+        // Same answer as a wrong password, and still counted.
         failures.fail(username, clientIp);
-        throw new BusinessException(ErrorCode.AUTH_ACCOUNT_DISABLED);
+        throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
       }
       if (!tenantId.equals(user.tenantId()) || !user.tenantEnabled()) {
         user = users.getById(user.id(), tenantId);

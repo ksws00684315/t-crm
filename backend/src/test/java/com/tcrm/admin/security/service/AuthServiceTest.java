@@ -113,15 +113,18 @@ class AuthServiceTest {
   }
 
   @Test
-  void shouldRejectLogin_whenNoCompanyIsUsable() {
-    // ADR-022: the last company is disabled and there is no other usable company.
+  void shouldRejectLogin_withTheWrongPasswordAnswer_whenNoCompanyIsUsable() {
+    // ADR-022: the last company is disabled and there is no other usable company. The answer must
+    // not reveal that the password was right.
     when(accounts.getByUsername("operator")).thenReturn(member(1, 2L, Role.STAFF, false));
     when(accounts.companies(7L)).thenReturn(List.of());
     when(passwords.matches("test-input", "test-hash")).thenReturn(true);
     try (var stp = mockStatic(StpUtil.class)) {
       assertThatThrownBy(
               () -> auth.login("operator", "test-input", CAPTCHA_ID, "AB7K", "198.51.100.8"))
-          .hasMessage(ErrorCode.AUTH_ACCOUNT_DISABLED.message());
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_INVALID_CREDENTIALS));
       stp.verify(() -> StpUtil.login(any()), never());
     }
     verify(passwords).matches("test-input", "test-hash");

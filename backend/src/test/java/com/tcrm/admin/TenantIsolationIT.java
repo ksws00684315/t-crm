@@ -425,20 +425,20 @@ class TenantIsolationIT {
     mvc.perform(get("/admin-api/auth/me").header(TOKEN, companyB.token()))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.errorCode").value("AUTH_ACCOUNT_DISABLED"));
-    // Task 21a §4.3: with no usable company left the login answers AUTH_ACCOUNT_DISABLED (still
-    // 401, no token) instead of the wrong-password answer.
+    // Task 21a §4.3 as revised after PR #65: with no usable company left, the correct password
+    // gets the same answer as a wrong one (401 AUTH_INVALID_CREDENTIALS, no token).
     String disabled =
         mvc.perform(
                 post("/admin-api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(loginBody(companyB.username(), PASSWORD)))
             .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.errorCode").value("AUTH_ACCOUNT_DISABLED"))
+            .andExpect(jsonPath("$.errorCode").value("AUTH_INVALID_CREDENTIALS"))
             .andExpect(jsonPath("$.data").doesNotExist())
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertThat(withoutTrace(wrong)).contains("AUTH_INVALID_CREDENTIALS");
+    assertThat(withoutTrace(disabled)).isEqualTo(withoutTrace(wrong));
     assertThat(disabled).doesNotContain("token");
     assertThat(field(kolB.code(), productB)).isEqualTo(link);
 

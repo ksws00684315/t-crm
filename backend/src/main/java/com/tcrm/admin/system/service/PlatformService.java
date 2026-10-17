@@ -22,6 +22,7 @@ import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Platform-administrator operations. Company rows live in {@code sys_tenant}, which the tenant line
@@ -111,6 +112,8 @@ public class PlatformService {
                 .toList());
   }
 
+  /** The account and its membership are written together or not at all. */
+  @Transactional(rollbackFor = Exception.class)
   public TenantAdminDTO createAdmin(
       Long tenantId, String username, String password, String nickname, String email) {
     require(tenantId);
@@ -154,8 +157,9 @@ public class PlatformService {
   }
 
   /**
-   * The account with exactly this login name (case-insensitive) and all its memberships, or null.
-   * No partial matching, so the platform cannot browse accounts.
+   * The company account with exactly this login name (case-insensitive) and all its memberships, or
+   * null. No partial matching, so the platform cannot browse accounts. A platform administrator
+   * account is answered as missing.
    */
   public PlatformUserDTO findUser(String username) {
     if (username == null || username.isBlank()) {
@@ -168,7 +172,7 @@ public class PlatformService {
               users.selectOne(
                   new LambdaQueryWrapper<SysUserDO>()
                       .apply("lower(username) = lower({0})", username.strip()));
-          return user == null ? null : view(user);
+          return user == null || user.getRole() != AccountType.MEMBER ? null : view(user);
         });
   }
 
@@ -177,6 +181,7 @@ public class PlatformService {
    * codes and data scope (ADR-018). 409 USER_ALREADY_MEMBER when a live membership exists; 404 for
    * an unknown company or account; 400 for a platform administrator account.
    */
+  @Transactional(rollbackFor = Exception.class)
   public PlatformUserDTO addMember(
       Long tenantId, Long userId, Role role, PostTemplate template, DataScope scope) {
     MemberRole resolved = MemberRole.resolve(role, template, scope);
@@ -204,12 +209,12 @@ public class PlatformService {
         });
   }
 
-  /** Changes the name and e-mail of any account. */
+  /** Changes the name and e-mail of a company account; a platform administrator is 404. */
   public void updateUser(Long userId, String nickname, String email) {
     TenantScope.runSystem(
         "edit account name and e-mail",
         () -> {
-          requireUser(userId);
+          requireMember(userId);
           users.update(
               null,
               new LambdaUpdateWrapper<SysUserDO>()
@@ -221,19 +226,23 @@ public class PlatformService {
         });
   }
 
-  /** Resets the password of any account; every token of the account becomes invalid. */
+  /**
+   * Resets the password of a company account; every token of the account becomes invalid. A
+   * platform administrator is 404.
+   */
   public void resetPassword(Long userId, String password) {
     TenantScope.runSystem(
         "reset account password",
         () -> {
-          requireUser(userId);
+          requireMember(userId);
           writePassword(userId, password);
         });
   }
 
   /**
-   * Enables or disables the whole account in every company. Disabling ends every token of the
-   * account. A platform administrator cannot disable itself.
+   * Enables or disables the whole company account in every company. Disabling ends every token of
+   * the account. A platform administrator cannot disable itself, and another platform administrator
+   * is 404.
    */
   public void updateUserStatus(Long userId, int status) {
     if (status == 0 && userId.equals(current.id())) {
@@ -242,7 +251,7 @@ public class PlatformService {
     TenantScope.runSystem(
         "change account status",
         () -> {
-          requireUser(userId);
+          requireMember(userId);
           users.update(
               null,
               new LambdaUpdateWrapper<SysUserDO>()
@@ -285,6 +294,7 @@ public class PlatformService {
         user.getId(),
         user.getUsername(),
         user.getNickname(),
+        user.getEmail(),
         user.getStatus(),
         members.listMemberships(user.getId()).stream()
             .map(
@@ -297,6 +307,15 @@ public class PlatformService {
   private SysUserDO requireUser(Long userId) {
     SysUserDO user = users.selectById(userId);
     if (user == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return user;
+  }
+
+  /** A company account. Platform administrator accounts are not managed here: they are 404. */
+  private SysUserDO requireMember(Long userId) {
+    SysUserDO user = requireUser(userId);
+    if (user.getRole() != AccountType.MEMBER) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     return user;

@@ -5,10 +5,15 @@ import java.util.List;
 
 /**
  * One account as the platform administrator sees it: identity, account-wide status, and every live
- * membership. No business data.
+ * membership. No business data. {@code email} is null when the account has none.
  */
 public record PlatformUserDTO(
-    Long id, String username, String nickname, Integer status, List<Company> companies) {
+    Long id,
+    String username,
+    String nickname,
+    String email,
+    Integer status,
+    List<Company> companies) {
   public PlatformUserDTO {
     companies = List.copyOf(companies);
   }

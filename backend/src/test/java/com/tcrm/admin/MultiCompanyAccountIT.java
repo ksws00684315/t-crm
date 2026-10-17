@@ -1,6 +1,10 @@
 package com.tcrm.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -10,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.PostTemplate;
+import com.tcrm.admin.system.service.UserPermissionService;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -25,6 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -79,6 +85,9 @@ class MultiCompanyAccountIT {
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final StringRedisTemplate redis;
+
+  /** Spied, not replaced: real behaviour unless a test stubs {@code grant} to fail. */
+  @MockitoSpyBean UserPermissionService permissions;
 
   private String adminA;
   private String platform;
@@ -351,12 +360,39 @@ class MultiCompanyAccountIT {
         .andExpect(jsonPath("$.errorCode").value("USER_ALREADY_MEMBER"));
     addMember(companyB.tenantId(), 987654321L, "STAFF", "BD").andExpect(status().isNotFound());
 
-    putJson(platform, "/admin-api/platform/users/" + multiId, Map.of("nickname", "Shared Name"))
+    String email = "shared" + suffix() + "@example.com";
+    putJson(
+            platform,
+            "/admin-api/platform/users/" + multiId,
+            Map.of("nickname", "Shared Name", "email", email))
+        .andExpect(status().isOk());
+    // The lookup returns the e-mail, so the form can send it back unchanged.
+    String found =
+        mvc.perform(
+                get("/admin-api/platform/users")
+                    .header(TOKEN, platform)
+                    .param("username", multiName))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.email").value(email))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    putJson(
+            platform,
+            "/admin-api/platform/users/" + multiId,
+            Map.of(
+                "nickname",
+                "Renamed Here",
+                "email",
+                json.readTree(found).at("/data/email").asText()))
         .andExpect(status().isOk());
     assertThat(
             jdbc.queryForObject(
                 "SELECT nickname FROM sys_user WHERE id = ?", String.class, multiId))
-        .isEqualTo("Shared Name");
+        .isEqualTo("Renamed Here");
+    assertThat(
+            jdbc.queryForObject("SELECT email FROM sys_user WHERE id = ?", String.class, multiId))
+        .isEqualTo(email);
 
     String before = CompanySessions.login(mvc, json, multiName, PASSWORD);
     String fresh = UUID.randomUUID().toString();
@@ -381,6 +417,54 @@ class MultiCompanyAccountIT {
     putJson(platform, "/admin-api/platform/users/" + multiId + "/status", Map.of("status", 1))
         .andExpect(status().isOk());
     CompanySessions.login(mvc, json, multiName, fresh);
+  }
+
+  @Test
+  void shouldTreatPlatformAdministratorAccountsAsMissing() throws Exception {
+    long bootstrapId =
+        jdbc.queryForObject("SELECT id FROM sys_user WHERE username = 'bootstrap'", Long.class);
+    mvc.perform(
+            get("/admin-api/platform/users").header(TOKEN, platform).param("username", "bootstrap"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").doesNotExist());
+    putJson(
+            platform,
+            "/admin-api/platform/users/" + bootstrapId,
+            Map.of("nickname", "Changed", "email", "changed@example.com"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+    putJson(
+            platform,
+            "/admin-api/platform/users/" + bootstrapId + "/password",
+            Map.of("password", PASSWORD + "x"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+    putJson(platform, "/admin-api/platform/users/" + bootstrapId + "/status", Map.of("status", 1))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT nickname FROM sys_user WHERE id = ?", String.class, bootstrapId))
+        .isNotEqualTo("Changed");
+    CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+  }
+
+  @Test
+  void shouldRollBackTheMembership_whenGrantingTheCodesFails() throws Exception {
+    long candidate = createSuperAdmin(adminA, "roll" + suffix());
+    doThrow(new IllegalStateException("grant failed"))
+        .when(permissions)
+        .grant(any(), anyLong(), anyList());
+    addMember(companyB.tenantId(), candidate, "STAFF", "BD")
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_INTERNAL_ERROR"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_user_tenant WHERE user_id = ? AND tenant_id = ?",
+                Integer.class,
+                candidate,
+                companyB.tenantId()))
+        .isZero();
   }
 
   @Test

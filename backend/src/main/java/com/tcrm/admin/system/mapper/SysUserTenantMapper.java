@@ -75,6 +75,17 @@ public interface SysUserTenantMapper extends BaseMapper<SysUserTenantDO> {
   List<MemberRow> listByRole(@Param("tenantId") Long tenantId, @Param("role") Role role);
 
   /**
+   * Account ids of the enabled super administrators of this company, ordered by id: the membership
+   * and the account are both enabled. Other companies are never read.
+   */
+  @Select(
+      "SELECT m.user_id FROM sys_user_tenant m"
+          + " JOIN sys_user u ON u.id = m.user_id AND u.is_deleted = FALSE"
+          + " WHERE m.tenant_id = #{tenantId} AND m.role = 'SUPER_ADMIN' AND m.status = 1"
+          + " AND m.is_deleted = FALSE AND u.status = 1 ORDER BY m.user_id")
+  List<Long> listEnabledSuperAdminIds(@Param("tenantId") Long tenantId);
+
+  /**
    * Usable BDs of this company ordered by username: enabled account and membership, STAFF with OWN
    * scope, holding {@code kolEditCode} in this company.
    */
