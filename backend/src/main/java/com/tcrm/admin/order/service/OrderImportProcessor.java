@@ -31,7 +31,9 @@ import java.util.Map;
 
 /**
  * Imports one order line per Excel row (task 18 §4.2). Same order across rows is written as one
- * head plus each line; empty sub-order ids get a stable key from item + SKU + in-file index.
+ * head plus each line; empty sub-order ids get a stable key from item + SKU + occurrence index
+ * within the same order (counted as soon as shop / order / item ids parse, even if the row later
+ * fails other checks).
  */
 class OrderImportProcessor implements ImportRowProcessor {
   static final String SHOP_REQUIRED = "import.order.error.shop-required";
@@ -65,7 +67,10 @@ class OrderImportProcessor implements ImportRowProcessor {
   private final ShopAccessApi shops;
   private final OrderWriter writer;
 
-  /** Per-file line index within each shop+order, used for stable sub-order keys. */
+  /**
+   * Per-file occurrence count of the same shop+order+item+SKU. Incremented as soon as those ids
+   * parse, so a failed row still reserves its index and a later fix+reimport keeps other keys.
+   */
   private final Map<String, Integer> lineIndexes = new HashMap<>();
 
   OrderImportProcessor(long taskId, ShopAccessApi shops, OrderWriter writer) {
@@ -157,6 +162,19 @@ class OrderImportProcessor implements ImportRowProcessor {
     if (!skuId.isEmpty() && skuId.length() > 32) {
       errors.add(ImportReason.of(SKU_LENGTH));
     }
+    // Reserve occurrence index as soon as shop / order / item ids parse (even if other checks
+    // fail).
+    Integer occurrence = null;
+    if (OrderImportFields.isWeidianId(shopWeidian)
+        && OrderImportFields.isWeidianId(orderNo)
+        && OrderImportFields.isWeidianId(itemId)
+        && (skuId.isEmpty() || skuId.length() <= 32)) {
+      String skuKey = skuId.isEmpty() ? "" : skuId;
+      String occurrenceKey = shopWeidian + ":" + orderNo + ":" + itemId + ":" + skuKey;
+      int index = lineIndexes.getOrDefault(occurrenceKey, 0);
+      lineIndexes.put(occurrenceKey, index + 1);
+      occurrence = index;
+    }
     String itemName = ITEM_NAME.of(row);
     if (itemName.isEmpty()) {
       errors.add(ImportReason.of(NAME_REQUIRED));
@@ -194,13 +212,10 @@ class OrderImportProcessor implements ImportRowProcessor {
     if (existing != null && Integer.valueOf(1).equals(existing.getSource())) {
       return List.of(ImportReason.of(SYNC_OWNED));
     }
-    String lineKey = shop.id() + ":" + orderNo;
-    int index = lineIndexes.getOrDefault(lineKey, 0);
-    lineIndexes.put(lineKey, index + 1);
     String sku = skuId.isEmpty() ? "" : skuId;
     String resolvedSub =
         subOrder.isEmpty()
-            ? "line-" + OrderNormalizer.hash(itemId + ":" + sku + ":" + index)
+            ? "line-" + OrderNormalizer.hash(itemId + ":" + sku + ":" + occurrence)
             : subOrder;
     Instant now = Instant.now();
     OrderDO order = new OrderDO();

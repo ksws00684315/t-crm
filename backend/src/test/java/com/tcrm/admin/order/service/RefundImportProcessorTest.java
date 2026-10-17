@@ -92,4 +92,16 @@ class RefundImportProcessorTest {
         .extracting(ImportReason::key)
         .containsExactly(RefundImportProcessor.AMOUNT_FORMAT);
   }
+
+  @Test
+  void shouldAcceptSlashUnpaddedRefundTimes() {
+    List<String> cells = valid();
+    cells.set(RefundImportColumn.REFUND_TIME.ordinal(), "2026/10/16 13:00");
+    cells.set(RefundImportColumn.FINISH_TIME.ordinal(), "2026/10/16 14:05:07");
+    assertThat(processor.process(cells)).isEmpty();
+    ArgumentCaptor<RefundDO> cap = ArgumentCaptor.forClass(RefundDO.class);
+    verify(writer).saveImportedRefund(eq(10L), eq("5001"), eq("sub-1"), cap.capture());
+    assertThat(cap.getValue().getRefundTime()).isNotNull();
+    assertThat(cap.getValue().getFinishTime()).isNotNull();
+  }
 }

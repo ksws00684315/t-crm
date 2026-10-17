@@ -10,8 +10,10 @@ import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ public class OrderWriter {
                 .eq(OrderDO::getShopId, next.getShopId())
                 .eq(OrderDO::getWeidianOrderId, next.getWeidianOrderId())
                 .last("FOR UPDATE"));
+    Integer previousSource = existing == null ? null : existing.getSource();
     if (existing == null) {
       orders.insert(next);
     } else {
@@ -81,10 +84,33 @@ public class OrderWriter {
         items.insert(line);
       }
     }
+    // API sync after Excel import: payload is the full line set; drop import-only keys.
+    if (Integer.valueOf(2).equals(previousSource) && Integer.valueOf(1).equals(next.getSource())) {
+      Set<String> keep = new HashSet<>();
+      for (var line : payload.items()) {
+        keep.add(line.getSubOrderId());
+      }
+      for (var old : previous) {
+        if (!keep.contains(old.getSubOrderId())) {
+          detachRefundsFromItem(old.getId());
+          items.deleteById(old.getId());
+        }
+      }
+    }
     var all = listItems(next.getId());
     attribution.apply(next, all, false);
     orders.updateById(next);
     all.forEach(items::updateById);
+  }
+
+  private void detachRefundsFromItem(Long orderItemId) {
+    var linked =
+        refunds.selectList(
+            new LambdaQueryWrapper<RefundDO>().eq(RefundDO::getOrderItemId, orderItemId));
+    for (var refund : linked) {
+      refund.setOrderItemId(null);
+      refunds.updateById(refund);
+    }
   }
 
   public List<OrderItemDO> listItems(Long orderId) {

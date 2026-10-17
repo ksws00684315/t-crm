@@ -9,10 +9,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
+import com.tcrm.admin.order.model.OrderDO;
+import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.service.OrderImportColumn;
+import com.tcrm.admin.order.service.OrderPayloadDTO;
+import com.tcrm.admin.order.service.OrderWriter;
 import com.tcrm.admin.order.service.RefundImportColumn;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -78,13 +84,15 @@ class OrderImportIT {
   private final MockMvc mvc;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
+  private final OrderWriter writer;
   private String admin;
 
   @Autowired
-  OrderImportIT(MockMvc mvc, JdbcTemplate jdbc, ObjectMapper json) {
+  OrderImportIT(MockMvc mvc, JdbcTemplate jdbc, ObjectMapper json, OrderWriter writer) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
+    this.writer = writer;
   }
 
   @BeforeEach
@@ -280,6 +288,106 @@ class OrderImportIT {
   }
 
   @Test
+  void shouldReplaceImportLines_whenApiSyncTakesOverSameOrder() throws Exception {
+    List<List<String>> rows =
+        List.of(
+            List.of(
+                "100",
+                "7100",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "20.00",
+                "0",
+                "9001",
+                "s1",
+                "Item A",
+                "Red",
+                "1",
+                "10.00"),
+            List.of(
+                "100",
+                "7100",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "20.00",
+                "0",
+                "9002",
+                "s2",
+                "Item B",
+                "Blue",
+                "1",
+                "10.00"));
+    String taskId = submit("/admin-api/order/order-imports", orderWorkbook(rows), "imp.xlsx");
+    assertThat(awaitTask(taskId).path("status").asText()).isEqualTo("SUCCESS");
+    Map<String, Object> order =
+        jdbc.queryForMap("SELECT * FROM crm_order WHERE weidian_order_id='7100'");
+    assertThat(order.get("source")).isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=?",
+                Long.class,
+                order.get("id")))
+        .isEqualTo(2L);
+    List<String> importSubs =
+        jdbc.query(
+            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? ORDER BY id",
+            (rs, i) -> rs.getString(1),
+            order.get("id"));
+    assertThat(importSubs).allSatisfy(s -> assertThat(s).startsWith("line-"));
+
+    OrderDO api = new OrderDO();
+    api.setShopId(10L);
+    api.setWeidianOrderId("7100");
+    api.setOrderStatus("PAID");
+    api.setRawStatus("pay");
+    api.setOrderTime(PAID.minusSeconds(60));
+    api.setPayTime(PAID);
+    api.setTotalAmount(new BigDecimal("20.00"));
+    api.setPayAmount(new BigDecimal("20.00"));
+    api.setFreight(BigDecimal.ZERO.setScale(2));
+    api.setDiscount(BigDecimal.ZERO.setScale(2));
+    api.setSource(1);
+    api.setSourceUpdateTime(Instant.now());
+    api.setLastSyncTime(Instant.now());
+    api.setAttributionStatus("PENDING");
+    OrderItemDO a = new OrderItemDO();
+    a.setSubOrderId("wd-sub-a");
+    a.setWeidianItemId("9001");
+    a.setSkuId("s1");
+    a.setItemName("Item A");
+    a.setSkuName("Red");
+    a.setQuantity(1);
+    a.setPayAmount(new BigDecimal("10.00"));
+    a.setRefundAmount(BigDecimal.ZERO.setScale(2));
+    a.setAttributionType(0);
+    OrderItemDO b = new OrderItemDO();
+    b.setSubOrderId("wd-sub-b");
+    b.setWeidianItemId("9002");
+    b.setSkuId("s2");
+    b.setItemName("Item B");
+    b.setSkuName("Blue");
+    b.setQuantity(1);
+    b.setPayAmount(new BigDecimal("10.00"));
+    b.setRefundAmount(BigDecimal.ZERO.setScale(2));
+    b.setAttributionType(0);
+    TenantScope.runCompany(1, () -> writer.save(new OrderPayloadDTO(api, List.of(a, b))));
+
+    Map<String, Object> after =
+        jdbc.queryForMap("SELECT source, pay_amount FROM crm_order WHERE weidian_order_id='7100'");
+    assertThat(after.get("source")).isEqualTo(1);
+    assertThat((java.math.BigDecimal) after.get("pay_amount")).isEqualByComparingTo("20.00");
+    List<String> apiSubs =
+        jdbc.query(
+            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? ORDER BY id",
+            (rs, i) -> rs.getString(1),
+            order.get("id"));
+    assertThat(apiSubs).containsExactly("wd-sub-a", "wd-sub-b");
+  }
+
   void shouldForbidImportWithoutPermission_andHideOtherCompanyShop() throws Exception {
     mvc.perform(
             multipart("/admin-api/order/order-imports")

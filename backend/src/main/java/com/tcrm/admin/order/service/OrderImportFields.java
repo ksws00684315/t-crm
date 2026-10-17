@@ -3,11 +3,10 @@ package com.tcrm.admin.order.service;
 import com.tcrm.admin.order.model.OrderStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -15,8 +14,16 @@ import java.util.regex.Pattern;
 /** Shared Excel cell parsers for order and refund imports (Beijing time, CNY yuan). */
 final class OrderImportFields {
   static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
-  static final DateTimeFormatter DATE_TIME =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
+
+  /**
+   * Accepts Excel display text for datetime cells: {@code -} or {@code /} separators, unpadded
+   * month/day/hour, optional seconds (default 0). Examples: {@code 2026-10-17 09:05:07}, {@code
+   * 2026/10/17 9:05}, {@code 2026/10/17 9:05:07}.
+   */
+  private static final Pattern BEIJING_TIME =
+      Pattern.compile(
+          "^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})\\s+(\\d{1,2}):(\\d{1,2})(?::(\\d{1,2}))?$");
+
   private static final Pattern WEIDIAN_ID = Pattern.compile("^[0-9]{1,32}$");
   private static final Pattern MONEY = Pattern.compile("^[0-9]+(\\.[0-9]{1,2})?$");
   private static final Pattern QUANTITY = Pattern.compile("^[1-9][0-9]*$");
@@ -63,9 +70,19 @@ final class OrderImportFields {
     if (text == null || text.isBlank()) {
       return null;
     }
+    var match = BEIJING_TIME.matcher(text.strip());
+    if (!match.matches()) {
+      return null;
+    }
     try {
-      return LocalDateTime.parse(text.strip(), DATE_TIME).atZone(BEIJING).toInstant();
-    } catch (DateTimeParseException e) {
+      int year = Integer.parseInt(match.group(1));
+      int month = Integer.parseInt(match.group(2));
+      int day = Integer.parseInt(match.group(3));
+      int hour = Integer.parseInt(match.group(4));
+      int minute = Integer.parseInt(match.group(5));
+      int second = match.group(6) == null ? 0 : Integer.parseInt(match.group(6));
+      return LocalDateTime.of(year, month, day, hour, minute, second).atZone(BEIJING).toInstant();
+    } catch (DateTimeException | NumberFormatException e) {
       return null;
     }
   }

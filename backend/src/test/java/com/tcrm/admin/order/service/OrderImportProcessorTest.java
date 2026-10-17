@@ -166,4 +166,49 @@ class OrderImportProcessorTest {
         .extracting(ImportReason::key)
         .containsExactly(OrderImportProcessor.SHOP_MISSING);
   }
+
+  @Test
+  void shouldKeepStableKey_whenEarlierRowFailsThenFileIsFixed() {
+    when(writer.find(eq(10L), eq("5001"))).thenReturn(null);
+    List<String> badA = validPaid();
+    badA.set(OrderImportColumn.ITEM_ID.ordinal(), "9001");
+    badA.set(OrderImportColumn.SKU_ID.ordinal(), "skuA");
+    badA.set(OrderImportColumn.ITEM_NAME.ordinal(), "x".repeat(300));
+    List<String> goodB = validPaid();
+    goodB.set(OrderImportColumn.ITEM_ID.ordinal(), "9002");
+    goodB.set(OrderImportColumn.SKU_ID.ordinal(), "skuB");
+    goodB.set(OrderImportColumn.ITEM_NAME.ordinal(), "Item B");
+
+    assertThat(processor.process(badA))
+        .extracting(ImportReason::key)
+        .contains(OrderImportProcessor.NAME_LENGTH);
+    assertThat(processor.process(goodB)).isEmpty();
+    ArgumentCaptor<OrderPayloadDTO> firstCap = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer).save(firstCap.capture());
+    String keyB = firstCap.getValue().items().getFirst().getSubOrderId();
+
+    OrderImportProcessor again = new OrderImportProcessor(99L, shops, writer);
+    List<String> fixedA = validPaid();
+    fixedA.set(OrderImportColumn.ITEM_ID.ordinal(), "9001");
+    fixedA.set(OrderImportColumn.SKU_ID.ordinal(), "skuA");
+    fixedA.set(OrderImportColumn.ITEM_NAME.ordinal(), "Item A");
+    assertThat(again.process(fixedA)).isEmpty();
+    assertThat(again.process(goodB)).isEmpty();
+    ArgumentCaptor<OrderPayloadDTO> cap = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer, org.mockito.Mockito.times(3)).save(cap.capture());
+    assertThat(cap.getAllValues().get(2).items().getFirst().getSubOrderId()).isEqualTo(keyB);
+  }
+
+  @Test
+  void shouldAcceptSlashUnpaddedBeijingTime() {
+    when(writer.find(10L, "5001")).thenReturn(null);
+    List<String> cells = validPaid();
+    cells.set(OrderImportColumn.ORDER_TIME.ordinal(), "2026/10/16 9:00");
+    cells.set(OrderImportColumn.PAY_TIME.ordinal(), "2026/10/16 9:05:07");
+    assertThat(processor.process(cells)).isEmpty();
+    ArgumentCaptor<OrderPayloadDTO> cap = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer).save(cap.capture());
+    assertThat(cap.getValue().order().getOrderTime()).isNotNull();
+    assertThat(cap.getValue().order().getPayTime()).isNotNull();
+  }
 }

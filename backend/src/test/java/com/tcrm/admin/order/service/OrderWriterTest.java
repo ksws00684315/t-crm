@@ -3,6 +3,7 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -263,5 +264,64 @@ class OrderWriterTest {
     when(orders.selectOne(any())).thenReturn(null);
     assertThat(writer.saveImportedRefund(5L, "missing", "", new RefundDO())).isFalse();
     verify(refunds, never()).insert(any(RefundDO.class));
+  }
+
+  @Test
+  void shouldDeleteImportOnlyLines_whenApiSyncReplacesSource2() {
+    var existing = order();
+    existing.setSource(2);
+    var importLine = item(20, "line-imported", "old");
+    importLine.setPayAmount(new BigDecimal("10.00"));
+    var apiLine = item(99, "wd-sub-1", "sku");
+    apiLine.setWeidianItemId("90");
+    apiLine.setItemName("API item");
+    apiLine.setSkuName("");
+    apiLine.setQuantity(1);
+    apiLine.setPayAmount(new BigDecimal("10.00"));
+    apiLine.setRefundAmount(BigDecimal.ZERO);
+    var next = order();
+    next.setId(null);
+    next.setTenantId(null);
+    next.setSource(1);
+    next.setPayAmount(new BigDecimal("10.00"));
+    when(orders.selectOne(any())).thenReturn(existing);
+    // previous items, then remaining after delete
+    when(items.selectList(any())).thenReturn(List.of(importLine), List.of(apiLine));
+    var linkedRefund = new RefundDO();
+    linkedRefund.setId(70L);
+    linkedRefund.setOrderItemId(20L);
+    when(refunds.selectList(any())).thenReturn(List.of(linkedRefund));
+
+    writer.save(new OrderPayloadDTO(next, List.of(apiLine)));
+
+    verify(items).insert(apiLine);
+    verify(items).deleteById(20L);
+    assertThat(linkedRefund.getOrderItemId()).isNull();
+    verify(refunds).updateById(linkedRefund);
+    verify(attribution).apply(eq(next), eq(List.of(apiLine)), eq(false));
+  }
+
+  @Test
+  void shouldKeepImportLines_whenSavingAnotherImportSource2() {
+    var existing = order();
+    existing.setSource(2);
+    var old = item(20, "line-a", "sku");
+    var nextLine = item(99, "line-b", "sku");
+    nextLine.setWeidianItemId("91");
+    nextLine.setItemName("B");
+    nextLine.setSkuName("");
+    nextLine.setQuantity(1);
+    nextLine.setPayAmount(new BigDecimal("5.00"));
+    nextLine.setRefundAmount(BigDecimal.ZERO);
+    var next = order();
+    next.setId(null);
+    next.setSource(2);
+    when(orders.selectOne(any())).thenReturn(existing);
+    when(items.selectList(any())).thenReturn(List.of(old), List.of(old, nextLine));
+
+    writer.save(new OrderPayloadDTO(next, List.of(nextLine)));
+
+    verify(items).insert(nextLine);
+    verify(items, never()).deleteById(anyLong());
   }
 }
