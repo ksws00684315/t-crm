@@ -37,6 +37,7 @@ import {
 } from "@/utils/sidebar";
 import LockScreen from "./LockScreen.vue";
 import MenuSearch from "./MenuSearch.vue";
+import NotificationBell from "./NotificationBell.vue";
 import ReauthDialog from "./ReauthDialog.vue";
 import SideMenu from "./SideMenu.vue";
 import TabBar from "./TabBar.vue";
@@ -295,6 +296,7 @@ onBeforeUnmount(() => {
           >
             <span class="layout__label">{{ t(`theme.${theme.mode}`) }}</span>
           </el-button>
+          <NotificationBell v-if="!access.isPlatformAdmin" />
           <LocaleSwitch />
           <el-dropdown
             v-if="company.switchable.value"

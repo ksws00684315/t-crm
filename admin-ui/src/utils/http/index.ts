@@ -88,7 +88,8 @@ function toApiError(status: number, body: unknown): ApiError {
       status,
       errorCode: body.errorCode,
       traceId: body.traceId,
-      fields: body.errorCode === "COMMON_VALIDATION_FAILED" ? fieldNames(body.data) : []
+      fields: body.errorCode === "COMMON_VALIDATION_FAILED" ? fieldNames(body.data) : [],
+      payload: body.data
     });
   }
   // Not an envelope (proxy error page, gateway timeout, ...).
@@ -111,6 +112,9 @@ export function createHttp(options: HttpOptions): Http {
     config.headers.set("Accept-Language", options.getLanguage());
     const companyId = options.getCompanyId?.() ?? null;
     if (companyId) config.headers.set(COMPANY_HEADER, companyId);
+    // axios serializes FormData to JSON while the JSON default is set; without it the browser
+    // sends multipart/form-data with its boundary.
+    if (config.data instanceof FormData) config.headers.setContentType(false);
     return config;
   });
 

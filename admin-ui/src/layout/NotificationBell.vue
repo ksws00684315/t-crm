@@ -1,0 +1,189 @@
+<script setup lang="ts">
+import { Avatar, Bell, Switch, Wallet, Warning } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  unreadNotificationCount,
+  type NotificationType,
+  type NotificationVO
+} from "@/api/notification/notification";
+import { useVisibilityPolling } from "@/composables/useVisibilityPolling";
+import { useUserStore } from "@/stores/user";
+import { notifyError } from "@/utils/notify";
+import {
+  canOpenNotification,
+  notificationHref,
+  notificationText,
+  relativeNotificationTime,
+  unreadBadge
+} from "@/utils/notification";
+import { accessOf } from "@/utils/permission";
+
+const { t } = useI18n();
+const router = useRouter();
+const user = useUserStore();
+const access = computed(() => accessOf(user.user));
+
+const count = ref(0);
+const items = ref<NotificationVO[]>([]);
+const open = ref(false);
+
+const badge = computed(() => unreadBadge(count.value));
+
+const icons: Record<NotificationType, typeof Wallet> = {
+  PAYOUT_ACCOUNT_SUBMITTED: Wallet,
+  ORDER_SYNC_FAILED: Warning,
+  BD_TRANSFER_CANCELLED: Switch,
+  KOLS_UNASSIGNED: Avatar
+};
+
+async function refreshCount() {
+  count.value = await unreadNotificationCount();
+}
+
+async function refreshList() {
+  const page = await listNotifications(1, 10, false);
+  items.value = page.items;
+}
+
+async function refresh() {
+  await Promise.all([refreshCount(), open.value ? refreshList() : Promise.resolve()]);
+}
+
+useVisibilityPolling(() => refresh().catch(() => undefined));
+
+async function onOpen() {
+  open.value = true;
+  try {
+    await refreshList();
+  } catch (error) {
+    notifyError(error);
+  }
+}
+
+function onHide() {
+  open.value = false;
+}
+
+async function markAll() {
+  try {
+    await markAllNotificationsRead();
+    count.value = 0;
+    items.value = items.value.map(item =>
+      item.readTime ? item : { ...item, readTime: new Date().toISOString() }
+    );
+  } catch (error) {
+    notifyError(error);
+  }
+}
+
+async function openItem(item: NotificationVO) {
+  if (!item.readTime) {
+    try {
+      await markNotificationRead(item.id);
+      item.readTime = new Date().toISOString();
+      count.value = Math.max(0, count.value - 1);
+    } catch (error) {
+      notifyError(error);
+      return;
+    }
+  }
+  if (!canOpenNotification(item.type, access.value)) {
+    ElMessage.warning(t("notification.noPermission"));
+    return;
+  }
+  await router.push(notificationHref(item));
+}
+</script>
+
+<template>
+  <el-popover trigger="click" placement="bottom-end" :width="360" @after-leave="onHide">
+    <template #reference>
+      <el-badge
+        :value="badge ?? undefined"
+        :hidden="badge === null"
+        data-test="notification-badge"
+        @click="onOpen"
+      >
+        <el-button text data-test="notification-bell" :aria-label="t('notification.open')">
+          <el-icon><Bell /></el-icon>
+        </el-button>
+      </el-badge>
+    </template>
+    <div class="notification-bell__panel">
+      <p v-if="items.length === 0" class="notification-bell__empty">
+        {{ t("notification.empty") }}
+      </p>
+      <button
+        v-for="item in items"
+        :key="item.id"
+        type="button"
+        class="notification-bell__item"
+        :class="{ 'notification-bell__item--unread': !item.readTime }"
+        data-test="notification-item"
+        @click="openItem(item)"
+      >
+        <el-icon><component :is="icons[item.type]" /></el-icon>
+        <span class="notification-bell__text">{{ notificationText(item) }}</span>
+        <span class="notification-bell__time">{{ relativeNotificationTime(item.createTime) }}</span>
+      </button>
+      <div class="notification-bell__footer">
+        <el-button text data-test="notification-mark-all" @click="markAll">
+          {{ t("notification.markAll") }}
+        </el-button>
+        <el-button text data-test="notification-view-all" @click="router.push('/notifications')">
+          {{ t("notification.viewAll") }}
+        </el-button>
+      </div>
+    </div>
+  </el-popover>
+</template>
+
+<style scoped>
+.notification-bell__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-2);
+}
+
+.notification-bell__empty {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+}
+
+.notification-bell__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--tcrm-space-1) var(--tcrm-space-2);
+  padding: var(--tcrm-space-2);
+  border: 0;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.notification-bell__item--unread {
+  font-weight: 600;
+}
+
+.notification-bell__text {
+  grid-column: 2;
+}
+
+.notification-bell__time {
+  grid-column: 2;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
+
+.notification-bell__footer {
+  display: flex;
+  justify-content: space-between;
+}
+</style>

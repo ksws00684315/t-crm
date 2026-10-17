@@ -118,6 +118,7 @@ describe("buildMenu", () => {
     expect(titles(superAdmin)).toEqual([
       "首页",
       "达人管理",
+      "转移记录",
       "商品",
       "店铺管理",
       "原商品",
@@ -133,6 +134,7 @@ describe("buildMenu", () => {
     expect(paths).toEqual([
       "/home",
       "/kol/kols",
+      "/kol/bd-transfers",
       "/product/shops",
       "/product/products",
       "/product/kol-items",
@@ -179,6 +181,15 @@ describe("canAccessRoute", () => {
     expect(canAccessRoute({ permission: "kol:view" }, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({}, accessOf(platformAdmin))).toBe(false);
     expect(canAccessRoute({ hideInMenu: true }, accessOf(platformAdmin))).toBe(true);
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(platformAdmin))
+    ).toBe(false);
+    expect(canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(superAdmin))).toBe(
+      true
+    );
+    expect(
+      canAccessRoute({ hideInMenu: true, companyAccount: true }, accessOf(staff("ALL", [])))
+    ).toBe(true);
     expect(canAccessRoute({}, accessOf(staff("ALL", [])))).toBe(true);
   });
 });

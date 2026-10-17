@@ -270,6 +270,42 @@ describe("KOL list page", () => {
     conflict.unmount();
   });
 
+  it("offers the batch transfer to the super administrator with the selection as the target", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const other = { ...row, id: "9007199254740994", kolCode: "KOL0002" };
+    const wrapper = await mountPage("2", [row, other]);
+    const button = wrapper.get('[data-test="transfer-bd"]');
+    expect(button.attributes("disabled")).toBeDefined();
+    wrapper
+      .findComponent({ name: "DataTable" })
+      .vm.$emit("selectionChange", [row as object, other as object]);
+    await nextTick();
+    expect(button.attributes("disabled")).toBeUndefined();
+    await button.trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "BdTransferDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("target")).toEqual({ kolIds: [row.id, other.id] });
+    wrapper.unmount();
+  });
+
+  it("opens the same transfer dialog from a row and hides it from staff", async () => {
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+    const staffView = await mountPage();
+    expect(staffView.find('[data-test="transfer-bd"]').exists()).toBe(false);
+    expect(staffView.find('[data-test="change-bd"]').exists()).toBe(false);
+    staffView.unmount();
+
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="change-bd"]').trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "BdTransferDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("target")).toEqual({ kolIds: [row.id] });
+    wrapper.unmount();
+  });
+
   it("shows the registration link only with kol:register-link and rotates it after confirmation", async () => {
     signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
     const writer = await mountPage();
