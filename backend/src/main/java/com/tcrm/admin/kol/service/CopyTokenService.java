@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,6 +52,7 @@ public class CopyTokenService implements CopyTokenApi {
   private final CopyTokenPlaintexts plaintexts;
   private final Clock clock;
 
+  @Autowired
   public CopyTokenService(
       KolCopyTokenMapper tokens,
       KolApi kols,
