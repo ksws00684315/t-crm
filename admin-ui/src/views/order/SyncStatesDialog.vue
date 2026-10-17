@@ -32,13 +32,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "enabled", label: t("order.syncEnabled"), width: 90 },
   { key: "authorized", label: t("order.syncAuthorized"), width: 90 },
   { key: "lastSuccessAt", label: t("order.syncLastSuccess"), width: 170, mono: true },
-  {
-    key: "lastError",
-    label: t("order.syncLastError"),
-    prop: "lastError",
-    minWidth: 180,
-    tooltip: true
-  },
+  { key: "lastError", label: t("order.syncLastError"), minWidth: 120 },
   { key: "actions", label: t("common.actions"), width: 110 }
 ]);
 
@@ -113,6 +107,16 @@ function close() {
       </template>
       <template #cell-lastSuccessAt="{ row }">
         {{ formatInstant(asState(row).lastSuccessAt) }}
+      </template>
+      <template #cell-lastError="{ row }">
+        <el-tooltip
+          v-if="asState(row).lastError"
+          :content="asState(row).lastError ?? ''"
+          placement="top"
+        >
+          <el-tag type="danger" data-test="sync-error">{{ t("order.syncFailed") }}</el-tag>
+        </el-tooltip>
+        <span v-else>-</span>
       </template>
       <template #actions="{ row }">
         <el-button

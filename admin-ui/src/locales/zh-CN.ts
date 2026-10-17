@@ -698,6 +698,7 @@ const zhCN = {
     syncUnauthorized: "未授权",
     syncLastSuccess: "最近成功时间",
     syncLastError: "最近错误",
+    syncFailed: "同步失败",
     syncNow: "立即同步",
     syncStarted: "已开始同步",
     importOrders: "导入订单",

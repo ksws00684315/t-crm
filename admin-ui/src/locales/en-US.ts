@@ -704,6 +704,7 @@ const enUS: MessageSchema = {
     syncUnauthorized: "Not authorized",
     syncLastSuccess: "Last success",
     syncLastError: "Last error",
+    syncFailed: "Sync failed",
     syncNow: "Sync now",
     syncStarted: "Synchronization started",
     importOrders: "Import orders",
