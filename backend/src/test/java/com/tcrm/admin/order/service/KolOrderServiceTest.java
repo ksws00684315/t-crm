@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
@@ -99,6 +100,58 @@ class KolOrderServiceTest {
                         1,
                         20)))
         .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldRejectUnknownStatusAndOutOfRangePage() {
+    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, "SETTLED", 1, 20)))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 0, 20)))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 1, 0)))
+        .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldReturnAnEmptyPageWithoutReadingLines_whenNothingMatches() {
+    when(orders.selectPage(any(), any())).thenReturn(page());
+
+    var result =
+        service.page(
+            new KolOrderFilterDTO(
+                Instant.parse("2026-10-01T00:00:00Z"),
+                Instant.parse("2026-10-02T00:00:00Z"),
+                "PAID",
+                2,
+                10));
+
+    assertThat(result.items()).isEmpty();
+    assertThat(result.page()).isEqualTo(2);
+    assertThat(result.size()).isEqualTo(10);
+    verifyNoInteractions(items);
+  }
+
+  @Test
+  void shouldReportZeroAmounts_whenLineAmountsAreMissing() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+    OrderItemDO line = item(21L, 700L, "1.00", "0.00");
+    line.setPayAmount(null);
+    line.setRefundAmount(null);
+    when(items.selectList(any())).thenReturn(List.of(line));
+
+    var row = service.page(new KolOrderFilterDTO(null, null, null, 1, 20)).items().getFirst();
+
+    assertThat(row.payAmount()).isEqualByComparingTo("0.00");
+    assertThat(row.refundAmount()).isEqualByComparingTo("0.00");
+    assertThat(row.items().getFirst().payAmount()).isEqualTo(new BigDecimal("0.00"));
+  }
+
+  @Test
+  void shouldMaskMissingOrderNumbersAsEmpty() {
+    assertThat(KolOrderService.maskOrderNo(null)).isEmpty();
+    assertThat(KolOrderService.maskOrderNo(" ")).isEmpty();
+    assertThat(KolOrderService.maskOrderNo("1")).isEqualTo("1");
   }
 
   private static KolAccountDTO kol() {
