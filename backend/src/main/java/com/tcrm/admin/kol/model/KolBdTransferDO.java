@@ -19,6 +19,7 @@ public class KolBdTransferDO extends BaseEntity {
   private BdTransferStatus status;
   private Instant executedAt;
   private String cancelReason;
+  private String reason;
 
   public Long getTenantId() {
     return tenantId;
@@ -82,5 +83,13 @@ public class KolBdTransferDO extends BaseEntity {
 
   public void setCancelReason(String value) {
     this.cancelReason = value;
+  }
+
+  public String getReason() {
+    return reason;
+  }
+
+  public void setReason(String value) {
+    this.reason = value;
   }
 }

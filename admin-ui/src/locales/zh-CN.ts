@@ -150,6 +150,7 @@ const zhCN = {
     home: "首页",
     tenants: "公司管理",
     kols: "达人管理",
+    bdTransfers: "转移记录",
     products: "商品",
     shops: "店铺管理",
     product: "原商品",
@@ -159,7 +160,8 @@ const zhCN = {
     auditLogs: "操作日志",
     password: "修改密码",
     forbidden: "无权访问",
-    notFound: "页面不存在"
+    notFound: "页面不存在",
+    notifications: "站内消息"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试",
@@ -447,6 +449,8 @@ const zhCN = {
     resetDone: "密码已重置，该用户需使用新密码重新登录",
     confirmDisable: "确定要停用用户 {username} 吗？",
     confirmEnable: "确定要启用用户 {username} 吗？",
+    disableBdEffect:
+      "停用后，其名下 {n} 位达人将立即转为未分配（归公司），转给他的预约转移将被取消。",
     disableTitle: "停用用户",
     enableTitle: "启用用户",
     disabled: "已停用",
@@ -549,11 +553,55 @@ const zhCN = {
     startedAt: "开始时间",
     endedAt: "结束时间",
     current: "当前",
-    changeBdTitle: "更换商务",
-    changeBdSummary: "达人 {code}（{name}），当前商务：{bd}",
-    changeBdPlaceholder: "不选择则改为未分配",
-    changeBdDone: "负责商务已更新",
     bdOption: "{nickname}（{username}）"
+  },
+  bdTransfer: {
+    action: "转移商务",
+    title: "转移商务",
+    target: "转移对象",
+    selectedKols: "已选 {n} 位达人",
+    bdAllKols: "商务 {name} 名下全部达人（当前 {n} 位）",
+    newBd: "新商务",
+    newBdPlaceholder: "请选择新商务",
+    newBdRequired: "请选择新商务",
+    unassigned: "未分配（归公司）",
+    effectiveTime: "生效时间",
+    now: "立即",
+    at: "指定时间",
+    pickTimePlaceholder: "选择日期时间",
+    timezoneHint: "时区：{timezone}（UTC{offset}）",
+    pickTime: "请选择生效时间",
+    timeFuture: "生效时间必须晚于当前时间",
+    timeRange: "生效时间需在一年以内",
+    reason: "原因",
+    reasonPlaceholder: "可选，最多 255 字",
+    tooMany: "一次最多转移 {max} 位达人",
+    success: "立即完成 {immediate} 位，预约 {scheduled} 位，跳过 {skipped} 位（已属于新商务）",
+    conflicts: "以下达人已有预约转移，请先取消：",
+    transferKols: "转移名下达人",
+    noKols: "名下没有达人",
+    kol: "达人",
+    kolCodePlaceholder: "如 KOL0001",
+    fromBd: "来源商务",
+    toBd: "目标商务",
+    effectiveAt: "约定生效时间",
+    executedAt: "实际执行时间",
+    cancelReason: "取消原因",
+    cancelTitle: "取消预约",
+    cancelConfirm: "确定取消达人 {code} 的这条预约转移吗？",
+    cancelled: "已取消预约",
+    status: {
+      SCHEDULED: "预约中",
+      DONE: "已完成",
+      CANCELLED: "已取消"
+    },
+    cancelReasons: {
+      OWNERSHIP_CHANGED: "执行时归属已变化",
+      TARGET_UNAVAILABLE: "目标商务不可用",
+      TARGET_DISABLED: "目标商务已停用",
+      REPLACED_BY_IMMEDIATE: "被立即转移取代",
+      MANUAL: "手动取消"
+    }
   },
   linkTemplate: {
     hint: "本公司全部代购平台模板，含已停用，按排序显示。",
@@ -693,6 +741,28 @@ const zhCN = {
     uri: "请求地址",
     ip: "IP",
     cost: "耗时(ms)"
+  },
+  notification: {
+    open: "站内消息",
+    markAll: "全部已读",
+    viewAll: "查看全部",
+    unread: "未读",
+    empty: "暂无消息",
+    noPermission: "你没有查看该页面的权限",
+    justNow: "刚刚",
+    minutes: "{n} 分钟前",
+    hours: "{n} 小时前",
+    days: "{n} 天前",
+    type: {
+      PAYOUT_ACCOUNT_SUBMITTED: "达人 {kolCode} 提交了 {accountType} 收款账户，待审核",
+      ORDER_SYNC_FAILED: "店铺 {shopName} 的订单同步失败",
+      BD_TRANSFER_CANCELLED: "达人 {kolCode} 的预约转移已取消：{reason}",
+      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配"
+    },
+    reason: {
+      OWNERSHIP_CHANGED: "执行时归属已变化",
+      TARGET_UNAVAILABLE: "目标商务不可用"
+    }
   }
 };
 

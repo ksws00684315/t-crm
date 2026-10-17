@@ -179,6 +179,7 @@ class SystemIT {
             "crm_kol_item:NO",
             "crm_kol_register_code:NO",
             "crm_link_template:NO",
+            "crm_notification:NO",
             "crm_order:NO",
             "crm_order_item:NO",
             "crm_order_sync_state:NO",

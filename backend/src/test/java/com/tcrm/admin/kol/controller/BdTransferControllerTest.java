@@ -114,11 +114,16 @@ class BdTransferControllerTest {
                     new BdTransferDTO(
                         9007199254740993L,
                         11L,
+                        "KOL0001",
+                        "Alice",
                         5L,
+                        "Source",
+                        null,
                         null,
                         Instant.parse("2026-11-01T00:00:00Z"),
                         BdTransferStatus.SCHEDULED,
                         null,
+                        "handover",
                         null,
                         Instant.parse("2026-10-16T00:00:00Z"))),
                 1,
@@ -129,7 +134,13 @@ class BdTransferControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("1"))
         .andExpect(jsonPath("$.data.items[0].id").value("9007199254740993"))
-        .andExpect(jsonPath("$.data.items[0].effectiveAt").value("2026-11-01T00:00:00Z"));
+        .andExpect(jsonPath("$.data.items[0].effectiveAt").value("2026-11-01T00:00:00Z"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.items[0].kolName").value("Alice"))
+        .andExpect(jsonPath("$.data.items[0].fromBdUserName").value("Source"))
+        .andExpect(
+            jsonPath("$.data.items[0].toBdUserName").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.items[0].reason").value("handover"));
   }
 
   @Test

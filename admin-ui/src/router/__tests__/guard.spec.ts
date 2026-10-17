@@ -168,10 +168,12 @@ describe("installGuard with the real route table", () => {
       ["home", null, false, false, false],
       ["platform/tenants", null, false, true, false],
       ["kol/kols", "kol:view", false, false, false],
+      ["kol/bd-transfers", null, true, false, false],
       ["product", null, false, false, false],
       ["system/users", null, true, false, false],
       ["system/link-templates", null, true, false, false],
       ["system/oper-logs", null, true, false, false],
+      ["notifications", null, false, false, false],
       ["account/password", null, false, false, false],
       ["403", null, false, false, false]
     ]);
