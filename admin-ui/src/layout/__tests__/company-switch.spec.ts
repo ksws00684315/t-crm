@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "@/api/auth";
+import * as notificationApi from "@/api/notification/notification";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
@@ -16,6 +17,7 @@ import { THEME_STORAGE_KEY } from "@/utils/theme";
 import Layout from "../index.vue";
 
 vi.mock("@/api/auth");
+vi.mock("@/api/notification/notification");
 
 const messages = {} as Record<"success" | "error", ReturnType<typeof vi.spyOn>>;
 
@@ -96,6 +98,8 @@ describe("header company switch", () => {
     messages.error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
     vi.mocked(authApi.switchCompany).mockReset();
     vi.mocked(authApi.fetchCurrentUser).mockReset();
+    vi.mocked(notificationApi.unreadNotificationCount).mockReset().mockResolvedValue(0);
+    vi.mocked(notificationApi.listNotifications).mockReset();
   });
 
   afterEach(() => {
@@ -213,6 +217,19 @@ describe("header company switch", () => {
     expect(store.user?.tenantId).toBe("1");
     expect(router.currentRoute.value.path).toBe("/system/users");
     expect(companyDropdown(wrapper)).toBeUndefined();
+  });
+
+  it("reloads the notification unread count right after the company changes", async () => {
+    const { wrapper } = await mountAs(inA);
+    expect(notificationApi.unreadNotificationCount).toHaveBeenCalledTimes(1);
+    vi.mocked(authApi.switchCompany).mockResolvedValue(inB);
+    vi.mocked(notificationApi.unreadNotificationCount).mockResolvedValue(4);
+
+    companyDropdown(wrapper)!.vm.$emit("command", "2");
+    await flushPromises();
+
+    expect(notificationApi.unreadNotificationCount).toHaveBeenCalledTimes(2);
+    expect(wrapper.get('[data-test="notification-badge"]').text()).toContain("4");
   });
 
   it("closes the channel when the layout goes away", async () => {

@@ -296,7 +296,8 @@ onBeforeUnmount(() => {
           >
             <span class="layout__label">{{ t(`theme.${theme.mode}`) }}</span>
           </el-button>
-          <NotificationBell v-if="!access.isPlatformAdmin" />
+          <!-- Keyed by company: a switch rebuilds the bell and it reloads the unread count at once. -->
+          <NotificationBell v-if="!access.isPlatformAdmin" :key="company.currentId.value ?? ''" />
           <LocaleSwitch />
           <el-dropdown
             v-if="company.switchable.value"
