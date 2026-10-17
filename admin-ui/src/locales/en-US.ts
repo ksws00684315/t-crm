@@ -154,6 +154,8 @@ const enUS: MessageSchema = {
     orders: "Orders",
     orderList: "Order List",
     orderUnmatched: "Matching Pool",
+    fund: "Funds",
+    payoutAccounts: "Payout account review",
     users: "Users",
     linkTemplates: "Agent templates",
     auditLogs: "Audit Log",
@@ -834,6 +836,41 @@ const enUS: MessageSchema = {
     uri: "Request URL",
     ip: "IP",
     cost: "Duration (ms)"
+  },
+  /** Task 15b: payout account review. */
+  payout: {
+    kol: "Creator",
+    kolCode: "Creator code",
+    type: "Type",
+    typeOption: {
+      PAYPAL: "PayPal",
+      USDT: "USDT"
+    },
+    account: "Account (masked)",
+    fullAccount: "Full account",
+    holder: "Receiver",
+    status: {
+      PENDING: "Under review",
+      APPROVED: "Approved",
+      REJECTED: "Rejected",
+      DISABLED: "Disabled"
+    },
+    defaultColumn: "Default",
+    submittedAt: "Submitted",
+    reviewedAt: "Reviewed",
+    detailTitle: "Payout account detail",
+    auditNote: "Opening the detail is recorded in the audit log.",
+    qr: "Payment QR code",
+    qrUnavailable: "Image failed to load",
+    approve: "Approve",
+    approveConfirm:
+      "Approve this payout account? The creator will not be able to change it afterwards.",
+    approved: "Approved.",
+    reject: "Reject",
+    rejectPlaceholder: "Enter the rejection reason (required, up to 255 characters)",
+    rejectReason: "Rejection reason",
+    rejectReasonRule: "Enter a rejection reason of up to 255 characters.",
+    rejected: "Rejected."
   },
   notification: {
     open: "Notifications",

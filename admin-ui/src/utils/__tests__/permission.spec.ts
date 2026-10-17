@@ -127,6 +127,8 @@ describe("buildMenu", () => {
       "订单",
       "订单列表",
       "人工匹配池",
+      "资金",
+      "收款账户审核",
       "用户管理",
       "代购平台模板",
       "操作日志"
@@ -144,6 +146,7 @@ describe("buildMenu", () => {
       "/product/kol-items",
       "/order/orders",
       "/order/unmatched",
+      "/fund/payout-accounts",
       "/system/users",
       "/system/link-templates",
       "/system/oper-logs"
@@ -164,6 +167,16 @@ describe("buildMenu", () => {
       "对应关系"
     ]);
     expect(titles(staff("OWN", ["product:view"]))).toEqual(["首页", "商品", "店铺管理", "原商品"]);
+  });
+
+  it("shows the payout-account review to either of its two permission codes", () => {
+    const expected = ["首页", "资金", "收款账户审核"];
+    expect(titles(staff("ALL", ["payout-account:review"]))).toEqual(expected);
+    expect(titles(staff("OWN", ["commission:view"]))).toEqual(expected);
+  });
+
+  it("hides the payout-account review without either permission code", () => {
+    expect(titles(staff("ALL", ["kol:view"]))).not.toContain("资金");
   });
 
   it("shows the order list but not the matching pool without order:manage", () => {
@@ -189,6 +202,21 @@ describe("canAccessRoute", () => {
     expect(canAccessRoute(mapping, accessOf(staff("ALL", [])))).toBe(false);
     expect(canAccessRoute({ superAdmin: true }, accessOf(staff("ALL", ["kol:view"])))).toBe(false);
     expect(canAccessRoute({ superAdmin: true }, accessOf(superAdmin))).toBe(true);
+  });
+
+  it("treats an array permission as any-of and a single code as before", () => {
+    const review = {
+      permission: ["payout-account:review", "commission:view"] as const
+    };
+    expect(canAccessRoute(review, accessOf(staff("ALL", ["payout-account:review"])))).toBe(true);
+    expect(canAccessRoute(review, accessOf(staff("ALL", ["commission:view"])))).toBe(true);
+    expect(
+      canAccessRoute(review, accessOf(staff("ALL", ["payout-account:review", "commission:view"])))
+    ).toBe(true);
+    expect(canAccessRoute(review, accessOf(staff("ALL", ["kol:view"])))).toBe(false);
+    expect(canAccessRoute(review, accessOf(staff("ALL", [])))).toBe(false);
+    expect(canAccessRoute(review, accessOf(superAdmin))).toBe(true);
+    expect(canAccessRoute(review, accessOf(platformAdmin))).toBe(false);
   });
 
   it("limits platform administrators to platform pages and hidden account pages", () => {

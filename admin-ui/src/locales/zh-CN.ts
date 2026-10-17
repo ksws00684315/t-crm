@@ -158,6 +158,8 @@ const zhCN = {
     orders: "订单",
     orderList: "订单列表",
     orderUnmatched: "人工匹配池",
+    fund: "资金",
+    payoutAccounts: "收款账户审核",
     users: "用户管理",
     linkTemplates: "代购平台模板",
     auditLogs: "操作日志",
@@ -822,6 +824,40 @@ const zhCN = {
     uri: "请求地址",
     ip: "IP",
     cost: "耗时(ms)"
+  },
+  /** 任务 15b：收款账户审核。 */
+  payout: {
+    kol: "达人",
+    kolCode: "达人编号",
+    type: "类型",
+    typeOption: {
+      PAYPAL: "PayPal",
+      USDT: "USDT"
+    },
+    account: "账号（脱敏）",
+    fullAccount: "完整账号",
+    holder: "收款人",
+    status: {
+      PENDING: "待审核",
+      APPROVED: "已通过",
+      REJECTED: "已驳回",
+      DISABLED: "已停用"
+    },
+    defaultColumn: "默认",
+    submittedAt: "提交时间",
+    reviewedAt: "审核时间",
+    detailTitle: "收款账户详情",
+    auditNote: "查看详情会记录操作日志。",
+    qr: "收款二维码",
+    qrUnavailable: "图片加载失败",
+    approve: "通过",
+    approveConfirm: "确认通过该收款账户？通过后达人不能再修改。",
+    approved: "已通过。",
+    reject: "驳回",
+    rejectPlaceholder: "请填写驳回原因（必填，不超过 255 字）",
+    rejectReason: "驳回原因",
+    rejectReasonRule: "请填写驳回原因，不超过 255 字。",
+    rejected: "已驳回。"
   },
   notification: {
     open: "站内消息",

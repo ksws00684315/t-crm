@@ -136,6 +136,29 @@ export const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: "fund",
+        name: "FundGroup",
+        redirect: "/fund/payout-accounts",
+        meta: {
+          title: "route.fund",
+          icon: "Wallet",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "payout-accounts",
+            name: "PayoutAccountReview",
+            component: () => import("@/views/fund/payout-account/index.vue"),
+            meta: {
+              title: "route.payoutAccounts",
+              // Either code opens the page; the review drawer itself needs payout-account:review.
+              permission: ["payout-account:review", "commission:view"],
+              componentName: "PayoutAccountReviewPage"
+            }
+          }
+        ]
+      },
+      {
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),

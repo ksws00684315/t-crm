@@ -171,6 +171,7 @@ describe("installGuard with the real route table", () => {
       ["kol/bd-transfers", null, true, false, false],
       ["product", null, false, false, false],
       ["order", null, false, false, false],
+      ["fund", null, false, false, false],
       ["system/users", null, true, false, false],
       ["system/link-templates", null, true, false, false],
       ["system/oper-logs", null, true, false, false],
@@ -200,6 +201,11 @@ describe("installGuard with the real route table", () => {
     ).toEqual([
       ["orders", "order:view", false],
       ["unmatched", "order:manage", false]
+    ]);
+    // The payout-account review accepts either of its two codes (task 15b §4.2.1).
+    const fund = layout?.children?.find(route => route.path === "fund");
+    expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
+      ["payout-account:review", "commission:view"]
     ]);
     for (const route of layout?.children ?? []) {
       expect(route.meta).not.toHaveProperty("roles");
