@@ -15,6 +15,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { formatInstant } from "@/utils/format";
+import { bdTransferCancelCode } from "@/utils/bd-transfer";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { readPageSize } from "@/utils/table-prefs";
@@ -30,6 +31,13 @@ const loading = ref(false);
 const rows = ref<BdTransferVO[]>([]);
 const total = ref(0);
 const bdUsers = ref<BdUserVO[]>([]);
+
+/** Known cancel reasons come from the language pack; anything else is shown as stored. */
+function cancelReasonText(reason: string | null): string {
+  if (!reason) return "-";
+  const code = bdTransferCancelCode(reason);
+  return code ? t(`bdTransfer.cancelReasons.${code}`) : reason;
+}
 
 /** Query params `status` and `kolCode` arrive from notification links (task 20). */
 function filtersFromRoute() {
@@ -202,10 +210,15 @@ async function cancelScheduled(row: BdTransferVO) {
   }
 }
 
-/** One path one tab, but notification links change the query on an already cached page. */
+/**
+ * One path one tab, but notification links change the query on an already cached page. The
+ * route is global, so a cached page would also see the query vanish when the user opens another
+ * page; only react while this page is the current route.
+ */
 watch(
   () => [route.query.status, route.query.kolCode],
   () => {
+    if (route.name !== "KolBdTransfers") return;
     const fromRoute = filtersFromRoute();
     query.kolCode = fromRoute.kolCode;
     query.status = fromRoute.status;
@@ -327,7 +340,9 @@ onMounted(() => {
         formatInstant(asTransfer(row).executedAt)
       }}</template>
       <template #cell-reason="{ row }">{{ asTransfer(row).reason || "-" }}</template>
-      <template #cell-cancelReason="{ row }">{{ asTransfer(row).cancelReason || "-" }}</template>
+      <template #cell-cancelReason="{ row }">{{
+        cancelReasonText(asTransfer(row).cancelReason)
+      }}</template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asTransfer(row).createTime) }}</template>
       <template #actions="{ row }">
         <el-button

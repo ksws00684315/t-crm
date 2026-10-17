@@ -142,6 +142,27 @@ describe("user management page", () => {
     expect(kolApi.listKols).toHaveBeenCalledWith({ bdUserId: "2", page: 1, size: 1 });
   });
 
+  it("shows the list before the creator counts arrive and updates the row once they do", async () => {
+    type CountPage = { items: never[]; total: string; page: number; size: number };
+    let resolveCount: (value: CountPage) => void = () => {};
+    vi.mocked(kolApi.listKols).mockReturnValue(
+      new Promise<CountPage>(resolve => {
+        resolveCount = resolve;
+      })
+    );
+    const wrapper = await mountPage();
+    // The users request is done while the count request is still pending: no loading mask,
+    // the row is on screen and the transfer action is not yet disabled.
+    expect(wrapper.findComponent({ name: "DataTable" }).props("loading")).toBe(false);
+    expect(wrapper.text()).toContain("alice");
+    expect(wrapper.get('[data-test="transfer-kols"]').attributes("disabled")).toBeUndefined();
+
+    resolveCount({ items: [], total: "0", page: 1, size: 1 });
+    await flushPromises();
+    expect(wrapper.get('[data-test="transfer-kols"]').attributes("disabled")).toBeDefined();
+    wrapper.unmount();
+  });
+
   it("explains the consequences when disabling a BD that owns creators", async () => {
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "3", page: 1, size: 1 });
     const wrapper = await mountPage();

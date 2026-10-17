@@ -594,6 +594,13 @@ const enUS: MessageSchema = {
       SCHEDULED: "Scheduled",
       DONE: "Done",
       CANCELLED: "Cancelled"
+    },
+    cancelReasons: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable",
+      TARGET_DISABLED: "The target BD was disabled",
+      REPLACED_BY_IMMEDIATE: "Replaced by an immediate transfer",
+      MANUAL: "Cancelled manually"
     }
   },
   linkTemplate: {

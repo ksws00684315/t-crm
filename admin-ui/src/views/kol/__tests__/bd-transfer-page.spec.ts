@@ -44,15 +44,19 @@ function page(items: BdTransferVO[] = [scheduled, done], total = "2") {
   return { items, total, page: 1, size: 20 };
 }
 
-async function mountPage(query: Record<string, string> = {}) {
-  vi.mocked(transferApi.listBdTransfers).mockResolvedValue(page());
+async function mountPage(query: Record<string, string> = {}, items?: BdTransferVO[]) {
+  vi.mocked(transferApi.listBdTransfers).mockResolvedValue(page(items));
   vi.mocked(bdApi.listBdUsers).mockResolvedValue([
     { id: "5", username: "bd5", nickname: "BD Five" },
     { id: "9", username: "bd9", nickname: "BD Nine" }
   ]);
+  // Same route name as the real table so the query watch can tell this page from others.
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: "/kol/bd-transfers", component: BdTransferPage }]
+    routes: [
+      { path: "/kol/bd-transfers", name: "KolBdTransfers", component: BdTransferPage },
+      { path: "/kol/kols", name: "KolList", component: { template: "<div />" } }
+    ]
   });
   await router.push({ path: "/kol/bd-transfers", query });
   await router.isReady();
@@ -132,6 +136,43 @@ describe("BD transfer records page", () => {
       expect.objectContaining({ status: "DONE", page: 1 })
     );
     wrapper.unmount();
+  });
+
+  it("ignores the query vanishing when another page becomes current (kept-alive page)", async () => {
+    const { wrapper, router } = await mountPage({ status: "SCHEDULED", kolCode: "KOL0001" });
+    vi.mocked(transferApi.listBdTransfers).mockClear();
+    await router.push({ path: "/kol/kols" });
+    await flushPromises();
+    expect(transferApi.listBdTransfers).not.toHaveBeenCalled();
+    // The filters typed on this page are kept for when the user comes back.
+    expect(wrapper.text()).toContain("达人编号：KOL0001");
+    wrapper.unmount();
+  });
+
+  it("shows known cancel reasons from the language pack and unknown ones as stored", async () => {
+    const cancelled: BdTransferVO = {
+      ...scheduled,
+      id: "30",
+      status: "CANCELLED",
+      cancelReason: "手动取消"
+    };
+    const unknown: BdTransferVO = {
+      ...scheduled,
+      id: "31",
+      status: "CANCELLED",
+      cancelReason: "A reason this build does not know"
+    };
+    i18n.global.locale.value = "en-US";
+    try {
+      const { wrapper } = await mountPage({}, [cancelled, unknown]);
+      const text = wrapper.text();
+      expect(text).toContain("Cancelled manually");
+      expect(text).not.toContain("手动取消");
+      expect(text).toContain("A reason this build does not know");
+      wrapper.unmount();
+    } finally {
+      i18n.global.locale.value = "zh-CN";
+    }
   });
 
   it("searches by creator code typed in the filter", async () => {

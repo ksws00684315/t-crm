@@ -205,7 +205,8 @@ async function load() {
     });
     rows.value = page.items;
     total.value = Number(page.total);
-    await loadKolCounts(page.items);
+    // One request per BD row; the table shows at once and the counts fill in as they arrive.
+    void loadKolCounts(page.items);
   } catch (error) {
     notifyError(error);
   } finally {

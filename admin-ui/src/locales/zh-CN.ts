@@ -589,6 +589,13 @@ const zhCN = {
       SCHEDULED: "预约中",
       DONE: "已完成",
       CANCELLED: "已取消"
+    },
+    cancelReasons: {
+      OWNERSHIP_CHANGED: "执行时归属已变化",
+      TARGET_UNAVAILABLE: "目标商务不可用",
+      TARGET_DISABLED: "目标商务已停用",
+      REPLACED_BY_IMMEDIATE: "被立即转移取代",
+      MANUAL: "手动取消"
     }
   },
   linkTemplate: {
