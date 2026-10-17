@@ -11,6 +11,7 @@ import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { kolAbilities } from "@/utils/permission";
+import CopyTokenCreateDialog from "@/views/product/copy-token/CopyTokenCreateDialog.vue";
 import { formatRate } from "@/utils/rate";
 
 defineOptions({ name: "KolDetailDrawer" });
@@ -24,11 +25,17 @@ const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>
 const loading = ref(false);
 const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
+const copyTokenVisible = ref(false);
 
 const inviteVisible = computed(() => {
   const kol = detail.value;
   if (!kol || !kolAbilities(me.user).canWrite) return false;
   return kol.accountStatus === 0 && kol.registerSource === 1;
+});
+
+const copyTokenVisibleBtn = computed(() => {
+  const kol = detail.value;
+  return !!kol && kol.status === 1 && kolAbilities(me.user).canCopyToken;
 });
 
 watch(
@@ -161,6 +168,16 @@ const historyColumns = computed<DataColumn[]>(() => [
               {{ t("kol.invite") }}
             </el-button>
           </el-descriptions-item>
+          <el-descriptions-item v-if="copyTokenVisibleBtn" :label="t('copyToken.title')">
+            <el-button
+              type="primary"
+              link
+              data-test="detail-copy-token"
+              @click="copyTokenVisible = true"
+            >
+              {{ t("kol.generateCopyToken") }}
+            </el-button>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('kol.bd')">
             {{ detail.bdUserName ?? t("common.unassigned") }}
           </el-descriptions-item>
@@ -212,6 +229,12 @@ const historyColumns = computed<DataColumn[]>(() => [
         </DataTable>
       </template>
     </div>
+    <CopyTokenCreateDialog
+      v-if="detail"
+      v-model="copyTokenVisible"
+      :preset-kol-id="detail.id"
+      :preset-kol-label="`${detail.name} (${detail.kolCode})`"
+    />
   </el-drawer>
 </template>
 

@@ -80,7 +80,7 @@ const zhCN = {
     },
     "kol:copy-token": {
       name: "复制令牌",
-      desc: "为达人生成或作废复制令牌"
+      desc: "为达人生成、复制或作废复制令牌"
     },
     "product:view": {
       name: "查看商品",
@@ -156,6 +156,7 @@ const zhCN = {
     product: "原商品",
     mappings: "对应关系",
     sheetSources: "商品源表",
+    copyTokens: "复制令牌",
     orders: "订单",
     orderList: "订单列表",
     orderUnmatched: "人工匹配池",
@@ -230,6 +231,10 @@ const zhCN = {
     SHEET_SOURCE_DISABLED: "该源表已停用",
     SHEET_SOURCE_EMPTY: "源表中没有读到任何商品链接，请检查列设置",
     SHEET_SOURCE_TOO_LARGE: "源表超过 50,000 行商品，请拆分后再读取",
+    COPY_TOKEN_INVALID: "复制令牌无效或已作废",
+    COPY_TOKEN_EXPIRED: "复制令牌已过期",
+    COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
+    KOL_DISABLED: "达人已停用",
     SHOP_DISABLED: "店铺已停用，无法执行该操作",
     SHOP_NOT_FOUND: "店铺不存在",
     PRODUCT_NOT_FOUND: "原商品不存在",
@@ -582,6 +587,7 @@ const zhCN = {
     sourceSelf: "自助注册",
     invite: "发送邀请",
     inviteSent: "邀请邮件已发送",
+    generateCopyToken: "生成复制令牌",
     registerLink: "我的注册链接",
     registerLinkTitle: "我的注册链接",
     registerLinkHint: "把链接发给达人，达人注册后自动归属到你名下。",
@@ -680,6 +686,37 @@ const zhCN = {
     created: "已创建",
     disabled: "已停用",
     enabled: "已启用"
+  },
+
+  copyToken: {
+    title: "复制令牌",
+    hint: "令牌",
+    hintPlaceholder: "脱敏值模糊搜索",
+    kol: "达人",
+    kolPlaceholder: "按编号或名称搜索",
+    channel: "目标渠道",
+    shop: "目标店铺",
+    shopAuto: "自动分配",
+    usage: "使用量",
+    validMinutes: "有效分钟",
+    expiresAt: "过期时间",
+    lastUsedAt: "最近使用",
+    create: "生成令牌",
+    createTitle: "生成复制令牌",
+    resultTitle: "令牌已生成",
+    resultHint: "请立即复制保存。之后可在列表中再次复制。",
+    copyPlain: "复制令牌",
+    revoke: "作废",
+    revokeConfirm: "确定作废该令牌？作废后不可恢复。",
+    revokeDone: "令牌已作废",
+    copied: "已复制到剪贴板",
+    channelWeidian: "微店",
+    statusActive: "有效",
+    statusExhausted: "已用尽",
+    statusExpired: "已过期",
+    statusRevoked: "已作废",
+    quota: "额度",
+    defaultsNote: "额度与有效分钟未填时使用系统默认值"
   },
   sheetSource: {
     hint: "从 Google 在线表格读取原商品；Excel 导入作为兜底。表格中删掉的商品不会自动下架。",

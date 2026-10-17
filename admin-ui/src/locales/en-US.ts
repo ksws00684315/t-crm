@@ -76,7 +76,7 @@ const enUS: MessageSchema = {
     },
     "kol:copy-token": {
       name: "Copy tokens",
-      desc: "Issue or revoke a creator's copy token"
+      desc: "Issue, copy, or revoke a creator's copy token"
     },
     "product:view": {
       name: "View products",
@@ -152,6 +152,7 @@ const enUS: MessageSchema = {
     product: "Product",
     mappings: "Mappings",
     sheetSources: "Source sheets",
+    copyTokens: "Copy tokens",
     orders: "Orders",
     orderList: "Order List",
     orderUnmatched: "Matching Pool",
@@ -233,6 +234,10 @@ const enUS: MessageSchema = {
     SHEET_SOURCE_EMPTY:
       "No product links were found in the source sheet. Check the column settings.",
     SHEET_SOURCE_TOO_LARGE: "The source sheet has more than 50,000 product rows. Split it first.",
+    COPY_TOKEN_INVALID: "The copy token is invalid or revoked",
+    COPY_TOKEN_EXPIRED: "The copy token has expired",
+    COPY_TOKEN_QUOTA_EXCEEDED: "The copy token quota has been used up",
+    KOL_DISABLED: "The creator account is disabled",
     SHOP_DISABLED: "The shop is disabled and this action cannot be done.",
     SHOP_NOT_FOUND: "Shop not found.",
     PRODUCT_NOT_FOUND: "Product not found.",
@@ -594,6 +599,7 @@ const enUS: MessageSchema = {
     sourceSelf: "Self-registered",
     invite: "Send invite",
     inviteSent: "Invitation email sent.",
+    generateCopyToken: "Generate copy token",
     registerLink: "My registration link",
     registerLinkTitle: "My registration link",
     registerLinkHint: "Send this link to a creator. After they register, they are assigned to you.",
@@ -695,6 +701,37 @@ const enUS: MessageSchema = {
     created: "Created.",
     disabled: "Disabled.",
     enabled: "Enabled."
+  },
+
+  copyToken: {
+    title: "Copy tokens",
+    hint: "Token",
+    hintPlaceholder: "Search by masked value",
+    kol: "Creator",
+    kolPlaceholder: "Search by code or name",
+    channel: "Target channel",
+    shop: "Target shop",
+    shopAuto: "Auto-assign",
+    usage: "Usage",
+    validMinutes: "Valid minutes",
+    expiresAt: "Expires at",
+    lastUsedAt: "Last used",
+    create: "Generate token",
+    createTitle: "Generate copy token",
+    resultTitle: "Token generated",
+    resultHint: "Copy it now. You can reveal it again from the list later.",
+    copyPlain: "Copy token",
+    revoke: "Revoke",
+    revokeConfirm: "Revoke this token? This cannot be undone.",
+    revokeDone: "Token revoked",
+    copied: "Copied to clipboard",
+    channelWeidian: "Weidian",
+    statusActive: "Active",
+    statusExhausted: "Exhausted",
+    statusExpired: "Expired",
+    statusRevoked: "Revoked",
+    quota: "Quota",
+    defaultsNote: "Empty quota and valid minutes use system defaults"
   },
   sheetSource: {
     hint: "Original products are read from online Google Sheets; Excel import is the fallback. Products removed from a sheet are not taken off sale automatically.",

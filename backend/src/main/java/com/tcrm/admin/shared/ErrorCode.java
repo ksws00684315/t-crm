@@ -81,7 +81,11 @@ public enum ErrorCode {
   SHEET_SOURCE_READING(409, "This source sheet is already being read"),
   SHEET_SOURCE_DISABLED(409, "Source sheet is disabled"),
   SHEET_SOURCE_EMPTY(422, "No product rows were found in the source sheet"),
-  SHEET_SOURCE_TOO_LARGE(422, "Source sheet has more than 50,000 product rows");
+  SHEET_SOURCE_TOO_LARGE(422, "Source sheet has more than 50,000 product rows"),
+  COPY_TOKEN_INVALID(401, "Copy token is invalid or revoked"),
+  COPY_TOKEN_EXPIRED(401, "Copy token has expired"),
+  COPY_TOKEN_QUOTA_EXCEEDED(429, "Copy token quota has been used up"),
+  KOL_DISABLED(403, "Creator account is disabled");
   private final int status;
   private final String message;
 

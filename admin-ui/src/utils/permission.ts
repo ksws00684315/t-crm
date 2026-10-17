@@ -291,6 +291,8 @@ export interface KolAbilities {
   canFilterBd: boolean;
   /** Show and rotate the caller's creator registration link. */
   canRegisterLink: boolean;
+  /** Generate, reveal and revoke copy tokens. */
+  canCopyToken: boolean;
 }
 
 export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilities {
@@ -301,7 +303,8 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: false
+      canRegisterLink: false,
+      canCopyToken: false
     };
   }
   const canEdit = access.can("kol:edit");
@@ -310,7 +313,8 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
     canChangeBd: access.isSuperAdmin,
     canAssignBd: access.isSuperAdmin || (canEdit && !access.isOwnScope),
     canFilterBd: access.can("kol:view") && !access.isOwnScope,
-    canRegisterLink: access.can("kol:register-link")
+    canRegisterLink: access.can("kol:register-link"),
+    canCopyToken: access.can("kol:copy-token")
   };
 }
 
