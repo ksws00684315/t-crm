@@ -107,6 +107,7 @@ class SystemIT {
   @BeforeEach
   void prepareIndependentData() {
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
+    jdbc.update("DELETE FROM sys_user_tenant WHERE user_id NOT IN (SELECT id FROM sys_user)");
     jdbc.update("UPDATE sys_user SET last_login_time=NULL WHERE username='bootstrap'");
     try (var connection = redis.getConnectionFactory().getConnection()) {
       connection.serverCommands().flushDb();
@@ -127,14 +128,21 @@ class SystemIT {
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN'", Integer.class))
+                "SELECT COUNT(*) FROM sys_user_tenant WHERE role='SUPER_ADMIN'", Integer.class))
         .isZero();
     assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE role='PLATFORM_ADMIN' AND tenant_id IS NULL"
-                    + " AND status=1",
+                "SELECT COUNT(*) FROM sys_user WHERE role='PLATFORM_ADMIN'"
+                    + " AND last_tenant_id IS NULL AND status=1",
                 Integer.class))
         .isEqualTo(1);
+    // ADR-022: the platform administrator has no membership.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user_tenant m JOIN sys_user u ON u.id = m.user_id"
+                    + " WHERE u.role='PLATFORM_ADMIN'",
+                Integer.class))
+        .isZero();
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_tenant WHERE id=1 AND tenant_code='default' AND status=1",
@@ -187,8 +195,8 @@ class SystemIT {
             "crm_weidian_app:NO",
             "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
-            "sys_user:YES",
-            "sys_user_permission:NO");
+            "sys_user_permission:NO",
+            "sys_user_tenant:NO");
     var without =
         jdbc.queryForList(
             """
@@ -206,16 +214,29 @@ class SystemIT {
             ORDER BY t.table_name
             """,
             String.class);
-    // Design §3.4 exceptions; crm_fx_rate holds the platform-level reference rate (§7.5).
+    // Design §3.4 exceptions; crm_fx_rate holds the platform-level reference rate (§7.5). An
+    // account (sys_user) belongs to no company since ADR-022; its companies are sys_user_tenant.
     assertThat(without)
-        .contains("sys_tenant", "crm_link_index_outbox", "crm_fx_rate", "flyway_schema_history")
-        .doesNotContain("crm_kol", "crm_click_log", "sys_user");
+        .contains(
+            "sys_tenant",
+            "crm_link_index_outbox",
+            "crm_fx_rate",
+            "flyway_schema_history",
+            "sys_user")
+        .doesNotContain("crm_kol", "crm_click_log", "sys_user_tenant", "sys_user_permission");
     assertThat(
             jdbc.queryForObject(
-                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sys_user_tenant'",
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sys_user_last_tenant'",
                 String.class))
-        .contains("PLATFORM_ADMIN")
-        .contains("tenant_id");
+        .contains("MEMBER")
+        .contains("last_tenant_id");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sys_user_tenant_role'",
+                String.class))
+        .contains("SUPER_ADMIN")
+        .contains("STAFF")
+        .doesNotContain("PLATFORM_ADMIN");
   }
 
   @Test
@@ -529,8 +550,8 @@ class SystemIT {
         () -> codes[1] = putStatus(otherToken, "/admin-api/system/users/" + firstId, demote));
     assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE role='SUPER_ADMIN' AND status=1"
-                    + " AND tenant_id = 1",
+                "SELECT COUNT(*) FROM sys_user_tenant WHERE role='SUPER_ADMIN' AND status=1"
+                    + " AND tenant_id = 1 AND is_deleted = FALSE",
                 Integer.class))
         .isEqualTo(1);
     assertThat(codes).containsExactlyInAnyOrder(200, 422);
@@ -575,7 +596,9 @@ class SystemIT {
         () -> putJson(admin, "/admin-api/system/users/" + id, editBody()));
     assertThat(
             jdbc.queryForObject(
-                "SELECT status FROM sys_user WHERE id=?", Integer.class, Long.valueOf(id)))
+                "SELECT status FROM sys_user_tenant WHERE user_id=? AND tenant_id=1",
+                Integer.class,
+                Long.valueOf(id)))
         .isZero();
     assertThat(
             jdbc.queryForObject(
@@ -619,10 +642,15 @@ class SystemIT {
     try (var lock = dataSource.getConnection()) {
       lock.setAutoCommit(false);
       for (Long userId : userIds) {
-        try (var statement =
-            lock.prepareStatement("SELECT id FROM sys_user WHERE id=? FOR UPDATE")) {
-          statement.setLong(1, userId);
-          statement.executeQuery().close();
+        // The account row (name, password) and its membership rows (role, status).
+        for (String sql :
+            List.of(
+                "SELECT id FROM sys_user WHERE id=? FOR UPDATE",
+                "SELECT id FROM sys_user_tenant WHERE user_id=? FOR UPDATE")) {
+          try (var statement = lock.prepareStatement(sql)) {
+            statement.setLong(1, userId);
+            statement.executeQuery().close();
+          }
         }
       }
       Future<?> firstDone = pool.submit(first);

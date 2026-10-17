@@ -20,6 +20,7 @@ import cn.dev33.satoken.dao.SaTokenDaoDefaultImpl;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.spring.SaTokenContextForSpringInJakartaServlet;
 import cn.dev33.satoken.stp.StpUtil;
+import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
@@ -169,7 +170,13 @@ class AuthControllerTest {
   void shouldSerializeLoginUserWithoutCredentials_whenLoginSucceeds() throws Exception {
     var actor = current.user();
     when(auth.login("operator", "test-input", "cid", "ab7k", "198.51.100.8"))
-        .thenReturn(new AuthService.LoginResult("X-Admin-Token", "unit-token", 28800, actor));
+        .thenReturn(
+            new AuthService.LoginResult(
+                "X-Admin-Token",
+                "unit-token",
+                28800,
+                actor,
+                List.of(new CompanyDTO(2L, "Company B", Role.STAFF))));
     mvc.perform(
             post("/admin-api/auth/login")
                 .with(
@@ -186,15 +193,96 @@ class AuthControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.user.id").value("1"))
         .andExpect(jsonPath("$.data.user.passwordHash").doesNotExist())
+        .andExpect(jsonPath("$.data.user.companies[0].tenantId").value("2"))
+        .andExpect(jsonPath("$.data.user.companies[0].tenantName").value("Company B"))
+        .andExpect(jsonPath("$.data.user.companies[0].role").value("STAFF"))
         .andExpect(jsonPath("$.data.token").value("unit-token"));
   }
 
   @Test
   void shouldReturnIdentity_whenOperatorIsAuthenticated() throws Exception {
+    when(auth.companies(any()))
+        .thenReturn(
+            List.of(
+                new CompanyDTO(1L, "Company A", Role.SUPER_ADMIN),
+                new CompanyDTO(2L, "Company B", Role.STAFF)));
     mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.role").value("STAFF"))
-        .andExpect(jsonPath("$.data.permissions").isArray());
+        .andExpect(jsonPath("$.data.permissions").isArray())
+        .andExpect(jsonPath("$.data.companies.length()").value(2))
+        .andExpect(jsonPath("$.data.companies[1].tenantId").value("2"))
+        .andExpect(jsonPath("$.data.companies[1].role").value("STAFF"));
+  }
+
+  @Test
+  void shouldAnswerLikeMe_whenCompanySwitches() throws Exception {
+    var switched =
+        new com.tcrm.admin.security.api.AccountDTO(
+            1L,
+            "operator",
+            "test-hash",
+            "Operator",
+            null,
+            Role.SUPER_ADMIN,
+            DataScope.ALL,
+            1,
+            null,
+            null,
+            0,
+            2L,
+            "Company B",
+            true);
+    when(auth.switchCompany(2L)).thenReturn(switched);
+    when(auth.companies(switched))
+        .thenReturn(List.of(new CompanyDTO(2L, "Company B", Role.SUPER_ADMIN)));
+    mvc.perform(
+            post("/admin-api/auth/company")
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content("{\"tenantId\":\"2\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.tenantId").value("2"))
+        .andExpect(jsonPath("$.data.tenantName").value("Company B"))
+        .andExpect(jsonPath("$.data.role").value("SUPER_ADMIN"))
+        .andExpect(jsonPath("$.data.companies[0].tenantId").value("2"));
+  }
+
+  @Test
+  void shouldRejectSwitch_whenCompanyIsNotTheCallers() throws Exception {
+    when(auth.switchCompany(9L))
+        .thenThrow(new BusinessException(com.tcrm.admin.shared.ErrorCode.AUTH_COMPANY_NOT_MEMBER));
+    mvc.perform(
+            post("/admin-api/auth/company")
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content("{\"tenantId\":9}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_COMPANY_NOT_MEMBER"));
+  }
+
+  @Test
+  void shouldRejectSwitch_whenCallerIsPlatformAdministrator() throws Exception {
+    when(current.roleNames(any())).thenReturn(List.of("PLATFORM_ADMIN"));
+    mvc.perform(
+            post("/admin-api/auth/company")
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content("{\"tenantId\":1}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+    verify(auth, org.mockito.Mockito.never()).switchCompany(anyLong());
+  }
+
+  @Test
+  void shouldRejectSwitch_whenTenantIdIsMissing() throws Exception {
+    mvc.perform(
+            post("/admin-api/auth/company")
+                .header("X-Admin-Token", token)
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    verify(auth, org.mockito.Mockito.never()).switchCompany(anyLong());
   }
 
   @Test

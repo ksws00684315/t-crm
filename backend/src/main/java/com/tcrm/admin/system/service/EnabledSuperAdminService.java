@@ -1,33 +1,30 @@
 package com.tcrm.admin.system.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.EnabledSuperAdminApi;
-import com.tcrm.admin.system.mapper.SysUserMapper;
-import com.tcrm.admin.system.model.SysUserDO;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
-/** Reads enabled super administrators. The tenant line limits the query to the current company. */
+/**
+ * Enabled super administrators of the current company (ADR-022). The role lives on the membership,
+ * so the query reads {@code sys_user_tenant} for this company only; the account must be enabled
+ * too. Without a company scope there is no company to read, so the call is refused.
+ */
 @Service
 public class EnabledSuperAdminService implements EnabledSuperAdminApi {
-  private final SysUserMapper users;
+  private final SysUserTenantMapper members;
 
-  public EnabledSuperAdminService(SysUserMapper users) {
-    this.users = users;
+  public EnabledSuperAdminService(SysUserTenantMapper members) {
+    this.members = members;
   }
 
   @Override
   public List<Long> listEnabledIds() {
-    return users
-        .selectList(
-            new LambdaQueryWrapper<SysUserDO>()
-                .select(SysUserDO::getId)
-                .eq(SysUserDO::getRole, Role.SUPER_ADMIN)
-                .eq(SysUserDO::getStatus, 1)
-                .orderByAsc(SysUserDO::getId))
-        .stream()
-        .map(SysUserDO::getId)
-        .toList();
+    Long tenantId = TenantScope.companyId();
+    if (tenantId == null) {
+      throw new IllegalStateException("enabled super administrators are listed in a company scope");
+    }
+    return members.listEnabledSuperAdminIds(tenantId);
   }
 }

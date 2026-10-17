@@ -179,6 +179,8 @@ const enUS: MessageSchema = {
     AUTH_CAPTCHA_RATE_LIMITED: "Too many captcha requests. Please try again later.",
     AUTH_ACCOUNT_DISABLED: "This account is disabled or unavailable. Contact an administrator.",
     AUTH_OLD_PASSWORD_INCORRECT: "The current password is incorrect.",
+    AUTH_COMPANY_NOT_MEMBER: "You cannot enter this company.",
+    AUTH_COMPANY_SWITCHED: "The current company was switched in another tab. Reload the page.",
     USER_USERNAME_EXISTS: "This username already exists.",
     TENANT_CODE_EXISTS: "This company code already exists.",
     USER_CANNOT_DISABLE_SELF: "You cannot disable your own account.",
@@ -186,6 +188,9 @@ const enUS: MessageSchema = {
     USER_INVALID_DATA_SCOPE: "Own Data Only applies only to a staff account.",
     USER_PERMISSION_INVALID: "Those permissions are not valid. Choose them again.",
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
+    USER_MULTI_COMPANY_LOCKED:
+      "This account belongs to several companies. Ask the platform administrator to change its name, email, or password.",
+    USER_ALREADY_MEMBER: "This account is already a member of this company.",
     KOL_EMAIL_EXISTS: "This email is already used by another creator.",
     KOL_CODE_EXISTS: "This creator code already exists.",
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",

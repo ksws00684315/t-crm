@@ -1,13 +1,17 @@
 package com.tcrm.admin.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.mapper.SysUserPermissionMapper;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
+import com.tcrm.admin.system.model.MemberRow;
 import com.tcrm.admin.system.model.SysUserDO;
 import com.tcrm.admin.system.model.SysUserPermissionDO;
 import java.util.Collection;
@@ -16,25 +20,46 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
-/** BD facade for other modules and the BD picker; exposes only ID, names and usability. */
+/**
+ * BD facade for other modules and the BD picker; exposes only ID, names and usability. A BD is
+ * judged by its membership of the current company (ADR-022): enabled account and membership, STAFF
+ * with OWN scope, and {@code kol:edit} granted in this company. Accounts that are not members of
+ * the current company are unknown here.
+ */
 @Service
 public class BdUserService implements BdUserApi {
   private final SysUserMapper users;
+  private final SysUserTenantMapper members;
   private final SysUserPermissionMapper permissions;
+  private final CurrentUserContext current;
 
-  public BdUserService(SysUserMapper users, SysUserPermissionMapper permissions) {
+  public BdUserService(
+      SysUserMapper users,
+      SysUserTenantMapper members,
+      SysUserPermissionMapper permissions,
+      CurrentUserContext current) {
     this.users = users;
+    this.members = members;
     this.permissions = permissions;
+    this.current = current;
   }
 
   @Override
   public BdUserDTO getById(Long id) {
-    return id == null ? null : toDto(users.selectOne(columns().eq(SysUserDO::getId, id)));
+    if (id == null) {
+      return null;
+    }
+    long tenantId = tenantId();
+    MemberRow member = members.getMember(id, tenantId);
+    if (member == null) {
+      return null;
+    }
+    return toDto(member, editorsAmong(List.of(id), tenantId).contains(id));
   }
 
   @Override
   public BdUserDTO lockById(Long id) {
-    return users.lockById(id) == null ? null : getById(id);
+    return id == null || members.lockMember(id, tenantId()) == null ? null : getById(id);
   }
 
   @Override
@@ -42,8 +67,12 @@ public class BdUserService implements BdUserApi {
     if (username == null || username.isBlank()) {
       return null;
     }
-    return toDto(
-        users.selectOne(columns().apply("lower(username) = lower({0})", username.strip())));
+    SysUserDO user =
+        users.selectOne(
+            new LambdaQueryWrapper<SysUserDO>()
+                .select(SysUserDO::getId)
+                .apply("lower(username) = lower({0})", username.strip()));
+    return user == null ? null : getById(user.getId());
   }
 
   @Override
@@ -51,27 +80,16 @@ public class BdUserService implements BdUserApi {
     if (ids == null || ids.isEmpty()) {
       return List.of();
     }
-    List<SysUserDO> rows = users.selectList(columns().in(SysUserDO::getId, ids));
-    Set<Long> editors = editorsAmong(rows.stream().map(SysUserDO::getId).toList());
-    return rows.stream().map(user -> toDto(user, editors.contains(user.getId()))).toList();
+    long tenantId = tenantId();
+    List<MemberRow> rows = members.listMembers(tenantId, ids);
+    Set<Long> editors = editorsAmong(rows.stream().map(MemberRow::getUserId).toList(), tenantId);
+    return rows.stream().map(m -> toDto(m, editors.contains(m.getUserId()))).toList();
   }
 
   @Override
   public List<BdUserDTO> listUsable() {
-    Set<Long> editors = editorsWith(Permission.KOL_EDIT.code());
-    if (editors.isEmpty()) {
-      return List.of();
-    }
-    return users
-        .selectList(
-            columns()
-                .eq(SysUserDO::getRole, Role.STAFF)
-                .eq(SysUserDO::getDataScope, DataScope.OWN)
-                .eq(SysUserDO::getStatus, 1)
-                .in(SysUserDO::getId, editors)
-                .orderByAsc(SysUserDO::getUsername, SysUserDO::getId))
-        .stream()
-        .map(user -> toDto(user, true))
+    return members.listUsableBds(tenantId(), Permission.KOL_EDIT.code()).stream()
+        .map(m -> toDto(m, true))
         .toList();
   }
 
@@ -80,46 +98,26 @@ public class BdUserService implements BdUserApi {
     return listUsable();
   }
 
-  private static LambdaQueryWrapper<SysUserDO> columns() {
-    return new LambdaQueryWrapper<SysUserDO>()
-        .select(
-            SysUserDO::getId,
-            SysUserDO::getUsername,
-            SysUserDO::getNickname,
-            SysUserDO::getRole,
-            SysUserDO::getDataScope,
-            SysUserDO::getStatus);
+  /**
+   * The company in force: an explicit company scope (background jobs such as scheduled transfers)
+   * or else the logged-in token's company.
+   */
+  private long tenantId() {
+    Long scoped = TenantScope.companyId();
+    return scoped != null ? scoped : current.user().tenantId();
   }
 
-  private BdUserDTO toDto(SysUserDO user) {
-    if (user == null) {
-      return null;
-    }
-    return toDto(user, editorsAmong(List.of(user.getId())).contains(user.getId()));
-  }
-
-  private static BdUserDTO toDto(SysUserDO user, boolean kolEdit) {
+  private static BdUserDTO toDto(MemberRow member, boolean kolEdit) {
     boolean usable =
-        user.getRole() == Role.STAFF
-            && user.getDataScope() == DataScope.OWN
-            && Integer.valueOf(1).equals(user.getStatus())
+        member.getRole() == Role.STAFF
+            && member.getDataScope() == DataScope.OWN
+            && Integer.valueOf(1).equals(member.getStatus())
+            && Integer.valueOf(1).equals(member.getAccountStatus())
             && kolEdit;
-    return new BdUserDTO(user.getId(), user.getUsername(), user.getNickname(), usable);
+    return new BdUserDTO(member.getUserId(), member.getUsername(), member.getNickname(), usable);
   }
 
-  /** Every user in this company who holds {@code code}. The tenant plugin limits the company. */
-  private Set<Long> editorsWith(String code) {
-    return permissions
-        .selectList(
-            new LambdaQueryWrapper<SysUserPermissionDO>()
-                .select(SysUserPermissionDO::getUserId)
-                .eq(SysUserPermissionDO::getPermissionCode, code))
-        .stream()
-        .map(SysUserPermissionDO::getUserId)
-        .collect(Collectors.toSet());
-  }
-
-  private Set<Long> editorsAmong(Collection<Long> ids) {
+  private Set<Long> editorsAmong(Collection<Long> ids, long tenantId) {
     if (ids.isEmpty()) {
       return Set.of();
     }
@@ -127,6 +125,7 @@ public class BdUserService implements BdUserApi {
         .selectList(
             new LambdaQueryWrapper<SysUserPermissionDO>()
                 .select(SysUserPermissionDO::getUserId)
+                .eq(SysUserPermissionDO::getTenantId, tenantId)
                 .in(SysUserPermissionDO::getUserId, ids)
                 .eq(SysUserPermissionDO::getPermissionCode, Permission.KOL_EDIT.code()))
         .stream()

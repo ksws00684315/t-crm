@@ -1,15 +1,16 @@
 package com.tcrm.admin.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
-import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.mapper.SysUserPermissionMapper;
-import com.tcrm.admin.system.model.SysUserDO;
+import com.tcrm.admin.system.mapper.SysUserTenantMapper;
+import com.tcrm.admin.system.model.MemberRow;
 import com.tcrm.admin.system.model.SysUserPermissionDO;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -19,18 +20,26 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Stored staff permissions. Unknown codes are rejected before any row is written. */
+/**
+ * Stored staff permissions, per company (ADR-022): codes held in one company do not affect another.
+ * Unknown codes are rejected before any row is written.
+ */
 @Service
 public class UserPermissionService {
-  private final SysUserMapper users;
+  private final SysUserTenantMapper members;
   private final SysUserPermissionMapper permissions;
   private final PermissionChangeApplier applier;
+  private final CurrentUserContext current;
 
   public UserPermissionService(
-      SysUserMapper users, SysUserPermissionMapper permissions, PermissionChangeApplier applier) {
-    this.users = users;
+      SysUserTenantMapper members,
+      SysUserPermissionMapper permissions,
+      PermissionChangeApplier applier,
+      CurrentUserContext current) {
+    this.members = members;
     this.permissions = permissions;
     this.applier = applier;
+    this.current = current;
   }
 
   /** Known codes in {@link Permission} order. Duplicates collapse. Null or unknown codes fail. */
@@ -49,11 +58,11 @@ public class UserPermissionService {
     return Permission.ordered(selected);
   }
 
-  public List<String> storedCodes(Long userId) {
-    return Permission.codes().stream().filter(storedSet(userId)::contains).toList();
+  public List<String> storedCodes(Long userId, long tenantId) {
+    return Permission.codes().stream().filter(storedSet(userId, tenantId)::contains).toList();
   }
 
-  public Map<Long, List<String>> storedCodes(Collection<Long> userIds) {
+  public Map<Long, List<String>> storedCodes(Collection<Long> userIds, long tenantId) {
     if (userIds == null || userIds.isEmpty()) {
       return Map.of();
     }
@@ -62,6 +71,7 @@ public class UserPermissionService {
         permissions.selectList(
             new LambdaQueryWrapper<SysUserPermissionDO>()
                 .select(SysUserPermissionDO::getUserId, SysUserPermissionDO::getPermissionCode)
+                .eq(SysUserPermissionDO::getTenantId, tenantId)
                 .in(SysUserPermissionDO::getUserId, userIds))) {
       Permission permission = Permission.fromCode(row.getPermissionCode());
       if (permission == null) {
@@ -76,10 +86,12 @@ public class UserPermissionService {
     return result;
   }
 
-  /** Replaces every stored code. Caller supplies the company; the tenant plugin also checks it. */
-  public void grant(Long userId, Long tenantId, List<String> codes) {
-    permissions.delete(
-        new LambdaQueryWrapper<SysUserPermissionDO>().eq(SysUserPermissionDO::getUserId, userId));
+  /**
+   * Replaces every code stored for this account in this company. Caller supplies the company; in a
+   * company scope the tenant plugin also checks it.
+   */
+  public void grant(Long userId, long tenantId, List<String> codes) {
+    clear(userId, tenantId);
     for (String code : codes) {
       SysUserPermissionDO row = new SysUserPermissionDO();
       row.setUserId(userId);
@@ -89,17 +101,20 @@ public class UserPermissionService {
     }
   }
 
-  public void clear(Long userId) {
+  public void clear(Long userId, long tenantId) {
     permissions.delete(
-        new LambdaQueryWrapper<SysUserPermissionDO>().eq(SysUserPermissionDO::getUserId, userId));
+        new LambdaQueryWrapper<SysUserPermissionDO>()
+            .eq(SysUserPermissionDO::getUserId, userId)
+            .eq(SysUserPermissionDO::getTenantId, tenantId));
   }
 
   /**
    * Staff permissions and data scope. Missing and cross-company ids are 404; other roles are 400.
    */
   public UserPermissionView get(Long id) {
-    SysUserDO user = requireStaff(id);
-    return new UserPermissionView(storedCodes(id), user.getDataScope());
+    long tenantId = current.user().tenantId();
+    MemberRow member = requireStaff(id, tenantId);
+    return new UserPermissionView(storedCodes(id, tenantId), member.getDataScope());
   }
 
   /**
@@ -109,10 +124,11 @@ public class UserPermissionService {
   @Transactional(rollbackFor = Exception.class)
   public void replace(Long id, List<String> codes, DataScope dataScope) {
     List<String> next = canonical(codes);
-    SysUserDO user = requireStaff(id);
+    long tenantId = current.user().tenantId();
+    MemberRow member = requireStaff(id, tenantId);
     applier.apply(
         new PermissionChange(
-            id, user.getTenantId(), storedCodes(id), next, user.getDataScope(), dataScope));
+            id, tenantId, storedCodes(id, tenantId), next, member.getDataScope(), dataScope));
   }
 
   public PermissionCatalog catalog() {
@@ -130,23 +146,24 @@ public class UserPermissionService {
     return new PermissionCatalog(items, templates);
   }
 
-  private SysUserDO requireStaff(Long id) {
-    SysUserDO user = users.selectById(id);
-    if (user == null) {
+  private MemberRow requireStaff(Long id, long tenantId) {
+    MemberRow member = members.getMember(id, tenantId);
+    if (member == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    if (user.getRole() != Role.STAFF) {
+    if (member.getRole() != Role.STAFF) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    return user;
+    return member;
   }
 
-  private java.util.Set<String> storedSet(Long userId) {
+  private java.util.Set<String> storedSet(Long userId, long tenantId) {
     return permissions
         .selectList(
             new LambdaQueryWrapper<SysUserPermissionDO>()
                 .select(SysUserPermissionDO::getPermissionCode)
-                .eq(SysUserPermissionDO::getUserId, userId))
+                .eq(SysUserPermissionDO::getUserId, userId)
+                .eq(SysUserPermissionDO::getTenantId, tenantId))
         .stream()
         .map(SysUserPermissionDO::getPermissionCode)
         .collect(java.util.stream.Collectors.toSet());

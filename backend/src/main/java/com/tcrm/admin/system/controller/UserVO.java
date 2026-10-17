@@ -18,7 +18,8 @@ public record UserVO(
     Instant lastLoginTime,
     Instant createTime,
     PostTemplate postTemplate,
-    List<String> permissions) {
+    List<String> permissions,
+    int companyCount) {
   public static UserVO from(UserDTO u) {
     return new UserVO(
         u.id(),
@@ -31,6 +32,7 @@ public record UserVO(
         u.lastLoginTime(),
         u.createTime(),
         u.postTemplate(),
-        u.permissions());
+        u.permissions(),
+        u.companyCount());
   }
 }
