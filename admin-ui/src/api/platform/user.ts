@@ -15,8 +15,8 @@ export interface PlatformUserVO {
   id: string;
   username: string;
   nickname: string;
-  /** Not part of the agreed lookup shape; used to pre-fill the edit form when present. */
-  email?: string | null;
+  /** Always present in the lookup result; null when the account has no email. */
+  email: string | null;
   /** Whole account: 1 enabled, 0 disabled. */
   status: 0 | 1;
   companies: PlatformUserCompanyVO[];

@@ -25,6 +25,7 @@ const account: platformUserApi.PlatformUserVO = {
   id: "7",
   username: "alice",
   nickname: "Alice",
+  email: "alice@example.com",
   status: 1,
   companies: [{ tenantId: "10", tenantName: "A 公司", role: "SUPER_ADMIN", status: 1 }]
 };
@@ -202,6 +203,36 @@ describe("platform: add an existing account to a company", () => {
       email: "alice@example.com"
     });
     expect(platformUserApi.findPlatformUser).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the existing email when only the name is changed", async () => {
+    vi.mocked(platformUserApi.updatePlatformUser).mockResolvedValue(null);
+    await openWithAccount();
+    click("account-edit");
+    await flushPromises();
+    expect(input("account-email").element.value).toBe("alice@example.com");
+    await input("account-nickname").setValue("Alice Chen");
+    click("account-save");
+    await flushPromises();
+    expect(platformUserApi.updatePlatformUser).toHaveBeenCalledWith("7", {
+      nickname: "Alice Chen",
+      email: "alice@example.com"
+    });
+  });
+
+  it("sends a null email when the account has none and the field is left empty", async () => {
+    vi.mocked(platformUserApi.updatePlatformUser).mockResolvedValue(null);
+    await openWithAccount({ ...account, email: null });
+    click("account-edit");
+    await flushPromises();
+    expect(input("account-email").element.value).toBe("");
+    await input("account-nickname").setValue("Alice Chen");
+    click("account-save");
+    await flushPromises();
+    expect(platformUserApi.updatePlatformUser).toHaveBeenCalledWith("7", {
+      nickname: "Alice Chen",
+      email: null
+    });
   });
 
   it("warns that a password reset signs the account out of every company", async () => {
