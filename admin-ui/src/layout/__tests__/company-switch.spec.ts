@@ -4,10 +4,12 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as authApi from "@/api/auth";
+import * as payoutApi from "@/api/commission/payout-account";
 import * as notificationApi from "@/api/notification/notification";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
+import { usePayoutPendingStore } from "@/stores/payout-pending";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import { ApiError } from "@/utils/http/error";
@@ -18,6 +20,7 @@ import Layout from "../index.vue";
 
 vi.mock("@/api/auth");
 vi.mock("@/api/notification/notification");
+vi.mock("@/api/commission/payout-account");
 
 const messages = {} as Record<"success" | "error", ReturnType<typeof vi.spyOn>>;
 
@@ -100,6 +103,7 @@ describe("header company switch", () => {
     vi.mocked(authApi.fetchCurrentUser).mockReset();
     vi.mocked(notificationApi.unreadNotificationCount).mockReset().mockResolvedValue(0);
     vi.mocked(notificationApi.listNotifications).mockReset();
+    vi.mocked(payoutApi.fetchPayoutPendingCount).mockReset().mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -230,6 +234,34 @@ describe("header company switch", () => {
 
     expect(notificationApi.unreadNotificationCount).toHaveBeenCalledTimes(2);
     expect(wrapper.get('[data-test="notification-badge"]').text()).toContain("4");
+  });
+
+  it("clears the payout review badge when the new company grants no review", async () => {
+    vi.mocked(payoutApi.fetchPayoutPendingCount).mockResolvedValue(3);
+    const { wrapper } = await mountAs(inA);
+    const pending = usePayoutPendingStore();
+    expect(pending.count).toBe(3);
+    vi.mocked(authApi.switchCompany).mockResolvedValue(inB);
+
+    companyDropdown(wrapper)!.vm.$emit("command", "2");
+    await flushPromises();
+
+    // B grants only kol:view, so A's pending reviews must not stay on the menu.
+    expect(pending.count).toBe(0);
+  });
+
+  it("reloads the payout review badge for the new company", async () => {
+    vi.mocked(payoutApi.fetchPayoutPendingCount).mockResolvedValue(3);
+    const inC: UserVO = { ...inA, tenantId: "3", tenantName: "C 公司" };
+    const { wrapper } = await mountAs(inA);
+    const pending = usePayoutPendingStore();
+    vi.mocked(authApi.switchCompany).mockResolvedValue(inC);
+    vi.mocked(payoutApi.fetchPayoutPendingCount).mockResolvedValue(5);
+
+    companyDropdown(wrapper)!.vm.$emit("command", "3");
+    await flushPromises();
+
+    expect(pending.count).toBe(5);
   });
 
   it("closes the channel when the layout goes away", async () => {

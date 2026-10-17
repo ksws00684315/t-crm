@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import type { CompanyVO } from "@/api/types";
+import { usePayoutPendingStore } from "@/stores/payout-pending";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
 import {
@@ -27,6 +28,7 @@ export function useCompanySync() {
   const router = useRouter();
   const user = useUserStore();
   const tabs = useTabsStore();
+  const payoutPending = usePayoutPendingStore();
 
   const companies = computed<CompanyVO[]>(() => companiesOf(user.user));
   const switchable = computed(() => canSwitchCompany(user.user));
@@ -64,6 +66,10 @@ export function useCompanySync() {
         return;
       }
       tabs.closeEveryTab();
+      // The pending-review badge belongs to the previous company; drop it, then refetch with the
+      // new company's codes (the fetch is skipped without payout-account:review).
+      payoutPending.count = 0;
+      void payoutPending.refresh();
       await router.replace(homeAffix().path);
       cacheKey.value = company;
       ElMessage.success(t("company.switched", { name: user.user?.tenantName ?? "" }));
