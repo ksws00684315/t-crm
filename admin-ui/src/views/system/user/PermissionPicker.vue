@@ -2,7 +2,12 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { PermissionChoice } from "@/utils/permission";
-import { groupPermissions, permissionGroupLabel, permissionText } from "@/utils/permission";
+import {
+  groupPermissions,
+  permissionGroupLabel,
+  permissionText,
+  togglePermission
+} from "@/utils/permission";
 
 defineOptions({ name: "PermissionPicker" });
 
@@ -44,16 +49,15 @@ function isChecked(value: unknown): boolean {
 }
 
 function toggleOne(code: string, checked: boolean): void {
-  const next = checked
-    ? [...props.modelValue, code]
-    : props.modelValue.filter(item => item !== code);
-  emit("update:modelValue", [...new Set(next)]);
+  emit("update:modelValue", togglePermission(props.modelValue, code, checked));
 }
 
 function toggleGroup(codes: readonly string[], checked: boolean): void {
-  const dropping = new Set(codes);
-  const kept = props.modelValue.filter(code => !dropping.has(code));
-  emit("update:modelValue", checked ? [...kept, ...codes] : kept);
+  let next = [...props.modelValue];
+  for (const code of codes) {
+    next = togglePermission(next, code, checked);
+  }
+  emit("update:modelValue", next);
 }
 </script>
 
@@ -84,6 +88,9 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
         </span>
       </el-checkbox>
     </section>
+    <p class="perm-exclusive" data-test="dependencies">
+      {{ t("user.permissionDependencies") }}
+    </p>
     <p class="perm-exclusive" data-test="exclusive">
       <strong>{{ t("user.exclusiveTitle") }}</strong>
       {{ t("user.exclusiveItems") }}

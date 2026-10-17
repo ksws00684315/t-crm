@@ -94,6 +94,39 @@ export interface PermissionChoice {
   group: string;
 }
 
+/**
+ * Edit-style codes and the view code each needs (task 24 §4.4). Checking an edit code checks its
+ * view code; clearing a view code clears the edit codes needing it. The relation is one level
+ * deep and lives only in the pickers — the backend accepts any set it is sent.
+ */
+export const EDIT_PERMISSION_DEPENDENCIES: Readonly<Record<string, string>> = {
+  "kol:edit": "kol:view",
+  "product:edit": "product:view",
+  "product:status": "product:view",
+  "order:manage": "order:view",
+  "payout-account:review": "commission:view"
+};
+
+/** One checkbox flip on a permission set, applying the dependency rules above. */
+export function togglePermission(
+  current: readonly string[],
+  code: string,
+  checked: boolean
+): string[] {
+  if (checked) {
+    const next = new Set(current);
+    next.add(code);
+    const required = EDIT_PERMISSION_DEPENDENCIES[code];
+    if (required) next.add(required);
+    return [...next];
+  }
+  const dropped = new Set([code]);
+  for (const [edit, view] of Object.entries(EDIT_PERMISSION_DEPENDENCIES)) {
+    if (view === code) dropped.add(edit);
+  }
+  return current.filter(item => !dropped.has(item));
+}
+
 export interface PermissionGroupView {
   group: string;
   items: PermissionChoice[];
