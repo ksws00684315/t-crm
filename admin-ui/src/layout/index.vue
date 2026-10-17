@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ArrowDown,
+  Check,
   Expand,
   Fold,
   FullScreen,
@@ -14,6 +15,7 @@ import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { routes } from "@/router/routes";
+import { useCompanySync } from "@/composables/useCompanySync";
 import { useIdleLock } from "@/composables/useIdleLock";
 import { useLocaleStore } from "@/stores/locale";
 import { useLockStore } from "@/stores/lock";
@@ -24,7 +26,7 @@ import { useTabsStore } from "@/stores/tabs";
 import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
-import { accessOf, accountLabel, buildMenu, canAccessRoute } from "@/utils/permission";
+import { accessOf, accountLabel, buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
 import { LOCK_IDLE_OPTIONS, type LockIdleMinutes } from "@/utils/lock";
 import { affixFor } from "@/utils/tabs";
@@ -55,6 +57,7 @@ const reauth = useReauthStore();
 const tabs = useTabsStore();
 const lockStore = useLockStore();
 useIdleLock();
+const company = useCompanySync();
 
 function idleLabel(minutes: LockIdleMinutes): string {
   return minutes === 0 ? t("lock.idleOff") : t("lock.idleMinutes", { n: minutes });
@@ -308,12 +311,54 @@ onBeforeUnmount(() => {
           >
             <span class="layout__label">{{ t(`theme.${theme.mode}`) }}</span>
           </el-button>
-          <NotificationBell v-if="!access.isPlatformAdmin" />
+          <!-- Keyed by company: a switch rebuilds the bell and it reloads the unread count at once. -->
+          <NotificationBell v-if="!access.isPlatformAdmin" :key="company.currentId.value ?? ''" />
           <LocaleSwitch />
+          <el-dropdown
+            v-if="company.switchable.value"
+            trigger="click"
+            :disabled="company.switching.value"
+            data-test="company-switch"
+            @command="company.switchTo"
+          >
+            <span
+              class="layout__company layout__label"
+              role="button"
+              :aria-label="t('company.switchTitle')"
+            >
+              {{ tenantLabel }}
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="item in company.companies.value"
+                  :key="item.tenantId"
+                  :command="item.tenantId"
+                  :data-test="`company-option-${item.tenantId}`"
+                >
+                  <span class="layout__company-option">
+                    <el-icon
+                      class="layout__company-check"
+                      :class="{ 'is-current': item.tenantId === company.currentId.value }"
+                      ><Check
+                    /></el-icon>
+                    <span>{{ item.tenantName }}</span>
+                    <span class="layout__company-role">{{ roleLabel(item.role) }}</span>
+                  </span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-dropdown trigger="click" @command="onCommand">
             <span class="layout__user">
               <span class="layout__label">{{ userLabel }}</span>
-              <span v-if="tenantLabel" class="layout__tenant layout__label">{{ tenantLabel }}</span>
+              <span
+                v-if="tenantLabel && !company.switchable.value"
+                class="layout__tenant layout__label"
+                data-test="tenant-label"
+                >{{ tenantLabel }}</span
+              >
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -355,7 +400,7 @@ onBeforeUnmount(() => {
         >
           <RouterView v-slot="{ Component }">
             <Transition name="tcrm-page" mode="out-in">
-              <KeepAlive :include="tabs.include">
+              <KeepAlive :key="company.cacheKey.value" :include="tabs.include">
                 <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
               </KeepAlive>
             </Transition>
@@ -442,6 +487,30 @@ onBeforeUnmount(() => {
 }
 .layout__tenant {
   color: var(--tcrm-color-text-secondary);
+}
+.layout__company {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--tcrm-color-text);
+}
+.layout__company-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+}
+.layout__company-check {
+  visibility: hidden;
+}
+.layout__company-check.is-current {
+  visibility: visible;
+  color: var(--el-color-primary);
+}
+.layout__company-role {
+  color: var(--tcrm-color-text-secondary);
+  font-size: 12px;
 }
 .layout__main {
   display: flex;

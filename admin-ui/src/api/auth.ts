@@ -55,6 +55,11 @@ export function fetchCurrentUser(): Promise<UserVO> {
   return http.request<UserVO>({ method: "get", url: "/auth/me" });
 }
 
+/** Moves the session to another company of this account; answers like `/auth/me`. */
+export function switchCompany(tenantId: string): Promise<UserVO> {
+  return http.request<UserVO>({ method: "post", url: "/auth/company", data: { tenantId } });
+}
+
 export function changePassword(request: PasswordRequest): Promise<null> {
   return http.request<null>({ method: "put", url: "/auth/password", data: request });
 }

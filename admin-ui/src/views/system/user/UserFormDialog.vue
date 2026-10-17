@@ -10,6 +10,8 @@ import {
   type PermissionCatalogVO
 } from "@/api/system/user";
 import type { CompanyRole, DataScope, PostTemplate, UserVO } from "@/api/types";
+import { isMultiCompany } from "@/utils/company";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { POST_TEMPLATES, postLabel, roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
 import {
@@ -42,6 +44,8 @@ const dataScopes = computed<{ value: DataScope; label: string }[]>(() => [
 ]);
 
 const editing = computed(() => props.user !== null);
+/** Name and email belong to the person; another company also uses them (ADR-022). */
+const personalLocked = computed(() => isMultiCompany(props.user));
 const formRef = ref<FormInstance>();
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
@@ -61,8 +65,8 @@ let catalogSeq = 0;
 const rules = computed<FormRules>(() => ({
   username: editing.value ? [] : [rule(validateUsername)],
   password: editing.value ? [] : [rule(validateNewPassword)],
-  nickname: [rule(validateNickname)],
-  email: [rule(validateEmail)],
+  nickname: personalLocked.value ? [] : [rule(validateNickname)],
+  email: personalLocked.value ? [] : [rule(validateEmail)],
   postTemplate: [
     {
       validator: (_rule, value: string, callback: (error?: Error) => void) => {
@@ -188,7 +192,11 @@ async function submit(): Promise<void> {
       "dataScope",
       "permissions"
     ]);
-    notifyError(error);
+    if (!props.user && error instanceof ApiError && error.errorCode === "USER_USERNAME_EXISTS") {
+      ElMessage.error(t("user.usernameExistsHint", { message: error.displayMessage }));
+    } else {
+      notifyError(error);
+    }
   } finally {
     saving.value = false;
   }
@@ -222,11 +230,24 @@ async function submit(): Promise<void> {
         />
       </el-form-item>
       <el-form-item :label="t('common.nickname')" prop="nickname" :error="serverErrors.nickname">
-        <el-input v-model="form.nickname" maxlength="64" data-test="nickname" />
+        <el-input
+          v-model="form.nickname"
+          maxlength="64"
+          :disabled="personalLocked"
+          data-test="nickname"
+        />
       </el-form-item>
       <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
-        <el-input v-model="form.email" maxlength="254" data-test="email" />
+        <el-input
+          v-model="form.email"
+          maxlength="254"
+          :disabled="personalLocked"
+          data-test="email"
+        />
       </el-form-item>
+      <p v-if="personalLocked" class="perm-note" data-test="personal-locked">
+        {{ t("user.multiCompanyHint") }}
+      </p>
       <el-form-item :label="t('user.role')" prop="role" :error="serverErrors.role">
         <el-select v-model="form.role" data-test="account-type">
           <el-option

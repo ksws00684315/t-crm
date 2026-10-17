@@ -85,6 +85,16 @@ export const useUserStore = defineStore("user", () => {
     }
   }
 
+  /**
+   * Moves the session to another company of this account. The answer replaces the whole identity:
+   * company, role, permission codes and therefore the menu.
+   */
+  async function switchCompany(tenantId: string) {
+    if (!token.value) return;
+    const fresh = await authApi.switchCompany(tenantId);
+    setSession({ token: token.value, expiresAt: expiresAt.value, user: fresh });
+  }
+
   /** Re-reads the account (role changes, disabled account). A 401 clears the session by itself. */
   async function refreshProfile() {
     if (!token.value) return;
@@ -105,6 +115,7 @@ export const useUserStore = defineStore("user", () => {
     loginReplacingToken,
     logout,
     clearSession,
-    refreshProfile
+    refreshProfile,
+    switchCompany
   };
 });

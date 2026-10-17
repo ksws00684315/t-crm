@@ -11,6 +11,7 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
+import { isMultiCompany } from "@/utils/company";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
@@ -386,6 +387,18 @@ onMounted(load);
           >{{ t("batch.disable") }}</el-button
         >
       </template>
+      <template #cell-username="{ row }">
+        <span>{{ asUser(row).username }}</span>
+        <el-tooltip
+          v-if="isMultiCompany(asUser(row))"
+          :content="t('user.multiCompanyHint')"
+          placement="top"
+        >
+          <el-tag size="small" type="warning" class="multi-company" data-test="multi-company">
+            {{ t("user.multiCompany") }}
+          </el-tag>
+        </el-tooltip>
+      </template>
       <template #cell-role="{ row }">
         {{ asUser(row).role ? roleLabel(asUser(row).role) : "" }}
       </template>
@@ -458,7 +471,25 @@ onMounted(load);
         >
           {{ asUser(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
         </el-button>
-        <el-button link type="warning" @click="openReset(asUser(row))">
+        <el-tooltip
+          v-if="isMultiCompany(asUser(row))"
+          :content="t('user.multiCompanyHint')"
+          placement="top"
+        >
+          <!-- A disabled button swallows hover events; the wrapper keeps the hint reachable. -->
+          <span class="reset-locked">
+            <el-button link type="warning" disabled data-test="reset-password">
+              {{ t("user.resetPassword") }}
+            </el-button>
+          </span>
+        </el-tooltip>
+        <el-button
+          v-else
+          link
+          type="warning"
+          data-test="reset-password"
+          @click="openReset(asUser(row))"
+        >
           {{ t("user.resetPassword") }}
         </el-button>
       </template>
@@ -472,6 +503,13 @@ onMounted(load);
 </template>
 
 <style scoped>
+.multi-company {
+  margin-left: 6px;
+}
+.reset-locked {
+  display: inline-flex;
+  margin-left: 12px;
+}
 /* Element Plus tooltips ignore disabled buttons, so the button sits in a span. */
 .user-page__transfer {
   margin-left: 12px;
