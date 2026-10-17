@@ -81,6 +81,23 @@ describe("request wrapper", () => {
     expect(seen[0].headers.has("X-Admin-Token")).toBe(false);
   });
 
+  it("sends a FormData upload as FormData, without the JSON content type", async () => {
+    const { http, seen } = setup({ status: 202, data: ok({ taskId: "1" }) });
+    const form = new FormData();
+    form.append("file", new Blob(["x"]), "import.xlsx");
+    await http.request({ method: "post", url: "/kol/kol-imports", data: form });
+    // With the instance's JSON default, axios used to serialize the form to '{"file":{}}'.
+    expect(seen[0].data).toBeInstanceOf(FormData);
+    expect(String(seen[0].headers.getContentType() ?? "")).not.toContain("application/json");
+  });
+
+  it("keeps the JSON content type for an object body", async () => {
+    const { http, seen } = setup({ status: 200, data: ok(null) });
+    await http.request({ method: "post", url: "/auth/login", data: { username: "a" } });
+    expect(seen[0].data).toBe('{"username":"a"}');
+    expect(seen[0].headers.getContentType()).toBe("application/json");
+  });
+
   it("maps a known errorCode to Chinese text and ignores the backend msg", async () => {
     const { http } = setup({ status: 409, data: failure(409, "USER_USERNAME_EXISTS") });
     const error = await rejection(http.request({ url: "/system/users" }));

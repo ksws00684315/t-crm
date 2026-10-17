@@ -2,6 +2,8 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import type { TransferTarget } from "@/api/kol/bd-transfer";
+import { listKols } from "@/api/kol/kol";
 import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -21,6 +23,7 @@ import {
   SELECTABLE_ROLES
 } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
+import BdTransferDialog from "@/views/kol/BdTransferDialog.vue";
 import PermissionsDialog from "./PermissionsDialog.vue";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
@@ -91,6 +94,42 @@ const resetVisible = ref(false);
 const resetUser = ref<UserVO | null>(null);
 const permissionsVisible = ref(false);
 const permissionsUser = ref<UserVO | null>(null);
+/** KOLs per BD row (task 16b): drives the transfer button and the disable confirmation. */
+const kolCounts = ref<Record<string, number>>({});
+const transferVisible = ref(false);
+const transferTarget = ref<TransferTarget | null>(null);
+
+function isBdRow(row: UserVO): boolean {
+  return isStaff(row) && row.dataScope === "OWN";
+}
+
+function bdCount(row: UserVO): number | undefined {
+  return kolCounts.value[row.id];
+}
+
+async function loadKolCounts(rows: UserVO[]) {
+  const bds = rows.filter(isBdRow);
+  await Promise.all(
+    bds.map(async row => {
+      try {
+        // Super administrator context, so bdUserId filters as typed (backend ignores it for OWN).
+        const page = await listKols({ bdUserId: row.id, page: 1, size: 1 });
+        kolCounts.value[row.id] = Number(page.total);
+      } catch {
+        // Count stays unknown: the transfer still works, the dialogs just show less context.
+      }
+    })
+  );
+}
+
+function openTransfer(row: UserVO) {
+  transferTarget.value = {
+    fromBdUserId: row.id,
+    fromBdName: row.nickname || row.username,
+    count: bdCount(row) ?? 0
+  };
+  transferVisible.value = true;
+}
 
 function permissionEntries(row: UserVO): { code: string; name: string }[] {
   return (row.permissions ?? []).map(code => ({ code, name: permissionText(code, "name") }));
@@ -166,6 +205,8 @@ async function load() {
     });
     rows.value = page.items;
     total.value = Number(page.total);
+    // One request per BD row; the table shows at once and the counts fill in as they arrive.
+    void loadKolCounts(page.items);
   } catch (error) {
     notifyError(error);
   } finally {
@@ -233,13 +274,21 @@ function openPermissions(row: UserVO) {
 async function toggleStatus(row: UserVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
+  /** A BD with creators loses them to the company on disable (design §4.13.5). */
+  const creators = disabling && isBdRow(row) ? bdCount(row) : undefined;
+  const base = disabling
+    ? t("user.confirmDisable", { username: row.username })
+    : t("user.confirmEnable", { username: row.username });
+  const message =
+    creators && creators > 0 ? `${base}\n${t("user.disableBdEffect", { n: creators })}` : base;
   try {
     await ElMessageBox.confirm(
-      disabling
-        ? t("user.confirmDisable", { username: row.username })
-        : t("user.confirmEnable", { username: row.username }),
+      message,
       disabling ? t("user.disableTitle") : t("user.enableTitle"),
-      { type: "warning" }
+      {
+        type: "warning",
+        ...(message.includes("\n") ? { customStyle: { whiteSpace: "pre-line" } } : {})
+      }
     );
   } catch {
     return; // cancelled
@@ -383,6 +432,24 @@ onMounted(load);
         >
           {{ t("user.permissionsTitle") }}
         </el-button>
+        <el-tooltip
+          v-if="isBdRow(asUser(row))"
+          placement="top"
+          :disabled="bdCount(asUser(row)) !== 0"
+          :content="t('bdTransfer.noKols')"
+        >
+          <span class="user-page__transfer">
+            <el-button
+              link
+              type="warning"
+              data-test="transfer-kols"
+              :disabled="bdCount(asUser(row)) === 0"
+              @click="openTransfer(asUser(row))"
+            >
+              {{ t("bdTransfer.transferKols") }}
+            </el-button>
+          </span>
+        </el-tooltip>
         <el-button
           link
           :type="asUser(row).status === 1 ? 'danger' : 'success'"
@@ -400,5 +467,16 @@ onMounted(load);
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
     <PermissionsDialog v-model="permissionsVisible" :user="permissionsUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
+    <BdTransferDialog v-model="transferVisible" :target="transferTarget" @saved="load" />
   </div>
 </template>
+
+<style scoped>
+/* Element Plus tooltips ignore disabled buttons, so the button sits in a span. */
+.user-page__transfer {
+  margin-left: 12px;
+}
+.user-page__transfer :deep(.el-button) {
+  margin-left: 0;
+}
+</style>

@@ -146,16 +146,23 @@ const enUS: MessageSchema = {
     home: "Home",
     tenants: "Companies",
     kols: "Creators",
+    bdTransfers: "BD Transfers",
     products: "Products",
     shops: "Shops",
     product: "Product",
     mappings: "Mappings",
+    orders: "Orders",
+    orderList: "Order List",
+    orderUnmatched: "Matching Pool",
+    fund: "Funds",
+    payoutAccounts: "Payout account review",
     users: "Users",
     linkTemplates: "Agent templates",
     auditLogs: "Audit Log",
     password: "Change Password",
     forbidden: "Access denied",
-    notFound: "Page not found"
+    notFound: "Page not found",
+    notifications: "Notifications"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
@@ -446,6 +453,8 @@ const enUS: MessageSchema = {
     resetDone: "Password reset. The user must sign in with the new password.",
     confirmDisable: "Disable user {username}?",
     confirmEnable: "Enable user {username}?",
+    disableBdEffect:
+      "After disabling, the {n} creators under this account immediately become unassigned (company-owned), and scheduled transfers to this account are cancelled.",
     disableTitle: "Disable user",
     enableTitle: "Enable user",
     disabled: "Disabled",
@@ -549,11 +558,56 @@ const enUS: MessageSchema = {
     startedAt: "Start time",
     endedAt: "End time",
     current: "Current",
-    changeBdTitle: "Change BD",
-    changeBdSummary: "Creator {code} ({name}). Current BD: {bd}",
-    changeBdPlaceholder: "Leave empty to mark as unassigned",
-    changeBdDone: "BD updated.",
     bdOption: "{nickname} ({username})"
+  },
+  bdTransfer: {
+    action: "Transfer BD",
+    title: "Transfer BD",
+    target: "Transfer",
+    selectedKols: "{n} creators selected",
+    bdAllKols: "All creators of {name} (currently {n})",
+    newBd: "New BD",
+    newBdPlaceholder: "Select a BD",
+    newBdRequired: "Select a BD",
+    unassigned: "Unassigned (company)",
+    effectiveTime: "Effective",
+    now: "Immediately",
+    at: "At a time",
+    pickTimePlaceholder: "Pick date and time",
+    timezoneHint: "Time zone: {timezone} (UTC{offset})",
+    pickTime: "Choose an effective time",
+    timeFuture: "The effective time must be later than now",
+    timeRange: "The effective time must be within one year",
+    reason: "Reason",
+    reasonPlaceholder: "Optional, up to 255 characters",
+    tooMany: "At most {max} creators per transfer",
+    success:
+      "{immediate} transferred now, {scheduled} scheduled, {skipped} skipped (already with the new BD)",
+    conflicts: "These creators already have a scheduled transfer; cancel it first:",
+    transferKols: "Transfer creators",
+    noKols: "No creators under this account",
+    kol: "Creator",
+    kolCodePlaceholder: "e.g. KOL0001",
+    fromBd: "From BD",
+    toBd: "To BD",
+    effectiveAt: "Agreed effective time",
+    executedAt: "Executed at",
+    cancelReason: "Cancel reason",
+    cancelTitle: "Cancel reservation",
+    cancelConfirm: "Cancel this scheduled transfer of creator {code}?",
+    cancelled: "Reservation cancelled",
+    status: {
+      SCHEDULED: "Scheduled",
+      DONE: "Done",
+      CANCELLED: "Cancelled"
+    },
+    cancelReasons: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable",
+      TARGET_DISABLED: "The target BD was disabled",
+      REPLACED_BY_IMMEDIATE: "Replaced by an immediate transfer",
+      MANUAL: "Cancelled manually"
+    }
   },
   linkTemplate: {
     hint: "Every agent template of this company, including disabled ones, in sort order.",
@@ -647,6 +701,89 @@ const enUS: MessageSchema = {
     importTitle: "Bulk Import Mappings",
     limitHint: "One file, at most 20MB and 20,000 rows"
   },
+  order: {
+    shop: "Shop",
+    orderId: "Order ID",
+    payTime: "Paid at",
+    orderStatus: "Order Status",
+    payAmount: "Paid",
+    refundTotal: "Refunds",
+    kol: "Creator",
+    bd: "Owner BD",
+    company: "Company",
+    attributionStatus: "Attribution",
+    payRange: "Payment time",
+    kolCode: "Creator code",
+    status: {
+      UNPAID: "Unpaid",
+      PAID: "Paid",
+      SHIPPED: "Shipped",
+      RECEIVED: "Received",
+      COMPLETED: "Completed",
+      CLOSED: "Closed",
+      UNKNOWN: "Unknown"
+    },
+    attribution: {
+      PENDING: "Awaiting payment",
+      ATTRIBUTED: "Attributed",
+      NON_KOL: "Non-creator",
+      CONFLICT: "Conflict",
+      UNMATCHED: "Unmatched"
+    },
+    line: {
+      itemId: "Item ID",
+      itemName: "Item",
+      sku: "SKU",
+      quantity: "Qty",
+      payAmount: "Line paid",
+      refund: "Refund",
+      kolCode: "Creator code",
+      attribution: "Attribution",
+      manualReason: "Manual reason",
+      attributionType: {
+        "0": "Unmatched",
+        "1": "Product ID",
+        "2": "Manual",
+        "3": "Non-creator",
+        "4": "Conflict"
+      }
+    },
+    syncStatus: "Sync status",
+    syncShop: "Shop",
+    syncEnabled: "Enabled",
+    syncAuthorized: "Authorized",
+    syncUnauthorized: "Not authorized",
+    syncLastSuccess: "Last success",
+    syncLastError: "Last error",
+    syncFailed: "Sync failed",
+    syncNow: "Sync now",
+    syncStarted: "Synchronization started",
+    importOrders: "Import orders",
+    importRefunds: "Import refunds",
+    orderImportTitle: "Import Orders",
+    refundImportTitle: "Import Refunds",
+    importLimitHint: "One file, at most 20MB and 20,000 rows",
+    orderTemplateFile: "order-import-template.xlsx",
+    refundTemplateFile: "refund-import-template.xlsx",
+    pool: {
+      assign: "Assign creator",
+      assignTitle: "Assign Creator",
+      searchKol: "Search by code, name or email",
+      selectKol: "Select a creator",
+      markNonKol: "Mark non-creator",
+      nonKolTitle: "Mark as Non-creator Order",
+      rematch: "Re-match",
+      rematchTitle: "Re-match",
+      rematchConfirm:
+        "This clears the current attribution and re-runs automatic matching with the current mappings. Continue?",
+      reason: "Reason",
+      reasonPlaceholder: "Required, at most 255 characters",
+      reasonRequired: "Please fill in the reason",
+      assigned: "Creator assigned",
+      markedNonKol: "Marked as a non-creator order",
+      rematched: "Re-matching finished"
+    }
+  },
   link: {
     reasonKolDisabled: "Creator disabled",
     reasonOffShelf: "Product off shelf",
@@ -699,6 +836,64 @@ const enUS: MessageSchema = {
     uri: "Request URL",
     ip: "IP",
     cost: "Duration (ms)"
+  },
+  /** Task 15b: payout account review. */
+  payout: {
+    kol: "Creator",
+    kolCode: "Creator code",
+    type: "Type",
+    typeOption: {
+      PAYPAL: "PayPal",
+      USDT: "USDT"
+    },
+    account: "Account (masked)",
+    fullAccount: "Full account",
+    holder: "Receiver",
+    status: {
+      PENDING: "Under review",
+      APPROVED: "Approved",
+      REJECTED: "Rejected",
+      DISABLED: "Disabled"
+    },
+    defaultColumn: "Default",
+    submittedAt: "Submitted",
+    reviewedAt: "Reviewed",
+    detailTitle: "Payout account detail",
+    auditNote: "Opening the detail is recorded in the audit log.",
+    qr: "Payment QR code",
+    qrUnavailable: "Image failed to load",
+    approve: "Approve",
+    approveConfirm:
+      "Approve this payout account? The creator will not be able to change it afterwards.",
+    approved: "Approved.",
+    reject: "Reject",
+    rejectPlaceholder: "Enter the rejection reason (required, up to 255 characters)",
+    rejectReason: "Rejection reason",
+    rejectReasonRule: "Enter a rejection reason of up to 255 characters.",
+    rejected: "Rejected."
+  },
+  notification: {
+    open: "Notifications",
+    markAll: "Mark all as read",
+    viewAll: "View all",
+    unread: "Unread",
+    empty: "No messages",
+    noPermission: "You do not have permission to view that page.",
+    justNow: "Just now",
+    minutes: "{n} minutes ago",
+    hours: "{n} hours ago",
+    days: "{n} days ago",
+    type: {
+      PAYOUT_ACCOUNT_SUBMITTED:
+        "Creator {kolCode} submitted a {accountType} payout account for review",
+      ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
+      BD_TRANSFER_CANCELLED: "Scheduled transfer for creator {kolCode} was cancelled: {reason}",
+      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned"
+    },
+    reason: {
+      OWNERSHIP_CHANGED: "Ownership changed at execution",
+      TARGET_UNAVAILABLE: "The target BD is unavailable"
+    }
   }
 };
 

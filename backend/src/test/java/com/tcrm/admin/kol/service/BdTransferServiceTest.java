@@ -16,6 +16,8 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
+import com.tcrm.admin.kol.api.KolsUnassignedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolBdTransferMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.ObjectMapper;
 
 class BdTransferServiceTest {
@@ -55,6 +58,7 @@ class BdTransferServiceTest {
   private final BdUserApi bds = mock(BdUserApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final BdTransferService service =
       new BdTransferService(
           kols,
@@ -65,7 +69,8 @@ class BdTransferServiceTest {
           TestTransactions.template(),
           audit,
           new AuditSanitizer(new ObjectMapper()),
-          Clock.fixed(NOW, ZoneOffset.UTC));
+          Clock.fixed(NOW, ZoneOffset.UTC),
+          events);
 
   @BeforeAll
   static void tables() {
@@ -132,6 +137,7 @@ class BdTransferServiceTest {
     assertThat(row.getValue().getToBdUserId()).isEqualTo(6L);
     assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.DONE);
     assertThat(row.getValue().getExecutedAt()).isEqualTo(NOW);
+    assertThat(row.getValue().getReason()).isEqualTo("handover");
     verify(history).closeCurrent(11L, NOW, 1L);
     var params = ArgumentCaptor.forClass(String.class);
     verify(audit)
@@ -175,7 +181,17 @@ class BdTransferServiceTest {
     assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.SCHEDULED);
     assertThat(row.getValue().getToBdUserId()).isNull();
     assertThat(row.getValue().getEffectiveAt()).isEqualTo(time);
+    assertThat(row.getValue().getReason()).isNull();
     verifyNoInteractions(history);
+  }
+
+  @Test
+  void shouldKeepReasonEmpty_whenLegacyPutTransfersOneKol() {
+    service.updateOne(11L, 6L);
+    var row = ArgumentCaptor.forClass(KolBdTransferDO.class);
+    verify(transfers).insert(row.capture());
+    assertThat(row.getValue().getStatus()).isEqualTo(BdTransferStatus.DONE);
+    assertThat(row.getValue().getReason()).isNull();
   }
 
   @Test
@@ -313,7 +329,8 @@ class BdTransferServiceTest {
   @Test
   void shouldClearOwnershipAndPreserveSourceReservations_whenDisabled() {
     when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
-    service.onStaffDisabled(new StaffDisabledEvent(1L, 5L));
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(1L, 5L)));
     var next = ArgumentCaptor.forClass(KolBdHistoryDO.class);
     verify(history).insert(next.capture());
     assertThat(next.getValue().getBdUserId()).isNull();
@@ -331,18 +348,68 @@ class BdTransferServiceTest {
   }
 
   @Test
-  void shouldPageWithDefaults_whenListing() {
+  void shouldResolveDisplayFieldsWithFixedQueries_whenListing() {
+    var done = new KolBdTransferDO();
+    done.setId(22L);
+    done.setKolId(11L);
+    done.setFromBdUserId(5L);
+    done.setToBdUserId(6L);
+    done.setEffectiveAt(NOW);
+    done.setStatus(BdTransferStatus.DONE);
+    done.setExecutedAt(NOW);
+    done.setReason("handover");
+    var unassigned = new KolBdTransferDO();
+    unassigned.setId(23L);
+    unassigned.setKolId(11L);
+    unassigned.setEffectiveAt(NOW);
+    unassigned.setStatus(BdTransferStatus.SCHEDULED);
     when(transfers.selectPage(any(), any()))
         .thenAnswer(
             i -> {
               Page<KolBdTransferDO> p = i.getArgument(0);
-              p.setRecords(List.of(reservation(NOW)));
-              p.setTotal(1);
+              p.setRecords(List.of(done, unassigned));
+              p.setTotal(2);
               return p;
             });
+    var kol = new KolDO();
+    kol.setId(11L);
+    kol.setKolCode("KOL0011");
+    kol.setName("Alice");
+    when(kols.selectList(any())).thenReturn(List.of(kol));
+    when(bds.listByIds(any()))
+        .thenReturn(
+            List.of(
+                new BdUserDTO(5L, "source-login", "Source Nick", false),
+                new BdUserDTO(6L, "target-login", "  ", false)));
     var result = service.page(new BdTransferFilterDTO(null, null, 5L, 6L, 1, 20));
-    assertThat(result.total()).isEqualTo(1);
-    assertThat(result.items().getFirst().id()).isEqualTo(21L);
+    var first = result.items().get(0);
+    assertThat(first.id()).isEqualTo(22L);
+    assertThat(first.kolCode()).isEqualTo("KOL0011");
+    assertThat(first.kolName()).isEqualTo("Alice");
+    assertThat(first.fromBdUserName()).isEqualTo("Source Nick");
+    assertThat(first.toBdUserName()).isEqualTo("target-login");
+    assertThat(first.reason()).isEqualTo("handover");
+    var second = result.items().get(1);
+    assertThat(second.fromBdUserName()).isNull();
+    assertThat(second.toBdUserName()).isNull();
+    verify(kols, times(1)).selectList(any());
+    verify(bds, times(1)).listByIds(any());
+  }
+
+  @Test
+  void shouldSkipDisplayQueries_whenPageIsEmpty() {
+    when(transfers.selectPage(any(), any()))
+        .thenAnswer(
+            i -> {
+              Page<KolBdTransferDO> p = i.getArgument(0);
+              p.setRecords(List.of());
+              p.setTotal(0);
+              return p;
+            });
+    var result = service.page(new BdTransferFilterDTO(null, null, null, null, 1, 20));
+    assertThat(result.items()).isEmpty();
+    verify(kols, never()).selectList(any());
+    verify(bds, never()).listByIds(any());
   }
 
   @Test
@@ -375,6 +442,65 @@ class BdTransferServiceTest {
     assertThatThrownBy(() -> service.create(c))
         .hasMessage(ErrorCode.COMMON_VALIDATION_FAILED.message());
     verifyNoInteractions(kols, history, transfers);
+  }
+
+  @Test
+  void shouldPublish_whenExecutionCancelsBecauseOwnershipChanged() {
+    reservation(NOW.minusSeconds(1)).setTenantId(4L);
+    when(kols.selectById(11L)).thenReturn(kol(11L, null));
+    service.executeDue(21L);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new BdTransferCancelledEvent(4L, 11L, 21L, "KOL11", "OWNERSHIP_CHANGED"));
+  }
+
+  @Test
+  void shouldPublish_whenExecutionCancelsBecauseTargetIsUnavailable() {
+    reservation(NOW.minusSeconds(1)).setTenantId(4L);
+    when(bds.lockById(6L)).thenReturn(null);
+    service.executeDue(21L);
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue())
+        .isEqualTo(new BdTransferCancelledEvent(4L, 11L, 21L, "KOL11", "TARGET_UNAVAILABLE"));
+  }
+
+  @Test
+  void shouldNotPublish_whenCancelledManually() {
+    reservation(NOW.plusSeconds(1)).setTenantId(4L);
+    when(transfers.update(isNull(), any())).thenReturn(1);
+    service.cancel(21L);
+    verify(events, never()).publishEvent(any());
+  }
+
+  @Test
+  void shouldPublishUnassigned_whenDisabledStaffHasCreators() {
+    when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
+    when(bds.getById(5L)).thenReturn(new BdUserDTO(5L, "bd5", "Blake", false));
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(8L, 5L)));
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue()).isEqualTo(new KolsUnassignedEvent(8L, 5L, "Blake", 1));
+  }
+
+  @Test
+  void shouldPublishUnassignedWithBlankName_whenBdIsMissing() {
+    when(kols.selectList(any())).thenReturn(List.of(kol(11L, 5L)));
+    when(bds.getById(5L)).thenReturn(null);
+    TestTransactions.template()
+        .executeWithoutResult(status -> service.onStaffDisabled(new StaffDisabledEvent(8L, 5L)));
+    var published = ArgumentCaptor.forClass(Object.class);
+    verify(events).publishEvent(published.capture());
+    assertThat(published.getValue()).isEqualTo(new KolsUnassignedEvent(8L, 5L, "", 1));
+  }
+
+  @Test
+  void shouldNotPublishUnassigned_whenDisabledStaffHasNoCreators() {
+    when(kols.selectList(any())).thenReturn(List.of());
+    service.onStaffDisabled(new StaffDisabledEvent(8L, 5L));
+    verify(events, never()).publishEvent(any());
   }
 
   @SuppressWarnings("unchecked")

@@ -2,9 +2,14 @@ package com.tcrm.admin.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.TransactionalEvents;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +20,9 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Per-shop incremental ingestion; no transaction spans HTTP calls. Caller holds order:sync lock.
@@ -31,14 +38,28 @@ public class OrderSync {
   private final OrderWriter writer;
   private final OrderNormalizer normalizer;
   private final Clock clock;
+  private final ShopAccessApi shops;
+  private final ApplicationEventPublisher events;
+  private final TransactionTemplate tx;
 
   @Autowired
   public OrderSync(
       WeidianBusinessApi api,
       OrderSyncStateMapper states,
       OrderWriter writer,
+      OrderNormalizer normalizer,
+      ShopAccessApi shops,
+      ApplicationEventPublisher events,
+      TransactionTemplate tx) {
+    this(api, states, writer, normalizer, Clock.systemUTC(), shops, events, tx);
+  }
+
+  public OrderSync(
+      WeidianBusinessApi api,
+      OrderSyncStateMapper states,
+      OrderWriter writer,
       OrderNormalizer normalizer) {
-    this(api, states, writer, normalizer, Clock.systemUTC());
+    this(api, states, writer, normalizer, Clock.systemUTC(), null, null, null);
   }
 
   OrderSync(
@@ -47,11 +68,26 @@ public class OrderSync {
       OrderWriter writer,
       OrderNormalizer normalizer,
       Clock clock) {
+    this(api, states, writer, normalizer, clock, null, null, null);
+  }
+
+  OrderSync(
+      WeidianBusinessApi api,
+      OrderSyncStateMapper states,
+      OrderWriter writer,
+      OrderNormalizer normalizer,
+      Clock clock,
+      ShopAccessApi shops,
+      ApplicationEventPublisher events,
+      TransactionTemplate tx) {
     this.api = api;
     this.states = states;
     this.writer = writer;
     this.normalizer = normalizer;
     this.clock = clock;
+    this.shops = shops;
+    this.events = events;
+    this.tx = tx;
   }
 
   public boolean synchronize(long shopId) {
@@ -67,6 +103,7 @@ public class OrderSync {
     Instant previousOrderCursor = state.getOrderCursor();
     Instant previousRefundCursor = state.getRefundCursor();
     Instant previousSuccess = state.getLastSuccessAt();
+    boolean notify = state.getLastError() == null && previousSuccess != null;
     try {
       orders(shopId, start(state.getOrderCursor(), end), end);
       refunds(shopId, start(state.getRefundCursor(), end), end);
@@ -87,9 +124,53 @@ public class OrderSync {
               ? business.getErrorCode().name()
               : "inspect API status logs";
       state.setLastError("Order synchronization failed" + context + ": " + category);
-      states.updateById(state);
+      saveFailure(state, notify, shopId);
       LOG.warn("Order synchronization failed for shop {}", shopId);
       return false;
+    }
+  }
+
+  /** Persists the failure. A success-to-failure transition notifies super admins once. */
+  private void saveFailure(OrderSyncStateDO state, boolean notify, long shopId) {
+    String shopName = notify ? shopName(shopId) : "";
+    if (tx == null) {
+      states.updateById(state);
+      return;
+    }
+    tx.executeWithoutResult(
+        status -> {
+          states.updateById(state);
+          if (notify) {
+            publishFailure(shopId, shopName);
+          }
+        });
+  }
+
+  private void publishFailure(long shopId, String shopName) {
+    if (events == null) {
+      return;
+    }
+    Long tenant = TenantScope.companyId();
+    if (tenant == null) {
+      LOG.warn("Order sync failure for shop {} has no company; notification skipped", shopId);
+      return;
+    }
+    TransactionalEvents.publish(events, new OrderSyncFailedEvent(tenant, shopId, shopName));
+  }
+
+  private String shopName(long shopId) {
+    if (shops == null) {
+      return "";
+    }
+    try {
+      ShopAccessDTO shop = shops.findShop(shopId);
+      if (shop == null || shop.name() == null) {
+        return "";
+      }
+      return shop.name();
+    } catch (RuntimeException ex) {
+      LOG.warn("Shop {} name unavailable ({})", shopId, ex.getClass().getSimpleName());
+      return "";
     }
   }
 

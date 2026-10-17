@@ -50,6 +50,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "kol/bd-transfers",
+        name: "KolBdTransfers",
+        component: () => import("@/views/kol/bd-transfers/index.vue"),
+        meta: {
+          title: "route.bdTransfers",
+          icon: "Switch",
+          superAdmin: true,
+          componentName: "KolBdTransferPage"
+        }
+      },
+      {
         path: "product",
         name: "ProductGroup",
         redirect: "/product/shops",
@@ -93,6 +104,61 @@ export const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: "order",
+        name: "OrderGroup",
+        redirect: "/order/orders",
+        meta: {
+          title: "route.orders",
+          icon: "List",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "orders",
+            name: "OrderList",
+            component: () => import("@/views/order/index.vue"),
+            meta: {
+              title: "route.orderList",
+              permission: "order:view",
+              componentName: "OrderListPage"
+            }
+          },
+          {
+            path: "unmatched",
+            name: "OrderUnmatched",
+            component: () => import("@/views/order/unmatched.vue"),
+            meta: {
+              title: "route.orderUnmatched",
+              permission: "order:manage",
+              componentName: "OrderUnmatchedPage"
+            }
+          }
+        ]
+      },
+      {
+        path: "fund",
+        name: "FundGroup",
+        redirect: "/fund/payout-accounts",
+        meta: {
+          title: "route.fund",
+          icon: "Wallet",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "payout-accounts",
+            name: "PayoutAccountReview",
+            component: () => import("@/views/fund/payout-account/index.vue"),
+            meta: {
+              title: "route.payoutAccounts",
+              // Either code opens the page; the review drawer itself needs payout-account:review.
+              permission: ["payout-account:review", "commission:view"],
+              componentName: "PayoutAccountReviewPage"
+            }
+          }
+        ]
+      },
+      {
         path: "system/users",
         name: "SystemUsers",
         component: () => import("@/views/system/user/index.vue"),
@@ -123,6 +189,17 @@ export const routes: RouteRecordRaw[] = [
           icon: "Document",
           superAdmin: true,
           componentName: "SystemOperLogPage"
+        }
+      },
+      {
+        path: "notifications",
+        name: "Notifications",
+        component: () => import("@/views/notification/index.vue"),
+        meta: {
+          title: "route.notifications",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "NotificationPage"
         }
       },
       {

@@ -4,11 +4,13 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.order.service.OrderDTO;
 import com.tcrm.admin.order.service.OrderService;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
+import com.tcrm.admin.order.service.OrderSyncStateDTO;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,13 @@ public class OrderController {
   public ResponseEntity<R<Void>> sync(@Valid @RequestBody OrderSyncRequest request) {
     syncs.trigger(request.shopId());
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.ok(null));
+  }
+
+  /** order:view; every shop of the company with sync status; shops without a record included. */
+  @GetMapping("/sync-states")
+  @SaCheckPermission("order:view")
+  public R<List<OrderSyncStateDTO>> syncStates() {
+    return R.ok(orders.listSyncStates());
   }
 
   /** order:manage; paginated CONFLICT / UNMATCHED orders and lines. */
