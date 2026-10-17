@@ -30,3 +30,7 @@ CLAUDE.local.md
 deploy/certs/
 deploy/www/
 deploy/backups/
+
+# Customer samples kept locally only (too large for GitHub, or duplicates of the tracked zip)
+docs/00-需求/客户补充资料-1015/测试专用【达人名称A】.xlsx
+docs/00-需求/客户补充资料-1015/prod5(2)/
