@@ -2,7 +2,7 @@
 
 > 本文件是交给编码代理执行的提示词，把全文作为任务输入即可。
 >
-> **执行环境**：本机执行，独立工作树 `.worktrees/17a-copy-tokens`，分支 `task/17a-copy-tokens` 已从最新的 `main` 检出。
+> **执行环境**：本任务由**非本机**代理执行。自行 `gh repo clone ksws00684315/t-crm`，从最新的 `origin/main` 检出分支 `task/17a-copy-tokens`。
 >
 > **范围说明**：任务 17 拆为两部分。本任务（17a）只做令牌的生成、列表、复制、作废，以及给 17b 用的认证与扣减额度的内部接口。客户表格脚本调用的对外复制接口（`/admin-api/external/product-links/*`）属于 17b，要等客户确认微店复制流程（Q1）后再做，**本任务不做**。
 
@@ -38,7 +38,8 @@
 
 - 后端：JDK 21，`mvn spotless:apply`、`mvn verify`、`mvn verify -Pdocker-it` 全部通过。
 - 管理端：Node 24，`pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm notices:check` 全部通过。
-- 本机验证端口：后端 18251、管理端 Vite 8826、PostgreSQL 55451、Redis 46451，Compose 项目名 `tcrm-17a`。避开负责人正在用的 18081、8848、8849、55432、46391。验证完停掉进程并 `down -v`。
+- 需要 JDK 21、Maven、Node 24 + pnpm、Docker。本机没有 Docker 时，在报告中写明哪些检查没跑，集成测试以 PR 上 CI 的 Backend verify 为准，CI 必须通过；浏览器验证需要本地起后端与数据库，做不到时在报告中说明，并改用 Vitest 组件测试覆盖第 5 节的界面场景。
+- 本地起服务时用 `deploy/docker-compose.dev.yml`（Compose 项目名 `tcrm-17a`），验证完停掉进程并 `down -v`。测试账号与密码自己随机生成，不写入仓库和报告。
 - 推送分支，按 PR 模板创建 PR，用 `gh pr checks --watch` 等 CI 通过。**不要合并 PR，不要推送 `main`。**
 - **不新增依赖。** 迁移版本号固定为 `V202610181100`。
 
