@@ -47,7 +47,7 @@ public class ProductImportService {
         TaskType.PRODUCT_IMPORT,
         ProductImportColumn.headerKeys(),
         file,
-        () -> new ProductImportProcessor(actorId, shops, products, kolItems, codes, tx),
+        () -> new ProductImportProcessor(actorId, null, shops, products, kolItems, codes, tx),
         TaskType.PRODUCT_IMPORT.maxRows());
   }
 }

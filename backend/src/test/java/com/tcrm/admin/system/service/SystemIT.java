@@ -164,6 +164,7 @@ class SystemIT {
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
             "crm_file:NO",
+            "crm_google_credential:NO",
             "crm_kol:NO",
             "crm_kol_auth_token:NO",
             "crm_kol_bd_history:NO",
@@ -178,6 +179,8 @@ class SystemIT {
             "crm_payout_account:NO",
             "crm_product:NO",
             "crm_refund:NO",
+            "crm_sheet_source:NO",
+            "crm_sheet_source_item:NO",
             "crm_shop:NO",
             "crm_task:NO",
             "crm_task_file:NO",

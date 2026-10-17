@@ -55,6 +55,7 @@ class ProductControllerTest {
         "类",
         "https://a.com/x.png",
         new BigDecimal("12.50"),
+        "CNY",
         new BigDecimal("0.1550"),
         1,
         Instant.parse("2026-01-01T00:00:00Z"),
@@ -68,6 +69,7 @@ class ProductControllerTest {
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].price").value("12.50"))
+        .andExpect(jsonPath("$.data.items[0].priceCurrency").value("CNY"))
         .andExpect(jsonPath("$.data.items[0].rate").value("0.1550"));
   }
 

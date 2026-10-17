@@ -197,10 +197,72 @@ export interface ProductVO {
   category: string | null;
   imageUrl: string | null;
   price: string;
+  /** ISO 4217 currency of `price`; CNY unless read from a source sheet (ADR-021). */
+  priceCurrency: string;
   rate: string | null;
   status: 0 | 1;
   createTime: string;
   updateTime: string;
+}
+
+/** Rows a source-sheet read skipped, by reason, with up to 100 examples. */
+export interface SheetSkippedVO {
+  empty: number;
+  nonWeidian: number;
+  noItemId: number;
+  noShop: number;
+  samples: { row: number; reason: "NON_WEIDIAN" | "NO_ITEM_ID" | "NO_SHOP"; name: string }[];
+}
+
+/** `SheetSourceVO` (ADR-021). Columns are letters; `lastError` is an error code or null. */
+export interface SheetSourceVO {
+  id: string;
+  sourceName: string;
+  spreadsheetId: string;
+  sheetTitle: string;
+  headerRow: number;
+  linkColumn: string;
+  nameColumn: string;
+  priceColumn: string;
+  categoryColumn: string | null;
+  imageColumn: string | null;
+  defaultShopId: string | null;
+  defaultShopName: string | null;
+  priceCurrency: string;
+  status: 0 | 1;
+  lastReadAt: string | null;
+  lastTaskId: string | null;
+  lastRowCount: number | null;
+  lastSkipped: SheetSkippedVO | null;
+  lastError: string | null;
+}
+
+/** Result of `POST /product/sheet-sources/{id}/reads`. */
+export interface SheetReadResultVO {
+  taskId: string;
+  rowCount: number;
+  skipped: SheetSkippedVO;
+}
+
+/** An original product no longer present in the source sheet. */
+export interface SheetMissingVO {
+  productId: string;
+  productCode: string;
+  productName: string;
+  productStatus: 0 | 1;
+  shopId: string;
+  shopName: string | null;
+  weidianItemId: string;
+  sheetRow: number;
+  lastSeenTime: string;
+}
+
+/** Company Google service account; the key itself is never returned. */
+export interface GoogleCredentialVO {
+  configured: boolean;
+  clientEmail: string | null;
+  privateKeyId: string | null;
+  updateTime: string | null;
 }
 
 /** `KolItemVO`. `validTo` null means currently effective. */

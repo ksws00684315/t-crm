@@ -31,7 +31,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Imports original products (task 05 §4.2): insert-or-update by (shop, weidian item id); blank
- * cells on update mean "leave unchanged"; codes are immutable.
+ * cells on update mean "leave unchanged"; codes are immutable. A null {@code priceCurrency} (Excel
+ * upload) inserts the default CNY and keeps the currency on update; a source sheet passes its
+ * configured currency (ADR-021 §9).
  */
 class ProductImportProcessor implements ImportRowProcessor {
   static final String CODE_FORMAT = "import.product.error.code-format";
@@ -55,6 +57,7 @@ class ProductImportProcessor implements ImportRowProcessor {
   static final String CONFLICT = "import.product.error.conflict";
 
   private final Long actorId;
+  private final String priceCurrency;
   private final ShopService shops;
   private final ProductMapper products;
   private final KolItemMapper kolItems;
@@ -65,12 +68,14 @@ class ProductImportProcessor implements ImportRowProcessor {
 
   ProductImportProcessor(
       Long actorId,
+      String priceCurrency,
       ShopService shops,
       ProductMapper products,
       KolItemMapper kolItems,
       ProductCodeGenerator codes,
       TransactionTemplate tx) {
     this.actorId = actorId;
+    this.priceCurrency = priceCurrency;
     this.shops = shops;
     this.products = products;
     this.kolItems = kolItems;
@@ -202,6 +207,7 @@ class ProductImportProcessor implements ImportRowProcessor {
     product.setCategory(category.isEmpty() ? null : category);
     product.setImageUrl(image.isEmpty() ? null : image);
     product.setPrice(price);
+    product.setPriceCurrency(priceCurrency);
     product.setRate(rate);
     product.setStatus(1);
     product.setCreateBy(actorId);
@@ -268,6 +274,9 @@ class ProductImportProcessor implements ImportRowProcessor {
     }
     if (price != null) {
       update.set(ProductDO::getPrice, price);
+      if (priceCurrency != null) {
+        update.set(ProductDO::getPriceCurrency, priceCurrency);
+      }
     }
     if (rate != null) {
       update.set(ProductDO::getRate, rate);

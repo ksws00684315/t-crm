@@ -124,6 +124,7 @@ describe("buildMenu", () => {
       "店铺管理",
       "原商品",
       "对应关系",
+      "商品源表",
       "订单",
       "订单列表",
       "人工匹配池",
@@ -144,6 +145,7 @@ describe("buildMenu", () => {
       "/product/shops",
       "/product/products",
       "/product/kol-items",
+      "/product/sheet-sources",
       "/order/orders",
       "/order/unmatched",
       "/fund/payout-accounts",
@@ -164,7 +166,8 @@ describe("buildMenu", () => {
       "商品",
       "店铺管理",
       "原商品",
-      "对应关系"
+      "对应关系",
+      "商品源表"
     ]);
     expect(titles(staff("OWN", ["product:view"]))).toEqual(["首页", "商品", "店铺管理", "原商品"]);
   });
