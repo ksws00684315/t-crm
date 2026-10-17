@@ -60,14 +60,7 @@ describe("error code messages", () => {
     const known = Object.keys(zhCN.errors).filter(key => CODE.test(key));
     const extra = known.filter(code => !backend.includes(code));
     // The message ships with this task. 10a adds the enum constant; until then this one code is pending.
-    // 21b ships the multi-company texts ahead of 21a, which adds those four constants.
-    const pending = [
-      "USER_PERMISSION_INVALID",
-      "AUTH_COMPANY_NOT_MEMBER",
-      "AUTH_COMPANY_SWITCHED",
-      "USER_MULTI_COMPANY_LOCKED",
-      "USER_ALREADY_MEMBER"
-    ].filter(code => !backend.includes(code));
+    const pending = ["USER_PERMISSION_INVALID"].filter(code => !backend.includes(code));
     expect(extra.sort()).toEqual(pending.sort());
   });
 });
