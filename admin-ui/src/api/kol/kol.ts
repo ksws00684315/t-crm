@@ -101,7 +101,7 @@ export function uploadKolImport(file: File): Promise<KolImportVO> {
   return http.request<KolImportVO>({
     method: "post",
     url: "/kol/kol-imports",
-    // For FormData axios drops the JSON default so the browser sets multipart/form-data + boundary.
+    // The http interceptor drops the JSON default for FormData; the browser sets the boundary.
     data: form,
     timeout: 120000
   });
