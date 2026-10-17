@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -124,6 +125,13 @@ class NotificationControllerTest {
         assertThat(method.getAnnotation(AuditLog.class)).isNull();
       }
     }
+  }
+
+  @Test
+  void shouldDeclareOnlyCompanyRoles_onTheController() {
+    SaCheckRole roles = NotificationController.class.getAnnotation(SaCheckRole.class);
+    assertThat(roles).isNotNull();
+    assertThat(roles.value()).containsExactlyInAnyOrder("SUPER_ADMIN", "STAFF");
   }
 
   private String token() {

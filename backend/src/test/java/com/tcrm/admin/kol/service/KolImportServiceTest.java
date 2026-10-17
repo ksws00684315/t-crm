@@ -46,7 +46,8 @@ class KolImportServiceTest {
 
   @Test
   void shouldBuildTemplateFromColumnDefinition() {
-    when(imports.template(KolImportColumn.headerKeys())).thenReturn(new byte[] {7});
+    when(imports.template(KolImportColumn.headerKeys(), KolImportColumn.textColumnIndexes()))
+        .thenReturn(new byte[] {7});
     assertThat(service.template()).containsExactly(7);
   }
 

@@ -1,5 +1,6 @@
 package com.tcrm.admin.task.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -72,4 +73,12 @@ public interface ImportTaskApi {
    * @param headerKeys template header message keys ("import.*") in column order
    */
   byte[] template(List<String> headerKeys);
+
+  /**
+   * Same as {@link #template(List)} but marks the given 0-based columns as Excel text format so
+   * long IDs stay text when operators fill the template.
+   *
+   * @param textColumns 0-based column indexes that must use the {@code @} text format
+   */
+  byte[] template(List<String> headerKeys, Collection<Integer> textColumns);
 }

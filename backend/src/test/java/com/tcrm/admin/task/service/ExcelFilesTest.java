@@ -14,6 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -241,5 +247,20 @@ class ExcelFilesTest {
     byte[] mixed = workbook(List.of("编号", "Name", "邮箱"), List.of(List.of("a", "b", "c")));
     assertError(
         () -> read(mixed, ExcelFiles.DEFAULT_MAX_ROWS), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+  }
+
+  @Test
+  void shouldMarkSelectedColumnsAsText_whenWritingTemplate() throws Exception {
+    byte[] content = excel.write(List.of("店铺ID", "名称", "商品ID"), List.of(), Set.of(0, 2));
+    try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+      Sheet sheet = wb.getSheetAt(0);
+      Row header = sheet.getRow(0);
+      DataFormatter formatter = new DataFormatter();
+      assertThat(formatter.formatCellValue(header.getCell(0))).isEqualTo("店铺ID");
+      // Default column style is what Excel applies when operators type into empty cells.
+      assertThat(sheet.getColumnStyle(0).getDataFormatString()).isEqualTo("@");
+      assertThat(sheet.getColumnStyle(2).getDataFormatString()).isEqualTo("@");
+      assertThat(sheet.getColumnStyle(1).getDataFormatString()).isNotEqualTo("@");
+    }
   }
 }

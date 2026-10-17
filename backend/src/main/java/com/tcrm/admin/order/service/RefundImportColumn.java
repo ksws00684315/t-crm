@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Refund import template columns (task 18 §4.3); header message keys resolve per language in
@@ -34,5 +35,11 @@ public enum RefundImportColumn {
 
   public static List<String> headerKeys() {
     return HEADER_KEYS;
+  }
+
+  /** 0-based columns that must stay text in the downloadable template. */
+  public static Set<Integer> textColumnIndexes() {
+    return Set.of(
+        SHOP_ID.ordinal(), REFUND_NO.ordinal(), ORDER_NO.ordinal(), SUB_ORDER_NO.ordinal());
   }
 }

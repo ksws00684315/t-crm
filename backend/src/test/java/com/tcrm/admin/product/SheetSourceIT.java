@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.sun.net.httpserver.HttpServer;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.integration.service.GoogleTestKeys;
 import java.io.IOException;
@@ -341,21 +342,31 @@ class SheetSourceIT {
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      String body =
-          mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, admin))
-              .andExpect(status().isOk())
-              .andReturn()
-              .getResponse()
-              .getContentAsString();
-      JsonNode data = json.readTree(body).path("data");
-      String s = data.path("status").asText();
-      if ("SUCCESS".equals(s) || "PARTIAL".equals(s) || "FAILED".equals(s)) {
-        return data;
-      }
-      Thread.sleep(100);
-    }
-    throw new IllegalStateException("task " + taskId + " did not finish");
+    JsonNode[] holder = new JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          try {
+            String body =
+                mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, admin))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            JsonNode data = json.readTree(body).path("data");
+            String s = data.path("status").asText();
+            if ("SUCCESS".equals(s) || "PARTIAL".equals(s) || "FAILED".equals(s)) {
+              holder[0] = data;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   /** One sheet row: link in E, name in B, price in D. */

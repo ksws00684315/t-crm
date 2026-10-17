@@ -237,22 +237,28 @@ class PayoutAccountIT {
   }
 
   /** The audit writer is asynchronous; poll until the row for the action shows up. */
-  private long awaitAuditRows(String action) throws InterruptedException {
+  private long awaitAuditRows(String action) {
     long deadline = System.currentTimeMillis() + 5_000;
-    while (true) {
-      Long count =
+    long count = 0L;
+    while (System.currentTimeMillis() <= deadline) {
+      Long found =
           jdbc.queryForObject(
               "SELECT COUNT(*) FROM sys_oper_log WHERE module = 'PayoutAccount' AND action = ?",
               Long.class,
               action);
-      if (count != null && count > 0) {
+      count = found == null ? 0L : found;
+      if (count > 0) {
         return count;
       }
-      if (System.currentTimeMillis() > deadline) {
-        return count == null ? 0 : count;
+      try {
+        // Poll interval while waiting for the async audit row.
+        Thread.sleep(50);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError("interrupted waiting for audit row " + action, e);
       }
-      Thread.sleep(50);
     }
+    return count;
   }
 
   /** Reads the current submission stamp of the account, as the reviewer UI would. */

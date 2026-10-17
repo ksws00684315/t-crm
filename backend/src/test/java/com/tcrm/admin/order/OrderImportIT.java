@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import cn.idev.excel.FastExcel;
 import com.tcrm.admin.CompanySessions;
+import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -393,6 +394,92 @@ class OrderImportIT {
         .isEqualTo(2L);
   }
 
+  @Test
+  void shouldAllowReinsertingSoftDeletedIdentity_whenPartialUniqueIndexApplies() throws Exception {
+    List<List<String>> rows =
+        List.of(
+            List.of(
+                "100",
+                "7200",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "10.00",
+                "0",
+                "9001",
+                "s1",
+                "Item A",
+                "Red",
+                "1",
+                "10.00"));
+    String taskId = submit("/admin-api/order/order-imports", orderWorkbook(rows), "reins.xlsx");
+    assertThat(awaitTask(taskId).path("status").asText()).isEqualTo("SUCCESS");
+    Map<String, Object> order =
+        jdbc.queryForMap("SELECT * FROM crm_order WHERE weidian_order_id='7200'");
+    String softKey =
+        jdbc.queryForObject(
+            "SELECT sub_order_id FROM crm_order_item WHERE order_id=? AND is_deleted = FALSE",
+            String.class,
+            order.get("id"));
+    assertThat(softKey).startsWith("line-");
+
+    OrderDO api = new OrderDO();
+    api.setShopId(10L);
+    api.setWeidianOrderId("7200");
+    api.setOrderStatus("PAID");
+    api.setRawStatus("pay");
+    api.setOrderTime(PAID.minusSeconds(60));
+    api.setPayTime(PAID);
+    api.setTotalAmount(new BigDecimal("10.00"));
+    api.setPayAmount(new BigDecimal("10.00"));
+    api.setFreight(BigDecimal.ZERO.setScale(2));
+    api.setDiscount(BigDecimal.ZERO.setScale(2));
+    api.setSource(1);
+    api.setSourceUpdateTime(Instant.now());
+    api.setLastSyncTime(Instant.now());
+    api.setAttributionStatus("PENDING");
+    OrderItemDO a = new OrderItemDO();
+    a.setSubOrderId("wd-sub-7200");
+    a.setWeidianItemId("9001");
+    a.setSkuId("s1");
+    a.setItemName("Item A");
+    a.setSkuName("Red");
+    a.setQuantity(1);
+    a.setPayAmount(new BigDecimal("10.00"));
+    a.setRefundAmount(BigDecimal.ZERO.setScale(2));
+    a.setAttributionType(0);
+    TenantScope.runCompany(1, () -> writer.save(new OrderPayloadDTO(api, List.of(a))));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=? AND is_deleted = TRUE AND sub_order_id=?",
+                Long.class,
+                order.get("id"),
+                softKey))
+        .isEqualTo(1L);
+
+    // Second API sync carries the soft-deleted import key again; live unique index must allow it.
+    OrderItemDO again = new OrderItemDO();
+    again.setSubOrderId(softKey);
+    again.setWeidianItemId("9001");
+    again.setSkuId("s1");
+    again.setItemName("Item A");
+    again.setSkuName("Red");
+    again.setQuantity(1);
+    again.setPayAmount(new BigDecimal("10.00"));
+    again.setRefundAmount(BigDecimal.ZERO.setScale(2));
+    again.setAttributionType(0);
+    api.setSourceUpdateTime(Instant.now().plusSeconds(1));
+    TenantScope.runCompany(1, () -> writer.save(new OrderPayloadDTO(api, List.of(again))));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=? AND is_deleted = FALSE AND sub_order_id=?",
+                Long.class,
+                order.get("id"),
+                softKey))
+        .isEqualTo(1L);
+  }
+
   void shouldForbidImportWithoutPermission_andHideOtherCompanyShop() throws Exception {
     mvc.perform(
             multipart("/admin-api/order/order-imports")
@@ -443,19 +530,29 @@ class OrderImportIT {
   }
 
   private JsonNode awaitTask(String taskId) throws Exception {
-    for (int i = 0; i < 100; i++) {
-      MvcResult result =
-          mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, admin))
-              .andExpect(status().isOk())
-              .andReturn();
-      JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
-      String status = data.path("status").asText();
-      if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
-        return data;
-      }
-      Thread.sleep(100);
-    }
-    throw new IllegalStateException("task " + taskId + " did not finish");
+    JsonNode[] holder = new JsonNode[1];
+    TestWait.until(
+        java.time.Duration.ofSeconds(30),
+        java.time.Duration.ofMillis(100),
+        () -> {
+          try {
+            MvcResult result =
+                mvc.perform(get("/admin-api/task/tasks/" + taskId).header(TOKEN, admin))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode data = json.readTree(result.getResponse().getContentAsString()).path("data");
+            String status = data.path("status").asText();
+            if ("SUCCESS".equals(status) || "PARTIAL".equals(status) || "FAILED".equals(status)) {
+              holder[0] = data;
+              return true;
+            }
+            return false;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        },
+        "task " + taskId + " did not finish");
+    return holder[0];
   }
 
   private static byte[] orderWorkbook(List<List<String>> rows) {

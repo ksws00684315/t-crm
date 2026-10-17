@@ -46,7 +46,8 @@ public class MappingImportService {
   }
 
   public byte[] template() {
-    return imports.template(MappingImportColumn.headerKeys());
+    return imports.template(
+        MappingImportColumn.headerKeys(), MappingImportColumn.textColumnIndexes());
   }
 
   public Long submit(ImportFileDTO file) {

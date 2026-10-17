@@ -17,6 +17,7 @@ import com.tcrm.admin.task.model.TaskFileKind;
 import com.tcrm.admin.task.model.TaskStatus;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -145,7 +146,12 @@ public class ImportTaskService implements ImportTaskApi {
 
   @Override
   public byte[] template(List<String> headerKeys) {
-    return excel.write(render(headerKeys, List.of(), AppLocale.current()), List.of());
+    return template(headerKeys, List.of());
+  }
+
+  @Override
+  public byte[] template(List<String> headerKeys, Collection<Integer> textColumns) {
+    return excel.write(render(headerKeys, List.of(), AppLocale.current()), List.of(), textColumns);
   }
 
   /**
