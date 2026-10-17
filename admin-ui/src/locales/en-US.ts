@@ -191,7 +191,7 @@ const enUS: MessageSchema = {
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
     KOL_AUTH_TOKEN_INVALID: "The invitation or reset link is invalid, expired, or already used.",
     KOL_LOGIN_SELECTION_INVALID: "The company selection credential is invalid or expired.",
-    KOL_TRANSFER_EXISTS: "Some KOLs already have a scheduled BD transfer. Cancel it first.",
+    KOL_TRANSFER_EXISTS: "Some creators already have a scheduled BD transfer. Cancel it first.",
     KOL_TRANSFER_NOT_SCHEDULED: "Only scheduled BD transfers can be cancelled.",
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
@@ -388,9 +388,9 @@ const enUS: MessageSchema = {
   export: {
     done: "Exported {n} rows",
     truncated: "{total} results; exported the first {n}. Narrow the filters and export in parts",
-    fileKol: "kols",
+    fileKol: "creators",
     fileProduct: "products",
-    fileMapping: "kol-items",
+    fileMapping: "mappings",
     fileUser: "users"
   },
   batch: {
@@ -465,6 +465,8 @@ const enUS: MessageSchema = {
     exclusiveTitle: "Super Admin only. These cannot be granted.",
     exclusiveItems:
       "Users and permissions, system settings, the audit log, prepay approval, marking a withdrawal as paid, and transferring creators.",
+    permissionDependencies:
+      "Checking an action permission also checks the view permission it needs; clearing a view permission also clears the action permissions that need it.",
     templateRequired: "Choose a post template",
     dataScope: "Data scope",
     lastLogin: "Last sign-in",

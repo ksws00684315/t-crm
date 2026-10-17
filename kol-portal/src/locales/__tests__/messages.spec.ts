@@ -18,6 +18,22 @@ describe("message packs", () => {
     expect(flattenKeys(zhCN)).toEqual(flattenKeys(enUS));
   });
 
+  it("keeps the KOL word out of user-facing English copy; Creator is the term (task 24 §4.3)", () => {
+    const offenders: string[] = [];
+    const visit = (value: object, prefix = "") => {
+      for (const [key, child] of Object.entries(value)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (child !== null && typeof child === "object") {
+          visit(child as object, path);
+        } else if (typeof child === "string" && /\bKOLs?\b/i.test(child)) {
+          offenders.push(`${path}: ${child}`);
+        }
+      }
+    };
+    visit(enUS);
+    expect(offenders).toEqual([]);
+  });
+
   it("has a message for every route meta.title key", () => {
     const keys = new Set(flattenKeys(enUS));
     const titles = routes.flatMap(collectTitles);
