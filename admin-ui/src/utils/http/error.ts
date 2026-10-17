@@ -10,6 +10,8 @@ export class ApiError extends Error {
   readonly traceId: string | null;
   /** Names of the request fields the backend rejected (COMMON_VALIDATION_FAILED only). */
   readonly fields: string[];
+  /** Envelope `data` of the failed response, when present (e.g. 409 conflict lists). */
+  readonly payload: unknown;
   /** Set by a global handler that already told the user (401 redirect); callers then stay quiet. */
   handled = false;
 
@@ -18,6 +20,7 @@ export class ApiError extends Error {
     errorCode: string | null;
     traceId: string | null;
     fields?: string[];
+    payload?: unknown;
   }) {
     // Our own text in the language valid at throw time, never the backend `msg`; displayMessage
     // resolves the text again so a language switch is reflected even for existing errors.
@@ -29,6 +32,7 @@ export class ApiError extends Error {
     this.errorCode = init.errorCode;
     this.traceId = init.traceId;
     this.fields = init.fields ?? [];
+    this.payload = init.payload ?? null;
   }
 
   /**

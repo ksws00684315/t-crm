@@ -50,6 +50,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "kol/bd-transfers",
+        name: "KolBdTransfers",
+        component: () => import("@/views/kol/bd-transfers/index.vue"),
+        meta: {
+          title: "route.bdTransfers",
+          icon: "Switch",
+          superAdmin: true,
+          componentName: "KolBdTransferPage"
+        }
+      },
+      {
         path: "product",
         name: "ProductGroup",
         redirect: "/product/shops",

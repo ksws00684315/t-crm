@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
  * Files allowed to contain Chinese. Each entry needs a reason. Empty means every scanned source
  * takes its UI copy from the message packs.
  */
-const ALLOWLIST: Readonly<Record<string, string>> = {};
+const ALLOWLIST: Readonly<Record<string, string>> = {
+  "utils/bd-transfer.ts":
+    "Lookup keys only: the backend stores BD transfer cancel reasons verbatim in Chinese (design §4.13); the file maps them to language-pack codes and renders nothing itself."
+};
 
 const CHINESE = /[\u4e00-\u9fff]/;
 
