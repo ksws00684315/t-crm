@@ -98,6 +98,9 @@ export function createHttp(options: HttpOptions): Http {
     const token = options.getToken();
     if (token) config.headers.set(TOKEN_HEADER, token);
     config.headers.set("Accept-Language", options.getLanguage());
+    // axios serializes FormData to JSON while the JSON default is set; without it the browser
+    // sends multipart/form-data with its boundary.
+    if (config.data instanceof FormData) config.headers.setContentType(false);
     return config;
   });
 
