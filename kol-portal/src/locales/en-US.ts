@@ -22,7 +22,7 @@ const enUS = {
     label: "Primary",
     home: "Home",
     payoutAccounts: "Payout accounts",
-    orders: "Orders"
+    orders: "My orders"
   },
   /** Each language is named in itself and shows the same label in both languages. */
   locale: {
@@ -74,12 +74,44 @@ const enUS = {
   home: {
     title: "Welcome",
     body: "This portal is under construction. Your sales, commission and withdrawal overview will appear here.",
+    viewOrders: "View my orders",
     payoutEntry: "Payout accounts"
+  },
+  orders: {
+    title: "My orders",
+    dateRange: "Date range",
+    last7Days: "Last 7 days",
+    last30Days: "Last 30 days",
+    last90Days: "Last 90 days",
+    customRange: "Custom range",
+    fromDate: "From date",
+    toDate: "To date",
+    allStatuses: "All statuses",
+    status: "Status",
+    orderNo: "Order number",
+    payTime: "Payment time",
+    payAmount: "Paid",
+    refundAmount: "Refund",
+    item: "Item",
+    sku: "SKU",
+    quantity: "Quantity",
+    empty: "No orders yet. Share your exclusive link and orders will appear here.",
+    loadFailed: "Orders could not be loaded. Please try again.",
+    statuses: {
+      UNPAID: "Unpaid",
+      PAID: "Paid",
+      SHIPPED: "Shipped",
+      RECEIVED: "Received",
+      COMPLETED: "Completed",
+      CLOSED: "Closed",
+      UNKNOWN: "Unknown"
+    }
   },
   /** Route `meta.title` values, translated when document.title is set. */
   route: {
     login: "Sign in",
     home: "Home",
+    orders: "My orders",
     activate: "Activate account",
     reset: "Reset password",
     forgot: "Forgot password",
