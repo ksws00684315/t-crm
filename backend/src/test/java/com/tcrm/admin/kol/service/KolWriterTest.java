@@ -34,7 +34,7 @@ class KolWriterTest {
 
   @BeforeEach
   void ids() {
-    when(codes.next()).thenReturn("KOL0001", "KOL0002", "KOL0003", "KOL0004");
+    when(codes.next()).thenReturn("KOL-AAA001", "KOL-AAA002", "KOL-AAA003", "KOL-AAA004");
   }
 
   private static DuplicateKeyException duplicate(String constraint) {
@@ -61,7 +61,7 @@ class KolWriterTest {
         .when(kols)
         .insert(any(KolDO.class));
     KolDO saved = writer.insert(kol(5L), null, 1L);
-    assertThat(saved.getKolCode()).isEqualTo("KOL0001");
+    assertThat(saved.getKolCode()).isEqualTo("KOL-AAA001");
     assertThat(saved.getCreateBy()).isEqualTo(1L);
     assertThat(saved.getDeleted()).isFalse();
     var period = ArgumentCaptor.forClass(KolBdHistoryDO.class);
@@ -75,7 +75,7 @@ class KolWriterTest {
 
   @Test
   void shouldNotWriteHistory_whenKolIsUnassigned() {
-    writer.insert(kol(null), "KOL0100", 1L);
+    writer.insert(kol(null), "KOL-AAA100", 1L);
     verify(history, never()).insert(any(KolBdHistoryDO.class));
     verify(codes, never()).next();
   }
@@ -83,7 +83,7 @@ class KolWriterTest {
   @Test
   void shouldRetryWithNewCode_whenGeneratedCodeLosesRace() {
     when(kols.insert(any(KolDO.class))).thenThrow(duplicate("uk_crm_kol_kol_code")).thenReturn(1);
-    assertThat(writer.insert(kol(null), null, 1L).getKolCode()).isEqualTo("KOL0002");
+    assertThat(writer.insert(kol(null), null, 1L).getKolCode()).isEqualTo("KOL-AAA002");
   }
 
   @Test
@@ -98,7 +98,7 @@ class KolWriterTest {
   @Test
   void shouldReportCodeExists_whenRequestedCodeIsTaken() {
     when(kols.insert(any(KolDO.class))).thenThrow(duplicate("uk_crm_kol_kol_code"));
-    assertThatThrownBy(() -> writer.insert(kol(null), "KOL0100", 1L))
+    assertThatThrownBy(() -> writer.insert(kol(null), "KOL-AAA100", 1L))
         .hasMessage(ErrorCode.KOL_CODE_EXISTS.message());
     verify(kols, times(1)).insert(any(KolDO.class));
   }

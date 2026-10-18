@@ -102,12 +102,13 @@ class NotificationIT {
         "INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, country, bd_user_id, create_time, update_time) VALUES (?, ?, ?, 'Ada', ?, 'US', ?, now(), now())",
         kolId,
         company.tenantId(),
-        "KOL" + kolId,
+        "KOL-AAA" + String.format("%03d", kolId),
         "ada" + kolId + "@example.com",
         bd);
     publish(
         company.tenantId(),
-        new PayoutAccountSubmittedEvent(company.tenantId(), kolId, 77L, "KOL" + kolId, "PAYPAL"));
+        new PayoutAccountSubmittedEvent(
+            company.tenantId(), kolId, 77L, "KOL-AAA" + String.format("%03d", kolId), "PAYPAL"));
     assertThat(count(company.tenantId())).isEqualTo(2);
     String params =
         jdbc.queryForObject(

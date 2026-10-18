@@ -23,10 +23,10 @@ class ClickRedisTest {
     var redis = mock(StringRedisTemplate.class);
     HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
     when(redis.opsForHash()).thenReturn(hashes);
-    when(hashes.get("link:KOL0001", "product"))
+    when(hashes.get("link:KOL-AAA001", "product"))
         .thenReturn(
             "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
-    assertThat(new ClickRedis(redis, 1000).lookup("KOL0001", "product"))
+    assertThat(new ClickRedis(redis, 1000).lookup("KOL-AAA001", "product"))
         .isEqualTo("{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":1}");
   }
 
@@ -57,7 +57,7 @@ class ClickRedisTest {
     var redis = mock(StringRedisTemplate.class);
     StreamOperations<String, Object, Object> streams = mock(StreamOperations.class);
     when(redis.opsForStream()).thenReturn(streams);
-    var fields = Map.of("kolCode", "KOL0001");
+    var fields = Map.of("kolCode", "KOL-AAA001");
     new ClickRedis(redis, 1000).append(fields);
     var event = org.mockito.ArgumentCaptor.forClass(MapRecord.class);
     var options = org.mockito.ArgumentCaptor.forClass(XAddOptions.class);
@@ -71,7 +71,7 @@ class ClickRedisTest {
     var redis = mock(StringRedisTemplate.class);
     StreamOperations<String, Object, Object> streams = mock(StreamOperations.class);
     when(redis.opsForStream()).thenReturn(streams);
-    new ClickRedis(redis, 5000).append(Map.of("kolCode", "KOL0001"));
+    new ClickRedis(redis, 5000).append(Map.of("kolCode", "KOL-AAA001"));
     var options = org.mockito.ArgumentCaptor.forClass(XAddOptions.class);
     verify(streams).add(any(MapRecord.class), options.capture());
     assertThat(options.getValue().getMaxlen()).isEqualTo(5000L);

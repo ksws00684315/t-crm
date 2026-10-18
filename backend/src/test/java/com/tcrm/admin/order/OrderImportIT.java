@@ -124,7 +124,7 @@ class OrderImportIT {
             + " VALUES(20,2,'Other','200',1,now(),now())");
     jdbc.update(
         "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,create_time,update_time)"
-            + " VALUES(100,1,'KOL0100','Creator','kol0100@example.test','US',now(),now())");
+            + " VALUES(100,1,'KOL-AAA100','Creator','kol0100@example.test','US',now(),now())");
     jdbc.update(
         "INSERT INTO crm_product(id,tenant_id,product_code,shop_id,weidian_item_id,name,price,create_time,update_time)"
             + " VALUES(1,1,'P1',10,'8001','Original',10,now(),now())");

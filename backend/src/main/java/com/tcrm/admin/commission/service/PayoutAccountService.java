@@ -45,6 +45,7 @@ public class PayoutAccountService {
       PayoutAccountType type,
       String account,
       String holderName,
+      String currency,
       UsdtNetwork network,
       Long qrFileId) {}
 
@@ -57,6 +58,7 @@ public class PayoutAccountService {
       PayoutAccountType accountType,
       String account,
       String holderName,
+      String currency,
       UsdtNetwork network,
       Long qrFileId,
       PayoutAccountStatus status,
@@ -74,6 +76,7 @@ public class PayoutAccountService {
       PayoutAccountType accountType,
       String accountMasked,
       String holderName,
+      String currency,
       UsdtNetwork network,
       Long qrFileId,
       PayoutAccountStatus status,
@@ -91,6 +94,7 @@ public class PayoutAccountService {
       PayoutAccountType accountType,
       String account,
       String holderName,
+      String currency,
       UsdtNetwork network,
       Long qrFileId,
       PayoutAccountStatus status,
@@ -202,6 +206,7 @@ public class PayoutAccountService {
                       .set(PayoutAccountDO::getAccountCipher, cipher.encrypt(c.account()))
                       .set(PayoutAccountDO::getAccountMasked, AccountMasker.mask(c.account()))
                       .set(PayoutAccountDO::getHolderName, holderOf(c))
+                      .set(PayoutAccountDO::getCurrency, currencyOf(c))
                       .set(PayoutAccountDO::getUsdtNetwork, networkOf(c))
                       .set(PayoutAccountDO::getQrFileId, c.qrFileId())
                       .set(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
@@ -345,6 +350,7 @@ public class PayoutAccountService {
         account.getAccountType(),
         cipher.decrypt(account.getAccountCipher()),
         account.getHolderName(),
+        account.getCurrency(),
         account.getUsdtNetwork(),
         account.getQrFileId(),
         account.getStatus(),
@@ -426,6 +432,7 @@ public class PayoutAccountService {
     account.setAccountCipher(cipher.encrypt(c.account()));
     account.setAccountMasked(AccountMasker.mask(c.account()));
     account.setHolderName(holderOf(c));
+    account.setCurrency(currencyOf(c));
     account.setUsdtNetwork(networkOf(c));
     account.setQrFileId(c.qrFileId());
     account.setCreateBy(account.getKolId());
@@ -433,6 +440,10 @@ public class PayoutAccountService {
 
   private static String holderOf(SaveCommand c) {
     return c.type() == PayoutAccountType.PAYPAL ? c.holderName() : null;
+  }
+
+  private static String currencyOf(SaveCommand c) {
+    return c.type() == PayoutAccountType.PAYPAL ? c.currency() : null;
   }
 
   private static UsdtNetwork networkOf(SaveCommand c) {
@@ -532,6 +543,7 @@ public class PayoutAccountService {
         account.getAccountType(),
         plainAccount,
         account.getHolderName(),
+        account.getCurrency(),
         account.getUsdtNetwork(),
         account.getQrFileId(),
         account.getStatus(),
@@ -551,6 +563,7 @@ public class PayoutAccountService {
         account.getAccountType(),
         account.getAccountMasked(),
         account.getHolderName(),
+        account.getCurrency(),
         account.getUsdtNetwork(),
         account.getQrFileId(),
         account.getStatus(),

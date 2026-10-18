@@ -53,6 +53,13 @@ public class KolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String sheetUrl;
 
+  /** Promotion workflow status (ADR-023); default PENDING_REVIEW for new rows. */
+  private String promotionStatus;
+
+  /** Dedicated landing page URL; nullable and clearable. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String landingUrl;
+
   /** 1 entered in admin, 2 self-registered; fixed after creation. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Integer registerSource;
@@ -178,6 +185,22 @@ public class KolDO extends BaseEntity {
 
   public void setSheetUrl(String value) {
     this.sheetUrl = value;
+  }
+
+  public String getPromotionStatus() {
+    return promotionStatus;
+  }
+
+  public void setPromotionStatus(String value) {
+    this.promotionStatus = value;
+  }
+
+  public String getLandingUrl() {
+    return landingUrl;
+  }
+
+  public void setLandingUrl(String value) {
+    this.landingUrl = value;
   }
 
   public Integer getRegisterSource() {

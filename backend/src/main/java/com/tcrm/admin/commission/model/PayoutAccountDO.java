@@ -30,6 +30,9 @@ public class PayoutAccountDO {
 
   private String holderName;
 
+  /** ISO 4217; PayPal only. */
+  private String currency;
+
   private UsdtNetwork usdtNetwork;
 
   private Long qrFileId;
@@ -113,6 +116,14 @@ public class PayoutAccountDO {
 
   public void setHolderName(String value) {
     this.holderName = value;
+  }
+
+  public String getCurrency() {
+    return currency;
+  }
+
+  public void setCurrency(String value) {
+    this.currency = value;
   }
 
   public UsdtNetwork getUsdtNetwork() {

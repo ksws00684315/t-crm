@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** KOL as shown in lists and details; the 2026-10-16 profile fields (task 11 §4.3) included. */
+/** KOL as shown in lists and details; includes promotion fields (task 25a / ADR-023). */
 public record KolDTO(
     Long id,
     String kolCode,
@@ -22,6 +22,10 @@ public record KolDTO(
     String linkTemplateName,
     String inviteCode,
     String sheetUrl,
+    String promotionStatus,
+    String displayStatus,
+    String landingUrl,
+    List<Long> platformTemplateIds,
     Integer registerSource,
     Integer accountStatus,
     Instant createTime,

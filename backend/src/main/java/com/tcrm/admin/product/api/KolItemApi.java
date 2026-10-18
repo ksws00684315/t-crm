@@ -1,6 +1,7 @@
 package com.tcrm.admin.product.api;
 
 import com.tcrm.admin.shared.PageResult;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -109,4 +110,15 @@ public interface KolItemApi {
    * set without querying.
    */
   Set<String> filterCurrentItemIds(Collection<String> weidianItemIds);
+
+  /**
+   * Ends every current exclusive-item mapping of the KOL ({@code valid_to = at}). Used by idle-KOL
+   * cleanup (task 25a review); does not touch soft-deleted KOLs elsewhere.
+   *
+   * @param kolId crm_kol.id
+   * @param at closing instant written to valid_to / update_time
+   * @param actorId update_by; null for system jobs
+   * @return number of mappings closed
+   */
+  int closeCurrentMappingsForKol(Long kolId, Instant at, Long actorId);
 }

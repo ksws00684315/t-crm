@@ -2,11 +2,14 @@ package com.tcrm.admin.kol.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.tcrm.admin.kol.service.KolClaimService;
+import com.tcrm.admin.kol.service.KolPromotionService;
 import com.tcrm.admin.kol.service.KolService;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -15,19 +18,25 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KOL management (task 04 §4.3, §5). Permission codes are checked here. A staff account with OWN
- * scope sees only KOLs assigned to them; changing the BD is super-admin only.
+ * KOL management (task 04 §4.3, §5; task 25a promotion / claim). Permission codes are checked here.
+ * A staff account with OWN scope sees only KOLs assigned to them; changing the BD is super-admin
+ * only. Claim additionally requires a usable BD.
  */
 @RestController
 @RequestMapping("/admin-api/kol/kols")
 public class KolController {
   private final KolService kols;
+  private final KolPromotionService promotions;
+  private final KolClaimService claims;
 
-  public KolController(KolService kols) {
+  public KolController(KolService kols, KolPromotionService promotions, KolClaimService claims) {
     this.kols = kols;
+    this.promotions = promotions;
+    this.claims = claims;
   }
 
   @GetMapping
@@ -80,6 +89,47 @@ public class KolController {
   @AuditLog(module = "KOL", action = "Resend invite")
   public R<Void> invite(@PathVariable @Min(1) Long id) {
     kols.resendInvite(id);
+    return R.ok(null);
+  }
+
+  @PutMapping("/{id}/promotion-status")
+  @SaCheckPermission("kol:edit")
+  @AuditLog(module = "KOL", action = "Change promotion status")
+  public R<Void> promotionStatus(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody PromotionStatusRequest r) {
+    promotions.updateStatus(id, r.status());
+    return R.ok(null);
+  }
+
+  @GetMapping("/{id}/promotion-config")
+  @SaCheckPermission("kol:edit")
+  public R<PromotionConfigVO> promotionConfig(@PathVariable @Min(1) Long id) {
+    return R.ok(PromotionConfigVO.from(promotions.getConfig(id)));
+  }
+
+  @PutMapping("/{id}/promotion-config")
+  @SaCheckPermission("kol:edit")
+  @AuditLog(module = "KOL", action = "Save promotion config")
+  public R<Void> savePromotionConfig(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody PromotionConfigRequest r) {
+    promotions.updateConfig(id, r.toCommand());
+    return R.ok(null);
+  }
+
+  @GetMapping("/{id}/promotion-records")
+  @SaCheckPermission("kol:edit")
+  public R<PageResult<PromotionRecordVO>> promotionRecords(
+      @PathVariable @Min(1) Long id,
+      @RequestParam(defaultValue = "1") @Min(1) int page,
+      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+    return R.ok(promotions.pageRecords(id, page, size).map(PromotionRecordVO::from));
+  }
+
+  @PostMapping("/{id}/claim")
+  @SaCheckPermission("kol:edit")
+  @AuditLog(module = "KOL", action = "Claim KOL")
+  public R<Void> claim(@PathVariable @Min(1) Long id) {
+    claims.claim(id);
     return R.ok(null);
   }
 }
