@@ -31,4 +31,17 @@ class KolPromotionSupportTest {
     kol.setInviteCode(null);
     assertThat(KolPromotionSupport.configComplete(kol, List.of(1L))).isFalse();
   }
+
+  @Test
+  void shouldListMissingConfigFieldNames_inFixedOrder() {
+    KolDO kol = new KolDO();
+    assertThat(KolPromotionSupport.missingConfigFields(kol, null))
+        .containsExactly("defaultRate", "platformTemplateIds", "landingUrl", "inviteCode");
+    kol.setDefaultRate(new BigDecimal("0.1000"));
+    kol.setLandingUrl("https://landing.example/");
+    assertThat(KolPromotionSupport.missingConfigFields(kol, List.of()))
+        .containsExactly("platformTemplateIds", "inviteCode");
+    kol.setInviteCode("inv");
+    assertThat(KolPromotionSupport.missingConfigFields(kol, List.of(1L))).isEmpty();
+  }
 }

@@ -97,8 +97,9 @@ public class KolService {
                 KolDO::getCountry,
                 filter.country() == null ? null : filter.country().strip().toUpperCase(Locale.ROOT))
             .eq(filter.status() != null, KolDO::getStatus, filter.status())
-            .eq(bd != null, KolDO::getBdUserId, bd)
-            .orderByDesc(KolDO::getCreateTime, KolDO::getId);
+            .eq(bd != null, KolDO::getBdUserId, bd);
+    applyDisplayStatus(query, filter.displayStatus());
+    query.orderByDesc(KolDO::getCreateTime, KolDO::getId);
     var result = kols.selectPage(new Page<>(filter.page(), filter.size()), query);
     List<KolDO> rows = result.getRecords();
     Map<Long, String> names = bdNames(rows.stream().map(KolDO::getBdUserId));
@@ -295,6 +296,32 @@ public class KolService {
     if (updated == 0) {
       throw new BusinessException(
           user.ownScope() ? ErrorCode.AUTH_FORBIDDEN : ErrorCode.COMMON_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Filters by display status (task 25a review). {@code PENDING_UPDATE} = no BD or BD not in {@link
+   * BdUserApi#listUsable()}; other values require that stored promotion status and a usable BD.
+   */
+  private void applyDisplayStatus(LambdaQueryWrapper<KolDO> query, String displayStatus) {
+    if (displayStatus == null || displayStatus.isBlank()) {
+      return;
+    }
+    String status = displayStatus.strip();
+    List<Long> usable =
+        bdUsers.listUsable().stream().map(BdUserDTO::id).filter(Objects::nonNull).toList();
+    if (PromotionStatus.DISPLAY_PENDING_UPDATE.equals(status)) {
+      if (usable.isEmpty()) {
+        return;
+      }
+      query.and(w -> w.isNull(KolDO::getBdUserId).or().notIn(KolDO::getBdUserId, usable));
+      return;
+    }
+    query.eq(KolDO::getPromotionStatus, status);
+    if (usable.isEmpty()) {
+      query.apply("1 = 0");
+    } else {
+      query.in(KolDO::getBdUserId, usable);
     }
   }
 

@@ -1,4 +1,4 @@
-package com.tcrm.admin.kol.service;
+package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.shared.DistributedLocks;
 import com.tcrm.admin.shared.TenantScope;
@@ -6,15 +6,15 @@ import com.tcrm.admin.system.api.EnabledTenantApi;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Daily 03:00 Asia/Shanghai idle-KOL cleanup (task 25a / ADR-023 §5). */
+/** Daily 03:00 Asia/Shanghai idle-KOL cleanup (task 25a / ADR-023 §5; orchestration in order). */
 @Component
-public class KolCleanupJob {
+public class IdleKolCleanupJob {
   private final DistributedLocks locks;
   private final EnabledTenantApi tenants;
-  private final KolCleanupService cleanup;
+  private final IdleKolCleanupService cleanup;
 
-  public KolCleanupJob(
-      DistributedLocks locks, EnabledTenantApi tenants, KolCleanupService cleanup) {
+  public IdleKolCleanupJob(
+      DistributedLocks locks, EnabledTenantApi tenants, IdleKolCleanupService cleanup) {
     this.locks = locks;
     this.tenants = tenants;
     this.cleanup = cleanup;

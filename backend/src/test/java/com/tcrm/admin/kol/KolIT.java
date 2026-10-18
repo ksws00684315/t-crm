@@ -706,4 +706,78 @@ class KolIT {
         .at("/data/token")
         .asText();
   }
+
+  @Test
+  void shouldFilterByDisplayStatus_includingPendingUpdate() throws Exception {
+    String admin = companyAdmin();
+    String bd1 = createBd(admin, "bd-filter");
+    String withBd =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType("application/json")
+                            .content(
+                                "{\"name\":\"Bound\",\"email\":\"bound-filter@example.com\","
+                                    + "\"country\":\"us\",\"bdUserId\":\""
+                                    + bd1
+                                    + "\",\"defaultRate\":\"0.10\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    String unbound =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType("application/json")
+                            .content(
+                                "{\"name\":\"Free\",\"email\":\"free-filter@example.com\","
+                                    + "\"country\":\"us\",\"defaultRate\":\"0.10\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    // New KOLs start PENDING_REVIEW; unbound shows as PENDING_UPDATE.
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("displayStatus", "PENDING_UPDATE")
+                .param("keyword", "free-filter@example.com")
+                .header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].id").value(unbound));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("displayStatus", "PENDING_REVIEW")
+                .param("keyword", "bound-filter@example.com")
+                .header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].id").value(withBd));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("displayStatus", "PENDING_REVIEW")
+                .param("keyword", "free-filter@example.com")
+                .header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+  }
+
+  @Test
+  void shouldPreviewIdleCleanup_onlyWhenAllScopeAndEnabledPath() throws Exception {
+    String admin = companyAdmin();
+    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+    createBd(admin, "bd-cleanup-own");
+    String bdToken = login("bd-cleanup-own", PASSWORD);
+    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, bdToken))
+        .andExpect(status().isForbidden());
+  }
 }

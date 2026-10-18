@@ -4,7 +4,6 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.tcrm.admin.kol.service.KolClaimService;
 import com.tcrm.admin.kol.service.KolCleanupService;
 import com.tcrm.admin.shared.AuditLog;
-import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -19,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KOL claim search and idle-cleanup config (task 25a / ADR-023). Paths sit under {@code
- * /admin-api/kol} alongside the list controller.
+ * KOL claim search and idle-cleanup config (task 25a / ADR-023). Cleanup preview and the scheduled
+ * job live in the order module (architecture review).
  */
 @RestController
 @RequestMapping("/admin-api/kol")
@@ -54,14 +53,6 @@ public class KolOpsController {
     return R.ok(null);
   }
 
-  @GetMapping("/cleanup-preview")
-  @SaCheckPermission("kol:edit")
-  public R<PageResult<CleanupPreviewVO>> cleanupPreview(
-      @RequestParam(defaultValue = "1") @Min(1) int page,
-      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-    return R.ok(cleanup.preview(page, size).map(CleanupPreviewVO::from));
-  }
-
   public record ClaimableKolVO(
       Long id, String kolCode, String name, String maskedEmail, String displayStatus) {
     static ClaimableKolVO from(KolClaimService.ClaimableKolDTO d) {
@@ -77,17 +68,4 @@ public class KolOpsController {
 
   public record CleanupConfigRequest(
       @NotNull Boolean enabled, @NotNull @Min(7) @Max(365) Integer idleDays) {}
-
-  public record CleanupPreviewVO(
-      Long id,
-      String kolCode,
-      String name,
-      String bdUserName,
-      java.time.Instant lastOrderAt,
-      java.time.Instant idleSince) {
-    static CleanupPreviewVO from(KolCleanupService.CleanupPreviewDTO d) {
-      return new CleanupPreviewVO(
-          d.id(), d.kolCode(), d.name(), d.bdUserName(), d.lastOrderAt(), d.idleSince());
-    }
-  }
 }

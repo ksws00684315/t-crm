@@ -124,13 +124,21 @@ class KolControllerTest {
                 .param("country", "us")
                 .param("status", "1")
                 .param("bdUserId", "5")
+                .param("displayStatus", "PENDING_UPDATE")
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isOk());
-    verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, 1, 20));
+    verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, "PENDING_UPDATE", 1, 20));
   }
 
   @ParameterizedTest
-  @CsvSource({"size, 101", "page, 0", "status, 2", "country, USA", "bdUserId, 0"})
+  @CsvSource({
+    "size, 101",
+    "page, 0",
+    "status, 2",
+    "country, USA",
+    "bdUserId, 0",
+    "displayStatus, FOO"
+  })
   void shouldReturn400_whenListParameterIsInvalid(String name, String value) throws Exception {
     mvc.perform(
             get(BASE)

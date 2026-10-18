@@ -57,7 +57,9 @@ class KolPromotionControllerTest {
 
   @Test
   void shouldReturn422_whenPromotionConfigIncomplete() throws Exception {
-    org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE))
+    org.mockito.Mockito.doThrow(
+            new BusinessException(
+                ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE, List.of("landingUrl", "inviteCode")))
         .when(promotions)
         .updateStatus(eq(10L), eq(PromotionStatus.PROMOTING));
     mvc.perform(
@@ -66,7 +68,9 @@ class KolPromotionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"PROMOTING\"}"))
         .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.errorCode").value("KOL_PROMOTION_CONFIG_INCOMPLETE"));
+        .andExpect(jsonPath("$.errorCode").value("KOL_PROMOTION_CONFIG_INCOMPLETE"))
+        .andExpect(jsonPath("$.data[0]").value("landingUrl"))
+        .andExpect(jsonPath("$.data[1]").value("inviteCode"));
   }
 
   @Test

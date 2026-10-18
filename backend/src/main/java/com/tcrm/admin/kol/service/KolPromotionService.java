@@ -110,9 +110,11 @@ public class KolPromotionService {
         txStatus -> {
           KolDO kol = requireVisible(id, user);
           List<Long> platformIds = platformIds(id);
-          if (status == PromotionStatus.PROMOTING
-              && !KolPromotionSupport.configComplete(kol, platformIds)) {
-            throw new BusinessException(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE);
+          if (status == PromotionStatus.PROMOTING) {
+            List<String> missing = KolPromotionSupport.missingConfigFields(kol, platformIds);
+            if (!missing.isEmpty()) {
+              throw new BusinessException(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE, missing);
+            }
           }
           Map<String, Object> before = KolPromotionSupport.snapshot(kol, platformIds);
           Instant now = Instant.now();
