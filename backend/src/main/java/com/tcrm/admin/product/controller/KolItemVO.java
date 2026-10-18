@@ -15,6 +15,8 @@ public record KolItemVO(
     String shopName,
     String weidianShopId,
     String weidianItemId,
+    String itemName,
+    String source,
     Instant validFrom,
     Instant validTo) {
   static KolItemVO from(KolItemDTO d) {
@@ -30,6 +32,8 @@ public record KolItemVO(
         d.shopName(),
         d.weidianShopId(),
         d.weidianItemId(),
+        d.itemName(),
+        d.source(),
         d.validFrom(),
         d.validTo());
   }

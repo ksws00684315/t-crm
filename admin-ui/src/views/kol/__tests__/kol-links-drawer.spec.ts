@@ -53,9 +53,10 @@ async function mountDrawer() {
   return wrapper;
 }
 
-function linkCopy(wrapper: ReturnType<typeof mount>, url: string) {
-  const block = wrapper.findAll(".copy-text").find(item => item.text().includes(url));
-  if (!block) throw new Error(`copy block not found for ${url}`);
+function linkCopy(wrapper: ReturnType<typeof mount>, url: string | null) {
+  const target = url ?? "";
+  const block = wrapper.findAll(".copy-text").find(item => item.text().includes(target));
+  if (!block) throw new Error(`copy block not found for ${target}`);
   return block.find('[data-test="copy"]');
 }
 
@@ -91,7 +92,9 @@ describe("KOL links drawer", () => {
     await linkCopy(wrapper, available.linkUrl).trigger("click");
     await flushPromises();
     expect(writeText).toHaveBeenCalledWith("https://t.example.com/t/KOL0001/P000001");
-    expect(ElMessage.success).toHaveBeenCalledWith(`已复制 ${truncateCopy(available.linkUrl)}`);
+    expect(ElMessage.success).toHaveBeenCalledWith(
+      `已复制 ${truncateCopy(available.linkUrl ?? "")}`
+    );
   });
 
   it("reports a failed copy", async () => {

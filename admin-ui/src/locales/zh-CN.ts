@@ -237,6 +237,9 @@ const zhCN = {
     COPY_TOKEN_EXPIRED: "复制令牌已过期",
     COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
     KOL_DISABLED: "达人已停用",
+    KOL_PROMO_SHEET_INVALID: "推广表不是可读取的 .xlsx 文件，请检查后重新上传",
+    KOL_PROMO_SHEET_TOO_LARGE: "推广表超过 300MB",
+    KOL_PROMO_UPLOAD_EXPIRED: "上传预览已过期（30 分钟），请重新上传推广表",
     SHOP_DISABLED: "店铺已停用，无法执行该操作",
     SHOP_NOT_FOUND: "店铺不存在",
     PRODUCT_NOT_FOUND: "原商品不存在",
@@ -928,7 +931,47 @@ const zhCN = {
     validTo: "失效时间",
     current: "当前有效",
     importTitle: "批量导入对应关系",
-    limitHint: "单个文件不超过 20MB、20000 行"
+    limitHint: "单个文件不超过 20MB、20000 行",
+    source: "来源",
+    sources: {
+      IMPORT: "导入",
+      SHEET_UPLOAD: "上传推广表"
+    },
+    noProduct: "未关联原商品"
+  },
+  promoSheet: {
+    title: "上传推广表",
+    open: "上传推广表",
+    chooseFile: "选择 .xlsx 文件",
+    hint: "一次上传一位达人的推广表，仅支持 .xlsx、最大 300MB；确认前不会写入任何数据。",
+    xlsxOnly: "只支持 .xlsx 文件。",
+    tooLarge: "文件超过 300MB。",
+    toAdd: "将新增",
+    existing: "已存在",
+    conflicts: "冲突",
+    duplicates: "重复",
+    notInSheet: "表中未出现",
+    skipped: "跳过",
+    tabNew: "新增",
+    tabConflicts: "冲突",
+    tabSkipped: "跳过",
+    noConflicts: "没有冲突商品。",
+    shop: "店铺",
+    shopId: "店铺 ID",
+    itemName: "商品名称",
+    sheet: "工作表",
+    rowNumber: "行号",
+    reason: "原因",
+    ownerKol: "所属达人",
+    otherOwner: "已属于其他达人",
+    confirm: "确认写入",
+    done: "已确认写入，达人的商品已更新。",
+    reasons: {
+      IN_SHEET: "表内跳转",
+      NON_WEIDIAN: "非微店平台",
+      NO_ITEM_ID: "链接中无商品 ID",
+      SHOP_NOT_REGISTERED: "店铺未登记"
+    }
   },
   order: {
     shop: "店铺",

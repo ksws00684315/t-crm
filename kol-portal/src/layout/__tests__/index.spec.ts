@@ -59,7 +59,12 @@ describe("layout navigation", () => {
   it("renders the shared nav items with the home entry marked current", async () => {
     const wrapper = await mountAt("/");
     const links = wrapper.findAll(".shell__nav-link");
-    expect(links.map(link => link.text())).toEqual(["Home", "Payout accounts", "My orders"]);
+    expect(links.map(link => link.text())).toEqual([
+      "Home",
+      "Payout accounts",
+      "My orders",
+      "My items"
+    ]);
     expect(links[0].attributes("href")).toBe("/");
     expect(links[1].attributes("href")).toBe("/payout-accounts");
     expect(links[2].attributes("href")).toBe("/orders");
@@ -78,7 +83,8 @@ describe("layout navigation", () => {
     expect(wrapper.findAll(".shell__nav-link").map(link => link.text())).toEqual([
       "首页",
       "收款账户",
-      "我的订单"
+      "我的订单",
+      "我的商品"
     ]);
   });
 });

@@ -26,6 +26,8 @@ const row: KolItemVO = {
   shopName: "旗舰店",
   weidianShopId: "100",
   weidianItemId: "123456",
+  itemName: null,
+  source: "IMPORT",
   validFrom: "2026-10-05T01:02:03Z",
   validTo: null
 };
@@ -96,6 +98,44 @@ describe("Kol item mapping page", () => {
     expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
   });
 
+  it("filters by source and marks mappings without an original product", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
+      items: [
+        row,
+        {
+          ...row,
+          id: "2",
+          productId: null,
+          productCode: null,
+          productName: null,
+          itemName: "快照商品",
+          source: "SHEET_UPLOAD"
+        }
+      ],
+      total: "2",
+      page: 1,
+      size: 20
+    });
+    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
+    const sourceSelect = wrapper.findComponent('[data-test="source-filter"]');
+    // The select's v-model is driven by its update:modelValue event.
+    (sourceSelect as unknown as { vm: { $emit: (event: string, value: string) => void } }).vm.$emit(
+      "update:modelValue",
+      "SHEET_UPLOAD"
+    );
+    await flushPromises();
+    await wrapper.find('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolItemApi.listKolItems).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "SHEET_UPLOAD" })
+    );
+    expect(wrapper.text()).toContain("未关联原商品");
+    expect(wrapper.text()).toContain("快照商品");
+    expect(wrapper.text()).toContain("上传推广表");
+  });
+
   it("queries when a precision filter is set and shows page total", async () => {
     signIn("STAFF", "ALL", ["product:view"]);
     const wrapper = await mountPage();
@@ -109,6 +149,7 @@ describe("Kol item mapping page", () => {
       productCode: undefined,
       shopId: undefined,
       weidianItemId: undefined,
+      source: undefined,
       current: true
     });
     expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(false);

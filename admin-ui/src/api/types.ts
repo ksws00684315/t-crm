@@ -302,13 +302,15 @@ export interface KolItemVO {
   kolId: string;
   kolCode: string | null;
   kolName: string | null;
-  productId: string;
+  productId: string | null;
   productCode: string | null;
   productName: string | null;
   shopId: string;
   shopName: string | null;
   weidianShopId: string | null;
   weidianItemId: string;
+  itemName: string | null;
+  source: string | null;
   validFrom: string;
   validTo: string | null;
 }
@@ -347,10 +349,10 @@ export type LinkUnavailableReason = "KOL_DISABLED" | "PRODUCT_OFF_SHELF" | "SHOP
  */
 export interface LinkVO {
   kolItemId: string;
-  productCode: string;
-  productName: string;
+  productCode: string | null;
+  productName: string | null;
   weidianItemId: string;
-  linkUrl: string;
+  linkUrl: string | null;
   targetUrl: string;
   available: boolean;
   unavailableReasons: LinkUnavailableReason[];

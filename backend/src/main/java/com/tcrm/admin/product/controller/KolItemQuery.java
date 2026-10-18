@@ -11,6 +11,7 @@ public record KolItemQuery(
     @Size(max = 16) String productCode,
     @Min(1) Long shopId,
     @Size(max = 32) String weidianItemId,
+    @Size(max = 16) String source,
     Boolean current,
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size) {
@@ -20,6 +21,7 @@ public record KolItemQuery(
         productCode,
         shopId,
         weidianItemId,
+        source,
         current == null || current,
         page == null ? 1 : page,
         size == null ? 20 : size);
