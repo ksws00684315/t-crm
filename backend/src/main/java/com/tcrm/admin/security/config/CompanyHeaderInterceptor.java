@@ -18,7 +18,10 @@ class CompanyHeaderInterceptor implements HandlerInterceptor {
   static final String HEADER = "X-Company-Id";
   static final String[] PATTERNS = {"/admin-api/**"};
   static final String[] EXCLUDED = {
-    "/admin-api/auth/**", "/admin-api/platform/**", "/admin-api/integration/weidian/oauth/callback"
+    "/admin-api/auth/**",
+    "/admin-api/platform/**",
+    "/admin-api/integration/weidian/oauth/callback",
+    "/admin-api/external/**"
   };
 
   private final CurrentUserContext current;

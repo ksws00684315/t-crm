@@ -69,6 +69,7 @@ public class ShopService implements ShopAccessApi {
     shop.setShopName(c.shopName().strip());
     shop.setWeidianShopId(weidianId);
     shop.setStatus(1);
+    shop.setCopyTarget(false);
     shop.setRemark(ProductRules.blankToNull(c.remark()));
     shop.setDeleted(false);
     try {
@@ -175,8 +176,48 @@ public class ShopService implements ShopAccessApi {
         shop.getShopName(),
         shop.getWeidianShopId(),
         shop.getStatus(),
+        Boolean.TRUE.equals(shop.getCopyTarget()),
         shop.getRemark(),
         shop.getCreateTime(),
         shop.getUpdateTime());
+  }
+
+  /**
+   * Marks this shop as the company's default copy target and clears any previous one (task 17b /
+   * ADR-019). SUPER_ADMIN only (controller).
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public void setCopyTarget(Long id) {
+    ShopDO shop = requireEnabled(id);
+    Instant now = Instant.now();
+    shops.update(
+        null,
+        new LambdaUpdateWrapper<ShopDO>()
+            .eq(ShopDO::getCopyTarget, true)
+            .set(ShopDO::getCopyTarget, false)
+            .set(ShopDO::getUpdateBy, current.id())
+            .set(ShopDO::getUpdateTime, now));
+    shops.update(
+        null,
+        new LambdaUpdateWrapper<ShopDO>()
+            .eq(ShopDO::getId, shop.getId())
+            .set(ShopDO::getCopyTarget, true)
+            .set(ShopDO::getUpdateBy, current.id())
+            .set(ShopDO::getUpdateTime, now));
+  }
+
+  /** Clears the copy-target flag on this shop when it currently holds it. */
+  @Transactional(rollbackFor = Exception.class)
+  public void clearCopyTarget(Long id) {
+    require(id);
+    Instant now = Instant.now();
+    shops.update(
+        null,
+        new LambdaUpdateWrapper<ShopDO>()
+            .eq(ShopDO::getId, id)
+            .eq(ShopDO::getCopyTarget, true)
+            .set(ShopDO::getCopyTarget, false)
+            .set(ShopDO::getUpdateBy, current.id())
+            .set(ShopDO::getUpdateTime, now));
   }
 }

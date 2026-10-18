@@ -119,7 +119,8 @@ public class SecurityConfiguration implements WebMvcConfigurer {
         .excludePathPatterns(
             "/admin-api/auth/login",
             "/admin-api/auth/captchas",
-            "/admin-api/integration/weidian/oauth/callback");
+            "/admin-api/integration/weidian/oauth/callback",
+            "/admin-api/external/**");
     // The displayed-company check runs after the status check (so it sees a valid login) and
     // before the role annotations, so a tab still showing the previous company gets 409 rather
     // than a 403 computed for the new company. A preflight sends no company header and passes
@@ -149,7 +150,8 @@ public class SecurityConfiguration implements WebMvcConfigurer {
         .excludePathPatterns(
             "/admin-api/auth/login",
             "/admin-api/auth/captchas",
-            "/admin-api/integration/weidian/oauth/callback");
+            "/admin-api/integration/weidian/oauth/callback",
+            "/admin-api/external/**");
     // KOL mirror of the two interceptors above: status checks first, annotations second. The
     // company scope opened by KolApiInterceptor covers every statement of the request (design
     // §3.4) and is closed in afterCompletion; public endpoints are excluded and run in system

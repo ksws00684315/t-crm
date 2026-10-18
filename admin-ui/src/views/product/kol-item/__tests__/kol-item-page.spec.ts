@@ -57,6 +57,7 @@ async function mountPage() {
       shopName: "旗舰店",
       weidianShopId: "100",
       status: 1,
+      copyTarget: false,
       remark: null,
       createTime: "2026-10-01T00:00:00Z",
       updateTime: "2026-10-01T00:00:00Z"
@@ -134,6 +135,30 @@ describe("Kol item mapping page", () => {
     expect(wrapper.text()).toContain("未关联原商品");
     expect(wrapper.text()).toContain("快照商品");
     expect(wrapper.text()).toContain("上传推广表");
+  });
+
+  it("includes COPY in the source filter and shows the copy label", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
+      items: [{ ...row, id: "3", source: "COPY" }],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
+    const sourceSelect = wrapper.findComponent('[data-test="source-filter"]');
+    (sourceSelect as unknown as { vm: { $emit: (event: string, value: string) => void } }).vm.$emit(
+      "update:modelValue",
+      "COPY"
+    );
+    await flushPromises();
+    await wrapper.find('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolItemApi.listKolItems).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "COPY" })
+    );
+    expect(wrapper.text()).toContain("复制");
   });
 
   it("queries when a precision filter is set and shows page total", async () => {

@@ -18,6 +18,9 @@ public class ShopDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String remark;
 
+  /** Default copy-target shop for the company (ADR-019 / task 17b). */
+  private Boolean copyTarget;
+
   /** Owning company. Updates never write this column. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long tenantId;
@@ -52,6 +55,14 @@ public class ShopDO extends BaseEntity {
 
   public void setRemark(String value) {
     this.remark = value;
+  }
+
+  public Boolean getCopyTarget() {
+    return copyTarget;
+  }
+
+  public void setCopyTarget(Boolean value) {
+    this.copyTarget = value;
   }
 
   public Long getTenantId() {

@@ -236,6 +236,8 @@ const zhCN = {
     COPY_TOKEN_INVALID: "复制令牌无效或已作废",
     COPY_TOKEN_EXPIRED: "复制令牌已过期",
     COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
+    COPY_TARGET_SHOP_MISSING: "未配置默认复制店铺，且令牌未指定目标店铺",
+    PRODUCT_LINK_RATE_LIMITED: "请求过于频繁，请稍后再试",
     KOL_DISABLED: "达人已停用",
     KOL_PROMO_SHEET_INVALID: "推广表不是可读取的 .xlsx 文件，请检查后重新上传",
     KOL_PROMO_SHEET_TOO_LARGE: "推广表超过 300MB",
@@ -783,7 +785,9 @@ const zhCN = {
     kolPlaceholder: "按编号或名称搜索",
     channel: "目标渠道",
     shop: "目标店铺",
-    shopAuto: "自动分配",
+    shopAuto: "默认复制店铺",
+    shopAutoMissing: "尚未设置默认复制店铺，请先在店铺管理中设置",
+    shopAutoNamed: "默认复制店铺（{name}）",
     usage: "使用量",
     validMinutes: "有效分钟",
     expiresAt: "过期时间",
@@ -868,6 +872,11 @@ const zhCN = {
     requiredFields: "请填写名称和页签名"
   },
   shop: {
+    copyTarget: "默认复制",
+    setCopyTarget: "设为默认复制店铺",
+    setCopyTargetDone: "已设为默认复制店铺",
+    clearCopyTarget: "取消默认复制店铺",
+    clearCopyTargetDone: "已取消默认复制店铺",
     hint: "全系统最多 3 个店铺；停用后不可再导入商品或对应关系。",
     confirmDisable: "确定要停用店铺「{name}」吗？",
     confirmEnable: "确定要启用店铺「{name}」吗？",
@@ -935,7 +944,8 @@ const zhCN = {
     source: "来源",
     sources: {
       IMPORT: "导入",
-      SHEET_UPLOAD: "上传推广表"
+      SHEET_UPLOAD: "上传推广表",
+      COPY: "复制"
     },
     noProduct: "未关联原商品"
   },

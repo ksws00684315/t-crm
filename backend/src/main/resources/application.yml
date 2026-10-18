@@ -111,6 +111,13 @@ crm:
   copy-token:
     default-quota: 1000
     default-valid-minutes: 1440
+  # External product-link APIs (task 17b / design §6.5).
+  product-links:
+    ip-rate-per-minute: 120
+    convert-token-rate-per-minute: 10
+    resolve-token-rate-per-minute: 120
+    worker-threads: 2
+    worker-queue: 200
   weidian:
     secret-key: ${TCRM_SECRET_KEY:}
     admin-base-url: ${TCRM_ADMIN_BASE_URL:}

@@ -240,6 +240,9 @@ const enUS: MessageSchema = {
     COPY_TOKEN_INVALID: "The copy token is invalid or revoked",
     COPY_TOKEN_EXPIRED: "The copy token has expired",
     COPY_TOKEN_QUOTA_EXCEEDED: "The copy token quota has been used up",
+    COPY_TARGET_SHOP_MISSING:
+      "No default copy shop is set and the token does not name a target shop",
+    PRODUCT_LINK_RATE_LIMITED: "Too many requests; please try again later",
     KOL_DISABLED: "The creator account is disabled",
     KOL_PROMO_SHEET_INVALID: "The promo sheet is not a readable .xlsx workbook; upload it again.",
     KOL_PROMO_SHEET_TOO_LARGE: "The promo sheet exceeds 300MB.",
@@ -800,7 +803,9 @@ const enUS: MessageSchema = {
     kolPlaceholder: "Search by code or name",
     channel: "Target channel",
     shop: "Target shop",
-    shopAuto: "Auto-assign",
+    shopAuto: "Default copy shop",
+    shopAutoMissing: "No default copy shop yet — set one in Shop management first",
+    shopAutoNamed: "Default copy shop ({name})",
     usage: "Usage",
     validMinutes: "Valid minutes",
     expiresAt: "Expires at",
@@ -885,6 +890,11 @@ const enUS: MessageSchema = {
     requiredFields: "Enter the name and the tab name"
   },
   shop: {
+    copyTarget: "Default copy",
+    setCopyTarget: "Set as default copy shop",
+    setCopyTargetDone: "Set as default copy shop",
+    clearCopyTarget: "Clear default copy shop",
+    clearCopyTargetDone: "Cleared default copy shop",
     hint: "At most 3 shops in the whole system. A disabled shop cannot receive product or mapping imports.",
     confirmDisable: 'Disable shop "{name}"?',
     confirmEnable: 'Enable shop "{name}"?',
@@ -952,7 +962,8 @@ const enUS: MessageSchema = {
     source: "Source",
     sources: {
       IMPORT: "Import",
-      SHEET_UPLOAD: "Sheet upload"
+      SHEET_UPLOAD: "Sheet upload",
+      COPY: "Copy"
     },
     noProduct: "No original product"
   },

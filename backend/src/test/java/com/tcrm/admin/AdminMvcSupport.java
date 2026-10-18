@@ -39,6 +39,18 @@ public final class AdminMvcSupport {
 
   private AdminMvcSupport() {}
 
+  /** Standalone MockMvc without the login interceptor (for {@code @PublicEndpoint} controllers). */
+  public static MockMvc buildPublic(Object... controllers) {
+    var builder = JsonMapper.builder();
+    new CommonConfiguration().jsonCustomizer().customize(builder);
+    return MockMvcBuilders.standaloneSetup(controllers)
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .setMessageConverters(
+            new ByteArrayHttpMessageConverter(),
+            new JacksonJsonHttpMessageConverter(builder.build()))
+        .build();
+  }
+
   /** Builds MockMvc around the controllers; the caller's role comes from {@link #actAs}. */
   public static MockMvc build(CurrentUserContext current, Object... controllers) {
     SaManager.setConfig(

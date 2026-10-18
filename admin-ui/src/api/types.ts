@@ -211,6 +211,7 @@ export interface ShopVO {
   shopName: string;
   weidianShopId: string;
   status: 0 | 1;
+  copyTarget: boolean;
   remark: string | null;
   createTime: string;
   updateTime: string;

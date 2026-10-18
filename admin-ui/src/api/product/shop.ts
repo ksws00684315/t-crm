@@ -31,3 +31,11 @@ export function updateShopStatus(id: string, status: 0 | 1): Promise<null> {
     data: { status }
   });
 }
+
+export function setCopyTarget(id: string): Promise<null> {
+  return http.request<null>({ method: "put", url: `/product/shops/${id}/copy-target` });
+}
+
+export function clearCopyTarget(id: string): Promise<null> {
+  return http.request<null>({ method: "delete", url: `/product/shops/${id}/copy-target` });
+}

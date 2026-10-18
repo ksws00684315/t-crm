@@ -90,7 +90,9 @@ public enum ErrorCode {
   KOL_PROMO_SHEET_TOO_LARGE(400, "Promo sheet exceeds 300 MB"),
   KOL_PROMO_UPLOAD_EXPIRED(410, "Upload preview has expired; upload the sheet again"),
   KOL_PROMOTION_CONFIG_INCOMPLETE(422, "Promotion config is incomplete for PROMOTING status"),
-  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD");
+  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD"),
+  COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
+  PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later");
   private final int status;
   private final String message;
 

@@ -7,6 +7,7 @@ public record ShopDTO(
     String shopName,
     String weidianShopId,
     Integer status,
+    Boolean copyTarget,
     String remark,
     Instant createTime,
     Instant updateTime) {}

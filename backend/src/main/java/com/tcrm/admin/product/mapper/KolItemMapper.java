@@ -35,6 +35,15 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
       """)
   KolItemDO findCurrentByKolProduct(@Param("kolId") Long kolId, @Param("productId") Long productId);
 
+  /** Current exclusive mapping for this Weidian item id (any shop), or null. */
+  @Select(
+      """
+      SELECT * FROM crm_kol_item
+      WHERE weidian_item_id = #{weidianItemId} AND valid_to IS NULL
+      LIMIT 1
+      """)
+  KolItemDO findCurrentByWeidianItem(@Param("weidianItemId") String weidianItemId);
+
   /** True when any current mapping uses this shop + weidian item as an exclusive item. */
   @Select(
       """

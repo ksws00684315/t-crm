@@ -8,6 +8,7 @@ public record ShopVO(
     String shopName,
     String weidianShopId,
     Integer status,
+    Boolean copyTarget,
     String remark,
     Instant createTime,
     Instant updateTime) {
@@ -17,6 +18,7 @@ public record ShopVO(
         s.shopName(),
         s.weidianShopId(),
         s.status(),
+        s.copyTarget(),
         s.remark(),
         s.createTime(),
         s.updateTime());

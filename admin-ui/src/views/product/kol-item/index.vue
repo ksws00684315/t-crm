@@ -66,7 +66,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true }
 ]);
 
-const sourceOptions = ["IMPORT", "SHEET_UPLOAD"];
+const sourceOptions = ["IMPORT", "SHEET_UPLOAD", "COPY"];
 
 const applied = ref({
   kolCode: "",
