@@ -50,7 +50,7 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 
 看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。数据卷 `tcrm-preview_pgdata` 在所有目录之间共用，PostgreSQL 只在数据卷为空时写入账号。如果这个目录还没有 `deploy/.env.preview`，但本机已经有这份数据卷，`up` 不会生成新密码，而是直接退出并提示：已有预览数据（可能来自其他目录）。请从原目录复制 `deploy/.env.preview` 到这里，或执行 `preview.sh reset` 清空后重建。
 
-`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。当前尚未合并、需要同步的有两处：17b 的 `/admin-api/external/` 限流，以及任务 26 的推广表上传（约 300MB）。哪个后合并，就由哪个同步。
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：预览构建不设置 `VITE_UPLOAD_BASE_URL`，上传走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
