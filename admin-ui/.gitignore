@@ -19,4 +19,4 @@ tests/**/coverage/
 *.ntvs*
 *.njsproj
 *.sln
-tsconfig.tsbuildinfo
+tsconfig.tsbuildinfoadmin-ui/public/
