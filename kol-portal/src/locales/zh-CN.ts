@@ -166,6 +166,8 @@ const zhCN: MessageSchema = {
       accountRange: "请输入 3～128 个字符。",
       accountPattern: "地址只能包含字母和数字。",
       holderRange: "请填写收款人（1～64 字符）。",
+      currency: "币种",
+      currencyRequired: "请选择币种。",
       network: "网络",
       networkRequired: "请选择网络。",
       qr: "二维码（可选）",

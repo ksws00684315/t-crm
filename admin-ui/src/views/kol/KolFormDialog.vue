@@ -4,6 +4,7 @@ import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { createKol, editKol } from "@/api/kol/kol";
+import { updatePromotionStatus } from "@/api/kol/promotion";
 import { listLinkTemplates } from "@/api/link/template";
 import type { BdUserVO, KolVO, LinkTemplateVO } from "@/api/types";
 import {
@@ -28,25 +29,37 @@ const MAX_SOCIAL_ACCOUNTS = 10;
 
 const { t } = useI18n();
 
-const props = defineProps<{
-  modelValue: boolean;
-  /** The KOL being edited; null creates a new one. */
-  kol: KolVO | null;
-  /** Show the BD picker when creating (super administrator, or kol:edit outside OWN). */
-  canPickBd: boolean;
-  bdUsers: BdUserVO[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean;
+    /** The KOL being edited; null creates a new one. */
+    kol: KolVO | null;
+    /** Show the BD picker when creating (super administrator, or kol:edit outside OWN). */
+    canPickBd: boolean;
+    bdUsers: BdUserVO[];
+    /**
+     * Review mode (task 25b §3.3): email and creator code are read-only, the footer adds the
+     * approve button that saves the profile and then moves the status to PENDING_PROMOTION.
+     */
+    review?: boolean;
+  }>(),
+  { review: false }
+);
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
   (event: "saved"): void;
 }>();
 
 const editing = computed(() => props.kol !== null);
-const title = computed(() =>
-  editing.value ? t("kol.editTitle", { code: props.kol?.kolCode ?? "" }) : t("kol.createTitle")
-);
+const title = computed(() => {
+  if (props.review && props.kol) return t("kol.reviewTitle", { code: props.kol.kolCode });
+  return editing.value
+    ? t("kol.editTitle", { code: props.kol?.kolCode ?? "" })
+    : t("kol.createTitle");
+});
 const formRef = ref<FormInstance>();
 const saving = ref(false);
+const approving = ref(false);
 const templatesLoading = ref(false);
 const templates = ref<LinkTemplateVO[]>([]);
 const serverErrors = ref<Record<string, string>>({});
@@ -162,9 +175,20 @@ function checkSocialAccounts(): boolean {
 }
 
 async function submit() {
+  if (!(await persistProfile())) return;
+  ElMessage.success(props.kol ? t("kol.saved") : t("kol.created"));
+  emit("saved");
+  close();
+}
+
+/**
+ * Validates and saves the profile; false when validation or the request failed (the field errors
+ * and the API failure are already shown to the user).
+ */
+async function persistProfile(): Promise<boolean> {
   serverErrors.value = {};
   const valid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
-  if (!checkSocialAccounts() || !valid) return;
+  if (!checkSocialAccounts() || !valid) return false;
   saving.value = true;
   const body = {
     name: form.name.trim(),
@@ -190,9 +214,7 @@ async function submit() {
     } else {
       await createKol({ ...body, bdUserId: props.canPickBd ? form.bdUserId : null });
     }
-    ElMessage.success(props.kol ? t("kol.saved") : t("kol.created"));
-    emit("saved");
-    close();
+    return true;
   } catch (error) {
     serverErrors.value = serverFieldErrors(error, [
       "name",
@@ -208,8 +230,31 @@ async function submit() {
     ]);
     if (serverErrors.value.defaultRate) serverErrors.value.percent = serverErrors.value.defaultRate;
     notifyError(error);
+    return false;
   } finally {
     saving.value = false;
+  }
+}
+
+/** Two steps (task 25b §3.3): save the profile, then set the status to PENDING_PROMOTION. */
+async function approveReview() {
+  const kol = props.kol;
+  if (!kol) return;
+  if (!(await persistProfile())) {
+    ElMessage.error(t("kol.reviewSaveFailed"));
+    return;
+  }
+  approving.value = true;
+  try {
+    await updatePromotionStatus(kol.id, "PENDING_PROMOTION");
+    ElMessage.success(t("kol.reviewApproved"));
+    emit("saved");
+    close();
+  } catch (error) {
+    ElMessage.error(t("kol.reviewStatusFailed"));
+    notifyError(error);
+  } finally {
+    approving.value = false;
   }
 }
 </script>
@@ -225,8 +270,11 @@ async function submit() {
       <el-form-item :label="t('common.name')" prop="name" :error="serverErrors.name">
         <el-input v-model="form.name" maxlength="64" />
       </el-form-item>
+      <el-form-item v-if="review" :label="t('kol.code')">
+        <el-input :model-value="kol?.kolCode ?? ''" disabled data-test="review-code" />
+      </el-form-item>
       <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
-        <el-input v-model="form.email" maxlength="128" />
+        <el-input v-model="form.email" data-test="email-input" maxlength="128" :disabled="review" />
       </el-form-item>
       <el-form-item :label="t('common.country')" prop="country" :error="serverErrors.country">
         <el-input
@@ -360,6 +408,15 @@ async function submit() {
       <el-button type="primary" data-test="kol-save" :loading="saving" @click="submit">{{
         t("common.save")
       }}</el-button>
+      <el-button
+        v-if="review"
+        type="success"
+        data-test="review-approve"
+        :loading="approving"
+        :disabled="saving"
+        @click="approveReview"
+        >{{ t("kol.approveReview") }}</el-button
+      >
     </template>
   </el-dialog>
 </template>

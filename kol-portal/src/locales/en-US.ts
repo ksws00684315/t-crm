@@ -167,6 +167,8 @@ const enUS = {
       accountRange: "Enter 3–128 characters.",
       accountPattern: "The address may contain letters and digits only.",
       holderRange: "Enter the receiver name (1–64 characters).",
+      currency: "Currency",
+      currencyRequired: "Choose the currency.",
       network: "Network",
       networkRequired: "Choose the network.",
       qr: "QR code (optional)",
