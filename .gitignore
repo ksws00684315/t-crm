@@ -29,6 +29,8 @@ CLAUDE.local.md
 # Deployment working directories (certificates, built static files, backups)
 deploy/certs/
 deploy/www/
+deploy/www-preview/
+deploy/.env.preview
 deploy/backups/
 
 # Customer samples kept locally only (too large for GitHub, or duplicates of the tracked zip)

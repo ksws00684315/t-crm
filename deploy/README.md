@@ -5,7 +5,9 @@
 | `.env.example` | 全部环境变量（名称与 backend / redirect 实际使用的一致）；复制为 `deploy/.env` 后填写，`.env` 不入库 |
 | `docker-compose.dev.yml` | 本地开发依赖：PostgreSQL 17.11、Redis 7.4.5 |
 | `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis |
-| `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段 |
+| `docker-compose.preview.yml` | 本地预览：与生产相同的五个服务，只绑定 `127.0.0.1:8890/8891/8892` |
+| `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
+| `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `backup/pg-backup.sh` | 每日 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 R2） |
 | `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
@@ -19,6 +21,38 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 ```
 
 宿主机端口由 `TCRM_DB_PORT`（默认 5432）、`TCRM_REDIS_PORT`（默认 6379）决定，只绑定 `127.0.0.1`；本机已有 PostgreSQL / Redis 占用端口时，在 `deploy/.env` 中改这两个变量即可，在本机启动的后台和跳转服务读取同名变量连接。库 `tcrm` 与应用账号由 PostgreSQL 镜像根据 `TCRM_DB_NAME`、`TCRM_DB_USERNAME`、`TCRM_DB_PASSWORD` 创建；表由后台启动时的 Flyway 创建，这里不挂载初始化 SQL。
+
+## 本地预览
+
+只用于在本机查看**当前工作目录**的源码，不用于任何服务器。一条命令从源码构建并启动管理端、达人端、后台、跳转服务、PostgreSQL 与 Redis。
+
+前置条件：Docker（含 Compose 插件）、Node.js、pnpm、openssl。
+
+```bash
+deploy/scripts/preview.sh up      # 构建并启动。可在任意目录执行（脚本按自身位置定位仓库根）
+deploy/scripts/preview.sh down    # 停止容器，保留数据卷；下次 up 数据还在
+deploy/scripts/preview.sh reset   # 停止并删除数据卷与 deploy/.env.preview，回到全新状态；须输入 yes
+```
+
+| 站点 | 地址 |
+|---|---|
+| 管理端 | http://localhost:8890 |
+| 达人端 | http://localhost:8891 |
+| 跳转服务 | http://localhost:8892 （`/t/…`、`/i/…`、`/healthz`） |
+
+PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端口写死在预览配置里，不能改。Compose 项目名是 `tcrm-preview`。
+
+`deploy/.env.preview` 不存在时，`up` 会随机生成数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号，文件权限 `600`。已存在则不覆盖。平台管理员用户名和密码**只在刚生成该文件时在终端打印一次**，之后查看 `deploy/.env.preview`。该文件与构建产物 `deploy/www-preview/` 不入库，不要把密码写进文档或提交。
+
+首次使用：用平台管理员登录管理端（登录验证码保持开启，与生产一致）→ 在平台管理里为默认公司创建超级管理员 → 退出后用超级管理员登录。预览不做演示数据。
+
+后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
+
+看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。
+
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后（例如推广表上传的体积限制），要同步改预览配置。
+
+预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
 ## 生产部署（模板，使用前逐项审阅）
 
