@@ -241,8 +241,6 @@ const enUS: MessageSchema = {
     COPY_TOKEN_EXPIRED: "The copy token has expired",
     COPY_TOKEN_QUOTA_EXCEEDED: "The copy token quota has been used up",
     KOL_DISABLED: "The creator account is disabled",
-    KOL_ALREADY_CLAIMED: "This creator has already been claimed by another BD",
-    KOL_PROMOTION_CONFIG_INCOMPLETE: "Promotion config is incomplete for PROMOTING status",
     SHOP_DISABLED: "The shop is disabled and this action cannot be done.",
     SHOP_NOT_FOUND: "Shop not found.",
     PRODUCT_NOT_FOUND: "Product not found.",
