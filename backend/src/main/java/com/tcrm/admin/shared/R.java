@@ -10,4 +10,9 @@ public record R<T>(int code, String msg, T data, String errorCode, String traceI
   public static <T> R<T> error(ErrorCode error, T data) {
     return new R<>(error.status(), error.message(), data, error.name(), MDC.get("traceId"));
   }
+
+  /** Same as {@link #error(ErrorCode, Object)} but with an explicit operator-facing {@code msg}. */
+  public static <T> R<T> error(ErrorCode error, String msg, T data) {
+    return new R<>(error.status(), msg, data, error.name(), MDC.get("traceId"));
+  }
 }

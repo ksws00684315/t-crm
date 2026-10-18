@@ -38,8 +38,11 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(BusinessException.class)
   public ResponseEntity<R<?>> business(BusinessException e) {
-    return ResponseEntity.status(e.getErrorCode().status())
-        .body(R.error(e.getErrorCode(), e.getData()));
+    R<?> body =
+        e.hasCustomMessage()
+            ? R.error(e.getErrorCode(), e.getMessage(), e.getData())
+            : R.error(e.getErrorCode(), e.getData());
+    return ResponseEntity.status(e.getErrorCode().status()).body(body);
   }
 
   @ExceptionHandler(NotLoginException.class)

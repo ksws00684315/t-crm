@@ -8,6 +8,7 @@ import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,22 @@ public class ShopController {
   @AuditLog(module = "PRODUCT", action = "Change shop status")
   public R<Void> status(@PathVariable @Min(1) Long id, @Valid @RequestBody ShopStatusRequest r) {
     shops.updateStatus(id, r.status());
+    return R.ok(null);
+  }
+
+  @PutMapping("/{id}/copy-target")
+  @SaCheckRole("SUPER_ADMIN")
+  @AuditLog(module = "PRODUCT", action = "Set default copy shop")
+  public R<Void> setCopyTarget(@PathVariable @Min(1) Long id) {
+    shops.setCopyTarget(id);
+    return R.ok(null);
+  }
+
+  @DeleteMapping("/{id}/copy-target")
+  @SaCheckRole("SUPER_ADMIN")
+  @AuditLog(module = "PRODUCT", action = "Clear default copy shop")
+  public R<Void> clearCopyTarget(@PathVariable @Min(1) Long id) {
+    shops.clearCopyTarget(id);
     return R.ok(null);
   }
 }

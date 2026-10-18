@@ -28,6 +28,7 @@ const result = ref<CreatedCopyTokenVO | null>(null);
 const kolOptions = ref<KolVO[]>([]);
 const kolSearching = ref(false);
 const shops = ref<ShopVO[]>([]);
+const defaultCopyShop = computed(() => shops.value.find(s => s.copyTarget) ?? null);
 
 const form = reactive<{
   kolId: string | null;
@@ -201,7 +202,14 @@ function close() {
             data-test="create-shop"
             style="width: 100%"
           >
-            <el-option :label="t('copyToken.shopAuto')" :value="null as unknown as string" />
+            <el-option
+              :label="
+                defaultCopyShop
+                  ? t('copyToken.shopAutoNamed', { name: defaultCopyShop.shopName })
+                  : t('copyToken.shopAuto')
+              "
+              :value="null as unknown as string"
+            />
             <el-option
               v-for="shop in shops"
               :key="shop.id"
@@ -210,6 +218,9 @@ function close() {
             />
           </el-select>
         </el-form-item>
+        <p v-if="!defaultCopyShop" class="hint" data-test="no-default-copy-shop">
+          {{ t("copyToken.shopAutoMissing") }}
+        </p>
         <p class="hint">{{ t("copyToken.defaultsNote") }}</p>
       </el-form>
     </template>

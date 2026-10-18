@@ -2,7 +2,14 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { createShop, editShop, listShops, updateShopStatus } from "@/api/product/shop";
+import {
+  clearCopyTarget,
+  createShop,
+  editShop,
+  listShops,
+  setCopyTarget,
+  updateShopStatus
+} from "@/api/product/shop";
 import type { ShopVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -34,11 +41,12 @@ const columns = computed<DataColumn[]>(() => {
     { key: "shopName", label: t("shop.name"), prop: "shopName", minWidth: 140 },
     { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140, mono: true },
     { key: "status", label: t("common.status"), width: 90 },
+    { key: "copyTarget", label: t("shop.copyTarget"), width: 110 },
     { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 160, tooltip: true },
     { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
   ];
   if (abilities.value.canManageShop) {
-    list.push({ key: "actions", label: t("common.actions"), width: 160 });
+    list.push({ key: "actions", label: t("common.actions"), width: 280 });
   }
   return list;
 });
@@ -93,6 +101,26 @@ async function save() {
     notifyError(error);
   } finally {
     saving.value = false;
+  }
+}
+
+async function markCopyTarget(row: ShopVO) {
+  try {
+    await setCopyTarget(row.id);
+    ElMessage.success(t("shop.setCopyTargetDone"));
+    await load();
+  } catch (error) {
+    notifyError(error);
+  }
+}
+
+async function unmarkCopyTarget(row: ShopVO) {
+  try {
+    await clearCopyTarget(row.id);
+    ElMessage.success(t("shop.clearCopyTargetDone"));
+    await load();
+  } catch (error) {
+    notifyError(error);
   }
 }
 
@@ -152,10 +180,34 @@ onMounted(() => void load());
           {{ asShop(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
         </el-tag>
       </template>
+      <template #cell-copyTarget="{ row }">
+        <el-tag v-if="asShop(row).copyTarget" type="warning" data-test="copy-target-tag">
+          {{ t("shop.copyTarget") }}
+        </el-tag>
+        <span v-else>—</span>
+      </template>
       <template #cell-updatedAt="{ row }">{{ formatInstant(asShop(row).updateTime) }}</template>
       <template v-if="abilities.canManageShop" #actions="{ row }">
         <el-button link type="primary" data-test="edit" @click="openEdit(asShop(row))">
           {{ t("common.edit") }}
+        </el-button>
+        <el-button
+          v-if="asShop(row).status === 1 && !asShop(row).copyTarget"
+          link
+          type="primary"
+          data-test="set-copy-target"
+          @click="markCopyTarget(asShop(row))"
+        >
+          {{ t("shop.setCopyTarget") }}
+        </el-button>
+        <el-button
+          v-if="asShop(row).copyTarget"
+          link
+          type="warning"
+          data-test="clear-copy-target"
+          @click="unmarkCopyTarget(asShop(row))"
+        >
+          {{ t("shop.clearCopyTarget") }}
         </el-button>
         <el-button
           link

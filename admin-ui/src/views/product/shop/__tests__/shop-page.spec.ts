@@ -14,6 +14,7 @@ const row: ShopVO = {
   id: "1",
   shopName: "旗舰店",
   weidianShopId: "100",
+  copyTarget: false,
   status: 1,
   remark: null,
   createTime: "2026-10-01T00:00:00Z",

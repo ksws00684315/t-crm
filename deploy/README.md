@@ -89,3 +89,18 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 ## 第三方许可声明
 
 两个 Dockerfile 把 backend、redirect、admin-ui、kol-portal 四份 `THIRD-PARTY-NOTICES` 复制到镜像的 `/licenses/`；`build-static.sh` 把同样四份放进两个静态目录的 `licenses/`（`https://admin.<域名>/licenses/backend.txt` 等）。
+
+
+## 客户表格脚本切换到本系统（任务 17b）
+
+1. 在 Google 表格脚本属性中把 `TALENT_CRM_API_BASE_URL` 改为 `https://admin.<域名>/admin-api`（不要末尾斜杠）。
+2. 脚本代码不用改；令牌在管理端「商品 > 复制令牌」生成。
+3. Nginx 建议对 `/admin-api/external/` 单独限流（例如每 IP 每分钟 120 次），与应用内限流叠加。示例：
+
+```nginx
+limit_req_zone $binary_remote_addr zone=external:10m rate=120r/m;
+location /admin-api/external/ {
+  limit_req zone=external burst=40 nodelay;
+  proxy_pass http://backend;
+}
+```

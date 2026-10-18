@@ -543,7 +543,8 @@ class TenantIsolationIT {
         || path.equals("/admin-api/auth/logout")
         || path.equals("/admin-api/auth/me")
         || path.equals("/admin-api/auth/password")
-        || path.equals("/admin-api/integration/weidian/oauth/callback");
+        || path.equals("/admin-api/integration/weidian/oauth/callback")
+        || path.startsWith("/admin-api/external/");
   }
 
   private void expectNotFound(org.springframework.test.web.servlet.RequestBuilder request)

@@ -87,7 +87,9 @@ public enum ErrorCode {
   COPY_TOKEN_QUOTA_EXCEEDED(429, "Copy token quota has been used up"),
   KOL_DISABLED(403, "Creator account is disabled"),
   KOL_PROMOTION_CONFIG_INCOMPLETE(422, "Promotion config is incomplete for PROMOTING status"),
-  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD");
+  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD"),
+  COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
+  PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later");
   private final int status;
   private final String message;
 
