@@ -20,9 +20,11 @@ import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.kol.model.KolPlatformDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
@@ -53,6 +55,8 @@ class KolServiceTest {
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdHistoryDO.class);
     TableInfoHelper.initTableInfo(
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolBdTransferDO.class);
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolPlatformDO.class);
   }
 
   private static final long BD = 5L;
@@ -86,7 +90,8 @@ class KolServiceTest {
               TestTransactions.template(),
               mock(com.tcrm.admin.system.api.ExternalAuditApi.class),
               new com.tcrm.admin.shared.AuditSanitizer(new tools.jackson.databind.ObjectMapper()),
-              events));
+              events),
+          mock(KolPlatformMapper.class));
 
   @org.junit.jupiter.api.BeforeEach
   void noTemplateNames() {
@@ -104,7 +109,7 @@ class KolServiceTest {
   private static KolDO kol(Long bd) {
     KolDO kol = new KolDO();
     kol.setId(11L);
-    kol.setKolCode("KOL0001");
+    kol.setKolCode("KOL-AAA001");
     kol.setName("Alice");
     kol.setEmail("alice@example.com");
     kol.setCountry("US");
@@ -142,14 +147,14 @@ class KolServiceTest {
   @Test
   void shouldForceOwnBdFilter_whenBdListsWithAnotherBdUserId() {
     actAs(BD, Role.STAFF, DataScope.OWN);
-    String query = pageQuery(new KolFilterDTO(null, null, null, OTHER_BD, 1, 20));
+    String query = pageQuery(new KolFilterDTO(null, null, null, OTHER_BD, null, 1, 20));
     assertThat(query).contains("bd_user_id =").contains("[" + BD + "]").doesNotContain("6");
   }
 
   @Test
   void shouldApplyAllFilters_whenOperatorWithAllScopeLists() {
     actAs(1L, Role.STAFF, DataScope.ALL);
-    String query = pageQuery(new KolFilterDTO(" 50%_\\a ", "us", 1, OTHER_BD, 2, 10));
+    String query = pageQuery(new KolFilterDTO(" 50%_\\a ", "us", 1, OTHER_BD, null, 2, 10));
     assertThat(query)
         .contains("(kol_code ILIKE", "OR name ILIKE", "OR email ILIKE")
         .contains("country =", "status =", "bd_user_id =")
@@ -160,13 +165,41 @@ class KolServiceTest {
   @Test
   void shouldNotFilterByBd_whenSuperAdminOmitsBdUserId() {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
-    String query = pageQuery(new KolFilterDTO("", " ", null, null, 1, 20));
+    String query = pageQuery(new KolFilterDTO("", " ", null, null, null, 1, 20));
     assertThat(query).doesNotContain("bd_user_id", "ILIKE", "country", "status");
   }
 
   @Test
   void shouldEscapeLikeWildcards() {
     assertThat(KolService.escapeLike("a%b_c\\d")).isEqualTo("a\\%b\\_c\\\\d");
+  }
+
+  @Test
+  void shouldFilterPendingUpdate_whenDisplayStatusIsPendingUpdate() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(bdUsers.listUsable()).thenReturn(List.of(new BdUserDTO(BD, "bd5", "BD", true)));
+    String query = pageQuery(new KolFilterDTO(null, null, null, null, "PENDING_UPDATE", 1, 20));
+    assertThat(query).contains("bd_user_id IS NULL").contains("NOT IN");
+  }
+
+  @Test
+  void shouldRequireUsableBd_whenFilteringStoredPromotionStatus() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(bdUsers.listUsable()).thenReturn(List.of(new BdUserDTO(BD, "bd5", "BD", true)));
+    String query = pageQuery(new KolFilterDTO(null, null, null, null, "PROMOTING", 1, 20));
+    assertThat(query)
+        .contains("promotion_status =")
+        .contains("bd_user_id IN")
+        .contains(String.valueOf(BD))
+        .contains("PROMOTING");
+  }
+
+  @Test
+  void shouldMatchNothing_whenFilteringPromotionWithoutUsableBd() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(bdUsers.listUsable()).thenReturn(List.of());
+    String query = pageQuery(new KolFilterDTO(null, null, null, null, "ENDED", 1, 20));
+    assertThat(query).contains("1 = 0");
   }
 
   @Test
@@ -245,7 +278,7 @@ class KolServiceTest {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
     KolDO stored = kol(null);
     when(kols.selectById(any())).thenReturn(stored);
-    assertThat(service.create(create(null)).kolCode()).isEqualTo("KOL0001");
+    assertThat(service.create(create(null)).kolCode()).isEqualTo("KOL-AAA001");
     var saved = ArgumentCaptor.forClass(KolDO.class);
     verify(writer).insert(saved.capture(), isNull(), eq(1L));
     assertThat(saved.getValue().getBdUserId()).isNull();

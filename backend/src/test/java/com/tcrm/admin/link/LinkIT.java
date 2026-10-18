@@ -814,7 +814,7 @@ class LinkIT {
   private String append(long kolItemId, long ts, String ipHash, String ua) {
     Map<String, String> event = new HashMap<>();
     event.put("kolItemId", Long.toString(kolItemId));
-    event.put("kolCode", "KOL0001");
+    event.put("kolCode", "KOL-AAA001");
     event.put("productCode", "P1");
     event.put("ts", Long.toString(ts));
     event.put("ipHash", ipHash);

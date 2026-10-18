@@ -11,6 +11,7 @@ import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
 import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.shared.PageResult;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -146,5 +147,13 @@ public class KolItemLookupService implements KolItemApi {
         row.getWeidianItemId(),
         productOnSale,
         Integer.valueOf(1).equals(row.getShopStatus()));
+  }
+
+  @Override
+  public int closeCurrentMappingsForKol(Long kolId, Instant at, Long actorId) {
+    if (kolId == null || at == null) {
+      return 0;
+    }
+    return items.closeCurrentByKol(kolId, at, actorId);
   }
 }

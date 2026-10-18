@@ -8,11 +8,13 @@ import com.tcrm.admin.product.model.KolItemLinkRow;
 import com.tcrm.admin.product.model.KolItemOwnerRow;
 import com.tcrm.admin.product.model.KolItemShopRow;
 import com.tcrm.admin.product.model.KolPortalItemRow;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface KolItemMapper extends BaseMapper<KolItemDO> {
@@ -212,4 +214,14 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
           + "</script>")
   IPage<KolPortalItemRow> pagePortalItems(
       Page<KolPortalItemRow> page, @Param("kolId") Long kolId, @Param("keyword") String keyword);
+
+  /** Ends current mappings of a KOL (task 25a idle cleanup via product.api). */
+  @Update(
+      """
+      UPDATE crm_kol_item
+         SET valid_to = #{at}, update_by = #{actorId}, update_time = #{at}
+       WHERE kol_id = #{kolId} AND valid_to IS NULL
+      """)
+  int closeCurrentByKol(
+      @Param("kolId") Long kolId, @Param("at") Instant at, @Param("actorId") Long actorId);
 }

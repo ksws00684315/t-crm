@@ -76,6 +76,7 @@ class KolPayoutAccountControllerTest {
         PayoutAccountType.USDT,
         "TQ5xnPW9tZ3kA7qL9aZ",
         null,
+        null,
         UsdtNetwork.TRC20,
         55L,
         status,
@@ -137,7 +138,7 @@ class KolPayoutAccountControllerTest {
             json(
                     put(BASE + "/77"),
                     "{\"accountType\":\"PAYPAL\",\"account\":\"alice@example.com\","
-                        + "\"holderName\":\"Alice D\"}")
+                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}")
                 .header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(accounts).update(eq(9007199254740993L), eq(77L), any(), any());

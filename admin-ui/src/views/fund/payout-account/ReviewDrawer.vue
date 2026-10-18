@@ -159,6 +159,12 @@ async function submitReject(): Promise<void> {
             {{ t(`payout.typeOption.${detail.accountType}`) }}
             <template v-if="detail.network"> · {{ detail.network }}</template>
           </el-descriptions-item>
+          <el-descriptions-item
+            v-if="detail.accountType === 'PAYPAL'"
+            :label="t('payout.currency')"
+          >
+            <span data-test="payout-currency">{{ detail.currency || "-" }}</span>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('payout.fullAccount')">
             <CopyText :value="detail.account" />
           </el-descriptions-item>

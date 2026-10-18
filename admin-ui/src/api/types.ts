@@ -104,6 +104,15 @@ export interface SocialAccountVO {
   primary: boolean;
 }
 
+/** Stored promotion status of a creator (ADR-023 §2). */
+export type PromotionStatus = "PENDING_REVIEW" | "PENDING_PROMOTION" | "PROMOTING" | "ENDED";
+
+/**
+ * Status shown in lists and drawers: the stored status, or `PENDING_UPDATE` when the creator has
+ * no active BD. Optional until task 25a returns it.
+ */
+export type DisplayStatus = PromotionStatus | "PENDING_UPDATE";
+
 /** `KolVO`. `defaultRate` is a fraction with 4 decimals ("0.1550" = 15.5%), null when not set. */
 export interface KolVO {
   id: string;
@@ -132,6 +141,14 @@ export interface KolVO {
    * 0 not activated, 1 activated. Task 12c adds this to `KolVO`; until then the field may be absent.
    */
   accountStatus?: 0 | 1;
+  /** Promotion status (task 25a); absent until the backend returns it. */
+  promotionStatus?: PromotionStatus | null;
+  /** Stored status, or `PENDING_UPDATE` without an active BD; absent until task 25a. */
+  displayStatus?: DisplayStatus | null;
+  /** Creator landing page (https). */
+  landingUrl?: string | null;
+  /** Selected purchasing-platform templates (multi-select, task 25a). */
+  platformTemplateIds?: string[];
   createTime: string;
   updateTime: string;
 }

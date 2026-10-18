@@ -38,6 +38,7 @@ const row: PayoutAccountRowVO = {
   accountType: "USDT",
   accountMasked: "TQ5x…K9aZ",
   holderName: null,
+  currency: null,
   network: "TRC20",
   qrFileId: "66",
   status: "PENDING",

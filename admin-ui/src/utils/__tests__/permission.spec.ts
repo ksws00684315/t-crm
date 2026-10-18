@@ -22,7 +22,8 @@ import {
 } from "../permission";
 
 function staff(dataScope: "ALL" | "OWN", permissions: readonly string[]): AbilitySubject {
-  return { role: "STAFF", dataScope, permissions, postTemplate: "OPERATOR" };
+  // Real sessions always carry the account status; enabled unless a test says otherwise.
+  return { role: "STAFF", dataScope, permissions, postTemplate: "OPERATOR", status: 1 };
 }
 
 const superAdmin: AbilitySubject = {
@@ -298,7 +299,9 @@ describe("kolAbilities", () => {
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: false,
+      canManageCleanup: false
     });
     expect(kolAbilities(superAdmin)).toEqual({
       canWrite: true,
@@ -306,7 +309,9 @@ describe("kolAbilities", () => {
       canAssignBd: true,
       canFilterBd: true,
       canRegisterLink: true,
-      canCopyToken: true
+      canCopyToken: true,
+      canClaimKol: false,
+      canManageCleanup: true
     });
     expect(kolAbilities(staff("ALL", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
@@ -314,7 +319,9 @@ describe("kolAbilities", () => {
       canAssignBd: true,
       canFilterBd: true,
       canRegisterLink: false,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: false,
+      canManageCleanup: true
     });
     expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
@@ -322,7 +329,9 @@ describe("kolAbilities", () => {
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: true,
+      canManageCleanup: false
     });
     expect(kolAbilities(staff("ALL", ["kol:view"]))).toEqual({
       canWrite: false,
@@ -330,7 +339,9 @@ describe("kolAbilities", () => {
       canAssignBd: false,
       canFilterBd: true,
       canRegisterLink: false,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: false,
+      canManageCleanup: false
     });
     expect(kolAbilities(staff("OWN", ["kol:register-link"]))).toEqual({
       canWrite: false,
@@ -338,7 +349,9 @@ describe("kolAbilities", () => {
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: true,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: false,
+      canManageCleanup: false
     });
     expect(kolAbilities(staff("OWN", ["kol:copy-token"]))).toEqual({
       canWrite: false,
@@ -346,8 +359,23 @@ describe("kolAbilities", () => {
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: true
+      canCopyToken: true,
+      canClaimKol: false,
+      canManageCleanup: false
     });
+  });
+
+  it("gives claiming only to an enabled OWN-scope BD with kol:edit (25a §4.4)", () => {
+    const bd = { role: "STAFF" as const, dataScope: "OWN" as const, permissions: ["kol:edit"] };
+    expect(kolAbilities({ ...bd, status: 1 })).toEqual(
+      expect.objectContaining({ canClaimKol: true })
+    );
+    expect(kolAbilities({ ...bd, status: 0 })).toEqual(
+      expect.objectContaining({ canClaimKol: false })
+    );
+    expect(kolAbilities({ role: "STAFF", dataScope: "OWN", permissions: [] })).toEqual(
+      expect.objectContaining({ canClaimKol: false })
+    );
   });
 });
 

@@ -88,7 +88,9 @@ public enum ErrorCode {
   KOL_DISABLED(403, "Creator account is disabled"),
   KOL_PROMO_SHEET_INVALID(400, "Promo sheet is not a readable .xlsx workbook"),
   KOL_PROMO_SHEET_TOO_LARGE(400, "Promo sheet exceeds 300 MB"),
-  KOL_PROMO_UPLOAD_EXPIRED(410, "Upload preview has expired; upload the sheet again");
+  KOL_PROMO_UPLOAD_EXPIRED(410, "Upload preview has expired; upload the sheet again"),
+  KOL_PROMOTION_CONFIG_INCOMPLETE(422, "Promotion config is incomplete for PROMOTING status"),
+  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD");
   private final int status;
   private final String message;
 

@@ -50,7 +50,7 @@ class RedirectIT {
 
   @BeforeEach
   void clear() {
-    redis.delete(java.util.List.of("link:KOL0001", "stream:click"));
+    redis.delete(java.util.List.of("link:KOL-AAA001", "stream:click"));
   }
 
   @Test
@@ -64,7 +64,7 @@ class RedirectIT {
             .range("stream:click", org.springframework.data.domain.Range.unbounded())
             .getFirst()
             .getValue();
-    assertThat(event.get("kolCode")).isEqualTo("KOL0001");
+    assertThat(event.get("kolCode")).isEqualTo("KOL-AAA001");
     assertThat(event.get("ipHash").toString().length()).isEqualTo(64);
   }
 
@@ -166,7 +166,7 @@ class RedirectIT {
     redis
         .opsForHash()
         .put(
-            "link:KOL0001",
+            "link:KOL-AAA001",
             "P000001",
             "{\"kolItemId\":\"1\",\"targetUrl\":\"https://example.com/item\",\"status\":"
                 + status
@@ -174,14 +174,14 @@ class RedirectIT {
   }
 
   private void target() throws Exception {
-    mvc.perform(get("/t/KOL0001/P000001"))
+    mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
         .andExpect(header().string("Location", "https://example.com/item"))
         .andExpect(header().string("Cache-Control", "no-store"));
   }
 
   private void fallback() throws Exception {
-    mvc.perform(get("/t/KOL0001/P000001"))
+    mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
         .andExpect(header().string("Location", "https://example.com/unavailable"));
   }

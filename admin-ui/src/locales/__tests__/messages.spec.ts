@@ -25,12 +25,13 @@ describe("message packs", () => {
         const path = prefix ? `${prefix}.${key}` : key;
         if (child !== null && typeof child === "object") {
           visit(child as object, path);
-        } else if (typeof child === "string" && /\bKOLs?\b/i.test(child)) {
+        } else if (typeof child === "string" && /\bKOLs?\b/i.test(stripCodeSamples(child))) {
           offenders.push(`${path}: ${child}`);
         }
       }
     };
-    // Word boundaries keep code samples such as "KOL0001" (the literal creator-code format) out.
+    // Word boundaries keep code samples out; since ADR-023 the code itself contains a hyphen
+    // ("KOL-ASD001"), so the samples are removed first and everything else stays strict.
     visit(enUS);
     expect(offenders).toEqual([]);
   });
@@ -44,6 +45,11 @@ describe("message packs", () => {
     }
   });
 });
+
+/** Removes literal creator-code samples (ADR-023 §1) so only the KOL *word* is checked. */
+function stripCodeSamples(text: string): string {
+  return text.replace(/KOL-[A-Z]{3}[0-9]{3,8}/g, "");
+}
 
 function collectTitles(route: (typeof routes)[number]): string[] {
   const own = typeof route.meta?.title === "string" ? [route.meta.title] : [];

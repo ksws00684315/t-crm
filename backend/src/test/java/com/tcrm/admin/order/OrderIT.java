@@ -156,9 +156,9 @@ class OrderIT {
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     shop(10, 1);
     shop(20, 2);
-    kol(100, "KOL0100", 1);
-    kol(200, "KOL0200", 1);
-    kol(300, "KOL0300", 2);
+    kol(100, "KOL-AAA100", 1);
+    kol(200, "KOL-AAA200", 1);
+    kol(300, "KOL-AAA300", 2);
     jdbc.update(
         "INSERT INTO crm_weidian_shop_auth(id,tenant_id,shop_id,auth_mode,status,create_time,update_time) VALUES(10,1,10,'SERVICE','AUTHORIZED',now(),now())");
     when(remote.orderList(anyLong(), any()))
@@ -234,13 +234,18 @@ class OrderIT {
   }
 
   private void history(long id, long kol, Long bd, Instant from, Instant to) {
+    // create_time slightly in the past so OrderSnapshotCorrection.createdBetween(start,
+    // Instant.now())
+    // always includes this row (PG CLOCK_TIMESTAMP can otherwise race the JVM Instant.now()).
     jdbc.update(
-        "INSERT INTO crm_kol_bd_history(id,tenant_id,kol_id,bd_user_id,start_time,end_time,create_time,update_time) VALUES(?,1,?,?,?,?,now(),now())",
+        "INSERT INTO crm_kol_bd_history(id,tenant_id,kol_id,bd_user_id,start_time,end_time,create_time,update_time) VALUES(?,1,?,?,?,?,?,?)",
         id,
         kol,
         bd,
         Timestamp.from(from),
-        to == null ? null : Timestamp.from(to));
+        to == null ? null : Timestamp.from(to),
+        Timestamp.from(Instant.now().minusSeconds(5)),
+        Timestamp.from(Instant.now()));
   }
 
   @Test
@@ -526,7 +531,7 @@ class OrderIT {
                 .param("shopId", "10")
                 .param("payFrom", PAID.minusSeconds(1).toString())
                 .param("payTo", PAID.plusSeconds(1).toString())
-                .param("kolCode", "KOL0100")
+                .param("kolCode", "KOL-AAA100")
                 .param("orderStatus", "PAID")
                 .param("attributionStatus", "UNMATCHED"))
         .andExpect(status().isOk())
@@ -535,7 +540,7 @@ class OrderIT {
     mvc.perform(
             get("/admin-api/order/orders")
                 .header("X-Admin-Token", admin)
-                .param("kolCode", "KOL9999"))
+                .param("kolCode", "KOL-ZZZ999"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("0"));
     mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", admin).param("shopId", "20"))
@@ -646,10 +651,10 @@ class OrderIT {
         .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(attributed)))
         .andExpect(jsonPath("$.data.items[0].shopId").value("10"))
         .andExpect(jsonPath("$.data.items[0].shopName").value("Test shop"))
-        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL0100"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL-AAA100"))
         .andExpect(jsonPath("$.data.items[0].kolName").value("Test creator"))
         .andExpect(jsonPath("$.data.items[0].bdUserName").value("order-display-bd"))
-        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL0100"))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL-AAA100"))
         .andExpect(jsonPath("$.data.items[1].id").value(String.valueOf(unmatched)))
         .andExpect(jsonPath("$.data.items[1].kolCode").isEmpty())
         .andExpect(jsonPath("$.data.items[1].bdUserName").isEmpty())

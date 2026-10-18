@@ -185,4 +185,35 @@ describe("register page", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("该邮箱已注册，请直接登录");
   });
+
+  it("requires a WhatsApp number before registering (task 25b §3.6)", async () => {
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({ tenantName: "Acme" });
+    const { wrapper } = await page(`/register?c=${CODE}`);
+    await fill(wrapper, {
+      "register-email": "ada@example.com",
+      "register-email-code": "123456",
+      "register-password": "long-enough-pw",
+      "register-confirm": "long-enough-pw",
+      "register-handle": "@ada"
+    });
+    choosePlatform(wrapper, "TikTok");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(wrapper.text()).toContain("Enter a WhatsApp number starting with + and 8–15 digits.");
+    expect(registerApi.registerKol).not.toHaveBeenCalled();
+
+    await fill(wrapper, { "register-whatsapp": "not-a-number" });
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(wrapper.text()).toContain("Enter a WhatsApp number starting with + and 8–15 digits.");
+    expect(registerApi.registerKol).not.toHaveBeenCalled();
+
+    await fill(wrapper, { "register-whatsapp": "+15551234567" });
+    vi.mocked(registerApi.registerKol).mockResolvedValue(session);
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(registerApi.registerKol).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsapp: "+15551234567" })
+    );
+  });
 });

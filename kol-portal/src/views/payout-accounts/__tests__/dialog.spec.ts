@@ -41,6 +41,7 @@ function account(overrides: Partial<PayoutAccountVO> = {}): PayoutAccountVO {
     accountType: "USDT",
     account: "TQ5xK9aZPn7vQm",
     holderName: null,
+    currency: null,
     network: "TRC20",
     qrFileId: null,
     status: "PENDING",
@@ -117,7 +118,8 @@ describe("payout account dialog", () => {
     expect(api.createPayoutAccount).toHaveBeenCalledWith({
       accountType: "PAYPAL",
       account: "ada@example.com",
-      holderName: "Ada Lovelace"
+      holderName: "Ada Lovelace",
+      currency: "USD"
     });
     expect(wrapper.emitted("saved")).toHaveLength(1);
   });
@@ -231,6 +233,7 @@ describe("payout account dialog", () => {
       account: "old@example.com",
       holderName: "Old",
       network: null,
+      currency: "EUR",
       status: "REJECTED"
     });
     const wrapper = await openDialog(edited);
@@ -243,7 +246,8 @@ describe("payout account dialog", () => {
     expect(api.updatePayoutAccount).toHaveBeenCalledWith("11", {
       accountType: "PAYPAL",
       account: "new@example.com",
-      holderName: "New Name"
+      holderName: "New Name",
+      currency: "EUR"
     });
     expect(wrapper.emitted("saved")).toHaveLength(1);
   });
@@ -254,5 +258,25 @@ describe("payout account dialog", () => {
     await submit(wrapper);
     expect(wrapper.emitted("conflict")).toHaveLength(1);
     expect(wrapper.emitted("saved")).toBeUndefined();
+  });
+
+  it("offers PayPal currencies with USD default and sends the chosen one (task 25b)", async () => {
+    const wrapper = await openDialog(null);
+    await chooseType(wrapper, "PAYPAL");
+    const currencySelect = wrapper
+      .findAllComponents(ElSelect)
+      .find(item => item.find('[data-test="currency-input"]').exists());
+    expect(currencySelect).toBeDefined();
+    expect(currencySelect!.props("modelValue")).toBe("USD");
+    expect(
+      currencySelect!.findAllComponents(ElOption).map(option => String(option.props("value")))
+    ).toEqual(["USD", "EUR", "GBP", "CNY"]);
+    // The default is USD, and the payload always carries a currency for PayPal.
+    await wrapper.get("#payout-account").setValue("ada@example.com");
+    await wrapper.get("#payout-holder").setValue("Ada");
+    await submit(wrapper);
+    expect(api.createPayoutAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ accountType: "PAYPAL", currency: "USD" })
+    );
   });
 });
