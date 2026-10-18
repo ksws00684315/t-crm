@@ -242,7 +242,10 @@ class CopyJobWorkerTest {
 
     worker.processJob(1L);
 
-    verify(kolItems).insert(org.mockito.ArgumentMatchers.<KolItemDO>any());
+    ArgumentCaptor<KolItemDO> inserted = ArgumentCaptor.forClass(KolItemDO.class);
+    verify(kolItems).insert(inserted.capture());
+    assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
+    assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90099");
     verify(copies, times(1)).copy(5L, "10001", 5L);
   }
 
@@ -311,7 +314,10 @@ class CopyJobWorkerTest {
     worker.processJob(1L);
 
     verify(products).insert(org.mockito.ArgumentMatchers.<ProductDO>any());
-    verify(kolItems).insert(org.mockito.ArgumentMatchers.<KolItemDO>any());
+    ArgumentCaptor<KolItemDO> inserted = ArgumentCaptor.forClass(KolItemDO.class);
+    verify(kolItems).insert(inserted.capture());
+    assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
+    assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90001");
     verify(tokens).consume(20L, 1);
   }
 

@@ -211,6 +211,16 @@ class ProductLinkIT {
             kolId,
             productId);
     assertThat(mappings).isEqualTo(1);
+    String mappingSource =
+        jdbc.queryForObject(
+            """
+            SELECT source FROM crm_kol_item
+            WHERE kol_id = ? AND product_id = ? AND valid_to IS NULL
+            """,
+            String.class,
+            kolId,
+            productId);
+    assertThat(mappingSource).isEqualTo("COPY");
     Integer outbox =
         jdbc.queryForObject(
             """

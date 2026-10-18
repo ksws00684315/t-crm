@@ -962,7 +962,8 @@ const enUS: MessageSchema = {
     source: "Source",
     sources: {
       IMPORT: "Import",
-      SHEET_UPLOAD: "Sheet upload"
+      SHEET_UPLOAD: "Sheet upload",
+      COPY: "Copy"
     },
     noProduct: "No original product"
   },

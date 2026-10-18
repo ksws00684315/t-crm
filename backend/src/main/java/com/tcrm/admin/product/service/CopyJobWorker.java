@@ -237,6 +237,7 @@ public class CopyJobWorker implements ApplicationRunner {
       neu.setProductId(product.getId());
       neu.setShopId(job.getTargetShopId());
       neu.setWeidianItemId(newItemId);
+      neu.setSource("COPY");
       neu.setValidFrom(now);
       neu.setCreateTime(now);
       neu.setUpdateTime(now);

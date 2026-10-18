@@ -944,7 +944,8 @@ const zhCN = {
     source: "来源",
     sources: {
       IMPORT: "导入",
-      SHEET_UPLOAD: "上传推广表"
+      SHEET_UPLOAD: "上传推广表",
+      COPY: "复制"
     },
     noProduct: "未关联原商品"
   },

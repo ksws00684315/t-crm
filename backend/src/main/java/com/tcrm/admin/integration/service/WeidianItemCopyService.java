@@ -156,6 +156,10 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
   /**
    * True when Weidian explicitly says the item is missing or not owned by this shop. Unknown codes
    * must not be treated as empty — they fail the copy item instead.
+   *
+   * <p>The numeric codes {@code 10003}/{@code 20003}/{@code 21001} and the Chinese/English keywords
+   * below are conjectured from API docs and observed messages; they must be verified against a real
+   * Weidian account before M0.
    */
   static boolean isItemNotFound(WeidianApiException error) {
     if (error == null) {
@@ -173,7 +177,7 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         return true;
       }
     }
-    // Documented / observed item-missing codes for vdian.item.get (non-retryable business misses).
+    // Conjectured item-missing codes for vdian.item.get — verify with a real account at M0.
     int code = error.statusCode();
     return code == 10003 || code == 20003 || code == 21001;
   }
