@@ -1,6 +1,6 @@
 import { http } from "../http";
 import type { DownloadedFile } from "@/utils/http";
-import type { KolDetailVO, KolVO, PageResult } from "../types";
+import type { DisplayStatus, KolDetailVO, KolVO, PageResult } from "../types";
 
 /** `KolQuery`; omitted fields mean "no filter". The backend ignores `bdUserId` for a BD. */
 export interface KolQuery {
@@ -10,6 +10,8 @@ export interface KolQuery {
   country?: string;
   status?: 0 | 1;
   bdUserId?: string;
+  /** Filters by the shown status, `PENDING_UPDATE` included (task 25a). */
+  displayStatus?: DisplayStatus;
 }
 
 /** `SocialAccountRequest`. At most one account may set `primary`. */

@@ -30,9 +30,14 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const { busy, validation, failure, errorText, submit } = useSubmission();
 
+/** Currencies in the picker, USD first because it is the default. */
+const PAYPAL_CURRENCIES = ["USD", "EUR", "GBP", "CNY"] as const;
+
 const accountType = ref<"" | "PAYPAL" | "USDT">("");
 const accountValue = ref("");
 const holderName = ref("");
+/** PayPal currencies offered in the picker (task 25b §3.6); USD is the default. */
+const currency = ref("USD");
 const network = ref<"" | UsdtNetwork>("");
 const qrFileId = ref<string | null>(null);
 const qrPreviewUrl = ref<string | null>(null);
@@ -54,6 +59,7 @@ function resetForm() {
   accountType.value = props.account?.accountType ?? "";
   accountValue.value = props.account?.account ?? "";
   holderName.value = props.account?.holderName ?? "";
+  currency.value = props.account?.currency || "USD";
   network.value = props.account?.network ?? "";
   qrFileId.value = props.account?.qrFileId ?? null;
   if (props.account?.qrFileId) void loadExistingQr(props.account.qrFileId);
@@ -122,6 +128,10 @@ function validate(): boolean {
       validation.value = "payoutAccounts.form.holderRange";
       return false;
     }
+    if (!currency.value) {
+      validation.value = "payoutAccounts.form.currencyRequired";
+      return false;
+    }
   } else {
     if (!/^[0-9A-Za-z]{3,128}$/.test(value)) {
       validation.value = "payoutAccounts.form.accountPattern";
@@ -141,7 +151,12 @@ function save() {
     const trimmed = accountValue.value.trim();
     const payload =
       accountType.value === "PAYPAL"
-        ? { accountType: "PAYPAL" as const, account: trimmed, holderName: holderName.value.trim() }
+        ? {
+            accountType: "PAYPAL" as const,
+            account: trimmed,
+            holderName: holderName.value.trim(),
+            currency: currency.value
+          }
         : {
             accountType: "USDT" as const,
             account: trimmed,
@@ -201,6 +216,21 @@ function close() {
           "
           :disabled="busy"
         />
+      </el-form-item>
+
+      <el-form-item
+        v-if="accountType === 'PAYPAL'"
+        :label="t('payoutAccounts.form.currency')"
+        for="payout-currency"
+      >
+        <el-select
+          id="payout-currency"
+          v-model="currency"
+          data-test="currency-input"
+          :disabled="busy"
+        >
+          <el-option v-for="item in PAYPAL_CURRENCIES" :key="item" :label="item" :value="item" />
+        </el-select>
       </el-form-item>
 
       <el-form-item

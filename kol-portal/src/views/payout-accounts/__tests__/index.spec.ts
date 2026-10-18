@@ -42,6 +42,7 @@ function account(overrides: Partial<PayoutAccountVO> = {}): PayoutAccountVO {
     accountType: "PAYPAL",
     account: "ada@example.com",
     holderName: "Ada Lovelace",
+    currency: "USD",
     network: null,
     qrFileId: null,
     status: "PENDING",
@@ -236,5 +237,13 @@ describe("payout accounts page", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="list-error"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("ada@example.com");
+  });
+
+  it("shows the PayPal currency on the card (task 25b §3.6)", async () => {
+    const wrapper = await page([account({ currency: "EUR" }), usdt({})]);
+    const types = wrapper.findAll('[data-test="type"]');
+    expect(types[0]!.text()).toContain("PayPal · EUR");
+    expect(types[1]!.text()).toContain("USDT · TRC20");
+    wrapper.unmount();
   });
 });

@@ -8,6 +8,8 @@ export interface AbilitySubject {
   dataScope: DataScope | null;
   permissions?: readonly string[] | null;
   postTemplate?: PostTemplate | null;
+  /** 1 enabled, 0 disabled; only the claim check needs it, so callers may omit it. */
+  status?: 0 | 1;
 }
 
 /** What a signed-in session may do. Pages use these flags instead of comparing role names. */
@@ -293,6 +295,10 @@ export interface KolAbilities {
   canRegisterLink: boolean;
   /** Generate, reveal and revoke copy tokens. */
   canCopyToken: boolean;
+  /** Claim an unassigned creator. Available BDs only (enabled STAFF, OWN scope, kol:edit). */
+  canClaimKol: boolean;
+  /** Edit the cleanup configuration and see its preview. kol:edit with the ALL data scope. */
+  canManageCleanup: boolean;
 }
 
 export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilities {
@@ -304,7 +310,9 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false
+      canCopyToken: false,
+      canClaimKol: false,
+      canManageCleanup: false
     };
   }
   const canEdit = access.can("kol:edit");
@@ -314,7 +322,9 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
     canAssignBd: access.isSuperAdmin || (canEdit && !access.isOwnScope),
     canFilterBd: access.can("kol:view") && !access.isOwnScope,
     canRegisterLink: access.can("kol:register-link"),
-    canCopyToken: access.can("kol:copy-token")
+    canCopyToken: access.can("kol:copy-token"),
+    canClaimKol: user.status === 1 && user.role === "STAFF" && access.isOwnScope && canEdit,
+    canManageCleanup: canEdit && !access.isOwnScope
   };
 }
 

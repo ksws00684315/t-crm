@@ -133,9 +133,9 @@ function statusText(status: PayoutAccountVO["status"]): string {
 }
 
 function typeText(account: PayoutAccountVO): string {
-  return account.accountType === "USDT"
-    ? t("payoutAccounts.type.USDT") + " · " + t(`payoutAccounts.network.${account.network}`)
-    : t("payoutAccounts.type.PAYPAL");
+  if (account.accountType === "USDT")
+    return t("payoutAccounts.type.USDT") + " · " + t(`payoutAccounts.network.${account.network}`);
+  return t("payoutAccounts.type.PAYPAL") + (account.currency ? " · " + account.currency : "");
 }
 
 /** Copy button for the full account; only its owner ever sees this page. */

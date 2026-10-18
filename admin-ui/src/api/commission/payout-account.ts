@@ -10,6 +10,8 @@ export interface PayoutAccountRowVO {
   accountType: "PAYPAL" | "USDT";
   accountMasked: string;
   holderName: string | null;
+  /** PayPal only (task 25, R18): ISO 4217, null for USDT. */
+  currency: string | null;
   network: "TRC20" | "ERC20" | "BEP20" | "SOL" | "TON" | null;
   qrFileId: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
