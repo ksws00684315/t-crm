@@ -85,6 +85,9 @@ class PromoSheetIT {
     r.add("crm.link.base-url", () -> "https://t.example.com");
     r.add("crm.kol-portal.base-url", () -> "https://kol.example.com");
     r.add("crm.link.click-consumer.enabled", () -> "false");
+    // The upload sub-domain (task 26 review) is a different origin from the console, so the
+    // console's origin must be whitelisted for the cross-origin upload to pass CORS.
+    r.add("crm.cors.allowed-origins", () -> "https://admin.example.com");
     WeidianTestProperties.register(r);
   }
 
@@ -498,6 +501,67 @@ class PromoSheetIT {
       }
     }
     return null;
+  }
+
+  @Test
+  void shouldPassCorsPreflightAndCrossOriginUpload_fromTheUploadSubDomain() throws Exception {
+    long kolA = seed()[0];
+    String origin = "https://admin.example.com";
+    // Preflight: the interceptors must not answer the tokenless OPTIONS with 401.
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options(
+                    "/admin-api/kol/kols/" + kolA + "/promo-sheet-uploads")
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "x-admin-token, x-company-id"))
+        .andExpect(status().isOk())
+        .andExpect(
+            result ->
+                assertThat(result.getResponse().getHeader("Access-Control-Allow-Origin"))
+                    .isEqualTo(origin));
+    // An origin outside the whitelist is rejected without allow headers.
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options(
+                    "/admin-api/kol/kols/" + kolA + "/promo-sheet-uploads")
+                .header("Origin", "https://untrusted.example.com")
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isForbidden());
+
+    // The actual cross-origin upload: same request the browser sends after the preflight.
+    MvcResult upload =
+        mvc.perform(
+                multipart("/admin-api/kol/kols/" + kolA + "/promo-sheet-uploads")
+                    .file(
+                        new MockMultipartFile(
+                            "file",
+                            "promo.xlsx",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            sampleSheet()))
+                    .header("Origin", origin)
+                    .header(TOKEN, adminToken)
+                    .header("X-Company-Id", "1"))
+            .andExpect(status().isOk())
+            .andReturn();
+    assertThat(upload.getResponse().getHeader("Access-Control-Allow-Origin")).isEqualTo(origin);
+    String uploadId =
+        json.readTree(upload.getResponse().getContentAsString()).at("/data/uploadId").asString();
+
+    // Cross-origin confirm keeps working on the main domain (no upload base URL override).
+    MvcResult confirmed =
+        mvc.perform(
+                post("/admin-api/kol/kols/"
+                        + kolA
+                        + "/promo-sheet-uploads/"
+                        + uploadId
+                        + "/confirm")
+                    .header(TOKEN, adminToken))
+            .andExpect(status().isOk())
+            .andReturn();
+    assertThat(
+            json.readTree(confirmed.getResponse().getContentAsString())
+                .at("/data/inserted")
+                .asInt())
+        .isEqualTo(2);
   }
 
   private String kolLogin(String email, String password) throws Exception {
