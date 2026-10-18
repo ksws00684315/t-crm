@@ -47,6 +47,15 @@ class RedirectServiceTest {
   }
 
   @Test
+  void shouldRejectOldKolCodeFormat_whenPathUsesPreAdr023Pattern() {
+    var redis = mock(ClickRedis.class);
+    var service = new RedirectService(redis, IPS, "https://fallback.example/", SALT);
+    var response = service.redirect("KOL0001", "product", new MockHttpServletRequest());
+    assertThat(response.getStatusCode().value()).isEqualTo(404);
+    verifyNoInteractions(redis);
+  }
+
+  @Test
   void shouldUseFallback_whenRedisLookupFails() {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString()))
@@ -54,7 +63,7 @@ class RedirectServiceTest {
     var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
     assertThat(
             service
-                .redirect("KOL0001", "product", new MockHttpServletRequest())
+                .redirect("KOL-AAA001", "product", new MockHttpServletRequest())
                 .getHeaders()
                 .getLocation()
                 .toString())
@@ -72,7 +81,7 @@ class RedirectServiceTest {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
     new RedirectService(redis, IPS, "https://example.com/fallback", SALT)
-        .redirect("KOL0001", "product", request);
+        .redirect("KOL-AAA001", "product", request);
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(redis).append(events.capture());
     return events.getValue();
@@ -117,7 +126,7 @@ class RedirectServiceTest {
           .thenReturn("{\"kolItemId\":\"1\",\"targetUrl\":\"" + target + "\",\"status\":1}");
       assertThat(
               service
-                  .redirect("KOL0001", "product", new MockHttpServletRequest())
+                  .redirect("KOL-AAA001", "product", new MockHttpServletRequest())
                   .getHeaders()
                   .getLocation()
                   .toString())
@@ -139,7 +148,7 @@ class RedirectServiceTest {
         .thenReturn(
             "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p?a=1%7C2\",\"status\":1}");
     var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
-    var response = service.redirect("KOL0001", "product", new MockHttpServletRequest());
+    var response = service.redirect("KOL-AAA001", "product", new MockHttpServletRequest());
     assertThat(response.getHeaders().getLocation().toString())
         .isEqualTo("https://example.com/p?a=1%7C2");
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);
@@ -158,7 +167,7 @@ class RedirectServiceTest {
       when(redis.lookup(anyString(), anyString())).thenReturn(value);
       assertThat(
               service
-                  .redirect("KOL0001", "product", new MockHttpServletRequest())
+                  .redirect("KOL-AAA001", "product", new MockHttpServletRequest())
                   .getHeaders()
                   .getLocation()
                   .toString())

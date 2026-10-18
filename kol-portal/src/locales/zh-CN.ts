@@ -230,6 +230,8 @@ const zhCN: MessageSchema = {
     FILE_TOO_LARGE: "文件超过 2MB。",
     FILE_IN_USE: "该文件已被其他账户使用。",
     KOL_EMAIL_EXISTS: "该邮箱已注册，请直接登录",
+    KOL_ALREADY_CLAIMED: "该达人已被其他商务认领",
+    KOL_PROMOTION_CONFIG_INCOMPLETE: "推广配置不完整，无法改为推广中",
     KOL_REGISTER_CODE_INVALID: "注册链接无效或已失效，请联系您的商务获取新链接",
     KOL_EMAIL_CODE_TOO_FREQUENT: "验证码发送过于频繁，请稍后再试",
     KOL_EMAIL_CODE_INVALID: "验证码错误、已过期或已使用",

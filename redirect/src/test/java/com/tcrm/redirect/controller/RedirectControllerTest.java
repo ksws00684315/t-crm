@@ -46,9 +46,9 @@ class RedirectControllerTest {
 
   @Test
   void shouldValidLinkRedirectsAndAppendsHashedEvent_whenRequested() throws Exception {
-    when(redis.lookup("KOL0001", "P000001")).thenReturn(ITEM);
+    when(redis.lookup("KOL-AAA001", "P000001")).thenReturn(ITEM);
     mvc.perform(
-            get("/t/KOL0001/P000001")
+            get("/t/KOL-AAA001/P000001")
                 .header("CF-Connecting-IP", "203.0.113.1")
                 .header("X-Forwarded-For", "198.51.100.1")
                 .header("CF-IPCountry", "US")
@@ -62,7 +62,7 @@ class RedirectControllerTest {
     Map<?, ?> fields = event.getValue();
     assertThat(fields.size()).isEqualTo(8);
     assertThat(fields.get("country")).isEqualTo("US");
-    assertThat(fields.get("kolCode")).isEqualTo("KOL0001");
+    assertThat(fields.get("kolCode")).isEqualTo("KOL-AAA001");
     assertThat(fields.get("ua")).isEqualTo("Test-Agent");
     String expected =
         java.util.HexFormat.of()
@@ -91,7 +91,7 @@ class RedirectControllerTest {
   @Test
   void shouldInvalidPathsAre404WithoutRedisLookup_whenRequested() throws Exception {
     for (String path :
-        new String[] {"/t/BAD/P000001", "/t/KOL0001/a.b", "/t/KOL0001/" + "a".repeat(33)}) {
+        new String[] {"/t/BAD/P000001", "/t/KOL-AAA001/a.b", "/t/KOL-AAA001/" + "a".repeat(33)}) {
       mvc.perform(get(path)).andExpect(status().isNotFound());
     }
     verifyNoInteractions(redis);
@@ -101,7 +101,7 @@ class RedirectControllerTest {
   void shouldStreamFailureStillRedirectsToTarget_whenRequested() throws Exception {
     when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
     doThrow(new IllegalStateException("simulated failure")).when(redis).append(anyMap());
-    mvc.perform(get("/t/KOL0001/P000001"))
+    mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
         .andExpect(header().string("Location", "https://example.com/item"));
   }
@@ -222,7 +222,7 @@ class RedirectControllerTest {
   }
 
   private void fallback() throws Exception {
-    mvc.perform(get("/t/KOL0001/P000001"))
+    mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
         .andExpect(header().string("Location", "https://example.com/unavailable"));
   }

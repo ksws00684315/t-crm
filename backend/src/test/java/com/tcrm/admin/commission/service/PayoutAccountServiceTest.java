@@ -80,12 +80,12 @@ class PayoutAccountServiceTest {
 
   private static PayoutAccountService.SaveCommand paypal(String account) {
     return new PayoutAccountService.SaveCommand(
-        PayoutAccountType.PAYPAL, account, "Alice Doe", null, null);
+        PayoutAccountType.PAYPAL, account, "Alice Doe", "USD", null, null);
   }
 
   private static PayoutAccountService.SaveCommand usdt(Long qrFileId) {
     return new PayoutAccountService.SaveCommand(
-        PayoutAccountType.USDT, "TQ5xnPW9tZ3kA7qL9aZ", null, UsdtNetwork.TRC20, qrFileId);
+        PayoutAccountType.USDT, "TQ5xnPW9tZ3kA7qL9aZ", null, null, UsdtNetwork.TRC20, qrFileId);
   }
 
   private static PayoutAccountDO account(PayoutAccountStatus status) {

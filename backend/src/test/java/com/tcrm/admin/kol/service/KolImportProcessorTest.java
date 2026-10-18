@@ -188,8 +188,8 @@ class KolImportProcessorTest {
 
   @Test
   void shouldKeepSuppliedCodeUppercased_whenCodeIsFree() {
-    assertThat(processor(false).process(row("kol0042", "A", "a@x.io", "CN"))).isEmpty();
-    KolDO kol = saved("KOL0042", ADMIN);
+    assertThat(processor(false).process(row("kol-aaa042", "A", "a@x.io", "CN"))).isEmpty();
+    KolDO kol = saved("KOL-AAA042", ADMIN);
     assertThat(kol.getSocialAccounts()).isEqualTo("[]");
     assertThat(kol.getDefaultRate()).isNull();
     assertThat(kol.getRemark()).isNull();
@@ -262,7 +262,7 @@ class KolImportProcessorTest {
             processor(false)
                 .process(
                     row(
-                        "KOL99999999",
+                        "KOL-ZZZ99999999",
                         "名".repeat(64),
                         email,
                         "US",
@@ -286,20 +286,20 @@ class KolImportProcessorTest {
   @Test
   void shouldFailSecondOccurrence_whenCodeOrEmailRepeatsInFile() {
     var p = processor(false);
-    assertThat(p.process(row("KOL0100", "A", "a@x.io", "US"))).isEmpty();
-    assertThat(p.process(row("kol0100", "B", "A@X.IO", "US")))
+    assertThat(p.process(row("KOL-AAA100", "A", "a@x.io", "US"))).isEmpty();
+    assertThat(p.process(row("kol-aaa100", "B", "A@X.IO", "US")))
         .containsExactly(
             ImportReason.of(KolImportProcessor.CODE_DUPLICATE),
             ImportReason.of(KolImportProcessor.EMAIL_DUPLICATE));
-    assertThat(p.process(row("KOL0100", "C", "c@x.io", "US")))
+    assertThat(p.process(row("KOL-AAA100", "C", "c@x.io", "US")))
         .containsExactly(ImportReason.of(KolImportProcessor.CODE_DUPLICATE));
   }
 
   @Test
   void shouldReportExisting_whenCodeOrEmailIsAlreadyStored() {
-    when(kols.existsCode("KOL0100")).thenReturn(true);
+    when(kols.existsCode("KOL-AAA100")).thenReturn(true);
     when(kols.selectCount(any())).thenReturn(1L);
-    assertThat(processor(false).process(row("KOL0100", "A", "a@x.io", "US")))
+    assertThat(processor(false).process(row("KOL-AAA100", "A", "a@x.io", "US")))
         .containsExactly(
             ImportReason.of(KolImportProcessor.CODE_EXISTS),
             ImportReason.of(KolImportProcessor.EMAIL_EXISTS));

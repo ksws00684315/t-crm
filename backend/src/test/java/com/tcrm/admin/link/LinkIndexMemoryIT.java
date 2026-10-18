@@ -85,7 +85,7 @@ class LinkIndexMemoryIT {
     long empty = usedMemory();
 
     for (int kol = 0; kol < KOLS; kol++) {
-      String kolCode = String.format(Locale.ROOT, "KOL%04d", kol + 1);
+      String kolCode = String.format(Locale.ROOT, "KOL-MEM%03d", kol + 1);
       Map<String, String> linkFields = new LinkedHashMap<>();
       for (int i = 0; i < ITEMS_PER_KOL; i++) {
         String item = item(kol, i);
@@ -114,8 +114,8 @@ class LinkIndexMemoryIT {
         mib(afterItemHashes - empty),
         mib(empty));
 
-    assertThat(redis.opsForHash().size("link:KOL0001")).isEqualTo(ITEMS_PER_KOL);
-    assertThat(redis.opsForHash().size("link:KOL0100")).isEqualTo(ITEMS_PER_KOL);
+    assertThat(redis.opsForHash().size("link:KOL-MEM001")).isEqualTo(ITEMS_PER_KOL);
+    assertThat(redis.opsForHash().size("link:KOL-MEM100")).isEqualTo(ITEMS_PER_KOL);
     // Two million IDs spread over 100 buckets by their last two digits: 20,000 each.
     assertThat(redis.opsForHash().size("linkitem:00")).isEqualTo(KOLS * ITEMS_PER_KOL / 100);
     assertThat(redis.opsForHash().size("linkitem:99")).isEqualTo(KOLS * ITEMS_PER_KOL / 100);

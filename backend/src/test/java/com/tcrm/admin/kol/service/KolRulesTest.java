@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -11,14 +12,29 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class KolRulesTest {
   @ParameterizedTest
-  @CsvSource({"1, KOL0001", "9999, KOL9999", "10000, KOL10000", "99999999, KOL99999999"})
-  void shouldPadToFourDigitsAndWiden_whenFormattingCode(long number, String code) {
-    assertThat(KolRules.formatCode(number)).isEqualTo(code);
+  @CsvSource({"1, KOL-ASD001", "999, KOL-ASD999", "1000, KOL-ASD1000", "99999999, KOL-ASD99999999"})
+  void shouldPadToThreeDigitsAndWiden_whenFormattingCode(long number, String code) {
+    assertThat(KolRules.formatCode("ASD", number)).isEqualTo(code);
     assertThat(KolRules.isCode(code)).isTrue();
   }
 
+  @Test
+  void shouldRejectLetters_whenNotThreeUppercase() {
+    assertThatThrownBy(() -> KolRules.formatCode("as", 1))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
   @ParameterizedTest
-  @ValueSource(strings = {"KOL001", "KOL123456789", "kol0001", "KOL00A1", "XKOL0001", ""})
+  @ValueSource(
+      strings = {
+        "KOL0001",
+        "KOL-asd001",
+        "KOL-AS001",
+        "KOL-ASD01",
+        "KOL-ASD123456789",
+        "XKOL-ASD001",
+        ""
+      })
   void shouldRejectCode_whenFormatIsWrong(String code) {
     assertThat(KolRules.isCode(code)).isFalse();
     assertThat(KolRules.isCode(null)).isFalse();
@@ -127,7 +143,6 @@ class KolRulesTest {
             "Agent Template Code",
             "Invite Code",
             "Promotion Sheet URL");
-    // The pre-task-11 variant stays accepted for files built with the old template.
     assertThat(com.tcrm.admin.TestTemplates.render(KolImportColumn.legacyHeaderKeys()))
         .containsExactly(
             "达人编号", "姓名", "邮箱", "国家", "负责商务用户名", "默认佣金比例(%)", "社媒平台", "社媒账号", "粉丝数", "备注");

@@ -170,7 +170,7 @@ class KolIT {
     long next = jdbc.queryForObject("SELECT last_value + 1 FROM crm_kol_code_seq", Long.class);
     // An imported code occupying an upcoming sequence number must be skipped, not reused.
     TenantScope.runCompany(
-        1L, () -> writer.insert(kol("taken@x.io"), String.format("KOL%04d", next + 2), 1L));
+        1L, () -> writer.insert(kol("taken@x.io"), String.format("KOL-ZZZ%03d", next + 2), 1L));
     ExecutorService pool = Executors.newFixedThreadPool(8);
     try {
       List<Callable<String>> jobs = new ArrayList<>();
@@ -185,8 +185,8 @@ class KolIT {
       for (Future<String> f : pool.invokeAll(jobs)) {
         codes.add(f.get());
       }
-      assertThat(codes).hasSize(40).doesNotContain(String.format("KOL%04d", next + 2));
-      assertThat(codes).allMatch(code -> code.matches("KOL\\d{4,8}"));
+      assertThat(codes).hasSize(40).doesNotContain(String.format("KOL-ZZZ%03d", next + 2));
+      assertThat(codes).allMatch(code -> code.matches("KOL-[A-Z]{3}[0-9]{3,8}"));
     } finally {
       pool.shutdownNow();
     }
@@ -353,13 +353,13 @@ class KolIT {
   void shouldImportPartiallyAndServeErrorFile_whenWorkbookHasBadRows() throws Exception {
     String admin = companyAdmin();
     createBd(admin, "bd-import");
-    TenantScope.runCompany(1L, () -> writer.insert(kol("existing@x.io"), "KOL0900", 1L));
+    TenantScope.runCompany(1L, () -> writer.insert(kol("existing@x.io"), "KOL-ZZZ900", 1L));
     List<List<String>> rows =
         List.of(
             row("", "Dave", "Dave@X.io", "de", "BD-IMPORT", "12.5", "YouTube", "@dave", "1,200"),
-            row("KOL0500", "Eve", "eve@x.io", "JP"),
-            row("kol0500", "Eve Again", "EVE@x.io", "JP"),
-            row("KOL0900", "Frank", "existing@x.io", "XX"),
+            row("KOL-ZZZ500", "Eve", "eve@x.io", "JP"),
+            row("kol-zzz500", "Eve Again", "EVE@x.io", "JP"),
+            row("KOL-ZZZ900", "Frank", "existing@x.io", "XX"),
             row("", "Gina", "gina@x.io", "US", "", "", "", "", "", "=1+1"));
     MockMultipartFile file =
         new MockMultipartFile("file", "达人导入.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, workbook(rows));
@@ -390,7 +390,7 @@ class KolIT {
                 "SELECT kol_code FROM crm_kol WHERE email IN ('dave@x.io','eve@x.io','gina@x.io')",
                 String.class))
         .hasSize(3)
-        .contains("KOL0500");
+        .contains("KOL-ZZZ500");
     assertThat(
             jdbc.queryForObject(
                 "SELECT default_rate::text || '|' || country || '|' || (social_accounts->0->>'followers')"
@@ -497,7 +497,8 @@ class KolIT {
             .doReadSync();
     assertThat(sheet.get(0).get(14)).isEqualTo("Error");
     assertThat(sheet.get(1).get(14))
-        .isEqualTo("Invalid KOL code; it must be KOL followed by 4 to 8 digits");
+        .isEqualTo(
+            "Invalid KOL code; it must be KOL- followed by 3 uppercase letters and 3 to 8 digits");
   }
 
   /** Task 11 §4.3: files built with the pre-task-11 ten-column template keep importing. */

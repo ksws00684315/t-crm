@@ -44,7 +44,8 @@ public class RedirectService {
 
   public ResponseEntity<Void> redirect(
       String kolCode, String productCode, HttpServletRequest request) {
-    if (!kolCode.matches("^KOL\\d{4,8}$") || !productCode.matches("^[A-Za-z0-9_-]{1,32}$")) {
+    if (!kolCode.matches("^KOL-[A-Z]{3}[0-9]{3,8}$")
+        || !productCode.matches("^[A-Za-z0-9_-]{1,32}$")) {
       return ResponseEntity.notFound().build();
     }
     return resolve(

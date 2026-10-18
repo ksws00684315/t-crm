@@ -20,9 +20,11 @@ import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.kol.service.BdHistoryDTO;
 import com.tcrm.admin.kol.service.CreateKolCommand;
 import com.tcrm.admin.kol.service.EditKolCommand;
+import com.tcrm.admin.kol.service.KolClaimService;
 import com.tcrm.admin.kol.service.KolDTO;
 import com.tcrm.admin.kol.service.KolDetailDTO;
 import com.tcrm.admin.kol.service.KolFilterDTO;
+import com.tcrm.admin.kol.service.KolPromotionService;
 import com.tcrm.admin.kol.service.KolService;
 import com.tcrm.admin.kol.service.SocialAccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -53,13 +55,16 @@ class KolControllerTest {
       """;
 
   private final KolService kols = mock(KolService.class);
+  private final KolPromotionService promotions = mock(KolPromotionService.class);
+  private final KolClaimService claims = mock(KolClaimService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
-  private final MockMvc mvc = AdminMvcSupport.build(current, new KolController(kols));
+  private final MockMvc mvc =
+      AdminMvcSupport.build(current, new KolController(kols, promotions, claims));
 
   private static KolDTO kol() {
     return new KolDTO(
         9007199254740993L,
-        "KOL0001",
+        "KOL-AAA001",
         "Alice",
         "alice@example.com",
         "US",
@@ -74,6 +79,10 @@ class KolControllerTest {
         "kakobuy",
         "aff-01",
         "https://docs.google.com/spreadsheets/d/1/edit",
+        "PROMOTING",
+        "PROMOTING",
+        "https://landing.example/alice",
+        List.of(77L),
         1,
         0,
         Instant.parse("2026-10-05T00:00:00Z"),
@@ -147,7 +156,7 @@ class KolControllerTest {
     mvc.perform(
             get(BASE + "/11").header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.kolCode").value("KOL-AAA001"))
         .andExpect(jsonPath("$.data.accountStatus").value(0))
         .andExpect(jsonPath("$.data.kol").doesNotExist())
         .andExpect(jsonPath("$.data.bdHistory[0].bdUserName").value("bd5"))
@@ -172,7 +181,7 @@ class KolControllerTest {
             json(post(BASE), VALID)
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.kolCode").value("KOL-AAA001"))
         .andExpect(jsonPath("$.data.whatsapp").value("+12345678"))
         .andExpect(jsonPath("$.data.linkTemplateId").value("77"))
         .andExpect(jsonPath("$.data.linkTemplateName").value("kakobuy"))

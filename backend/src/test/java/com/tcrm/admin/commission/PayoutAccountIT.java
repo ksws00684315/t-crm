@@ -296,7 +296,7 @@ class PayoutAccountIT {
                     .content(
                         "{\"accountType\":\"PAYPAL\",\"account\":\""
                             + account
-                            + "\",\"holderName\":\"Alice D\"}"))
+                            + "\",\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -381,7 +381,7 @@ class PayoutAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"accountType\":\"PAYPAL\",\"account\":\"resubmitted@example.com\","
-                        + "\"holderName\":\"Alice D\"}"))
+                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
         .andExpect(status().isOk());
     mvc.perform(
             put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
@@ -414,7 +414,7 @@ class PayoutAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"accountType\":\"PAYPAL\",\"account\":\"other@example.com\","
-                        + "\"holderName\":\"Alice D\"}"))
+                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_LOCKED"));
     mvc.perform(
@@ -441,7 +441,7 @@ class PayoutAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"accountType\":\"PAYPAL\",\"account\":\"fixed@example.com\","
-                        + "\"holderName\":\"Alice D\"}"))
+                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
         .andExpect(status().isOk());
     mvc.perform(get("/admin-api/commission/payout-accounts/" + third).header(ADMIN_TOKEN, reviewer))
         .andExpect(status().isOk())
@@ -493,7 +493,7 @@ class PayoutAccountIT {
                 .header(KOL_TOKEN, kol.token())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"accountType\":\"PAYPAL\",\"account\":\"x@example.com\",\"holderName\":\"A\"}"))
+                    "{\"accountType\":\"PAYPAL\",\"account\":\"x@example.com\",\"holderName\":\"A\",\"currency\":\"USD\"}"))
         .andExpect(status().isNotFound());
 
     // The QR of the disabled account stays downloadable for the reviewer.
@@ -529,7 +529,7 @@ class PayoutAccountIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"accountType\":\"PAYPAL\",\"account\":\"max6@example.com\","
-                        + "\"holderName\":\"Max\"}"))
+                        + "\"holderName\":\"Max\",\"currency\":\"USD\"}"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_LIMIT"));
 
@@ -670,7 +670,7 @@ class PayoutAccountIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                             "{\"accountType\":\"PAYPAL\",\"account\":\"dave@example.com\","
-                                + "\"holderName\":\"Dave\"}"))
+                                + "\"holderName\":\"Dave\",\"currency\":\"USD\"}"))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
