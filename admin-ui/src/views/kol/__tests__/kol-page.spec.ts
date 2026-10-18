@@ -1,9 +1,10 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
+import * as promotionApi from "@/api/kol/promotion";
 import * as templateApi from "@/api/link/template";
 import * as bdApi from "@/api/system/bd-user";
 import type { DataScope, KolVO, Role } from "@/api/types";
@@ -14,13 +15,14 @@ import { ApiError } from "@/utils/http/error";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
+vi.mock("@/api/kol/promotion");
 vi.mock("@/api/link/link");
 vi.mock("@/api/link/template");
 vi.mock("@/api/system/bd-user");
 
 const row: KolVO = {
   id: "9007199254740993",
-  kolCode: "KOL0001",
+  kolCode: "KOL-ASD001",
   name: "Alice",
   email: "alice@example.com",
   country: "US",
@@ -37,6 +39,8 @@ const row: KolVO = {
   sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
   registerSource: 1,
   accountStatus: 0,
+  displayStatus: "PENDING_REVIEW",
+  promotionStatus: "PENDING_REVIEW",
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
@@ -85,7 +89,7 @@ describe("KOL list page", () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
     const text = wrapper.text();
-    expect(text).toContain("KOL0001");
+    expect(text).toContain("KOL-ASD001");
     expect(text).toContain("15.5%");
     expect(text).toContain("未分配");
     expect(text).toContain("启用");
@@ -272,7 +276,7 @@ describe("KOL list page", () => {
 
   it("offers the batch transfer to the super administrator with the selection as the target", async () => {
     signIn("SUPER_ADMIN", "ALL");
-    const other = { ...row, id: "9007199254740994", kolCode: "KOL0002" };
+    const other = { ...row, id: "9007199254740994", kolCode: "KOL-QWE002" };
     const wrapper = await mountPage("2", [row, other]);
     const button = wrapper.get('[data-test="transfer-bd"]');
     expect(button.attributes("disabled")).toBeDefined();
@@ -343,5 +347,207 @@ describe("KOL list page", () => {
     expect(document.body.textContent).toContain("https://kol.example/register?c=new-code");
     expect(ElMessage.success).toHaveBeenCalledWith("已生成新的注册链接");
     wrapper.unmount();
+  });
+
+  it("shows every display status with its own tag", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const statuses = [
+      "PENDING_REVIEW",
+      "PENDING_PROMOTION",
+      "PROMOTING",
+      "ENDED",
+      "PENDING_UPDATE"
+    ] as const;
+    const items = statuses.map((status, index) => ({
+      ...row,
+      id: `900719925474099${index}`,
+      displayStatus: status
+    }));
+    const wrapper = await mountPage("5", items);
+    const tags = wrapper.findAll('[data-test="promotion-status"]');
+    expect(tags.map(tag => tag.text())).toEqual([
+      "待审核",
+      "待推广",
+      "推广中",
+      "合作结束",
+      "待更新"
+    ]);
+    const expectedTypes = ["warning", "primary", "success", "info", "danger"];
+    expectedTypes.forEach((type, index) => {
+      expect(tags[index].find(".el-tag").classes()).toContain(`el-tag--${type}`);
+    });
+    // The account enabled/disabled column is renamed so only one column is called 状态.
+    expect(wrapper.text()).toContain("启用状态");
+    wrapper.unmount();
+  });
+
+  it("sends the display status filter once applied and drops it with the chip", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="search-expand"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-test="promotion-filter"]').trigger("click");
+    await nextTick();
+    const option = [...document.body.querySelectorAll(".el-select-dropdown__item")].find(item =>
+      item.textContent?.includes("推广中")
+    );
+    await new DOMWrapper(option!).trigger("click");
+    await nextTick();
+    vi.mocked(kolApi.listKols).mockClear();
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolApi.listKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ displayStatus: "PROMOTING" })
+    );
+    expect(wrapper.text()).toContain("推广中");
+
+    const chip = wrapper
+      .findAll('[data-test="search-chip"]')
+      .find(element => element.text().includes("推广中"));
+    expect(chip).toBeDefined();
+    chip!.get("button").trigger("click");
+    await flushPromises();
+    expect(kolApi.listKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ displayStatus: undefined })
+    );
+    wrapper.unmount();
+  });
+
+  it("opens the review screen when clicking 待审核", async () => {
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    const wrapper = await mountPage("1", [{ ...row, displayStatus: "PENDING_REVIEW" }]);
+    await wrapper.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "KolFormDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("review")).toBe(true);
+    expect(dialog.props("kol")?.id).toBe(row.id);
+    wrapper.unmount();
+  });
+
+  it("opens the promotion settings when clicking 待推广", async () => {
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: null,
+      platformTemplateIds: [],
+      landingUrl: null,
+      inviteCode: null,
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+    const wrapper = await mountPage("1", [{ ...row, displayStatus: "PENDING_PROMOTION" }]);
+    await wrapper.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    const drawer = wrapper.findComponent({ name: "PromotionConfigDrawer" });
+    expect(drawer.props("modelValue")).toBe(true);
+    expect(drawer.props("kol")?.id).toBe(row.id);
+    wrapper.unmount();
+  });
+
+  it("opens the detail drawer for 推广中 and 合作结束", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.mocked(kolApi.getKol).mockResolvedValue({ ...row, bdHistory: [] });
+    const promoting = await mountPage("1", [{ ...row, displayStatus: "PROMOTING" }]);
+    await promoting.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    expect(promoting.findComponent({ name: "KolDetailDrawer" }).props("modelValue")).toBe(true);
+    promoting.unmount();
+
+    const ended = await mountPage("1", [{ ...row, displayStatus: "ENDED" }]);
+    await ended.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    expect(ended.findComponent({ name: "KolDetailDrawer" }).props("modelValue")).toBe(true);
+    expect(promotionApi.getPromotionConfig).not.toHaveBeenCalled();
+    ended.unmount();
+  });
+
+  it("routes 待更新 to the BD transfer for a super admin, and to a hint for a BD", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const admin = await mountPage("1", [{ ...row, displayStatus: "PENDING_UPDATE" }]);
+    await admin.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    expect(admin.findComponent({ name: "BdTransferDialog" }).props("modelValue")).toBe(true);
+    admin.unmount();
+
+    const info = vi.spyOn(ElMessage, "info").mockImplementation(() => ({}) as never);
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    const bd = await mountPage("1", [{ ...row, displayStatus: "PENDING_UPDATE" }]);
+    await bd.get('[data-test="promotion-status"]').trigger("click");
+    await flushPromises();
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("未绑定在职商务"));
+    expect(bd.findComponent({ name: "BdTransferDialog" }).props("modelValue")).toBe(false);
+    bd.unmount();
+  });
+
+  it("offers the status change row action to editors only", async () => {
+    signIn("STAFF", "ALL", ["kol:view"]);
+    const viewer = await mountPage();
+    expect(viewer.find('[data-test="change-status"]').exists()).toBe(false);
+    viewer.unmount();
+
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    const wrapper = await mountPage();
+    await wrapper.get('tbody [data-test="change-status"]').trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "PromotionStatusDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("kol")?.id).toBe(row.id);
+    wrapper.unmount();
+  });
+
+  it("opens the settings for the creator the status dialog was about", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const bob = {
+      ...row,
+      id: "9007199254740994",
+      kolCode: "KOL-QWE002",
+      displayStatus: "PENDING_PROMOTION" as const
+    };
+    const wrapper = await mountPage("2", [row, bob]);
+    // The 422 shortcut must target the creator of THIS dialog, not a previously opened one.
+    const rows = wrapper.findAll("tbody tr");
+    const bobRow = rows.find(item => item.text().includes("KOL-QWE002"));
+    await bobRow!.get('[data-test="change-status"]').trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "PromotionStatusDialog" });
+    expect(dialog.props("kol")?.id).toBe(bob.id);
+    dialog.vm.$emit("openConfig");
+    await nextTick();
+    const config = wrapper.findComponent({ name: "PromotionConfigDrawer" });
+    expect(config.props("modelValue")).toBe(true);
+    expect(config.props("kol")?.id).toBe(bob.id);
+    wrapper.unmount();
+  });
+
+  it("shows claim only to an available BD and cleanup only to ALL-scope editors", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const superAdmin = await mountPage();
+    expect(superAdmin.find('[data-test="claim-kol"]').exists()).toBe(false);
+    expect(superAdmin.find('[data-test="cleanup-config"]').exists()).toBe(true);
+    superAdmin.unmount();
+
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+    const operator = await mountPage();
+    expect(operator.find('[data-test="claim-kol"]').exists()).toBe(false);
+    expect(operator.find('[data-test="cleanup-config"]').exists()).toBe(true);
+    operator.unmount();
+
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    const bd = await mountPage();
+    expect(bd.find('[data-test="claim-kol"]').exists()).toBe(true);
+    expect(bd.find('[data-test="cleanup-config"]').exists()).toBe(false);
+    bd.unmount();
+
+    signIn("STAFF", "ALL", ["kol:view"]);
+    const viewer = await mountPage();
+    expect(viewer.find('[data-test="claim-kol"]').exists()).toBe(false);
+    expect(viewer.find('[data-test="cleanup-config"]').exists()).toBe(false);
+    viewer.unmount();
   });
 });

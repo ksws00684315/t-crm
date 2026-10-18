@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n";
 import { inviteKol, listKols, updateKolStatus } from "@/api/kol/kol";
 import type { TransferTarget } from "@/api/kol/bd-transfer";
 import { listBdUsers } from "@/api/system/bd-user";
-import type { BdUserVO, KolVO } from "@/api/types";
+import type { BdUserVO, DisplayStatus, KolVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
@@ -17,13 +17,19 @@ import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { canExport, kolAbilities, linkAbilities } from "@/utils/permission";
+import { DISPLAY_STATUSES, promotionStatusLabelKey, promotionTagType } from "@/utils/promotion";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
 import BdTransferDialog from "./BdTransferDialog.vue";
+import ClaimKolDialog from "./ClaimKolDialog.vue";
+import CleanupConfigDialog from "./CleanupConfigDialog.vue";
 import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
 import KolLinksDrawer from "./KolLinksDrawer.vue";
+import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
+import PromotionConfigDrawer from "./PromotionConfigDrawer.vue";
+import PromotionStatusDialog from "./PromotionStatusDialog.vue";
 import RegisterLinkDialog from "./RegisterLinkDialog.vue";
 
 defineOptions({ name: "KolListPage" });
@@ -52,6 +58,7 @@ const query = reactive<{
   country: string;
   status?: 0 | 1;
   bdUserId?: string;
+  displayStatus?: DisplayStatus;
 }>({ page: 1, size: readPageSize("kol", 20), keyword: "", country: "" });
 
 function asKol(row: object): KolVO {
@@ -67,10 +74,11 @@ const columns = computed<DataColumn[]>(() => [
   { key: "sheet", label: t("kol.sheet"), width: 70 },
   { key: "bd", label: t("kol.bd"), minWidth: 110 },
   { key: "rate", label: t("kol.defaultRate"), width: 110, amount: true },
-  { key: "status", label: t("common.status"), width: 90 },
+  { key: "promotion", label: t("kol.promotionStatus"), width: 100 },
+  { key: "status", label: t("kol.enableStatus"), width: 90 },
   { key: "account", label: t("kol.account"), width: 100 },
   { key: "createdAt", label: t("common.createdAt"), width: 180, mono: true },
-  { key: "actions", label: t("common.actions"), width: 360 }
+  { key: "actions", label: t("common.actions"), width: 460 }
 ]);
 
 /** Chips and empty-state filter-count reflect the last applied search, not in-progress typing. */
@@ -78,7 +86,8 @@ const applied = ref({
   keyword: "",
   country: "",
   status: undefined as 0 | 1 | undefined,
-  bdUserId: undefined as string | undefined
+  bdUserId: undefined as string | undefined,
+  displayStatus: undefined as DisplayStatus | undefined
 });
 
 const chips = computed<SearchChip[]>(() => {
@@ -90,8 +99,15 @@ const chips = computed<SearchChip[]>(() => {
   if (applied.value.status === 0 || applied.value.status === 1) {
     list.push({
       key: "status",
-      label: t("common.status"),
+      label: t("kol.enableStatus"),
       text: applied.value.status === 1 ? t("common.enabled") : t("common.disabled")
+    });
+  }
+  if (applied.value.displayStatus) {
+    list.push({
+      key: "displayStatus",
+      label: t("kol.promotionStatus"),
+      text: t(promotionStatusLabelKey(applied.value.displayStatus))
     });
   }
   if (applied.value.bdUserId) {
@@ -109,6 +125,8 @@ const chips = computed<SearchChip[]>(() => {
 
 const formVisible = ref(false);
 const editingKol = ref<KolVO | null>(null);
+/** True while the edit dialog is the review screen reached from the status column (25b §3.3). */
+const reviewMode = ref(false);
 const transferVisible = ref(false);
 const transferTarget = ref<TransferTarget | null>(null);
 const detailVisible = ref(false);
@@ -118,6 +136,14 @@ const linksVisible = ref(false);
 const linksKol = ref<KolVO | null>(null);
 const registerVisible = ref(false);
 const invitingId = ref<string | null>(null);
+const promoSheetVisible = ref(false);
+const promoSheetKol = ref<KolVO | null>(null);
+const configVisible = ref(false);
+const configKol = ref<KolVO | null>(null);
+const statusDialogVisible = ref(false);
+const statusDialogKol = ref<KolVO | null>(null);
+const claimVisible = ref(false);
+const cleanupVisible = ref(false);
 
 function accountText(status: 0 | 1 | undefined): string {
   if (status === 0) return t("kol.accountInactive");
@@ -151,7 +177,8 @@ function appliedQuery() {
     keyword: applied.value.keyword || undefined,
     country: applied.value.country || undefined,
     status: applied.value.status,
-    bdUserId: abilities.value.canFilterBd ? applied.value.bdUserId || undefined : undefined
+    bdUserId: abilities.value.canFilterBd ? applied.value.bdUserId || undefined : undefined,
+    displayStatus: applied.value.displayStatus
   };
 }
 
@@ -212,7 +239,8 @@ function snapshotFilters(): void {
     keyword: query.keyword.trim(),
     country: query.country.trim().toUpperCase(),
     status: query.status,
-    bdUserId: abilities.value.canFilterBd ? query.bdUserId : undefined
+    bdUserId: abilities.value.canFilterBd ? query.bdUserId : undefined,
+    displayStatus: query.displayStatus
   };
 }
 
@@ -227,6 +255,7 @@ function reset() {
   query.country = "";
   query.status = undefined;
   query.bdUserId = undefined;
+  query.displayStatus = undefined;
   search();
 }
 
@@ -235,6 +264,7 @@ function removeChip(key: string): void {
   if (key === "country") query.country = "";
   if (key === "status") query.status = undefined;
   if (key === "bd") query.bdUserId = undefined;
+  if (key === "displayStatus") query.displayStatus = undefined;
   search();
 }
 
@@ -249,12 +279,54 @@ function onSize(size: number): void {
 
 function openCreate() {
   editingKol.value = null;
+  reviewMode.value = false;
   formVisible.value = true;
 }
 
 function openEdit(row: KolVO) {
   editingKol.value = row;
+  reviewMode.value = false;
   formVisible.value = true;
+}
+
+function openConfig(row: KolVO) {
+  configKol.value = row;
+  configVisible.value = true;
+}
+
+function openStatusDialog(row: KolVO) {
+  statusDialogKol.value = row;
+  statusDialogVisible.value = true;
+}
+
+/**
+ * Clicking the status tag opens the screen that status asks for (25b §3.2): review, promotion
+ * settings, the promotion data in the detail drawer, or a BD transfer for "needs update".
+ */
+function handleStatusClick(row: KolVO): void {
+  const status = row.displayStatus;
+  if (!status) return;
+  if (status === "PENDING_REVIEW") {
+    editingKol.value = row;
+    reviewMode.value = true;
+    formVisible.value = true;
+    return;
+  }
+  if (status === "PENDING_PROMOTION") {
+    openConfig(row);
+    return;
+  }
+  if (status === "PROMOTING" || status === "ENDED") {
+    openDetail(row);
+    return;
+  }
+  // PENDING_UPDATE: only the super administrator can reassign the BD.
+  if (abilities.value.canChangeBd) {
+    transferTarget.value = { kolIds: [row.id] };
+    transferVisible.value = true;
+  } else {
+    ElMessage.info(t("kol.pendingUpdateHint"));
+  }
 }
 
 /** Batch toolbar entry: the selection never spans pages, so it stays far below the 500 cap. */
@@ -277,6 +349,11 @@ function openDetail(row: KolVO) {
 function openLinks(row: KolVO) {
   linksKol.value = row;
   linksVisible.value = true;
+}
+
+function openPromoSheet(row: KolVO) {
+  promoSheetKol.value = row;
+  promoSheetVisible.value = true;
 }
 
 async function sendInvite(row: KolVO) {
@@ -356,6 +433,21 @@ onMounted(() => {
             <el-option :label="t('common.disabled')" :value="0" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="t('kol.promotionStatus')" data-test="promotion-filter">
+          <el-select
+            v-model="query.displayStatus"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 140px"
+          >
+            <el-option
+              v-for="status in DISPLAY_STATUSES"
+              :key="status"
+              :label="t(promotionStatusLabelKey(status))"
+              :value="status"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item v-if="abilities.canFilterBd" :label="t('kol.bd')" data-test="bd-filter">
           <el-select
             v-model="query.bdUserId"
@@ -374,9 +466,25 @@ onMounted(() => {
         </el-form-item>
       </template>
       <template
-        v-if="abilities.canWrite || abilities.canRegisterLink || abilities.canChangeBd"
+        v-if="
+          abilities.canWrite ||
+          abilities.canRegisterLink ||
+          abilities.canChangeBd ||
+          abilities.canClaimKol ||
+          abilities.canManageCleanup
+        "
         #actions
       >
+        <el-button v-if="abilities.canClaimKol" data-test="claim-kol" @click="claimVisible = true">
+          {{ t("kol.claim") }}
+        </el-button>
+        <el-button
+          v-if="abilities.canManageCleanup"
+          data-test="cleanup-config"
+          @click="cleanupVisible = true"
+        >
+          {{ t("cleanup.title") }}
+        </el-button>
         <el-button
           v-if="abilities.canRegisterLink"
           data-test="register-link"
@@ -468,6 +576,19 @@ onMounted(() => {
       </template>
       <template #cell-bd="{ row }">{{ asKol(row).bdUserName ?? t("common.unassigned") }}</template>
       <template #cell-rate="{ row }">{{ formatRate(asKol(row).defaultRate) }}</template>
+      <template #cell-promotion="{ row }">
+        <span
+          v-if="asKol(row).displayStatus"
+          class="status-tag"
+          data-test="promotion-status"
+          @click="handleStatusClick(asKol(row))"
+        >
+          <el-tag :type="promotionTagType(asKol(row).displayStatus!)">
+            {{ t(promotionStatusLabelKey(asKol(row).displayStatus!)) }}
+          </el-tag>
+        </span>
+        <span v-else>-</span>
+      </template>
       <template #cell-status="{ row }">
         <el-tag :type="asKol(row).status === 1 ? 'success' : 'info'">
           {{ asKol(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
@@ -498,6 +619,15 @@ onMounted(() => {
           {{ t("kol.links") }}
         </el-button>
         <el-button
+          v-if="abilities.canWrite"
+          link
+          type="primary"
+          data-test="promo-sheet"
+          @click="openPromoSheet(asKol(row))"
+        >
+          {{ t("promoSheet.open") }}
+        </el-button>
+        <el-button
           v-if="showInvite(asKol(row))"
           link
           type="primary"
@@ -510,6 +640,14 @@ onMounted(() => {
         <template v-if="abilities.canWrite">
           <el-button link type="primary" data-test="edit" @click="openEdit(asKol(row))">
             {{ t("common.edit") }}
+          </el-button>
+          <el-button
+            link
+            type="primary"
+            data-test="change-status"
+            @click="openStatusDialog(asKol(row))"
+          >
+            {{ t("kol.changeStatus") }}
           </el-button>
           <el-button
             link
@@ -535,12 +673,13 @@ onMounted(() => {
     <KolFormDialog
       v-model="formVisible"
       :kol="editingKol"
+      :review="reviewMode"
       :can-pick-bd="abilities.canAssignBd"
       :bd-users="bdUsers"
       @saved="load"
     />
     <BdTransferDialog v-model="transferVisible" :target="transferTarget" @saved="load" />
-    <KolDetailDrawer v-model="detailVisible" :kol-id="detailId" />
+    <KolDetailDrawer v-model="detailVisible" :kol-id="detailId" @open-config="openConfig" />
     <KolImportDialog v-model="importVisible" @finished="search" />
     <KolLinksDrawer
       v-model="linksVisible"
@@ -548,5 +687,25 @@ onMounted(() => {
       :kol-name="linksKol?.name"
     />
     <RegisterLinkDialog v-model="registerVisible" />
+    <PromoSheetUploadDialog
+      v-model="promoSheetVisible"
+      :kol-id="promoSheetKol?.id ?? null"
+      :kol-label="promoSheetKol ? `${promoSheetKol.name} (${promoSheetKol.kolCode})` : ''"
+    />
+    <PromotionConfigDrawer v-model="configVisible" :kol="configKol" @saved="load" />
+    <PromotionStatusDialog
+      v-model="statusDialogVisible"
+      :kol="statusDialogKol"
+      @changed="load"
+      @open-config="statusDialogKol && openConfig(statusDialogKol)"
+    />
+    <ClaimKolDialog v-model="claimVisible" @claimed="load" />
+    <CleanupConfigDialog v-model="cleanupVisible" />
   </div>
 </template>
+
+<style scoped>
+.status-tag {
+  cursor: pointer;
+}
+</style>

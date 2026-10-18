@@ -1,6 +1,5 @@
-package com.tcrm.admin.product.service;
+package com.tcrm.admin.product.api;
 
-import com.tcrm.admin.product.api.SheetCellDTO;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -12,8 +11,11 @@ import java.util.regex.Pattern;
  * Turns source-sheet cells into product fields (ADR-021 §5), following the customer's sheet script
  * 3.0.5 where it applies. Pure functions; nothing here makes network calls, so short links that
  * would need a redirect are reported instead of followed.
+ *
+ * <p>Lives in {@code product.api} since task 26: the KOL module's promo-sheet reader shares the
+ * same link rules. The rules and tests are unchanged (task 26 §3.2).
  */
-final class SheetLinkParser {
+public final class SheetLinkParser {
   private static final Pattern HYPERLINK =
       Pattern.compile("^=\\s*HYPERLINK\\(\\s*\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
   private static final Pattern IMAGE =
@@ -39,14 +41,14 @@ final class SheetLinkParser {
   private SheetLinkParser() {}
 
   /** Why a non-empty row was not turned into a product row. */
-  enum Skip {
+  public enum Skip {
     NON_WEIDIAN,
     NO_ITEM_ID,
     NO_SHOP
   }
 
   /** Link of a cell: the cell link, then a rich-text run link, a HYPERLINK formula, or the text. */
-  static String link(SheetCellDTO cell) {
+  public static String link(SheetCellDTO cell) {
     if (cell == null) {
       return null;
     }
@@ -67,7 +69,7 @@ final class SheetLinkParser {
   }
 
   /** URL-decoded until stable (agents wrap an encoded Weidian URL, sometimes twice). */
-  static String decode(String url) {
+  public static String decode(String url) {
     String current = url;
     for (int i = 0; i < 3; i++) {
       String next;
@@ -84,7 +86,7 @@ final class SheetLinkParser {
     return current;
   }
 
-  static boolean isOtherPlatform(String decoded) {
+  public static boolean isOtherPlatform(String decoded) {
     return !decoded.toLowerCase(Locale.ROOT).contains("weidian")
         && OTHER_PLATFORM.matcher(decoded).find();
   }
@@ -93,7 +95,7 @@ final class SheetLinkParser {
    * Weidian item ID: {@code itemID=}, then {@code /weidian/{id}}, then the first 10-digit run that
    * is not the shop ID of a {@code shop{id}.v.weidian.com} host.
    */
-  static String itemId(String decoded) {
+  public static String itemId(String decoded) {
     for (Pattern p : new Pattern[] {ITEM_PARAM, WEIDIAN_PATH}) {
       Matcher m = p.matcher(decoded);
       if (m.find()) {
@@ -111,13 +113,13 @@ final class SheetLinkParser {
   }
 
   /** Weidian shop ID from a {@code shop{id}.v.weidian.com} host, or null. */
-  static String shopId(String decoded) {
+  public static String shopId(String decoded) {
     Matcher m = SHOP.matcher(decoded);
     return m.find() ? m.group(1) : null;
   }
 
   /** HTTPS image address of an {@code =IMAGE("https://…")} formula, or empty. */
-  static String image(SheetCellDTO cell) {
+  public static String image(SheetCellDTO cell) {
     if (cell == null || cell.formula() == null) {
       return "";
     }
@@ -130,7 +132,7 @@ final class SheetLinkParser {
    * it (for example {@code "¥145 | $21.13"} in USD gives {@code 21.13}), otherwise the first
    * number; thousands separators removed. Empty when the cell has no number.
    */
-  static String price(String text, String currency) {
+  public static String price(String text, String currency) {
     if (text == null || text.isBlank()) {
       return "";
     }

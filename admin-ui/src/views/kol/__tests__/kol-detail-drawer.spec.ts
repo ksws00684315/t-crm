@@ -151,4 +151,28 @@ describe("KOL detail drawer", () => {
     expect(kolApi.getKol).toHaveBeenCalledTimes(2);
     conflict.unmount();
   });
+
+  it("shows the promotion status and the landing page (task 25b)", async () => {
+    const wrapper = await open(
+      detail({
+        displayStatus: "PENDING_UPDATE",
+        promotionStatus: "PROMOTING",
+        landingUrl: "https://brand.example/ada"
+      })
+    );
+    const text = document.body.textContent ?? "";
+    expect(wrapper.find('[data-test="detail-display-status"]').text()).toBe("待更新");
+    expect(text).toContain("https://brand.example/ada");
+    wrapper.unmount();
+  });
+
+  it("offers the promotion settings from the detail drawer to editors (task 25b)", async () => {
+    const wrapper = await open(detail({ displayStatus: "PROMOTING" }));
+    const button = wrapper.find('[data-test="detail-edit-config"]');
+    expect(button.exists()).toBe(true);
+    await button.trigger("click");
+    const emittedKol = wrapper.emitted("openConfig")?.[0]?.[0] as { id?: string } | undefined;
+    expect(emittedKol?.id).toBe(detail().id);
+    wrapper.unmount();
+  });
 });

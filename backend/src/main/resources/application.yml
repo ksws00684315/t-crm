@@ -24,9 +24,13 @@ spring:
     encoding: UTF-8
   servlet:
     multipart:
-      # Import files are limited to 20 MB (spec 06 section 3); the request adds form overhead.
-      max-file-size: 20MB
-      max-request-size: 21MB
+      # Spring's multipart ceiling is sized for the promo-sheet upload (task 26, ADR-024); the
+      # tiny threshold streams every upload to a temporary file instead of memory. Each endpoint
+      # still enforces its own business limit in code: 20 MB imports (ExcelFiles), 2 MB images
+      # (FileRules), 300 MB promo sheets (PromoSheetService).
+      max-file-size: 300MB
+      max-request-size: 301MB
+      file-size-threshold: 1
   task:
     execution:
       pool:

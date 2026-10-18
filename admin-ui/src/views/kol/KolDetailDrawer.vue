@@ -12,7 +12,9 @@ import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { kolAbilities } from "@/utils/permission";
 import CopyTokenCreateDialog from "@/views/product/copy-token/CopyTokenCreateDialog.vue";
+import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
 import { formatRate } from "@/utils/rate";
+import { promotionStatusLabelKey, promotionTagType } from "@/utils/promotion";
 
 defineOptions({ name: "KolDetailDrawer" });
 
@@ -20,12 +22,25 @@ const { t } = useI18n();
 const me = useUserStore();
 
 const props = defineProps<{ modelValue: boolean; kolId: string | null }>();
-const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
+const emit = defineEmits<{
+  (event: "update:modelValue", value: boolean): void;
+  /** The viewer asked to edit the promotion settings; the page opens the config drawer. */
+  (event: "openConfig", kol: KolDetailVO): void;
+}>();
 
 const loading = ref(false);
 const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
 const copyTokenVisible = ref(false);
+const promoSheetVisible = ref(false);
+
+const promoSheetButton = computed(() => {
+  const kol = detail.value;
+  return !!kol && kolAbilities(me.user).canWrite;
+});
+
+/** Promotion settings stay editable after promoting (ADR-023 §3), so offer them here too. */
+const canEditConfig = computed(() => kolAbilities(me.user).canWrite);
 
 const inviteVisible = computed(() => {
   const kol = detail.value;
@@ -155,6 +170,35 @@ const historyColumns = computed<DataColumn[]>(() => [
           <el-descriptions-item :label="t('kol.registerSource')">
             {{ sourceText(detail.registerSource) }}
           </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.promotionStatus')">
+            <el-tag
+              v-if="detail.displayStatus"
+              :type="promotionTagType(detail.displayStatus)"
+              data-test="detail-display-status"
+            >
+              {{ t(promotionStatusLabelKey(detail.displayStatus)) }}
+            </el-tag>
+            <span v-else>-</span>
+            <el-button
+              v-if="canEditConfig"
+              type="primary"
+              link
+              data-test="detail-edit-config"
+              @click="detail && emit('openConfig', detail)"
+            >
+              {{ t("promotion.configTitle") }}
+            </el-button>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('promotion.landingUrl')">
+            <a
+              v-if="detail.landingUrl"
+              :href="detail.landingUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ detail.landingUrl }}</a
+            >
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('kol.account')">
             <span data-test="account-status">{{ accountText(detail.accountStatus) }}</span>
             <el-button
@@ -176,6 +220,16 @@ const historyColumns = computed<DataColumn[]>(() => [
               @click="copyTokenVisible = true"
             >
               {{ t("kol.generateCopyToken") }}
+            </el-button>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="promoSheetButton" :label="t('promoSheet.title')">
+            <el-button
+              type="primary"
+              link
+              data-test="detail-promo-sheet"
+              @click="promoSheetVisible = true"
+            >
+              {{ t("promoSheet.open") }}
             </el-button>
           </el-descriptions-item>
           <el-descriptions-item :label="t('kol.bd')">
@@ -234,6 +288,12 @@ const historyColumns = computed<DataColumn[]>(() => [
       v-model="copyTokenVisible"
       :preset-kol-id="detail.id"
       :preset-kol-label="`${detail.name} (${detail.kolCode})`"
+    />
+    <PromoSheetUploadDialog
+      v-if="detail"
+      v-model="promoSheetVisible"
+      :kol-id="detail.id"
+      :kol-label="`${detail.name} (${detail.kolCode})`"
     />
   </el-drawer>
 </template>

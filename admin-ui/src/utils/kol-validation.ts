@@ -15,6 +15,8 @@ const COUNT_PATTERN = /^\d{1,15}$/;
 const WHATSAPP_PATTERN = /^\+[0-9]{8,15}$/;
 const INVITE_CODE_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const SHEET_URL_PATTERN = /^https:\/\/docs\.google\.com\/spreadsheets\/.*$/;
+/** Creator code, ADR-023 §1: "KOL-" + 3 capital letters + 3–8 digits, e.g. KOL-ASD001. */
+const KOL_CODE_PATTERN = /^KOL-[A-Z]{3}[0-9]{3,8}$/;
 
 /** Length in Unicode characters, as the backend counts it. */
 const length = (value: string) => [...value].length;
@@ -31,6 +33,28 @@ export function validateKolEmail(value: string): string | null {
   const text = value.trim();
   if (length(text) > 128) return translate("validation.kolEmailTooLong");
   if (!EMAIL_PATTERN.test(text)) return translate("validation.emailInvalid");
+  return null;
+}
+
+/** Creator code format (ADR-023 §1); rejects the old "KOL0001" shape as well. */
+export function validateKolCode(value: string): string | null {
+  const text = value.trim();
+  if (!text) return translate("validation.kolCodeRequired");
+  if (!KOL_CODE_PATTERN.test(text)) return translate("validation.kolCode");
+  return null;
+}
+
+/** True when the text looks like a creator code ("KOL…"); a claim search also accepts emails. */
+export function looksLikeKolCode(value: string): boolean {
+  return /^KOL/i.test(value.trim());
+}
+
+/** Creator landing page: optional, https, at most 512 characters. */
+export function validateLandingUrl(value: string): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  if (length(text) > 512 || !HTTPS_URL_PATTERN.test(text))
+    return translate("validation.landingUrl");
   return null;
 }
 

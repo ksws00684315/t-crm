@@ -3,12 +3,15 @@ import { nextTick } from "vue";
 import ElementPlus, { ElMessage } from "element-plus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
+import * as promotionApi from "@/api/kol/promotion";
 import * as templateApi from "@/api/link/template";
 import type { KolVO, LinkTemplateVO } from "@/api/types";
 import { i18n } from "@/locales";
+import { ApiError } from "@/utils/http/error";
 import KolFormDialog from "../KolFormDialog.vue";
 
 vi.mock("@/api/kol/kol");
+vi.mock("@/api/kol/promotion");
 vi.mock("@/api/link/template");
 
 const enabled: LinkTemplateVO = {
@@ -31,7 +34,7 @@ const disabled: LinkTemplateVO = {
 
 const kol: KolVO = {
   id: "9007199254740993",
-  kolCode: "KOL0001",
+  kolCode: "KOL-ASD001",
   name: "Alice",
   email: "alice@example.com",
   country: "US",
@@ -67,10 +70,10 @@ async function setLabeled(label: string, value: string) {
   await new DOMWrapper(field).setValue(value);
 }
 
-async function openDialog(current: KolVO | null = null) {
+async function openDialog(current: KolVO | null = null, review = false) {
   vi.mocked(templateApi.listLinkTemplates).mockResolvedValue([enabled, disabled]);
   const wrapper = mount(KolFormDialog, {
-    props: { modelValue: false, kol: current, canPickBd: false, bdUsers: [] },
+    props: { modelValue: false, kol: current, canPickBd: false, bdUsers: [], review },
     global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
   });
@@ -151,6 +154,62 @@ describe("KOL form dialog", () => {
     expect(text).toContain("OldShop（已停用）");
     expect(text).not.toContain("old-shop");
     wrapper.unmount();
+  });
+
+  describe("review mode (task 25b §3.3)", () => {
+    it("locks the email and the code and offers the approve button", async () => {
+      const wrapper = await openDialog(kol, true);
+      expect(document.body.textContent).toContain("审核达人 KOL-ASD001");
+      const code = document.body.querySelector<HTMLInputElement>('[data-test="review-code"]');
+      expect(code?.value).toBe("KOL-ASD001");
+      const email = document.body.querySelector<HTMLInputElement>('[data-test="email-input"]');
+      expect(email?.value).toBe("alice@example.com");
+      expect(email?.disabled).toBe(true);
+      expect(document.body.querySelector('[data-test="review-approve"]')).not.toBeNull();
+      wrapper.unmount();
+    });
+
+    it("approve saves the profile and then moves the status to PENDING_PROMOTION", async () => {
+      const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+      vi.mocked(kolApi.editKol).mockResolvedValue(null);
+      const wrapper = await openDialog(kol, true);
+      await input("review-approve").trigger("click");
+      await flushPromises();
+      expect(kolApi.editKol).toHaveBeenCalledTimes(1);
+      expect(promotionApi.updatePromotionStatus).toHaveBeenCalledWith(kol.id, "PENDING_PROMOTION");
+      expect(success).toHaveBeenCalledWith("资料已保存，状态已改为待推广");
+      expect(wrapper.emitted("saved")).toHaveLength(1);
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([false]);
+      wrapper.unmount();
+    });
+
+    it("approve stops after the first step when the profile save fails", async () => {
+      const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
+      vi.mocked(kolApi.editKol).mockRejectedValue(
+        new ApiError({ status: 400, errorCode: "COMMON_VALIDATION_FAILED", traceId: "t" })
+      );
+      const wrapper = await openDialog(kol, true);
+      await input("review-approve").trigger("click");
+      await flushPromises();
+      expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith("资料保存失败，状态未修改");
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toBeUndefined();
+      wrapper.unmount();
+    });
+
+    it("approve explains when the profile saved but the status change failed", async () => {
+      const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
+      vi.mocked(kolApi.editKol).mockResolvedValue(null);
+      vi.mocked(promotionApi.updatePromotionStatus).mockRejectedValue(
+        new ApiError({ status: 500, errorCode: "COMMON_INTERNAL_ERROR", traceId: "t" })
+      );
+      const wrapper = await openDialog(kol, true);
+      await input("review-approve").trigger("click");
+      await flushPromises();
+      expect(kolApi.editKol).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith("资料已保存，但修改状态失败");
+      wrapper.unmount();
+    });
   });
 
   it("allows none of the social rows to stay primary", async () => {

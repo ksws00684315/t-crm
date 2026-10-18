@@ -22,7 +22,8 @@ const enUS = {
     label: "Primary",
     home: "Home",
     payoutAccounts: "Payout accounts",
-    orders: "My orders"
+    orders: "My orders",
+    items: "My items"
   },
   /** Each language is named in itself and shows the same label in both languages. */
   locale: {
@@ -77,6 +78,17 @@ const enUS = {
     viewOrders: "View my orders",
     payoutEntry: "Payout accounts"
   },
+  items: {
+    title: "My items",
+    searchPlaceholder: "Search by item name",
+    search: "Search",
+    loadFailed: "Could not load your items. Please try again.",
+    empty: "No items yet",
+    emptyHint: "Your items appear here once your manager finishes the promotion setup.",
+    unnamed: "Unnamed item",
+    copyLink: "Copy link",
+    copied: "Copied"
+  },
   orders: {
     title: "My orders",
     dateRange: "Date range",
@@ -112,6 +124,7 @@ const enUS = {
     login: "Sign in",
     home: "Home",
     orders: "My orders",
+    items: "My items",
     activate: "Activate account",
     reset: "Reset password",
     forgot: "Forgot password",
@@ -167,6 +180,8 @@ const enUS = {
       accountRange: "Enter 3–128 characters.",
       accountPattern: "The address may contain letters and digits only.",
       holderRange: "Enter the receiver name (1–64 characters).",
+      currency: "Currency",
+      currencyRequired: "Choose the currency.",
       network: "Network",
       networkRequired: "Choose the network.",
       qr: "QR code (optional)",

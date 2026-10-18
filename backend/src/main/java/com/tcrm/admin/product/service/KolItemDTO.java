@@ -14,5 +14,7 @@ public record KolItemDTO(
     String shopName,
     String weidianShopId,
     String weidianItemId,
+    String itemName,
+    String source,
     Instant validFrom,
     Instant validTo) {}
