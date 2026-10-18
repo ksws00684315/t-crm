@@ -209,8 +209,8 @@ class PromoSheetIT {
             + " image_url, price, status, is_deleted, create_time, update_time)"
             + " VALUES (99, 1, 'P000001', 11, '1111111111', 'Original Silver Ring',"
             + " 'https://img.example.com/ring.png', 0, 1, false, now(), now())");
-    long kolA = insertKol("a@example.com", "KOL100001");
-    long kolB = insertKol("b@example.com", "KOL100002");
+    long kolA = insertKol("a@example.com", "KOL-AAA001");
+    long kolB = insertKol("b@example.com", "KOL-BBB002");
     insertMapping(kolB, null, "2222222222", "IMPORT");
     insertMapping(kolA, null, "5555555555", "IMPORT");
     return new long[] {kolA, kolB};
@@ -283,7 +283,7 @@ class PromoSheetIT {
     assertThat(preview.at("/skipSamples").get(0).at("/row").asInt()).isEqualTo(7);
     // The super administrator sees who owns the conflicting item.
     assertThat(preview.at("/conflictsDetail").get(0).at("/ownerKolCode").asString())
-        .isEqualTo("KOL100002");
+        .isEqualTo("KOL-BBB002");
     // New items carry the product code when one exists and stay empty otherwise.
     List<String> codes = new ArrayList<>();
     preview
@@ -579,9 +579,16 @@ class PromoSheetIT {
 
     // Task 25a idle cleanup ends every current mapping of the KOL; a null product_id and the
     // SHEET_UPLOAD source must not change that (the SQL filters only on kol_id + valid_to).
+    // Three mappings are current: the seeded IMPORT one plus the two just confirmed.
     Instant before = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
-    int closed = items.closeCurrentMappingsForKol(kolA, before, null);
-    assertThat(closed).isEqualTo(2);
+    // runCompany is void: the count is read back from the database below.
+    TenantScope.runCompany(1L, () -> items.closeCurrentMappingsForKol(kolA, before, null));
+    Integer closed =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NOT NULL",
+            Integer.class,
+            kolA);
+    assertThat(closed).isEqualTo(3);
     Integer open =
         jdbc.queryForObject(
             "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NULL",
