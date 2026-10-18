@@ -6,10 +6,9 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * {@code defaultRate} is a fraction with 4 decimals ("0.1550"), null when not set. The 2026-10-16
- * profile fields (task 11 §4.3): {@code whatsapp}, {@code linkTemplateId} with {@code
- * linkTemplateName}, {@code inviteCode}, {@code sheetUrl}, {@code registerSource} (1 entered in
- * admin, 2 self-registered), and {@code accountStatus} (0 unactivated, 1 activated; task 12c).
+ * List/detail row. {@code defaultRate} is a fraction with 4 decimals ("0.1550"), null when not set.
+ * Promotion fields (task 25a / ADR-023): {@code promotionStatus}, {@code displayStatus} (may be
+ * {@code PENDING_UPDATE}), {@code landingUrl}, {@code platformTemplateIds}.
  */
 public record KolVO(
     Long id,
@@ -28,6 +27,10 @@ public record KolVO(
     String linkTemplateName,
     String inviteCode,
     String sheetUrl,
+    String promotionStatus,
+    String displayStatus,
+    String landingUrl,
+    List<Long> platformTemplateIds,
     Integer registerSource,
     Integer accountStatus,
     Instant createTime,
@@ -50,6 +53,10 @@ public record KolVO(
         k.linkTemplateName(),
         k.inviteCode(),
         k.sheetUrl(),
+        k.promotionStatus(),
+        k.displayStatus(),
+        k.landingUrl(),
+        k.platformTemplateIds(),
         k.registerSource(),
         k.accountStatus(),
         k.createTime(),

@@ -237,6 +237,8 @@ const enUS = {
     FILE_TOO_LARGE: "The file is larger than 2 MB.",
     FILE_IN_USE: "This file is already used by another account.",
     KOL_EMAIL_EXISTS: "This email is already registered. Please sign in.",
+    KOL_ALREADY_CLAIMED: "This creator has already been claimed by another BD",
+    KOL_PROMOTION_CONFIG_INCOMPLETE: "Promotion config is incomplete for PROMOTING status",
     KOL_REGISTER_CODE_INVALID:
       "This registration link is invalid or has expired. Please contact your representative for a new link.",
     KOL_EMAIL_CODE_TOO_FREQUENT:

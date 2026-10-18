@@ -5,11 +5,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface KolItemMapper extends BaseMapper<KolItemDO> {
@@ -158,4 +160,14 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
           + "</foreach>"
           + "</script>")
   List<String> filterCurrentItemIds(@Param("itemIds") Collection<String> itemIds);
+
+  /** Ends current mappings of a KOL (task 25a idle cleanup via product.api). */
+  @Update(
+      """
+      UPDATE crm_kol_item
+         SET valid_to = #{at}, update_by = #{actorId}, update_time = #{at}
+       WHERE kol_id = #{kolId} AND valid_to IS NULL
+      """)
+  int closeCurrentByKol(
+      @Param("kolId") Long kolId, @Param("at") Instant at, @Param("actorId") Long actorId);
 }

@@ -14,13 +14,15 @@ public record KolQuery(
     @Size(max = 128) String keyword,
     @Pattern(regexp = "[A-Za-z]{2}") String country,
     @Min(0) @Max(1) Integer status,
-    @Min(1) Long bdUserId) {
+    @Min(1) Long bdUserId,
+    @Pattern(regexp = "PENDING_REVIEW|PENDING_PROMOTION|PROMOTING|ENDED|PENDING_UPDATE")
+        String displayStatus) {
   public KolQuery {
     page = page == null ? 1 : page;
     size = size == null ? 20 : size;
   }
 
   KolFilterDTO toFilter() {
-    return new KolFilterDTO(keyword, country, status, bdUserId, page, size);
+    return new KolFilterDTO(keyword, country, status, bdUserId, displayStatus, page, size);
   }
 }

@@ -12,6 +12,7 @@ import com.tcrm.admin.kol.model.BdTransferStatus;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.AuditSanitizer;
@@ -111,6 +112,48 @@ public class BdTransferService {
     tx.executeWithoutResult(
         status ->
             createInTransaction(new BdTransferCommand(List.of(kolId), null, target, null, null)));
+  }
+
+  /**
+   * Usable BD claims an unbound (or bound-to-unusable-BD) KOL for themselves (ADR-023 §4). Row lock
+   * serializes concurrent claims; the loser gets 409 KOL_ALREADY_CLAIMED.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public void claim(Long kolId) {
+    AccountDTO user = current.user();
+    BdUserDTO self = bds.getById(user.id());
+    if (self == null || !self.usable()) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    tx.executeWithoutResult(
+        status -> {
+          KolDO kol = lockKol(kolId);
+          if (!isClaimable(kol)) {
+            throw new BusinessException(ErrorCode.KOL_ALREADY_CLAIMED);
+          }
+          Instant now = now();
+          changeOwnership(kol, user.id(), now, user.id());
+          KolBdTransferDO row = new KolBdTransferDO();
+          row.setKolId(kol.getId());
+          row.setFromBdUserId(kol.getBdUserId());
+          row.setToBdUserId(user.id());
+          row.setEffectiveAt(now);
+          row.setStatus(BdTransferStatus.DONE);
+          row.setExecutedAt(now);
+          row.setReason("claim");
+          row.setDeleted(false);
+          transfers.insert(row);
+          record("Claim KOL", "POST", new CancelAuditDTO(kolId));
+        });
+  }
+
+  /** True when the KOL has no usable BD (unassigned or BD no longer usable). */
+  boolean isClaimable(KolDO kol) {
+    if (kol.getBdUserId() == null) {
+      return true;
+    }
+    BdUserDTO bd = bds.getById(kol.getBdUserId());
+    return bd == null || !bd.usable();
   }
 
   private BdTransferResultDTO createInTransaction(BdTransferCommand c) {

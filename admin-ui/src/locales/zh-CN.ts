@@ -237,6 +237,8 @@ const zhCN = {
     COPY_TOKEN_EXPIRED: "复制令牌已过期",
     COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
     KOL_DISABLED: "达人已停用",
+    KOL_ALREADY_CLAIMED: "该达人已被其他商务认领",
+    KOL_PROMOTION_CONFIG_INCOMPLETE: "推广配置不完整，无法改为推广中",
     SHOP_DISABLED: "店铺已停用，无法执行该操作",
     SHOP_NOT_FOUND: "店铺不存在",
     PRODUCT_NOT_FOUND: "原商品不存在",

@@ -85,7 +85,9 @@ public enum ErrorCode {
   COPY_TOKEN_INVALID(401, "Copy token is invalid or revoked"),
   COPY_TOKEN_EXPIRED(401, "Copy token has expired"),
   COPY_TOKEN_QUOTA_EXCEEDED(429, "Copy token quota has been used up"),
-  KOL_DISABLED(403, "Creator account is disabled");
+  KOL_DISABLED(403, "Creator account is disabled"),
+  KOL_PROMOTION_CONFIG_INCOMPLETE(422, "Promotion config is incomplete for PROMOTING status"),
+  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD");
   private final int status;
   private final String message;
 

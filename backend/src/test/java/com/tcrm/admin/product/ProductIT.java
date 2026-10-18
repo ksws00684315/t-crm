@@ -238,7 +238,7 @@ class ProductIT {
             List.of(
                 List.of("1003", "9201", kolCode, productCode),
                 List.of("1003", "9201", kolCode, productCode), // duplicate exclusive in file
-                List.of("1003", "9999", "KOL9999", productCode))); // missing kol
+                List.of("1003", "9999", "KOL-ZZZ999", productCode))); // missing kol
     MvcResult submit =
         mvc.perform(
                 multipart("/admin-api/product/kol-item-imports")
@@ -300,7 +300,7 @@ class ProductIT {
     long shopId = createShop("店D", "1004");
     String kolCode = createKol("Eve", "eve@example.com");
     String productCode = importProduct(shopId, "2004", "袜");
-    byte[] workbook = mappingWorkbook(List.of(List.of("1004", "9301", "KOL9999", productCode)));
+    byte[] workbook = mappingWorkbook(List.of(List.of("1004", "9301", "KOL-ZZZ999", productCode)));
     MvcResult submit =
         mvc.perform(
                 multipart("/admin-api/product/kol-item-imports")

@@ -127,7 +127,7 @@ class BdTransferIT {
         "INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, country, bd_user_id, create_time, update_time) VALUES (?, ?, ?, 'Test', ?, 'US', ?, now(), now())",
         id,
         tenant,
-        "KOL" + (1000 + id),
+        "KOL-AAA" + String.format("%03d", id),
         "test" + id + "@example.test",
         bd);
     jdbc.update(
@@ -297,7 +297,7 @@ class BdTransferIT {
                         new BdTransferCommand(List.of(11L, 12L), null, target, future(), null))))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value("KOL_TRANSFER_EXISTS"))
-        .andExpect(jsonPath("$.data[0]").value("KOL1011"));
+        .andExpect(jsonPath("$.data[0]").value("KOL-AAA011"));
     assertThat(state(first)).isEqualTo("SCHEDULED");
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_kol_bd_transfer", Integer.class))
         .isEqualTo(1);
@@ -428,7 +428,7 @@ class BdTransferIT {
     mvc.perform(
             get(BASE)
                 .header(TOKEN, admin)
-                .param("kolCode", "KOL1011")
+                .param("kolCode", "KOL-AAA011")
                 .param("status", "SCHEDULED")
                 .param("fromBdUserId", Long.toString(source)))
         .andExpect(status().isOk())
@@ -462,15 +462,15 @@ class BdTransferIT {
                 .content(json.writeValueAsString(Map.of("bdUserId", target))))
         .andExpect(status().isOk());
     schedule(12L, null, future());
-    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL1011"))
+    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL-AAA011"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("1"))
-        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL1011"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL-AAA011"))
         .andExpect(jsonPath("$.data.items[0].kolName").value("Test"))
         .andExpect(jsonPath("$.data.items[0].fromBdUserName").value("源商务"))
         .andExpect(jsonPath("$.data.items[0].toBdUserName").value("target-bd"))
         .andExpect(jsonPath("$.data.items[0].reason").value("离职交接"));
-    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL1012"))
+    mvc.perform(get(BASE).header(TOKEN, admin).param("kolCode", "KOL-AAA012"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("2"))
         .andExpect(jsonPath("$.data.items[0].reason").value("handover"))

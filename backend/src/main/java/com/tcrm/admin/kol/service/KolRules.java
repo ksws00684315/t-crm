@@ -8,8 +8,8 @@ import java.util.regex.Pattern;
 
 /** Field rules shared by the KOL API and the Excel import (task 04 §4.1, §4.5). */
 public final class KolRules {
-  /** KOL code format, identical to the redirect service check. */
-  public static final String CODE_PATTERN = "KOL\\d{4,8}";
+  /** KOL code format (ADR-023), identical to the redirect service check. */
+  public static final String CODE_PATTERN = "KOL-[A-Z]{3}[0-9]{3,8}";
 
   /** Pragmatic e-mail shape: local part, "@", at least two dot-separated DNS labels. */
   public static final String EMAIL_PATTERN =
@@ -49,9 +49,19 @@ public final class KolRules {
 
   private KolRules() {}
 
-  /** Formats a sequence number as a KOL code: at least 4 digits, zero-padded (KOL0001). */
-  public static String formatCode(long number) {
-    return String.format(Locale.ROOT, "KOL%04d", number);
+  /**
+   * Formats a KOL code: {@code KOL-} + 3 uppercase letters + sequence number padded to at least 3
+   * digits (ADR-023). Example: {@code KOL-ASD001}, {@code KOL-QWE1234}.
+   */
+  public static String formatCode(String letters, long number) {
+    if (letters == null || !letters.matches("[A-Z]{3}")) {
+      throw new IllegalArgumentException("letters must be 3 uppercase A-Z");
+    }
+    String digits = Long.toString(number);
+    if (digits.length() < 3) {
+      digits = String.format(Locale.ROOT, "%03d", number);
+    }
+    return "KOL-" + letters + digits;
   }
 
   public static boolean isCode(String value) {

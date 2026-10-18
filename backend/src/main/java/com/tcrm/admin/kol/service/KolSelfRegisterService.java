@@ -5,6 +5,7 @@ import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolRegisterCodeMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolRegisterCodeDO;
+import com.tcrm.admin.kol.model.PromotionStatus;
 import com.tcrm.admin.kol.service.KolAuthService.LoginResult;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -129,6 +130,7 @@ public class KolSelfRegisterService {
     kol.setStatus(1);
     kol.setWhatsapp(request.whatsapp().strip());
     kol.setRegisterSource(2);
+    kol.setPromotionStatus(PromotionStatus.PENDING_REVIEW.name());
     kol.setAccountStatus(1);
     kol.setPasswordHash(passwords.encode(request.password()));
     kol.setCredentialVersion(0);

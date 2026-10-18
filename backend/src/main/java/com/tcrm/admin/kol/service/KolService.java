@@ -7,8 +7,11 @@ import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.kol.model.KolPlatformDO;
+import com.tcrm.admin.kol.model.PromotionStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
@@ -49,6 +52,7 @@ public class KolService {
   private final ApplicationEventPublisher events;
   private final KolInvites invites;
   private final BdTransferService transfers;
+  private final KolPlatformMapper platforms;
 
   public KolService(
       KolMapper kols,
@@ -60,7 +64,8 @@ public class KolService {
       TransactionTemplate tx,
       ApplicationEventPublisher events,
       KolInvites invites,
-      BdTransferService transfers) {
+      BdTransferService transfers,
+      KolPlatformMapper platforms) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
@@ -71,6 +76,7 @@ public class KolService {
     this.events = events;
     this.invites = invites;
     this.transfers = transfers;
+    this.platforms = platforms;
   }
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
@@ -91,14 +97,17 @@ public class KolService {
                 KolDO::getCountry,
                 filter.country() == null ? null : filter.country().strip().toUpperCase(Locale.ROOT))
             .eq(filter.status() != null, KolDO::getStatus, filter.status())
-            .eq(bd != null, KolDO::getBdUserId, bd)
-            .orderByDesc(KolDO::getCreateTime, KolDO::getId);
+            .eq(bd != null, KolDO::getBdUserId, bd);
+    applyDisplayStatus(query, filter.displayStatus());
+    query.orderByDesc(KolDO::getCreateTime, KolDO::getId);
     var result = kols.selectPage(new Page<>(filter.page(), filter.size()), query);
-    Map<Long, String> names = bdNames(result.getRecords().stream().map(KolDO::getBdUserId));
-    Map<Long, String> templates =
-        templateNames(result.getRecords().stream().map(KolDO::getLinkTemplateId));
+    List<KolDO> rows = result.getRecords();
+    Map<Long, String> names = bdNames(rows.stream().map(KolDO::getBdUserId));
+    Map<Long, String> templates = templateNames(rows.stream().map(KolDO::getLinkTemplateId));
+    Map<Long, List<Long>> platformIds = platformIdsByKol(rows.stream().map(KolDO::getId).toList());
+    Map<Long, BdUserDTO> bdUsable = bdUsableById(rows.stream().map(KolDO::getBdUserId));
     return new PageResult<>(
-        result.getRecords().stream().map(kol -> toDto(kol, names, templates)).toList(),
+        rows.stream().map(kol -> toDto(kol, names, templates, platformIds, bdUsable)).toList(),
         result.getTotal(),
         filter.page(),
         filter.size());
@@ -115,8 +124,10 @@ public class KolService {
         bdNames(
             Stream.concat(
                 Stream.of(kol.getBdUserId()), periods.stream().map(KolBdHistoryDO::getBdUserId)));
+    Map<Long, List<Long>> platformIds = platformIdsByKol(List.of(kol.getId()));
+    Map<Long, BdUserDTO> bdUsable = bdUsableById(Stream.of(kol.getBdUserId()));
     return new KolDetailDTO(
-        toDto(kol, names, templateNames(Stream.of(kol.getLinkTemplateId()))),
+        toDto(kol, names, templateNames(Stream.of(kol.getLinkTemplateId())), platformIds, bdUsable),
         periods.stream()
             .map(
                 p ->
@@ -150,6 +161,7 @@ public class KolService {
     kol.setInviteCode(blankToNull(c.inviteCode()));
     kol.setSheetUrl(blankToNull(c.sheetUrl()));
     kol.setRegisterSource(1);
+    kol.setPromotionStatus(PromotionStatus.PENDING_REVIEW.name());
     writer.insert(kol, null, user.id());
     // Re-read so timestamps match later reads (the database keeps milliseconds).
     KolDO saved = kols.selectById(kol.getId());
@@ -157,8 +169,14 @@ public class KolService {
     // transaction); a transport failure is a WARN and the back office can resend (task 12a §4.4).
     // Excel imports bypass this method and never auto-invite.
     invites.issueAndSend(kol.getId());
+    KolDO row = saved == null ? kol : saved;
+    List<Long> selfId = row.getId() == null ? List.of() : List.of(row.getId());
     return toDto(
-        saved == null ? kol : saved, bdNames(Stream.of(bd)), templateNames(Stream.of(templateId)));
+        row,
+        bdNames(Stream.of(bd)),
+        templateNames(Stream.of(templateId)),
+        platformIdsByKol(selfId),
+        bdUsableById(Stream.of(bd)));
   }
 
   /**
@@ -281,6 +299,32 @@ public class KolService {
     }
   }
 
+  /**
+   * Filters by display status (task 25a review). {@code PENDING_UPDATE} = no BD or BD not in {@link
+   * BdUserApi#listUsable()}; other values require that stored promotion status and a usable BD.
+   */
+  private void applyDisplayStatus(LambdaQueryWrapper<KolDO> query, String displayStatus) {
+    if (displayStatus == null || displayStatus.isBlank()) {
+      return;
+    }
+    String status = displayStatus.strip();
+    List<Long> usable =
+        bdUsers.listUsable().stream().map(BdUserDTO::id).filter(Objects::nonNull).toList();
+    if (PromotionStatus.DISPLAY_PENDING_UPDATE.equals(status)) {
+      if (usable.isEmpty()) {
+        return;
+      }
+      query.and(w -> w.isNull(KolDO::getBdUserId).or().notIn(KolDO::getBdUserId, usable));
+      return;
+    }
+    query.eq(KolDO::getPromotionStatus, status);
+    if (usable.isEmpty()) {
+      query.apply("1 = 0");
+    } else {
+      query.in(KolDO::getBdUserId, usable);
+    }
+  }
+
   /** Validates a requested BD: null (unassigned) or a usable BD, else KOL_INVALID_BD_USER. */
   private Long usableBd(Long bdUserId) {
     if (bdUserId == null) {
@@ -323,7 +367,18 @@ public class KolService {
     return names;
   }
 
-  private static KolDTO toDto(KolDO kol, Map<Long, String> bdNames, Map<Long, String> templates) {
+  private KolDTO toDto(
+      KolDO kol,
+      Map<Long, String> bdNames,
+      Map<Long, String> templates,
+      Map<Long, List<Long>> platformIds,
+      Map<Long, BdUserDTO> bdUsable) {
+    Long bdId = kol.getBdUserId();
+    BdUserDTO bd = bdId == null ? null : bdUsable.get(bdId);
+    String promotion =
+        kol.getPromotionStatus() == null
+            ? PromotionStatus.PENDING_REVIEW.name()
+            : kol.getPromotionStatus();
     return new KolDTO(
         kol.getId(),
         kol.getKolCode(),
@@ -331,8 +386,8 @@ public class KolService {
         kol.getEmail(),
         kol.getCountry(),
         SocialAccountsJson.read(kol.getSocialAccounts()),
-        kol.getBdUserId(),
-        kol.getBdUserId() == null ? null : bdNames.get(kol.getBdUserId()),
+        bdId,
+        bdId == null ? null : bdNames.get(bdId),
         kol.getDefaultRate(),
         kol.getStatus(),
         kol.getRemark(),
@@ -341,10 +396,41 @@ public class KolService {
         kol.getLinkTemplateId() == null ? null : templates.get(kol.getLinkTemplateId()),
         kol.getInviteCode(),
         kol.getSheetUrl(),
+        promotion,
+        KolPromotionSupport.displayStatus(promotion, bd),
+        kol.getLandingUrl(),
+        platformIds.getOrDefault(kol.getId(), List.of()),
         kol.getRegisterSource(),
         kol.getAccountStatus() == null ? 0 : kol.getAccountStatus(),
         kol.getCreateTime(),
         kol.getUpdateTime());
+  }
+
+  private Map<Long, List<Long>> platformIdsByKol(List<Long> kolIds) {
+    Map<Long, List<Long>> out = new HashMap<>();
+    if (kolIds.isEmpty()) {
+      return out;
+    }
+    for (KolPlatformDO row :
+        platforms.selectList(
+            new LambdaQueryWrapper<KolPlatformDO>().in(KolPlatformDO::getKolId, kolIds))) {
+      out.computeIfAbsent(row.getKolId(), id -> new java.util.ArrayList<>())
+          .add(row.getLinkTemplateId());
+    }
+    for (List<Long> ids : out.values()) {
+      ids.sort(Long::compareTo);
+    }
+    return out;
+  }
+
+  private Map<Long, BdUserDTO> bdUsableById(Stream<Long> ids) {
+    Set<Long> wanted = new HashSet<>();
+    ids.filter(Objects::nonNull).forEach(wanted::add);
+    Map<Long, BdUserDTO> map = new HashMap<>();
+    for (BdUserDTO bd : bdUsers.listByIds(wanted)) {
+      map.put(bd.id(), bd);
+    }
+    return map;
   }
 
   /**

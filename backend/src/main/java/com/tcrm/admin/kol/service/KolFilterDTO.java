@@ -2,4 +2,10 @@ package com.tcrm.admin.kol.service;
 
 /** List filters; null means no filter. {@code bdUserId} is ignored for OWN users. */
 public record KolFilterDTO(
-    String keyword, String country, Integer status, Long bdUserId, int page, int size) {}
+    String keyword,
+    String country,
+    Integer status,
+    Long bdUserId,
+    String displayStatus,
+    int page,
+    int size) {}
