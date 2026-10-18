@@ -7,6 +7,8 @@ server_tokens off;
 limit_req_zone $binary_remote_addr zone=tcrm_login:10m rate=10r/m;
 # Login captcha issuing (ADR-017); the backend also limits 120 per IP per minute.
 limit_req_zone $binary_remote_addr zone=tcrm_captcha:10m rate=120r/m;
+# External product-link APIs (task 17b / ADR-019); stacks with app Redis limits.
+limit_req_zone $binary_remote_addr zone=tcrm_external:10m rate=120r/m;
 # Redirect rate limit. Loose on purpose so shared mobile egress (CGNAT) is not blocked.
 # Cloudflare rate limiting is the primary defense; this zone is the origin fallback.
 limit_req_zone $binary_remote_addr zone=tcrm_redirect:10m rate=30r/s;
@@ -113,6 +115,13 @@ server {
 
     location = /admin-api/auth/captchas {
         limit_req zone=tcrm_captcha burst=30 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-admin:8080;
+    }
+
+    location /admin-api/external/ {
+        limit_req zone=tcrm_external burst=40 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
         proxy_pass http://crm-admin:8080;

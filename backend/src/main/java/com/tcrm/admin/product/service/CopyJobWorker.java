@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.product.api.KolItemChangedEvent;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
+import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
 import com.tcrm.admin.product.mapper.CopyJobItemMapper;
 import com.tcrm.admin.product.mapper.CopyJobMapper;
 import com.tcrm.admin.product.mapper.KolItemMapper;
@@ -159,6 +160,12 @@ public class CopyJobWorker implements ApplicationRunner {
     for (CopyJobItemDO row : pending) {
       try {
         tx.executeWithoutResult(status -> processOne(job, row));
+      } catch (MappingPersistException e) {
+        LOG.warn(
+            "Weidian item {} created for copy job item {} but CRM mapping failed",
+            e.weidianItemId(),
+            row.getId());
+        markFailed(row.getId(), ProductLinkMessages.mappingPersistFailed(e.weidianItemId()));
       } catch (RuntimeException e) {
         LOG.warn(
             "Copy job item {} failed: {}",
@@ -172,7 +179,6 @@ public class CopyJobWorker implements ApplicationRunner {
   }
 
   private void processOne(CopyJobDO job, CopyJobItemDO row) {
-    // Re-read under company scope in case another worker finished it.
     CopyJobItemDO fresh = items.selectById(row.getId());
     if (fresh == null || !CopyJobItemDO.STATUS_PENDING.equals(fresh.getStatus())) {
       return;
@@ -181,10 +187,25 @@ public class CopyJobWorker implements ApplicationRunner {
       markFailed(fresh.getId(), ProductLinkMessages.UNSUPPORTED_CHANNEL);
       return;
     }
-    // already copied for this kol+product?
+
+    // ADR-019 rule 2: exclusive (copied) item IDs must not be treated as source for another copy.
+    KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
+    if (exclusive != null) {
+      if (exclusive.getKolId() != null && exclusive.getKolId().equals(job.getKolId())) {
+        markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null);
+        return;
+      }
+      markFailed(fresh.getId(), ProductLinkMessages.OTHER_KOL_EXCLUSIVE);
+      return;
+    }
+
     SourceLookup source = findSource(fresh.getSourceProductId());
     if (source.conflict()) {
       markFailed(fresh.getId(), ProductLinkMessages.SOURCE_CONFLICT);
+      return;
+    }
+    if (source.incomplete()) {
+      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_INCOMPLETE);
       return;
     }
     if (source.product() == null) {
@@ -194,34 +215,38 @@ public class CopyJobWorker implements ApplicationRunner {
     ProductDO product = source.product();
     KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), product.getId());
     if (existing != null) {
-      markSuccess(fresh.getId(), existing.getWeidianItemId());
+      markSuccess(fresh.getId(), existing.getWeidianItemId(), null);
       return;
     }
     if (!tokens.consume(job.getTokenId(), 1)) {
       markFailed(fresh.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT);
       return;
     }
-    String newItemId;
+    CopyResult copied;
     try {
-      newItemId =
-          copies.copy(product.getShopId(), product.getWeidianItemId(), job.getTargetShopId());
+      copied = copies.copy(product.getShopId(), product.getWeidianItemId(), job.getTargetShopId());
     } catch (RuntimeException e) {
       markFailed(fresh.getId(), failMessage(e));
       return;
     }
-    Instant now = Instant.now();
-    KolItemDO neu = new KolItemDO();
-    neu.setKolId(job.getKolId());
-    neu.setProductId(product.getId());
-    neu.setShopId(job.getTargetShopId());
-    neu.setWeidianItemId(newItemId);
-    neu.setValidFrom(now);
-    neu.setCreateTime(now);
-    neu.setUpdateTime(now);
-    neu.setTenantId(job.getTenantId());
-    kolItems.insert(neu);
-    TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
-    markSuccess(fresh.getId(), newItemId);
+    String newItemId = copied.newItemId();
+    try {
+      Instant now = Instant.now();
+      KolItemDO neu = new KolItemDO();
+      neu.setKolId(job.getKolId());
+      neu.setProductId(product.getId());
+      neu.setShopId(job.getTargetShopId());
+      neu.setWeidianItemId(newItemId);
+      neu.setValidFrom(now);
+      neu.setCreateTime(now);
+      neu.setUpdateTime(now);
+      neu.setTenantId(job.getTenantId());
+      kolItems.insert(neu);
+      TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
+      markSuccess(fresh.getId(), newItemId, copied.detailWarning());
+    } catch (RuntimeException e) {
+      throw new MappingPersistException(newItemId, e);
+    }
   }
 
   private SourceLookup findSource(String weidianItemId) {
@@ -246,6 +271,7 @@ public class CopyJobWorker implements ApplicationRunner {
       return enabledShop ? SourceLookup.found(product) : SourceLookup.missing();
     }
     // Not registered: probe each enabled shop via Weidian item.get; register the first hit.
+    // Exclusive IDs are excluded earlier; probe only treats explicit not-found as empty.
     List<ShopDO> hits = new ArrayList<>();
     WeidianItemCopyApi.ProbedItem hitItem = null;
     for (ShopDO shop : enabled) {
@@ -262,12 +288,12 @@ public class CopyJobWorker implements ApplicationRunner {
       return SourceLookup.conflicted();
     }
     ShopDO shop = hits.getFirst();
-    ProductDO registered =
-        ensureProduct(
-            shop.getId(),
-            weidianItemId,
-            hitItem == null ? null : hitItem.name(),
-            hitItem == null ? null : hitItem.price());
+    String name = hitItem == null ? null : hitItem.name();
+    BigDecimal price = hitItem == null ? null : hitItem.price();
+    if (name == null || name.isBlank() || price == null) {
+      return SourceLookup.lackingInfo();
+    }
+    ProductDO registered = ensureProduct(shop.getId(), weidianItemId, name, price);
     return SourceLookup.found(registered);
   }
 
@@ -282,13 +308,19 @@ public class CopyJobWorker implements ApplicationRunner {
     if (existing != null) {
       return existing;
     }
+    if (name == null || name.isBlank() || price == null) {
+      throw new BusinessException(
+          com.tcrm.admin.shared.ErrorCode.WEIDIAN_API_FAILED,
+          ProductLinkMessages.SOURCE_INCOMPLETE,
+          null);
+    }
     Instant now = Instant.now();
     ProductDO product = new ProductDO();
     product.setProductCode(codes.next());
     product.setShopId(shopId);
     product.setWeidianItemId(weidianItemId);
-    product.setName(name == null || name.isBlank() ? weidianItemId : name);
-    product.setPrice(price == null ? BigDecimal.ZERO : price);
+    product.setName(name);
+    product.setPrice(price);
     product.setPriceCurrency("CNY");
     product.setStatus(1);
     product.setCreateTime(now);
@@ -298,7 +330,7 @@ public class CopyJobWorker implements ApplicationRunner {
     return products.selectById(product.getId());
   }
 
-  private void markSuccess(long itemId, String targetItemId) {
+  private void markSuccess(long itemId, String targetItemId, String warning) {
     items.update(
         null,
         new LambdaUpdateWrapper<CopyJobItemDO>()
@@ -306,7 +338,7 @@ public class CopyJobWorker implements ApplicationRunner {
             .eq(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_PENDING)
             .set(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_SUCCESS)
             .set(CopyJobItemDO::getTargetItemId, targetItemId)
-            .set(CopyJobItemDO::getErrorMessage, null)
+            .set(CopyJobItemDO::getErrorMessage, warning)
             .set(CopyJobItemDO::getUpdateTime, Instant.now()));
   }
 
@@ -329,13 +361,15 @@ public class CopyJobWorker implements ApplicationRunner {
 
   private static String failMessage(RuntimeException e) {
     if (e instanceof BusinessException be) {
+      if (be.hasCustomMessage()) {
+        return be.getMessage();
+      }
       return ProductLinkMessages.zh(be.getErrorCode());
     }
     String msg = e.getMessage();
     if (msg == null || msg.isBlank()) {
       return ProductLinkMessages.WEIDIAN_FAILED;
     }
-    // Never leak tokens/secrets; keep a short Chinese/English reason.
     if (msg.toLowerCase().contains("token") || msg.toLowerCase().contains("secret")) {
       return ProductLinkMessages.WEIDIAN_FAILED;
     }
@@ -353,17 +387,35 @@ public class CopyJobWorker implements ApplicationRunner {
     };
   }
 
-  private record SourceLookup(ProductDO product, boolean conflict) {
+  /** Carries a Weidian item id out of a rolled-back TX so the outer catch can record it. */
+  static final class MappingPersistException extends RuntimeException {
+    private final String weidianItemId;
+
+    MappingPersistException(String weidianItemId, Throwable cause) {
+      super(cause);
+      this.weidianItemId = weidianItemId;
+    }
+
+    String weidianItemId() {
+      return weidianItemId;
+    }
+  }
+
+  private record SourceLookup(ProductDO product, boolean conflict, boolean incomplete) {
     static SourceLookup missing() {
-      return new SourceLookup(null, false);
+      return new SourceLookup(null, false, false);
     }
 
     static SourceLookup conflicted() {
-      return new SourceLookup(null, true);
+      return new SourceLookup(null, true, false);
+    }
+
+    static SourceLookup lackingInfo() {
+      return new SourceLookup(null, false, true);
     }
 
     static SourceLookup found(ProductDO product) {
-      return new SourceLookup(product, false);
+      return new SourceLookup(product, false, false);
     }
   }
 }

@@ -21,8 +21,12 @@ final class ProductLinkMessages {
   static final String UNSUPPORTED_CHANNEL = "不支持的来源渠道";
   static final String SOURCE_NOT_IN_SHOPS = "来源商品不在本公司已登记的店铺中";
   static final String SOURCE_CONFLICT = "多个店铺都有该商品";
+  static final String SOURCE_INCOMPLETE = "来源商品信息不完整";
+  static final String OTHER_KOL_EXCLUSIVE = "该商品是其他达人的专属商品";
   static final String QUOTA_INSUFFICIENT = "额度不足";
   static final String WEIDIAN_FAILED = "微店复制失败";
+  static final String WEIDIAN_CALL_FAILED = "微店接口调用失败";
+  static final String DETAIL_SAVE_WARNING = "商品已复制，详情保存失败，请在微店后台补充详情";
   static final String INTERRUPTED = "应用重启，任务中断";
 
   private ProductLinkMessages() {}
@@ -43,6 +47,7 @@ final class ProductLinkMessages {
       case COMMON_NOT_FOUND -> JOB_NOT_FOUND;
       case PRODUCT_LINK_RATE_LIMITED -> RATE_LIMITED;
       case COMMON_VALIDATION_FAILED -> VALIDATION;
+      case WEIDIAN_API_FAILED -> WEIDIAN_CALL_FAILED;
       default -> code.message();
     };
   }
@@ -52,5 +57,9 @@ final class ProductLinkMessages {
       return e;
     }
     return new BusinessException(e.getErrorCode(), zh(e.getErrorCode()), e.getData());
+  }
+
+  static String mappingPersistFailed(String weidianItemId) {
+    return "微店已创建商品 " + weidianItemId + "，系统登记失败，请人工核对";
   }
 }

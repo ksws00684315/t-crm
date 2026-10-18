@@ -3,6 +3,7 @@ package com.tcrm.admin.product.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
+import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.product.mapper.CopyJobItemMapper;
 import com.tcrm.admin.product.mapper.CopyJobMapper;
 import com.tcrm.admin.product.mapper.KolItemMapper;
@@ -51,6 +52,7 @@ public class ProductLinkService {
   private final ProductLinkRateLimiter rates;
   private final CopyJobWorker worker;
   private final CopyJobProgress progress;
+  private final WeidianItemCopyApi copies;
   private final JdbcTemplate jdbc;
   private final SecureRandom random;
   private final String linkBaseUrl;
@@ -65,6 +67,7 @@ public class ProductLinkService {
       ProductLinkRateLimiter rates,
       CopyJobWorker worker,
       CopyJobProgress progress,
+      WeidianItemCopyApi copies,
       JdbcTemplate jdbc,
       @Value("${crm.link.base-url}") String linkBaseUrl) {
     this(
@@ -76,6 +79,7 @@ public class ProductLinkService {
         rates,
         worker,
         progress,
+        copies,
         jdbc,
         linkBaseUrl,
         new SecureRandom());
@@ -90,6 +94,7 @@ public class ProductLinkService {
       ProductLinkRateLimiter rates,
       CopyJobWorker worker,
       CopyJobProgress progress,
+      WeidianItemCopyApi copies,
       JdbcTemplate jdbc,
       String linkBaseUrl,
       SecureRandom random) {
@@ -101,6 +106,7 @@ public class ProductLinkService {
     this.rates = rates;
     this.worker = worker;
     this.progress = progress;
+    this.copies = copies;
     this.jdbc = jdbc;
     this.linkBaseUrl = linkBaseUrl == null ? "" : linkBaseUrl.replaceAll("/+$", "");
     this.random = random;
@@ -388,15 +394,7 @@ public class ProductLinkService {
     if (shop.getStatus() == null || shop.getStatus() != 1) {
       throw ProductLinkMessages.chinese(ErrorCode.SHOP_DISABLED);
     }
-    Integer authorized =
-        jdbc.queryForObject(
-            """
-            SELECT COUNT(*) FROM crm_weidian_shop_auth
-            WHERE shop_id = ? AND status = 'AUTHORIZED' AND is_deleted = FALSE
-            """,
-            Integer.class,
-            shopId);
-    if (authorized == null || authorized == 0) {
+    if (!copies.isShopAuthorized(shopId)) {
       throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
     }
     return shopId;

@@ -13,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.TestWait;
 import com.tcrm.admin.WeidianTestProperties;
+import com.tcrm.admin.link.service.LinkIndexSyncJob;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
+import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.ProbedItem;
 import com.tcrm.admin.shared.SecretCipher;
 import java.math.BigDecimal;
@@ -89,6 +91,7 @@ class ProductLinkIT {
   private final ObjectMapper json;
   private final StringRedisTemplate redis;
   private final SecretCipher cipher;
+  private final LinkIndexSyncJob sync;
 
   private String admin;
 
@@ -98,12 +101,14 @@ class ProductLinkIT {
       JdbcTemplate jdbc,
       ObjectMapper json,
       StringRedisTemplate redis,
-      SecretCipher cipher) {
+      SecretCipher cipher,
+      LinkIndexSyncJob sync) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.redis = redis;
     this.cipher = cipher;
+    this.sync = sync;
   }
 
   @BeforeEach
@@ -124,7 +129,8 @@ class ProductLinkIT {
       connection.serverCommands().flushAll();
     }
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
-    when(copies.copy(anyLong(), any(), anyLong())).thenReturn("90001");
+    when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90001", null));
+    when(copies.isShopAuthorized(anyLong())).thenReturn(true);
     when(copies.probe(anyLong(), any()))
         .thenReturn(Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"))));
   }
@@ -216,6 +222,15 @@ class ProductLinkIT {
             productId);
     assertThat(outbox).isGreaterThanOrEqualTo(1);
 
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () -> {
+          sync.drain();
+          return Boolean.TRUE.equals(redis.opsForHash().hasKey("linkitem:01", "90001"));
+        },
+        "linkitem bucket should contain the new exclusive item id");
+    assertThat(redis.opsForHash().hasKey("linkitem:01", "90001")).isTrue();
+
     // Re-convert same product: existing mapping → success without another Weidian add
     when(copies.copy(anyLong(), any(), anyLong()))
         .thenThrow(new AssertionError("should not copy again"));
@@ -294,6 +309,92 @@ class ProductLinkIT {
     mvc.perform(get(BASE + "/jobs/does-not-exist-job-code-xx"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.msg").value("任务编号不存在"));
+  }
+
+  @Test
+  void shouldResolveAlreadyApplied_forOwnExclusiveItem() throws Exception {
+    long shopId = createShop("1001", "Main");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    long productId = insertProduct(shopId, "10001", "Source item");
+    long kolId = createKol("AppliedKol", "applied17b@example.com");
+    String token = createToken(kolId, 10);
+    // Seed an exclusive mapping whose weidian id will be sent as "source"
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item(
+          id, kol_id, product_id, shop_id, weidian_item_id, valid_from,
+          tenant_id, create_time, update_time)
+        VALUES (17001, ?, ?, ?, '90001', now(), 1, now(), now())
+        """,
+        kolId,
+        productId,
+        shopId);
+    // Create an empty completed job so resolve has a jobCode
+    jdbc.update(
+        """
+        INSERT INTO crm_copy_job(
+          id, tenant_id, kol_id, token_id, job_code, caller_platform, target_shop_id,
+          status, total_count, success_count, fail_count, create_time, update_time)
+        VALUES (17001, 1, ?, (SELECT id FROM crm_kol_copy_token WHERE kol_id = ? LIMIT 1),
+                'alreadyAppliedJobCode17bxx', 'test', ?, 'completed', 0, 0, 0, now(), now())
+        """,
+        kolId,
+        kolId,
+        shopId);
+
+    mvc.perform(
+            post(BASE + "/jobs/alreadyAppliedJobCode17bxx/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90001"}]}
+                    """
+                        .formatted(token)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("already_applied"));
+  }
+
+  @Test
+  void shouldRejectResolve_withOtherKolToken() throws Exception {
+    long shopId = createShop("1002", "Other");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    long kolA = createKol("KolA", "kola17b@example.com");
+    long kolB = createKol("KolB", "kolb17b@example.com");
+    String tokenA = createToken(kolA, 5);
+    String tokenB = createToken(kolB, 5);
+    MvcResult converted =
+        mvc.perform(
+                post(BASE + "/convert")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"token":"%s","callerPlatform":"google_sheet_plugin",
+                         "items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"10001"}]}
+                        """
+                            .formatted(tokenA)))
+            .andExpect(status().isOk())
+            .andReturn();
+    String jobCode =
+        json.readTree(converted.getResponse().getContentAsString())
+            .path("data")
+            .path("jobCode")
+            .asString();
+
+    mvc.perform(
+            post(BASE + "/jobs/" + jobCode + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"10001"}]}
+                    """
+                        .formatted(tokenB)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.errorCode").value("COPY_TOKEN_INVALID"));
   }
 
   private long createShop(String weidianId, String name) throws Exception {

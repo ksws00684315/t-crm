@@ -95,12 +95,4 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 1. 在 Google 表格脚本属性中把 `TALENT_CRM_API_BASE_URL` 改为 `https://admin.<域名>/admin-api`（不要末尾斜杠）。
 2. 脚本代码不用改；令牌在管理端「商品 > 复制令牌」生成。
-3. Nginx 建议对 `/admin-api/external/` 单独限流（例如每 IP 每分钟 120 次），与应用内限流叠加。示例：
-
-```nginx
-limit_req_zone $binary_remote_addr zone=external:10m rate=120r/m;
-location /admin-api/external/ {
-  limit_req zone=external burst=40 nodelay;
-  proxy_pass http://backend;
-}
-```
+3. Nginx 对 `/admin-api/external/` 单独限流（每 IP 每分钟 120 次，burst 40），写在 `deploy/nginx/templates/default.conf.template`（zone `tcrm_external`，upstream `crm-admin`），与应用内 Redis 限流叠加。README 只说明作用，不另贴与生产不一致的片段。

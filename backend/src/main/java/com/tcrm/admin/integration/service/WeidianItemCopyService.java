@@ -1,5 +1,6 @@
 package com.tcrm.admin.integration.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
@@ -12,42 +13,68 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemSku;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailBlock;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailRequest;
+import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
+import com.tcrm.admin.integration.model.WeidianShopAuthDO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /** Weidian-backed {@link WeidianItemCopyApi} (task 17b / ADR-019). No markup; no business retry. */
 @Service
 public class WeidianItemCopyService implements WeidianItemCopyApi {
-  private final WeidianBusinessApi weidian;
+  private static final Logger LOG = LoggerFactory.getLogger(WeidianItemCopyService.class);
 
-  public WeidianItemCopyService(WeidianBusinessApi weidian) {
+  /** Operator-facing warning when addItem succeeded but saveItemDetail failed. */
+  static final String DETAIL_SAVE_WARNING = "商品已复制，详情保存失败，请在微店后台补充详情";
+
+  static final String SOURCE_INCOMPLETE = "来源商品信息不完整";
+
+  private final WeidianBusinessApi weidian;
+  private final WeidianShopAuthMapper auths;
+
+  public WeidianItemCopyService(WeidianBusinessApi weidian, WeidianShopAuthMapper auths) {
     this.weidian = weidian;
+    this.auths = auths;
   }
 
   @Override
-  public String copy(long sourceShopId, String sourceItemId, long targetShopId) {
+  public CopyResult copy(long sourceShopId, String sourceItemId, long targetShopId) {
     ItemResponse item = weidian.item(sourceShopId, new ItemRequest(sourceItemId, null, null));
+    AddItemRequest add = buildAdd(item);
     Long sourceIdLong = parseLong(sourceItemId);
     ItemDetailResponse detail =
         sourceIdLong == null
             ? new ItemDetailResponse(List.of(), null)
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
-    AddItemResponse created = weidian.addItem(targetShopId, buildAdd(item));
+    AddItemResponse created = weidian.addItem(targetShopId, add);
     if (created == null || created.itemId() == null) {
       throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
     }
+    String newId = Long.toString(created.itemId());
     List<SaveItemDetailBlock> blocks = toSaveBlocks(detail);
-    if (!blocks.isEmpty()) {
-      weidian.saveItemDetail(targetShopId, new SaveItemDetailRequest(blocks));
+    if (blocks.isEmpty()) {
+      return new CopyResult(newId, null);
     }
-    return Long.toString(created.itemId());
+    try {
+      weidian.saveItemDetail(targetShopId, new SaveItemDetailRequest(blocks));
+      return new CopyResult(newId, null);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Weidian item {} created in shop {} but detail save failed: {}",
+          newId,
+          targetShopId,
+          safeReason(e));
+      return new CopyResult(newId, DETAIL_SAVE_WARNING);
+    }
   }
 
   @Override
@@ -58,15 +85,40 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         return Optional.empty();
       }
       return Optional.of(new ProbedItem(item.itemId(), item.itemName(), item.price()));
-    } catch (RuntimeException e) {
-      return Optional.empty();
+    } catch (WeidianApiException e) {
+      if (isItemNotFound(e)) {
+        return Optional.empty();
+      }
+      throw new BusinessException(
+          ErrorCode.WEIDIAN_API_FAILED,
+          "微店接口调用失败" + (e.statusCode() >= 0 ? "：" + e.statusCode() : ""),
+          null);
+    } catch (WeidianTransportException e) {
+      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, "微店接口调用失败", null);
     }
   }
 
-  private static AddItemRequest buildAdd(ItemResponse item) {
+  @Override
+  public boolean isShopAuthorized(long shopId) {
+    Long count =
+        auths.selectCount(
+            new LambdaQueryWrapper<WeidianShopAuthDO>()
+                .eq(WeidianShopAuthDO::getShopId, shopId)
+                .eq(WeidianShopAuthDO::getStatus, WeidianAuthStatus.AUTHORIZED.name()));
+    return count != null && count > 0;
+  }
+
+  /** Visible for unit tests. Rejects defaults that would create zero-price catalogue items. */
+  static AddItemRequest buildAdd(ItemResponse item) {
+    if (item == null) {
+      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, SOURCE_INCOMPLETE, null);
+    }
     JsonNode raw = item.raw();
-    String name = firstNonBlank(item.itemName(), text(raw, "item_name"), "copied-item");
-    BigDecimal price = firstPrice(item.price(), decimal(raw, "price"), BigDecimal.ZERO);
+    String name = firstNonBlank(item.itemName(), text(raw, "item_name"));
+    BigDecimal price = firstPrice(item.price(), decimal(raw, "price"));
+    if (name == null || price == null) {
+      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, SOURCE_INCOMPLETE, null);
+    }
     Integer stock = item.stock() != null ? item.stock() : intVal(raw, "stock");
     List<ItemImage> images = images(raw);
     List<ItemSku> skus = skus(raw);
@@ -99,6 +151,46 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         null,
         null,
         skus.isEmpty() ? null : skus);
+  }
+
+  /**
+   * True when Weidian explicitly says the item is missing or not owned by this shop. Unknown codes
+   * must not be treated as empty — they fail the copy item instead.
+   */
+  static boolean isItemNotFound(WeidianApiException error) {
+    if (error == null) {
+      return false;
+    }
+    String msg = error.getMessage();
+    if (msg != null) {
+      String lower = msg.toLowerCase(Locale.ROOT);
+      if (lower.contains("不存在")
+          || lower.contains("不属于")
+          || lower.contains("not exist")
+          || lower.contains("not found")
+          || lower.contains("does not belong")
+          || lower.contains("no such item")) {
+        return true;
+      }
+    }
+    // Documented / observed item-missing codes for vdian.item.get (non-retryable business misses).
+    int code = error.statusCode();
+    return code == 10003 || code == 20003 || code == 21001;
+  }
+
+  private static String safeReason(Throwable e) {
+    if (e instanceof WeidianApiException api) {
+      return "Weidian error " + api.statusCode();
+    }
+    String msg = e.getMessage();
+    if (msg == null || msg.isBlank()) {
+      return e.getClass().getSimpleName();
+    }
+    String lower = msg.toLowerCase(Locale.ROOT);
+    if (lower.contains("token") || lower.contains("secret")) {
+      return e.getClass().getSimpleName();
+    }
+    return msg.length() > 120 ? msg.substring(0, 120) : msg;
   }
 
   private static List<SaveItemDetailBlock> toSaveBlocks(ItemDetailResponse detail) {
@@ -234,13 +326,10 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     return null;
   }
 
-  private static BigDecimal firstPrice(BigDecimal a, BigDecimal b, BigDecimal fallback) {
+  private static BigDecimal firstPrice(BigDecimal a, BigDecimal b) {
     if (a != null) {
       return a;
     }
-    if (b != null) {
-      return b;
-    }
-    return fallback;
+    return b;
   }
 }

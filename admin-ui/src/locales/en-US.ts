@@ -240,7 +240,8 @@ const enUS: MessageSchema = {
     COPY_TOKEN_INVALID: "The copy token is invalid or revoked",
     COPY_TOKEN_EXPIRED: "The copy token has expired",
     COPY_TOKEN_QUOTA_EXCEEDED: "The copy token quota has been used up",
-    COPY_TARGET_SHOP_MISSING: "No default copy shop is set and the token does not name a target shop",
+    COPY_TARGET_SHOP_MISSING:
+      "No default copy shop is set and the token does not name a target shop",
     PRODUCT_LINK_RATE_LIMITED: "Too many requests; please try again later",
     KOL_DISABLED: "The creator account is disabled",
     SHOP_DISABLED: "The shop is disabled and this action cannot be done.",

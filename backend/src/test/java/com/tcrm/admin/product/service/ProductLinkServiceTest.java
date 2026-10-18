@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,12 +13,14 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
+import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.product.mapper.CopyJobItemMapper;
 import com.tcrm.admin.product.mapper.CopyJobMapper;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.CopyJobDO;
 import com.tcrm.admin.product.model.CopyJobItemDO;
+import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.product.service.ProductLinkService.ConvertCommand;
 import com.tcrm.admin.product.service.ProductLinkService.ConvertItem;
@@ -45,6 +46,7 @@ class ProductLinkServiceTest {
   private final ProductLinkRateLimiter rates = mock(ProductLinkRateLimiter.class);
   private final CopyJobWorker worker = mock(CopyJobWorker.class);
   private final CopyJobProgress progress = mock(CopyJobProgress.class);
+  private final WeidianItemCopyApi copies = mock(WeidianItemCopyApi.class);
   private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
   private final AtomicLong ids = new AtomicLong(100);
   private ProductLinkService service;
@@ -61,6 +63,7 @@ class ProductLinkServiceTest {
             rates,
             worker,
             progress,
+            copies,
             jdbc,
             "https://t.example",
             new SecureRandom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}));
@@ -121,7 +124,7 @@ class ProductLinkServiceTest {
     shop.setStatus(1);
     shop.setWeidianShopId("9001");
     when(shops.selectById(5L)).thenReturn(shop);
-    when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(5L))).thenReturn(1);
+    when(copies.isShopAuthorized(5L)).thenReturn(true);
     when(items.listByJob(anyLong())).thenReturn(List.of());
 
     var result =
@@ -172,5 +175,182 @@ class ProductLinkServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getMessage())
         .isEqualTo("复制令牌已过期");
+  }
+
+  @Test
+  void shouldRejectExpiredToken_inChinese() {
+    when(tokens.authenticate("tok")).thenThrow(new BusinessException(ErrorCode.COPY_TOKEN_EXPIRED));
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getMessage())
+        .isEqualTo("复制令牌已过期");
+  }
+
+  @Test
+  void shouldRejectQuotaExceeded_inChinese() {
+    when(tokens.authenticate("tok"))
+        .thenThrow(new BusinessException(ErrorCode.COPY_TOKEN_QUOTA_EXCEEDED));
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getMessage())
+        .isEqualTo("复制令牌额度已用尽");
+  }
+
+  @Test
+  void shouldRejectDisabledKol_inChinese() {
+    when(tokens.authenticate("tok")).thenThrow(new BusinessException(ErrorCode.KOL_DISABLED));
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getMessage())
+        .isEqualTo("达人账号已停用");
+  }
+
+  @Test
+  void shouldRejectUnauthorizedTargetShop() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(1);
+    when(shops.selectById(5L)).thenReturn(shop);
+    when(copies.isShopAuthorized(5L)).thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e -> {
+              BusinessException be = (BusinessException) e;
+              assertThat(be.getErrorCode()).isEqualTo(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
+              assertThat(be.getMessage()).contains("未完成微店授权");
+            });
+  }
+
+  @Test
+  void shouldRejectDisabledTargetShop() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(0);
+    when(shops.selectById(5L)).thenReturn(shop);
+
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.SHOP_DISABLED);
+  }
+
+  @Test
+  void shouldRejectResolve_whenTokenBelongsToOtherKol() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 1L, 99L, "WEIDIAN", 5L, 5));
+    CopyJobDO job = new CopyJobDO();
+    job.setJobCode("abc");
+    job.setKolId(10L);
+    job.setTenantId(1L);
+    when(jobs.findByCode("abc")).thenReturn(job);
+
+    assertThatThrownBy(
+            () ->
+                service.resolve(
+                    "abc",
+                    new ProductLinkService.ResolveCommand(
+                        "tok", List.of(new ProductLinkService.ResolveItem("WEIDIAN", "1")))))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.COPY_TOKEN_INVALID);
+  }
+
+  @Test
+  void shouldReturnAlreadyApplied_whenSourceIsOwnExclusive() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 1L, 10L, "WEIDIAN", 5L, 5));
+    CopyJobDO job = new CopyJobDO();
+    job.setId(7L);
+    job.setJobCode("jobcode");
+    job.setKolId(10L);
+    job.setTenantId(1L);
+    job.setTargetShopId(5L);
+    job.setStatus(CopyJobDO.STATUS_COMPLETED);
+    job.setUpdateTime(java.time.Instant.now());
+    when(jobs.findByCode("jobcode")).thenReturn(job);
+    when(items.listByJob(7L)).thenReturn(List.of());
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setWeidianShopId("1001");
+    when(shops.selectById(5L)).thenReturn(shop);
+    KolItemDO exclusive = new KolItemDO();
+    exclusive.setKolId(10L);
+    exclusive.setWeidianItemId("90001");
+    when(kolItems.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exclusive);
+
+    var result =
+        service.resolve(
+            "jobcode",
+            new ProductLinkService.ResolveCommand(
+                "tok", List.of(new ProductLinkService.ResolveItem("WEIDIAN", "90001"))));
+
+    assertThat(result.items()).hasSize(1);
+    assertThat(result.items().getFirst().status()).isEqualTo("already_applied");
+  }
+
+  @Test
+  void shouldGenerateUrlSafeJobCode_ofExpectedLength() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(1);
+    when(shops.selectById(5L)).thenReturn(shop);
+    when(copies.isShopAuthorized(5L)).thenReturn(true);
+    when(items.listByJob(anyLong())).thenReturn(List.of());
+
+    var result =
+        service.convert(
+            new ConvertCommand(
+                "tok", "google_sheet_plugin", List.of(new ConvertItem("WEIDIAN", "111", null))));
+
+    assertThat(result.jobCode()).hasSize(22);
+    assertThat(result.jobCode()).matches("[A-Za-z0-9_-]{22}");
+  }
+
+  @Test
+  void shouldNotLeakOtherCompanyJobItems_whenJobCodeUnknownInCompany() {
+    // getJob uses system scope to find by code then company scope — missing job is 404
+    when(jobs.findByCode("missing")).thenReturn(null);
+    assertThatThrownBy(() -> service.getJob("missing"))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.COMMON_NOT_FOUND);
   }
 }
