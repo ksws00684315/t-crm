@@ -42,17 +42,19 @@ deploy/scripts/preview.sh reset   # 停止并删除数据卷与 deploy/.env.prev
 
 PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端口写死在预览配置里，不能改。Compose 项目名是 `tcrm-preview`。
 
-`deploy/.env.preview` 不存在时，`up` 会随机生成数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号，文件权限 `600`。已存在则不覆盖。平台管理员用户名和密码**只在刚生成该文件时在终端打印一次**，之后查看 `deploy/.env.preview`。该文件与构建产物 `deploy/www-preview/` 不入库，不要把密码写进文档或提交。
+`deploy/.env.preview` 不存在、且本机还没有预览数据卷时，`up` 会随机生成数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号，文件权限 `600`。已存在则不覆盖。平台管理员用户名和密码**只在刚生成该文件时在终端打印一次**，之后查看 `deploy/.env.preview`。该文件与构建产物 `deploy/www-preview/` 不入库，不要把密码写进文档或提交。
 
 首次使用：用平台管理员登录管理端（登录验证码保持开启，与生产一致）→ 在平台管理里为默认公司创建超级管理员 → 退出后用超级管理员登录。预览不做演示数据。
 
 后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
 
-看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。
+看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。数据卷 `tcrm-preview_pgdata` 在所有目录之间共用，PostgreSQL 只在数据卷为空时写入账号。如果这个目录还没有 `deploy/.env.preview`，但本机已经有这份数据卷，`up` 不会生成新密码，而是直接退出并提示：已有预览数据（可能来自其他目录）。请从原目录复制 `deploy/.env.preview` 到这里，或执行 `preview.sh reset` 清空后重建。
 
-`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后（例如推广表上传的体积限制），要同步改预览配置。
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。当前尚未合并、需要同步的有两处：17b 的 `/admin-api/external/` 限流，以及任务 26 的推广表上传（约 300MB）。哪个后合并，就由哪个同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
+
+排障：预览网络是 `172.30.0.0/24`，与生产模板相同。本机如果已经有网络占用这个网段，启动会失败。这种情况少见；出现时先处理占用该网段的网络，不要改预览配置里的网段。
 
 ## 生产部署（模板，使用前逐项审阅）
 

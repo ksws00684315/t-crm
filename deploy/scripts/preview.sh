@@ -43,6 +43,12 @@ require_up_tools() {
   done
 }
 
+# The compose project name is fixed, so this volume is shared by every checkout.
+# PostgreSQL only initializes credentials when the volume is empty.
+preview_volume_exists() {
+  docker volume inspect "${PROJECT}_pgdata" >/dev/null 2>&1
+}
+
 compose() {
   if [[ -f "$ENV_FILE" ]]; then
     docker compose -p "$PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
@@ -138,10 +144,15 @@ wait_healthy() {
 }
 
 cmd_up() {
-  require_up_tools
+  require_docker
   generated=0
   creds_printed=0
   trap print_creds_once EXIT
+  if [[ ! -f "$ENV_FILE" ]] && preview_volume_exists; then
+    echo "已有预览数据（可能来自其他目录）。请从原目录复制 deploy/.env.preview 到这里，或执行 preview.sh reset 清空后重建。" >&2
+    exit 1
+  fi
+  require_up_tools
   if [[ ! -f "$ENV_FILE" ]]; then
     generate_env
   fi
