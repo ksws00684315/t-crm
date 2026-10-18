@@ -8,6 +8,7 @@ import com.tcrm.admin.link.mapper.LinkIndexOutboxMapper;
 import com.tcrm.admin.link.model.LinkIndexOutboxDO;
 import com.tcrm.admin.link.model.LinkIndexScope;
 import com.tcrm.admin.product.api.KolItemChangedEvent;
+import com.tcrm.admin.product.api.KolMappingsChangedEvent;
 import com.tcrm.admin.product.api.ProductStatusChangedEvent;
 import com.tcrm.admin.product.api.ShopStatusChangedEvent;
 import java.time.Clock;
@@ -47,6 +48,15 @@ public class LinkIndexListener {
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onKolItemChanged(KolItemChangedEvent event) {
     insert(LinkIndexScope.MAPPING, event.kolId(), event.productId());
+  }
+
+  /**
+   * Bulk mapping changes of one KOL (task 26 sheet upload): a KOL-scope row rewrites every current
+   * field, which also covers mappings without an original product in the linkitem buckets.
+   */
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+  public void onKolMappingsChanged(KolMappingsChangedEvent event) {
+    insert(LinkIndexScope.KOL, event.kolId(), null);
   }
 
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)

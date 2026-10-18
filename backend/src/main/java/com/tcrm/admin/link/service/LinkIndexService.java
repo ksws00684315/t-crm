@@ -229,7 +229,11 @@ public class LinkIndexService {
   private static Map<String, String> fields(KolRefDTO kol, List<KolItemLinkDTO> links) {
     Map<String, String> fields = new LinkedHashMap<>(Math.max(16, links.size() * 2));
     for (KolItemLinkDTO link : links) {
-      fields.put(link.productCode(), LinkRules.indexValue(kol, link));
+      // A promo-sheet mapping without an original product (task 26) has no /t/ field; it lives in
+      // the linkitem index only.
+      if (link.productCode() != null) {
+        fields.put(link.productCode(), LinkRules.indexValue(kol, link));
+      }
     }
     return fields;
   }

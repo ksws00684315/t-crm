@@ -23,7 +23,8 @@ const zhCN: MessageSchema = {
     label: "主导航",
     home: "首页",
     payoutAccounts: "收款账户",
-    orders: "我的订单"
+    orders: "我的订单",
+    items: "我的商品"
   },
   locale: {
     "en-US": "English",
@@ -77,6 +78,17 @@ const zhCN: MessageSchema = {
     viewOrders: "查看我的订单",
     payoutEntry: "收款账户"
   },
+  items: {
+    title: "我的商品",
+    searchPlaceholder: "按商品名称搜索",
+    search: "搜索",
+    loadFailed: "商品加载失败，请重试。",
+    empty: "还没有商品",
+    emptyHint: "商务完成推广配置后，你的商品会显示在这里。",
+    unnamed: "未命名商品",
+    copyLink: "复制链接",
+    copied: "已复制"
+  },
   orders: {
     title: "我的订单",
     dateRange: "时间范围",
@@ -111,6 +123,7 @@ const zhCN: MessageSchema = {
     login: "登录",
     home: "首页",
     orders: "我的订单",
+    items: "我的商品",
     activate: "激活账号",
     reset: "重置密码",
     forgot: "找回密码",

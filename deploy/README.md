@@ -5,7 +5,9 @@
 | `.env.example` | 全部环境变量（名称与 backend / redirect 实际使用的一致）；复制为 `deploy/.env` 后填写，`.env` 不入库 |
 | `docker-compose.dev.yml` | 本地开发依赖：PostgreSQL 17.11、Redis 7.4.5 |
 | `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis |
-| `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段 |
+| `docker-compose.preview.yml` | 本地预览：与生产相同的五个服务，只绑定 `127.0.0.1:8890/8891/8892` |
+| `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
+| `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `backup/pg-backup.sh` | 每日 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 R2） |
 | `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
@@ -20,9 +22,43 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 宿主机端口由 `TCRM_DB_PORT`（默认 5432）、`TCRM_REDIS_PORT`（默认 6379）决定，只绑定 `127.0.0.1`；本机已有 PostgreSQL / Redis 占用端口时，在 `deploy/.env` 中改这两个变量即可，在本机启动的后台和跳转服务读取同名变量连接。库 `tcrm` 与应用账号由 PostgreSQL 镜像根据 `TCRM_DB_NAME`、`TCRM_DB_USERNAME`、`TCRM_DB_PASSWORD` 创建；表由后台启动时的 Flyway 创建，这里不挂载初始化 SQL。
 
+## 本地预览
+
+只用于在本机查看**当前工作目录**的源码，不用于任何服务器。一条命令从源码构建并启动管理端、达人端、后台、跳转服务、PostgreSQL 与 Redis。
+
+前置条件：Docker（含 Compose 插件）、Node.js、pnpm、openssl。
+
+```bash
+deploy/scripts/preview.sh up      # 构建并启动。可在任意目录执行（脚本按自身位置定位仓库根）
+deploy/scripts/preview.sh down    # 停止容器，保留数据卷；下次 up 数据还在
+deploy/scripts/preview.sh reset   # 停止并删除数据卷、预览镜像与 deploy/.env.preview，回到全新状态；须输入 yes
+```
+
+| 站点 | 地址 |
+|---|---|
+| 管理端 | http://localhost:8890 |
+| 达人端 | http://localhost:8891 |
+| 跳转服务 | http://localhost:8892 （`/t/…`、`/i/…`、`/healthz`） |
+
+PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端口写死在预览配置里，不能改。Compose 项目名是 `tcrm-preview`。
+
+`deploy/.env.preview` 不存在、且本机还没有预览数据卷时，`up` 会随机生成数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号，文件权限 `600`。已存在则不覆盖。平台管理员用户名和密码**只在刚生成该文件时在终端打印一次**，之后查看 `deploy/.env.preview`。该文件与构建产物 `deploy/www-preview/` 不入库，不要把密码写进文档或提交。
+
+首次使用：用平台管理员登录管理端（登录验证码保持开启，与生产一致）→ 在平台管理里为默认公司创建超级管理员 → 退出后用超级管理员登录。预览不做演示数据。
+
+后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
+
+看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。数据卷 `tcrm-preview_pgdata` 在所有目录之间共用，PostgreSQL 只在数据卷为空时写入账号。如果这个目录还没有 `deploy/.env.preview`，但本机已经有这份数据卷，`up` 不会生成新密码，而是直接退出并提示：已有预览数据（可能来自其他目录）。请从原目录复制 `deploy/.env.preview` 到这里，或执行 `preview.sh reset` 清空后重建。
+
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：预览构建不设置 `VITE_UPLOAD_BASE_URL`，上传走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
+
+预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
+
+排障：预览网络是 `172.30.0.0/24`，与生产模板相同。本机如果已经有网络占用这个网段，启动会失败。这种情况少见；出现时先处理占用该网段的网络，不要改预览配置里的网段。
+
 ## 生产部署（模板，使用前逐项审阅）
 
-1. 域名：Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>` 到服务器；SSL/TLS 模式用 Full (strict)，把 Cloudflare 源站证书放到 `TCRM_CERT_DIR`（`origin.pem`、`origin.key`）。
+1. 域名：Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>` 到服务器；SSL/TLS 模式用 Full (strict)，把 Cloudflare 源站证书放到 `TCRM_CERT_DIR`（`origin.pem`、`origin.key`）。**另加一条 `upload.<域名>` 的 A 记录并设为「仅 DNS」（灰云，不代理）**：推广表上传（任务 26）最大 300 MB，超过 Cloudflare 免费计划约 100 MB 的请求体上限，必须绕过代理直连源站；源站证书需覆盖 `upload.<域名>`（SAN 里加一条，或单独签发）。
 2. 填写 `deploy/.env`（`TCRM_DOMAIN`、数据库、`TCRM_REDIS_PASSWORD`（生产必填）、首次平台管理员、跳转回退地址、IP 哈希盐、中转链接地址 `TCRM_LINK_BASE_URL` 等）。首次启动用这两个变量创建平台管理员；登录后在平台管理里为默认公司创建超级管理员。升级已有库时，该用户名不能与任何已有用户冲突。`TCRM_LINK_BASE_URL` 必填，应为 `https://t.<域名>`（https、不带末尾斜杠），后台据此生成 `https://t.<域名>/t/{达人编号}/{原商品编码}`；缺失或格式不对时后台启动失败。
    微店接入还要求设置 `TCRM_SECRET_KEY` 和 `TCRM_ADMIN_BASE_URL`。使用 `openssl rand -base64 32` 生成主密钥，作为 32 字节 Base64 值保存于受控的部署密钥库，并单独备份；不要写入仓库。丢失主密钥意味着已保存的凭证全部要重新录入。`TCRM_ADMIN_BASE_URL` 必须是无末尾斜杠的 HTTPS 后台地址（例如 `https://admin.example.com`）；将该域名登记为微店开放平台的回调域名。缺失或格式错误时后台启动失败。
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
@@ -32,6 +68,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
+8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`TCRM_CERT_DIR` 的证书覆盖该子域名；管理端镜像构建时已注入 `VITE_UPLOAD_BASE_URL=https://upload.<域名>`（未注入时上传会走 `admin.<域名>`，超过 100 MB 的文件会被 Cloudflare 拒绝）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
 
 ## 邮件服务（Resend）
 
@@ -64,6 +101,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 - `t.<域名>` 只转发 `/t/…`、`/i/…`（客户表格脚本写入的按复制商品 ID 中转链接，ADR-019）与 `/healthz` 到 crm-redirect，其余返回 404。`/t/` 与 `/i/` 共用同一限速区，按客户端 IP 限速 30 次/秒、突发 60，超出返回 429；`/healthz` 不限速。阈值偏松，是为了不误伤移动网络中大量用户共用出口 IP（CGNAT）的情况。边缘层（Cloudflare 频率限制规则）是主要防线，Nginx 限速是源站兜底；阈值可按实际流量调整。
 - `kol.<域名>` / `admin.<域名>`：静态资源 + 单页应用回退；`/kol-api/`、`/admin-api/` 转发到 crm-admin；登录接口有 10 次/分钟（突发 5）的频率限制；登录验证码签发接口 `/admin-api/auth/captchas` 有 120 次/分钟（突发 30）的频率限制，后台另按每 IP 每分钟 120 张限制（`crm.auth.captcha.issue-per-minute`，ADR-017）。
+- **推广表上传子域名（任务 26，ADR-024；负责人 2026-10-18 决定）**：上传走独立的 `upload.<域名>`，在 Cloudflare 中设为「仅 DNS」不代理（免费计划的代理会拒绝约 100 MB 以上的请求体）。该 server 只放行 `POST /admin-api/kol/kols/{id}/promo-sheet-uploads`（含浏览器先发的 CORS 预检 OPTIONS），`client_max_body_size 300m`、`proxy_read_timeout 300s`；其它路径一律 404。`admin.<域名>` 保持 `client_max_body_size 21m` 默认（导入 20 MB + 表单开销），不再为上传放宽。后端侧 Spring multipart 上限同为 300 MB（`file-size-threshold` 极小，先落临时文件），各接口仍在代码层校验各自业务上限：Excel 导入 20 MB、业务图片 2 MB、推广表 300 MB。管理端构建时用 `VITE_UPLOAD_BASE_URL=https://upload.<域名>` 指向上传域名；未配置时回退当前域名（本地开发不受影响）。跨域上传要求 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端源。
 - 响应头（规范 06）：`X-Content-Type-Options`、`Referrer-Policy`、HSTS（一年）、`X-Frame-Options`，两个前端另加 `Content-Security-Policy`。
 - 客户端 IP：本模板用 `proxy.conf` 把转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` **一律重写为 `$remote_addr`**，客户端自带的转发头到不了应用（这是防伪造的实际手段）。`cloudflare-real-ip.conf` 的 `set_real_ip_from` 只决定对哪些对端采用 `CF-Connecting-IP` 来解析 `$remote_addr`，**并不限制谁可以连上 Nginx**。compose 网络固定 `172.30.0.0/24`，生产中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已写死为该网段。
 - `${TCRM_DOMAIN}` 由 nginx 镜像在启动时替换（`NGINX_ENVSUBST_FILTER=^TCRM_`）。

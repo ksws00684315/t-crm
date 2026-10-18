@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -96,13 +97,19 @@ public class SecurityConfiguration implements WebMvcConfigurer {
   public void addInterceptors(InterceptorRegistry registry) {
     // Company status is checked before @SaCheckRole / @SaCheckPermission. SaInterceptor runs
     // annotations first, so a disabled company whose role list is empty would otherwise be 403.
-    // This interceptor runs first and answers 401, matching a disabled account.
+    // This interceptor runs first and answers 401, matching a disabled account. A CORS preflight
+    // (task 26 review: the promo-sheet upload sub-domain is a different origin from the console)
+    // carries no token and is answered by Spring's PreFlightHandler — the interceptors pass it
+    // through instead of rejecting it with 401 before any CORS header exists.
     registry
         .addInterceptor(
             new HandlerInterceptor() {
               @Override
               public boolean preHandle(
                   HttpServletRequest request, HttpServletResponse response, Object handler) {
+                if (CorsUtils.isPreFlightRequest(request)) {
+                  return true;
+                }
                 StpUtil.checkLogin();
                 current.user();
                 return true;
@@ -116,7 +123,8 @@ public class SecurityConfiguration implements WebMvcConfigurer {
             "/admin-api/external/**");
     // The displayed-company check runs after the status check (so it sees a valid login) and
     // before the role annotations, so a tab still showing the previous company gets 409 rather
-    // than a 403 computed for the new company.
+    // than a 403 computed for the new company. A preflight sends no company header and passes
+    // the null check below on its own.
     registry
         .addInterceptor(new CompanyHeaderInterceptor(current))
         .addPathPatterns(CompanyHeaderInterceptor.PATTERNS)
@@ -127,7 +135,17 @@ public class SecurityConfiguration implements WebMvcConfigurer {
                 handler -> {
                   StpUtil.checkLogin();
                   current.user();
-                }))
+                }) {
+              @Override
+              public boolean preHandle(
+                  HttpServletRequest request, HttpServletResponse response, Object handler)
+                  throws Exception {
+                if (CorsUtils.isPreFlightRequest(request)) {
+                  return true;
+                }
+                return super.preHandle(request, response, handler);
+              }
+            })
         .addPathPatterns("/admin-api/**")
         .excludePathPatterns(
             "/admin-api/auth/login",

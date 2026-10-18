@@ -5,6 +5,7 @@ public record KolItemFilterDTO(
     String productCode,
     Long shopId,
     String weidianItemId,
+    String source,
     boolean currentOnly,
     int page,
     int size) {}

@@ -244,6 +244,9 @@ const enUS: MessageSchema = {
       "No default copy shop is set and the token does not name a target shop",
     PRODUCT_LINK_RATE_LIMITED: "Too many requests; please try again later",
     KOL_DISABLED: "The creator account is disabled",
+    KOL_PROMO_SHEET_INVALID: "The promo sheet is not a readable .xlsx workbook; upload it again.",
+    KOL_PROMO_SHEET_TOO_LARGE: "The promo sheet exceeds 300MB.",
+    KOL_PROMO_UPLOAD_EXPIRED: "The upload preview has expired (30 minutes); upload it again.",
     SHOP_DISABLED: "The shop is disabled and this action cannot be done.",
     SHOP_NOT_FOUND: "Shop not found.",
     PRODUCT_NOT_FOUND: "Product not found.",
@@ -955,7 +958,47 @@ const enUS: MessageSchema = {
     validTo: "Valid to",
     current: "Currently valid",
     importTitle: "Bulk Import Mappings",
-    limitHint: "One file, at most 20MB and 20,000 rows"
+    limitHint: "One file, at most 20MB and 20,000 rows",
+    source: "Source",
+    sources: {
+      IMPORT: "Import",
+      SHEET_UPLOAD: "Sheet upload"
+    },
+    noProduct: "No original product"
+  },
+  promoSheet: {
+    title: "Upload Promo Sheet",
+    open: "Upload Promo Sheet",
+    chooseFile: "Choose .xlsx file",
+    hint: "One workbook per creator, .xlsx up to 300MB. Nothing is written before you confirm.",
+    xlsxOnly: "Only .xlsx files are accepted.",
+    tooLarge: "The file exceeds 300MB.",
+    toAdd: "To add",
+    existing: "Existing",
+    conflicts: "Conflicts",
+    duplicates: "Duplicates",
+    notInSheet: "Not in sheet",
+    skipped: "Skipped",
+    tabNew: "New",
+    tabConflicts: "Conflicts",
+    tabSkipped: "Skipped",
+    noConflicts: "No conflicting items.",
+    shop: "Shop",
+    shopId: "Shop ID",
+    itemName: "Item Name",
+    sheet: "Worksheet",
+    rowNumber: "Row",
+    reason: "Reason",
+    ownerKol: "Owner",
+    otherOwner: "Owned by another creator",
+    confirm: "Confirm and write",
+    done: "Confirmed. The creator's items have been updated.",
+    reasons: {
+      IN_SHEET: "In-sheet jump",
+      NON_WEIDIAN: "Non-Weidian platform",
+      NO_ITEM_ID: "No item ID in link",
+      SHOP_NOT_REGISTERED: "Shop not registered"
+    }
   },
   order: {
     shop: "Shop",

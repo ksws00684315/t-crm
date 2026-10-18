@@ -86,6 +86,10 @@ public class KolItemService {
                 filter.weidianItemId() != null && !filter.weidianItemId().isBlank(),
                 KolItemDO::getWeidianItemId,
                 filter.weidianItemId() == null ? null : filter.weidianItemId().strip())
+            .eq(
+                filter.source() != null && !filter.source().isBlank(),
+                KolItemDO::getSource,
+                filter.source() == null ? null : filter.source().strip())
             .isNull(filter.currentOnly(), KolItemDO::getValidTo)
             .orderByDesc(KolItemDO::getValidFrom, KolItemDO::getId);
     var result = items.selectPage(new Page<>(filter.page(), filter.size()), query);
@@ -165,6 +169,8 @@ public class KolItemService {
         shop == null ? null : shop.getShopName(),
         shop == null ? null : shop.getWeidianShopId(),
         row.getWeidianItemId(),
+        row.getItemName(),
+        row.getSource(),
         row.getValidFrom(),
         row.getValidTo());
   }

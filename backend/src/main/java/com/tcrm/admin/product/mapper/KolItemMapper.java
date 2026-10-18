@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
+import com.tcrm.admin.product.model.KolItemOwnerRow;
+import com.tcrm.admin.product.model.KolItemShopRow;
+import com.tcrm.admin.product.model.KolPortalItemRow;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -53,8 +56,11 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
       @Param("shopId") Long shopId, @Param("weidianItemId") String weidianItemId);
 
   /**
-   * Current mappings joined with their undeleted product and shop (task 06 link index). Every query
-   * below starts from an index on crm_kol_item: kol → uk_crm_kol_item_kol_product, product →
+   * Current mappings joined with their shop and, when present, the undeleted original product (task
+   * 06 link index). The product join is outer since task 26: a promo-sheet mapping may have no
+   * original product, yet its {@code linkitem} field must exist for the {@code /i/{id}} redirect; a
+   * mapping whose product was deleted keeps the old behaviour and drops out. Every query below
+   * starts from an index on crm_kol_item: kol → uk_crm_kol_item_kol_product, product →
    * idx_crm_kol_item_product.
    */
   String LINK_COLUMNS =
@@ -63,20 +69,20 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
              p.name AS product_name, ki.shop_id, ki.weidian_item_id,
              p.status AS product_status, s.status AS shop_status
       FROM crm_kol_item ki
-      JOIN crm_product p ON p.id = ki.product_id AND p.is_deleted = FALSE
+      LEFT JOIN crm_product p ON p.id = ki.product_id AND p.is_deleted = FALSE
       JOIN crm_shop s ON s.id = ki.shop_id AND s.is_deleted = FALSE
+      WHERE (ki.product_id IS NULL OR p.id IS NOT NULL)
       """;
 
-  @Select(LINK_COLUMNS + " WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL")
+  @Select(LINK_COLUMNS + " AND ki.kol_id = #{kolId} AND ki.valid_to IS NULL")
   List<KolItemLinkRow> listCurrentLinksByKol(@Param("kolId") Long kolId);
 
   @Select(
-      LINK_COLUMNS
-          + " WHERE ki.kol_id = #{kolId} AND ki.shop_id = #{shopId} AND ki.valid_to IS NULL")
+      LINK_COLUMNS + " AND ki.kol_id = #{kolId} AND ki.shop_id = #{shopId} AND ki.valid_to IS NULL")
   List<KolItemLinkRow> listCurrentLinksByKolAndShop(
       @Param("kolId") Long kolId, @Param("shopId") Long shopId);
 
-  @Select(LINK_COLUMNS + " WHERE ki.product_id = #{productId} AND ki.valid_to IS NULL")
+  @Select(LINK_COLUMNS + " AND ki.product_id = #{productId} AND ki.valid_to IS NULL")
   List<KolItemLinkRow> listCurrentLinksByProduct(@Param("productId") Long productId);
 
   /**
@@ -117,14 +123,14 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
 
   @Select(
       LINK_COLUMNS
-          + " WHERE ki.kol_id = #{kolId} AND ki.product_id = #{productId} AND ki.valid_to IS NULL")
+          + " AND ki.kol_id = #{kolId} AND ki.product_id = #{productId} AND ki.valid_to IS NULL")
   KolItemLinkRow getCurrentLink(@Param("kolId") Long kolId, @Param("productId") Long productId);
 
   /** Link list page of one KOL ordered by product code; productCode null means all products. */
   @Select(
       "<script>"
           + LINK_COLUMNS
-          + " WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL"
+          + " AND ki.kol_id = #{kolId} AND ki.valid_to IS NULL"
           + "<if test='productCode != null'> AND p.product_code = #{productCode}</if>"
           + " ORDER BY p.product_code ASC, ki.id ASC"
           + "</script>")
@@ -169,6 +175,54 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
           + "</foreach>"
           + "</script>")
   List<String> filterCurrentItemIds(@Param("itemIds") Collection<String> itemIds);
+
+  /**
+   * Owner of each current mapping of these shop items (task 26): {@code weidian_item_id} → KOL id.
+   * Uses {@code idx_crm_kol_item_item_shop_from} with the shop prefix.
+   */
+  @Select(
+      "<script>"
+          + "SELECT weidian_item_id, kol_id FROM crm_kol_item"
+          + " WHERE shop_id = #{shopId} AND valid_to IS NULL AND weidian_item_id IN"
+          + " <foreach collection='itemIds' item='itemId' open='(' separator=',' close=')'>"
+          + "#{itemId}"
+          + "</foreach>"
+          + "</script>")
+  List<KolItemOwnerRow> listCurrentOwners(
+      @Param("shopId") Long shopId, @Param("itemIds") Collection<String> itemIds);
+
+  /**
+   * The KOL's current mappings with their shop's Weidian id (task 26): the promo-sheet report
+   * counts mappings whose shop item did not appear in the sheet.
+   */
+  @Select(
+      """
+      SELECT ki.weidian_item_id, s.weidian_shop_id
+      FROM crm_kol_item ki
+      JOIN crm_shop s ON s.id = ki.shop_id AND s.is_deleted = FALSE
+      WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL
+      """)
+  List<KolItemShopRow> listCurrentItemsWithShop(@Param("kolId") Long kolId);
+
+  /**
+   * The KOL's current mappings for the portal item list (task 26), keyword-filtered by display name
+   * (original product name first, then the sheet snapshot). Pages by creation time.
+   */
+  @Select(
+      "<script>"
+          + "SELECT ki.id, ki.weidian_item_id, p.name AS product_name, ki.item_name,"
+          + " p.image_url, ki.create_time"
+          + " FROM crm_kol_item ki"
+          + " LEFT JOIN crm_product p ON p.id = ki.product_id AND p.is_deleted = FALSE"
+          + " WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL"
+          + "<if test='keyword != null'>"
+          + " AND COALESCE(NULLIF(p.name, ''), NULLIF(ki.item_name, '')) ILIKE"
+          + " '%' || #{keyword} || '%'"
+          + "</if>"
+          + " ORDER BY ki.create_time DESC, ki.id DESC"
+          + "</script>")
+  IPage<KolPortalItemRow> pagePortalItems(
+      Page<KolPortalItemRow> page, @Param("kolId") Long kolId, @Param("keyword") String keyword);
 
   /** Ends current mappings of a KOL (task 25a idle cleanup via product.api). */
   @Update(
