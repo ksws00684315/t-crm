@@ -87,13 +87,13 @@ export function promotionFieldDiffs(
 ): PromotionFieldDiff[] {
   const keys = new Set<string>([
     ...RECORD_FIELD_KEYS,
-    ...Object.keys(before ?? {}),
-    ...Object.keys(after ?? {})
+    ...Object.keys(before ?? {}).map(normalizeFieldKey),
+    ...Object.keys(after ?? {}).map(normalizeFieldKey)
   ]);
   const diffs: PromotionFieldDiff[] = [];
   for (const key of keys) {
-    const from = before ? before[key] : undefined;
-    const to = after ? after[key] : undefined;
+    const from = snapshotValue(before, key);
+    const to = snapshotValue(after, key);
     if (sameValue(key, from, to)) continue;
     diffs.push({
       key,
@@ -102,6 +102,19 @@ export function promotionFieldDiffs(
     });
   }
   return diffs;
+}
+
+/** The backend writes the live status as `promotionStatus`; both names mean the same field. */
+function normalizeFieldKey(key: string): string {
+  return key === "promotionStatus" ? "status" : key;
+}
+
+/** Reads the value of a normalized field, accepting the backend's own field name too. */
+function snapshotValue(snapshot: Record<string, unknown> | null, key: string): unknown {
+  if (!snapshot) return undefined;
+  if (key in snapshot) return snapshot[key];
+  const alias = key === "status" ? "promotionStatus" : null;
+  return alias && alias in snapshot ? snapshot[alias] : undefined;
 }
 
 /**

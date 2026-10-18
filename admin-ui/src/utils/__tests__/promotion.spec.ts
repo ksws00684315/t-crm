@@ -86,6 +86,22 @@ describe("promotionFieldDiffs", () => {
     expect(map.get("status")).toMatchObject({ from: "PENDING_PROMOTION", to: "PROMOTING" });
   });
 
+  it("reads the backend's own promotionStatus key as the status field", () => {
+    // Real records store the live status under `promotionStatus`, not `status`.
+    const snapshot = {
+      defaultRate: null,
+      platformTemplateIds: [],
+      landingUrl: null,
+      inviteCode: null,
+      sheetUrl: null
+    };
+    const diffs = promotionFieldDiffs(
+      { ...snapshot, promotionStatus: "PENDING_PROMOTION" },
+      { ...snapshot, promotionStatus: "PROMOTING" }
+    );
+    expect(diffs).toEqual([{ key: "status", from: "PENDING_PROMOTION", to: "PROMOTING" }]);
+  });
+
   it("keeps platform order irrelevant and keeps unknown fields from a newer backend", () => {
     const diffs = promotionFieldDiffs(
       { platformTemplateIds: ["8", "7"], extra: "a" },
