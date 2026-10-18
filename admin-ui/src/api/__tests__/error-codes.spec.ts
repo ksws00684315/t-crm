@@ -59,8 +59,13 @@ describe("error code messages", () => {
     const backend = backendErrorCodes();
     const known = Object.keys(zhCN.errors).filter(key => CODE.test(key));
     const extra = known.filter(code => !backend.includes(code));
-    // The message ships with this task. 10a adds the enum constant; until then this one code is pending.
-    const pending = ["USER_PERMISSION_INVALID"].filter(code => !backend.includes(code));
+    // Message ships with this task; the enum constant arrives with its own task.
+    // USER_PERMISSION_INVALID: task 06b. The two KOL codes: task 25a (this branch is 25b).
+    const pending = [
+      "USER_PERMISSION_INVALID",
+      "KOL_PROMOTION_CONFIG_INCOMPLETE",
+      "KOL_ALREADY_CLAIMED"
+    ].filter(code => !backend.includes(code));
     expect(extra.sort()).toEqual(pending.sort());
   });
 });

@@ -37,6 +37,7 @@ function detail(overrides: Partial<PayoutAccountDetailVO> = {}): PayoutAccountDe
     account: "TQ5xK9aZPn7vQm4Rt",
     accountMasked: "TQ5x…m4Rt",
     holderName: null,
+    currency: null,
     network: "TRC20",
     qrFileId: "66",
     status: "PENDING",
@@ -169,5 +170,17 @@ describe("payout review drawer", () => {
     expect(document.querySelector('[data-test="approve"]')).toBeNull();
     expect(document.querySelector('[data-test="reject"]')).toBeNull();
     expect(document.body.textContent).toContain("No");
+  });
+
+  it("shows the PayPal currency in the review detail (task 25b §3.6)", async () => {
+    const wrapper = await openDrawer(
+      detail({ accountType: "PAYPAL", currency: "EUR", network: null })
+    );
+    expect(wrapper.find('[data-test="payout-currency"]').text()).toBe("EUR");
+    wrapper.unmount();
+
+    const usdt = await openDrawer(detail({ accountType: "USDT", currency: null }));
+    expect(usdt.find('[data-test="payout-currency"]').exists()).toBe(false);
+    usdt.unmount();
   });
 });

@@ -6,6 +6,8 @@ export interface PayoutAccountVO {
   accountType: "PAYPAL" | "USDT";
   account: string;
   holderName: string | null;
+  /** PayPal only (task 25, R18): ISO 4217 currency; null for USDT. */
+  currency: string | null;
   network: "TRC20" | "ERC20" | "BEP20" | "SOL" | "TON" | null;
   qrFileId: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
@@ -20,6 +22,8 @@ export interface PayoutAccountPayload {
   accountType: "PAYPAL" | "USDT";
   account: string;
   holderName?: string;
+  /** PayPal only (task 25, R18): ISO 4217; the form always sends one. */
+  currency?: string;
   network?: "TRC20" | "ERC20" | "BEP20" | "SOL" | "TON";
   qrFileId?: string;
 }
