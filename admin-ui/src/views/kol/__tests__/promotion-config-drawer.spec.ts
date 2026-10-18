@@ -129,6 +129,22 @@ describe("promotion config drawer", () => {
     wrapper.unmount();
   });
 
+  it("renders an unknown record type as a dash instead of a missing i18n key", async () => {
+    // Element Plus measures columns with an empty row, and a newer backend may send a new type;
+    // neither may reach the message pack as `recordTypeOption.undefined`.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue(
+      page([{ ...record, changeType: "UNKNOWN" as never }])
+    );
+    const wrapper = await openDrawer();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("promotion.recordTypeOption");
+    expect(text).toContain("-");
+    expect(warn.mock.calls.flat().join(" ")).not.toContain("recordTypeOption");
+    warn.mockRestore();
+    wrapper.unmount();
+  });
+
   it("offers only enabled company templates for the multi-select", async () => {
     const wrapper = await openDrawer();
     await element("platform-select").find(".el-select__wrapper").trigger("click");

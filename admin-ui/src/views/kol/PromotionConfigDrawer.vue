@@ -46,7 +46,7 @@ const emit = defineEmits<{
   (event: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -112,8 +112,10 @@ function asRecord(row: object): PromotionRecordVO {
   return row as PromotionRecordVO;
 }
 
+/** Unknown types (or the empty row Element Plus uses for column measuring) render as "-". */
 function typeText(record: PromotionRecordVO): string {
-  return t(`promotion.recordTypeOption.${record.changeType}`);
+  const key = `promotion.recordTypeOption.${record?.changeType}`;
+  return record?.changeType && te(key) ? t(key) : "-";
 }
 
 /** One "label: from → to" line; a status value renders like the status tags do. */
