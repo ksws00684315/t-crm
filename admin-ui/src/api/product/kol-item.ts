@@ -9,6 +9,8 @@ export interface KolItemQuery {
   productCode?: string;
   shopId?: string;
   weidianItemId?: string;
+  /** Mapping source filter (task 26): IMPORT or SHEET_UPLOAD. */
+  source?: string;
   /** Default true on the backend; false includes historical mappings. */
   current?: boolean;
 }

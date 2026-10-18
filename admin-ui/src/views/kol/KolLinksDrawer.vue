@@ -141,13 +141,15 @@ function reasonText(row: LinkVO): string {
       @refresh="load"
     >
       <template #cell-productCode="{ row }">
-        <CopyText :value="asLink(row).productCode" />
+        <CopyText v-if="asLink(row).productCode" :value="asLink(row).productCode" />
+        <el-tag v-else size="small" type="info">{{ t("mapping.noProduct") }}</el-tag>
       </template>
       <template #cell-weidianItemId="{ row }">
         <CopyText :value="asLink(row).weidianItemId" />
       </template>
       <template #cell-linkUrl="{ row }">
-        <CopyText :value="asLink(row).linkUrl" />
+        <CopyText v-if="asLink(row).linkUrl" :value="asLink(row).linkUrl" />
+        <span v-else>-</span>
       </template>
       <template #cell-targetUrl="{ row }">
         <CopyText :value="asLink(row).targetUrl" />

@@ -132,6 +132,10 @@ public class KolItemLookupService implements KolItemApi {
   }
 
   static KolItemLinkDTO toDto(KolItemLinkRow row) {
+    // A null product status means the mapping has no original product (task 26): there is no
+    // on-shelf state to check, so only the KOL and the shop decide usability.
+    boolean productOnSale =
+        row.getProductStatus() == null || Integer.valueOf(1).equals(row.getProductStatus());
     return new KolItemLinkDTO(
         row.getKolItemId(),
         row.getKolId(),
@@ -140,7 +144,7 @@ public class KolItemLookupService implements KolItemApi {
         row.getProductName(),
         row.getShopId(),
         row.getWeidianItemId(),
-        Integer.valueOf(1).equals(row.getProductStatus()),
+        productOnSale,
         Integer.valueOf(1).equals(row.getShopStatus()));
   }
 }

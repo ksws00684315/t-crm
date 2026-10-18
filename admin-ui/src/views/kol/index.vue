@@ -24,6 +24,7 @@ import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
 import KolLinksDrawer from "./KolLinksDrawer.vue";
+import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
 import RegisterLinkDialog from "./RegisterLinkDialog.vue";
 
 defineOptions({ name: "KolListPage" });
@@ -70,7 +71,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: 90 },
   { key: "account", label: t("kol.account"), width: 100 },
   { key: "createdAt", label: t("common.createdAt"), width: 180, mono: true },
-  { key: "actions", label: t("common.actions"), width: 360 }
+  { key: "actions", label: t("common.actions"), width: 460 }
 ]);
 
 /** Chips and empty-state filter-count reflect the last applied search, not in-progress typing. */
@@ -118,6 +119,8 @@ const linksVisible = ref(false);
 const linksKol = ref<KolVO | null>(null);
 const registerVisible = ref(false);
 const invitingId = ref<string | null>(null);
+const promoSheetVisible = ref(false);
+const promoSheetKol = ref<KolVO | null>(null);
 
 function accountText(status: 0 | 1 | undefined): string {
   if (status === 0) return t("kol.accountInactive");
@@ -277,6 +280,11 @@ function openDetail(row: KolVO) {
 function openLinks(row: KolVO) {
   linksKol.value = row;
   linksVisible.value = true;
+}
+
+function openPromoSheet(row: KolVO) {
+  promoSheetKol.value = row;
+  promoSheetVisible.value = true;
 }
 
 async function sendInvite(row: KolVO) {
@@ -498,6 +506,15 @@ onMounted(() => {
           {{ t("kol.links") }}
         </el-button>
         <el-button
+          v-if="abilities.canWrite"
+          link
+          type="primary"
+          data-test="promo-sheet"
+          @click="openPromoSheet(asKol(row))"
+        >
+          {{ t("promoSheet.open") }}
+        </el-button>
+        <el-button
           v-if="showInvite(asKol(row))"
           link
           type="primary"
@@ -548,5 +565,10 @@ onMounted(() => {
       :kol-name="linksKol?.name"
     />
     <RegisterLinkDialog v-model="registerVisible" />
+    <PromoSheetUploadDialog
+      v-model="promoSheetVisible"
+      :kol-id="promoSheetKol?.id ?? null"
+      :kol-label="promoSheetKol ? `${promoSheetKol.name} (${promoSheetKol.kolCode})` : ''"
+    />
   </div>
 </template>

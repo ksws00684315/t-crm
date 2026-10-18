@@ -2,6 +2,9 @@ package com.tcrm.admin.product.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.product.model.ProductDO;
+import com.tcrm.admin.product.model.PromoProductRow;
+import java.util.Collection;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -28,6 +31,18 @@ public interface ProductMapper extends BaseMapper<ProductDO> {
       """)
   boolean existsAliveShopItem(
       @Param("shopId") Long shopId, @Param("weidianItemId") String weidianItemId);
+
+  /** Original products of these shop items, keyed by {@code weidianItemId} (task 26). */
+  @Select(
+      "<script>"
+          + "SELECT weidian_item_id, id AS product_id, product_code FROM crm_product"
+          + " WHERE shop_id = #{shopId} AND is_deleted = FALSE AND weidian_item_id IN"
+          + " <foreach collection='itemIds' item='itemId' open='(' separator=',' close=')'>"
+          + "#{itemId}"
+          + "</foreach>"
+          + "</script>")
+  List<PromoProductRow> listByShopItems(
+      @Param("shopId") Long shopId, @Param("itemIds") Collection<String> itemIds);
 
   /**
    * Serializes original-product and exclusive-item writes for one shop item until the surrounding

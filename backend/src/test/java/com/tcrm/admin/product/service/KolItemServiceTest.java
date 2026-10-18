@@ -71,7 +71,8 @@ class KolItemServiceTest {
 
   @Test
   void shouldReject_whenAllPrecisionFiltersMissing() {
-    assertThatThrownBy(() -> service.page(new KolItemFilterDTO(null, null, 1L, null, true, 1, 20)))
+    assertThatThrownBy(
+            () -> service.page(new KolItemFilterDTO(null, null, 1L, null, null, true, 1, 20)))
         .isInstanceOf(BusinessException.class)
         .extracting(ex -> ((BusinessException) ex).getErrorCode())
         .isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -79,7 +80,8 @@ class KolItemServiceTest {
 
   @Test
   void shouldReject_whenOnlyBlankStringsProvided() {
-    assertThatThrownBy(() -> service.page(new KolItemFilterDTO("  ", "", null, "   ", true, 1, 20)))
+    assertThatThrownBy(
+            () -> service.page(new KolItemFilterDTO("  ", "", null, "   ", null, true, 1, 20)))
         .isInstanceOf(BusinessException.class)
         .extracting(ex -> ((BusinessException) ex).getErrorCode())
         .isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -113,6 +115,7 @@ class KolItemServiceTest {
                 blankToNull(productCode),
                 null,
                 blankToNull(itemId),
+                null,
                 true,
                 1,
                 20));

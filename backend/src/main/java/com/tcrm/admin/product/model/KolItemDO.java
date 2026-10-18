@@ -18,6 +18,8 @@ public class KolItemDO {
   private Long productId;
   private Long shopId;
   private String weidianItemId;
+  private String itemName;
+  private String source;
   private Instant validFrom;
   private Instant validTo;
 
@@ -75,6 +77,22 @@ public class KolItemDO {
 
   public void setWeidianItemId(String value) {
     this.weidianItemId = value;
+  }
+
+  public String getItemName() {
+    return itemName;
+  }
+
+  public void setItemName(String value) {
+    this.itemName = value;
+  }
+
+  public String getSource() {
+    return source;
+  }
+
+  public void setSource(String value) {
+    this.source = value;
   }
 
   public Instant getValidFrom() {

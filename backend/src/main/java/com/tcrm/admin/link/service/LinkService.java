@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,24 +82,35 @@ public class LinkService {
     return links.map(link -> toDto(kol, link, counts.get(link.productId())));
   }
 
-  /** Counts keyed by original product ID; a KOL has at most one current link per product. */
+  /**
+   * Counts keyed by original product ID; a KOL has at most one current link per product. Mappings
+   * without an original product (task 26) have no click count: clicks are counted per link, and
+   * they have none.
+   */
   private Map<Long, ClickCountRow> counts(long kolId, List<KolItemLinkDTO> links) {
     if (links.isEmpty()) {
       return Map.of();
     }
-    var productIds = links.stream().map(KolItemLinkDTO::productId).toList();
+    var productIds =
+        links.stream().map(KolItemLinkDTO::productId).filter(Objects::nonNull).toList();
+    if (productIds.isEmpty()) {
+      return Map.of();
+    }
     return clickLogs.countSince(kolId, productIds, clock.instant().minus(CLICK_PERIOD)).stream()
         .collect(Collectors.toMap(ClickCountRow::getProductId, Function.identity()));
   }
 
   private LinkDTO toDto(KolRefDTO kol, KolItemLinkDTO link, ClickCountRow count) {
     var reasons = LinkRules.reasons(kol.enabled(), link);
+    // The /t/{kolCode}/{productCode} link exists only for mappings with an original product
+    // (task 26 §3.1).
+    String productCode = link.productCode();
     return new LinkDTO(
         link.kolItemId(),
-        link.productCode(),
+        productCode,
         link.productName(),
         link.weidianItemId(),
-        urls.linkUrl(kol.kolCode(), link.productCode()),
+        productCode == null ? null : urls.linkUrl(kol.kolCode(), productCode),
         LinkUrls.targetUrl(kol, link.weidianItemId()),
         reasons.isEmpty(),
         reasons,

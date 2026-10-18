@@ -12,6 +12,7 @@ import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { kolAbilities } from "@/utils/permission";
 import CopyTokenCreateDialog from "@/views/product/copy-token/CopyTokenCreateDialog.vue";
+import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
 import { formatRate } from "@/utils/rate";
 
 defineOptions({ name: "KolDetailDrawer" });
@@ -26,6 +27,12 @@ const loading = ref(false);
 const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
 const copyTokenVisible = ref(false);
+const promoSheetVisible = ref(false);
+
+const promoSheetButton = computed(() => {
+  const kol = detail.value;
+  return !!kol && kolAbilities(me.user).canWrite;
+});
 
 const inviteVisible = computed(() => {
   const kol = detail.value;
@@ -178,6 +185,16 @@ const historyColumns = computed<DataColumn[]>(() => [
               {{ t("kol.generateCopyToken") }}
             </el-button>
           </el-descriptions-item>
+          <el-descriptions-item v-if="promoSheetButton" :label="t('promoSheet.title')">
+            <el-button
+              type="primary"
+              link
+              data-test="detail-promo-sheet"
+              @click="promoSheetVisible = true"
+            >
+              {{ t("promoSheet.open") }}
+            </el-button>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('kol.bd')">
             {{ detail.bdUserName ?? t("common.unassigned") }}
           </el-descriptions-item>
@@ -234,6 +251,12 @@ const historyColumns = computed<DataColumn[]>(() => [
       v-model="copyTokenVisible"
       :preset-kol-id="detail.id"
       :preset-kol-label="`${detail.name} (${detail.kolCode})`"
+    />
+    <PromoSheetUploadDialog
+      v-if="detail"
+      v-model="promoSheetVisible"
+      :kol-id="detail.id"
+      :kol-label="`${detail.name} (${detail.kolCode})`"
     />
   </el-drawer>
 </template>

@@ -66,10 +66,12 @@ class KolItemLookupServiceTest {
   }
 
   @Test
-  void shouldTreatMissingStatusAsUnusable() {
+  void shouldTreatMissingProductAsOnSale_andMissingShopAsUnusable() {
+    // Since task 26 a null product status means the mapping has no original product: there is no
+    // on-shelf state to check, so only the KOL and the shop decide usability.
     when(items.listCurrentLinksByProduct(20L)).thenReturn(List.of(row(null, null)));
     KolItemLinkDTO link = service.listCurrentLinksByProduct(20L).getFirst();
-    assertThat(link.productOnSale()).isFalse();
+    assertThat(link.productOnSale()).isTrue();
     assertThat(link.shopEnabled()).isFalse();
   }
 

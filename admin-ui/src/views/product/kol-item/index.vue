@@ -39,6 +39,7 @@ const query = reactive<{
   productCode: string;
   shopId?: string;
   weidianItemId: string;
+  source?: string;
   includeHistory: boolean;
 }>({
   page: 1,
@@ -60,15 +61,19 @@ const columns = computed<DataColumn[]>(() => [
   { key: "productName", label: t("mapping.productName"), prop: "productName", minWidth: 140 },
   { key: "shopName", label: t("mapping.shop"), prop: "shopName", minWidth: 110 },
   { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150, mono: true },
+  { key: "source", label: t("mapping.source"), width: 120 },
   { key: "validFrom", label: t("mapping.validFrom"), width: 170, mono: true },
   { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true }
 ]);
+
+const sourceOptions = ["IMPORT", "SHEET_UPLOAD"];
 
 const applied = ref({
   kolCode: "",
   productCode: "",
   shopId: undefined as string | undefined,
   weidianItemId: "",
+  source: undefined as string | undefined,
   includeHistory: false
 });
 
@@ -91,6 +96,13 @@ const chips = computed<SearchChip[]>(() => {
   }
   if (weidianItemId) {
     list.push({ key: "weidianItemId", label: t("mapping.exclusiveId"), text: weidianItemId });
+  }
+  if (applied.value.source) {
+    list.push({
+      key: "source",
+      label: t("mapping.source"),
+      text: t("mapping.sources." + applied.value.source)
+    });
   }
   if (applied.value.includeHistory) {
     list.push({
@@ -125,6 +137,7 @@ function appliedQuery() {
     productCode: applied.value.productCode || undefined,
     shopId: applied.value.shopId || undefined,
     weidianItemId: applied.value.weidianItemId || undefined,
+    source: applied.value.source || undefined,
     current: !applied.value.includeHistory
   };
 }
@@ -136,9 +149,16 @@ const { exporting, exportCsv } = useListExport<KolItemVO>({
     { label: t("mapping.kolCode"), value: row => row.kolCode },
     { label: t("mapping.kolName"), value: row => row.kolName },
     { label: t("mapping.productCode"), value: row => row.productCode },
-    { label: t("mapping.productName"), value: row => row.productName },
+    {
+      label: t("mapping.productName"),
+      value: row => row.productName ?? row.itemName ?? ""
+    },
     { label: t("mapping.shop"), value: row => row.shopName },
     { label: t("mapping.exclusiveId"), value: row => row.weidianItemId },
+    {
+      label: t("mapping.source"),
+      value: row => (row.source ? t("mapping.sources." + row.source) : "")
+    },
     { label: t("mapping.validFrom"), value: row => formatInstant(row.validFrom) },
     {
       label: t("mapping.validTo"),
@@ -184,6 +204,7 @@ function snapshotFilters(): void {
     productCode: query.productCode.trim(),
     shopId: query.shopId,
     weidianItemId: query.weidianItemId.trim(),
+    source: query.source,
     includeHistory: query.includeHistory
   };
 }
@@ -199,6 +220,7 @@ function reset() {
   query.productCode = "";
   query.shopId = undefined;
   query.weidianItemId = "";
+  query.source = undefined;
   query.includeHistory = false;
   query.page = 1;
   applied.value = {
@@ -206,6 +228,7 @@ function reset() {
     productCode: "",
     shopId: undefined,
     weidianItemId: "",
+    source: undefined,
     includeHistory: false
   };
   clearResults();
@@ -216,6 +239,7 @@ function removeChip(key: string): void {
   if (key === "productCode") query.productCode = "";
   if (key === "shop") query.shopId = undefined;
   if (key === "weidianItemId") query.weidianItemId = "";
+  if (key === "source") query.source = undefined;
   if (key === "history") query.includeHistory = false;
   search();
 }
@@ -283,6 +307,22 @@ onMounted(() => {
             data-test="weidian-item-id"
           />
         </el-form-item>
+        <el-form-item :label="t('mapping.source')">
+          <el-select
+            v-model="query.source"
+            clearable
+            :placeholder="t('common.all')"
+            style="width: 160px"
+            data-test="source-filter"
+          >
+            <el-option
+              v-for="value in sourceOptions"
+              :key="value"
+              :label="t('mapping.sources.' + value)"
+              :value="value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('mapping.includeHistory')">
           <el-switch v-model="query.includeHistory" data-test="history" />
         </el-form-item>
@@ -337,7 +377,21 @@ onMounted(() => {
       @clear-filters="reset"
     >
       <template #cell-kolCode="{ row }"><CopyText :value="asItem(row).kolCode" /></template>
-      <template #cell-productCode="{ row }"><CopyText :value="asItem(row).productCode" /></template>
+      <template #cell-productCode="{ row }">
+        <CopyText v-if="asItem(row).productCode" :value="asItem(row).productCode" />
+        <el-tag v-else size="small" type="info" data-test="no-product">{{
+          t("mapping.noProduct")
+        }}</el-tag>
+      </template>
+      <template #cell-productName="{ row }">
+        {{ asItem(row).productName ?? asItem(row).itemName ?? "-" }}
+      </template>
+      <template #cell-source="{ row }">
+        <el-tag v-if="asItem(row).source" size="small">{{
+          t("mapping.sources." + asItem(row).source)
+        }}</el-tag>
+        <span v-else>-</span>
+      </template>
       <template #cell-weidianItemId="{ row }">
         <CopyText :value="asItem(row).weidianItemId" />
       </template>
