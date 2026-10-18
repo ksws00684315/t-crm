@@ -167,6 +167,7 @@ cmd_up() {
   echo "管理端    http://localhost:8890"
   echo "达人端    http://localhost:8891"
   echo "跳转服务  http://localhost:8892  （/t/…、/i/…、/healthz）"
+  echo "提示：平台管理员只能管理公司。要看业务功能，请先在「公司管理」中为默认公司创建超级管理员，再用超级管理员登录。"
 }
 
 cmd_down() {
@@ -177,13 +178,13 @@ cmd_down() {
 cmd_reset() {
   local reply
   require_docker
-  printf '将删除预览环境的数据卷和 deploy/.env.preview。输入 yes 确认：'
+  printf '将删除预览环境的数据卷、预览镜像和 deploy/.env.preview。输入 yes 确认：'
   read -r reply
   if [[ "$reply" != "yes" ]]; then
     echo "已取消。" >&2
     exit 1
   fi
-  compose down -v
+  compose down -v --rmi local
   rm -f "$ENV_FILE"
   echo "预览环境已清空。"
 }

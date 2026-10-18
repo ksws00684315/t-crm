@@ -31,7 +31,7 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 ```bash
 deploy/scripts/preview.sh up      # 构建并启动。可在任意目录执行（脚本按自身位置定位仓库根）
 deploy/scripts/preview.sh down    # 停止容器，保留数据卷；下次 up 数据还在
-deploy/scripts/preview.sh reset   # 停止并删除数据卷与 deploy/.env.preview，回到全新状态；须输入 yes
+deploy/scripts/preview.sh reset   # 停止并删除数据卷、预览镜像与 deploy/.env.preview，回到全新状态；须输入 yes
 ```
 
 | 站点 | 地址 |
