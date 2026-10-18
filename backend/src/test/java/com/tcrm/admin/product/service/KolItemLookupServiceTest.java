@@ -19,6 +19,7 @@ import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
 import com.tcrm.admin.product.model.ProductDO;
+import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,6 +31,8 @@ class KolItemLookupServiceTest {
     TableInfoHelper.initTableInfo(
         new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolItemDO.class);
   }
+
+  private static final Instant INSTANT = Instant.parse("2026-10-18T00:00:00Z");
 
   private final KolItemMapper items = mock(KolItemMapper.class);
   private final ProductMapper products = mock(ProductMapper.class);
@@ -131,5 +134,14 @@ class KolItemLookupServiceTest {
     assertThat(new KolItemLookupService(unused, products).listRefsByIds(List.of())).isEmpty();
     assertThat(new KolItemLookupService(unused, products).listRefsByIds(null)).isEmpty();
     verifyNoInteractions(unused);
+  }
+
+  @Test
+  void shouldDelegateCloseCurrentMappingsForKol_toTheMapperUpdate() {
+    when(items.closeCurrentByKol(10L, INSTANT, 7L)).thenReturn(3);
+    assertThat(service.closeCurrentMappingsForKol(10L, INSTANT, 7L)).isEqualTo(3);
+    assertThat(service.closeCurrentMappingsForKol(null, INSTANT, 7L)).isZero();
+    assertThat(service.closeCurrentMappingsForKol(10L, null, 7L)).isZero();
+    verify(items).closeCurrentByKol(10L, INSTANT, 7L);
   }
 }

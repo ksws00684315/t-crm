@@ -12,9 +12,11 @@ import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.service.KolWriter;
 import com.tcrm.admin.link.service.LinkIndexSyncJob;
+import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.shared.TenantScope;
 import java.io.ByteArrayOutputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +101,7 @@ class PromoSheetIT {
   private final KolWriter kolWriter;
   private final KolAccountStore accounts;
   private final BCryptPasswordEncoder passwords;
+  private final KolItemApi items;
 
   @Autowired
   PromoSheetIT(
@@ -109,7 +112,8 @@ class PromoSheetIT {
       LinkIndexSyncJob sync,
       KolWriter kolWriter,
       KolAccountStore accounts,
-      BCryptPasswordEncoder passwords) {
+      BCryptPasswordEncoder passwords,
+      KolItemApi items) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
@@ -118,6 +122,7 @@ class PromoSheetIT {
     this.kolWriter = kolWriter;
     this.accounts = accounts;
     this.passwords = passwords;
+    this.items = items;
   }
 
   private String adminToken;
@@ -562,6 +567,34 @@ class PromoSheetIT {
                 .at("/data/inserted")
                 .asInt())
         .isEqualTo(2);
+  }
+
+  @Test
+  void shouldCloseSheetUploadMappings_withoutProductOnIdleCleanup() throws Exception {
+    long kolA = seed()[0];
+    // Confirm an upload: one mapping with an original product, one without (both SHEET_UPLOAD).
+    JsonNode preview = upload(kolA, sampleSheet(), adminToken).at("/data");
+    String uploadId = preview.at("/uploadId").asString();
+    assertThat(confirmRaw(kolA, uploadId, adminToken).getResponse().getStatus()).isEqualTo(200);
+
+    // Task 25a idle cleanup ends every current mapping of the KOL; a null product_id and the
+    // SHEET_UPLOAD source must not change that (the SQL filters only on kol_id + valid_to).
+    Instant before = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+    int closed = items.closeCurrentMappingsForKol(kolA, before, null);
+    assertThat(closed).isEqualTo(2);
+    Integer open =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NULL",
+            Integer.class,
+            kolA);
+    assertThat(open).isZero();
+    Integer closedWithoutProduct =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NOT NULL"
+                + " AND product_id IS NULL AND source = 'SHEET_UPLOAD'",
+            Integer.class,
+            kolA);
+    assertThat(closedWithoutProduct).isEqualTo(1);
   }
 
   private String kolLogin(String email, String password) throws Exception {
