@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { routes } from "@/router/routes";
 import enUS from "../en-US";
@@ -14,6 +16,31 @@ function flattenKeys(value: object, prefix = ""): string[] {
 }
 
 describe("message packs", () => {
+  it("shows SparkTrack everywhere and keeps T-CRM out (task 32 §2.4)", () => {
+    expect(zhCN.app.title).toBe("SparkTrack Creator Portal");
+    expect(enUS.app.title).toBe("SparkTrack Creator Portal");
+    const flatten = (values: unknown): string[] =>
+      typeof values === "string"
+        ? [values]
+        : values && typeof values === "object"
+          ? Object.values(values).flatMap(flatten)
+          : [];
+    for (const [locale, pack] of [
+      ["zh-CN", zhCN],
+      ["en-US", enUS]
+    ] as const) {
+      for (const sentence of flatten(pack)) {
+        expect(sentence.includes("T-CRM"), `${locale}: ${sentence}`).toBe(false);
+      }
+    }
+  });
+
+  it("keeps T-CRM out of the document title", () => {
+    const html = readFileSync(resolve(__dirname, "../../../index.html"), "utf8");
+    expect(html).not.toContain("T-CRM");
+    expect(html).toContain("SparkTrack");
+  });
+
   it("has exactly the same keys in en-US and zh-CN (typecheck guards this too)", () => {
     expect(flattenKeys(zhCN)).toEqual(flattenKeys(enUS));
   });

@@ -215,7 +215,7 @@ describe("login page", () => {
     useLocaleStore().setLocale("en-US");
     await nextTick();
     const text = wrapper.text();
-    expect(text).toContain("T-CRM Admin");
+    expect(text).toContain("SparkTrack Admin");
     expect(text).toContain("Username");
     expect(text).toContain("Password");
     expect(text).toContain("Sign in");

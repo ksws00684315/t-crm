@@ -35,6 +35,53 @@ vi.mock("@/stores/user", () => ({
   }
 }));
 
+describe("layout header (task 32 §2.4)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    setActivePinia(createPinia());
+  });
+
+  it("drops the refresh, fullscreen, lock and theme buttons; keeps the rest", async () => {
+    storeState.user = {
+      id: "1",
+      username: "alice",
+      nickname: "Alice",
+      email: null,
+      role: "SUPER_ADMIN",
+      postTemplate: null,
+      permissions: [],
+      dataScope: "ALL",
+      tenantId: "1",
+      tenantName: "北美公司",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-05T00:00:00Z"
+    } satisfies UserVO;
+    const router = createRouter({ history: createMemoryHistory(), routes });
+    await router.push("/home");
+    const wrapper = mount(Layout, {
+      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
+    });
+    for (const removed of ["refresh-page", "fullscreen", "lock", "theme"]) {
+      expect(wrapper.find(`[data-test="${removed}"]`).exists()).toBe(false);
+    }
+    // What the owner kept: menu search, bell, locale, company switch, user menu, tab bar.
+    expect(wrapper.find('[data-test="menu-search"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "NotificationBell" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "LocaleSwitch" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "TabBar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "LockScreen" }).exists()).toBe(false);
+    // The user menu no longer offers locking or idle times.
+    const userMenuText = wrapper.text();
+    expect(userMenuText).not.toContain("锁定屏幕");
+    expect(userMenuText).not.toContain("自动锁定");
+    expect(wrapper.text()).toContain("SparkTrack 管理端");
+    wrapper.unmount();
+  });
+});
+
 describe("layout tenant label", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -140,7 +187,7 @@ describe("layout tenant label", () => {
     });
     await nextTick();
     const text = wrapper.text();
-    expect(text).toContain("T-CRM Admin");
+    expect(text).toContain("SparkTrack Admin");
     expect(text).toContain("Home");
     expect(text).toContain("Creators");
     expect(text).toContain("Super Admin");

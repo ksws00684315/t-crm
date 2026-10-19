@@ -6,7 +6,7 @@
  */
 const enUS = {
   app: {
-    title: "T-CRM Creator Portal"
+    title: "SparkTrack Creator Portal"
   },
   common: {
     language: "Language",
@@ -31,7 +31,7 @@ const enUS = {
     "zh-CN": "中文"
   },
   login: {
-    title: "T-CRM Creator Portal",
+    title: "SparkTrack Creator Portal",
     account: "Email",
     password: "Password",
     submit: "Sign in",
@@ -194,27 +194,27 @@ const enUS = {
     }
   },
   register: {
-    title: "Create your account",
+    title: "Creator registration",
+    subtitle: "Complete your profile to join the invited workspace",
     invitedBy: "Invited by {name}",
     invalidLink:
       "This registration link is invalid or has expired. Please contact your representative for a new link.",
     emailExists: "This email is already registered. Please sign in.",
     goToLogin: "Sign in",
-    inviteCode: "Business invite code",
+    inviteCode: "Invitation code",
+    inviteCodeRequired: "Enter the invitation code.",
+    inviteCodeReadonly: "Filled from your invitation link",
     codeInvalid: "Enter a valid 8-character invite code.",
     invalidCode: "This invite code is invalid. Check it and try again.",
     tryLater: "Too many attempts. Please try again later.",
+    name: "Name",
     nameRequired: "Enter your account name (up to 64 characters).",
     socialPairRequired: "Enter both a primary platform and account name, or leave both blank.",
-    sendCode: "Send code",
-    resendIn: "Resend in {seconds}s",
-    emailCode: "Verification code",
-    emailCodeInvalid: "Enter the 6-digit verification code.",
-    whatsapp: "WhatsApp",
+    whatsapp: "WhatsApp (optional)",
     whatsappInvalid: "Enter a WhatsApp number starting with + and 8–15 digits.",
     phone: "Phone number (optional)",
     phoneInvalid: "Enter a phone number starting with + and 8–15 digits.",
-    platformLabel: "Primary platform",
+    platformLabel: "Main platform (optional)",
     platformPlaceholder: "Select a platform",
     platforms: {
       TikTok: "TikTok",
@@ -224,14 +224,8 @@ const enUS = {
       Facebook: "Facebook",
       Other: "Other"
     },
-    handle: "Account name",
-    profileUrl: "Profile URL (optional)",
-    urlInvalid: "Profile URL must start with https://.",
-    more: "More (optional)",
-    name: "Name",
-    country: "Country",
-    countryInvalid: "Use a 2-letter country code, or leave it blank.",
-    submit: "Create account"
+    handle: "Social account",
+    submit: "Create creator account"
   },
   errors: {
     COMMON_VALIDATION_FAILED:

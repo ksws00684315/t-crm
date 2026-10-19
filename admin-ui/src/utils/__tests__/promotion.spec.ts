@@ -105,7 +105,6 @@ describe("missing and incomplete promotion fields", () => {
         defaultRate: "0.1000",
         inviteCode: "ADA",
         platforms: [{ templateId: "7", address: "https://shop.example/ada" }],
-        jumpTemplateId: "7",
         sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
         review: true
       })
@@ -115,7 +114,6 @@ describe("missing and incomplete promotion fields", () => {
         defaultRate: "0.1",
         inviteCode: "ADA",
         platforms: [{ templateId: "7", address: "" }],
-        jumpTemplateId: "7",
         sheetUrl: "sheet",
         review: true
       })

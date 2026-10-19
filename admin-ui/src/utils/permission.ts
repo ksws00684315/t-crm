@@ -283,22 +283,18 @@ export function buildMenu(routes: readonly RouteRecordRaw[], access: AccessProfi
 
 /** What the KOL pages show. The backend enforces the same rules. */
 export interface KolAbilities {
-  /** Create, edit, enable/disable and import. */
+  /** Edit profiles, review, commission, cleanup and freeze. */
   canWrite: boolean;
-  /** Move a creator to another BD. Super administrator only. */
-  canChangeBd: boolean;
   /** Pick a BD while creating or importing. Super administrator, or kol:edit outside OWN. */
   canAssignBd: boolean;
   /** Filter the list by BD. kol:view outside OWN. */
   canFilterBd: boolean;
   /** Show and rotate the caller's creator registration link. */
   canRegisterLink: boolean;
+  /** Open the "invite creator" dialog: the BD conditions above, or the super administrator. */
+  canInviteKol: boolean;
   /** Generate, reveal and revoke copy tokens. */
   canCopyToken: boolean;
-  /** Claim an unassigned creator. Available BDs only (enabled STAFF, OWN scope, kol:edit). */
-  canClaimKol: boolean;
-  /** Edit the cleanup configuration and see its preview. kol:edit with the ALL data scope. */
-  canManageCleanup: boolean;
 }
 
 export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilities {
@@ -306,30 +302,28 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
   if (!user) {
     return {
       canWrite: false,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: false,
-      canManageCleanup: false
+      canInviteKol: false,
+      canCopyToken: false
     };
   }
   const canEdit = access.can("kol:edit");
+  const canRegisterLink =
+    user.status === 1 &&
+    user.role === "STAFF" &&
+    access.isOwnScope &&
+    canEdit &&
+    access.can("kol:register-link");
   return {
     canWrite: canEdit,
-    canChangeBd: access.isSuperAdmin,
     canAssignBd: access.isSuperAdmin || (canEdit && !access.isOwnScope),
     canFilterBd: access.can("kol:view") && !access.isOwnScope,
-    canRegisterLink:
-      user.status === 1 &&
-      user.role === "STAFF" &&
-      access.isOwnScope &&
-      canEdit &&
-      access.can("kol:register-link"),
-    canCopyToken: access.can("kol:copy-token"),
-    canClaimKol: user.status === 1 && user.role === "STAFF" && access.isOwnScope && canEdit,
-    canManageCleanup: canEdit && !access.isOwnScope
+    canRegisterLink,
+    // Task 33 §3.1 lets the super administrator keep an invitation code of their own.
+    canInviteKol: access.isSuperAdmin || canRegisterLink,
+    canCopyToken: access.can("kol:copy-token")
   };
 }
 

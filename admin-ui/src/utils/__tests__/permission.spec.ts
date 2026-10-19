@@ -166,21 +166,31 @@ describe("buildMenu", () => {
   it("shows every company page to the super administrator", () => {
     expect(titles(superAdmin)).toEqual([
       "首页",
-      "达人管理",
-      "转移记录",
-      "商品",
+      "经营分析",
+      "店铺表现",
+      "畅销商品",
+      "达人排行",
+      "邀请人业绩",
+      "商品管理",
       "店铺管理",
-      "原商品",
-      "对应关系",
-      "商品源表",
-      "复制令牌",
-      "订单",
-      "订单列表",
-      "人工匹配池",
-      "资金",
-      "收款账户审核",
-      "用户管理",
-      "代购平台模板",
+      "Token管理",
+      "商品任务",
+      "订单管理",
+      "订单查询",
+      "退款查询",
+      "达人管理",
+      "达人列表",
+      "达人商品",
+      "达人收入",
+      "财务结算",
+      "达人提现",
+      "结算明细",
+      "结算配置",
+      "系统管理",
+      "账号管理",
+      "权限设置",
+      "平台维护",
+      "上传文件",
       "操作日志"
     ]);
     const items = buildMenu(routes, accessOf(superAdmin));
@@ -189,56 +199,102 @@ describe("buildMenu", () => {
     );
     expect(paths).toEqual([
       "/home",
-      "/kol/kols",
-      "/kol/bd-transfers",
+      "/analytics/shop-performance",
+      "/analytics/best-sellers",
+      "/analytics/kol-ranking",
+      "/analytics/inviter-performance",
       "/product/shops",
-      "/product/products",
-      "/product/kol-items",
-      "/product/sheet-sources",
       "/product/copy-tokens",
+      "/product/tasks",
       "/order/orders",
-      "/order/unmatched",
-      "/fund/payout-accounts",
+      "/order/refunds",
+      "/kol/kols",
+      "/kol/kol-items",
+      "/kol/income",
+      "/fund/payouts",
+      "/fund/settlement-details",
+      "/fund/settlement-config",
       "/system/users",
+      "/system/post-templates",
       "/system/link-templates",
+      "/system/tasks",
       "/system/oper-logs"
     ]);
   });
 
-  it("shows only home and creators to a sub-account that has kol:view", () => {
-    expect(titles(staff("ALL", ["kol:view"]))).toEqual(["首页", "达人管理"]);
-    expect(titles(staff("OWN", ["kol:view"]))).toEqual(["首页", "达人管理"]);
+  it("shows home, the creator list and uploads to a sub-account that has kol:view", () => {
+    // Uploads carries no permission code: every company account sees its own import tasks.
+    expect(titles(staff("ALL", ["kol:view"]))).toEqual([
+      "首页",
+      "达人管理",
+      "达人列表",
+      "系统管理",
+      "上传文件"
+    ]);
+    expect(titles(staff("OWN", ["kol:view"]))).toEqual([
+      "首页",
+      "达人管理",
+      "达人列表",
+      "系统管理",
+      "上传文件"
+    ]);
   });
 
-  it("hides mapping for an OWN sub-account that can view products", () => {
+  it("hides creator products for an OWN sub-account that can view products", () => {
     expect(titles(staff("ALL", ["product:view"]))).toEqual([
       "首页",
-      "商品",
+      "商品管理",
       "店铺管理",
-      "原商品",
-      "对应关系",
-      "商品源表"
+      "商品任务",
+      "达人管理",
+      "达人商品",
+      "系统管理",
+      "上传文件"
     ]);
-    expect(titles(staff("OWN", ["product:view"]))).toEqual(["首页", "商品", "店铺管理", "原商品"]);
+    expect(titles(staff("OWN", ["product:view"]))).toEqual([
+      "首页",
+      "商品管理",
+      "店铺管理",
+      "商品任务",
+      "系统管理",
+      "上传文件"
+    ]);
   });
 
-  it("shows the payout-account review to either of its two permission codes", () => {
-    const expected = ["首页", "资金", "收款账户审核"];
-    expect(titles(staff("ALL", ["payout-account:review"]))).toEqual(expected);
-    expect(titles(staff("OWN", ["commission:view"]))).toEqual(expected);
+  it("shows the payouts page to either of its two permission codes", () => {
+    expect(titles(staff("ALL", ["payout-account:review"]))).toEqual([
+      "首页",
+      "财务结算",
+      "达人提现",
+      "系统管理",
+      "上传文件"
+    ]);
+    // commission:view also opens the creator-income and settlement placeholders.
+    expect(titles(staff("OWN", ["commission:view"]))).toEqual([
+      "首页",
+      "达人管理",
+      "达人收入",
+      "财务结算",
+      "达人提现",
+      "结算明细",
+      "结算配置",
+      "系统管理",
+      "上传文件"
+    ]);
   });
 
   it("hides the payout-account review without either permission code", () => {
-    expect(titles(staff("ALL", ["kol:view"]))).not.toContain("资金");
+    expect(titles(staff("ALL", ["kol:view"]))).not.toContain("财务结算");
   });
 
-  it("shows the order list but not the matching pool without order:manage", () => {
-    expect(titles(staff("ALL", ["order:view"]))).toEqual(["首页", "订单", "订单列表"]);
-    expect(titles(staff("ALL", ["order:view", "order:manage"]))).toEqual([
+  it("shows order query to anyone with order:view (the pool is a tab now)", () => {
+    expect(titles(staff("ALL", ["order:view"]))).toEqual([
       "首页",
-      "订单",
-      "订单列表",
-      "人工匹配池"
+      "订单管理",
+      "订单查询",
+      "退款查询",
+      "系统管理",
+      "上传文件"
     ]);
   });
 
@@ -292,86 +348,63 @@ describe("canAccessRoute", () => {
 });
 
 describe("kolAbilities", () => {
-  it("follows the permission matrix for creators", () => {
+  it("follows the permission matrix for creators (task 32 §2.2)", () => {
     expect(kolAbilities(null)).toEqual({
       canWrite: false,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: false,
-      canManageCleanup: false
+      canInviteKol: false,
+      canCopyToken: false
     });
     expect(kolAbilities(superAdmin)).toEqual({
       canWrite: true,
-      canChangeBd: true,
       canAssignBd: true,
       canFilterBd: true,
       canRegisterLink: false,
-      canCopyToken: true,
-      canClaimKol: false,
-      canManageCleanup: true
+      // The super administrator keeps an invitation code of their own (task 33 §3.1).
+      canInviteKol: true,
+      canCopyToken: true
     });
     expect(kolAbilities(staff("ALL", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
-      canChangeBd: false,
       canAssignBd: true,
       canFilterBd: true,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: false,
-      canManageCleanup: true
+      canInviteKol: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"]))).toEqual({
       canWrite: true,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: true,
-      canManageCleanup: false
+      canInviteKol: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit", "kol:register-link"]))).toEqual({
       canWrite: true,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: true,
-      canCopyToken: false,
-      canClaimKol: true,
-      canManageCleanup: false
+      canInviteKol: true,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("ALL", ["kol:view"]))).toEqual({
       canWrite: false,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: true,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: false,
-      canManageCleanup: false
+      canInviteKol: false,
+      canCopyToken: false
     });
     expect(kolAbilities(staff("OWN", ["kol:register-link"]))).toEqual({
       canWrite: false,
-      canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
       canRegisterLink: false,
-      canCopyToken: false,
-      canClaimKol: false,
-      canManageCleanup: false
-    });
-    expect(kolAbilities(staff("OWN", ["kol:copy-token"]))).toEqual({
-      canWrite: false,
-      canChangeBd: false,
-      canAssignBd: false,
-      canFilterBd: false,
-      canRegisterLink: false,
-      canCopyToken: true,
-      canClaimKol: false,
-      canManageCleanup: false
+      canInviteKol: false,
+      canCopyToken: false
     });
   });
 
@@ -380,19 +413,6 @@ describe("kolAbilities", () => {
     expect(
       kolAbilities(staff("OWN", ["kol:view", "kol:edit", "kol:register-link"])).canRegisterLink
     ).toBe(true);
-  });
-
-  it("gives claiming only to an enabled OWN-scope BD with kol:edit (25a §4.4)", () => {
-    const bd = { role: "STAFF" as const, dataScope: "OWN" as const, permissions: ["kol:edit"] };
-    expect(kolAbilities({ ...bd, status: 1 })).toEqual(
-      expect.objectContaining({ canClaimKol: true })
-    );
-    expect(kolAbilities({ ...bd, status: 0 })).toEqual(
-      expect.objectContaining({ canClaimKol: false })
-    );
-    expect(kolAbilities({ role: "STAFF", dataScope: "OWN", permissions: [] })).toEqual(
-      expect.objectContaining({ canClaimKol: false })
-    );
   });
 });
 

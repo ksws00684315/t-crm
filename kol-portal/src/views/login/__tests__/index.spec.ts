@@ -25,7 +25,7 @@ describe("login page", () => {
 
   it("renders English by default", async () => {
     const wrapper = await mountPage();
-    expect(wrapper.find("h1").text()).toBe("T-CRM Creator Portal");
+    expect(wrapper.find("h1").text()).toBe("SparkTrack Creator Portal");
     expect(wrapper.text()).toContain("Email");
     expect(wrapper.text()).toContain("Password");
     expect(wrapper.text()).toContain("Sign in");
@@ -39,7 +39,7 @@ describe("login page", () => {
     const wrapper = await mountPage();
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(wrapper.find("h1").text()).toBe("T-CRM Creator Portal");
+    expect(wrapper.find("h1").text()).toBe("SparkTrack Creator Portal");
     expect(wrapper.text()).toContain("邮箱");
     expect(wrapper.text()).toContain("密码");
     expect(wrapper.text()).toContain("登录");

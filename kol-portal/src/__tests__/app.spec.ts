@@ -48,9 +48,9 @@ describe("app root", () => {
     await mountApp();
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(document.title).toBe("登录 | T-CRM Creator Portal");
+    expect(document.title).toBe("登录 | SparkTrack Creator Portal");
     useLocaleStore().setLocale("en-US");
     await nextTick();
-    expect(document.title).toBe("Sign in | T-CRM Creator Portal");
+    expect(document.title).toBe("Sign in | SparkTrack Creator Portal");
   });
 });

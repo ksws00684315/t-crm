@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
  * takes its UI copy from the message packs.
  */
 const ALLOWLIST: Readonly<Record<string, string>> = {
-  "utils/bd-transfer.ts":
-    "Lookup keys only: the backend stores BD transfer cancel reasons verbatim in Chinese (design §4.13); the file maps them to language-pack codes and renders nothing itself."
+  "views/system/oper-log/index.vue":
+    "Lookup key only: the quick filter matches the Chinese word the backend writes into BD-transfer summaries (task 33 §3.3); the constant renders nothing itself."
 };
 
 const CHINESE = /[\u4e00-\u9fff]/;

@@ -4,6 +4,10 @@ import type { RouteRecordRaw } from "vue-router";
  * Static routes. Access is `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
  * The menu is derived from the same data; nothing is fetched from the backend.
  * Company home has no permission code: every company account may open it.
+ *
+ * The tree follows the owner's 2026-10-20 menu decision (task 32 §2.1): seven first-level
+ * groups mirroring the original system. Pages still under construction render the shared
+ * coming-soon component; they stay in the menu.
  */
 export const routes: RouteRecordRaw[] = [
   {
@@ -39,26 +43,56 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
-        path: "kol/kols",
-        name: "KolList",
-        component: () => import("@/views/kol/index.vue"),
+        path: "analytics",
+        name: "AnalyticsGroup",
+        redirect: "/analytics/shop-performance",
         meta: {
-          title: "route.kols",
-          icon: "Avatar",
-          permission: "kol:view",
-          componentName: "KolListPage"
-        }
-      },
-      {
-        path: "kol/bd-transfers",
-        name: "KolBdTransfers",
-        component: () => import("@/views/kol/bd-transfers/index.vue"),
-        meta: {
-          title: "route.bdTransfers",
-          icon: "Switch",
-          superAdmin: true,
-          componentName: "KolBdTransferPage"
-        }
+          title: "route.analytics",
+          icon: "TrendCharts",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "shop-performance",
+            name: "AnalyticsShopPerformance",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.shopPerformance",
+              permission: "dashboard:shop",
+              componentName: "ComingSoonPage"
+            }
+          },
+          {
+            path: "best-sellers",
+            name: "AnalyticsBestSellers",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.bestSellers",
+              permission: "dashboard:shop",
+              componentName: "ComingSoonPage"
+            }
+          },
+          {
+            path: "kol-ranking",
+            name: "AnalyticsKolRanking",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.kolRanking",
+              permission: "dashboard:kol",
+              componentName: "ComingSoonPage"
+            }
+          },
+          {
+            path: "inviter-performance",
+            name: "AnalyticsInviterPerformance",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.inviterPerformance",
+              permission: "dashboard:team",
+              componentName: "ComingSoonPage"
+            }
+          }
+        ]
       },
       {
         path: "product",
@@ -72,44 +106,12 @@ export const routes: RouteRecordRaw[] = [
         children: [
           {
             path: "shops",
-            name: "ShopList",
-            component: () => import("@/views/product/shop/index.vue"),
+            name: "ShopManagement",
+            component: () => import("@/views/product/shop-management/index.vue"),
             meta: {
-              title: "route.shops",
+              title: "route.shopManagement",
               permission: "product:view",
-              componentName: "ShopListPage"
-            }
-          },
-          {
-            path: "products",
-            name: "ProductList",
-            component: () => import("@/views/product/product/index.vue"),
-            meta: {
-              title: "route.product",
-              permission: "product:view",
-              componentName: "ProductListPage"
-            }
-          },
-          {
-            path: "kol-items",
-            name: "KolItemList",
-            component: () => import("@/views/product/kol-item/index.vue"),
-            meta: {
-              title: "route.mappings",
-              permission: "product:view",
-              hideForOwn: true,
-              componentName: "KolItemListPage"
-            }
-          },
-          {
-            path: "sheet-sources",
-            name: "SheetSourceList",
-            component: () => import("@/views/product/sheet-source/index.vue"),
-            meta: {
-              title: "route.sheetSources",
-              permission: "product:view",
-              hideForOwn: true,
-              componentName: "SheetSourcePage"
+              componentName: "ShopManagementPage"
             }
           },
           {
@@ -120,6 +122,16 @@ export const routes: RouteRecordRaw[] = [
               title: "route.copyTokens",
               permission: "kol:copy-token",
               componentName: "CopyTokenPage"
+            }
+          },
+          {
+            path: "tasks",
+            name: "ProductTasks",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.productTasks",
+              permission: "product:view",
+              componentName: "ComingSoonPage"
             }
           }
         ]
@@ -136,22 +148,65 @@ export const routes: RouteRecordRaw[] = [
         children: [
           {
             path: "orders",
-            name: "OrderList",
-            component: () => import("@/views/order/index.vue"),
+            name: "OrderQuery",
+            component: () => import("@/views/order/order-query/index.vue"),
             meta: {
-              title: "route.orderList",
+              title: "route.orderQuery",
               permission: "order:view",
-              componentName: "OrderListPage"
+              componentName: "OrderQueryPage"
             }
           },
           {
-            path: "unmatched",
-            name: "OrderUnmatched",
-            component: () => import("@/views/order/unmatched.vue"),
+            path: "refunds",
+            name: "OrderRefunds",
+            component: () => import("@/views/common/ComingSoon.vue"),
             meta: {
-              title: "route.orderUnmatched",
-              permission: "order:manage",
-              componentName: "OrderUnmatchedPage"
+              title: "route.refundQuery",
+              permission: "order:view",
+              componentName: "ComingSoonPage"
+            }
+          }
+        ]
+      },
+      {
+        path: "kol",
+        name: "KolGroup",
+        redirect: "/kol/kols",
+        meta: {
+          title: "route.kolManage",
+          icon: "Avatar",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "kols",
+            name: "KolList",
+            component: () => import("@/views/kol/index.vue"),
+            meta: {
+              title: "route.kols",
+              permission: "kol:view",
+              componentName: "KolListPage"
+            }
+          },
+          {
+            path: "kol-items",
+            name: "KolItemList",
+            component: () => import("@/views/product/kol-item/index.vue"),
+            meta: {
+              title: "route.kolItems",
+              permission: "product:view",
+              hideForOwn: true,
+              componentName: "KolItemListPage"
+            }
+          },
+          {
+            path: "income",
+            name: "KolIncome",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.kolIncome",
+              permission: "commission:view",
+              componentName: "ComingSoonPage"
             }
           }
         ]
@@ -159,7 +214,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: "fund",
         name: "FundGroup",
-        redirect: "/fund/payout-accounts",
+        redirect: "/fund/payouts",
         meta: {
           title: "route.fund",
           icon: "Wallet",
@@ -167,50 +222,98 @@ export const routes: RouteRecordRaw[] = [
         },
         children: [
           {
-            path: "payout-accounts",
-            name: "PayoutAccountReview",
-            component: () => import("@/views/fund/payout-account/index.vue"),
+            path: "payouts",
+            name: "FundPayouts",
+            component: () => import("@/views/fund/payout/index.vue"),
             meta: {
-              title: "route.payoutAccounts",
+              title: "route.payouts",
               // Either code opens the page; the review drawer itself needs payout-account:review.
               permission: ["payout-account:review", "commission:view"],
-              componentName: "PayoutAccountReviewPage"
+              componentName: "FundPayoutPage"
+            }
+          },
+          {
+            path: "settlement-details",
+            name: "FundSettlementDetails",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.settlementDetails",
+              permission: "commission:view",
+              componentName: "ComingSoonPage"
+            }
+          },
+          {
+            path: "settlement-config",
+            name: "FundSettlementConfig",
+            component: () => import("@/views/common/ComingSoon.vue"),
+            meta: {
+              title: "route.settlementConfig",
+              permission: "commission:view",
+              componentName: "ComingSoonPage"
             }
           }
         ]
       },
       {
-        path: "system/users",
-        name: "SystemUsers",
-        component: () => import("@/views/system/user/index.vue"),
+        path: "system",
+        name: "SystemGroup",
+        redirect: "/system/users",
         meta: {
-          title: "route.users",
-          icon: "UserFilled",
-          superAdmin: true,
-          componentName: "SystemUserPage"
-        }
-      },
-      {
-        path: "system/link-templates",
-        name: "SystemLinkTemplates",
-        component: () => import("@/views/system/link-template/index.vue"),
-        meta: {
-          title: "route.linkTemplates",
-          icon: "Link",
-          superAdmin: true,
-          componentName: "SystemLinkTemplatePage"
-        }
-      },
-      {
-        path: "system/oper-logs",
-        name: "SystemOperLogs",
-        component: () => import("@/views/system/oper-log/index.vue"),
-        meta: {
-          title: "route.auditLogs",
-          icon: "Document",
-          superAdmin: true,
-          componentName: "SystemOperLogPage"
-        }
+          title: "route.system",
+          icon: "Setting",
+          menuGroup: true
+        },
+        children: [
+          {
+            path: "users",
+            name: "SystemUsers",
+            component: () => import("@/views/system/user/index.vue"),
+            meta: {
+              title: "route.users",
+              superAdmin: true,
+              componentName: "SystemUserPage"
+            }
+          },
+          {
+            path: "post-templates",
+            name: "SystemPostTemplates",
+            component: () => import("@/views/system/post-template/index.vue"),
+            meta: {
+              title: "route.postTemplates",
+              superAdmin: true,
+              componentName: "SystemPostTemplatePage"
+            }
+          },
+          {
+            path: "link-templates",
+            name: "SystemLinkTemplates",
+            component: () => import("@/views/system/link-template/index.vue"),
+            meta: {
+              title: "route.linkTemplates",
+              superAdmin: true,
+              componentName: "SystemLinkTemplatePage"
+            }
+          },
+          {
+            path: "tasks",
+            name: "SystemTasks",
+            component: () => import("@/views/system/import-task/index.vue"),
+            meta: {
+              title: "route.importTasks",
+              componentName: "SystemImportTaskPage"
+            }
+          },
+          {
+            path: "oper-logs",
+            name: "SystemOperLogs",
+            component: () => import("@/views/system/oper-log/index.vue"),
+            meta: {
+              title: "route.auditLogs",
+              superAdmin: true,
+              componentName: "SystemOperLogPage"
+            }
+          }
+        ]
       },
       {
         path: "notifications",
@@ -239,6 +342,28 @@ export const routes: RouteRecordRaw[] = [
           componentName: "ForbiddenPage",
           noTab: true
         }
+      },
+      // Merged and removed pages keep working as redirects, so bookmarks, notification links
+      // and restored tabs land on the new location (task 32 §2.1).
+      {
+        path: "product/products",
+        redirect: "/product/shops"
+      },
+      {
+        path: "product/sheet-sources",
+        redirect: "/product/shops"
+      },
+      {
+        path: "order/unmatched",
+        redirect: "/order/orders"
+      },
+      {
+        path: "fund/payout-accounts",
+        redirect: "/fund/payouts"
+      },
+      {
+        path: "kol/bd-transfers",
+        redirect: "/system/oper-logs"
       }
     ]
   },

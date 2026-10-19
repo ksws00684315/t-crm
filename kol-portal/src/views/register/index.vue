@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { previewRegister, registerKol, sendRegisterCode } from "@/api/register";
+import { previewRegister, registerKol } from "@/api/register";
 import AuthShell from "@/components/AuthShell.vue";
 import { useSessionStore } from "@/stores/session";
 import { validEmail, validPassword } from "@/utils/auth";
@@ -11,6 +11,12 @@ import { useSubmission } from "@/utils/useSubmission";
 
 defineOptions({ name: "RegisterPage" });
 
+/**
+ * Registration form after 02.01 (task 32 §2.5): invitation code on top, then the required
+ * account name / email / password / confirm password, then the optional phone, WhatsApp, main
+ * platform and social account. No e-mail verification step and no country field. Through a
+ * link the code is pre-filled and read-only; from the login page it is empty and required.
+ */
 const platforms = ["TikTok", "Instagram", "YouTube", "X", "Facebook", "Other"] as const;
 const { t } = useI18n();
 const route = useRoute();
@@ -19,26 +25,22 @@ const session = useSessionStore();
 const linkedCode = computed(() => (typeof route.query.code === "string" ? route.query.code : ""));
 const code = ref(linkedCode.value.toUpperCase());
 const bdUserName = ref("");
+const tenantName = ref("");
 const linkState = ref<"checking" | "ready" | "invalid" | "empty">(
   linkedCode.value ? "checking" : "empty"
 );
 const previewError = ref("");
+const name = ref("");
 const email = ref("");
-const emailCode = ref("");
 const password = ref("");
 const confirm = ref("");
 const whatsapp = ref("");
 const phone = ref("");
 const platform = ref("");
 const handle = ref("");
-const profileUrl = ref("");
-const name = ref("");
-const country = ref("");
-const seconds = ref(0);
 const emailExists = ref(false);
 const { busy, validation, errorText, submit } = useSubmission();
 const rateLimitError = ref("");
-let timer: ReturnType<typeof setInterval> | undefined;
 
 function blank(value: string): string | null {
   const trimmed = value.trim();
@@ -52,19 +54,18 @@ async function loadPreview() {
   if (!code.value) {
     linkState.value = "empty";
     bdUserName.value = "";
+    tenantName.value = "";
     return;
   }
   if (!/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code.value)) {
     linkState.value = "invalid";
     return;
   }
-  if (code.value.length !== 8) {
-    linkState.value = "invalid";
-    return;
-  }
   linkState.value = "checking";
   try {
-    bdUserName.value = (await previewRegister(code.value)).bdUserName;
+    const preview = await previewRegister(code.value);
+    bdUserName.value = preview.bdUserName ?? "";
+    tenantName.value = preview.tenantName ?? "";
     linkState.value = "ready";
   } catch (error) {
     linkState.value = "invalid";
@@ -73,50 +74,19 @@ async function loadPreview() {
   }
 }
 
-function startCountdown() {
-  seconds.value = 60;
-  if (timer) clearInterval(timer);
-  timer = setInterval(() => {
-    seconds.value -= 1;
-    if (seconds.value <= 0 && timer) clearInterval(timer);
-  }, 1000);
-}
-
-function sendCode() {
-  return submit(async () => {
-    emailExists.value = false;
-    rateLimitError.value = "";
-    if (linkState.value !== "ready") {
-      validation.value = "register.codeInvalid";
-      return;
-    }
-    if (!validEmail(email.value.trim())) {
-      validation.value = "auth.emailInvalid";
-      return;
-    }
-    try {
-      await sendRegisterCode({ code: code.value, email: email.value.trim() });
-      startCountdown();
-    } catch (error) {
-      if (error instanceof ApiError && error.errorCode === "KOL_EMAIL_EXISTS") {
-        emailExists.value = true;
-        return;
-      }
-      if (error instanceof ApiError && error.status === 429) {
-        rateLimitError.value = t("register.tryLater");
-        return;
-      }
-      throw error;
-    }
-  });
-}
+/** 02.01: the code belongs to the super administrator when no BD name comes back. */
+const invitedByText = computed(() =>
+  bdUserName.value
+    ? t("register.invitedBy", { name: bdUserName.value })
+    : tenantName.value
+      ? t("register.invitedBy", { name: tenantName.value })
+      : ""
+);
 
 function register() {
   return submit(async () => {
     emailExists.value = false;
     const address = email.value.trim();
-    const url = profileUrl.value.trim();
-    const region = country.value.trim();
     if (!/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code.value)) {
       validation.value = "register.codeInvalid";
       return;
@@ -131,10 +101,6 @@ function register() {
     }
     if (!validEmail(address)) {
       validation.value = "auth.emailInvalid";
-      return;
-    }
-    if (!/^\d{6}$/.test(emailCode.value.trim())) {
-      validation.value = "register.emailCodeInvalid";
       return;
     }
     if (!validPassword(password.value)) {
@@ -157,27 +123,16 @@ function register() {
       validation.value = "register.socialPairRequired";
       return;
     }
-    if (url && !/^https:\/\/[^\s/?#]+\S*$/.test(url)) {
-      validation.value = "register.urlInvalid";
-      return;
-    }
-    if (region && !/^[A-Za-z]{2}$/.test(region)) {
-      validation.value = "register.countryInvalid";
-      return;
-    }
     try {
       const result = await registerKol({
         code: code.value,
         email: address,
-        emailCode: emailCode.value.trim(),
         password: password.value,
+        name: name.value.trim(),
         phone: blank(phone.value),
         whatsapp: blank(whatsapp.value),
         primaryPlatform: blank(platform.value),
-        primaryHandle: blank(handle.value),
-        primaryUrl: blank(url),
-        name: name.value.trim(),
-        country: blank(region)
+        primaryHandle: blank(handle.value)
       });
       session.acceptSession(result);
       await router.replace("/");
@@ -206,19 +161,17 @@ watch(
 watch(code, () => {
   if (!linkedCode.value) void loadPreview();
 });
-onUnmounted(() => {
-  if (timer) clearInterval(timer);
-});
 </script>
 
 <template>
   <AuthShell :title="t('register.title')">
+    <p class="register-subtitle">{{ t("register.subtitle") }}</p>
     <p v-if="linkedCode && linkState === 'invalid' && !previewError" class="register-invalid">
       {{ t("register.invalidLink") }}
     </p>
     <template v-else-if="!linkedCode || linkState === 'ready' || !!previewError">
-      <p v-if="linkedCode" class="register-join">
-        {{ t("register.invitedBy", { name: bdUserName }) }}
+      <p v-if="linkState === 'ready' && invitedByText" class="register-join">
+        {{ invitedByText }}
       </p>
       <p v-if="!linkedCode && linkState === 'invalid'" class="register-invalid">
         {{ t("register.invalidCode") }}
@@ -246,39 +199,21 @@ onUnmounted(() => {
             :readonly="!!linkedCode"
             :disabled="busy || !!linkedCode"
             autocomplete="off"
+            :placeholder="linkedCode ? '' : t('register.inviteCodeRequired')"
           />
+          <div v-if="linkedCode" class="register-code-note">
+            {{ t("register.inviteCodeReadonly") }}
+          </div>
         </el-form-item>
         <el-form-item :label="t('register.name')" for="register-name">
           <el-input id="register-name" v-model="name" maxlength="64" :disabled="busy" />
         </el-form-item>
         <el-form-item :label="t('auth.email')" for="register-email">
-          <div class="register-email">
-            <el-input
-              id="register-email"
-              v-model="email"
-              type="email"
-              autocomplete="email"
-              :disabled="busy"
-            />
-            <el-button
-              id="register-send"
-              native-type="button"
-              :loading="busy"
-              :disabled="busy"
-              @click="sendCode"
-              >{{
-                seconds > 0 ? t("register.resendIn", { seconds }) : t("register.sendCode")
-              }}</el-button
-            >
-          </div>
-        </el-form-item>
-        <el-form-item :label="t('register.emailCode')" for="register-email-code">
           <el-input
-            id="register-email-code"
-            v-model="emailCode"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
+            id="register-email"
+            v-model="email"
+            type="email"
+            autocomplete="email"
             :disabled="busy"
           />
         </el-form-item>
@@ -302,6 +237,9 @@ onUnmounted(() => {
             :disabled="busy"
           />
         </el-form-item>
+        <el-form-item :label="t('register.phone')" for="register-phone">
+          <el-input id="register-phone" v-model="phone" autocomplete="tel" :disabled="busy" />
+        </el-form-item>
         <el-form-item :label="t('register.whatsapp')" for="register-whatsapp">
           <el-input
             id="register-whatsapp"
@@ -310,9 +248,6 @@ onUnmounted(() => {
             placeholder="+15551234567"
             :disabled="busy"
           />
-        </el-form-item>
-        <el-form-item :label="t('register.phone')" for="register-phone">
-          <el-input id="register-phone" v-model="phone" autocomplete="tel" :disabled="busy" />
         </el-form-item>
         <el-form-item :label="t('register.platformLabel')">
           <el-select
@@ -332,22 +267,6 @@ onUnmounted(() => {
         <el-form-item :label="t('register.handle')" for="register-handle">
           <el-input id="register-handle" v-model="handle" maxlength="64" :disabled="busy" />
         </el-form-item>
-        <el-form-item :label="t('register.profileUrl')" for="register-url">
-          <el-input
-            id="register-url"
-            v-model="profileUrl"
-            type="url"
-            placeholder="https://"
-            :disabled="busy"
-          />
-        </el-form-item>
-        <el-collapse>
-          <el-collapse-item :title="t('register.more')" name="more">
-            <el-form-item :label="t('register.country')" for="register-country">
-              <el-input id="register-country" v-model="country" maxlength="2" :disabled="busy" />
-            </el-form-item>
-          </el-collapse-item>
-        </el-collapse>
         <el-button
           native-type="submit"
           type="primary"
@@ -365,18 +284,21 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.register-subtitle {
+  margin: -8px 0 20px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+}
 .register-join,
 .register-invalid {
   margin: -8px 0 20px;
   text-align: center;
 }
-.register-email {
-  display: flex;
-  gap: 8px;
+.register-code-note {
   width: 100%;
-}
-.register-email .el-input {
-  flex: 1;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 .register-platform {
   width: 100%;

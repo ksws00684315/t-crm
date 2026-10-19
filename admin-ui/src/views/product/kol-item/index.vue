@@ -3,9 +3,10 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { rebuildLinkIndex } from "@/api/link/link";
+import { listKols } from "@/api/kol/kol";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
-import type { KolItemVO, ShopVO } from "@/api/types";
+import type { KolItemVO, KolVO, ShopVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -16,6 +17,8 @@ import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { canExport, linkAbilities, productAbilities } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
+import KolLinksDrawer from "@/views/kol/KolLinksDrawer.vue";
+import PromoSheetUploadDialog from "@/views/kol/PromoSheetUploadDialog.vue";
 
 defineOptions({ name: "KolItemListPage" });
 
@@ -63,7 +66,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150, mono: true },
   { key: "source", label: t("mapping.source"), width: 120 },
   { key: "validFrom", label: t("mapping.validFrom"), width: 170, mono: true },
-  { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true }
+  { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true },
+  { key: "actions", label: t("common.actions"), width: 90 }
 ]);
 
 const sourceOptions = ["IMPORT", "SHEET_UPLOAD", "COPY"];
@@ -116,6 +120,44 @@ const chips = computed<SearchChip[]>(() => {
 const importVisible = ref(false);
 const importTitle = computed(() => t("mapping.importTitle"));
 const importLimitHint = computed(() => t("mapping.limitHint"));
+const linksVisible = ref(false);
+const linksKol = ref<{ kolCode: string; kolName: string } | null>(null);
+const promoSheetVisible = ref(false);
+const promoSheetKol = ref<{ id: string; label: string } | null>(null);
+const kolPickerVisible = ref(false);
+const kolSearchKeyword = ref("");
+const kolSearching = ref(false);
+const kolOptions = ref<KolVO[]>([]);
+
+function openLinks(row: KolItemVO) {
+  linksKol.value = { kolCode: row.kolCode ?? "", kolName: row.kolName ?? "" };
+  linksVisible.value = true;
+}
+
+async function searchKols(keyword: string): Promise<void> {
+  const text = keyword.trim();
+  if (!text) {
+    kolOptions.value = [];
+    return;
+  }
+  kolSearching.value = true;
+  try {
+    const page = await listKols({ page: 1, size: 20, keyword: text });
+    kolOptions.value = page.items;
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    kolSearching.value = false;
+  }
+}
+
+function pickKol(kolId: string) {
+  const kol = kolOptions.value.find(item => item.id === kolId);
+  if (!kol) return;
+  promoSheetKol.value = { id: kol.id, label: `${kol.name} (${kol.kolCode})` };
+  kolPickerVisible.value = false;
+  promoSheetVisible.value = true;
+}
 
 function hasPrecisionFilter(): boolean {
   return (
@@ -330,6 +372,13 @@ onMounted(() => {
       <template #actions>
         <el-button
           v-if="abilities.canImportMapping"
+          data-test="upload-promo-sheet"
+          @click="kolPickerVisible = true"
+        >
+          {{ t("promoSheet.open") }}
+        </el-button>
+        <el-button
+          v-if="abilities.canImportMapping"
           data-test="import"
           @click="importVisible = true"
         >
@@ -395,6 +444,17 @@ onMounted(() => {
       <template #cell-weidianItemId="{ row }">
         <CopyText :value="asItem(row).weidianItemId" />
       </template>
+      <template #actions="{ row }">
+        <el-button
+          v-if="links.canViewLinks"
+          link
+          type="primary"
+          data-test="links"
+          @click="openLinks(asItem(row))"
+        >
+          {{ t("kol.links") }}
+        </el-button>
+      </template>
       <template #cell-validFrom="{ row }">{{ formatInstant(asItem(row).validFrom) }}</template>
       <template #cell-validTo="{ row }">
         {{ asItem(row).validTo ? formatInstant(asItem(row).validTo) : t("mapping.current") }}
@@ -410,6 +470,37 @@ onMounted(() => {
       :download-template="downloadKolItemTemplate"
       :upload="uploadKolItemImport"
       @finished="search"
+    />
+    <KolLinksDrawer
+      v-model="linksVisible"
+      :kol-code="linksKol?.kolCode ?? null"
+      :kol-name="linksKol?.kolName ?? undefined"
+    />
+    <el-dialog v-model="kolPickerVisible" :title="t('promoSheet.open')" width="480px">
+      <el-select
+        v-model="kolSearchKeyword"
+        filterable
+        remote
+        clearable
+        :remote-method="searchKols"
+        :loading="kolSearching"
+        :placeholder="t('bdTransfer.specificPlaceholder')"
+        style="width: 100%"
+        data-test="promo-kol-picker"
+        @change="pickKol($event as string)"
+      >
+        <el-option
+          v-for="kol in kolOptions"
+          :key="kol.id"
+          :label="`${kol.name} (${kol.kolCode})`"
+          :value="kol.id"
+        />
+      </el-select>
+    </el-dialog>
+    <PromoSheetUploadDialog
+      v-model="promoSheetVisible"
+      :kol-id="promoSheetKol?.id ?? null"
+      :kol-label="promoSheetKol?.label ?? ''"
     />
   </div>
 </template>

@@ -142,6 +142,11 @@ export interface KolVO {
   relationStatus: RelationStatus;
   displayRelationStatus: DisplayRelationStatus;
   loginStatus: LoginStatus;
+  /**
+   * Per-creator auto cleanup (task 33 §3.2): null = off, otherwise the number of days without
+   * orders after which the creator is cleaned up. Optional until the backend ships it.
+   */
+  autoCleanupDays?: number | null;
   platforms: Array<{ templateId: string; templateName: string; address: string }>;
   jumpTemplateId: string | null;
   configVersion: number | null;

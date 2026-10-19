@@ -92,7 +92,7 @@ describe("resolveAccess", () => {
   it("rejects OWN on hideForOwn routes (same as the menu)", () => {
     expect(
       resolveAccess(
-        target("/product/kol-items", { permission: "product:view", hideForOwn: true }),
+        target("/kol/kol-items", { permission: "product:view", hideForOwn: true }),
         session(productOwn)
       )
     ).toBe("/403");
@@ -100,8 +100,8 @@ describe("resolveAccess", () => {
 
   it("allows a non-OWN account that has product:view on hideForOwn routes", () => {
     const meta = { permission: "product:view" as const, hideForOwn: true };
-    expect(resolveAccess(target("/product/kol-items", meta), session(productAll))).toBe(true);
-    expect(resolveAccess(target("/product/kol-items", meta), session(superAdmin))).toBe(true);
+    expect(resolveAccess(target("/kol/kol-items", meta), session(productAll))).toBe(true);
+    expect(resolveAccess(target("/kol/kol-items", meta), session(superAdmin))).toBe(true);
   });
 });
 
@@ -135,12 +135,12 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
-  it("redirects OWN away from /product/kol-items to 403", async () => {
-    expect((await navigate(productOwn, "/product/kol-items")).path).toBe("/403");
+  it("redirects OWN away from /kol/kol-items to 403", async () => {
+    expect((await navigate(productOwn, "/kol/kol-items")).path).toBe("/403");
   });
 
-  it("opens /product/kol-items for a non-OWN account with product:view", async () => {
-    expect((await navigate(productAll, "/product/kol-items")).name).toBe("KolItemList");
+  it("opens /kol/kol-items for a non-OWN account with product:view", async () => {
+    expect((await navigate(productAll, "/kol/kol-items")).name).toBe("KolItemList");
   });
 
   it("routes platform home to company management and blocks business pages", async () => {
@@ -167,17 +167,21 @@ describe("installGuard with the real route table", () => {
     expect(flags).toEqual([
       ["home", null, false, false, false],
       ["platform/tenants", null, false, true, false],
-      ["kol/kols", "kol:view", false, false, false],
-      ["kol/bd-transfers", null, true, false, false],
+      ["analytics", null, false, false, false],
       ["product", null, false, false, false],
       ["order", null, false, false, false],
+      ["kol", null, false, false, false],
       ["fund", null, false, false, false],
-      ["system/users", null, true, false, false],
-      ["system/link-templates", null, true, false, false],
-      ["system/oper-logs", null, true, false, false],
+      ["system", null, false, false, false],
       ["notifications", null, false, false, false],
       ["account/password", null, false, false, false],
-      ["403", null, false, false, false]
+      ["403", null, false, false, false],
+      // Merged and removed pages survive as plain redirects (task 32 §2.1).
+      ["product/products", null, false, false, false],
+      ["product/sheet-sources", null, false, false, false],
+      ["order/unmatched", null, false, false, false],
+      ["fund/payout-accounts", null, false, false, false],
+      ["kol/bd-transfers", null, false, false, false]
     ]);
     const product = layout?.children?.find(route => route.path === "product");
     expect(
@@ -188,10 +192,8 @@ describe("installGuard with the real route table", () => {
       ])
     ).toEqual([
       ["shops", "product:view", false],
-      ["products", "product:view", false],
-      ["kol-items", "product:view", true],
-      ["sheet-sources", "product:view", true],
-      ["copy-tokens", "kol:copy-token", false]
+      ["copy-tokens", "kol:copy-token", false],
+      ["tasks", "product:view", false]
     ]);
     const order = layout?.children?.find(route => route.path === "order");
     expect(
@@ -202,15 +204,17 @@ describe("installGuard with the real route table", () => {
       ])
     ).toEqual([
       ["orders", "order:view", false],
-      ["unmatched", "order:manage", false]
+      ["refunds", "order:view", false]
     ]);
     // The payout-account review accepts either of its two codes (task 15b §4.2.1).
     const fund = layout?.children?.find(route => route.path === "fund");
     expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
-      ["payout-account:review", "commission:view"]
+      ["payout-account:review", "commission:view"],
+      "commission:view",
+      "commission:view"
     ]);
     for (const route of layout?.children ?? []) {
-      expect(route.meta).not.toHaveProperty("roles");
+      if (route.meta) expect(route.meta).not.toHaveProperty("roles");
     }
   });
 });

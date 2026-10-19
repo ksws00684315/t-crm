@@ -48,15 +48,17 @@ export function notificationText(item: NotificationView): string {
   });
 }
 
-/** Target route from task 20 §4.6. Missing pages render the existing 404. */
+/** Target route. Missing pages render the existing 404. */
 export function notificationHref(item: NotificationView): string {
   switch (item.type) {
     case "PAYOUT_ACCOUNT_SUBMITTED":
-      return `/fund/payout-accounts?id=${encodeURIComponent(item.bizId ?? "")}`;
+      return `/fund/payouts?id=${encodeURIComponent(item.bizId ?? "")}`;
     case "ORDER_SYNC_FAILED":
       return "/order/orders";
     case "BD_TRANSFER_CANCELLED":
-      return `/kol/bd-transfers?kolCode=${encodeURIComponent(item.params?.kolCode ?? "")}`;
+      // Transfer records live in the audit log since task 32 §2 (decision 5); the kol code is
+      // the keyword, so the link lands on that creator's transfer rows.
+      return `/system/oper-logs?module=KOL&keyword=${encodeURIComponent(item.params?.kolCode ?? "")}`;
     case "KOLS_UNASSIGNED":
       return "/kol/kols";
     default:

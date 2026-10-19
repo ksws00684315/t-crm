@@ -7,7 +7,7 @@ import type { MessageSchema } from "./en-US";
  */
 const zhCN: MessageSchema = {
   app: {
-    title: "T-CRM Creator Portal"
+    title: "SparkTrack Creator Portal"
   },
   common: {
     language: "语言",
@@ -31,7 +31,7 @@ const zhCN: MessageSchema = {
     "zh-CN": "中文"
   },
   login: {
-    title: "T-CRM Creator Portal",
+    title: "SparkTrack Creator Portal",
     account: "邮箱",
     password: "密码",
     submit: "登录",
@@ -193,27 +193,27 @@ const zhCN: MessageSchema = {
     }
   },
   register: {
-    title: "创建账号",
-    invitedBy: "邀请人：{name}",
-    invalidLink: "注册链接无效或已失效，请联系您的商务获取新链接",
-    emailExists: "该邮箱已注册，请直接登录",
+    title: "达人注册",
+    subtitle: "完善资料，加入受邀的工作空间",
+    invitedBy: "受邀加入：{name}",
+    invalidLink: "注册链接无效或已过期，请联系你的商务获取新链接。",
+    emailExists: "该邮箱已注册，请直接登录。",
     goToLogin: "去登录",
     inviteCode: "商务邀请码",
-    codeInvalid: "请输入有效的 8 位邀请码。",
-    invalidCode: "邀请码无效，请检查后重试。",
-    tryLater: "尝试次数过多，请稍后再试。",
-    nameRequired: "请填写账户名（最多 64 个字符）。",
-    socialPairRequired: "平台和社媒账号必须同时填写，或同时留空。",
-    sendCode: "发送验证码",
-    resendIn: "{seconds} 秒后可重发",
-    emailCode: "验证码",
-    emailCodeInvalid: "请输入 6 位验证码。",
-    whatsapp: "WhatsApp",
-    whatsappInvalid: "请输入以 + 开头、后接 8～15 位数字的 WhatsApp 号码。",
-    phone: "手机号（可选）",
-    phoneInvalid: "请输入以 + 开头、后接 8～15 位数字的手机号。",
-    platformLabel: "主阵地平台",
-    platformPlaceholder: "请选择平台",
+    inviteCodeRequired: "请输入商务邀请码。",
+    inviteCodeReadonly: "已通过邀请链接自动填写",
+    codeInvalid: "请输入 8 位有效邀请码。",
+    invalidCode: "邀请码无效，请核对后重试。",
+    tryLater: "尝试过于频繁，请稍后再试。",
+    name: "账户名",
+    nameRequired: "请输入账户名（不超过 64 个字符）。",
+    socialPairRequired: "核心社媒平台与核心社媒ID需同时填写，或同时留空。",
+    whatsapp: "WhatsApp（选填）",
+    whatsappInvalid: "WhatsApp 须以 + 开头，后接 8～15 位数字。",
+    phone: "手机号（选填）",
+    phoneInvalid: "手机号须以 + 开头，后接 8～15 位数字。",
+    platformLabel: "核心社媒平台（选填）",
+    platformPlaceholder: "选择平台",
     platforms: {
       TikTok: "TikTok",
       Instagram: "Instagram",
@@ -222,14 +222,8 @@ const zhCN: MessageSchema = {
       Facebook: "Facebook",
       Other: "其他"
     },
-    handle: "账号名",
-    profileUrl: "主页链接（可选）",
-    urlInvalid: "主页链接必须以 https:// 开头。",
-    more: "更多（可选）",
-    name: "名称",
-    country: "国家",
-    countryInvalid: "请填写两位国家代码，或留空。",
-    submit: "创建账号"
+    handle: "核心社媒ID",
+    submit: "创建达人账号"
   },
   errors: {
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试。",

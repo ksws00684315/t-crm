@@ -1,7 +1,6 @@
 import * as ElementPlusIcons from "@element-plus/icons-vue";
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
-import "element-plus/theme-chalk/dark/css-vars.css";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import App from "./App.vue";
@@ -9,7 +8,6 @@ import { setupHttp } from "./api/setup";
 import { i18n } from "./locales";
 import router from "./router";
 import { useLocaleStore } from "./stores/locale";
-import { useThemeStore } from "./stores/theme";
 import "./style/tokens.css";
 import "./style/index.css";
 
@@ -21,7 +19,6 @@ app.use(createPinia());
 // Creates the locale store once, so the persisted language reaches i18n, Element Plus and
 // <html lang> before the first render.
 useLocaleStore();
-useThemeStore();
 setupHttp(router);
 app.use(router);
 app.use(ElementPlus);

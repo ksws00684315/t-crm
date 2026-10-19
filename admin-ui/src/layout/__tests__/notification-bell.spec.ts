@@ -160,6 +160,6 @@ describe("notification bell", () => {
     allowed?.click();
     await flushPromises();
     expect(api.markNotificationRead).toHaveBeenCalledWith("77");
-    expect(push).toHaveBeenCalledWith("/fund/payout-accounts?id=77");
+    expect(push).toHaveBeenCalledWith("/fund/payouts?id=77");
   });
 });
