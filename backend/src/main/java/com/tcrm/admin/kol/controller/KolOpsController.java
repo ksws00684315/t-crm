@@ -54,9 +54,10 @@ public class KolOpsController {
   }
 
   public record ClaimableKolVO(
-      Long id, String kolCode, String name, String maskedEmail, String displayStatus) {
+      Long id, String kolCode, String name, String maskedEmail, String displayRelationStatus) {
     static ClaimableKolVO from(KolClaimService.ClaimableKolDTO d) {
-      return new ClaimableKolVO(d.id(), d.kolCode(), d.name(), d.maskedEmail(), d.displayStatus());
+      return new ClaimableKolVO(
+          d.id(), d.kolCode(), d.name(), d.maskedEmail(), d.displayRelationStatus());
     }
   }
 

@@ -51,8 +51,8 @@ class KolRegisterCodeServiceTest {
   void shouldCreateACode_whenTheBdHasNone() {
     when(codes.selectOne(any())).thenReturn(null);
     KolRegisterCodeDTO dto = service.current();
-    assertThat(dto.code()).matches("[0-9A-Za-z]{32}");
-    assertThat(dto.url()).isEqualTo("https://kol.example.com/register?c=" + dto.code());
+    assertThat(dto.code()).matches("[2-9A-HJ-NP-Z]{8}");
+    assertThat(dto.url()).isEqualTo("https://kol.example.com/register?code=" + dto.code());
     assertThat(dto.status()).isEqualTo(1);
     ArgumentCaptor<KolRegisterCodeDO> inserted = ArgumentCaptor.forClass(KolRegisterCodeDO.class);
     verify(codes).insert(inserted.capture());
@@ -64,7 +64,7 @@ class KolRegisterCodeServiceTest {
 
   @Test
   void shouldReturnTheExistingCode_withoutInserting() {
-    KolRegisterCodeDO active = row("A".repeat(32));
+    KolRegisterCodeDO active = row("A2B3C4D5");
     when(codes.selectOne(any())).thenReturn(active);
     assertThat(service.current().code()).isEqualTo(active.getCode());
     verify(codes, never()).insert(any(KolRegisterCodeDO.class));
@@ -72,7 +72,7 @@ class KolRegisterCodeServiceTest {
 
   @Test
   void shouldReturnTheWinner_whenAConcurrentInsertWinsTheUniqueIndex() {
-    KolRegisterCodeDO winner = row("B".repeat(32));
+    KolRegisterCodeDO winner = row("B2C3D4E5");
     when(codes.selectOne(any())).thenReturn(null).thenReturn(winner);
     doThrow(new DuplicateKeyException("uk_crm_kol_register_code_active_bd"))
         .when(codes)
@@ -97,7 +97,7 @@ class KolRegisterCodeServiceTest {
   void shouldRevokeThenInsert_whenRotating() {
     when(codes.selectOne(any())).thenReturn(null);
     KolRegisterCodeDTO dto = service.rotate();
-    assertThat(dto.code()).matches("[0-9A-Za-z]{32}");
+    assertThat(dto.code()).matches("[2-9A-HJ-NP-Z]{8}");
     verify(codes).revokeActive(eq(8L), eq(8L), any());
     verify(codes).insert(any(KolRegisterCodeDO.class));
   }

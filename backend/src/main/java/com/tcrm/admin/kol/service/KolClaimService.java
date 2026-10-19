@@ -3,7 +3,7 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolDO;
-import com.tcrm.admin.kol.model.PromotionStatus;
+import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
@@ -13,7 +13,7 @@ import com.tcrm.admin.system.api.BdUserDTO;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
 
-/** Exact search for claimable KOLs and claim entry (task 25a / ADR-023 §4). */
+/** Exact search for claimable KOLs and claim entry (task 25a / 29). */
 @Service
 public class KolClaimService {
   private final KolMapper kols;
@@ -51,17 +51,17 @@ public class KolClaimService {
     if (kol == null || !transfers.isClaimable(kol)) {
       return null;
     }
-    String promotion =
-        kol.getPromotionStatus() == null
-            ? PromotionStatus.PENDING_REVIEW.name()
-            : kol.getPromotionStatus();
+    String relation =
+        kol.getRelationStatus() == null
+            ? RelationStatus.PENDING_PROMOTION.name()
+            : kol.getRelationStatus();
     BdUserDTO bd = kol.getBdUserId() == null ? null : bdUsers.getById(kol.getBdUserId());
     return new ClaimableKolDTO(
         kol.getId(),
         kol.getKolCode(),
         kol.getName(),
         maskEmail(kol.getEmail()),
-        KolPromotionSupport.displayStatus(promotion, bd));
+        KolPromotionSupport.displayRelationStatus(relation, bd));
   }
 
   public void claim(Long kolId) {
@@ -89,5 +89,5 @@ public class KolClaimService {
   }
 
   public record ClaimableKolDTO(
-      Long id, String kolCode, String name, String maskedEmail, String displayStatus) {}
+      Long id, String kolCode, String name, String maskedEmail, String displayRelationStatus) {}
 }

@@ -23,12 +23,14 @@ public class KolEmailCodes {
   static final Duration WINDOW = Duration.ofHours(1);
   static final int SEND_IP_LIMIT = 20;
   static final int REGISTER_IP_LIMIT = 20;
+  static final int PREVIEW_IP_LIMIT = 20;
   static final int REGISTER_EMAIL_LIMIT = 10;
 
   private static final String CODE_PREFIX = "kol:register:email-code:";
   private static final String COOLDOWN_PREFIX = "kol:register:email-cooldown:";
   private static final String SEND_IP_PREFIX = "kol:register:rate:send-ip:";
   private static final String REGISTER_IP_PREFIX = "kol:register:rate:reg-ip:";
+  private static final String PREVIEW_IP_PREFIX = "kol:register:rate:preview-ip:";
   private static final String REGISTER_EMAIL_PREFIX = "kol:register:rate:reg-email:";
 
   /**
@@ -80,6 +82,10 @@ public class KolEmailCodes {
 
   public void requireRegisterIp(String clientIp) {
     require(REGISTER_IP_PREFIX + digest(clientIp), REGISTER_IP_LIMIT);
+  }
+
+  public void requirePreviewIp(String clientIp) {
+    require(PREVIEW_IP_PREFIX + digest(clientIp), PREVIEW_IP_LIMIT);
   }
 
   public void requireRegisterEmail(String email) {

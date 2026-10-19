@@ -5,7 +5,8 @@ import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolRegisterCodeMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolRegisterCodeDO;
-import com.tcrm.admin.kol.model.PromotionStatus;
+import com.tcrm.admin.kol.model.RelationStatus;
+import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.kol.service.KolAuthService.LoginResult;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -21,13 +22,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
- * Public self-registration (task 12c §4.3). The register code selects the company and the owning
+ * Public self-registration (task 12c / 29). The register code selects the company and the owning
  * BD; the new KOL is activated at once and signed in with the same payload as a password login.
- * This class does not log the code, the password or the email address.
  */
 @Service
 public class KolSelfRegisterService {
-  private static final Pattern CODE = Pattern.compile("[0-9A-Za-z]{32}");
+  private static final Pattern CODE = Pattern.compile("[2-9A-HJ-NP-Z]{8}");
 
   private final KolRegisterCodeMapper codes;
   private final BdUserApi bdUsers;
@@ -63,15 +63,13 @@ public class KolSelfRegisterService {
     this.auth = auth;
   }
 
-  /** Company name for a link that is still usable; anything else is a 404. */
-  public KolRegisterPreview preview(String rawCode) {
-    return new KolRegisterPreview(requireLink(rawCode).tenantName());
+  /** BD display name and company name for a link that is still usable; anything else is a 404. */
+  public KolRegisterPreview preview(String rawCode, String clientIp) {
+    emailCodes.requirePreviewIp(clientIp);
+    Resolved link = requireLink(rawCode);
+    return new KolRegisterPreview(link.bdUserName(), link.tenantName());
   }
 
-  /**
-   * Sends a code when the link is usable and the email is free in that company. An address that
-   * already belongs to a KOL of the company is {@code KOL_EMAIL_EXISTS} and no mail is sent.
-   */
   public void sendEmailCode(String rawCode, String email, String clientIp) {
     emailCodes.requireSendIp(clientIp);
     Resolved link = requireLink(rawCode);
@@ -84,14 +82,11 @@ public class KolSelfRegisterService {
     mails.sendRegisterCode(address, link.tenantName(), code);
   }
 
-  /**
-   * Creates the KOL (source 2, activated, owned by the link's BD, one primary social account) and
-   * returns the login. A blank name is stored as the primary handle.
-   */
   public LoginResult register(KolRegistration request, String clientIp) {
     emailCodes.requireRegisterIp(clientIp);
     String address = normalize(request.email());
     emailCodes.requireRegisterEmail(address);
+    validateSocialPair(request.primaryPlatform(), request.primaryHandle());
     Resolved link = requireLink(request.code());
     if (emailTaken(link.tenantId(), address)) {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
@@ -110,27 +105,30 @@ public class KolSelfRegisterService {
   }
 
   private KolDO insert(Resolved link, KolRegistration request, String address) {
-    String handle = request.primaryHandle().strip();
-    String name =
-        request.name() == null || request.name().isBlank() ? handle : request.name().strip();
+    String name = request.name().strip();
+    List<SocialAccountDTO> socials = List.of();
+    if (request.primaryPlatform() != null && !request.primaryPlatform().isBlank()) {
+      socials =
+          List.of(
+              new SocialAccountDTO(
+                  request.primaryPlatform(),
+                  request.primaryHandle().strip(),
+                  blankToNull(request.primaryUrl()),
+                  null,
+                  true));
+    }
     KolDO kol = new KolDO();
     kol.setName(name);
     kol.setEmail(address);
+    kol.setPhone(blankToNull(request.phone()));
     kol.setCountry(country(request.country()));
-    kol.setSocialAccounts(
-        SocialAccountsJson.write(
-            List.of(
-                new SocialAccountDTO(
-                    request.primaryPlatform(),
-                    handle,
-                    blankToNull(request.primaryUrl()),
-                    null,
-                    true))));
+    kol.setSocialAccounts(SocialAccountsJson.write(socials));
     kol.setBdUserId(link.bdUserId());
     kol.setStatus(1);
-    kol.setWhatsapp(request.whatsapp().strip());
+    kol.setWhatsapp(blankToNull(request.whatsapp()));
     kol.setRegisterSource(2);
-    kol.setPromotionStatus(PromotionStatus.PENDING_REVIEW.name());
+    kol.setReviewStatus(ReviewStatus.PENDING.name());
+    kol.setRelationStatus(RelationStatus.PENDING_PROMOTION.name());
     kol.setAccountStatus(1);
     kol.setPasswordHash(passwords.encode(request.password()));
     kol.setCredentialVersion(0);
@@ -145,12 +143,9 @@ public class KolSelfRegisterService {
                 > 0);
   }
 
-  /**
-   * A link is usable only while its code is active, its BD is still a usable BD of that company,
-   * and the company is enabled. Every failure is the same 404.
-   */
   private Resolved requireLink(String rawCode) {
-    if (rawCode == null || !CODE.matcher(rawCode).matches()) {
+    String code = KolRegisterCodeGenerator.normalize(rawCode);
+    if (code == null || !CODE.matcher(code).matches()) {
       throw new BusinessException(ErrorCode.KOL_REGISTER_CODE_INVALID);
     }
     return TenantScope.callSystem(
@@ -158,8 +153,7 @@ public class KolSelfRegisterService {
         () -> {
           KolRegisterCodeDO row =
               codes.selectOne(
-                  new LambdaQueryWrapper<KolRegisterCodeDO>()
-                      .eq(KolRegisterCodeDO::getCode, rawCode));
+                  new LambdaQueryWrapper<KolRegisterCodeDO>().eq(KolRegisterCodeDO::getCode, code));
           if (row == null
               || !Integer.valueOf(KolRegisterCodeDO.STATUS_ACTIVE).equals(row.getStatus())) {
             throw new BusinessException(ErrorCode.KOL_REGISTER_CODE_INVALID);
@@ -174,8 +168,18 @@ public class KolSelfRegisterService {
           if (tenant == null || !tenant.enabled()) {
             throw new BusinessException(ErrorCode.KOL_REGISTER_CODE_INVALID);
           }
-          return new Resolved(row.getTenantId(), row.getBdUserId(), tenant.name());
+          String bdName =
+              bd.nickname() == null || bd.nickname().isBlank() ? bd.username() : bd.nickname();
+          return new Resolved(row.getTenantId(), row.getBdUserId(), tenant.name(), bdName);
         });
+  }
+
+  private static void validateSocialPair(String platform, String handle) {
+    boolean hasPlatform = platform != null && !platform.isBlank();
+    boolean hasHandle = handle != null && !handle.isBlank();
+    if (hasPlatform != hasHandle) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
   }
 
   private static String normalize(String email) {
@@ -190,5 +194,5 @@ public class KolSelfRegisterService {
     return value == null || value.isBlank() ? null : value.strip();
   }
 
-  private record Resolved(long tenantId, long bdUserId, String tenantName) {}
+  private record Resolved(long tenantId, long bdUserId, String tenantName, String bdUserName) {}
 }

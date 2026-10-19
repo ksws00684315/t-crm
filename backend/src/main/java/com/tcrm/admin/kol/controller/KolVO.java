@@ -6,15 +6,15 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * List/detail row. {@code defaultRate} is a fraction with 4 decimals ("0.1550"), null when not set.
- * Promotion fields (task 25a / ADR-023): {@code promotionStatus}, {@code displayStatus} (may be
- * {@code PENDING_UPDATE}), {@code landingUrl}, {@code platformTemplateIds}.
+ * List/detail row (task 29 / ADR-025). {@code defaultRate} is a fraction with 4 decimals
+ * ("0.1550"), null when not set. IDs in nested platforms are strings.
  */
 public record KolVO(
     Long id,
     String kolCode,
     String name,
     String email,
+    String phone,
     String country,
     List<SocialAccountVO> socialAccounts,
     Long bdUserId,
@@ -23,14 +23,17 @@ public record KolVO(
     Integer status,
     String remark,
     String whatsapp,
-    Long linkTemplateId,
-    String linkTemplateName,
+    Long jumpTemplateId,
+    String jumpTemplateName,
     String inviteCode,
     String sheetUrl,
-    String promotionStatus,
-    String displayStatus,
-    String landingUrl,
-    List<Long> platformTemplateIds,
+    String reviewStatus,
+    String relationStatus,
+    String displayRelationStatus,
+    String loginStatus,
+    List<PlatformVO> platforms,
+    Integer configVersion,
+    Instant inviteTime,
     Integer registerSource,
     Integer accountStatus,
     Instant createTime,
@@ -41,6 +44,7 @@ public record KolVO(
         k.kolCode(),
         k.name(),
         k.email(),
+        k.phone(),
         k.country(),
         k.socialAccounts().stream().map(SocialAccountVO::from).toList(),
         k.bdUserId(),
@@ -49,17 +53,29 @@ public record KolVO(
         k.status(),
         k.remark(),
         k.whatsapp(),
-        k.linkTemplateId(),
-        k.linkTemplateName(),
+        k.jumpTemplateId(),
+        k.jumpTemplateName(),
         k.inviteCode(),
         k.sheetUrl(),
-        k.promotionStatus(),
-        k.displayStatus(),
-        k.landingUrl(),
-        k.platformTemplateIds(),
+        k.reviewStatus(),
+        k.relationStatus(),
+        k.displayRelationStatus(),
+        k.loginStatus(),
+        k.platforms().stream()
+            .map(
+                p ->
+                    new PlatformVO(
+                        p.templateId() == null ? null : Long.toString(p.templateId()),
+                        p.templateName(),
+                        p.address()))
+            .toList(),
+        k.configVersion(),
+        k.inviteTime(),
         k.registerSource(),
         k.accountStatus(),
         k.createTime(),
         k.updateTime());
   }
+
+  public record PlatformVO(String templateId, String templateName, String address) {}
 }

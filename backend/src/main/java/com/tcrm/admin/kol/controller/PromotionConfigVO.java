@@ -5,8 +5,7 @@ import java.util.List;
 
 public record PromotionConfigVO(
     String defaultRate,
-    List<Long> platformTemplateIds,
-    String landingUrl,
+    List<PlatformAddressVO> platforms,
     String inviteCode,
     String sheetUrl,
     Long jumpTemplateId,
@@ -14,11 +13,19 @@ public record PromotionConfigVO(
   static PromotionConfigVO from(KolPromotionService.PromotionConfigDTO d) {
     return new PromotionConfigVO(
         d.defaultRate(),
-        d.platformTemplateIds(),
-        d.landingUrl(),
+        d.platforms().stream()
+            .map(
+                p ->
+                    new PlatformAddressVO(
+                        p.templateId() == null ? null : Long.toString(p.templateId()),
+                        null,
+                        p.address()))
+            .toList(),
         d.inviteCode(),
         d.sheetUrl(),
         d.jumpTemplateId(),
         d.remark());
   }
+
+  public record PlatformAddressVO(String templateId, String templateName, String address) {}
 }

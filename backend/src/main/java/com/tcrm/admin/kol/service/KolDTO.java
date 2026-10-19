@@ -4,12 +4,13 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** KOL as shown in lists and details; includes promotion fields (task 25a / ADR-023). */
+/** KOL as shown in lists and details (task 29 / ADR-025). */
 public record KolDTO(
     Long id,
     String kolCode,
     String name,
     String email,
+    String phone,
     String country,
     List<SocialAccountDTO> socialAccounts,
     Long bdUserId,
@@ -18,15 +19,20 @@ public record KolDTO(
     Integer status,
     String remark,
     String whatsapp,
-    Long linkTemplateId,
-    String linkTemplateName,
+    Long jumpTemplateId,
+    String jumpTemplateName,
     String inviteCode,
     String sheetUrl,
-    String promotionStatus,
-    String displayStatus,
-    String landingUrl,
-    List<Long> platformTemplateIds,
+    String reviewStatus,
+    String relationStatus,
+    String displayRelationStatus,
+    String loginStatus,
+    List<PlatformDTO> platforms,
+    Integer configVersion,
+    Instant inviteTime,
     Integer registerSource,
     Integer accountStatus,
     Instant createTime,
-    Instant updateTime) {}
+    Instant updateTime) {
+  public record PlatformDTO(Long templateId, String templateName, String address) {}
+}

@@ -6,6 +6,8 @@ public record KolFilterDTO(
     String country,
     Integer status,
     Long bdUserId,
-    String displayStatus,
+    String reviewStatus,
+    String relationStatus,
+    String loginStatus,
     int page,
     int size) {}

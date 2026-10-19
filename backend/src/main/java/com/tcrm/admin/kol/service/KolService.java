@@ -10,9 +10,12 @@ import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPlatformDO;
-import com.tcrm.admin.kol.model.PromotionStatus;
+import com.tcrm.admin.kol.model.LoginStatus;
+import com.tcrm.admin.kol.model.RelationStatus;
+import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.LoginFailureCounter;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
@@ -20,6 +23,8 @@ import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +56,7 @@ public class KolService {
   private final KolInvites invites;
   private final BdTransferService transfers;
   private final KolPlatformMapper platforms;
+  private final LoginFailureCounter loginFailures;
 
   public KolService(
       KolMapper kols,
@@ -63,7 +69,9 @@ public class KolService {
       ApplicationEventPublisher events,
       KolInvites invites,
       BdTransferService transfers,
-      KolPlatformMapper platforms) {
+      KolPlatformMapper platforms,
+      @org.springframework.beans.factory.annotation.Qualifier("kolLoginFailures")
+          LoginFailureCounter loginFailures) {
     this.kols = kols;
     this.history = history;
     this.writer = writer;
@@ -75,6 +83,7 @@ public class KolService {
     this.invites = invites;
     this.transfers = transfers;
     this.platforms = platforms;
+    this.loginFailures = loginFailures;
   }
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
@@ -96,16 +105,26 @@ public class KolService {
                 filter.country() == null ? null : filter.country().strip().toUpperCase(Locale.ROOT))
             .eq(filter.status() != null, KolDO::getStatus, filter.status())
             .eq(bd != null, KolDO::getBdUserId, bd);
-    applyDisplayStatus(query, filter.displayStatus());
+    if (filter.reviewStatus() != null && !filter.reviewStatus().isBlank()) {
+      query.eq(KolDO::getReviewStatus, filter.reviewStatus().strip());
+    }
+    applyRelationStatus(query, filter.relationStatus());
+    applyLoginStatusFilter(query, filter.loginStatus());
     query.orderByDesc(KolDO::getCreateTime, KolDO::getId);
     var result = kols.selectPage(new Page<>(filter.page(), filter.size()), query);
     List<KolDO> rows = result.getRecords();
     Map<Long, String> names = bdNames(rows.stream().map(KolDO::getBdUserId));
     Map<Long, String> templates = templateNames(rows.stream().map(KolDO::getLinkTemplateId));
-    Map<Long, List<Long>> platformIds = platformIdsByKol(rows.stream().map(KolDO::getId).toList());
+    Map<Long, List<KolDTO.PlatformDTO>> platformsMap =
+        platformsByKol(rows.stream().map(KolDO::getId).toList(), templates);
     Map<Long, BdUserDTO> bdUsable = bdUsableById(rows.stream().map(KolDO::getBdUserId));
+    Set<String> locked =
+        loginFailures.findLockedUsernames(
+            rows.stream().map(KolDO::getEmail).filter(Objects::nonNull).toList());
     return new PageResult<>(
-        rows.stream().map(kol -> toDto(kol, names, templates, platformIds, bdUsable)).toList(),
+        rows.stream()
+            .map(kol -> toDto(kol, names, templates, platformsMap, bdUsable, locked))
+            .toList(),
         result.getTotal(),
         filter.page(),
         filter.size());
@@ -122,10 +141,15 @@ public class KolService {
         bdNames(
             Stream.concat(
                 Stream.of(kol.getBdUserId()), periods.stream().map(KolBdHistoryDO::getBdUserId)));
-    Map<Long, List<Long>> platformIds = platformIdsByKol(List.of(kol.getId()));
+    Map<Long, String> templateMap = templateNames(Stream.of(kol.getLinkTemplateId()));
+    Map<Long, List<KolDTO.PlatformDTO>> platformsMap =
+        platformsByKol(List.of(kol.getId()), templateMap);
     Map<Long, BdUserDTO> bdUsable = bdUsableById(Stream.of(kol.getBdUserId()));
+    Set<String> locked =
+        loginFailures.findLockedUsernames(
+            kol.getEmail() == null ? List.of() : List.of(kol.getEmail()));
     return new KolDetailDTO(
-        toDto(kol, names, templateNames(Stream.of(kol.getLinkTemplateId())), platformIds, bdUsable),
+        toDto(kol, names, templateMap, platformsMap, bdUsable, locked),
         periods.stream()
             .map(
                 p ->
@@ -159,7 +183,8 @@ public class KolService {
     kol.setInviteCode(blankToNull(c.inviteCode()));
     kol.setSheetUrl(blankToNull(c.sheetUrl()));
     kol.setRegisterSource(1);
-    kol.setPromotionStatus(PromotionStatus.PENDING_REVIEW.name());
+    kol.setReviewStatus(ReviewStatus.PENDING.name());
+    kol.setRelationStatus(RelationStatus.PENDING_PROMOTION.name());
     writer.insert(kol, null, user.id());
     // Re-read so timestamps match later reads (the database keeps milliseconds).
     KolDO saved = kols.selectById(kol.getId());
@@ -169,12 +194,14 @@ public class KolService {
     invites.issueAndSend(kol.getId());
     KolDO row = saved == null ? kol : saved;
     List<Long> selfId = row.getId() == null ? List.of() : List.of(row.getId());
+    Map<Long, String> templateMap = templateNames(Stream.of(templateId));
     return toDto(
         row,
         bdNames(Stream.of(bd)),
-        templateNames(Stream.of(templateId)),
-        platformIdsByKol(selfId),
-        bdUsableById(Stream.of(bd)));
+        templateMap,
+        platformsByKol(selfId, templateMap),
+        bdUsableById(Stream.of(bd)),
+        Set.of());
   }
 
   /**
@@ -207,6 +234,7 @@ public class KolService {
                   null,
                   scoped(id, user)
                       .set(KolDO::getName, c.name().strip())
+                      .set(KolDO::getPhone, blankToNull(c.phone()))
                       .set(KolDO::getCountry, country(c.country()))
                       .set(
                           KolDO::getSocialAccounts,
@@ -276,28 +304,46 @@ public class KolService {
   }
 
   /**
-   * Filters by display status (task 25a review). {@code PENDING_UPDATE} = no BD or BD not in {@link
-   * BdUserApi#listUsable()}; other values require that stored promotion status and a usable BD.
+   * Filters by display relation status (task 29). {@code PENDING_UPDATE} = not INVALID and (no BD
+   * or BD not usable); {@code INVALID} = stored INVALID; other values require stored status and
+   * usable BD.
    */
-  private void applyDisplayStatus(LambdaQueryWrapper<KolDO> query, String displayStatus) {
-    if (displayStatus == null || displayStatus.isBlank()) {
+  private void applyRelationStatus(LambdaQueryWrapper<KolDO> query, String relationStatus) {
+    if (relationStatus == null || relationStatus.isBlank()) {
       return;
     }
-    String status = displayStatus.strip();
+    String status = relationStatus.strip();
     List<Long> usable =
         bdUsers.listUsable().stream().map(BdUserDTO::id).filter(Objects::nonNull).toList();
-    if (PromotionStatus.DISPLAY_PENDING_UPDATE.equals(status)) {
+    if (RelationStatus.DISPLAY_PENDING_UPDATE.equals(status)) {
+      query.ne(KolDO::getRelationStatus, RelationStatus.INVALID.name());
       if (usable.isEmpty()) {
         return;
       }
       query.and(w -> w.isNull(KolDO::getBdUserId).or().notIn(KolDO::getBdUserId, usable));
       return;
     }
-    query.eq(KolDO::getPromotionStatus, status);
+    query.eq(KolDO::getRelationStatus, status);
+    if (RelationStatus.INVALID.name().equals(status)) {
+      return;
+    }
     if (usable.isEmpty()) {
       query.apply("1 = 0");
     } else {
       query.in(KolDO::getBdUserId, usable);
+    }
+  }
+
+  /** SQL-only loginStatus filter: FROZEN ↔ status=0; NORMAL_OR_ABNORMAL ↔ status=1. */
+  private void applyLoginStatusFilter(LambdaQueryWrapper<KolDO> query, String loginStatus) {
+    if (loginStatus == null || loginStatus.isBlank()) {
+      return;
+    }
+    String status = loginStatus.strip();
+    if (LoginStatus.FROZEN.name().equals(status)) {
+      query.eq(KolDO::getStatus, 0);
+    } else if (LoginStatus.FILTER_NORMAL_OR_ABNORMAL.equals(status)) {
+      query.eq(KolDO::getStatus, 1);
     }
   }
 
@@ -347,23 +393,28 @@ public class KolService {
       KolDO kol,
       Map<Long, String> bdNames,
       Map<Long, String> templates,
-      Map<Long, List<Long>> platformIds,
-      Map<Long, BdUserDTO> bdUsable) {
+      Map<Long, List<KolDTO.PlatformDTO>> platformsMap,
+      Map<Long, BdUserDTO> bdUsable,
+      Set<String> lockedEmails) {
     Long bdId = kol.getBdUserId();
     BdUserDTO bd = bdId == null ? null : bdUsable.get(bdId);
-    String promotion =
-        kol.getPromotionStatus() == null
-            ? PromotionStatus.PENDING_REVIEW.name()
-            : kol.getPromotionStatus();
+    String review =
+        kol.getReviewStatus() == null ? ReviewStatus.PENDING.name() : kol.getReviewStatus();
+    String relation =
+        kol.getRelationStatus() == null
+            ? RelationStatus.PENDING_PROMOTION.name()
+            : kol.getRelationStatus();
+    String login = deriveLoginStatus(kol, lockedEmails);
     return new KolDTO(
         kol.getId(),
         kol.getKolCode(),
         kol.getName(),
         kol.getEmail(),
+        kol.getPhone(),
         kol.getCountry(),
         SocialAccountsJson.read(kol.getSocialAccounts()),
         bdId,
-        bdId == null ? null : bdNames.get(bdId),
+        bdId == null ? null : displayBdName(bdNames, bdId, bd),
         kol.getDefaultRate(),
         kol.getStatus(),
         kol.getRemark(),
@@ -372,29 +423,71 @@ public class KolService {
         kol.getLinkTemplateId() == null ? null : templates.get(kol.getLinkTemplateId()),
         kol.getInviteCode(),
         kol.getSheetUrl(),
-        promotion,
-        KolPromotionSupport.displayStatus(promotion, bd),
-        kol.getLandingUrl(),
-        platformIds.getOrDefault(kol.getId(), List.of()),
+        review,
+        relation,
+        KolPromotionSupport.displayRelationStatus(relation, bd),
+        login,
+        platformsMap.getOrDefault(kol.getId(), List.of()),
+        kol.getConfigVersion(),
+        kol.getCreateTime(),
         kol.getRegisterSource(),
         kol.getAccountStatus() == null ? 0 : kol.getAccountStatus(),
         kol.getCreateTime(),
         kol.getUpdateTime());
   }
 
-  private Map<Long, List<Long>> platformIdsByKol(List<Long> kolIds) {
-    Map<Long, List<Long>> out = new HashMap<>();
+  private static String displayBdName(Map<Long, String> bdNames, Long bdId, BdUserDTO bd) {
+    if (bd != null) {
+      String nickname = bd.nickname();
+      if (nickname != null && !nickname.isBlank()) {
+        return nickname;
+      }
+      return bd.username();
+    }
+    return bdNames.get(bdId);
+  }
+
+  private static String deriveLoginStatus(KolDO kol, Set<String> lockedEmails) {
+    if (kol.getStatus() != null && kol.getStatus() == 0) {
+      return LoginStatus.FROZEN.name();
+    }
+    int account = kol.getAccountStatus() == null ? 0 : kol.getAccountStatus();
+    boolean locked = kol.getEmail() != null && lockedEmails.contains(kol.getEmail());
+    if (account == 0 || locked) {
+      return LoginStatus.ABNORMAL.name();
+    }
+    return LoginStatus.NORMAL.name();
+  }
+
+  private Map<Long, List<KolDTO.PlatformDTO>> platformsByKol(
+      List<Long> kolIds, Map<Long, String> templateNames) {
+    Map<Long, List<KolDTO.PlatformDTO>> out = new HashMap<>();
     if (kolIds.isEmpty()) {
       return out;
     }
-    for (KolPlatformDO row :
+    // Also load names for platform templates not already in map
+    List<KolPlatformDO> rows =
         platforms.selectList(
-            new LambdaQueryWrapper<KolPlatformDO>().in(KolPlatformDO::getKolId, kolIds))) {
-      out.computeIfAbsent(row.getKolId(), id -> new java.util.ArrayList<>())
-          .add(row.getLinkTemplateId());
+            new LambdaQueryWrapper<KolPlatformDO>().in(KolPlatformDO::getKolId, kolIds));
+    Set<Long> needed = new HashSet<>();
+    for (KolPlatformDO row : rows) {
+      if (!templateNames.containsKey(row.getLinkTemplateId())) {
+        needed.add(row.getLinkTemplateId());
+      }
     }
-    for (List<Long> ids : out.values()) {
-      ids.sort(Long::compareTo);
+    Map<Long, String> extra = templates.namesByIds(needed);
+    Map<Long, String> allNames = new HashMap<>(templateNames);
+    allNames.putAll(extra);
+    for (KolPlatformDO row : rows) {
+      out.computeIfAbsent(row.getKolId(), id -> new ArrayList<>())
+          .add(
+              new KolDTO.PlatformDTO(
+                  row.getLinkTemplateId(),
+                  allNames.get(row.getLinkTemplateId()),
+                  row.getAddress()));
+    }
+    for (List<KolDTO.PlatformDTO> list : out.values()) {
+      list.sort(Comparator.comparing(KolDTO.PlatformDTO::templateId));
     }
     return out;
   }

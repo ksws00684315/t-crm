@@ -22,9 +22,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KOL management (task 04 §4.3, §5; task 25a promotion / claim). Permission codes are checked here.
- * A staff account with OWN scope sees only KOLs assigned to them; changing the BD is super-admin
- * only. Claim additionally requires a usable BD.
+ * KOL management (task 04 / 25a / 29). Permission codes are checked here. A staff account with OWN
+ * scope sees only KOLs assigned to them; changing the BD is super-admin only.
  */
 @RestController
 @RequestMapping("/admin-api/kol/kols")
@@ -92,12 +91,20 @@ public class KolController {
     return R.ok(null);
   }
 
-  @PutMapping("/{id}/promotion-status")
+  @PostMapping("/{id}/review")
   @SaCheckPermission("kol:edit")
-  @AuditLog(module = "KOL", action = "Change promotion status")
-  public R<Void> promotionStatus(
-      @PathVariable @Min(1) Long id, @Valid @RequestBody PromotionStatusRequest r) {
-    promotions.updateStatus(id, r.status());
+  @AuditLog(module = "KOL", action = "Review KOL")
+  public R<Void> review(@PathVariable @Min(1) Long id, @Valid @RequestBody ReviewKolRequest r) {
+    promotions.review(id, r.toCommand());
+    return R.ok(null);
+  }
+
+  @PutMapping("/{id}/relation-status")
+  @SaCheckPermission("kol:edit")
+  @AuditLog(module = "KOL", action = "Change relation status")
+  public R<Void> relationStatus(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody RelationStatusRequest r) {
+    promotions.updateRelationStatus(id, r.status());
     return R.ok(null);
   }
 

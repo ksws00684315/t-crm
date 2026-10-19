@@ -6,8 +6,13 @@ import org.junit.jupiter.api.Test;
 
 class KolRegisterCodeGeneratorTest {
   @Test
-  void shouldDraw32UnbiasedBase62Characters() {
+  void shouldDraw8CharactersWithoutAmbiguousGlyphs() {
     String code = KolRegisterCodeGenerator.next();
-    assertThat(code).hasSize(KolRegisterCodeGenerator.LENGTH).matches("[0-9A-Za-z]{32}");
+    assertThat(code).hasSize(KolRegisterCodeGenerator.LENGTH).matches("[2-9A-HJ-NP-Z]{8}");
+  }
+
+  @Test
+  void normalize_uppercases() {
+    assertThat(KolRegisterCodeGenerator.normalize("ab2cdefg")).isEqualTo("AB2CDEFG");
   }
 }

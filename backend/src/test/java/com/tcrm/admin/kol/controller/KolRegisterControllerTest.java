@@ -24,7 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 class KolRegisterControllerTest {
-  private static final String CODE = "D".repeat(32);
+  private static final String CODE = "D2E3F4G5";
 
   private final KolSelfRegisterService registration = mock(KolSelfRegisterService.class);
   private final MockMvc mvc =
@@ -35,9 +35,12 @@ class KolRegisterControllerTest {
 
   @Test
   void shouldPreviewWithoutAToken() throws Exception {
-    when(registration.preview(CODE)).thenReturn(new KolRegisterPreview("Acme"));
+    when(registration.preview(
+            org.mockito.ArgumentMatchers.eq(CODE), org.mockito.ArgumentMatchers.anyString()))
+        .thenReturn(new KolRegisterPreview("Acme BD", "Acme"));
     mvc.perform(get("/kol-api/register/" + CODE))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.bdUserName").value("Acme BD"))
         .andExpect(jsonPath("$.data.tenantName").value("Acme"))
         .andExpect(jsonPath("$.data.code").doesNotExist());
   }
@@ -81,7 +84,7 @@ class KolRegisterControllerTest {
                     "{\"code\":\""
                         + CODE
                         + "\",\"email\":\"ada@example.com\",\"emailCode\":\"123456\","
-                        + "\"password\":\"register-pass-1\",\"whatsapp\":\"+15551234567\","
+                        + "\"password\":\"register-pass-1\",\"name\":\"Ada\",\"whatsapp\":\"+15551234567\","
                         + "\"primaryPlatform\":\"TikTok\",\"primaryHandle\":\"ada\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.tokenName").value("X-Kol-Token"))

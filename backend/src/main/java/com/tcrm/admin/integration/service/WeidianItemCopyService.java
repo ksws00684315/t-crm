@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
+import com.tcrm.admin.integration.api.WeidianBusinessApi.DeleteItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponseBlock;
@@ -161,6 +162,32 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
    * below are conjectured from API docs and observed messages; they must be verified against a real
    * Weidian account before M0.
    */
+  @Override
+  public DeleteResult deleteItem(long shopId, String weidianItemId) {
+    if (weidianItemId == null || weidianItemId.isBlank()) {
+      return new DeleteResult(false, "微店商品 ID 为空");
+    }
+    try {
+      weidian.deleteItem(shopId, new DeleteItemRequest(weidianItemId.strip()));
+      return new DeleteResult(true, null);
+    } catch (WeidianApiException e) {
+      if (isItemNotFound(e)) {
+        return new DeleteResult(true, null);
+      }
+      return new DeleteResult(false, chineseFailReason(e));
+    } catch (RuntimeException e) {
+      return new DeleteResult(false, chineseFailReason(e));
+    }
+  }
+
+  /** Operator-facing Chinese reason without tokens or secrets. */
+  static String chineseFailReason(Throwable e) {
+    if (e instanceof WeidianApiException api) {
+      return "微店删除失败（错误码 " + api.statusCode() + "）";
+    }
+    return "微店删除失败";
+  }
+
   static boolean isItemNotFound(WeidianApiException error) {
     if (error == null) {
       return false;
