@@ -43,32 +43,40 @@ const kol: KolVO = {
   status: 1,
   remark: null,
   whatsapp: null,
+  phone: null,
   linkTemplateId: null,
   linkTemplateName: null,
   inviteCode: null,
   sheetUrl: null,
   registerSource: 2,
   accountStatus: 1,
-  displayStatus: "PENDING_PROMOTION",
-  promotionStatus: "PENDING_PROMOTION",
+  reviewStatus: "APPROVED",
+  relationStatus: "PENDING_PROMOTION",
+  displayRelationStatus: "PENDING_PROMOTION",
+  loginStatus: "NORMAL",
+  platforms: [{ templateId: "7", templateName: "AgentOne", address: "https://brand.example/ada" }],
+  jumpTemplateId: "7",
+  configVersion: 1,
+  inviteTime: "2026-10-05T01:02:03Z",
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
 
 const config: promotionApi.PromotionConfigVO = {
   defaultRate: "0.1550",
-  platformTemplateIds: ["7"],
-  landingUrl: "https://brand.example/ada",
+  platforms: [{ templateId: "7", templateName: "AgentOne", address: "https://brand.example/ada" }],
   inviteCode: "ADA",
-  sheetUrl: null,
-  jumpTemplateId: null,
+  sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+  jumpTemplateId: "7",
   remark: null
 };
 
 const record: PromotionRecordVO = {
   changeType: "CONFIG",
-  before: { defaultRate: null, inviteCode: null, status: "PENDING_PROMOTION" },
-  after: { defaultRate: "0.1550", inviteCode: "ADA", status: "PENDING_PROMOTION" },
+  versionNo: 1,
+  effectiveTime: "2026-10-17T02:03:04Z",
+  before: { defaultRate: null, inviteCode: null, relationStatus: "PENDING_PROMOTION" },
+  after: { defaultRate: "0.1550", inviteCode: "ADA", relationStatus: "PENDING_PROMOTION" },
   remark: "首次填写",
   operatorName: "admin",
   createTime: "2026-10-17T02:03:04Z"
@@ -100,11 +108,11 @@ describe("promotion config drawer", () => {
     document.body.innerHTML = "";
     vi.mocked(promotionApi.getPromotionConfig).mockReset();
     vi.mocked(promotionApi.savePromotionConfig).mockReset();
-    vi.mocked(promotionApi.updatePromotionStatus).mockReset();
+    vi.mocked(promotionApi.updateRelationStatus).mockReset();
     vi.mocked(promotionApi.listPromotionRecords).mockReset();
     vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue(config);
     vi.mocked(promotionApi.savePromotionConfig).mockResolvedValue(null);
-    vi.mocked(promotionApi.updatePromotionStatus).mockResolvedValue(null);
+    vi.mocked(promotionApi.updateRelationStatus).mockResolvedValue(null);
     vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue(page([record]));
     vi.mocked(templateApi.listLinkTemplates).mockResolvedValue([enabledTemplate, disabledTemplate]);
   });
@@ -120,7 +128,7 @@ describe("promotion config drawer", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain("推广配置 - KOL-ASD001（Alice）");
     // el-input puts data-test on the native input; the value lives on the element, not the text.
-    const landing = document.body.querySelector<HTMLInputElement>('[data-test="landing-url"]');
+    const landing = document.body.querySelector<HTMLInputElement>('[data-test="platform-address"]');
     expect(landing?.value).toBe("https://brand.example/ada");
     // Change history renders the two changed fields with before → after values.
     expect(text).toContain("佣金比例：- → 15.5%");
@@ -165,27 +173,24 @@ describe("promotion config drawer", () => {
     await flushPromises();
     expect(promotionApi.savePromotionConfig).toHaveBeenCalledWith(kol.id, {
       defaultRate: "0.1550",
-      platformTemplateIds: ["7"],
-      landingUrl: "https://brand.example/ada",
+      platforms: [{ templateId: "7", address: "https://brand.example/ada" }],
       inviteCode: "ADA",
-      sheetUrl: null,
+      sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
       jumpTemplateId: "7",
       remark: null
     });
-    expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
+    expect(promotionApi.updateRelationStatus).not.toHaveBeenCalled();
     expect(success).toHaveBeenCalledWith("推广配置已保存");
     // A plain save keeps the drawer open so the new record can be checked.
     expect(wrapper.props("modelValue")).toBe(true);
     wrapper.unmount();
   });
 
-  it("blocks an invalid landing page before any request", async () => {
+  it("blocks an invalid platform-specific address before any request", async () => {
     const wrapper = await openDrawer();
-    await element("landing-url").setValue("http://brand.example");
+    await element("platform-address").setValue("http://brand.example");
     await element("config-save").trigger("click");
-    await vi.waitFor(() =>
-      expect(document.body.textContent).toContain("落地页地址须以 https:// 开头")
-    );
+    await vi.waitFor(() => expect(document.body.textContent).toContain("代购平台地址"));
     expect(promotionApi.savePromotionConfig).not.toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -194,15 +199,15 @@ describe("promotion config drawer", () => {
     vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
       ...config,
       defaultRate: null,
-      landingUrl: null
+      platforms: []
     });
     const wrapper = await openDrawer();
     await element("config-save-start").trigger("click");
     await flushPromises();
     expect(promotionApi.savePromotionConfig).not.toHaveBeenCalled();
-    expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
+    expect(promotionApi.updateRelationStatus).not.toHaveBeenCalled();
     expect(element("incomplete-alert").text()).toContain("佣金比例");
-    expect(element("incomplete-alert").text()).toContain("落地页地址");
+    expect(element("incomplete-alert").text()).toContain("代购平台");
     wrapper.unmount();
   });
 
@@ -212,25 +217,25 @@ describe("promotion config drawer", () => {
     await element("config-save-start").trigger("click");
     await flushPromises();
     expect(promotionApi.savePromotionConfig).toHaveBeenCalledTimes(1);
-    expect(promotionApi.updatePromotionStatus).toHaveBeenCalledWith(kol.id, "PROMOTING");
+    expect(promotionApi.updateRelationStatus).toHaveBeenCalledWith(kol.id, "PROMOTING");
     expect(success).toHaveBeenCalledWith("已保存并开始推广");
     expect(wrapper.emitted("saved")).toHaveLength(1);
     wrapper.unmount();
   });
 
   it("stays open with the missing list when the backend answers 422", async () => {
-    vi.mocked(promotionApi.updatePromotionStatus).mockRejectedValue(
+    vi.mocked(promotionApi.updateRelationStatus).mockRejectedValue(
       new ApiError({
         status: 422,
         errorCode: "KOL_PROMOTION_CONFIG_INCOMPLETE",
         traceId: "t-1",
-        payload: { missingFields: ["platformTemplateIds"] }
+        payload: ["platformAddress"]
       })
     );
     const wrapper = await openDrawer();
     await element("config-save-start").trigger("click");
     await flushPromises();
-    expect(element("incomplete-alert").text()).toContain("代购平台");
+    expect(element("incomplete-alert").text()).toContain("代购平台地址");
     // The config was saved; only the status change failed, so the drawer stays open.
     expect(promotionApi.savePromotionConfig).toHaveBeenCalledTimes(1);
     expect(wrapper.props("modelValue")).toBe(true);
@@ -242,8 +247,10 @@ describe("promotion config drawer", () => {
       page([
         {
           changeType: "STATUS",
-          before: { status: "PENDING_PROMOTION" },
-          after: { status: "PROMOTING" },
+          versionNo: null,
+          effectiveTime: null,
+          before: { relationStatus: "PENDING_PROMOTION" },
+          after: { relationStatus: "PROMOTING" },
           remark: null,
           operatorName: "bd5",
           createTime: "2026-10-17T05:00:00Z"

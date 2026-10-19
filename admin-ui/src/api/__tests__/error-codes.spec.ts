@@ -64,7 +64,8 @@ describe("error code messages", () => {
     const pending = [
       "USER_PERMISSION_INVALID",
       "KOL_PROMOTION_CONFIG_INCOMPLETE",
-      "KOL_ALREADY_CLAIMED"
+      "KOL_ALREADY_CLAIMED",
+      "KOL_REVIEW_REQUIRED"
     ].filter(code => !backend.includes(code));
     expect(extra.sort()).toEqual(pending.sort());
   });

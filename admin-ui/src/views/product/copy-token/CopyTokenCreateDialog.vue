@@ -72,12 +72,21 @@ watch(
           status: 1,
           remark: null,
           whatsapp: null,
+          phone: null,
           linkTemplateId: null,
           linkTemplateName: null,
           inviteCode: null,
           sheetUrl: null,
           registerSource: 1,
           accountStatus: 1,
+          reviewStatus: "APPROVED",
+          relationStatus: "PENDING_PROMOTION",
+          displayRelationStatus: "PENDING_PROMOTION",
+          loginStatus: "NORMAL",
+          platforms: [],
+          jumpTemplateId: null,
+          configVersion: null,
+          inviteTime: "",
           createTime: "",
           updateTime: ""
         }
@@ -99,8 +108,8 @@ async function searchKols(keyword: string) {
   }
   kolSearching.value = true;
   try {
-    const page = await listKols({ keyword: keyword.trim(), status: 1, page: 1, size: 20 });
-    kolOptions.value = page.items;
+    const page = await listKols({ keyword: keyword.trim(), page: 1, size: 100 });
+    kolOptions.value = page.items.filter(kol => kol.status === 1);
   } catch (error) {
     notifyError(error);
   } finally {

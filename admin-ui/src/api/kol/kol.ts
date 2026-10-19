@@ -1,17 +1,16 @@
 import { http } from "../http";
 import type { DownloadedFile } from "@/utils/http";
-import type { DisplayStatus, KolDetailVO, KolVO, PageResult } from "../types";
+import type { DisplayRelationStatus, KolDetailVO, KolVO, PageResult, ReviewStatus } from "../types";
 
 /** `KolQuery`; omitted fields mean "no filter". The backend ignores `bdUserId` for a BD. */
 export interface KolQuery {
   page?: number;
   size?: number;
   keyword?: string;
-  country?: string;
-  status?: 0 | 1;
   bdUserId?: string;
-  /** Filters by the shown status, `PENDING_UPDATE` included (task 25a). */
-  displayStatus?: DisplayStatus;
+  reviewStatus?: ReviewStatus;
+  relationStatus?: DisplayRelationStatus;
+  loginStatus?: "FROZEN" | "NORMAL_OR_ABNORMAL";
 }
 
 /** `SocialAccountRequest`. At most one account may set `primary`. */
@@ -31,13 +30,23 @@ export interface EditKolRequest {
   socialAccounts: SocialAccountRequest[];
   remark: string | null;
   whatsapp: string | null;
+  phone: string | null;
+}
+
+export interface ReviewKolRequest {
+  name: string;
+  phone: string | null;
+  whatsapp: string | null;
+  primaryPlatform: string | null;
+  primaryHandle: string | null;
+  country: string | null;
+  remark: string | null;
 }
 
 /** `GET` / `POST /kol/register-code`. `url` is the full creator-portal link. */
 export interface RegisterCodeVO {
   code: string;
   url: string;
-  status: 0 | 1;
 }
 
 /** Create body still carries email and the fields that seed promotion config. */
@@ -49,6 +58,7 @@ export interface CreateKolRequest {
   defaultRate: string | null;
   remark: string | null;
   whatsapp: string | null;
+  phone: string | null;
   linkTemplateId: string | null;
   inviteCode: string | null;
   sheetUrl: string | null;
@@ -78,6 +88,10 @@ export function createKol(request: CreateKolRequest): Promise<KolVO> {
 
 export function editKol(id: string, request: EditKolRequest): Promise<null> {
   return http.request<null>({ method: "put", url: `/kol/kols/${id}`, data: request });
+}
+
+export function reviewKol(id: string, request: ReviewKolRequest): Promise<null> {
+  return http.request<null>({ method: "post", url: `/kol/kols/${id}/review`, data: request });
 }
 
 export function updateKolStatus(id: string, status: 0 | 1): Promise<null> {

@@ -26,21 +26,30 @@ const row: KolVO = {
   name: "Alice",
   email: "alice@example.com",
   country: "US",
-  socialAccounts: [],
+  socialAccounts: [
+    { platform: "TikTok", handle: "@alice", url: null, followers: null, primary: true }
+  ],
   bdUserId: null,
   bdUserName: null,
   defaultRate: "0.1550",
   status: 1,
   remark: null,
   whatsapp: "+8613800000000",
+  phone: null,
   linkTemplateId: "7",
   linkTemplateName: "AgentOne",
   inviteCode: "ABC123",
   sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
   registerSource: 1,
   accountStatus: 0,
-  displayStatus: "PENDING_REVIEW",
-  promotionStatus: "PENDING_REVIEW",
+  reviewStatus: "APPROVED",
+  relationStatus: "PENDING_PROMOTION",
+  displayRelationStatus: "PENDING_PROMOTION",
+  loginStatus: "NORMAL",
+  platforms: [],
+  jumpTemplateId: null,
+  configVersion: 1,
+  inviteTime: "2026-10-05T01:02:03Z",
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
@@ -92,7 +101,7 @@ describe("KOL list page", () => {
     expect(text).toContain("KOL-ASD001");
     expect(text).toContain("15.5%");
     expect(text).toContain("未分配");
-    expect(text).toContain("启用");
+    expect(text).toContain("正常");
   });
 
   it("renders the creator list in English", async () => {
@@ -102,7 +111,7 @@ describe("KOL list page", () => {
     const text = wrapper.text();
     expect(text).toContain("Creator Code");
     expect(text).toContain("Unassigned");
-    expect(text).toContain("Enabled");
+    expect(text).toContain("Normal");
   });
 
   it("converts the string total before handing it to el-pagination", async () => {
@@ -204,23 +213,19 @@ describe("KOL list page", () => {
     expect(wrapper.text()).not.toContain("typed-only");
   });
 
-  it("shows the platform, the sheet link and the account, and can hide the platform column", async () => {
+  it("shows contact and primary platform, and can hide the platform column", async () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
-    const link = wrapper.get('[data-test="sheet-link"]');
-    expect(link.attributes("href")).toBe(row.sheetUrl);
-    expect(link.attributes("target")).toBe("_blank");
-    expect(link.attributes("rel")).toBe("noopener noreferrer");
-    expect(wrapper.get('[data-test="account"]').text()).toContain("未激活");
-    expect(wrapper.text()).toContain("AgentOne");
+    expect(wrapper.text()).toContain("+8613800000000");
+    expect(wrapper.text()).toContain("TikTok / @alice");
     await wrapper.get('[data-test="column-settings"]').trigger("click");
     await nextTick();
     const box = [...document.body.querySelectorAll(".el-checkbox")].find(element =>
-      element.textContent?.includes("代购平台")
+      element.textContent?.includes("核心社媒平台及 ID")
     );
     box?.querySelector("input")?.click();
     await nextTick();
-    expect(wrapper.text()).not.toContain("AgentOne");
+    expect(wrapper.text()).not.toContain("TikTok / @alice");
     wrapper.unmount();
   });
 
@@ -233,7 +238,9 @@ describe("KOL list page", () => {
     signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
     const activated = await mountPage("1", [{ ...row, accountStatus: 1 }]);
     expect(activated.find('[data-test="invite"]').exists()).toBe(false);
-    expect(activated.get('[data-test="account"]').text()).toContain("已激活");
+    expect(
+      activated.findAll('[data-test="login-status"]').some(tag => tag.text().includes("正常"))
+    ).toBe(true);
     activated.unmount();
 
     const selfRegistered = await mountPage("1", [{ ...row, registerSource: 2 }]);
@@ -242,8 +249,7 @@ describe("KOL list page", () => {
 
     const missing = await mountPage("1", [{ ...row, accountStatus: undefined }]);
     expect(missing.find('[data-test="invite"]').exists()).toBe(false);
-    expect(missing.find('[data-test="account"]').exists()).toBe(false);
-    expect(missing.text()).toContain("-");
+    expect(missing.find('[data-test="login-status"]').exists()).toBe(true);
     missing.unmount();
   });
 
@@ -328,21 +334,25 @@ describe("KOL list page", () => {
     signIn("STAFF", "OWN", ["kol:view", "kol:edit", "kol:register-link"]);
     vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
       code: "old-code",
-      url: "https://kol.example/register?c=old-code",
-      status: 1
+      url: "https://kol.example/register?code=old-code"
     });
     vi.mocked(kolApi.rotateRegisterCode).mockResolvedValue({
       code: "new-code",
-      url: "https://kol.example/register?c=new-code",
-      status: 1
+      url: "https://kol.example/register?code=new-code"
     });
     const wrapper = await mountPage();
     expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
     await wrapper.get('[data-test="register-link"]').trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("old-code");
-    expect(document.body.textContent).toContain("https://kol.example/register?c=old-code");
+    expect(document.body.textContent).toContain("https://kol.example/register?code=old-code");
     expect(document.body.textContent).toContain("把链接发给达人，达人注册后自动归属到你名下。");
+    const codeRow = wrapper.find('[data-test="register-code"]');
+    const linkRow = wrapper.find('[data-test="register-url"]');
+    expect(codeRow.exists()).toBe(true);
+    expect(linkRow.exists()).toBe(true);
+    expect(codeRow.find('[data-test="copy"]').exists()).toBe(true);
+    expect(linkRow.find('[data-test="copy"]').exists()).toBe(true);
 
     vi.spyOn(ElMessageBox, "confirm").mockRejectedValueOnce("cancel");
     document.body.querySelector<HTMLButtonElement>('[data-test="rotate-link"]')!.click();
@@ -354,49 +364,39 @@ describe("KOL list page", () => {
     document.body.querySelector<HTMLButtonElement>('[data-test="rotate-link"]')!.click();
     await flushPromises();
     expect(kolApi.rotateRegisterCode).toHaveBeenCalledTimes(1);
-    expect(document.body.textContent).toContain("https://kol.example/register?c=new-code");
+    expect(document.body.textContent).toContain("https://kol.example/register?code=new-code");
     expect(ElMessage.success).toHaveBeenCalledWith("已生成新的注册链接");
     wrapper.unmount();
   });
 
   it("shows every display status with its own tag", async () => {
     signIn("SUPER_ADMIN", "ALL");
-    const statuses = [
-      "PENDING_REVIEW",
-      "PENDING_PROMOTION",
-      "PROMOTING",
-      "ENDED",
-      "PENDING_UPDATE"
-    ] as const;
+    const statuses = ["PENDING_PROMOTION", "PROMOTING", "INVALID", "PENDING_UPDATE"] as const;
     const items = statuses.map((status, index) => ({
       ...row,
       id: `900719925474099${index}`,
-      displayStatus: status
+      reviewStatus: "APPROVED" as const,
+      relationStatus: status === "PENDING_UPDATE" ? ("PROMOTING" as const) : status,
+      displayRelationStatus: status
     }));
     const wrapper = await mountPage("5", items);
-    const tags = wrapper.findAll('[data-test="promotion-status"]');
-    expect(tags.map(tag => tag.text())).toEqual([
-      "待审核",
-      "待推广",
-      "推广中",
-      "合作结束",
-      "待更新"
-    ]);
-    const expectedTypes = ["warning", "primary", "success", "info", "danger"];
+    const tags = wrapper.findAll('[data-test="relation-status"]').filter(tag => tag.text() !== "-");
+    expect(tags.map(tag => tag.text())).toEqual(["待推广", "推广中", "无效", "待更新"]);
+    const expectedTypes = ["primary", "success", "info", "danger"];
     expectedTypes.forEach((type, index) => {
       expect(tags[index].find(".el-tag").classes()).toContain(`el-tag--${type}`);
     });
     // The account enabled/disabled column is renamed so only one column is called 状态.
-    expect(wrapper.text()).toContain("启用状态");
+    expect(wrapper.text()).toContain("审核状态");
     wrapper.unmount();
   });
 
-  it("sends the display status filter once applied and drops it with the chip", async () => {
+  it("sends the relation status filter once applied and drops it with the chip", async () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
     await wrapper.get('[data-test="search-expand"]').trigger("click");
     await nextTick();
-    await wrapper.get('[data-test="promotion-filter"]').trigger("click");
+    await wrapper.get('[data-test="relation-filter"]').trigger("click");
     await nextTick();
     const option = [...document.body.querySelectorAll(".el-select-dropdown__item")].find(item =>
       item.textContent?.includes("推广中")
@@ -407,7 +407,7 @@ describe("KOL list page", () => {
     await wrapper.get('[data-test="search"]').trigger("click");
     await flushPromises();
     expect(kolApi.listKols).toHaveBeenLastCalledWith(
-      expect.objectContaining({ displayStatus: "PROMOTING" })
+      expect.objectContaining({ relationStatus: "PROMOTING" })
     );
     expect(wrapper.text()).toContain("推广中");
 
@@ -418,15 +418,47 @@ describe("KOL list page", () => {
     chip!.get("button").trigger("click");
     await flushPromises();
     expect(kolApi.listKols).toHaveBeenLastCalledWith(
-      expect.objectContaining({ displayStatus: undefined })
+      expect.objectContaining({ relationStatus: undefined })
+    );
+    wrapper.unmount();
+  });
+
+  it("filters by PENDING_UPDATE and FROZEN using their independent query parameters", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="search-expand"]').trigger("click");
+    await nextTick();
+
+    await wrapper.get('[data-test="relation-filter"] .el-select__wrapper').trigger("click");
+    await flushPromises();
+    const pendingUpdate = [...document.body.querySelectorAll(".el-select-dropdown__item")].find(
+      item => item.textContent?.includes("待更新")
+    );
+    await new DOMWrapper(pendingUpdate!).trigger("click");
+    await wrapper.get('[data-test="login-filter"] .el-select__wrapper').trigger("click");
+    await flushPromises();
+    const frozen = [...document.body.querySelectorAll(".el-select-dropdown__item")].find(item =>
+      item.textContent?.includes("冻结")
+    );
+    await new DOMWrapper(frozen!).trigger("click");
+
+    vi.mocked(kolApi.listKols).mockClear();
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolApi.listKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({ relationStatus: "PENDING_UPDATE", loginStatus: "FROZEN" })
     );
     wrapper.unmount();
   });
 
   it("opens the review screen when clicking 待审核", async () => {
     signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
-    const wrapper = await mountPage("1", [{ ...row, displayStatus: "PENDING_REVIEW" }]);
-    await wrapper.get('[data-test="promotion-status"]').trigger("click");
+    const wrapper = await mountPage("1", [{ ...row, reviewStatus: "PENDING" }]);
+    const reviewTag = wrapper
+      .findAll('[data-test="review-status"]')
+      .filter(tag => tag.text().includes("待审核"))
+      .at(-1);
+    await new DOMWrapper(reviewTag!.element.parentElement!).trigger("click");
     await flushPromises();
     const dialog = wrapper.findComponent({ name: "KolFormDialog" });
     expect(dialog.props("modelValue")).toBe(true);
@@ -439,8 +471,7 @@ describe("KOL list page", () => {
     signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
     vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
       defaultRate: null,
-      platformTemplateIds: [],
-      landingUrl: null,
+      platforms: [],
       inviteCode: null,
       sheetUrl: null,
       jumpTemplateId: null,
@@ -452,8 +483,12 @@ describe("KOL list page", () => {
       page: 1,
       size: 10
     });
-    const wrapper = await mountPage("1", [{ ...row, displayStatus: "PENDING_PROMOTION" }]);
-    await wrapper.get('[data-test="promotion-status"]').trigger("click");
+    const wrapper = await mountPage("1", [{ ...row, displayRelationStatus: "PENDING_PROMOTION" }]);
+    const pendingTag = wrapper
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text().includes("待推广"))
+      .at(-1);
+    await new DOMWrapper(pendingTag!.element.parentElement!).trigger("click");
     await flushPromises();
     const drawer = wrapper.findComponent({ name: "PromotionConfigDrawer" });
     expect(drawer.props("modelValue")).toBe(true);
@@ -461,39 +496,165 @@ describe("KOL list page", () => {
     wrapper.unmount();
   });
 
-  it("opens the detail drawer for 推广中 and 合作结束", async () => {
-    signIn("SUPER_ADMIN", "ALL");
-    vi.mocked(kolApi.getKol).mockResolvedValue({ ...row, bdHistory: [] });
-    const promoting = await mountPage("1", [{ ...row, displayStatus: "PROMOTING" }]);
-    await promoting.get('[data-test="promotion-status"]').trigger("click");
+  it("opens read-only promotion settings for an unreviewed 待推广 creator", async () => {
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: null,
+      platforms: [],
+      inviteCode: null,
+      sheetUrl: null,
+      jumpTemplateId: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+    const wrapper = await mountPage("1", [
+      { ...row, reviewStatus: "PENDING", displayRelationStatus: "PENDING_PROMOTION" }
+    ]);
+    const pendingTag = wrapper
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text().includes("待推广"))
+      .at(-1);
+    await new DOMWrapper(pendingTag!.element.parentElement!).trigger("click");
     await flushPromises();
-    expect(promoting.findComponent({ name: "KolDetailDrawer" }).props("modelValue")).toBe(true);
+    const drawer = wrapper.findComponent({ name: "PromotionConfigDrawer" });
+    expect(drawer.props("modelValue")).toBe(true);
+    expect(drawer.props("readOnly")).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("opens read-only promotion records for 推广中 and 无效", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1550",
+      platforms: [],
+      inviteCode: "ADA",
+      sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+      jumpTemplateId: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+    const promoting = await mountPage("1", [{ ...row, displayRelationStatus: "PROMOTING" }]);
+    const promotingTag = promoting
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text() === "推广中")
+      .at(-1);
+    await new DOMWrapper(promotingTag!.element.parentElement!).trigger("click");
+    await flushPromises();
+    const promotingConfig = promoting.findComponent({ name: "PromotionConfigDrawer" });
+    expect(promotingConfig.props("modelValue")).toBe(true);
+    expect(promotingConfig.props("readOnly")).toBe(true);
     promoting.unmount();
 
-    const ended = await mountPage("1", [{ ...row, displayStatus: "ENDED" }]);
-    await ended.get('[data-test="promotion-status"]').trigger("click");
+    const ended = await mountPage("1", [{ ...row, displayRelationStatus: "INVALID" }]);
+    const endedTag = ended
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text() === "无效")
+      .at(-1);
+    await new DOMWrapper(endedTag!.element.parentElement!).trigger("click");
     await flushPromises();
-    expect(ended.findComponent({ name: "KolDetailDrawer" }).props("modelValue")).toBe(true);
-    expect(promotionApi.getPromotionConfig).not.toHaveBeenCalled();
+    const invalidConfig = ended.findComponent({ name: "PromotionConfigDrawer" });
+    expect(invalidConfig.props("modelValue")).toBe(true);
+    expect(invalidConfig.props("readOnly")).toBe(true);
+    expect(promotionApi.getPromotionConfig).toHaveBeenCalledWith(row.id);
     ended.unmount();
   });
 
   it("routes 待更新 to the BD transfer for a super admin, and to a hint for a BD", async () => {
     signIn("SUPER_ADMIN", "ALL");
-    const admin = await mountPage("1", [{ ...row, displayStatus: "PENDING_UPDATE" }]);
-    await admin.get('[data-test="promotion-status"]').trigger("click");
+    const admin = await mountPage("1", [{ ...row, displayRelationStatus: "PENDING_UPDATE" }]);
+    const adminTag = admin
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text() === "待更新")
+      .at(-1);
+    await new DOMWrapper(adminTag!.element.parentElement!).trigger("click");
     await flushPromises();
     expect(admin.findComponent({ name: "BdTransferDialog" }).props("modelValue")).toBe(true);
     admin.unmount();
 
     const info = vi.spyOn(ElMessage, "info").mockImplementation(() => ({}) as never);
     signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
-    const bd = await mountPage("1", [{ ...row, displayStatus: "PENDING_UPDATE" }]);
-    await bd.get('[data-test="promotion-status"]').trigger("click");
+    const bd = await mountPage("1", [{ ...row, displayRelationStatus: "PENDING_UPDATE" }]);
+    const bdTag = bd
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text() === "待更新")
+      .at(-1);
+    await new DOMWrapper(bdTag!.element.parentElement!).trigger("click");
     await flushPromises();
     expect(info).toHaveBeenCalledWith(expect.stringContaining("未绑定在职商务"));
     expect(bd.findComponent({ name: "BdTransferDialog" }).props("modelValue")).toBe(false);
     bd.unmount();
+  });
+
+  it("opens promotion records read-only for viewers and blocks review editing", async () => {
+    const info = vi.spyOn(ElMessage, "info").mockImplementation(() => ({}) as never);
+    signIn("STAFF", "ALL", ["kol:view"]);
+    const pending = await mountPage("1", [{ ...row, reviewStatus: "PENDING" }]);
+    const reviewTag = pending
+      .findAll('[data-test="review-status"]')
+      .filter(tag => tag.text().includes("待审核"))
+      .at(-1)!;
+    await new DOMWrapper(reviewTag.element.parentElement!).trigger("click");
+    expect(pending.findComponent({ name: "KolFormDialog" }).props("modelValue")).toBe(false);
+    expect(info).toHaveBeenCalledWith("当前账号只有查看权限，不能进入可编辑的审核或推广设置。");
+    pending.unmount();
+
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1550",
+      platforms: [],
+      inviteCode: "ADA",
+      sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+      jumpTemplateId: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+    const promoting = await mountPage("1", [
+      { ...row, reviewStatus: "APPROVED", displayRelationStatus: "PROMOTING" }
+    ]);
+    const relationTag = promoting
+      .findAll('[data-test="relation-status"]')
+      .filter(tag => tag.text() === "推广中")
+      .at(-1)!;
+    await new DOMWrapper(relationTag.element.parentElement!).trigger("click");
+    await flushPromises();
+    const config = promoting.findComponent({ name: "PromotionConfigDrawer" });
+    expect(config.props("modelValue")).toBe(true);
+    expect(config.props("readOnly")).toBe(true);
+    expect(config.find('[data-test="config-save"]').exists()).toBe(false);
+    promoting.unmount();
+  });
+
+  it("requires a reason up to 200 characters before manual cleanup", async () => {
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+    vi.mocked(promotionApi.cleanupKol).mockResolvedValue(null);
+    const prompt = vi
+      .spyOn(ElMessageBox, "prompt")
+      .mockResolvedValue({ value: "客户要求移除" } as never);
+    const wrapper = await mountPage();
+    await wrapper.get('tbody [data-test="manual-cleanup"]').trigger("click");
+    await flushPromises();
+    const options = prompt.mock.calls[0][2] as { inputValidator: (value: string) => boolean };
+    expect(prompt.mock.calls[0][0]).toContain("无法恢复");
+    expect(options.inputValidator(" ")).toBe(false);
+    expect(options.inputValidator("a".repeat(201))).toBe(false);
+    expect(options.inputValidator("有效原因")).toBe(true);
+    expect(promotionApi.cleanupKol).toHaveBeenCalledWith(row.id, "客户要求移除");
+    prompt.mockRestore();
+    wrapper.unmount();
   });
 
   it("offers the status change row action to editors only", async () => {
@@ -518,7 +679,7 @@ describe("KOL list page", () => {
       ...row,
       id: "9007199254740994",
       kolCode: "KOL-QWE002",
-      displayStatus: "PENDING_PROMOTION" as const
+      displayRelationStatus: "PENDING_PROMOTION" as const
     };
     const wrapper = await mountPage("2", [row, bob]);
     // The 422 shortcut must target the creator of THIS dialog, not a previously opened one.
@@ -541,24 +702,34 @@ describe("KOL list page", () => {
     const superAdmin = await mountPage();
     expect(superAdmin.find('[data-test="claim-kol"]').exists()).toBe(false);
     expect(superAdmin.find('[data-test="cleanup-config"]').exists()).toBe(true);
+    expect(
+      superAdmin.findAll(".el-tabs__item").some(item => item.text().includes("清理记录"))
+    ).toBe(true);
     superAdmin.unmount();
 
     signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
     const operator = await mountPage();
     expect(operator.find('[data-test="claim-kol"]').exists()).toBe(false);
     expect(operator.find('[data-test="cleanup-config"]').exists()).toBe(true);
+    expect(operator.findAll(".el-tabs__item").some(item => item.text().includes("清理记录"))).toBe(
+      true
+    );
     operator.unmount();
 
     signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
     const bd = await mountPage();
     expect(bd.find('[data-test="claim-kol"]').exists()).toBe(true);
     expect(bd.find('[data-test="cleanup-config"]').exists()).toBe(false);
+    expect(bd.findAll(".el-tabs__item").some(item => item.text().includes("清理记录"))).toBe(true);
     bd.unmount();
 
     signIn("STAFF", "ALL", ["kol:view"]);
     const viewer = await mountPage();
     expect(viewer.find('[data-test="claim-kol"]').exists()).toBe(false);
     expect(viewer.find('[data-test="cleanup-config"]').exists()).toBe(false);
+    expect(viewer.findAll(".el-tabs__item").some(item => item.text().includes("清理记录"))).toBe(
+      true
+    );
     viewer.unmount();
   });
 });

@@ -105,6 +105,7 @@ function chooseCompany() {
       >
     </el-form>
     <div class="auth-links">
+      <RouterLink to="/register">{{ t("login.signUp") }}</RouterLink>
       <RouterLink to="/forgot">{{ t("login.forgot") }}</RouterLink>
     </div>
     <el-dialog

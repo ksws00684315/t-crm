@@ -36,6 +36,7 @@ const enUS = {
     password: "Password",
     submit: "Sign in",
     forgot: "Forgot password?",
+    signUp: "Sign up",
     selectCompany: "Choose your company",
     chooseCompany: "Please choose a company.",
     continue: "Continue"
@@ -60,6 +61,7 @@ const enUS = {
   account: {
     title: "My account",
     kolCode: "Creator code",
+    phone: "Phone number",
     name: "Name",
     email: "Email",
     country: "Country",
@@ -193,20 +195,27 @@ const enUS = {
   },
   register: {
     title: "Create your account",
-    join: "Join {company}",
+    invitedBy: "Invited by {name}",
     invalidLink:
       "This registration link is invalid or has expired. Please contact your representative for a new link.",
     emailExists: "This email is already registered. Please sign in.",
     goToLogin: "Sign in",
+    inviteCode: "Business invite code",
+    codeInvalid: "Enter a valid 8-character invite code.",
+    invalidCode: "This invite code is invalid. Check it and try again.",
+    tryLater: "Too many attempts. Please try again later.",
+    nameRequired: "Enter your account name (up to 64 characters).",
+    socialPairRequired: "Enter both a primary platform and account name, or leave both blank.",
     sendCode: "Send code",
     resendIn: "Resend in {seconds}s",
     emailCode: "Verification code",
     emailCodeInvalid: "Enter the 6-digit verification code.",
     whatsapp: "WhatsApp",
     whatsappInvalid: "Enter a WhatsApp number starting with + and 8–15 digits.",
+    phone: "Phone number (optional)",
+    phoneInvalid: "Enter a phone number starting with + and 8–15 digits.",
     platformLabel: "Primary platform",
     platformPlaceholder: "Select a platform",
-    platformRequired: "Select your primary platform.",
     platforms: {
       TikTok: "TikTok",
       Instagram: "Instagram",
@@ -216,7 +225,6 @@ const enUS = {
       Other: "Other"
     },
     handle: "Account name",
-    handleRequired: "Enter your account name (up to 64 characters).",
     profileUrl: "Profile URL (optional)",
     urlInvalid: "Profile URL must start with https://.",
     more: "More (optional)",

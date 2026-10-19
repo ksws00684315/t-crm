@@ -2,14 +2,14 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { updatePromotionStatus } from "@/api/kol/promotion";
-import type { DisplayStatus, KolVO, PromotionStatus } from "@/api/types";
+import { updateRelationStatus } from "@/api/kol/promotion";
+import type { DisplayRelationStatus, KolVO, RelationStatus } from "@/api/types";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import {
   missingPromotionFields,
-  PROMOTION_STATUS_OPTIONS,
-  promotionStatusLabelKey
+  RELATION_STATUS_OPTIONS,
+  relationStatusLabelKey
 } from "@/utils/promotion";
 
 defineOptions({ name: "PromotionStatusDialog" });
@@ -23,12 +23,13 @@ const emit = defineEmits<{
   (event: "changed"): void;
   /** The 422 answer asked for the settings; the page opens the config drawer. */
   (event: "openConfig"): void;
+  (event: "openReview"): void;
 }>();
 
 const { t } = useI18n();
 
 const saving = ref(false);
-const target = ref<PromotionStatus | "">("");
+const target = ref<RelationStatus | "">("");
 const errorText = ref("");
 const missingKeys = ref<string[]>([]);
 /** True when the backend answered 422 incomplete, even without a readable field list. */
@@ -36,18 +37,20 @@ const incomplete = ref(false);
 
 const FIELD_KEYS = [
   "defaultRate",
-  "platformTemplateIds",
-  "landingUrl",
+  "platforms",
+  "platformAddress",
   "inviteCode",
-  "jumpTemplateId"
+  "jumpTemplateId",
+  "sheetUrl",
+  "review"
 ];
 
 function fieldLabel(key: string): string {
   return FIELD_KEYS.includes(key) ? t(`promotion.field.${key}`) : key;
 }
 
-function statusLabel(status: DisplayStatus): string {
-  return t(promotionStatusLabelKey(status));
+function statusLabel(status: DisplayRelationStatus): string {
+  return t(relationStatusLabelKey(status));
 }
 
 watch(
@@ -86,7 +89,7 @@ async function submit() {
   missingKeys.value = [];
   incomplete.value = false;
   try {
-    await updatePromotionStatus(kol.id, next);
+    await updateRelationStatus(kol.id, next);
     ElMessage.success(t("kol.statusChanged"));
     emit("changed");
     emit("update:modelValue", false);
@@ -108,7 +111,8 @@ async function submit() {
 }
 
 function goConfig(): void {
-  emit("openConfig");
+  if (missingKeys.value.includes("review")) emit("openReview");
+  else emit("openConfig");
   emit("update:modelValue", false);
 }
 </script>
@@ -132,7 +136,7 @@ function goConfig(): void {
       <el-form-item :label="t('kol.changeStatusTarget')">
         <el-select v-model="target" data-test="status-target" style="width: 220px">
           <el-option
-            v-for="status in PROMOTION_STATUS_OPTIONS"
+            v-for="status in RELATION_STATUS_OPTIONS"
             :key="status"
             :label="statusLabel(status)"
             :value="status"

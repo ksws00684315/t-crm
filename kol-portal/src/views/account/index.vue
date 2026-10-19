@@ -61,7 +61,7 @@ function save() {
     }}</el-button>
     <dl v-if="session.kol" class="profile">
       <template
-        v-for="field in ['kolCode', 'name', 'email', 'country', 'tenantName'] as const"
+        v-for="field in ['kolCode', 'name', 'email', 'phone', 'country', 'tenantName'] as const"
         :key="field"
         ><dt>{{ t(`account.${field}`) }}</dt>
         <dd>{{ session.kol[field] || t("account.unavailable") }}</dd></template

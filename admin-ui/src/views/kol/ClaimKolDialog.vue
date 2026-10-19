@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n";
 import { claimKol, findClaimableKol, type ClaimableKolVO } from "@/api/kol/promotion";
 import { notifyError } from "@/utils/notify";
 import { looksLikeKolCode, validateKolCode, validateKolEmail } from "@/utils/kol-validation";
-import { promotionStatusLabelKey, promotionTagType } from "@/utils/promotion";
+import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
 
 defineOptions({ name: "ClaimKolDialog" });
 
@@ -128,9 +128,9 @@ async function claim() {
       <el-descriptions-item :label="t('common.email')">{{
         result.maskedEmail
       }}</el-descriptions-item>
-      <el-descriptions-item :label="t('kol.promotionStatus')">
-        <el-tag :type="promotionTagType(result.displayStatus)">
-          {{ t(promotionStatusLabelKey(result.displayStatus)) }}
+      <el-descriptions-item :label="t('kol.relationStatus')">
+        <el-tag :type="relationTagType(result.displayRelationStatus)">
+          {{ t(relationStatusLabelKey(result.displayRelationStatus)) }}
         </el-tag>
       </el-descriptions-item>
     </el-descriptions>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { Link } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { inviteKol, listKols, updateKolStatus } from "@/api/kol/kol";
+import { cleanupKol } from "@/api/kol/promotion";
 import type { TransferTarget } from "@/api/kol/bd-transfer";
 import { listBdUsers } from "@/api/system/bd-user";
-import type { BdUserVO, DisplayStatus, KolVO } from "@/api/types";
+import type { BdUserVO, DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
@@ -16,13 +16,18 @@ import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
-import { canExport, kolAbilities, linkAbilities } from "@/utils/permission";
-import { DISPLAY_STATUSES, promotionStatusLabelKey, promotionTagType } from "@/utils/promotion";
+import { accessOf, canExport, kolAbilities, linkAbilities } from "@/utils/permission";
+import {
+  DISPLAY_RELATION_STATUSES,
+  relationStatusLabelKey,
+  relationTagType
+} from "@/utils/promotion";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
 import BdTransferDialog from "./BdTransferDialog.vue";
 import ClaimKolDialog from "./ClaimKolDialog.vue";
 import CleanupConfigDialog from "./CleanupConfigDialog.vue";
+import CleanupRecordsPage from "./CleanupRecordsPage.vue";
 import KolDetailDrawer from "./KolDetailDrawer.vue";
 import KolFormDialog from "./KolFormDialog.vue";
 import KolImportDialog from "./KolImportDialog.vue";
@@ -43,6 +48,7 @@ const abilities = computed(() => kolAbilities(me.user));
 const KOL_CREATE_ENABLED = false;
 const links = computed(() => linkAbilities(me.user));
 const exportAllowed = computed(() => canExport(me.user));
+const canViewCleanupRecords = computed(() => accessOf(me.user).can("kol:view"));
 const needsBdList = computed(
   () => abilities.value.canFilterBd || abilities.value.canAssignBd || abilities.value.canChangeBd
 );
@@ -55,59 +61,73 @@ const query = reactive<{
   page: number;
   size: number;
   keyword: string;
-  country: string;
-  status?: 0 | 1;
+  reviewStatus?: ReviewStatus;
+  relationStatus?: DisplayRelationStatus;
+  loginStatus?: "FROZEN" | "NORMAL_OR_ABNORMAL";
   bdUserId?: string;
-  displayStatus?: DisplayStatus;
-}>({ page: 1, size: readPageSize("kol", 20), keyword: "", country: "" });
+}>({ page: 1, size: readPageSize("kol", 20), keyword: "" });
 
 function asKol(row: object): KolVO {
   return row as KolVO;
 }
 
+function reviewStatusText(status?: ReviewStatus): string {
+  return status ? t(`kol.reviewStatusOption.${status}`) : "-";
+}
+
+function loginStatusText(status?: KolVO["loginStatus"]): string {
+  return status ? t(`kol.loginStatusOption.${status}`) : "-";
+}
+
+function relationStatusText(status?: DisplayRelationStatus): string {
+  return status ? t(relationStatusLabelKey(status)) : "-";
+}
+
 const columns = computed<DataColumn[]>(() => [
   { key: "kolCode", label: t("kol.code"), width: 160, mono: true },
   { key: "name", label: t("common.name"), prop: "name", minWidth: 120 },
+  { key: "contact", label: t("kol.phoneWhatsapp"), minWidth: 170 },
   { key: "email", label: t("common.email"), minWidth: 200, mono: true },
-  { key: "country", label: t("common.country"), prop: "country", width: 80 },
-  { key: "platform", label: t("kol.agentPlatform"), minWidth: 120 },
-  { key: "sheet", label: t("kol.sheet"), width: 70 },
+  { key: "platform", label: t("kol.primaryPlatform"), minWidth: 140 },
+  { key: "rate", label: t("kol.defaultRate"), width: 130 },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: 170, mono: true },
   { key: "bd", label: t("kol.bd"), minWidth: 110 },
-  { key: "rate", label: t("kol.defaultRate"), width: 110, amount: true },
-  { key: "promotion", label: t("kol.promotionStatus"), width: 100 },
-  { key: "status", label: t("kol.enableStatus"), width: 90 },
-  { key: "account", label: t("kol.account"), width: 100 },
-  { key: "createdAt", label: t("common.createdAt"), width: 180, mono: true },
-  { key: "actions", label: t("common.actions"), width: 460 }
+  { key: "review", label: t("kol.reviewStatus"), width: 100 },
+  { key: "login", label: t("kol.loginStatus"), width: 100 },
+  { key: "relation", label: t("kol.relationStatus"), width: 110 },
+  { key: "actions", label: t("common.actions"), width: 500 }
 ]);
 
 /** Chips and empty-state filter-count reflect the last applied search, not in-progress typing. */
 const applied = ref({
   keyword: "",
-  country: "",
-  status: undefined as 0 | 1 | undefined,
-  bdUserId: undefined as string | undefined,
-  displayStatus: undefined as DisplayStatus | undefined
+  reviewStatus: undefined as ReviewStatus | undefined,
+  relationStatus: undefined as DisplayRelationStatus | undefined,
+  loginStatus: undefined as ("FROZEN" | "NORMAL_OR_ABNORMAL") | undefined,
+  bdUserId: undefined as string | undefined
 });
 
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
   const keyword = applied.value.keyword;
-  const country = applied.value.country;
   if (keyword) list.push({ key: "keyword", label: t("common.keyword"), text: keyword });
-  if (country) list.push({ key: "country", label: t("common.country"), text: country });
-  if (applied.value.status === 0 || applied.value.status === 1) {
+  if (applied.value.reviewStatus)
     list.push({
-      key: "status",
-      label: t("kol.enableStatus"),
-      text: applied.value.status === 1 ? t("common.enabled") : t("common.disabled")
+      key: "reviewStatus",
+      label: t("kol.reviewStatus"),
+      text: t(`kol.reviewStatusOption.${applied.value.reviewStatus}`)
     });
-  }
-  if (applied.value.displayStatus) {
+  if (applied.value.relationStatus)
     list.push({
-      key: "displayStatus",
-      label: t("kol.promotionStatus"),
-      text: t(promotionStatusLabelKey(applied.value.displayStatus))
+      key: "relationStatus",
+      label: t("kol.relationStatus"),
+      text: t(relationStatusLabelKey(applied.value.relationStatus))
+    });
+  if (applied.value.loginStatus) {
+    list.push({
+      key: "loginStatus",
+      label: t("kol.loginStatus"),
+      text: t(`kol.loginStatusOption.${applied.value.loginStatus}`)
     });
   }
   if (applied.value.bdUserId) {
@@ -139,17 +159,13 @@ const invitingId = ref<string | null>(null);
 const promoSheetVisible = ref(false);
 const promoSheetKol = ref<KolVO | null>(null);
 const configVisible = ref(false);
+const configReadOnly = ref(false);
 const configKol = ref<KolVO | null>(null);
 const statusDialogVisible = ref(false);
 const statusDialogKol = ref<KolVO | null>(null);
 const claimVisible = ref(false);
 const cleanupVisible = ref(false);
-
-function accountText(status: 0 | 1 | undefined): string {
-  if (status === 0) return t("kol.accountInactive");
-  if (status === 1) return t("kol.accountActive");
-  return "";
-}
+const activeTab = ref("creators");
 
 function showInvite(row: KolVO): boolean {
   return abilities.value.canWrite && row.accountStatus === 0 && row.registerSource === 1;
@@ -175,10 +191,10 @@ async function load() {
 function appliedQuery() {
   return {
     keyword: applied.value.keyword || undefined,
-    country: applied.value.country || undefined,
-    status: applied.value.status,
-    bdUserId: abilities.value.canFilterBd ? applied.value.bdUserId || undefined : undefined,
-    displayStatus: applied.value.displayStatus
+    reviewStatus: applied.value.reviewStatus,
+    relationStatus: applied.value.relationStatus,
+    loginStatus: applied.value.loginStatus,
+    bdUserId: abilities.value.canFilterBd ? applied.value.bdUserId || undefined : undefined
   };
 }
 
@@ -189,17 +205,28 @@ const { exporting, exportCsv } = useListExport<KolVO>({
     { label: t("kol.code"), value: row => row.kolCode },
     { label: t("common.name"), value: row => row.name },
     { label: t("common.email"), value: row => row.email },
-    { label: t("common.country"), value: row => row.country ?? "" },
-    { label: t("kol.agentPlatform"), value: row => row.linkTemplateName ?? "" },
-    { label: t("kol.sheet"), value: row => row.sheetUrl ?? "" },
-    { label: t("kol.bd"), value: row => row.bdUserName ?? t("common.unassigned") },
-    { label: t("kol.defaultRate"), value: row => formatRate(row.defaultRate) },
+    { label: t("kol.phone"), value: row => row.phone ?? "" },
+    { label: t("kol.whatsapp"), value: row => row.whatsapp ?? "" },
     {
-      label: t("common.status"),
-      value: row => (row.status === 1 ? t("common.enabled") : t("common.disabled"))
+      label: t("kol.primaryPlatform"),
+      value: row => row.socialAccounts.find(item => item.primary)?.platform ?? ""
     },
-    { label: t("kol.account"), value: row => accountText(row.accountStatus) },
-    { label: t("common.createdAt"), value: row => formatInstant(row.createTime) }
+    {
+      label: t("kol.primaryHandle"),
+      value: row => row.socialAccounts.find(item => item.primary)?.handle ?? ""
+    },
+    {
+      label: t("kol.defaultRate"),
+      value: row =>
+        `${formatRate(row.defaultRate)} ${row.configVersion ? `v${row.configVersion}` : ""}`
+    },
+    { label: t("kol.inviteTime"), value: row => formatInstant(row.inviteTime) },
+    { label: t("kol.reviewStatus"), value: row => t(`kol.reviewStatusOption.${row.reviewStatus}`) },
+    { label: t("kol.loginStatus"), value: row => t(`kol.loginStatusOption.${row.loginStatus}`) },
+    {
+      label: t("kol.relationStatus"),
+      value: row => t(relationStatusLabelKey(row.displayRelationStatus))
+    }
   ]
 });
 
@@ -237,10 +264,10 @@ async function loadBdUsers() {
 function snapshotFilters(): void {
   applied.value = {
     keyword: query.keyword.trim(),
-    country: query.country.trim().toUpperCase(),
-    status: query.status,
-    bdUserId: abilities.value.canFilterBd ? query.bdUserId : undefined,
-    displayStatus: query.displayStatus
+    reviewStatus: query.reviewStatus,
+    relationStatus: query.relationStatus,
+    loginStatus: query.loginStatus,
+    bdUserId: abilities.value.canFilterBd ? query.bdUserId : undefined
   };
 }
 
@@ -252,19 +279,19 @@ function search() {
 
 function reset() {
   query.keyword = "";
-  query.country = "";
-  query.status = undefined;
+  query.reviewStatus = undefined;
+  query.relationStatus = undefined;
+  query.loginStatus = undefined;
   query.bdUserId = undefined;
-  query.displayStatus = undefined;
   search();
 }
 
 function removeChip(key: string): void {
   if (key === "keyword") query.keyword = "";
-  if (key === "country") query.country = "";
-  if (key === "status") query.status = undefined;
+  if (key === "reviewStatus") query.reviewStatus = undefined;
+  if (key === "relationStatus") query.relationStatus = undefined;
+  if (key === "loginStatus") query.loginStatus = undefined;
   if (key === "bd") query.bdUserId = undefined;
-  if (key === "displayStatus") query.displayStatus = undefined;
   search();
 }
 
@@ -289,8 +316,18 @@ function openEdit(row: KolVO) {
   formVisible.value = true;
 }
 
-function openConfig(row: KolVO) {
+function openReview(row: KolVO) {
+  editingKol.value = row;
+  reviewMode.value = true;
+  formVisible.value = true;
+}
+
+function openConfig(
+  row: KolVO,
+  readOnly = !abilities.value.canWrite || row.reviewStatus !== "APPROVED"
+) {
   configKol.value = row;
+  configReadOnly.value = readOnly;
   configVisible.value = true;
 }
 
@@ -303,21 +340,22 @@ function openStatusDialog(row: KolVO) {
  * Clicking the status tag opens the screen that status asks for (25b §3.2): review, promotion
  * settings, the promotion data in the detail drawer, or a BD transfer for "needs update".
  */
-function handleStatusClick(row: KolVO): void {
-  const status = row.displayStatus;
-  if (!status) return;
-  if (status === "PENDING_REVIEW") {
-    editingKol.value = row;
-    reviewMode.value = true;
-    formVisible.value = true;
-    return;
-  }
+function handleReviewStatusClick(row: KolVO): void {
+  if (row.reviewStatus !== "PENDING") return;
+  if (abilities.value.canWrite) openReview(row);
+  else ElMessage.info(t("kol.viewOnlyStatusHint"));
+}
+
+function handleRelationStatusClick(row: KolVO): void {
+  const status = row.displayRelationStatus;
   if (status === "PENDING_PROMOTION") {
-    openConfig(row);
+    // The status label is the shortcut to promotion configuration. Unreviewed
+    // creators open it read-only; the backend still requires review to save.
+    openConfig(row, !abilities.value.canWrite || row.reviewStatus !== "APPROVED");
     return;
   }
-  if (status === "PROMOTING" || status === "ENDED") {
-    openDetail(row);
+  if (status === "PROMOTING" || status === "INVALID") {
+    openConfig(row, true);
     return;
   }
   // PENDING_UPDATE: only the super administrator can reassign the BD.
@@ -376,9 +414,9 @@ async function toggleStatus(row: KolVO) {
   try {
     await ElMessageBox.confirm(
       disabling
-        ? t("kol.confirmDisable", { code: row.kolCode, name: row.name })
-        : t("kol.confirmEnable", { code: row.kolCode, name: row.name }),
-      disabling ? t("kol.disableTitle") : t("kol.enableTitle"),
+        ? t("kol.confirmFreeze", { code: row.kolCode, name: row.name })
+        : t("kol.confirmUnfreeze", { code: row.kolCode, name: row.name }),
+      disabling ? t("kol.freezeTitle") : t("kol.unfreezeTitle"),
       { type: "warning" }
     );
   } catch {
@@ -386,10 +424,31 @@ async function toggleStatus(row: KolVO) {
   }
   try {
     await updateKolStatus(row.id, target);
-    ElMessage.success(disabling ? t("kol.disabled") : t("kol.enabled"));
+    ElMessage.success(disabling ? t("kol.frozen") : t("kol.unfrozen"));
     await load();
   } catch (error) {
     notifyError(error);
+  }
+}
+
+async function manualCleanup(row: KolVO) {
+  try {
+    const result = await ElMessageBox.prompt(
+      t("cleanup.manualConfirm", { code: row.kolCode }),
+      t("cleanup.manualTitle"),
+      {
+        type: "warning",
+        inputType: "textarea",
+        inputPlaceholder: t("cleanup.reasonPlaceholder"),
+        inputValidator: value => Boolean(value?.trim()) && [...(value ?? "")].length <= 200,
+        inputErrorMessage: t("cleanup.reasonRequired")
+      }
+    );
+    await cleanupKol(row.id, result.value.trim());
+    ElMessage.success(t("cleanup.manualStarted"));
+    await load();
+  } catch (error) {
+    if (error !== "cancel" && error !== "close") notifyError(error);
   }
 }
 
@@ -401,274 +460,353 @@ onMounted(() => {
 
 <template>
   <div class="list-page">
-    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
-      <template #primary>
-        <el-form-item :label="t('common.keyword')">
-          <el-input
-            v-model="query.keyword"
-            clearable
-            maxlength="128"
-            :placeholder="t('kol.keywordPlaceholder')"
-          />
-        </el-form-item>
-        <el-form-item :label="t('common.country')">
-          <el-input
-            v-model="query.country"
-            clearable
-            maxlength="2"
-            :placeholder="t('kol.countryPlaceholder')"
-            style="width: 90px"
-          />
-        </el-form-item>
-      </template>
-      <template #more>
-        <el-form-item :label="t('common.status')">
-          <el-select
-            v-model="query.status"
-            clearable
-            :placeholder="t('common.all')"
-            style="width: 110px"
+    <el-tabs v-model="activeTab" class="kol-tabs">
+      <el-tab-pane :label="t('route.kols')" name="creators">
+        <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+          <template #primary>
+            <el-form-item :label="t('common.keyword')">
+              <el-input
+                v-model="query.keyword"
+                clearable
+                maxlength="128"
+                :placeholder="t('kol.keywordPlaceholder')"
+              />
+            </el-form-item>
+          </template>
+          <template #more>
+            <el-form-item :label="t('kol.reviewStatus')" data-test="review-filter">
+              <el-select
+                v-model="query.reviewStatus"
+                clearable
+                :placeholder="t('common.all')"
+                style="width: 130px"
+              >
+                <el-option :label="t('kol.reviewStatusOption.PENDING')" value="PENDING" />
+                <el-option :label="t('kol.reviewStatusOption.APPROVED')" value="APPROVED" />
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="t('kol.relationStatus')" data-test="relation-filter">
+              <el-select
+                v-model="query.relationStatus"
+                clearable
+                :placeholder="t('common.all')"
+                style="width: 150px"
+              >
+                <el-option
+                  v-for="status in DISPLAY_RELATION_STATUSES"
+                  :key="status"
+                  :label="t(relationStatusLabelKey(status))"
+                  :value="status"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="t('kol.loginStatus')" data-test="login-filter">
+              <el-select
+                v-model="query.loginStatus"
+                clearable
+                :placeholder="t('common.all')"
+                style="width: 150px"
+              >
+                <el-option :label="t('kol.loginStatusOption.FROZEN')" value="FROZEN" />
+                <el-option
+                  :label="t('kol.loginStatusOption.NORMAL_OR_ABNORMAL')"
+                  value="NORMAL_OR_ABNORMAL"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item v-if="abilities.canFilterBd" :label="t('kol.bd')" data-test="bd-filter">
+              <el-select
+                v-model="query.bdUserId"
+                clearable
+                filterable
+                :placeholder="t('common.all')"
+                style="width: 160px"
+              >
+                <el-option
+                  v-for="bd in bdUsers"
+                  :key="bd.id"
+                  :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
+                  :value="bd.id"
+                />
+              </el-select>
+            </el-form-item>
+          </template>
+          <template
+            v-if="
+              abilities.canWrite ||
+              abilities.canRegisterLink ||
+              abilities.canChangeBd ||
+              abilities.canClaimKol ||
+              abilities.canManageCleanup
+            "
+            #actions
           >
-            <el-option :label="t('common.enabled')" :value="1" />
-            <el-option :label="t('common.disabled')" :value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="t('kol.promotionStatus')" data-test="promotion-filter">
-          <el-select
-            v-model="query.displayStatus"
-            clearable
-            :placeholder="t('common.all')"
-            style="width: 140px"
-          >
-            <el-option
-              v-for="status in DISPLAY_STATUSES"
-              :key="status"
-              :label="t(promotionStatusLabelKey(status))"
-              :value="status"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="abilities.canFilterBd" :label="t('kol.bd')" data-test="bd-filter">
-          <el-select
-            v-model="query.bdUserId"
-            clearable
-            filterable
-            :placeholder="t('common.all')"
-            style="width: 160px"
-          >
-            <el-option
-              v-for="bd in bdUsers"
-              :key="bd.id"
-              :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
-              :value="bd.id"
-            />
-          </el-select>
-        </el-form-item>
-      </template>
-      <template
-        v-if="
-          abilities.canWrite ||
-          abilities.canRegisterLink ||
-          abilities.canChangeBd ||
-          abilities.canClaimKol ||
-          abilities.canManageCleanup
-        "
-        #actions
-      >
-        <el-button v-if="abilities.canClaimKol" data-test="claim-kol" @click="claimVisible = true">
-          {{ t("kol.claim") }}
-        </el-button>
-        <el-button
-          v-if="abilities.canManageCleanup"
-          data-test="cleanup-config"
-          @click="cleanupVisible = true"
-        >
-          {{ t("cleanup.title") }}
-        </el-button>
-        <el-button
-          v-if="abilities.canRegisterLink"
-          data-test="register-link"
-          @click="registerVisible = true"
-        >
-          {{ t("kol.registerLink") }}
-        </el-button>
-        <el-button
-          v-if="abilities.canChangeBd"
-          type="warning"
-          data-test="transfer-bd"
-          :disabled="selection.length === 0"
-          @click="openTransferSelected"
-        >
-          {{ t("bdTransfer.action") }}
-        </el-button>
-        <el-button
-          v-if="KOL_CREATE_ENABLED && abilities.canWrite"
-          type="success"
-          data-test="create"
-          @click="openCreate"
-        >
-          {{ t("kol.create") }}
-        </el-button>
-        <el-button
-          v-if="KOL_CREATE_ENABLED && abilities.canWrite"
-          data-test="import"
-          @click="importVisible = true"
-        >
-          {{ t("kol.import") }}
-        </el-button>
-      </template>
-    </ListSearch>
+            <el-button
+              v-if="abilities.canClaimKol"
+              data-test="claim-kol"
+              @click="claimVisible = true"
+            >
+              {{ t("kol.claim") }}
+            </el-button>
+            <el-button
+              v-if="abilities.canManageCleanup"
+              data-test="cleanup-config"
+              @click="cleanupVisible = true"
+            >
+              {{ t("cleanup.title") }}
+            </el-button>
+            <el-button
+              v-if="abilities.canRegisterLink"
+              data-test="register-link"
+              @click="registerVisible = true"
+            >
+              {{ t("kol.registerLink") }}
+            </el-button>
+            <el-button
+              v-if="abilities.canChangeBd"
+              type="warning"
+              data-test="transfer-bd"
+              :disabled="selection.length === 0"
+              @click="openTransferSelected"
+            >
+              {{ t("bdTransfer.action") }}
+            </el-button>
+            <el-button
+              v-if="KOL_CREATE_ENABLED && abilities.canWrite"
+              type="success"
+              data-test="create"
+              @click="openCreate"
+            >
+              {{ t("kol.create") }}
+            </el-button>
+            <el-button
+              v-if="KOL_CREATE_ENABLED && abilities.canWrite"
+              data-test="import"
+              @click="importVisible = true"
+            >
+              {{ t("kol.import") }}
+            </el-button>
+          </template>
+        </ListSearch>
 
-    <DataTable
-      table-id="kol"
-      :rows="rows"
-      :columns="columns"
-      :loading="loading"
-      :total="total"
-      :page="query.page"
-      :size="query.size"
-      :filter-count="chips.length"
-      :exportable="exportAllowed"
-      :exporting="exporting"
-      :selectable="abilities.canWrite"
-      @export="exportCsv"
-      @selection-change="selection = $event as KolVO[]"
-      @update:page="onPage"
-      @update:size="onSize"
-      @refresh="load"
-      @clear-filters="reset"
-    >
-      <template #batch>
-        <el-button
-          type="success"
-          plain
-          size="small"
-          :loading="batch.running.value"
-          data-test="batch-enable"
-          @click="batchStatus(1)"
-          >{{ t("batch.enable") }}</el-button
+        <DataTable
+          table-id="kol"
+          :rows="rows"
+          :columns="columns"
+          :loading="loading"
+          :total="total"
+          :page="query.page"
+          :size="query.size"
+          :filter-count="chips.length"
+          :exportable="exportAllowed"
+          :exporting="exporting"
+          :selectable="abilities.canWrite"
+          @export="exportCsv"
+          @selection-change="selection = $event as KolVO[]"
+          @update:page="onPage"
+          @update:size="onSize"
+          @refresh="load"
+          @clear-filters="reset"
         >
-        <el-button
-          type="danger"
-          plain
-          size="small"
-          :loading="batch.running.value"
-          data-test="batch-disable"
-          @click="batchStatus(0)"
-          >{{ t("batch.disable") }}</el-button
-        >
-      </template>
-      <template #cell-kolCode="{ row }"><CopyText :value="asKol(row).kolCode" /></template>
-      <template #cell-email="{ row }"><CopyText :value="asKol(row).email" /></template>
-      <template #cell-platform="{ row }">{{ asKol(row).linkTemplateName || "-" }}</template>
-      <template #cell-sheet="{ row }">
-        <a
-          v-if="asKol(row).sheetUrl"
-          data-test="sheet-link"
-          :href="asKol(row).sheetUrl ?? ''"
-          target="_blank"
-          rel="noopener noreferrer"
-          :aria-label="t('kol.openSheet')"
-        >
-          <el-icon><Link /></el-icon>
-        </a>
-        <span v-else>-</span>
-      </template>
-      <template #cell-bd="{ row }">{{ asKol(row).bdUserName ?? t("common.unassigned") }}</template>
-      <template #cell-rate="{ row }">{{ formatRate(asKol(row).defaultRate) }}</template>
-      <template #cell-promotion="{ row }">
-        <span
-          v-if="asKol(row).displayStatus"
-          class="status-tag"
-          data-test="promotion-status"
-          @click="handleStatusClick(asKol(row))"
-        >
-          <el-tag :type="promotionTagType(asKol(row).displayStatus!)">
-            {{ t(promotionStatusLabelKey(asKol(row).displayStatus!)) }}
-          </el-tag>
-        </span>
-        <span v-else>-</span>
-      </template>
-      <template #cell-status="{ row }">
-        <el-tag :type="asKol(row).status === 1 ? 'success' : 'info'">
-          {{ asKol(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
-        </el-tag>
-      </template>
-      <template #cell-account="{ row }">
-        <el-tag
-          v-if="asKol(row).accountStatus === 0 || asKol(row).accountStatus === 1"
-          data-test="account"
-          :type="asKol(row).accountStatus === 1 ? 'success' : 'info'"
-        >
-          {{ accountText(asKol(row).accountStatus) }}
-        </el-tag>
-        <span v-else>-</span>
-      </template>
-      <template #cell-createdAt="{ row }">{{ formatInstant(asKol(row).createTime) }}</template>
-      <template #actions="{ row }">
-        <el-button link type="primary" @click="openDetail(asKol(row))">{{
-          t("common.detail")
-        }}</el-button>
-        <el-button
-          v-if="links.canViewLinks"
-          link
-          type="primary"
-          data-test="links"
-          @click="openLinks(asKol(row))"
-        >
-          {{ t("kol.links") }}
-        </el-button>
-        <el-button
-          v-if="abilities.canWrite"
-          link
-          type="primary"
-          data-test="promo-sheet"
-          @click="openPromoSheet(asKol(row))"
-        >
-          {{ t("promoSheet.open") }}
-        </el-button>
-        <el-button
-          v-if="showInvite(asKol(row))"
-          link
-          type="primary"
-          data-test="invite"
-          :loading="invitingId === asKol(row).id"
-          @click="sendInvite(asKol(row))"
-        >
-          {{ t("kol.invite") }}
-        </el-button>
-        <template v-if="abilities.canWrite">
-          <el-button link type="primary" data-test="edit" @click="openEdit(asKol(row))">
-            {{ t("common.edit") }}
-          </el-button>
-          <el-button
-            link
-            type="primary"
-            data-test="change-status"
-            @click="openStatusDialog(asKol(row))"
+          <template #batch>
+            <el-button
+              type="success"
+              plain
+              size="small"
+              :loading="batch.running.value"
+              data-test="batch-enable"
+              @click="batchStatus(1)"
+              >{{ t("batch.enable") }}</el-button
+            >
+            <el-button
+              type="danger"
+              plain
+              size="small"
+              :loading="batch.running.value"
+              data-test="batch-disable"
+              @click="batchStatus(0)"
+              >{{ t("batch.disable") }}</el-button
+            >
+          </template>
+          <template #cell-kolCode="{ row }"><CopyText :value="asKol(row).kolCode" /></template>
+          <template #cell-email="{ row }"><CopyText :value="asKol(row).email" /></template>
+          <template #cell-contact="{ row }">{{
+            [asKol(row).phone, asKol(row).whatsapp].filter(Boolean).join(" / ") || "-"
+          }}</template>
+          <template #cell-platform="{ row }">
+            {{ asKol(row).socialAccounts.find(item => item.primary)?.platform || "-" }} /
+            {{ asKol(row).socialAccounts.find(item => item.primary)?.handle || "-" }}
+          </template>
+          <template #cell-bd="{ row }">{{
+            asKol(row).bdUserName ?? t("common.unassigned")
+          }}</template>
+          <template #cell-rate="{ row }"
+            >{{ formatRate(asKol(row).defaultRate) }}
+            <a v-if="asKol(row).configVersion" href="#" @click.prevent="openConfig(asKol(row))"
+              >v{{ asKol(row).configVersion }}</a
+            ></template
           >
-            {{ t("kol.changeStatus") }}
-          </el-button>
-          <el-button
-            link
-            :type="asKol(row).status === 1 ? 'danger' : 'success'"
-            data-test="status"
-            @click="toggleStatus(asKol(row))"
-          >
-            {{ asKol(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
-          </el-button>
-        </template>
-        <el-button
-          v-if="abilities.canChangeBd && asKol(row).id"
-          link
-          type="warning"
-          data-test="change-bd"
-          @click="openBd(asKol(row))"
-        >
-          {{ t("kol.changeBd") }}
-        </el-button>
-      </template>
-    </DataTable>
+          <template #cell-inviteTime="{ row }">{{ formatInstant(asKol(row).inviteTime) }}</template>
+          <template #cell-review="{ row }">
+            <span
+              class="status-interaction"
+              :role="
+                abilities.canWrite && asKol(row).reviewStatus === 'PENDING' ? 'button' : undefined
+              "
+              :tabindex="abilities.canWrite && asKol(row).reviewStatus === 'PENDING' ? 0 : -1"
+              @click="handleReviewStatusClick(asKol(row))"
+              @keydown.enter.prevent="handleReviewStatusClick(asKol(row))"
+              @keydown.space.prevent="handleReviewStatusClick(asKol(row))"
+            >
+              <el-tag
+                :type="asKol(row).reviewStatus === 'APPROVED' ? 'success' : 'warning'"
+                class="status-tag"
+                data-test="review-status"
+                >{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag
+              >
+            </span>
+          </template>
+          <template #cell-login="{ row }">
+            <el-tag
+              :type="
+                asKol(row).loginStatus === 'NORMAL'
+                  ? 'success'
+                  : asKol(row).loginStatus === 'FROZEN'
+                    ? 'info'
+                    : 'warning'
+              "
+              data-test="login-status"
+              >{{ loginStatusText(asKol(row).loginStatus) }}</el-tag
+            >
+          </template>
+          <template #cell-relation="{ row }">
+            <span
+              class="status-interaction"
+              :role="
+                abilities.canWrite ||
+                ['PROMOTING', 'INVALID'].includes(asKol(row).displayRelationStatus)
+                  ? 'button'
+                  : undefined
+              "
+              :tabindex="
+                abilities.canWrite ||
+                ['PROMOTING', 'INVALID'].includes(asKol(row).displayRelationStatus)
+                  ? 0
+                  : -1
+              "
+              @click="handleRelationStatusClick(asKol(row))"
+              @keydown.enter.prevent="handleRelationStatusClick(asKol(row))"
+              @keydown.space.prevent="handleRelationStatusClick(asKol(row))"
+            >
+              <el-tag
+                class="status-tag"
+                data-test="relation-status"
+                :type="
+                  asKol(row).displayRelationStatus
+                    ? relationTagType(asKol(row).displayRelationStatus)
+                    : 'info'
+                "
+                >{{ relationStatusText(asKol(row).displayRelationStatus) }}</el-tag
+              >
+            </span>
+          </template>
+          <template #actions="{ row }">
+            <el-button link type="primary" @click="openDetail(asKol(row))">{{
+              t("common.detail")
+            }}</el-button>
+            <el-button
+              v-if="links.canViewLinks"
+              link
+              type="primary"
+              data-test="links"
+              @click="openLinks(asKol(row))"
+            >
+              {{ t("kol.links") }}
+            </el-button>
+            <el-button
+              v-if="abilities.canWrite"
+              link
+              type="primary"
+              data-test="promo-sheet"
+              @click="openPromoSheet(asKol(row))"
+            >
+              {{ t("promoSheet.open") }}
+            </el-button>
+            <el-button
+              v-if="showInvite(asKol(row))"
+              link
+              type="primary"
+              data-test="invite"
+              :loading="invitingId === asKol(row).id"
+              @click="sendInvite(asKol(row))"
+            >
+              {{ t("kol.invite") }}
+            </el-button>
+            <template v-if="abilities.canWrite">
+              <el-button link type="primary" data-test="edit" @click="openEdit(asKol(row))">
+                {{ t("common.edit") }}
+              </el-button>
+              <el-button
+                v-if="asKol(row).reviewStatus === 'PENDING'"
+                link
+                type="primary"
+                data-test="review"
+                @click="openReview(asKol(row))"
+                >{{ t("kol.review") }}</el-button
+              >
+              <el-button
+                v-if="asKol(row).reviewStatus === 'APPROVED'"
+                link
+                type="primary"
+                data-test="promotion-config"
+                @click="openConfig(asKol(row))"
+                >{{ t("promotion.configTitle") }}</el-button
+              >
+              <el-button
+                link
+                type="primary"
+                data-test="change-status"
+                @click="openStatusDialog(asKol(row))"
+                >{{ t("kol.changeRelationStatus") }}</el-button
+              >
+              <el-button
+                link
+                :type="asKol(row).status === 1 ? 'danger' : 'success'"
+                data-test="status"
+                @click="toggleStatus(asKol(row))"
+              >
+                {{ asKol(row).status === 1 ? t("kol.freeze") : t("kol.unfreeze") }}
+              </el-button>
+              <el-button
+                link
+                type="danger"
+                data-test="manual-cleanup"
+                @click="manualCleanup(asKol(row))"
+                >{{ t("cleanup.manual") }}</el-button
+              >
+            </template>
+            <el-button
+              v-if="abilities.canChangeBd && asKol(row).id"
+              link
+              type="warning"
+              data-test="change-bd"
+              @click="openBd(asKol(row))"
+            >
+              {{ t("kol.changeBd") }}
+            </el-button>
+          </template>
+        </DataTable>
+      </el-tab-pane>
+      <el-tab-pane
+        v-if="canViewCleanupRecords"
+        :label="t('cleanup.records')"
+        name="cleanup"
+        lazy
+        data-test="cleanup-records-tab"
+      >
+        <CleanupRecordsPage :can-write="abilities.canWrite" />
+      </el-tab-pane>
+    </el-tabs>
 
     <KolFormDialog
       v-model="formVisible"
@@ -692,12 +830,19 @@ onMounted(() => {
       :kol-id="promoSheetKol?.id ?? null"
       :kol-label="promoSheetKol ? `${promoSheetKol.name} (${promoSheetKol.kolCode})` : ''"
     />
-    <PromotionConfigDrawer v-model="configVisible" :kol="configKol" @saved="load" />
+    <PromotionConfigDrawer
+      v-model="configVisible"
+      :kol="configKol"
+      :read-only="configReadOnly"
+      @saved="load"
+      @open-review="configKol && openReview(configKol)"
+    />
     <PromotionStatusDialog
       v-model="statusDialogVisible"
       :kol="statusDialogKol"
       @changed="load"
       @open-config="statusDialogKol && openConfig(statusDialogKol)"
+      @open-review="statusDialogKol && openReview(statusDialogKol)"
     />
     <ClaimKolDialog v-model="claimVisible" @claimed="load" />
     <CleanupConfigDialog v-model="cleanupVisible" />
@@ -707,5 +852,15 @@ onMounted(() => {
 <style scoped>
 .status-tag {
   cursor: pointer;
+}
+
+.status-interaction {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.status-interaction:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 </style>

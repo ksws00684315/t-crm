@@ -104,14 +104,10 @@ export interface SocialAccountVO {
   primary: boolean;
 }
 
-/** Stored promotion status of a creator (ADR-023 §2). */
-export type PromotionStatus = "PENDING_REVIEW" | "PENDING_PROMOTION" | "PROMOTING" | "ENDED";
-
-/**
- * Status shown in lists and drawers: the stored status, or `PENDING_UPDATE` when the creator has
- * no active BD. Optional until task 25a returns it.
- */
-export type DisplayStatus = PromotionStatus | "PENDING_UPDATE";
+export type ReviewStatus = "PENDING" | "APPROVED";
+export type RelationStatus = "PENDING_PROMOTION" | "PROMOTING" | "INVALID";
+export type DisplayRelationStatus = RelationStatus | "PENDING_UPDATE";
+export type LoginStatus = "NORMAL" | "FROZEN" | "ABNORMAL";
 
 /** `KolVO`. `defaultRate` is a fraction with 4 decimals ("0.1550" = 15.5%), null when not set. */
 export interface KolVO {
@@ -130,6 +126,7 @@ export interface KolVO {
   status: 0 | 1;
   remark: string | null;
   whatsapp: string | null;
+  phone: string | null;
   /** Enabled template id, or a disabled one still stored on the creator. */
   linkTemplateId: string | null;
   linkTemplateName: string | null;
@@ -141,14 +138,14 @@ export interface KolVO {
    * 0 not activated, 1 activated. Task 12c adds this to `KolVO`; until then the field may be absent.
    */
   accountStatus?: 0 | 1;
-  /** Promotion status (task 25a); absent until the backend returns it. */
-  promotionStatus?: PromotionStatus | null;
-  /** Stored status, or `PENDING_UPDATE` without an active BD; absent until task 25a. */
-  displayStatus?: DisplayStatus | null;
-  /** Creator landing page (https). */
-  landingUrl?: string | null;
-  /** Selected purchasing-platform templates (multi-select, task 25a). */
-  platformTemplateIds?: string[];
+  reviewStatus: ReviewStatus;
+  relationStatus: RelationStatus;
+  displayRelationStatus: DisplayRelationStatus;
+  loginStatus: LoginStatus;
+  platforms: Array<{ templateId: string; templateName: string; address: string }>;
+  jumpTemplateId: string | null;
+  configVersion: number | null;
+  inviteTime: string;
   createTime: string;
   updateTime: string;
 }
