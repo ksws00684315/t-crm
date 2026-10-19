@@ -308,7 +308,7 @@ describe("kolAbilities", () => {
       canChangeBd: true,
       canAssignBd: true,
       canFilterBd: true,
-      canRegisterLink: true,
+      canRegisterLink: false,
       canCopyToken: true,
       canClaimKol: false,
       canManageCleanup: true
@@ -328,7 +328,7 @@ describe("kolAbilities", () => {
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: false,
+      canRegisterLink: true,
       canCopyToken: false,
       canClaimKol: true,
       canManageCleanup: false
@@ -348,7 +348,7 @@ describe("kolAbilities", () => {
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
-      canRegisterLink: true,
+      canRegisterLink: false,
       canCopyToken: false,
       canClaimKol: false,
       canManageCleanup: false

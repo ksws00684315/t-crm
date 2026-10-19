@@ -34,6 +34,7 @@ const RECORD_FIELD_KEYS = [
   "landingUrl",
   "inviteCode",
   "sheetUrl",
+  "jumpTemplateId",
   "status"
 ];
 
@@ -65,6 +66,7 @@ const form = reactive({
   landingUrl: "",
   inviteCode: "",
   sheetUrl: "",
+  jumpTemplateId: null as string | null,
   note: ""
 });
 
@@ -86,6 +88,11 @@ const templateOptions = computed(() =>
   templates.value
     .filter(item => item.status === 1)
     .map(item => ({ id: item.id, label: item.templateName }))
+);
+
+/** Jump platform dropdown lists only the platforms already selected. */
+const jumpTemplateOptions = computed(() =>
+  templateOptions.value.filter(item => form.platformTemplateIds.includes(item.id))
 );
 
 function templateName(id: string): string {
@@ -141,6 +148,19 @@ watch(
   }
 );
 
+watch(
+  () => [...form.platformTemplateIds],
+  ids => {
+    if (ids.length === 1) {
+      form.jumpTemplateId = ids[0] ?? null;
+      return;
+    }
+    if (form.jumpTemplateId && !ids.includes(form.jumpTemplateId)) {
+      form.jumpTemplateId = null;
+    }
+  }
+);
+
 async function loadAll() {
   const id = props.kol?.id;
   if (!id) return;
@@ -157,6 +177,7 @@ async function loadAll() {
     form.landingUrl = config.landingUrl ?? "";
     form.inviteCode = config.inviteCode ?? "";
     form.sheetUrl = config.sheetUrl ?? "";
+    form.jumpTemplateId = config.jumpTemplateId ?? null;
     form.note = "";
     records.value = recordPage.items;
     recordsTotal.value = Number(recordPage.total);
@@ -188,6 +209,7 @@ function requestBody() {
     landingUrl: form.landingUrl.trim() || null,
     inviteCode: form.inviteCode.trim() || null,
     sheetUrl: form.sheetUrl.trim() || null,
+    jumpTemplateId: form.jumpTemplateId,
     remark: form.note.trim() || null
   };
 }
@@ -232,7 +254,8 @@ async function saveAndStart() {
     defaultRate: percentToRate(form.percent),
     platformTemplateIds: form.platformTemplateIds,
     landingUrl: form.landingUrl.trim() || null,
-    inviteCode: form.inviteCode.trim() || null
+    inviteCode: form.inviteCode.trim() || null,
+    jumpTemplateId: form.jumpTemplateId
   });
   if (missing.length > 0) {
     showIncomplete(missing);
@@ -306,6 +329,22 @@ function onRecordsPage(page: number): void {
           >
             <el-option
               v-for="item in templateOptions"
+              :key="item.id"
+              :label="item.label"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('promotion.jumpTemplate')" data-test="jump-template">
+          <el-select
+            v-model="form.jumpTemplateId"
+            clearable
+            filterable
+            :placeholder="t('promotion.jumpTemplatePlaceholder')"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in jumpTemplateOptions"
               :key="item.id"
               :label="item.label"
               :value="item.id"

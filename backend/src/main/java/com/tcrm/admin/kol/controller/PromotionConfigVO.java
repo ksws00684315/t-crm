@@ -9,6 +9,7 @@ public record PromotionConfigVO(
     String landingUrl,
     String inviteCode,
     String sheetUrl,
+    Long jumpTemplateId,
     String remark) {
   static PromotionConfigVO from(KolPromotionService.PromotionConfigDTO d) {
     return new PromotionConfigVO(
@@ -17,6 +18,7 @@ public record PromotionConfigVO(
         d.landingUrl(),
         d.inviteCode(),
         d.sheetUrl(),
+        d.jumpTemplateId(),
         d.remark());
   }
 }

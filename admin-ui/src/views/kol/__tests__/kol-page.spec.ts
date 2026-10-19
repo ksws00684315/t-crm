@@ -103,7 +103,6 @@ describe("KOL list page", () => {
     expect(text).toContain("Creator Code");
     expect(text).toContain("Unassigned");
     expect(text).toContain("Enabled");
-    expect(text).toContain("My registration link");
   });
 
   it("converts the string total before handing it to el-pagination", async () => {
@@ -310,13 +309,18 @@ describe("KOL list page", () => {
     wrapper.unmount();
   });
 
-  it("shows the registration link only with kol:register-link and rotates it after confirmation", async () => {
+  it("shows the registration link only to an enabled OWN-scope BD with kol:edit", async () => {
     signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
     const writer = await mountPage();
     expect(writer.find('[data-test="register-link"]').exists()).toBe(false);
     writer.unmount();
 
-    signIn("STAFF", "OWN", ["kol:view", "kol:register-link"]);
+    signIn("SUPER_ADMIN", "ALL");
+    const admin = await mountPage();
+    expect(admin.find('[data-test="register-link"]').exists()).toBe(false);
+    admin.unmount();
+
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
     vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
       code: "old-code",
       url: "https://kol.example/register?c=old-code",
@@ -331,6 +335,7 @@ describe("KOL list page", () => {
     expect(wrapper.find('[data-test="create"]').exists()).toBe(false);
     await wrapper.get('[data-test="register-link"]').trigger("click");
     await flushPromises();
+    expect(document.body.textContent).toContain("old-code");
     expect(document.body.textContent).toContain("https://kol.example/register?c=old-code");
     expect(document.body.textContent).toContain("把链接发给达人，达人注册后自动归属到你名下。");
 
@@ -433,6 +438,7 @@ describe("KOL list page", () => {
       landingUrl: null,
       inviteCode: null,
       sheetUrl: null,
+      jumpTemplateId: null,
       remark: null
     });
     vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({

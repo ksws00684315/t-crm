@@ -88,7 +88,8 @@ public class ImportTaskService implements ImportTaskApi {
       ImportFileDTO file,
       Supplier<ImportRowProcessor> processor,
       int maxRows) {
-    excel.check(file);
+    boolean allowCsv = type == TaskType.ORDER_IMPORT || type == TaskType.REFUND_IMPORT;
+    excel.check(file, allowCsv);
     // The file must carry one full template language; the worker later re-reads the same variant.
     List<List<String>> variants =
         new ArrayList<>(variants(headerKeys, AppLocale.ZH_CN, AppLocale.EN_US));
@@ -108,7 +109,13 @@ public class ImportTaskService implements ImportTaskApi {
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
     input.setFileName(fileName(file.fileName()));
-    input.setContentType(XLSX_CONTENT_TYPE);
+    String storedType =
+        allowCsv
+                && file.fileName() != null
+                && file.fileName().toLowerCase(java.util.Locale.ROOT).endsWith(".csv")
+            ? "text/csv"
+            : XLSX_CONTENT_TYPE;
+    input.setContentType(storedType);
     input.setContent(file.content());
     tx.executeWithoutResult(
         status -> {

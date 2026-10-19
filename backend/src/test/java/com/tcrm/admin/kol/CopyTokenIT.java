@@ -276,6 +276,64 @@ class CopyTokenIT {
         .andExpect(jsonPath("$.data.items[0].displayStatus").value("EXPIRED"));
   }
 
+  @Test
+  void shouldCreateWithTargetShop_andRejectDisabledOrForeign() throws Exception {
+    long kolId = createKol("ShopTok", "shoptok28@example.com", null);
+    long shopId =
+        Long.parseLong(
+            json.readTree(
+                    mvc.perform(
+                            post("/admin-api/product/shops")
+                                .header(ADMIN_TOKEN, admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                    "{\"shopName\":\"Copy Shop\",\"weidianShopId\":\"28001\"}"))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString())
+                .at("/data/id")
+                .asText());
+
+    mvc.perform(
+            post("/admin-api/kol/copy-tokens")
+                .header(ADMIN_TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"kolId\":\""
+                        + kolId
+                        + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\""
+                        + shopId
+                        + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.targetShopId").value(String.valueOf(shopId)));
+
+    jdbc.update("UPDATE crm_shop SET status = 0 WHERE id = ?", shopId);
+    mvc.perform(
+            post("/admin-api/kol/copy-tokens")
+                .header(ADMIN_TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"kolId\":\""
+                        + kolId
+                        + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\""
+                        + shopId
+                        + "\"}"))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errorCode").value("SHOP_DISABLED"));
+
+    mvc.perform(
+            post("/admin-api/kol/copy-tokens")
+                .header(ADMIN_TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"kolId\":\""
+                        + kolId
+                        + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\"999999\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.errorCode").value("SHOP_NOT_FOUND"));
+  }
+
   private long staff(String username, String scope, String... permissions) throws Exception {
     String body =
         mvc.perform(

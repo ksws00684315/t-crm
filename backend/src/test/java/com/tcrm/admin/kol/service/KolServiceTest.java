@@ -16,7 +16,6 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -44,7 +43,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DuplicateKeyException;
 
 class KolServiceTest {
   @BeforeAll
@@ -331,8 +329,7 @@ class KolServiceTest {
   }
 
   private static EditKolCommand edit() {
-    return new EditKolCommand(
-        "Alice B", "ALICE@example.com", "gb", List.of(), null, "VIP", null, null, null, null);
+    return new EditKolCommand("Alice B", "gb", List.of(), "VIP", null);
   }
 
   @Test
@@ -353,10 +350,12 @@ class KolServiceTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldUpdateEditableFieldsOnly_whenBdEditsOwnKol() {
+  void shouldUpdateProfileFieldsOnly_whenBdEditsOwnKol() {
     actAs(BD, Role.STAFF, DataScope.OWN);
     KolDO kol = kol(BD);
     kol.setDefaultRate(new BigDecimal("0.1"));
+    kol.setEmail("alice@example.com");
+    kol.setInviteCode("keep-invite");
     when(kols.selectById(11L)).thenReturn(kol);
     when(kols.update(isNull(), any())).thenReturn(1);
 
@@ -370,31 +369,47 @@ class KolServiceTest {
                 update.getValue())
             .getSqlSet();
     assertThat(sqlSet)
-        .contains("name=", "email=", "country=", "social_accounts=", "default_rate=", "remark=")
+        .contains("name=", "country=", "social_accounts=", "remark=", "whatsapp=")
+        .doesNotContain("email=")
+        .doesNotContain("default_rate=")
+        .doesNotContain("link_template_id=")
+        .doesNotContain("invite_code=")
+        .doesNotContain("sheet_url=")
         .doesNotContain("bd_user_id")
         .doesNotContain("kol_code");
-    // update_by is the actor (BD); bd_user_id must stay out of the SET clause above.
     assertThat(
             ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) update.getValue())
                 .getParamNameValuePairs()
                 .values())
-        .contains("Alice B", "alice@example.com", "GB", "VIP");
-    ArgumentCaptor<Wrapper<KolDO>> query = ArgumentCaptor.forClass(Wrapper.class);
-    verify(kols).selectCount(query.capture());
-    assertThat(query.getValue().getSqlSegment()).contains("lower(email) =", "id <>");
+        .contains("Alice B", "GB", "VIP");
+    verify(kols, never()).selectCount(any());
   }
 
   @Test
-  void shouldReject409_whenEditedEmailIsTaken() {
+  void shouldLeaveEmailAndPromotionFieldsUntouched_whenEditIgnoresThem() {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
-    when(kols.selectById(11L)).thenReturn(kol(null));
-    when(kols.selectCount(any())).thenReturn(1L);
-    assertThatThrownBy(() -> service.update(11L, edit()))
-        .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
-    when(kols.selectCount(any())).thenReturn(0L);
-    when(kols.update(isNull(), any())).thenThrow(new DuplicateKeyException("unit"));
-    assertThatThrownBy(() -> service.update(11L, edit()))
-        .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
+    KolDO existing = kol(BD);
+    existing.setEmail("alice@example.com");
+    existing.setDefaultRate(new BigDecimal("0.2000"));
+    existing.setInviteCode("old-invite");
+    existing.setLinkTemplateId(77L);
+    when(kols.selectById(11L)).thenReturn(existing);
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    service.update(11L, edit());
+
+    verify(events, never()).publishEvent(any());
+    ArgumentCaptor<Wrapper<KolDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), update.capture());
+    String sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                update.getValue())
+            .getSqlSet();
+    assertThat(sqlSet)
+        .doesNotContain("email=")
+        .doesNotContain("default_rate=")
+        .doesNotContain("invite_code=")
+        .doesNotContain("link_template_id=");
   }
 
   @Test
@@ -537,14 +552,16 @@ class KolServiceTest {
                 wrapper.getValue())
             .getSqlSet();
     assertThat(sqlSet)
-        .contains("name=", "email=", "country=", "social_accounts=", "default_rate=", "remark=")
+        .contains("name=", "country=", "social_accounts=", "remark=")
+        .doesNotContain("email=")
+        .doesNotContain("default_rate=")
         .doesNotContain("bd_user_id");
     assertThat(wrapper.getValue().getSqlSegment()).contains("id =");
     assertThat(
             ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) wrapper.getValue())
                 .getParamNameValuePairs()
                 .values())
-        .contains("Alice B", "alice@example.com", "GB", "VIP");
+        .contains("Alice B", "GB", "VIP");
   }
 
   @Test
@@ -563,11 +580,8 @@ class KolServiceTest {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
     when(templates.usableTemplate(77L))
         .thenThrow(new BusinessException(ErrorCode.LINK_TEMPLATE_INVALID));
-    when(kols.selectById(11L)).thenReturn(kol(BD));
 
     assertThatThrownBy(() -> service.create(create(null, 77L)))
-        .hasMessage(ErrorCode.LINK_TEMPLATE_INVALID.message());
-    assertThatThrownBy(() -> service.update(11L, edit(null, 77L, null)))
         .hasMessage(ErrorCode.LINK_TEMPLATE_INVALID.message());
     verifyNoInteractions(writer);
   }
@@ -590,31 +604,15 @@ class KolServiceTest {
   }
 
   @Test
-  void shouldPublishLinkTargetEvent_whenTemplateOrInviteCodeChanges() {
-    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
-    KolDO existing = kol(BD);
-    existing.setLinkTemplateId(77L);
-    existing.setInviteCode("old");
-    when(kols.selectById(11L)).thenReturn(existing);
-    when(kols.update(isNull(), any())).thenReturn(1);
-    when(templates.usableTemplate(77L)).thenReturn(template());
-
-    service.update(11L, edit(null, 77L, "new"));
-
-    verify(events).publishEvent(new KolLinkTargetChangedEvent(11L));
-  }
-
-  @Test
-  void shouldNotPublishLinkTargetEvent_whenTargetInputsAreUnchanged() {
+  void shouldNotPublishLinkTargetEvent_whenOrdinaryEditRuns() {
     actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
     KolDO existing = kol(BD);
     existing.setLinkTemplateId(77L);
     existing.setInviteCode("same");
     when(kols.selectById(11L)).thenReturn(existing);
     when(kols.update(isNull(), any())).thenReturn(1);
-    when(templates.usableTemplate(77L)).thenReturn(template());
 
-    service.update(11L, edit(null, 77L, "same"));
+    service.update(11L, edit());
 
     verify(events, never()).publishEvent(any());
   }
@@ -636,10 +634,7 @@ class KolServiceTest {
     when(kols.selectById(11L)).thenReturn(kol(BD));
     when(kols.update(isNull(), any())).thenReturn(1);
 
-    service.update(
-        11L,
-        new EditKolCommand(
-            "Alice B", "alice@example.com", null, List.of(), null, "VIP", null, null, null, null));
+    service.update(11L, new EditKolCommand("Alice B", null, List.of(), "VIP", null));
 
     var wrapper = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).update(isNull(), wrapper.capture());
@@ -663,20 +658,6 @@ class KolServiceTest {
         templateId,
         " aff-01 ",
         " https://docs.google.com/spreadsheets/d/1/edit ");
-  }
-
-  private static EditKolCommand edit(Long bdUnused, Long templateId, String inviteCode) {
-    return new EditKolCommand(
-        "Alice B",
-        "ALICE@example.com",
-        "gb",
-        List.of(),
-        null,
-        "VIP",
-        null,
-        templateId,
-        inviteCode,
-        null);
   }
 
   @Test

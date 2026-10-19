@@ -82,7 +82,7 @@ describe("promotion status dialog", () => {
     const options = [...document.body.querySelectorAll(".el-select-dropdown__item")].map(
       item => item.textContent
     );
-    expect(options).toEqual(["待审核", "待推广", "推广中", "合作结束"]);
+    expect(options).toEqual(["待推广", "推广中", "合作结束"]);
 
     await element("status-submit").trigger("click");
     await flushPromises();

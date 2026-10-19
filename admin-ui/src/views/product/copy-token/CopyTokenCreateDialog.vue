@@ -37,7 +37,7 @@ const form = reactive<{
   targetShopId: string | null;
 }>({
   kolId: null,
-  quota: 1000,
+  quota: 1,
   validMinutes: 1440,
   targetShopId: null
 });
@@ -53,7 +53,7 @@ watch(
     if (!openNow) return;
     result.value = null;
     form.kolId = props.presetKolId ?? null;
-    form.quota = 1000;
+    form.quota = 1;
     form.validMinutes = 1440;
     form.targetShopId = null;
     kolOptions.value = [];

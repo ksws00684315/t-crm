@@ -932,24 +932,30 @@ class LinkIT {
         .asText();
   }
 
-  /** Edits the KOL's link target inputs through the API (task 11 §4.3). */
+  /**
+   * Edits the KOL's link target inputs through promotion config (task 28 §3.2): ordinary edit no
+   * longer accepts invite code / jump template.
+   */
   private void editKol(String kolCode, Long templateId, String inviteCode) throws Exception {
     long kolId = id("SELECT id FROM crm_kol WHERE kol_code = ?", kolCode);
-    String email =
-        jdbc.queryForObject("SELECT email FROM crm_kol WHERE kol_code = ?", String.class, kolCode);
     StringBuilder body = new StringBuilder();
-    body.append("{\"name\":\"Name\",\"email\":\"")
-        .append(email)
-        .append("\",\"country\":\"US\",\"socialAccounts\":[]");
+    body.append(
+        "{\"defaultRate\":null,\"landingUrl\":\"https://landing.example/\",\"sheetUrl\":null,\"remark\":null");
     if (templateId != null) {
-      body.append(",\"linkTemplateId\":\"").append(templateId).append('"');
+      body.append(",\"platformTemplateIds\":[").append(templateId).append("]");
+      body.append(",\"jumpTemplateId\":").append(templateId);
+    } else {
+      body.append(",\"platformTemplateIds\":[]");
+      body.append(",\"jumpTemplateId\":null");
     }
     if (inviteCode != null) {
       body.append(",\"inviteCode\":\"").append(inviteCode).append('"');
+    } else {
+      body.append(",\"inviteCode\":null");
     }
     body.append('}');
     mvc.perform(
-            put("/admin-api/kol/kols/" + kolId)
+            put("/admin-api/kol/kols/" + kolId + "/promotion-config")
                 .header(TOKEN, adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body.toString()))

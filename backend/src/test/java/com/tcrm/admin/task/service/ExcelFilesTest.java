@@ -263,4 +263,39 @@ class ExcelFilesTest {
       assertThat(sheet.getColumnStyle(1).getDataFormatString()).isNotEqualTo("@");
     }
   }
+
+  @Test
+  void shouldAcceptCsv_whenAllowed() {
+    byte[] csv = "编号,姓名,邮箱\nKOL1,张三,a@example.com\n".getBytes(StandardCharsets.UTF_8);
+    excel.check(file("orders.csv", "text/csv", csv), true);
+    excel.check(file("orders.CSV", "application/octet-stream", csv), true);
+  }
+
+  @Test
+  void shouldRejectCsv_whenNotAllowed() {
+    byte[] csv = "编号,姓名,邮箱\nKOL1,张三,a@example.com\n".getBytes(StandardCharsets.UTF_8);
+    assertError(
+        () -> excel.check(file("orders.csv", "text/csv", csv)), ErrorCode.TASK_FILE_INVALID);
+  }
+
+  @Test
+  void shouldReadCsv_matchingExcelRows_withBomQuotesAndLongIds() {
+    byte[] bom = new byte[] {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    String body = "编号,姓名,邮箱\n1234567890123456789,\"张,三\",\"a\"\"b@example.com\"\n";
+    byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+    byte[] csv = new byte[bom.length + bodyBytes.length];
+    System.arraycopy(bom, 0, csv, 0, bom.length);
+    System.arraycopy(bodyBytes, 0, csv, bom.length, bodyBytes.length);
+
+    ExcelFiles.SheetData sheet = excel.read(csv, VARIANTS, 10);
+    assertThat(sheet.matchedHeaders()).isEqualTo(HEADERS);
+    assertThat(sheet.rows())
+        .containsExactly(List.of("1234567890123456789", "张,三", "a\"b@example.com"));
+  }
+
+  @Test
+  void shouldRejectCsv_whenHeaderMismatches() {
+    byte[] csv = "姓名,编号,邮箱\na,b,c\n".getBytes(StandardCharsets.UTF_8);
+    assertError(() -> excel.read(csv, VARIANTS, 10), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+  }
 }

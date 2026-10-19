@@ -26,10 +26,11 @@ final class KolPromotionSupport {
 
   /**
    * Missing promotion-config field names for a PROMOTING transition. Names are fixed for the admin
-   * UI: {@code defaultRate}, {@code platformTemplateIds}, {@code landingUrl}, {@code inviteCode}.
+   * UI: {@code defaultRate}, {@code platformTemplateIds}, {@code landingUrl}, {@code inviteCode},
+   * {@code jumpTemplateId}.
    */
   static List<String> missingConfigFields(KolDO kol, List<Long> platformTemplateIds) {
-    List<String> missing = new ArrayList<>(4);
+    List<String> missing = new ArrayList<>(5);
     if (kol.getDefaultRate() == null) {
       missing.add("defaultRate");
     }
@@ -42,6 +43,9 @@ final class KolPromotionSupport {
     if (kol.getInviteCode() == null || kol.getInviteCode().isBlank()) {
       missing.add("inviteCode");
     }
+    if (kol.getLinkTemplateId() == null) {
+      missing.add("jumpTemplateId");
+    }
     return List.copyOf(missing);
   }
 
@@ -53,6 +57,7 @@ final class KolPromotionSupport {
     map.put("landingUrl", kol.getLandingUrl());
     map.put("inviteCode", kol.getInviteCode());
     map.put("sheetUrl", kol.getSheetUrl());
+    map.put("jumpTemplateId", kol.getLinkTemplateId());
     return map;
   }
 

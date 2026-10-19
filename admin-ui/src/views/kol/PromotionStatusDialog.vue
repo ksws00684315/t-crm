@@ -8,7 +8,7 @@ import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import {
   missingPromotionFields,
-  PROMOTION_STATUSES,
+  PROMOTION_STATUS_OPTIONS,
   promotionStatusLabelKey
 } from "@/utils/promotion";
 
@@ -34,7 +34,13 @@ const missingKeys = ref<string[]>([]);
 /** True when the backend answered 422 incomplete, even without a readable field list. */
 const incomplete = ref(false);
 
-const FIELD_KEYS = ["defaultRate", "platformTemplateIds", "landingUrl", "inviteCode"];
+const FIELD_KEYS = [
+  "defaultRate",
+  "platformTemplateIds",
+  "landingUrl",
+  "inviteCode",
+  "jumpTemplateId"
+];
 
 function fieldLabel(key: string): string {
   return FIELD_KEYS.includes(key) ? t(`promotion.field.${key}`) : key;
@@ -126,7 +132,7 @@ function goConfig(): void {
       <el-form-item :label="t('kol.changeStatusTarget')">
         <el-select v-model="target" data-test="status-target" style="width: 220px">
           <el-option
-            v-for="status in PROMOTION_STATUSES"
+            v-for="status in PROMOTION_STATUS_OPTIONS"
             :key="status"
             :label="statusLabel(status)"
             :value="status"

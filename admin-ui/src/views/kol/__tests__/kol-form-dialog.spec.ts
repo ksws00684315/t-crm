@@ -145,15 +145,19 @@ describe("KOL form dialog", () => {
     wrapper.unmount();
   });
 
-  it("lists enabled templates and keeps the current disabled template as a marked option", async () => {
-    const wrapper = await openDialog(kol);
+  it("lists enabled templates when creating, and hides them when editing", async () => {
+    const create = await openDialog(null);
     await input("template-select").trigger("click");
     await flushPromises();
-    const text = document.body.textContent ?? "";
-    expect(text).toContain("AgentOne");
-    expect(text).toContain("OldShop（已停用）");
-    expect(text).not.toContain("old-shop");
-    wrapper.unmount();
+    expect(document.body.textContent ?? "").toContain("AgentOne");
+    create.unmount();
+
+    const edit = await openDialog(kol);
+    expect(document.body.querySelector('[data-test="template-select"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="invite-code"]')).toBeNull();
+    const email = document.body.querySelector<HTMLInputElement>('[data-test="email-input"]');
+    expect(email?.disabled).toBe(true);
+    edit.unmount();
   });
 
   describe("review mode (task 25b §3.3)", () => {

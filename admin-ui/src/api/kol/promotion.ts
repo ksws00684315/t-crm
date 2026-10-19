@@ -24,6 +24,8 @@ export interface PromotionConfigVO {
   landingUrl: string | null;
   inviteCode: string | null;
   sheetUrl: string | null;
+  /** Jump platform template id stored in crm_kol.link_template_id. */
+  jumpTemplateId: string | null;
   remark: string | null;
 }
 
@@ -34,6 +36,7 @@ export interface PromotionConfigRequest {
   landingUrl: string | null;
   inviteCode: string | null;
   sheetUrl: string | null;
+  jumpTemplateId: string | null;
   remark: string | null;
 }
 

@@ -61,6 +61,7 @@ const config: promotionApi.PromotionConfigVO = {
   landingUrl: "https://brand.example/ada",
   inviteCode: "ADA",
   sheetUrl: null,
+  jumpTemplateId: null,
   remark: null
 };
 
@@ -168,6 +169,7 @@ describe("promotion config drawer", () => {
       landingUrl: "https://brand.example/ada",
       inviteCode: "ADA",
       sheetUrl: null,
+      jumpTemplateId: "7",
       remark: null
     });
     expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();

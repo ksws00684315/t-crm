@@ -7,11 +7,16 @@ import type { DisplayStatus, PromotionStatus } from "@/api/types";
 import { formatRate } from "@/utils/rate";
 
 /** Every stored status, in the order pickers show them. */
-export const PROMOTION_STATUSES: readonly PromotionStatus[] = [
-  "PENDING_REVIEW",
+/** Statuses offered in the change-status dialog (task 28 §3.3: no PENDING_REVIEW). */
+export const PROMOTION_STATUS_OPTIONS: readonly PromotionStatus[] = [
   "PENDING_PROMOTION",
   "PROMOTING",
   "ENDED"
+];
+
+export const PROMOTION_STATUSES: readonly PromotionStatus[] = [
+  "PENDING_REVIEW",
+  ...PROMOTION_STATUS_OPTIONS
 ];
 
 /** Stored statuses plus the computed "no active BD" state shown in lists. */
@@ -47,6 +52,7 @@ const RECORD_FIELD_KEYS = [
   "landingUrl",
   "inviteCode",
   "sheetUrl",
+  "jumpTemplateId",
   "status"
 ] as const;
 
@@ -153,6 +159,7 @@ export interface PromotionCompletenessInput {
   platformTemplateIds?: string[] | null;
   landingUrl?: string | null;
   inviteCode?: string | null;
+  jumpTemplateId?: string | null;
 }
 
 /** Client mirror of the backend rule; the 422 answer stays the authority. */
@@ -163,5 +170,6 @@ export function incompletePromotionFields(config: PromotionCompletenessInput): s
     missing.push("platformTemplateIds");
   if (!config.landingUrl) missing.push("landingUrl");
   if (!config.inviteCode) missing.push("inviteCode");
+  if (!config.jumpTemplateId) missing.push("jumpTemplateId");
   return missing;
 }

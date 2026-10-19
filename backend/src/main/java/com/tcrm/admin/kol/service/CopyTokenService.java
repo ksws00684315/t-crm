@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.CopyTargetShopApi;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
 import com.tcrm.admin.kol.api.KolApi;
@@ -28,7 +29,6 @@ import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,7 +44,7 @@ public class CopyTokenService implements CopyTokenApi {
 
   private final KolCopyTokenMapper tokens;
   private final KolApi kols;
-  private final JdbcTemplate jdbc;
+  private final CopyTargetShopApi shops;
   private final SecretCipher cipher;
   private final CurrentUserContext current;
   private final int defaultQuota;
@@ -56,15 +56,15 @@ public class CopyTokenService implements CopyTokenApi {
   public CopyTokenService(
       KolCopyTokenMapper tokens,
       KolApi kols,
-      JdbcTemplate jdbc,
+      CopyTargetShopApi shops,
       SecretCipher cipher,
       CurrentUserContext current,
-      @Value("${crm.copy-token.default-quota:1000}") int defaultQuota,
+      @Value("${crm.copy-token.default-quota:1}") int defaultQuota,
       @Value("${crm.copy-token.default-valid-minutes:1440}") int defaultValidMinutes) {
     this(
         tokens,
         kols,
-        jdbc,
+        shops,
         cipher,
         current,
         defaultQuota,
@@ -76,7 +76,7 @@ public class CopyTokenService implements CopyTokenApi {
   CopyTokenService(
       KolCopyTokenMapper tokens,
       KolApi kols,
-      JdbcTemplate jdbc,
+      CopyTargetShopApi shops,
       SecretCipher cipher,
       CurrentUserContext current,
       int defaultQuota,
@@ -85,7 +85,7 @@ public class CopyTokenService implements CopyTokenApi {
       Clock clock) {
     this.tokens = tokens;
     this.kols = kols;
-    this.jdbc = jdbc;
+    this.shops = shops;
     this.cipher = cipher;
     this.current = current;
     this.defaultQuota = defaultQuota;
@@ -337,30 +337,8 @@ public class CopyTokenService implements CopyTokenApi {
     return refs.isEmpty() ? null : refs.get(0);
   }
 
-  /**
-   * Validates the shop in the caller's company without depending on the product module (avoids a
-   * kol ↔ product cycle; product already depends on kol.api).
-   */
   private void requireEnabledShop(long shopId) {
-    Long tenantId = TenantScope.companyId();
-    if (tenantId == null) {
-      throw new MissingTenantException("shop lookup requires a company");
-    }
-    List<Integer> statuses =
-        jdbc.query(
-            """
-            SELECT status FROM crm_shop
-             WHERE id = ? AND tenant_id = ? AND is_deleted = FALSE
-            """,
-            (rs, rowNum) -> rs.getInt(1),
-            shopId,
-            tenantId);
-    if (statuses.isEmpty()) {
-      throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
-    }
-    if (statuses.get(0) != 1) {
-      throw new BusinessException(ErrorCode.SHOP_DISABLED);
-    }
+    shops.requireEnabled(shopId);
   }
 
   private Map<Long, KolRefDTO> kolRefs(List<KolCopyTokenDO> rows) {
@@ -381,27 +359,10 @@ public class CopyTokenService implements CopyTokenApi {
             .filter(Objects::nonNull)
             .distinct()
             .toList();
-    Map<Long, String> byId = new HashMap<>();
     if (ids.isEmpty()) {
-      return byId;
+      return Map.of();
     }
-    Long tenantId = TenantScope.companyId();
-    if (tenantId == null) {
-      return byId;
-    }
-    String placeholders = String.join(",", ids.stream().map(id -> "?").toList());
-    java.util.ArrayList<Object> args = new java.util.ArrayList<>();
-    args.add(tenantId);
-    args.addAll(ids);
-    jdbc.query(
-        "SELECT id, shop_name FROM crm_shop WHERE tenant_id = ? AND is_deleted = FALSE AND id IN ("
-            + placeholders
-            + ")",
-        rs -> {
-          byId.put(rs.getLong(1), rs.getString(2));
-        },
-        args.toArray());
-    return byId;
+    return shops.namesByIds(ids);
   }
 
   private CopyTokenRowDTO toRow(

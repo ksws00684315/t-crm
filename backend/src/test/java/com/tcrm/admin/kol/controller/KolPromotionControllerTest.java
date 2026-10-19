@@ -78,7 +78,7 @@ class KolPromotionControllerTest {
     when(promotions.getConfig(10L))
         .thenReturn(
             new KolPromotionService.PromotionConfigDTO(
-                "0.1000", List.of(3L), "https://landing.example/", "inv", null, null));
+                "0.1000", List.of(3L), "https://landing.example/", "inv", null, 3L, null));
     mvc.perform(
             get("/admin-api/kol/kols/10/promotion-config")
                 .header(AdminMvcSupport.TOKEN_HEADER, token()))

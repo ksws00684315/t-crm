@@ -3,7 +3,6 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
@@ -30,7 +29,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -193,54 +191,32 @@ public class KolService {
   }
 
   /**
-   * Updates editable KOL fields only. Uses a column whitelist so a concurrent {@link #updateBdUser}
-   * cannot be overwritten with a stale {@code bd_user_id} (never set here). A change of the link
-   * target inputs (template or invite code) publishes {@link KolLinkTargetChangedEvent} in the same
-   * transaction, registering a link index refresh (task 11 §4.4; ADR-013).
+   * Updates profile fields only (task 28 §3.2 / §3.3). Email, commission rate, jump template,
+   * invite code and sheet URL are not writable here — promotion config is the sole entry for the
+   * latter four; email is read-only for every role. Uses a column whitelist so a concurrent {@link
+   * #updateBdUser} cannot be overwritten with a stale {@code bd_user_id}.
    */
   public void update(Long id, EditKolCommand c) {
     AccountDTO user = current.user();
-    KolDO existing = requireVisible(id, user);
-    Long templateId = usableTemplate(c.linkTemplateId());
-    String email = normalizeEmail(c.email());
-    if (emailTaken(email, id)) {
-      throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
-    }
+    requireVisible(id, user);
     Instant now = Instant.now();
     tx.executeWithoutResult(
         txStatus -> {
-          int updated;
-          try {
-            updated =
-                kols.update(
-                    null,
-                    scoped(id, user)
-                        .set(KolDO::getName, c.name().strip())
-                        .set(KolDO::getEmail, email)
-                        .set(KolDO::getCountry, country(c.country()))
-                        .set(
-                            KolDO::getSocialAccounts,
-                            SocialAccountsJson.write(c.socialAccounts()),
-                            "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
-                        .set(KolDO::getDefaultRate, c.defaultRate())
-                        .set(KolDO::getRemark, blankToNull(c.remark()))
-                        .set(KolDO::getWhatsapp, blankToNull(c.whatsapp()))
-                        .set(KolDO::getLinkTemplateId, templateId)
-                        .set(KolDO::getInviteCode, blankToNull(c.inviteCode()))
-                        .set(KolDO::getSheetUrl, blankToNull(c.sheetUrl()))
-                        .set(KolDO::getUpdateBy, user.id())
-                        .set(KolDO::getUpdateTime, now));
-          } catch (DuplicateKeyException e) {
-            // Only uk_crm_kol_email can be violated by an edit; the code never changes here.
-            throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
-          }
+          int updated =
+              kols.update(
+                  null,
+                  scoped(id, user)
+                      .set(KolDO::getName, c.name().strip())
+                      .set(KolDO::getCountry, country(c.country()))
+                      .set(
+                          KolDO::getSocialAccounts,
+                          SocialAccountsJson.write(c.socialAccounts()),
+                          "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
+                      .set(KolDO::getRemark, blankToNull(c.remark()))
+                      .set(KolDO::getWhatsapp, blankToNull(c.whatsapp()))
+                      .set(KolDO::getUpdateBy, user.id())
+                      .set(KolDO::getUpdateTime, now));
           requireUpdated(updated, user);
-          boolean targetChanged =
-              !Objects.equals(existing.getLinkTemplateId(), templateId)
-                  || !Objects.equals(existing.getInviteCode(), blankToNull(c.inviteCode()));
-          if (targetChanged) {
-            TransactionalEvents.publish(events, new KolLinkTargetChangedEvent(id));
-          }
         });
   }
 

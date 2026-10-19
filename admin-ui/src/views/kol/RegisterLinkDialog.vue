@@ -68,8 +68,15 @@ async function rotate() {
     @update:model-value="emit('update:modelValue', $event)"
   >
     <p class="hint">{{ t("kol.registerLinkHint") }}</p>
-    <div v-loading="loading" data-test="register-url">
-      <CopyText v-if="link" :value="link.url" />
+    <div v-loading="loading" class="fields">
+      <div v-if="link" class="field" data-test="register-code">
+        <div class="label">{{ t("kol.registerInviteCode") }}</div>
+        <CopyText :value="link.code" />
+      </div>
+      <div v-if="link" class="field" data-test="register-url">
+        <div class="label">{{ t("kol.registerLinkUrl") }}</div>
+        <CopyText :value="link.url" />
+      </div>
     </div>
     <template #footer>
       <el-button @click="close">{{ t("common.close") }}</el-button>
@@ -83,5 +90,14 @@ async function rotate() {
 <style scoped>
 .hint {
   margin: 0 0 12px;
+}
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field .label {
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 </style>
