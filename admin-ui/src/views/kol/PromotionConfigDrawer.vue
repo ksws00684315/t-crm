@@ -91,11 +91,16 @@ const title = computed(() =>
     : t("promotion.configTitle")
 );
 
-/** Enabled templates of this company are the multi-select options (ADR-023 §3). */
+/** Read-only views use names already included in the KOL list row. */
 const templateOptions = computed(() =>
-  templates.value
-    .filter(item => item.status === 1)
-    .map(item => ({ id: item.id, label: item.templateName }))
+  props.readOnly
+    ? (props.kol?.platforms ?? []).map(item => ({
+        id: item.templateId,
+        label: item.templateName || item.templateId
+      }))
+    : templates.value
+        .filter(item => item.status === 1)
+        .map(item => ({ id: item.id, label: item.templateName }))
 );
 
 /** Jump platform dropdown lists only the platforms already selected. */
@@ -180,9 +185,12 @@ async function loadAll() {
   if (!id) return;
   loading.value = true;
   try {
+    const templateRequest = props.readOnly
+      ? Promise.resolve([] as LinkTemplateVO[])
+      : listLinkTemplates().catch(() => [] as LinkTemplateVO[]);
     const [config, templateList, recordPage] = await Promise.all([
       getPromotionConfig(id),
-      listLinkTemplates().catch(() => [] as LinkTemplateVO[]),
+      templateRequest,
       listPromotionRecords(id, { page: 1, size: recordsSize })
     ]);
     templates.value = templateList;

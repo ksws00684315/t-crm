@@ -92,9 +92,9 @@ function element(testId: string): DOMWrapper<Element> {
   return new DOMWrapper(found);
 }
 
-async function openDrawer() {
+async function openDrawer(readOnly = false) {
   const wrapper = mount(PromotionConfigDrawer, {
-    props: { modelValue: false, kol },
+    props: { modelValue: false, kol, readOnly },
     global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
   });
@@ -135,6 +135,19 @@ describe("promotion config drawer", () => {
     expect(text).toContain("邀请码：- → ADA");
     expect(text).toContain("admin");
     expect(text).toContain("首次填写");
+    wrapper.unmount();
+  });
+
+  it("uses KOL row platform names without requesting editable templates in read-only mode", async () => {
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      ...config,
+      platforms: [{ templateId: "7", templateName: null, address: "https://brand.example/ada" }]
+    });
+    const wrapper = await openDrawer(true);
+    expect(templateApi.listLinkTemplates).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("AgentOne");
+    expect(promotionApi.getPromotionConfig).toHaveBeenCalledWith(kol.id);
+    expect(promotionApi.listPromotionRecords).toHaveBeenCalledWith(kol.id, { page: 1, size: 10 });
     wrapper.unmount();
   });
 

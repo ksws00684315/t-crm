@@ -16,7 +16,7 @@ export interface PromotionPlatform {
 
 export interface PromotionConfigVO {
   defaultRate: string | null;
-  platforms: Array<PromotionPlatform & { templateName: string }>;
+  platforms: Array<PromotionPlatform & { templateName: string | null }>;
   inviteCode: string | null;
   jumpTemplateId: string | null;
   sheetUrl: string | null;
