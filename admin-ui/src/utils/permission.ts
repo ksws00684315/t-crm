@@ -321,7 +321,12 @@ export function kolAbilities(user: AbilitySubject | null | undefined): KolAbilit
     canChangeBd: access.isSuperAdmin,
     canAssignBd: access.isSuperAdmin || (canEdit && !access.isOwnScope),
     canFilterBd: access.can("kol:view") && !access.isOwnScope,
-    canRegisterLink: access.can("kol:register-link"),
+    canRegisterLink:
+      user.status === 1 &&
+      user.role === "STAFF" &&
+      access.isOwnScope &&
+      canEdit &&
+      access.can("kol:register-link"),
     canCopyToken: access.can("kol:copy-token"),
     canClaimKol: user.status === 1 && user.role === "STAFF" && access.isOwnScope && canEdit,
     canManageCleanup: canEdit && !access.isOwnScope

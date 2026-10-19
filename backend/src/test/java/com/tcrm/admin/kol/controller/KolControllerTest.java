@@ -290,15 +290,14 @@ class KolControllerTest {
     // The constrained path variable (@Min id) switches Spring to method validation; the body's
     // field errors must still be reported by field, not as the parameter name "r".
     mvc.perform(
-            json(put(BASE + "/11"), "{\"name\":\"\",\"email\":\"bad\",\"country\":\"US\"}")
+            json(put(BASE + "/11"), "{\"name\":\"\",\"country\":\"US\",\"whatsapp\":\"bad!!\"}")
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"))
-        .andExpect(jsonPath("$.data[*].field").value(containsInAnyOrder("email", "name")));
+        .andExpect(jsonPath("$.data[*].field").value(containsInAnyOrder("name", "whatsapp")));
     verifyNoInteractions(kols);
   }
 
-  @Test
   void shouldReportPathParameterName_whenIdIsBelowMinimum() throws Exception {
     mvc.perform(
             json(put(BASE + "/0"), VALID)
@@ -342,14 +341,10 @@ class KolControllerTest {
     mvc.perform(
             json(
                     put(BASE + "/11"),
-                    "{\"name\":\"A\",\"email\":\"a@x.io\",\"country\":\"gb\",\"defaultRate\":0}")
+                    "{\"name\":\"A\",\"country\":\"gb\",\"socialAccounts\":[],\"remark\":null,\"whatsapp\":null}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
-    verify(kols)
-        .update(
-            11L,
-            new EditKolCommand(
-                "A", "a@x.io", "gb", List.of(), new BigDecimal("0"), null, null, null, null, null));
+    verify(kols).update(11L, new EditKolCommand("A", "gb", List.of(), null, null));
     mvc.perform(
             json(put(BASE + "/11/status"), "{\"status\":0}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))

@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.CopyTargetShopApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
@@ -33,14 +34,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 
 class CopyTokenServiceTest {
   @BeforeAll
@@ -54,7 +54,7 @@ class CopyTokenServiceTest {
 
   private final KolCopyTokenMapper tokens = mock(KolCopyTokenMapper.class);
   private final KolApi kols = mock(KolApi.class);
-  private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+  private final CopyTargetShopApi shops = mock(CopyTargetShopApi.class);
   private final SecretCipher cipher = new SecretCipher(SECRET);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final CopyTokenPlaintexts plaintexts =
@@ -63,10 +63,10 @@ class CopyTokenServiceTest {
       new CopyTokenService(
           tokens,
           kols,
-          jdbc,
+          shops,
           cipher,
           current,
-          1000,
+          1,
           1440,
           plaintexts,
           Clock.fixed(NOW, ZoneOffset.UTC));
@@ -101,7 +101,7 @@ class CopyTokenServiceTest {
 
     assertThat(CopyTokenPlaintexts.looksValid(created.token())).isTrue();
     assertThat(created.row().tokenHint()).isEqualTo(CopyTokenPlaintexts.hint(created.token()));
-    assertThat(created.row().quota()).isEqualTo(1000);
+    assertThat(created.row().quota()).isEqualTo(1);
     assertThat(created.row().validMinutes()).isEqualTo(1440);
     assertThat(created.row().displayStatus()).isEqualTo(CopyTokenDisplayStatus.ACTIVE);
 
@@ -121,12 +121,16 @@ class CopyTokenServiceTest {
         .hasMessage(ErrorCode.KOL_DISABLED.message());
 
     when(kols.listByIds(List.of(10L))).thenReturn(List.of(kol(10L, true, 99L)));
-    when(jdbc.query(any(String.class), any(RowMapper.class), any(), any())).thenReturn(List.of());
+    org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.SHOP_NOT_FOUND))
+        .when(shops)
+        .requireEnabled(5L);
     assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(10L, 10, 60, 5L)))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.SHOP_NOT_FOUND.message());
 
-    when(jdbc.query(any(String.class), any(RowMapper.class), any(), any())).thenReturn(List.of(0));
+    org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.SHOP_DISABLED))
+        .when(shops)
+        .requireEnabled(5L);
     assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(10L, 10, 60, 5L)))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.SHOP_DISABLED.message());
@@ -134,6 +138,27 @@ class CopyTokenServiceTest {
     assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(10L, 0, 60, null)))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.COMMON_VALIDATION_FAILED.message());
+  }
+
+  @Test
+  void shouldCreateWithTargetShop_whenShopEnabled() {
+    KolRefDTO kol = kol(10L, true, 99L);
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(kol));
+    when(shops.namesByIds(List.of(5L))).thenReturn(Map.of(5L, "Shop A"));
+    when(tokens.insert(any(KolCopyTokenDO.class)))
+        .thenAnswer(
+            inv -> {
+              KolCopyTokenDO row = inv.getArgument(0);
+              row.setId(101L);
+              row.setCreateTime(NOW);
+              return 1;
+            });
+
+    CreatedCopyTokenDTO created = service.create(new CreateCopyTokenCommand(10L, null, null, 5L));
+
+    assertThat(created.row().targetShopId()).isEqualTo(5L);
+    assertThat(created.row().targetShopName()).isEqualTo("Shop A");
+    verify(shops).requireEnabled(5L);
   }
 
   @Test

@@ -203,6 +203,7 @@ const enUS: MessageSchema = {
     KOL_EMAIL_CODE_INVALID: "The verification code is wrong, expired, or already used.",
     KOL_REGISTER_TOO_FREQUENT: "Too many registration attempts. Please try again later.",
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
+    KOL_REVIEW_ALREADY_DONE: "Creator review is already done; cannot return to pending review",
     KOL_PROMOTION_CONFIG_INCOMPLETE:
       "The promotion settings are incomplete, so the creator cannot start promoting yet.",
     KOL_ALREADY_CLAIMED: "Another BD just claimed this creator. Refresh and try again.",
@@ -616,6 +617,8 @@ const enUS: MessageSchema = {
     inviteSent: "Invitation email sent.",
     generateCopyToken: "Generate copy token",
     registerLink: "My registration link",
+    registerInviteCode: "Invite code",
+    registerLinkUrl: "Registration link",
     registerLinkTitle: "My registration link",
     registerLinkHint: "Send this link to a creator. After they register, they are assigned to you.",
     registerLinkRotate: "Revoke and create a new link",
@@ -675,6 +678,8 @@ const enUS: MessageSchema = {
   promotion: {
     configTitle: "Promotion settings",
     configTitleWithName: "Promotion settings – {code} ({name})",
+    jumpTemplate: "Jump platform",
+    jumpTemplatePlaceholder: "Choose from selected platforms",
     platforms: "Purchasing platforms (multiple)",
     landingUrl: "Landing page URL",
     landingUrlPlaceholder: "https://…",
@@ -698,6 +703,7 @@ const enUS: MessageSchema = {
       platformTemplateIds: "Purchasing platforms",
       landingUrl: "Landing page URL",
       inviteCode: "Invite code",
+      jumpTemplateId: "Jump platform",
       sheetUrl: "Promotion sheet URL",
       status: "Status"
     },
@@ -972,6 +978,7 @@ const enUS: MessageSchema = {
     open: "Upload Promo Sheet",
     chooseFile: "Choose .xlsx file",
     hint: "One workbook per creator, .xlsx up to 300MB. Nothing is written before you confirm.",
+    xlsxOrCsv: "Only .xlsx or .csv files are supported.",
     xlsxOnly: "Only .xlsx files are accepted.",
     tooLarge: "The file exceeds 300MB.",
     toAdd: "To add",

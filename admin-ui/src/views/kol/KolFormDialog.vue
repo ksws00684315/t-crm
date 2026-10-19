@@ -190,29 +190,41 @@ async function persistProfile(): Promise<boolean> {
   const valid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
   if (!checkSocialAccounts() || !valid) return false;
   saving.value = true;
-  const body = {
-    name: form.name.trim(),
-    email: form.email.trim(),
-    country: form.country.trim() ? form.country.trim().toUpperCase() : null,
-    socialAccounts: form.socialAccounts.map(account => ({
-      platform: account.platform.trim(),
-      handle: account.handle.trim(),
-      url: account.url.trim() || null,
-      followers: account.followers.trim() || null,
-      primary: account.primary
-    })),
-    defaultRate: percentToRate(form.percent),
-    remark: form.remark.trim() || null,
-    whatsapp: form.whatsapp.trim() || null,
-    linkTemplateId: form.linkTemplateId,
-    inviteCode: form.inviteCode.trim() || null,
-    sheetUrl: form.sheetUrl.trim() || null
-  };
   try {
     if (props.kol) {
-      await editKol(props.kol.id, body);
+      await editKol(props.kol.id, {
+        name: form.name.trim(),
+        country: form.country.trim() ? form.country.trim().toUpperCase() : null,
+        socialAccounts: form.socialAccounts.map(account => ({
+          platform: account.platform.trim(),
+          handle: account.handle.trim(),
+          url: account.url.trim() || null,
+          followers: account.followers.trim() || null,
+          primary: account.primary
+        })),
+        remark: form.remark.trim() || null,
+        whatsapp: form.whatsapp.trim() || null
+      });
     } else {
-      await createKol({ ...body, bdUserId: props.canPickBd ? form.bdUserId : null });
+      await createKol({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        country: form.country.trim() ? form.country.trim().toUpperCase() : null,
+        socialAccounts: form.socialAccounts.map(account => ({
+          platform: account.platform.trim(),
+          handle: account.handle.trim(),
+          url: account.url.trim() || null,
+          followers: account.followers.trim() || null,
+          primary: account.primary
+        })),
+        defaultRate: percentToRate(form.percent),
+        remark: form.remark.trim() || null,
+        whatsapp: form.whatsapp.trim() || null,
+        linkTemplateId: form.linkTemplateId,
+        inviteCode: form.inviteCode.trim() || null,
+        sheetUrl: form.sheetUrl.trim() || null,
+        bdUserId: props.canPickBd ? form.bdUserId : null
+      });
     }
     return true;
   } catch (error) {
@@ -274,7 +286,12 @@ async function approveReview() {
         <el-input :model-value="kol?.kolCode ?? ''" disabled data-test="review-code" />
       </el-form-item>
       <el-form-item :label="t('common.email')" prop="email" :error="serverErrors.email">
-        <el-input v-model="form.email" data-test="email-input" maxlength="128" :disabled="review" />
+        <el-input
+          v-model="form.email"
+          data-test="email-input"
+          maxlength="128"
+          :disabled="editing || review"
+        />
       </el-form-item>
       <el-form-item :label="t('common.country')" prop="country" :error="serverErrors.country">
         <el-input
@@ -304,7 +321,12 @@ async function approveReview() {
           />
         </el-select>
       </el-form-item>
-      <el-form-item :label="t('kol.rateLabel')" prop="percent" :error="serverErrors.percent">
+      <el-form-item
+        v-if="!editing"
+        :label="t('kol.rateLabel')"
+        prop="percent"
+        :error="serverErrors.percent"
+      >
         <el-input
           v-model="form.percent"
           :placeholder="t('kol.ratePlaceholder')"
@@ -324,6 +346,7 @@ async function approveReview() {
         />
       </el-form-item>
       <el-form-item
+        v-if="!editing"
         :label="t('kol.agentPlatform')"
         prop="linkTemplateId"
         :error="serverErrors.linkTemplateId"
@@ -344,10 +367,20 @@ async function approveReview() {
           />
         </el-select>
       </el-form-item>
-      <el-form-item :label="t('kol.inviteCode')" prop="inviteCode" :error="serverErrors.inviteCode">
+      <el-form-item
+        v-if="!editing"
+        :label="t('kol.inviteCode')"
+        prop="inviteCode"
+        :error="serverErrors.inviteCode"
+      >
         <el-input v-model="form.inviteCode" data-test="invite-code" maxlength="64" />
       </el-form-item>
-      <el-form-item :label="t('kol.sheetUrl')" prop="sheetUrl" :error="serverErrors.sheetUrl">
+      <el-form-item
+        v-if="!editing"
+        :label="t('kol.sheetUrl')"
+        prop="sheetUrl"
+        :error="serverErrors.sheetUrl"
+      >
         <el-input
           v-model="form.sheetUrl"
           data-test="sheet-url"

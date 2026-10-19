@@ -144,20 +144,23 @@ describe("incompletePromotionFields", () => {
       "defaultRate",
       "platformTemplateIds",
       "landingUrl",
-      "inviteCode"
+      "inviteCode",
+      "jumpTemplateId"
     ]);
     expect(
       incompletePromotionFields({
         defaultRate: "0.1000",
         platformTemplateIds: ["7"],
         landingUrl: "https://brand.example",
-        inviteCode: "ADA"
+        inviteCode: "ADA",
+        jumpTemplateId: "7"
       })
     ).toEqual([]);
     expect(incompletePromotionFields({ defaultRate: "0.1000", platformTemplateIds: [] })).toEqual([
       "platformTemplateIds",
       "landingUrl",
-      "inviteCode"
+      "inviteCode",
+      "jumpTemplateId"
     ]);
   });
 });

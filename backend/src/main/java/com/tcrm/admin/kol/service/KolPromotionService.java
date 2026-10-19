@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tcrm.admin.kol.api.KolLinkTargetChangedEvent;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
@@ -17,6 +18,7 @@ import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,6 +55,7 @@ public class KolPromotionService {
   private final TransactionTemplate tx;
   private final ExternalAuditApi audit;
   private final AuditSanitizer sanitizer;
+  private final ApplicationEventPublisher events;
 
   public KolPromotionService(
       KolMapper kols,
@@ -62,7 +66,8 @@ public class KolPromotionService {
       CurrentUserContext current,
       TransactionTemplate tx,
       ExternalAuditApi audit,
-      AuditSanitizer sanitizer) {
+      AuditSanitizer sanitizer,
+      ApplicationEventPublisher events) {
     this.kols = kols;
     this.platforms = platforms;
     this.records = records;
@@ -72,6 +77,7 @@ public class KolPromotionService {
     this.tx = tx;
     this.audit = audit;
     this.sanitizer = sanitizer;
+    this.events = events;
   }
 
   public PromotionConfigDTO getConfig(Long id) {
@@ -88,6 +94,8 @@ public class KolPromotionService {
           KolDO kol = requireVisible(id, user);
           List<Long> beforePlatforms = platformIds(id);
           Map<String, Object> before = KolPromotionSupport.snapshot(kol, beforePlatforms);
+          String beforeInvite = kol.getInviteCode();
+          Long beforeJump = kol.getLinkTemplateId();
           applyConfig(kol, command, user.id());
           List<Long> afterPlatforms = platformIds(id);
           KolDO after = kols.selectById(id);
@@ -99,6 +107,12 @@ public class KolPromotionService {
               afterSnap,
               blankToNull(command.remark()),
               user.id());
+          boolean targetChanged =
+              !Objects.equals(beforeInvite, after.getInviteCode())
+                  || !Objects.equals(beforeJump, after.getLinkTemplateId());
+          if (targetChanged) {
+            TransactionalEvents.publish(events, new KolLinkTargetChangedEvent(id));
+          }
           recordAudit("Save promotion config", Map.of("kolId", id));
         });
   }
@@ -109,6 +123,10 @@ public class KolPromotionService {
     tx.executeWithoutResult(
         txStatus -> {
           KolDO kol = requireVisible(id, user);
+          if (status == PromotionStatus.PENDING_REVIEW
+              && !PromotionStatus.PENDING_REVIEW.name().equals(kol.getPromotionStatus())) {
+            throw new BusinessException(ErrorCode.KOL_REVIEW_ALREADY_DONE);
+          }
           List<Long> platformIds = platformIds(id);
           if (status == PromotionStatus.PROMOTING) {
             List<String> missing = KolPromotionSupport.missingConfigFields(kol, platformIds);
@@ -180,6 +198,7 @@ public class KolPromotionService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     List<Long> templateIds = normalizeTemplateIds(command.platformTemplateIds());
+    Long jumpId = resolveJumpTemplateId(command.jumpTemplateId(), templateIds);
     Instant now = Instant.now();
     AccountDTO user = current.user();
     int updated =
@@ -190,10 +209,35 @@ public class KolPromotionService {
                 .set(KolDO::getLandingUrl, landing)
                 .set(KolDO::getInviteCode, invite)
                 .set(KolDO::getSheetUrl, sheet)
+                .set(KolDO::getLinkTemplateId, jumpId)
                 .set(KolDO::getUpdateBy, actorId)
                 .set(KolDO::getUpdateTime, now));
     requireUpdated(updated, user);
     replacePlatforms(kol.getId(), templateIds, actorId);
+  }
+
+  /**
+   * Jump platform must be one of the selected platforms. A single selection auto-picks it; multiple
+   * platforms without an explicit jump return a validation error (task 28 §3.2).
+   */
+  private Long resolveJumpTemplateId(Long requested, List<Long> templateIds) {
+    if (templateIds.isEmpty()) {
+      return null;
+    }
+    if (templateIds.size() == 1) {
+      Long only = templateIds.get(0);
+      if (requested != null && !Objects.equals(requested, only)) {
+        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+      }
+      return only;
+    }
+    if (requested == null) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    if (!templateIds.contains(requested)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return requested;
   }
 
   private List<Long> normalizeTemplateIds(List<Long> raw) {
@@ -275,6 +319,7 @@ public class KolPromotionService {
         kol.getLandingUrl(),
         kol.getInviteCode(),
         kol.getSheetUrl(),
+        kol.getLinkTemplateId(),
         null);
   }
 
@@ -377,6 +422,7 @@ public class KolPromotionService {
       String landingUrl,
       String inviteCode,
       String sheetUrl,
+      Long jumpTemplateId,
       String remark) {}
 
   public record PromotionConfigDTO(
@@ -385,6 +431,7 @@ public class KolPromotionService {
       String landingUrl,
       String inviteCode,
       String sheetUrl,
+      Long jumpTemplateId,
       String remark) {}
 
   public record PromotionRecordDTO(

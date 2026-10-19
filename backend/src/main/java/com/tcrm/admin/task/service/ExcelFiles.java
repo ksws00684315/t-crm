@@ -36,25 +36,44 @@ public class ExcelFiles {
   /** Default data row limit (KOL import); callers pass a per-type limit to {@link #read}. */
   public static final int DEFAULT_MAX_ROWS = 2_000;
 
-  private static final Set<String> ACCEPTED_TYPES =
+  private static final Set<String> ACCEPTED_XLSX_TYPES =
       Set.of(ImportTaskApi.XLSX_CONTENT_TYPE, "application/octet-stream");
+  private static final Set<String> ACCEPTED_CSV_TYPES =
+      Set.of("text/csv", "application/csv", "text/plain", "application/octet-stream");
   private static final byte[] ZIP_SIGNATURE = {0x50, 0x4B, 0x03, 0x04};
   private static final String SHEET = "Sheet1";
 
   /** Rejects anything that is not a plausible .xlsx upload, before parsing it. */
   public void check(ImportFileDTO file) {
+    check(file, false);
+  }
+
+  /**
+   * Same as {@link #check(ImportFileDTO)} but, when {@code allowCsv} is true, also accepts UTF-8
+   * {@code .csv} uploads (order / refund imports, task 28 §3.6).
+   */
+  public void check(ImportFileDTO file, boolean allowCsv) {
     String name = file.fileName() == null ? "" : file.fileName().toLowerCase(Locale.ROOT);
     String type = file.contentType() == null ? "" : file.contentType().toLowerCase(Locale.ROOT);
     int semicolon = type.indexOf(';');
     if (semicolon >= 0) {
       type = type.substring(0, semicolon).trim();
     }
-    if (!name.endsWith(".xlsx") || !ACCEPTED_TYPES.contains(type)) {
-      throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
-    }
     byte[] content = file.content();
     if (content.length > MAX_BYTES) {
       throw new BusinessException(ErrorCode.TASK_FILE_TOO_LARGE);
+    }
+    if (name.endsWith(".csv")) {
+      if (!allowCsv || !ACCEPTED_CSV_TYPES.contains(type)) {
+        throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
+      }
+      if (content.length == 0) {
+        throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
+      }
+      return;
+    }
+    if (!name.endsWith(".xlsx") || !ACCEPTED_XLSX_TYPES.contains(type)) {
+      throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
     }
     if (content.length < ZIP_SIGNATURE.length) {
       throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
@@ -66,20 +85,50 @@ public class ExcelFiles {
     }
   }
 
+  /** True when the bytes do not look like an OOXML zip (xlsx). */
+  static boolean looksLikeCsv(byte[] content) {
+    if (content == null || content.length < ZIP_SIGNATURE.length) {
+      return true;
+    }
+    for (int i = 0; i < ZIP_SIGNATURE.length; i++) {
+      if (content[i] != ZIP_SIGNATURE[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** A parsed sheet: the header variant the file matched, and its data rows. */
   public record SheetData(List<String> matchedHeaders, List<List<String>> rows) {}
 
   /**
-   * Reads the first sheet: the header row must equal one of {@code headerVariants} exactly (the
-   * Chinese and the English template; mixing languages is a mismatch); the following non-blank rows
-   * are returned as trimmed texts padded to the header count (extra columns are ignored).
+   * Reads the first sheet as xlsx. Non-xlsx bytes are rejected with {@code TASK_FILE_INVALID}.
    *
    * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
    *     TASK_FILE_TOO_MANY_ROWS
    */
   public SheetData read(byte[] content, List<List<String>> headerVariants, int maxRows) {
+    return read(content, headerVariants, maxRows, false);
+  }
+
+  /**
+   * Reads the first sheet. When {@code asCsv} is true (order / refund imports whose stored
+   * contentType is {@code text/csv}), parse with {@link CsvFiles}; otherwise require an xlsx zip
+   * and reject other content with {@code TASK_FILE_INVALID} (task 28 review).
+   *
+   * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
+   *     TASK_FILE_TOO_MANY_ROWS
+   */
+  public SheetData read(
+      byte[] content, List<List<String>> headerVariants, int maxRows, boolean asCsv) {
     if (maxRows < 1) {
       throw new IllegalArgumentException("maxRows must be positive");
+    }
+    if (asCsv) {
+      return CsvFiles.read(content, headerVariants, maxRows);
+    }
+    if (looksLikeCsv(content)) {
+      throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
     }
     RowCollector collector = new RowCollector(headerVariants, maxRows);
     try {

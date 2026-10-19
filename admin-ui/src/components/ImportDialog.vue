@@ -17,16 +17,21 @@ const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_FAILURES = 3;
 const IMPORT_MAX_BYTES = 20 * 1024 * 1024;
 
-const props = defineProps<{
-  modelValue: boolean;
-  title: string;
-  /** Shown in the first step, e.g. "One file, at most 20MB and 20,000 rows". */
-  limitHint: string;
-  templateFileName: string;
-  taskType: TaskType;
-  downloadTemplate: () => Promise<DownloadedFile>;
-  upload: (file: File) => Promise<{ taskId: string }>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean;
+    title: string;
+    /** Shown in the first step, e.g. "One file, at most 20MB and 20,000 rows". */
+    limitHint: string;
+    templateFileName: string;
+    taskType: TaskType;
+    downloadTemplate: () => Promise<DownloadedFile>;
+    upload: (file: File) => Promise<{ taskId: string }>;
+    /** Order / refund imports also accept .csv (task 28 §3.6). */
+    acceptCsv?: boolean;
+  }>(),
+  { acceptCsv: false }
+);
 
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
@@ -125,7 +130,11 @@ function onFileChange(event: Event) {
 }
 
 function checkFile(selected: File): string | null {
-  if (!selected.name.toLowerCase().endsWith(".xlsx")) return t("import.xlsxOnly");
+  const name = selected.name.toLowerCase();
+  const ok = props.acceptCsv
+    ? name.endsWith(".xlsx") || name.endsWith(".csv")
+    : name.endsWith(".xlsx");
+  if (!ok) return props.acceptCsv ? t("import.xlsxOrCsv") : t("import.xlsxOnly");
   if (selected.size > IMPORT_MAX_BYTES) return t("import.tooLarge");
   return null;
 }
@@ -214,7 +223,11 @@ function close() {
       <input
         ref="fileInput"
         type="file"
-        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        :accept="
+          props.acceptCsv
+            ? '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'
+            : '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        "
         data-test="file"
         @change="onFileChange"
       />

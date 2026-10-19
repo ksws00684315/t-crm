@@ -28,7 +28,7 @@ function row(overrides: Partial<CopyTokenVO> = {}): CopyTokenVO {
     targetShopId: null,
     targetShopName: null,
     used: 0,
-    quota: 1000,
+    quota: 1,
     validMinutes: 1440,
     expiresAt: "2026-10-18T12:00:00Z",
     displayStatus: "ACTIVE",

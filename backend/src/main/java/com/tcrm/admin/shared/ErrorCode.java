@@ -92,6 +92,7 @@ public enum ErrorCode {
   KOL_PROMOTION_CONFIG_INCOMPLETE(422, "Promotion config is incomplete for PROMOTING status"),
   KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD"),
   COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
+  KOL_REVIEW_ALREADY_DONE(409, "KOL review is already done and cannot return to PENDING_REVIEW"),
   PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later");
   private final int status;
   private final String message;

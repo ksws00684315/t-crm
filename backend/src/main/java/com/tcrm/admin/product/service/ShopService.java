@@ -2,6 +2,7 @@ package com.tcrm.admin.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.tcrm.admin.kol.api.CopyTargetShopApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.ShopStatusChangedEvent;
@@ -15,7 +16,11 @@ import com.tcrm.admin.shared.MissingTenantException;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -23,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Shop management (task 05 §4.1). At most 3 shops; only SUPER_ADMIN may write (controller). */
 @Service
-public class ShopService implements ShopAccessApi {
+public class ShopService implements ShopAccessApi, CopyTargetShopApi {
   private final ShopMapper shops;
   private final CurrentUserContext current;
   private final ApplicationEventPublisher events;
@@ -170,7 +175,35 @@ public class ShopService implements ShopAccessApi {
         .toList();
   }
 
+  @Override
+  public void requireEnabled(long shopId) {
+    ShopDO shop = shops.selectById(shopId);
+    if (shop == null) {
+      throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
+    }
+    if (shop.getStatus() == null || shop.getStatus() != 1) {
+      throw new BusinessException(ErrorCode.SHOP_DISABLED);
+    }
+  }
+
+  @Override
+  public Map<Long, String> namesByIds(Collection<Long> shopIds) {
+    Map<Long, String> byId = new HashMap<>();
+    if (shopIds == null || shopIds.isEmpty()) {
+      return byId;
+    }
+    List<Long> ids = shopIds.stream().filter(Objects::nonNull).distinct().toList();
+    if (ids.isEmpty()) {
+      return byId;
+    }
+    for (ShopDO shop : shops.selectList(new LambdaQueryWrapper<ShopDO>().in(ShopDO::getId, ids))) {
+      byId.put(shop.getId(), shop.getShopName());
+    }
+    return byId;
+  }
+
   static ShopDTO toDto(ShopDO shop) {
+
     return new ShopDTO(
         shop.getId(),
         shop.getShopName(),

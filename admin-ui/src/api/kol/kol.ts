@@ -23,19 +23,14 @@ export interface SocialAccountRequest {
   primary: boolean;
 }
 
-/** `EditKolRequest`. `defaultRate` is a fraction string with up to 4 decimals, or null. */
+/** Ordinary edit body (task 28): profile fields only; email is read-only in the UI. */
 export interface EditKolRequest {
   name: string;
-  email: string;
   /** Null clears the country. */
   country: string | null;
   socialAccounts: SocialAccountRequest[];
-  defaultRate: string | null;
   remark: string | null;
   whatsapp: string | null;
-  linkTemplateId: string | null;
-  inviteCode: string | null;
-  sheetUrl: string | null;
 }
 
 /** `GET` / `POST /kol/register-code`. `url` is the full creator-portal link. */
@@ -45,8 +40,19 @@ export interface RegisterCodeVO {
   status: 0 | 1;
 }
 
-/** `CreateKolRequest`. `bdUserId` is ignored for a BD (the KOL is always assigned to them). */
-export interface CreateKolRequest extends EditKolRequest {
+/** Create body still carries email and the fields that seed promotion config. */
+export interface CreateKolRequest {
+  name: string;
+  email: string;
+  country: string | null;
+  socialAccounts: SocialAccountRequest[];
+  defaultRate: string | null;
+  remark: string | null;
+  whatsapp: string | null;
+  linkTemplateId: string | null;
+  inviteCode: string | null;
+  sheetUrl: string | null;
+  /** Ignored for a BD (the KOL is always assigned to them). */
   bdUserId: string | null;
 }
 

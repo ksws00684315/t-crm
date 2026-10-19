@@ -338,6 +338,7 @@ onMounted(() => {
     <SyncStatesDialog v-model="syncVisible" @synced="load" />
 
     <ImportDialog
+      accept-csv
       v-model="orderImportVisible"
       :title="t('order.orderImportTitle')"
       :limit-hint="t('order.importLimitHint')"
@@ -349,6 +350,7 @@ onMounted(() => {
     />
 
     <ImportDialog
+      accept-csv
       v-model="refundImportVisible"
       :title="t('order.refundImportTitle')"
       :limit-hint="t('order.importLimitHint')"
