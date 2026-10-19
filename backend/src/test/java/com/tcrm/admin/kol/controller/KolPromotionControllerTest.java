@@ -3,6 +3,7 @@ package com.tcrm.admin.kol.controller;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -123,5 +124,75 @@ class KolPromotionControllerTest {
                 .content("{\"name\":\"Alice\"}"))
         .andExpect(status().isOk());
     verify(promotions).review(eq(10L), org.mockito.ArgumentMatchers.any());
+  }
+
+  private String viewOnlyToken() {
+    return AdminMvcSupport.actAs(
+        current, 1L, Role.STAFF, DataScope.OWN, java.util.Set.of("kol:view"));
+  }
+
+  @Test
+  void shouldAllowViewOnlyStaff_toReadPromotionConfigAndRecords() throws Exception {
+    when(promotions.getConfig(10L))
+        .thenReturn(
+            new KolPromotionService.PromotionConfigDTO(
+                "0.1000",
+                List.of(new PlatformInput(3L, "https://landing.example/")),
+                "inv",
+                null,
+                3L,
+                null));
+    when(promotions.pageRecords(10L, 1, 20))
+        .thenReturn(
+            new PageResult<>(
+                List.of(
+                    new KolPromotionService.PromotionRecordDTO(
+                        "STATUS",
+                        Map.of("relationStatus", "PENDING_PROMOTION"),
+                        Map.of("relationStatus", "PROMOTING"),
+                        null,
+                        "BD",
+                        java.time.Instant.parse("2026-10-18T00:00:00Z"),
+                        null,
+                        null)),
+                1,
+                1,
+                20));
+    String token = viewOnlyToken();
+    mvc.perform(
+            get("/admin-api/kol/kols/10/promotion-config")
+                .header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.defaultRate").value("0.1000"));
+    mvc.perform(
+            get("/admin-api/kol/kols/10/promotion-records")
+                .header(AdminMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].changeType").value("STATUS"));
+  }
+
+  @Test
+  void shouldReturn403_whenViewOnlyStaffWritesPromotion() throws Exception {
+    String token = viewOnlyToken();
+    mvc.perform(
+            put("/admin-api/kol/kols/10/promotion-config")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"defaultRate\":\"0.1000\",\"platforms\":[{\"templateId\":3,\"address\":\"https://x\"}],\"inviteCode\":\"inv\"}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            put("/admin-api/kol/kols/10/relation-status")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"PROMOTING\"}"))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post("/admin-api/kol/kols/10/review")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Alice\"}"))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(promotions);
   }
 }

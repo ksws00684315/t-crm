@@ -109,7 +109,7 @@ public class KolController {
   }
 
   @GetMapping("/{id}/promotion-config")
-  @SaCheckPermission("kol:edit")
+  @SaCheckPermission("kol:view")
   public R<PromotionConfigVO> promotionConfig(@PathVariable @Min(1) Long id) {
     return R.ok(PromotionConfigVO.from(promotions.getConfig(id)));
   }
@@ -124,7 +124,7 @@ public class KolController {
   }
 
   @GetMapping("/{id}/promotion-records")
-  @SaCheckPermission("kol:edit")
+  @SaCheckPermission("kol:view")
   public R<PageResult<PromotionRecordVO>> promotionRecords(
       @PathVariable @Min(1) Long id,
       @RequestParam(defaultValue = "1") @Min(1) int page,

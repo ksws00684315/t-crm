@@ -50,7 +50,7 @@ public class IdleKolCleanupController {
   }
 
   @GetMapping("/cleanup-items")
-  @SaCheckPermission("kol:edit")
+  @SaCheckPermission("kol:view")
   public R<PageResult<CleanupItemVO>> cleanupItems(
       @RequestParam(required = false) String kolCode,
       @RequestParam(required = false) @Pattern(regexp = "PENDING|SUCCESS|FAILED") String status,
