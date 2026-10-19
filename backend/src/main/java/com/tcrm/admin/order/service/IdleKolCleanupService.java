@@ -1,9 +1,11 @@
 package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.kol.api.KolCleanupApi;
+import com.tcrm.admin.kol.api.KolCleanupApi.CleanupKolSnapshot;
 import com.tcrm.admin.kol.api.KolCleanupConfigDTO;
 import com.tcrm.admin.kol.api.PromotingKolDTO;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.product.api.KolCleanupItemApi;
 import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -23,17 +25,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Idle-KOL cleanup orchestration (task 25a architecture review): order owns the job and preview so
- * pay-time reads stay in this module; kol/product mutations go through their api packages.
+ * Idle-KOL cleanup orchestration (task 25a / 29): order owns the job, preview, manual cleanup, and
+ * cleanup-item listing so pay-time and Weidian deletes go through api packages.
  */
 @Service
 public class IdleKolCleanupService {
   private final KolCleanupApi cleanup;
   private final KolItemApi items;
+  private final KolCleanupItemApi cleanupItems;
   private final OrderMapper orders;
   private final BdUserApi bdUsers;
   private final CurrentUserContext current;
@@ -44,6 +48,7 @@ public class IdleKolCleanupService {
   public IdleKolCleanupService(
       KolCleanupApi cleanup,
       KolItemApi items,
+      KolCleanupItemApi cleanupItems,
       OrderMapper orders,
       BdUserApi bdUsers,
       CurrentUserContext current,
@@ -52,6 +57,7 @@ public class IdleKolCleanupService {
       TransactionTemplate tx) {
     this.cleanup = cleanup;
     this.items = items;
+    this.cleanupItems = cleanupItems;
     this.orders = orders;
     this.bdUsers = bdUsers;
     this.current = current;
@@ -95,7 +101,7 @@ public class IdleKolCleanupService {
     List<IdleKol> idle = findIdle(config.idleDays(), now);
     int cleaned = 0;
     for (IdleKol candidate : idle) {
-      if (cleanOne(candidate.id(), now)) {
+      if (cleanOne(candidate.id(), now, "AUTO", null, null)) {
         cleaned++;
       }
     }
@@ -111,6 +117,69 @@ public class IdleKolCleanupService {
           sanitizer.sanitize(Map.of("cleaned", cleaned, "idleDays", config.idleDays())));
     }
     return cleaned;
+  }
+
+  /** Manual cleanup for one KOL (task 29). Same effect as auto; reason required. */
+  public void cleanupManual(long kolId, String reason) {
+    AccountDTO user = current.user();
+    String cleanedReason = requireReason(reason);
+    Instant now = Instant.now();
+    boolean ok =
+        Boolean.TRUE.equals(
+            tx.execute(
+                status -> {
+                  Optional<CleanupKolSnapshot> locked = cleanup.lockKol(kolId);
+                  if (locked.isEmpty()) {
+                    throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+                  }
+                  CleanupKolSnapshot snap = locked.get();
+                  if (user.ownScope() && !user.id().equals(snap.bdUserId())) {
+                    throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+                  }
+                  cleanupItems.createPendingItems(
+                      snap.id(),
+                      snap.kolCode(),
+                      snap.bdUserId(),
+                      "MANUAL",
+                      cleanedReason,
+                      now,
+                      user.id());
+                  items.closeCurrentMappingsForKol(snap.id(), now, user.id());
+                  return cleanup.softDeleteLockedKol(snap.id());
+                }));
+    if (ok) {
+      cleanupItems.processAllPendingForKol(kolId, now);
+      audit.recordTenantWriteOperation(
+          user.tenantId(),
+          user.id(),
+          "KOL",
+          "Manual KOL cleanup",
+          "POST",
+          "/admin-api/kol/kols/" + kolId + "/cleanup",
+          sanitizer.sanitize(Map.of("kolId", kolId)));
+    }
+  }
+
+  public PageResult<KolCleanupItemApi.KolCleanupItemDTO> pageCleanupItems(
+      String kolCode, String status, int page, int size) {
+    AccountDTO user = current.user();
+    Long scope = user.ownScope() ? user.id() : null;
+    return cleanupItems.page(kolCode, status, scope, page, size);
+  }
+
+  public void retryCleanupItem(long id) {
+    AccountDTO user = current.user();
+    var row =
+        cleanupItems
+            .getById(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+    if (user.ownScope() && !user.id().equals(row.bdUserId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    if (!"FAILED".equals(row.status())) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    cleanupItems.retryFailed(id);
   }
 
   /** Package-visible for unit tests: same idle判定 as preview and execute. */
@@ -133,17 +202,25 @@ public class IdleKolCleanupService {
     return out;
   }
 
-  private boolean cleanOne(Long kolId, Instant now) {
-    return Boolean.TRUE.equals(
+  private boolean cleanOne(Long kolId, Instant now, String trigger, String reason, Long actorId) {
+    Boolean deleted =
         tx.execute(
             status -> {
-              // Lock + verify PROMOTING before closing mappings so a non-idle race closes nothing.
-              if (!cleanup.softDeletePromotingKol(kolId)) {
+              Optional<CleanupKolSnapshot> locked = cleanup.lockPromotingKol(kolId);
+              if (locked.isEmpty()) {
                 return false;
               }
-              items.closeCurrentMappingsForKol(kolId, now, null);
-              return true;
-            }));
+              CleanupKolSnapshot snap = locked.get();
+              cleanupItems.createPendingItems(
+                  snap.id(), snap.kolCode(), snap.bdUserId(), trigger, reason, now, actorId);
+              items.closeCurrentMappingsForKol(kolId, now, actorId);
+              return cleanup.softDeleteLockedKol(kolId);
+            });
+    if (Boolean.TRUE.equals(deleted)) {
+      cleanupItems.processAllPendingForKol(kolId, now);
+      return true;
+    }
+    return false;
   }
 
   private Map<Long, Instant> lastPayByKol(List<Long> kolIds) {
@@ -164,6 +241,17 @@ public class IdleKolCleanupService {
     if (user.ownScope() || user.dataScope() == DataScope.OWN) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
+  }
+
+  private static String requireReason(String reason) {
+    if (reason == null || reason.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    String value = reason.strip();
+    if (value.length() > 200) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return value;
   }
 
   private Map<Long, String> bdNames(List<Long> ids) {

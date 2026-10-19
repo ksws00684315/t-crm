@@ -9,11 +9,12 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * Ordinary edit body (task 28 §3.2 / §3.3): profile fields only. Email is shown read-only in the
- * admin UI and is never accepted here; promotion fields go through promotion-config.
+ * Ordinary edit body (task 28 / 29): profile fields only. Email is shown read-only in the admin UI
+ * and is never accepted here; promotion fields go through promotion-config.
  */
 public record EditKolRequest(
     @NotBlank @Size(max = KolRules.MAX_NAME) String name,
+    @Size(max = KolRules.MAX_WHATSAPP) @Pattern(regexp = KolRules.WHATSAPP_PATTERN) String phone,
     @CountryCode String country,
     @Size(max = KolRules.MAX_SOCIAL_ACCOUNTS) List<@Valid SocialAccountRequest> socialAccounts,
     @Size(max = KolRules.MAX_REMARK) String remark,
@@ -21,6 +22,11 @@ public record EditKolRequest(
         String whatsapp) {
   EditKolCommand toCommand() {
     return new EditKolCommand(
-        name, country, KolRequests.social(socialAccounts), remark, KolRequests.text(whatsapp));
+        name,
+        KolRequests.text(phone),
+        country,
+        KolRequests.social(socialAccounts),
+        remark,
+        KolRequests.text(whatsapp));
   }
 }

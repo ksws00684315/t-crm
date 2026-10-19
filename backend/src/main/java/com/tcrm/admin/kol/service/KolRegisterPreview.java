@@ -1,4 +1,4 @@
 package com.tcrm.admin.kol.service;
 
-/** Company name shown on a valid register link. Nothing else about the company is exposed. */
-public record KolRegisterPreview(String tenantName) {}
+/** BD display name shown on a valid register link. Nothing else is exposed (task 29). */
+public record KolRegisterPreview(String bdUserName) {}

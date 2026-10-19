@@ -33,7 +33,7 @@ import org.mockito.InOrder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class KolSelfRegisterServiceTest {
-  private static final String CODE = "A".repeat(32);
+  private static final String CODE = "A2B3C4D5";
   private static final String IP = "198.51.100.9";
 
   private final KolRegisterCodeMapper codes = mock(KolRegisterCodeMapper.class);
@@ -62,6 +62,9 @@ class KolSelfRegisterServiceTest {
     when(tenants.listByIds(List.of(7L))).thenReturn(List.of(new TenantRefDTO(7L, "Acme", true)));
     when(kols.selectCount(any())).thenReturn(0L);
     when(passwords.encode(anyString())).thenReturn("bcrypt-hash");
+    org.mockito.Mockito.doNothing()
+        .when(emailCodes)
+        .requirePreviewIp(org.mockito.ArgumentMatchers.any());
     when(emailCodes.issue(7L, "a@b.co")).thenReturn("123456");
     when(writer.insert(any(), isNull(), isNull()))
         .thenAnswer(
@@ -83,12 +86,12 @@ class KolSelfRegisterServiceTest {
 
   @Test
   void shouldPreviewOnlyAUsableLink() {
-    assertThat(service.preview(CODE).tenantName()).isEqualTo("Acme");
+    assertThat(service.preview(CODE, "127.0.0.1").bdUserName()).isEqualTo("BD");
   }
 
   @Test
   void shouldHideEveryReasonALinkIsUnusable() {
-    assertThatThrownBy(() -> service.preview("short"))
+    assertThatThrownBy(() -> service.preview("short", "127.0.0.1"))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.KOL_REGISTER_CODE_INVALID.message());
     verify(codes, never()).selectOne(any());
@@ -142,7 +145,7 @@ class KolSelfRegisterServiceTest {
 
   @Test
   void shouldCreateAnActivatedKol_andSignItIn() {
-    LoginResult result = service.register(registration(null), IP);
+    LoginResult result = service.register(registration("Ada"), IP);
     assertThat(result.token()).isEqualTo("token");
     InOrder order = inOrder(emailCodes, writer, audit, auth);
     order.verify(emailCodes).requireRegisterIp(IP);
@@ -164,7 +167,7 @@ class KolSelfRegisterServiceTest {
         .insert(
             org.mockito.ArgumentMatchers.argThat(
                 kol ->
-                    kol.getName().equals("creator_handle")
+                    kol.getName().equals("Ada")
                         && kol.getEmail().equals("a@b.co")
                         && "US".equals(kol.getCountry())
                         && kol.getBdUserId().equals(3L)
@@ -181,7 +184,7 @@ class KolSelfRegisterServiceTest {
   }
 
   private static void assertInvalid(KolSelfRegisterService service) {
-    assertThatThrownBy(() -> service.preview(CODE))
+    assertThatThrownBy(() -> service.preview(CODE, "127.0.0.1"))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.KOL_REGISTER_CODE_INVALID.message());
   }
@@ -207,11 +210,12 @@ class KolSelfRegisterServiceTest {
         " A@B.CO ",
         "123456",
         "register-pass-1",
+        name,
+        null,
         " +15551234567 ",
         "TikTok",
         " creator_handle ",
         "  ",
-        name,
         " us ");
   }
 }

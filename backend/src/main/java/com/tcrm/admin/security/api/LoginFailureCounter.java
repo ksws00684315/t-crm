@@ -1,5 +1,8 @@
 package com.tcrm.admin.security.api;
 
+import java.util.Collection;
+import java.util.Set;
+
 /**
  * Login failure throttling boundary (ADR-008) for other modules: the KOL login counts on the same
  * three scopes and thresholds as the administrator login, but on its own Redis keys so neither
@@ -14,4 +17,10 @@ public interface LoginFailureCounter {
 
   /** Clears only the username + IP counter after a successful login (ADR-008). */
   void clear(String username, String ip);
+
+  /**
+   * Returns the subset of usernames (emails) whose account-wide lock key is present (task 29 login
+   * status). Empty input returns an empty set without talking to Redis.
+   */
+  Set<String> findLockedUsernames(Collection<String> usernames);
 }

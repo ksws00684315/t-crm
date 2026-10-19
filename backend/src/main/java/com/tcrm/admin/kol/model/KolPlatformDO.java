@@ -14,6 +14,10 @@ public class KolPlatformDO extends BaseEntity {
   private Long kolId;
   private Long linkTemplateId;
 
+  /** Per-platform address (https); replaces crm_kol.landing_url (ADR-025). */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String address;
+
   public Long getTenantId() {
     return tenantId;
   }
@@ -36,5 +40,13 @@ public class KolPlatformDO extends BaseEntity {
 
   public void setLinkTemplateId(Long value) {
     this.linkTemplateId = value;
+  }
+
+  public String getAddress() {
+    return address;
+  }
+
+  public void setAddress(String value) {
+    this.address = value;
   }
 }

@@ -11,7 +11,7 @@ import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.model.KolCleanupConfigDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPromotionRecordDO;
-import com.tcrm.admin.kol.model.PromotionStatus;
+import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
@@ -24,14 +24,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Idle-KOL cleanup config and kol.api collaborators (task 25a / ADR-023 §5). Preview and scheduled
- * execution live in the order module so cross-module table access goes through api packages.
+ * Idle-KOL cleanup config and kol.api collaborators (task 25a / 29 / ADR-025). Preview and
+ * scheduled execution live in the order module so cross-module table access goes through api
+ * packages.
  */
 @Service
 public class KolCleanupService implements KolCleanupApi {
@@ -112,7 +114,7 @@ public class KolCleanupService implements KolCleanupApi {
     List<KolDO> promoting =
         kols.selectList(
             new LambdaQueryWrapper<KolDO>()
-                .eq(KolDO::getPromotionStatus, PromotionStatus.PROMOTING.name())
+                .eq(KolDO::getRelationStatus, RelationStatus.PROMOTING.name())
                 .orderByAsc(KolDO::getId));
     List<PromotingKolDTO> out = new ArrayList<>(promoting.size());
     for (KolDO kol : promoting) {
@@ -130,14 +132,37 @@ public class KolCleanupService implements KolCleanupApi {
   }
 
   @Override
-  public boolean softDeletePromotingKol(long kolId) {
-    // Caller must already be in a transaction (order cleanup wraps close + delete).
+  public Optional<CleanupKolSnapshot> lockPromotingKol(long kolId) {
     Long locked = kols.lockById(kolId);
     if (locked == null) {
-      return false;
+      return Optional.empty();
     }
     KolDO kol = kols.selectById(kolId);
-    if (kol == null || !PromotionStatus.PROMOTING.name().equals(kol.getPromotionStatus())) {
+    if (kol == null || !RelationStatus.PROMOTING.name().equals(kol.getRelationStatus())) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new CleanupKolSnapshot(kol.getId(), kol.getKolCode(), kol.getName(), kol.getBdUserId()));
+  }
+
+  @Override
+  public Optional<CleanupKolSnapshot> lockKol(long kolId) {
+    Long locked = kols.lockById(kolId);
+    if (locked == null) {
+      return Optional.empty();
+    }
+    KolDO kol = kols.selectById(kolId);
+    if (kol == null) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new CleanupKolSnapshot(kol.getId(), kol.getKolCode(), kol.getName(), kol.getBdUserId()));
+  }
+
+  @Override
+  public boolean softDeleteLockedKol(long kolId) {
+    KolDO kol = kols.selectById(kolId);
+    if (kol == null) {
       return false;
     }
     kols.deleteById(kolId);
@@ -156,7 +181,11 @@ public class KolCleanupService implements KolCleanupApi {
                 .last("LIMIT 50"));
     for (KolPromotionRecordDO row : rows) {
       Map<?, ?> after = parse(row.getAfterJson());
-      if (PromotionStatus.PROMOTING.name().equals(String.valueOf(after.get("promotionStatus")))) {
+      Object relation = after.get("relationStatus");
+      if (relation == null) {
+        relation = after.get("promotionStatus");
+      }
+      if (RelationStatus.PROMOTING.name().equals(String.valueOf(relation))) {
         return row.getCreateTime();
       }
     }

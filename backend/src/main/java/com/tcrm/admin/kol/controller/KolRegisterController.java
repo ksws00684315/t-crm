@@ -16,9 +16,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Public KOL self-registration (task 12c §4.3). These paths are excluded from the KOL login
- * interceptor; a bad link is 404 {@code KOL_REGISTER_CODE_INVALID}. A successful register returns
- * the same body as a successful {@code POST /kol-api/auth/login}.
+ * Public KOL self-registration (task 12c / 29). These paths are excluded from the KOL login
+ * interceptor; a bad link is 404 {@code KOL_REGISTER_CODE_INVALID}.
  */
 @RestController
 public class KolRegisterController {
@@ -32,8 +31,9 @@ public class KolRegisterController {
 
   @PublicEndpoint
   @GetMapping("/kol-api/register/{code}")
-  public R<KolRegisterPreviewVO> preview(@PathVariable @NotBlank String code) {
-    return R.ok(KolRegisterPreviewVO.from(registration.preview(code)));
+  public R<KolRegisterPreviewVO> preview(
+      @PathVariable @NotBlank String code, HttpServletRequest request) {
+    return R.ok(KolRegisterPreviewVO.from(registration.preview(code, clientIps.resolve(request))));
   }
 
   @PublicEndpoint
@@ -52,10 +52,10 @@ public class KolRegisterController {
         KolLoginVO.from(registration.register(body.toRegistration(), clientIps.resolve(request))));
   }
 
-  /** Only the company name. The code, the BD and the company id stay on the server. */
-  public record KolRegisterPreviewVO(String tenantName) {
+  /** Only the BD display name. The code, the BD id and the company stay on the server. */
+  public record KolRegisterPreviewVO(String bdUserName) {
     static KolRegisterPreviewVO from(KolRegisterPreview preview) {
-      return new KolRegisterPreviewVO(preview.tenantName());
+      return new KolRegisterPreviewVO(preview.bdUserName());
     }
   }
 }
