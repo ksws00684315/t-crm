@@ -680,8 +680,7 @@ const enUS: MessageSchema = {
     /** Super-admin tab on the creator page: transfer creators between BDs. */
     manageTab: "Creator Management",
     listTab: "Creator List",
-    transferRecordsHint: "Transfer records are in System → Audit Log",
-    unboundRowHint: "This creator has no BD; only profile edit and review are available"
+    transferRecordsHint: "Transfer records are in System → Audit Log"
   },
   promotion: {
     configTitle: "Commission",

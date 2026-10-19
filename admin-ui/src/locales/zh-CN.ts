@@ -664,8 +664,7 @@ const zhCN = {
     /** Super-admin tab on the creator page: transfer creators between BDs. */
     manageTab: "达人管理",
     listTab: "达人列表",
-    transferRecordsHint: "转移记录请到 系统管理 → 操作日志 查询",
-    unboundRowHint: "该达人未绑定商务，仅支持资料编辑与审核"
+    transferRecordsHint: "转移记录请到 系统管理 → 操作日志 查询"
   },
   promotion: {
     configTitle: "佣金信息",
