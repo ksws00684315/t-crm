@@ -4,5 +4,6 @@ package com.tcrm.admin.kol.model;
 public enum PromotionChangeType {
   CONFIG,
   STATUS,
-  REVIEW
+  REVIEW,
+  AUTO_CLEANUP
 }

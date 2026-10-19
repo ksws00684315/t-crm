@@ -31,7 +31,7 @@ class MailConfigurationTest {
   @Test
   void shouldUseResend_whenApiKeyAndSenderAreConfigured() {
     MailSender sender =
-        configuration.mailSender("re_key", "T-CRM <no-reply@example.com>", true, json);
+        configuration.mailSender("re_key", "SparkTrack <no-reply@example.com>", true, json);
     assertThat(sender).isInstanceOf(ResendMailSender.class);
   }
 }

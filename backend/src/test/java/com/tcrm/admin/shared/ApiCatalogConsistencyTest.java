@@ -99,6 +99,7 @@ class ApiCatalogConsistencyTest {
           if (full.endsWith("/") && full.length() > 1) {
             full = full.substring(0, full.length() - 1);
           }
+          full = full.replaceAll("\\{([^}:]+):[^}]+}", "{$1}");
           if (full.startsWith(pathPrefix)) {
             found.add(methodName + " " + full);
           }

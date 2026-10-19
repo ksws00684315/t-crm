@@ -36,14 +36,11 @@ class KolMailsTest {
     MailSender sender = mock(MailSender.class);
     doThrow(new RuntimeException("smtp down")).when(sender).send(any());
     KolMailTemplates templates = new KolMailTemplates(new KolPortalUrls("https://kol.example.com"));
-    new KolMails(sender, templates).sendRegisterCode("alice.secret@example.com", "Acme", "654321");
+    new KolMails(sender, templates).sendInvite("alice.secret@example.com", "Acme", "safe-token");
     assertThat(appender.list).hasSize(1);
     String line = appender.list.getFirst().getFormattedMessage();
-    assertThat(line)
-        .contains("kol-register-code")
-        .contains("a***@example.com")
-        .contains("smtp down");
-    assertThat(line).doesNotContain("alice.secret").doesNotContain("654321");
+    assertThat(line).contains("kol-invite").contains("a***@example.com").contains("smtp down");
+    assertThat(line).doesNotContain("alice.secret").doesNotContain("safe-token");
   }
 
   @Test

@@ -2,19 +2,15 @@ package com.tcrm.admin.kol.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.api.KolCleanupApi;
-import com.tcrm.admin.kol.api.KolCleanupConfigDTO;
 import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.api.PromotingKolDTO;
-import com.tcrm.admin.kol.mapper.KolCleanupConfigMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
-import com.tcrm.admin.kol.model.KolCleanupConfigDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPromotionRecordDO;
 import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
-import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -38,9 +34,6 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class KolCleanupService implements KolCleanupApi {
   private static final JsonMapper JSON = JsonMapper.builder().build();
-  private static final int DEFAULT_IDLE_DAYS = 90;
-
-  private final KolCleanupConfigMapper configs;
   private final KolMapper kols;
   private final KolPromotionRecordMapper records;
   private final CurrentUserContext current;
@@ -49,14 +42,12 @@ public class KolCleanupService implements KolCleanupApi {
   private final ApplicationEventPublisher events;
 
   public KolCleanupService(
-      KolCleanupConfigMapper configs,
       KolMapper kols,
       KolPromotionRecordMapper records,
       CurrentUserContext current,
       ExternalAuditApi audit,
       AuditSanitizer sanitizer,
       ApplicationEventPublisher events) {
-    this.configs = configs;
     this.kols = kols;
     this.records = records;
     this.current = current;
@@ -65,48 +56,53 @@ public class KolCleanupService implements KolCleanupApi {
     this.events = events;
   }
 
-  public CleanupConfigDTO getConfig() {
-    requireAllScope();
-    return toDto(loadOrDefault());
-  }
-
   @Override
-  public KolCleanupConfigDTO getCleanupConfig() {
-    return toApi(loadOrDefault());
-  }
-
   @Transactional(rollbackFor = Exception.class)
-  public void saveConfig(boolean enabled, int idleDays) {
-    requireAllScope();
-    if (idleDays < 7 || idleDays > 365) {
+  public void setAutoCleanupDays(long kolId, Integer days) {
+    if (days != null && (days < 1 || days > 365)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     AccountDTO user = current.user();
-    KolCleanupConfigDO row =
-        configs.selectOne(new LambdaQueryWrapper<KolCleanupConfigDO>().last("LIMIT 1"));
-    Instant now = Instant.now();
-    if (row == null) {
-      row = new KolCleanupConfigDO();
-      row.setEnabled(enabled);
-      row.setIdleDays(idleDays);
-      row.setCreateBy(user.id());
-      row.setUpdateBy(user.id());
-      configs.insert(row);
-    } else {
-      row.setEnabled(enabled);
-      row.setIdleDays(idleDays);
-      row.setUpdateBy(user.id());
-      row.setUpdateTime(now);
-      configs.updateById(row);
+    KolDO kol = kols.selectById(kolId);
+    if (kol == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
+    if (user.ownScope() && !user.id().equals(kol.getBdUserId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    Integer beforeDays = kol.getAutoCleanupDays();
+    Instant now = Instant.now();
+    int updated =
+        kols.update(
+            null,
+            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>()
+                .eq(KolDO::getId, kolId)
+                .eq(user.ownScope(), KolDO::getBdUserId, user.id())
+                .set(KolDO::getAutoCleanupDays, days)
+                .set(KolDO::getUpdateBy, user.id())
+                .set(KolDO::getUpdateTime, now));
+    if (updated != 1) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    Map<String, Object> before =
+        Map.of("autoCleanupDays", beforeDays == null ? "disabled" : beforeDays);
+    Map<String, Object> after = Map.of("autoCleanupDays", days == null ? "disabled" : days);
+    KolPromotionRecordDO record = new KolPromotionRecordDO();
+    record.setKolId(kolId);
+    record.setChangeType("AUTO_CLEANUP");
+    record.setBeforeJson(JSON.writeValueAsString(before));
+    record.setAfterJson(JSON.writeValueAsString(after));
+    record.setRemark(null);
+    record.setCreateBy(user.id());
+    records.insert(record);
     audit.recordTenantWriteOperation(
         user.tenantId(),
         user.id(),
         "KOL",
-        "Save cleanup config",
+        "Save KOL auto cleanup",
         "PUT",
-        "/admin-api/kol/cleanup-config",
-        sanitizer.sanitize(Map.of("enabled", enabled, "idleDays", idleDays)));
+        "/admin-api/kol/kols/" + kolId + "/auto-cleanup",
+        sanitizer.sanitize(Map.of("kolId", kolId, "days", days == null ? "disabled" : days)));
   }
 
   @Override
@@ -115,6 +111,7 @@ public class KolCleanupService implements KolCleanupApi {
         kols.selectList(
             new LambdaQueryWrapper<KolDO>()
                 .eq(KolDO::getRelationStatus, RelationStatus.PROMOTING.name())
+                .isNotNull(KolDO::getAutoCleanupDays)
                 .orderByAsc(KolDO::getId));
     List<PromotingKolDTO> out = new ArrayList<>(promoting.size());
     for (KolDO kol : promoting) {
@@ -125,6 +122,7 @@ public class KolCleanupService implements KolCleanupApi {
               kol.getKolCode(),
               kol.getName(),
               kol.getBdUserId(),
+              kol.getAutoCleanupDays(),
               lastPromotingSince(kol.getId()),
               fallback));
     }
@@ -138,11 +136,18 @@ public class KolCleanupService implements KolCleanupApi {
       return Optional.empty();
     }
     KolDO kol = kols.selectById(kolId);
-    if (kol == null || !RelationStatus.PROMOTING.name().equals(kol.getRelationStatus())) {
+    if (kol == null
+        || !RelationStatus.PROMOTING.name().equals(kol.getRelationStatus())
+        || kol.getAutoCleanupDays() == null) {
       return Optional.empty();
     }
     return Optional.of(
-        new CleanupKolSnapshot(kol.getId(), kol.getKolCode(), kol.getName(), kol.getBdUserId()));
+        new CleanupKolSnapshot(
+            kol.getId(),
+            kol.getKolCode(),
+            kol.getName(),
+            kol.getBdUserId(),
+            kol.getAutoCleanupDays()));
   }
 
   @Override
@@ -156,7 +161,12 @@ public class KolCleanupService implements KolCleanupApi {
       return Optional.empty();
     }
     return Optional.of(
-        new CleanupKolSnapshot(kol.getId(), kol.getKolCode(), kol.getName(), kol.getBdUserId()));
+        new CleanupKolSnapshot(
+            kol.getId(),
+            kol.getKolCode(),
+            kol.getName(),
+            kol.getBdUserId(),
+            kol.getAutoCleanupDays()));
   }
 
   @Override
@@ -170,13 +180,13 @@ public class KolCleanupService implements KolCleanupApi {
     return true;
   }
 
-  /** Time of the latest STATUS change into PROMOTING; null when never recorded. */
+  /** Time of the latest promotion configuration saved into PROMOTING; null when never recorded. */
   private Instant lastPromotingSince(Long kolId) {
     List<KolPromotionRecordDO> rows =
         records.selectList(
             new LambdaQueryWrapper<KolPromotionRecordDO>()
                 .eq(KolPromotionRecordDO::getKolId, kolId)
-                .eq(KolPromotionRecordDO::getChangeType, "STATUS")
+                .in(KolPromotionRecordDO::getChangeType, "STATUS", "CONFIG")
                 .orderByDesc(KolPromotionRecordDO::getCreateTime, KolPromotionRecordDO::getId)
                 .last("LIMIT 50"));
     for (KolPromotionRecordDO row : rows) {
@@ -192,39 +202,10 @@ public class KolCleanupService implements KolCleanupApi {
     return null;
   }
 
-  private KolCleanupConfigDO loadOrDefault() {
-    KolCleanupConfigDO row =
-        configs.selectOne(new LambdaQueryWrapper<KolCleanupConfigDO>().last("LIMIT 1"));
-    if (row != null) {
-      return row;
-    }
-    KolCleanupConfigDO defaults = new KolCleanupConfigDO();
-    defaults.setEnabled(false);
-    defaults.setIdleDays(DEFAULT_IDLE_DAYS);
-    return defaults;
-  }
-
-  private void requireAllScope() {
-    AccountDTO user = current.user();
-    if (user.ownScope() || user.dataScope() == DataScope.OWN) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-  }
-
-  private static CleanupConfigDTO toDto(KolCleanupConfigDO row) {
-    return new CleanupConfigDTO(Boolean.TRUE.equals(row.getEnabled()), row.getIdleDays());
-  }
-
-  private static KolCleanupConfigDTO toApi(KolCleanupConfigDO row) {
-    return new KolCleanupConfigDTO(Boolean.TRUE.equals(row.getEnabled()), row.getIdleDays());
-  }
-
   private static Map<?, ?> parse(String json) {
     if (json == null || json.isBlank()) {
       return Map.of();
     }
     return JSON.readValue(json, Map.class);
   }
-
-  public record CleanupConfigDTO(boolean enabled, int idleDays) {}
 }

@@ -83,7 +83,7 @@ public class KolPromotionService {
   }
 
   public PromotionConfigDTO getConfig(Long id) {
-    KolDO kol = requireVisible(id, current.user());
+    KolDO kol = requireOwned(id, current.user());
     return toConfig(kol, platformRefs(id));
   }
 
@@ -92,7 +92,7 @@ public class KolPromotionService {
     AccountDTO user = current.user();
     tx.executeWithoutResult(
         status -> {
-          KolDO kol = requireVisible(id, user);
+          KolDO kol = requireOwned(id, user);
           if (!ReviewStatus.APPROVED.name().equals(kol.getReviewStatus())) {
             throw new BusinessException(ErrorCode.KOL_REVIEW_REQUIRED);
           }
@@ -107,7 +107,7 @@ public class KolPromotionService {
           KolDO after = kols.selectById(id);
           Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, afterPlatforms);
           insertConfigRecord(
-              id, before, afterSnap, blankToNull(command.remark()), user.id(), nextVersion, now);
+              id, before, afterSnap, command.remark().strip(), user.id(), nextVersion, now);
           boolean targetChanged =
               !Objects.equals(beforeInvite, after.getInviteCode())
                   || !Objects.equals(beforeJump, after.getLinkTemplateId());
@@ -119,41 +119,11 @@ public class KolPromotionService {
   }
 
   @Transactional(rollbackFor = Exception.class)
-  public void updateRelationStatus(Long id, RelationStatus status) {
-    AccountDTO user = current.user();
-    tx.executeWithoutResult(
-        txStatus -> {
-          KolDO kol = requireVisible(id, user);
-          List<PlatformRef> platformRefs = platformRefs(id);
-          if (status == RelationStatus.PROMOTING) {
-            List<String> missing = KolPromotionSupport.missingConfigFields(kol, platformRefs);
-            if (!missing.isEmpty()) {
-              throw new BusinessException(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE, missing);
-            }
-          }
-          Map<String, Object> before = KolPromotionSupport.snapshot(kol, platformRefs);
-          Instant now = Instant.now();
-          int updated =
-              kols.update(
-                  null,
-                  scoped(id, user)
-                      .set(KolDO::getRelationStatus, status.name())
-                      .set(KolDO::getUpdateBy, user.id())
-                      .set(KolDO::getUpdateTime, now));
-          requireUpdated(updated, user);
-          KolDO after = kols.selectById(id);
-          Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, platformRefs);
-          insertRecord(id, PromotionChangeType.STATUS, before, afterSnap, null, user.id());
-          recordAudit("Change relation status", Map.of("kolId", id, "status", status.name()));
-        });
-  }
-
-  @Transactional(rollbackFor = Exception.class)
   public void review(Long id, ReviewCommand command) {
     AccountDTO user = current.user();
     tx.executeWithoutResult(
         txStatus -> {
-          KolDO kol = requireVisible(id, user);
+          KolDO kol = requireProfileVisible(id, user);
           if (!ReviewStatus.PENDING.name().equals(kol.getReviewStatus())) {
             throw new BusinessException(ErrorCode.KOL_REVIEW_ALREADY_DONE);
           }
@@ -165,7 +135,7 @@ public class KolPromotionService {
           int updated =
               kols.update(
                   null,
-                  scoped(id, user)
+                  scopedProfile(id, user)
                       .set(KolDO::getName, command.name().strip())
                       .set(KolDO::getPhone, blankToNull(command.phone()))
                       .set(KolDO::getWhatsapp, blankToNull(command.whatsapp()))
@@ -187,7 +157,7 @@ public class KolPromotionService {
   }
 
   public PageResult<PromotionRecordDTO> pageRecords(Long id, int page, int size) {
-    requireVisible(id, current.user());
+    requireOwned(id, current.user());
     var result =
         records.selectPage(
             new Page<>(page, size),
@@ -240,6 +210,15 @@ public class KolPromotionService {
             command.jumpTemplateId(),
             platformInputs.stream().map(PlatformInput::templateId).toList());
     AccountDTO user = current.user();
+    String remark = blankToNull(command.remark());
+    if (rate == null
+        || invite == null
+        || sheet == null
+        || remark == null
+        || platformInputs.isEmpty()
+        || platformInputs.stream().anyMatch(p -> p.address() == null)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     int updated =
         kols.update(
             null,
@@ -247,7 +226,9 @@ public class KolPromotionService {
                 .set(KolDO::getDefaultRate, rate)
                 .set(KolDO::getInviteCode, invite)
                 .set(KolDO::getSheetUrl, sheet)
+                .set(KolDO::getPromotionRemark, remark)
                 .set(KolDO::getLinkTemplateId, jumpId)
+                .set(KolDO::getRelationStatus, RelationStatus.PROMOTING.name())
                 .set(KolDO::getConfigVersion, version)
                 .set(KolDO::getUpdateBy, actorId)
                 .set(KolDO::getUpdateTime, now));
@@ -259,20 +240,11 @@ public class KolPromotionService {
     if (templateIds.isEmpty()) {
       return null;
     }
-    if (templateIds.size() == 1) {
-      Long only = templateIds.get(0);
-      if (requested != null && !Objects.equals(requested, only)) {
-        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-      }
-      return only;
-    }
-    if (requested == null) {
+    Long resolved = requested == null ? templateIds.get(0) : requested;
+    if (!templateIds.contains(resolved)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    if (!templateIds.contains(requested)) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
-    return requested;
+    return resolved;
   }
 
   private List<PlatformInput> normalizePlatforms(List<PlatformInput> raw) {
@@ -283,13 +255,12 @@ public class KolPromotionService {
     List<PlatformInput> out = new ArrayList<>();
     for (PlatformInput p : raw) {
       if (p == null || p.templateId() == null || p.templateId() <= 0 || !seen.add(p.templateId())) {
-        continue;
+        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
       }
       templates.usableTemplate(p.templateId());
       String address = requireHttps(p.address());
       out.add(new PlatformInput(p.templateId(), address));
     }
-    out.sort((a, b) -> Long.compare(a.templateId(), b.templateId()));
     return out;
   }
 
@@ -381,7 +352,7 @@ public class KolPromotionService {
         kol.getInviteCode(),
         kol.getSheetUrl(),
         kol.getLinkTemplateId(),
-        null);
+        kol.getPromotionRemark());
   }
 
   private List<SocialAccountDTO> primarySocial(String platform, String handle, KolDO existing) {
@@ -405,7 +376,7 @@ public class KolPromotionService {
     return out;
   }
 
-  private KolDO requireVisible(Long id, AccountDTO user) {
+  private KolDO requireOwned(Long id, AccountDTO user) {
     KolDO kol = kols.selectById(id);
     if (kol == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
@@ -416,10 +387,29 @@ public class KolPromotionService {
     return kol;
   }
 
+  private KolDO requireProfileVisible(Long id, AccountDTO user) {
+    KolDO kol = kols.selectById(id);
+    if (kol == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (user.ownScope() && kol.getBdUserId() != null && !user.id().equals(kol.getBdUserId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    return kol;
+  }
+
   private static LambdaUpdateWrapper<KolDO> scoped(Long id, AccountDTO user) {
     return new LambdaUpdateWrapper<KolDO>()
         .eq(KolDO::getId, id)
         .eq(user.ownScope(), KolDO::getBdUserId, user.id());
+  }
+
+  private static LambdaUpdateWrapper<KolDO> scopedProfile(Long id, AccountDTO user) {
+    return new LambdaUpdateWrapper<KolDO>()
+        .eq(KolDO::getId, id)
+        .and(
+            user.ownScope(),
+            w -> w.eq(KolDO::getBdUserId, user.id()).or().isNull(KolDO::getBdUserId));
   }
 
   private static void requireUpdated(int updated, AccountDTO user) {

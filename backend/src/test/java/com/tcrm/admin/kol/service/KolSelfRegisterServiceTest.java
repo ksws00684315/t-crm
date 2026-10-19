@@ -3,7 +3,6 @@ package com.tcrm.admin.kol.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -18,7 +17,9 @@ import com.tcrm.admin.kol.mapper.KolRegisterCodeMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolRegisterCodeDO;
 import com.tcrm.admin.kol.service.KolAuthService.LoginResult;
+import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.KolAccountDTO;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
@@ -42,13 +43,12 @@ class KolSelfRegisterServiceTest {
   private final KolMapper kols = mock(KolMapper.class);
   private final KolWriter writer = mock(KolWriter.class);
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
-  private final KolEmailCodes emailCodes = mock(KolEmailCodes.class);
-  private final KolMails mails = mock(KolMails.class);
+  private final KolRegistrationRateLimiter rateLimiter = mock(KolRegistrationRateLimiter.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final KolAuthService auth = mock(KolAuthService.class);
   private final KolSelfRegisterService service =
       new KolSelfRegisterService(
-          codes, bdUsers, tenants, kols, writer, passwords, emailCodes, mails, audit, auth);
+          codes, bdUsers, tenants, kols, writer, passwords, rateLimiter, audit, auth);
 
   @BeforeEach
   void setUp() {
@@ -62,10 +62,6 @@ class KolSelfRegisterServiceTest {
     when(tenants.listByIds(List.of(7L))).thenReturn(List.of(new TenantRefDTO(7L, "Acme", true)));
     when(kols.selectCount(any())).thenReturn(0L);
     when(passwords.encode(anyString())).thenReturn("bcrypt-hash");
-    org.mockito.Mockito.doNothing()
-        .when(emailCodes)
-        .requirePreviewIp(org.mockito.ArgumentMatchers.any());
-    when(emailCodes.issue(7L, "a@b.co")).thenReturn("123456");
     when(writer.insert(any(), isNull(), isNull()))
         .thenAnswer(
             invocation -> {
@@ -115,44 +111,36 @@ class KolSelfRegisterServiceTest {
   }
 
   @Test
-  void shouldNotSendOrReserve_whenTheEmailAlreadyBelongsToTheCompany() {
-    when(kols.selectCount(any())).thenReturn(1L);
-    assertThatThrownBy(() -> service.sendEmailCode(CODE, " A@B.CO ", IP))
-        .isInstanceOf(BusinessException.class)
-        .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
-    verify(emailCodes).requireSendIp(IP);
-    verify(emailCodes, never()).reserveSend(anyLong(), anyString());
-    verify(emailCodes, never()).issue(anyLong(), anyString());
-    verifyNoInteractions(mails);
-  }
-
-  @Test
-  void shouldReserveThenStoreThenSend() {
-    service.sendEmailCode(CODE, " A@B.CO ", IP);
-    InOrder order = inOrder(emailCodes, mails);
-    order.verify(emailCodes).requireSendIp(IP);
-    order.verify(emailCodes).reserveSend(7L, "a@b.co");
-    order.verify(emailCodes).issue(7L, "a@b.co");
-    order.verify(mails).sendRegisterCode("a@b.co", "Acme", "123456");
-  }
-
-  @Test
-  void shouldNotConsumeTheCode_whenTheEmailIsTaken() {
+  void shouldRejectDuplicateEmailWithoutEmailVerification() {
     when(kols.selectCount(any())).thenReturn(1L);
     assertThatThrownBy(() -> service.register(registration("  "), IP))
         .hasMessage(ErrorCode.KOL_EMAIL_EXISTS.message());
-    verify(emailCodes, never()).consume(anyLong(), anyString(), anyString());
+    verify(rateLimiter).requireRegisterIp(IP);
     verifyNoInteractions(writer, audit, auth);
+  }
+
+  @Test
+  void shouldRegisterSuperAdminInviteAsUnassignedAndPreviewWithoutBdName() {
+    when(bdUsers.getById(3L))
+        .thenReturn(
+            new BdUserDTO(3L, "admin", "Admin", false, Role.SUPER_ADMIN, DataScope.ALL, true));
+    assertThat(service.preview(CODE, IP).bdUserName()).isNull();
+
+    service.register(registration("Ada"), IP);
+
+    verify(writer)
+        .insert(
+            org.mockito.ArgumentMatchers.argThat(kol -> kol.getBdUserId() == null),
+            isNull(),
+            isNull());
   }
 
   @Test
   void shouldCreateAnActivatedKol_andSignItIn() {
     LoginResult result = service.register(registration("Ada"), IP);
     assertThat(result.token()).isEqualTo("token");
-    InOrder order = inOrder(emailCodes, writer, audit, auth);
-    order.verify(emailCodes).requireRegisterIp(IP);
-    order.verify(emailCodes).requireRegisterEmail("a@b.co");
-    order.verify(emailCodes).consume(7L, "a@b.co", "123456");
+    InOrder order = inOrder(rateLimiter, writer, audit, auth);
+    order.verify(rateLimiter).requireRegisterIp(IP);
     order.verify(writer).insert(any(KolDO.class), isNull(), isNull());
     order
         .verify(audit)
@@ -210,7 +198,6 @@ class KolSelfRegisterServiceTest {
     return new KolRegistration(
         CODE,
         " A@B.CO ",
-        "123456",
         "register-pass-1",
         name,
         null,

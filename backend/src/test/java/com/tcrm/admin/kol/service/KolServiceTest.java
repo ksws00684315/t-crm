@@ -246,7 +246,8 @@ class KolServiceTest {
     when(kols.selectById(11L)).thenReturn(kol(OTHER_BD));
     assertThatThrownBy(() -> service.get(11L)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
     when(kols.selectById(11L)).thenReturn(kol(null));
-    assertThatThrownBy(() -> service.get(11L)).hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
+    when(history.selectList(any())).thenReturn(List.of());
+    assertThat(service.get(11L).kol().bdUserId()).isNull();
   }
 
   @Test
@@ -513,7 +514,7 @@ class KolServiceTest {
     var period = ArgumentCaptor.forClass(KolBdHistoryDO.class);
     verify(history).insert(period.capture());
     assertThat(period.getValue().getBdUserId()).isNull();
-    verify(bdUsers, never()).getById(any());
+    verify(bdUsers).getById(BD);
   }
 
   @Test

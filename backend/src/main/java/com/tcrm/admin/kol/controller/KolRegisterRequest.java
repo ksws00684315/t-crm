@@ -14,7 +14,6 @@ public record KolRegisterRequest(
     @NotBlank @Pattern(regexp = "[2-9A-HJ-NP-Za-hj-np-z]{8}") String code,
     @NotBlank @Size(max = KolRules.MAX_EMAIL) @Pattern(regexp = KolRules.EMAIL_PATTERN)
         String email,
-    @NotBlank @Pattern(regexp = "\\d{6}") String emailCode,
     @NotBlank @Size(min = 10, max = 72) @Pattern(regexp = "[\\x20-\\x7E]+") String password,
     @NotBlank @Size(max = KolRules.MAX_NAME) String name,
     @Size(max = KolRules.MAX_WHATSAPP) @Pattern(regexp = KolRules.WHATSAPP_PATTERN) String phone,
@@ -27,7 +26,6 @@ public record KolRegisterRequest(
     return new KolRegistration(
         code,
         email,
-        emailCode,
         password,
         name,
         phone,

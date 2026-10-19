@@ -63,12 +63,20 @@ class UserServiceTest {
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final UserPermissionService permissions = mock(UserPermissionService.class);
+  private final PostTemplateService postTemplates = mock(PostTemplateService.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final UserService service =
-      new UserService(users, members, passwords, current, permissions, events);
+      new UserService(users, members, passwords, current, permissions, postTemplates, events);
 
   @BeforeEach
   void loggedInSuperAdministrator() {
+    org.mockito.Mockito.when(postTemplates.getDefault(any(), anyLong()))
+        .thenAnswer(
+            invocation -> {
+              PostTemplate template = invocation.getArgument(0);
+              return new PostTemplateService.PostTemplateView(
+                  template, template.dataScope(), template.permissionCodes(), true);
+            });
     when(current.user())
         .thenReturn(
             new AccountDTO(

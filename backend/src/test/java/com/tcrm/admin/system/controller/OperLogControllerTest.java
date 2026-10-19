@@ -1,6 +1,6 @@
 package com.tcrm.admin.system.controller;
 
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.shared.GlobalExceptionHandler;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.system.service.OperLogQuery;
 import com.tcrm.admin.system.service.OperLogService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -35,14 +36,14 @@ class OperLogControllerTest {
 
   @Test
   void shouldAcceptLastAllowedPage_whenListingOperLogs() throws Exception {
-    when(logs.page(10000, 20)).thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
+    when(logs.page(any(OperLogQuery.class))).thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
     mvc.perform(get("/admin-api/system/oper-logs?page=10000")).andExpect(status().isOk());
-    verify(logs).page(10000, 20);
+    verify(logs).page(new OperLogQuery(null, null, null, null, null, 10000, 20));
   }
 
   @Test
   void shouldRejectOversizedPage_whenSizeExceedsHundred() throws Exception {
     mvc.perform(get("/admin-api/system/oper-logs?size=101")).andExpect(status().isBadRequest());
-    verify(logs, never()).page(anyInt(), anyInt());
+    verify(logs, never()).page(any(OperLogQuery.class));
   }
 }

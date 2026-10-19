@@ -8,6 +8,7 @@ import com.tcrm.admin.kol.model.KolRegisterCodeDO;
 import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.kol.service.KolAuthService.LoginResult;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
@@ -35,8 +36,7 @@ public class KolSelfRegisterService {
   private final KolMapper kols;
   private final KolWriter writer;
   private final BCryptPasswordEncoder passwords;
-  private final KolEmailCodes emailCodes;
-  private final KolMails mails;
+  private final KolRegistrationRateLimiter rateLimiter;
   private final ExternalAuditApi audit;
   private final KolAuthService auth;
 
@@ -47,8 +47,7 @@ public class KolSelfRegisterService {
       KolMapper kols,
       KolWriter writer,
       BCryptPasswordEncoder passwords,
-      KolEmailCodes emailCodes,
-      KolMails mails,
+      KolRegistrationRateLimiter rateLimiter,
       ExternalAuditApi audit,
       KolAuthService auth) {
     this.codes = codes;
@@ -57,41 +56,26 @@ public class KolSelfRegisterService {
     this.kols = kols;
     this.writer = writer;
     this.passwords = passwords;
-    this.emailCodes = emailCodes;
-    this.mails = mails;
+    this.rateLimiter = rateLimiter;
     this.audit = audit;
     this.auth = auth;
   }
 
   /** BD display name and company name for a link that is still usable; anything else is a 404. */
   public KolRegisterPreview preview(String rawCode, String clientIp) {
-    emailCodes.requirePreviewIp(clientIp);
+    rateLimiter.requirePreviewIp(clientIp);
     Resolved link = requireLink(rawCode);
     return new KolRegisterPreview(link.bdUserName(), link.tenantName());
   }
 
-  public void sendEmailCode(String rawCode, String email, String clientIp) {
-    emailCodes.requireSendIp(clientIp);
-    Resolved link = requireLink(rawCode);
-    String address = normalize(email);
-    if (emailTaken(link.tenantId(), address)) {
-      throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
-    }
-    emailCodes.reserveSend(link.tenantId(), address);
-    String code = emailCodes.issue(link.tenantId(), address);
-    mails.sendRegisterCode(address, link.tenantName(), code);
-  }
-
   public LoginResult register(KolRegistration request, String clientIp) {
-    emailCodes.requireRegisterIp(clientIp);
+    rateLimiter.requireRegisterIp(clientIp);
     String address = normalize(request.email());
-    emailCodes.requireRegisterEmail(address);
     validateSocialPair(request.primaryPlatform(), request.primaryHandle());
     Resolved link = requireLink(request.code());
     if (emailTaken(link.tenantId(), address)) {
       throw new BusinessException(ErrorCode.KOL_EMAIL_EXISTS);
     }
-    emailCodes.consume(link.tenantId(), address, request.emailCode());
     KolDO kol = TenantScope.callCompany(link.tenantId(), () -> insert(link, request, address));
     audit.recordKolOperation(
         link.tenantId(),
@@ -160,7 +144,7 @@ public class KolSelfRegisterService {
           }
           BdUserDTO bd =
               TenantScope.callCompany(row.getTenantId(), () -> bdUsers.getById(row.getBdUserId()));
-          if (bd == null || !bd.usable()) {
+          if (bd == null || (!bd.usable() && !(bd.role() == Role.SUPER_ADMIN && bd.enabled()))) {
             throw new BusinessException(ErrorCode.KOL_REGISTER_CODE_INVALID);
           }
           var tenant =
@@ -168,9 +152,15 @@ public class KolSelfRegisterService {
           if (tenant == null || !tenant.enabled()) {
             throw new BusinessException(ErrorCode.KOL_REGISTER_CODE_INVALID);
           }
+          boolean superAdmin = bd.role() == Role.SUPER_ADMIN;
           String bdName =
-              bd.nickname() == null || bd.nickname().isBlank() ? bd.username() : bd.nickname();
-          return new Resolved(row.getTenantId(), row.getBdUserId(), tenant.name(), bdName);
+              superAdmin
+                  ? null
+                  : bd.nickname() == null || bd.nickname().isBlank()
+                      ? bd.username()
+                      : bd.nickname();
+          return new Resolved(
+              row.getTenantId(), superAdmin ? null : row.getBdUserId(), tenant.name(), bdName);
         });
   }
 
@@ -194,5 +184,5 @@ public class KolSelfRegisterService {
     return value == null || value.isBlank() ? null : value.strip();
   }
 
-  private record Resolved(long tenantId, long bdUserId, String tenantName, String bdUserName) {}
+  private record Resolved(Long tenantId, Long bdUserId, String tenantName, String bdUserName) {}
 }

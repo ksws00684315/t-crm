@@ -83,7 +83,7 @@ class KolRegisterControllerTest {
                 .content(
                     "{\"code\":\""
                         + CODE
-                        + "\",\"email\":\"ada@example.com\",\"emailCode\":\"123456\","
+                        + "\",\"email\":\"ada@example.com\","
                         + "\"password\":\"register-pass-1\",\"name\":\"Ada\",\"whatsapp\":\"+15551234567\","
                         + "\"primaryPlatform\":\"TikTok\",\"primaryHandle\":\"ada\"}"))
         .andExpect(status().isOk())

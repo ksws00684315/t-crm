@@ -38,12 +38,6 @@ public class KolMails {
     send(templates.reset(to, links));
   }
 
-  /** Six-digit registration code; async like the other KOL mails. The code stays in the message. */
-  @Async
-  public void sendRegisterCode(String to, String company, String code) {
-    send(templates.registerCode(to, company, code));
-  }
-
   private void send(MailMessage message) {
     try {
       sender.send(message);

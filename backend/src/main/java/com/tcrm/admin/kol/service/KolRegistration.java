@@ -4,7 +4,6 @@ package com.tcrm.admin.kol.service;
 public record KolRegistration(
     String code,
     String email,
-    String emailCode,
     String password,
     String name,
     String phone,

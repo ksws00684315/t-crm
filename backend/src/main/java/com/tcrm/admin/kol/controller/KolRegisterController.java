@@ -30,18 +30,10 @@ public class KolRegisterController {
   }
 
   @PublicEndpoint
-  @GetMapping("/kol-api/register/{code}")
+  @GetMapping("/kol-api/register/{code:^(?!email-codes$).+$}")
   public R<KolRegisterPreviewVO> preview(
       @PathVariable @NotBlank String code, HttpServletRequest request) {
     return R.ok(KolRegisterPreviewVO.from(registration.preview(code, clientIps.resolve(request))));
-  }
-
-  @PublicEndpoint
-  @PostMapping("/kol-api/register/email-codes")
-  public R<Void> emailCode(
-      @Valid @RequestBody KolRegisterEmailRequest body, HttpServletRequest request) {
-    registration.sendEmailCode(body.code(), body.email(), clientIps.resolve(request));
-    return R.ok(null);
   }
 
   @PublicEndpoint

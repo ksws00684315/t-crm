@@ -33,10 +33,11 @@ class PlatformServiceTest {
   private final SysUserMapper users = mock(SysUserMapper.class);
   private final SysUserTenantMapper members = mock(SysUserTenantMapper.class);
   private final UserPermissionService permissions = mock(UserPermissionService.class);
+  private final PostTemplateService postTemplates = mock(PostTemplateService.class);
   private final BCryptPasswordEncoder passwords = mock(BCryptPasswordEncoder.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final PlatformService service =
-      new PlatformService(tenants, users, members, permissions, passwords, current);
+      new PlatformService(tenants, users, members, permissions, postTemplates, passwords, current);
 
   @BeforeAll
   static void tables() {

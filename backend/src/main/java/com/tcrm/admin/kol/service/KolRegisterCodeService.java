@@ -5,6 +5,7 @@ import com.tcrm.admin.kol.mapper.KolRegisterCodeMapper;
 import com.tcrm.admin.kol.model.KolRegisterCodeDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
@@ -73,6 +74,9 @@ public class KolRegisterCodeService {
    */
   private AccountDTO requireBd() {
     AccountDTO user = current.user();
+    if (user.role() == Role.SUPER_ADMIN && !user.ownScope()) {
+      return user;
+    }
     BdUserDTO bd = bdUsers.getById(user.id());
     if (bd == null || !bd.usable()) {
       throw new BusinessException(ErrorCode.KOL_INVALID_BD_USER);
