@@ -4,6 +4,8 @@
 >
 > **执行环境**：非本机执行。自行 `gh repo clone ksws00684315/t-crm`，从最新的 `origin/main` 检出分支 `task/29-kol-lifecycle-backend`。需要 JDK 21、Docker。本任务只改后端与文档，不需要起前端和本地预览。
 >
+> **契约补充（2026-10-19）**：3.6 清理明细增加 `shopName`；3.7 注册预览的响应字段明确为 `{bdUserName, tenantName}`。
+>
 > **并行说明**：前端任务 30（管理端 + 达人端，本机执行）按本文**第 3 节的接口约定**同时开发。第 3 节是双方的契约：字段名、取值、错误码、路径都不要擅自改。确实需要改时，先停下来，在 PR 中说明。迁移版本号使用 `V202610191000`～`V202610191009`。
 >
 > **CI 说明**：GitHub Actions 暂停使用，**不要等待** `gh pr checks`。验收以本地全量检查为准，命令与结果写进 PR 描述和执行报告。
@@ -141,7 +143,7 @@
   - 不做业务层自动重试；提供手动重试接口，见下文。
 - **清理明细表** `crm_kol_cleanup_item`，放在 `product` 模块。字段：`tenant_id`、`kol_id`、`kol_code`（快照）、`kol_item_id`、`shop_id`、`weidian_item_id`、`status`（`PENDING` / `SUCCESS` / `FAILED`）、`trigger`（`AUTO` / `MANUAL`）、`reason`、`fail_reason`、`cleanup_time`、`finish_time`。表和字段都要有注释。
 - **接口**：
-  - `GET /admin-api/kol/cleanup-items?kolCode&status&page&size`：列表，按数据范围过滤；
+  - `GET /admin-api/kol/cleanup-items?kolCode&status&page&size`：列表，按数据范围过滤。每行字段：`id`、`kolCode`、`shopId`、`shopName`、`weidianItemId`、`status`、`trigger`、`reason`、`failReason`、`cleanupTime`、`finishTime`（2026-10-19 补充：增加 `shopName`）；
   - `POST /admin-api/kol/cleanup-items/{id}/retry`：只能重试 `FAILED` 的明细，权限 `kol:edit`。
 - 模块边界：编排仍放在 `order` 模块，经由各模块的 `api` 调用。**不得**跨模块直接写 SQL（任务 25a、17b、28 都纠正过这个问题）。
 
@@ -151,7 +153,7 @@
   - 现在的注册码是 32 位随机串，没法手输。改为 **8 位**，字符集为大写字母和数字，去掉容易混淆的 `0 O 1 I L`，全局唯一，输入时不区分大小写；
   - 注册链接改为 `{kolPortalBase}/register?code=XXXXXXXX`；
   - 已有的 32 位注册码作废：迁移时吊销，商务下次获取时自动生成新码。
-- **防枚举**：`GET /kol-api/register/{code}`（预览）和 `POST /kol-api/register` 按来源 IP 限流，例如每分钟 20 次，复用现有的限流做法；超出返回 429。预览接口只返回商务的显示名，不返回其他信息。
+- **防枚举**：`GET /kol-api/register/{code}`（预览）和 `POST /kol-api/register` 按来源 IP 限流，例如每分钟 20 次，复用现有的限流做法；超出返回 429。预览接口的响应为 `{bdUserName, tenantName}`：`bdUserName` 是商务的显示名，`tenantName` 沿用现有字段，不返回其他信息（2026-10-19 补充：明确字段名）。
 - **注册请求 `POST /kol-api/register`**：
   - 必填：`code`（8 位）、`email`、`emailCode`、`password`、`name`（账户名）；
   - 选填：`phone`、`whatsapp`、`primaryPlatform`、`primaryHandle`、`country`、`primaryUrl`；
