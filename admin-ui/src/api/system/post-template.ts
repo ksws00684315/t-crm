@@ -33,8 +33,8 @@ export function savePostTemplate(
   });
 }
 
-export function resetPostTemplate(postTemplate: PostTemplate): Promise<PostTemplateVO> {
-  return http.request<PostTemplateVO>({
+export function resetPostTemplate(postTemplate: PostTemplate): Promise<null> {
+  return http.request<null>({
     method: "post",
     url: `/system/post-templates/${postTemplate}/reset`
   });

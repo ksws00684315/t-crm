@@ -87,12 +87,8 @@ describe("post template page (task 32 §2.3)", () => {
 
   it("resets a card to the code default after the confirm", async () => {
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue({ action: "confirm" } as never);
-    vi.mocked(postTemplateApi.resetPostTemplate).mockResolvedValue({
-      postTemplate: "OPERATOR",
-      dataScope: "OWN",
-      permissions: ["product:view"],
-      isDefault: true
-    });
+    vi.mocked(postTemplateApi.resetPostTemplate).mockResolvedValue(null);
+    vi.mocked(postTemplateApi.listPostTemplates).mockResolvedValue(templates());
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const wrapper = await mountPage();
     // The second card is OPERATOR; the first reset button belongs to BD.
