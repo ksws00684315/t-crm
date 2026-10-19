@@ -15,24 +15,21 @@ import org.junit.jupiter.api.Test;
 
 class KolPromotionSupportTest {
   @Test
-  void displayRelationStatus_prefersInvalidOverPendingUpdate() {
+  void displayRelationStatus_freezeThenMissingBdThenStoredStatus() {
     BdUserDTO unusable = new BdUserDTO(1L, "bd", "BD", false);
     assertEquals(
         RelationStatus.INVALID.name(),
-        KolPromotionSupport.displayRelationStatus(RelationStatus.INVALID.name(), null));
-    assertEquals(
-        RelationStatus.INVALID.name(),
-        KolPromotionSupport.displayRelationStatus(RelationStatus.INVALID.name(), unusable));
+        KolPromotionSupport.displayRelationStatus(0, RelationStatus.PROMOTING.name(), null));
     assertEquals(
         RelationStatus.DISPLAY_PENDING_UPDATE,
-        KolPromotionSupport.displayRelationStatus(RelationStatus.PROMOTING.name(), null));
+        KolPromotionSupport.displayRelationStatus(1, RelationStatus.PROMOTING.name(), unusable));
     assertEquals(
         RelationStatus.DISPLAY_PENDING_UPDATE,
-        KolPromotionSupport.displayRelationStatus(RelationStatus.PROMOTING.name(), unusable));
+        KolPromotionSupport.displayRelationStatus(1, RelationStatus.PROMOTING.name(), null));
     BdUserDTO usable = new BdUserDTO(1L, "bd", "BD", true);
     assertEquals(
         RelationStatus.PROMOTING.name(),
-        KolPromotionSupport.displayRelationStatus(RelationStatus.PROMOTING.name(), usable));
+        KolPromotionSupport.displayRelationStatus(1, RelationStatus.PROMOTING.name(), usable));
   }
 
   @Test
@@ -43,8 +40,8 @@ class KolPromotionSupportTest {
     assertTrue(missing.contains("defaultRate"));
     assertTrue(missing.contains("inviteCode"));
     assertTrue(missing.contains("platforms"));
-    assertTrue(missing.contains("jumpTemplateId"));
     assertTrue(missing.contains("sheetUrl"));
+    assertTrue(missing.contains("remark"));
     assertFalse(missing.contains("review"));
   }
 
@@ -70,6 +67,7 @@ class KolPromotionSupportTest {
     kol.setInviteCode("INV");
     kol.setLinkTemplateId(7L);
     kol.setSheetUrl("https://docs.google.com/sheet");
+    kol.setPromotionRemark("Reviewed");
     assertTrue(
         KolPromotionSupport.configComplete(
             kol, List.of(new PlatformRef(7L, "https://example.com/x"))));

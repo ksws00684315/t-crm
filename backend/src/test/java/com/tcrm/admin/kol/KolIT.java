@@ -770,14 +770,66 @@ class KolIT {
   }
 
   @Test
-  void shouldPreviewIdleCleanup_onlyWhenAllScopeAndEnabledPath() throws Exception {
+  void shouldSetPerKolCleanupAndRemoveCompanyCleanupEndpoints() throws Exception {
     String admin = companyAdmin();
+    String bdId = createBd(admin, "bd-cleanup-own");
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                "{\"name\":\"Cleanup\",\"email\":\"cleanup@example.com\","
+                                    + "\"country\":\"US\",\"bdUserId\":\""
+                                    + bdId
+                                    + "\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+
+    mvc.perform(
+            put("/admin-api/kol/kols/" + kolId + "/auto-cleanup")
+                .header(TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"days\":30}"))
+        .andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isEqualTo(30);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_promotion_record WHERE kol_id = ? AND change_type = 'AUTO_CLEANUP'",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isEqualTo(1);
+
+    mvc.perform(
+            put("/admin-api/kol/kols/" + kolId + "/auto-cleanup")
+                .header(TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"days\":null}"))
+        .andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isNull();
+
+    mvc.perform(get("/admin-api/kol/cleanup-config").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
     mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, admin))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.total").value("0"));
-    createBd(admin, "bd-cleanup-own");
-    String bdToken = login("bd-cleanup-own", PASSWORD);
-    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, bdToken))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/admin-api/kol/cleanup-items").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
+    mvc.perform(post("/admin-api/kol/cleanup-items/9/retry").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
   }
 }

@@ -81,18 +81,6 @@ class KolPromotionServiceTest {
   }
 
   @Test
-  void updateRelationStatus_toPromoting_requiresCompleteConfig() {
-    KolDO kol = baseKol();
-    kol.setReviewStatus(ReviewStatus.APPROVED.name());
-    when(kols.selectById(1L)).thenReturn(kol);
-    when(platforms.selectList(any())).thenReturn(List.of());
-    assertThatThrownBy(() -> service.updateRelationStatus(1L, RelationStatus.PROMOTING))
-        .isInstanceOf(BusinessException.class)
-        .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE);
-  }
-
-  @Test
   void review_rejectsWhenAlreadyApproved() {
     KolDO kol = baseKol();
     kol.setReviewStatus(ReviewStatus.APPROVED.name());

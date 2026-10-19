@@ -122,7 +122,7 @@ public class ProductLinkService {
         new LinkTemplateView(
             "tcrm-relay",
             TCR_TEMPLATE_CODE,
-            "T-CRM 中转",
+            "SparkTrack 中转",
             linkBaseUrl + "/i/{PRODUCT_ID}",
             channel,
             0));

@@ -52,7 +52,7 @@ class ProductLinkControllerTest {
                 new LinkTemplateView(
                     "tcrm-relay",
                     "TCRM_RELAY",
-                    "T-CRM 中转",
+                    "SparkTrack 中转",
                     "https://t.example/i/{PRODUCT_ID}",
                     "WEIDIAN",
                     0),

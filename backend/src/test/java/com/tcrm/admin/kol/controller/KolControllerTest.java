@@ -20,7 +20,7 @@ import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.kol.service.BdHistoryDTO;
 import com.tcrm.admin.kol.service.CreateKolCommand;
 import com.tcrm.admin.kol.service.EditKolCommand;
-import com.tcrm.admin.kol.service.KolClaimService;
+import com.tcrm.admin.kol.service.KolCleanupService;
 import com.tcrm.admin.kol.service.KolDTO;
 import com.tcrm.admin.kol.service.KolDetailDTO;
 import com.tcrm.admin.kol.service.KolFilterDTO;
@@ -56,10 +56,10 @@ class KolControllerTest {
 
   private final KolService kols = mock(KolService.class);
   private final KolPromotionService promotions = mock(KolPromotionService.class);
-  private final KolClaimService claims = mock(KolClaimService.class);
+  private final KolCleanupService cleanup = mock(KolCleanupService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final MockMvc mvc =
-      AdminMvcSupport.build(current, new KolController(kols, promotions, claims));
+      AdminMvcSupport.build(current, new KolController(kols, promotions, cleanup));
 
   private static KolDTO kol() {
     return new KolDTO(
@@ -86,6 +86,7 @@ class KolControllerTest {
         "NORMAL",
         List.of(new KolDTO.PlatformDTO(77L, "kakobuy", "https://landing.example/alice")),
         1,
+        null,
         Instant.parse("2026-10-05T00:00:00Z"),
         1,
         0,

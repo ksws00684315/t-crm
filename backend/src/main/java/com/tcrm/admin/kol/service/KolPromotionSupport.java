@@ -15,11 +15,11 @@ final class KolPromotionSupport {
   private KolPromotionSupport() {}
 
   /**
-   * Display relation status: stored {@code INVALID} wins; otherwise no usable BD → {@code
-   * PENDING_UPDATE}; else the stored value.
+   * Display relation status: a frozen KOL is invalid; otherwise an unusable BD is pending update;
+   * otherwise show the stored promotion state.
    */
-  static String displayRelationStatus(String relationStatus, BdUserDTO bd) {
-    if (RelationStatus.INVALID.name().equals(relationStatus)) {
+  static String displayRelationStatus(Integer loginStatus, String relationStatus, BdUserDTO bd) {
+    if (Integer.valueOf(0).equals(loginStatus)) {
       return RelationStatus.INVALID.name();
     }
     if (bd == null || !bd.usable()) {
@@ -32,11 +32,7 @@ final class KolPromotionSupport {
     return missingConfigFields(kol, platforms).isEmpty();
   }
 
-  /**
-   * Missing field names for a PROMOTING transition. Fixed names for the admin UI: {@code
-   * defaultRate}, {@code inviteCode}, {@code platforms}, {@code platformAddress}, {@code
-   * jumpTemplateId}, {@code sheetUrl}, and {@code review} when not approved.
-   */
+  /** Missing field names for a complete promotion configuration. A jump template is optional. */
   static List<String> missingConfigFields(KolDO kol, List<PlatformRef> platforms) {
     List<String> missing = new ArrayList<>(7);
     if (!ReviewStatus.APPROVED.name().equals(kol.getReviewStatus())) {
@@ -57,11 +53,11 @@ final class KolPromotionSupport {
         missing.add("platformAddress");
       }
     }
-    if (kol.getLinkTemplateId() == null) {
-      missing.add("jumpTemplateId");
-    }
     if (kol.getSheetUrl() == null || kol.getSheetUrl().isBlank()) {
       missing.add("sheetUrl");
+    }
+    if (kol.getPromotionRemark() == null || kol.getPromotionRemark().isBlank()) {
+      missing.add("remark");
     }
     return List.copyOf(missing);
   }
@@ -86,6 +82,7 @@ final class KolPromotionSupport {
                 .toList());
     map.put("inviteCode", kol.getInviteCode());
     map.put("sheetUrl", kol.getSheetUrl());
+    map.put("remark", kol.getPromotionRemark());
     map.put("jumpTemplateId", kol.getLinkTemplateId());
     map.put("configVersion", kol.getConfigVersion());
     map.put("phone", kol.getPhone());

@@ -5,19 +5,21 @@ import com.tcrm.admin.kol.service.KolPromotionService.PlatformInput;
 import com.tcrm.admin.kol.service.KolRules;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record PromotionConfigRequest(
-    @Size(max = 16) String defaultRate,
-    List<@Valid PlatformAddressRequest> platforms,
-    @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
+    @NotBlank @Size(max = 16) String defaultRate,
+    @NotEmpty List<@Valid PlatformAddressRequest> platforms,
+    @NotBlank @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
         String inviteCode,
-    @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_PATTERN)
+    @NotBlank @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_PATTERN)
         String sheetUrl,
     @Min(1) Long jumpTemplateId,
-    @Size(max = KolRules.MAX_REMARK) String remark) {
+    @NotBlank @Size(max = KolRules.MAX_REMARK) String remark) {
   KolPromotionService.PromotionConfigCommand toCommand() {
     List<PlatformInput> platformInputs =
         platforms == null
@@ -41,6 +43,7 @@ public record PromotionConfigRequest(
   }
 
   public record PlatformAddressRequest(
-      @Size(max = 32) String templateId,
-      @Size(max = KolRules.MAX_URL) @Pattern(regexp = KolRules.HTTPS_URL_PATTERN) String address) {}
+      @NotBlank @Size(max = 32) String templateId,
+      @NotBlank @Size(max = KolRules.MAX_URL) @Pattern(regexp = KolRules.HTTPS_URL_PATTERN)
+          String address) {}
 }

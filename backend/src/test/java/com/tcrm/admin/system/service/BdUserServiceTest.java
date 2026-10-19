@@ -102,7 +102,10 @@ class BdUserServiceTest {
       Role role, DataScope scope, int status, int accountStatus, boolean usable) {
     when(members.getMember(5L, 3L)).thenReturn(member(5L, role, scope, status, accountStatus));
     when(permissions.selectList(any())).thenReturn(List.of(grant(5L)));
-    assertThat(service.getById(5L)).isEqualTo(new BdUserDTO(5L, "bd5", "BD 5", usable));
+    assertThat(service.getById(5L))
+        .isEqualTo(
+            new BdUserDTO(
+                5L, "bd5", "BD 5", usable, role, scope, status == 1 && accountStatus == 1));
   }
 
   @Test

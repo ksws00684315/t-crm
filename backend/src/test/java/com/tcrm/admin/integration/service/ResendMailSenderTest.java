@@ -51,7 +51,7 @@ class ResendMailSenderTest {
 
   private ResendMailSender sender() {
     return new ResendMailSender(
-        "re_test_key", "T-CRM <no-reply@example.com>", new ObjectMapper(), baseUrl);
+        "re_test_key", "SparkTrack <no-reply@example.com>", new ObjectMapper(), baseUrl);
   }
 
   private static MailMessage mail() {
@@ -69,7 +69,7 @@ class ResendMailSenderTest {
     assertThat(authorizations).containsExactly("Bearer re_test_key");
     assertThat(bodies).hasSize(1);
     var body = new ObjectMapper().readTree(bodies.getFirst());
-    assertThat(body.path("from").asString()).isEqualTo("T-CRM <no-reply@example.com>");
+    assertThat(body.path("from").asString()).isEqualTo("SparkTrack <no-reply@example.com>");
     assertThat(body.path("to").get(0).asString()).isEqualTo("kol@example.com");
     assertThat(body.path("subject").asString()).contains("Set up your creator account");
     assertThat(body.path("text").asString()).contains("activate?token=raw");

@@ -952,7 +952,7 @@ class LinkIT {
             });
     StringBuilder body = new StringBuilder();
     body.append(
-        "{\"defaultRate\":\"0.1000\",\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1/edit\",\"remark\":null");
+        "{\"defaultRate\":\"0.1000\",\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1/edit\",\"remark\":\"integration test\"");
     if (templateId != null) {
       body.append(",\"platforms\":[{\"templateId\":\"")
           .append(templateId)

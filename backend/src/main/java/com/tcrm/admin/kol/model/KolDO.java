@@ -66,6 +66,14 @@ public class KolDO extends BaseEntity {
   /** Current promotion config version; null until first config save. */
   private Integer configVersion;
 
+  /** Required promotion configuration note; distinct from the general profile remark. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String promotionRemark;
+
+  /** Per-KOL automatic cleanup threshold; null disables it. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Integer autoCleanupDays;
+
   /** 1 entered in admin, 2 self-registered; fixed after creation. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Integer registerSource;
@@ -223,6 +231,22 @@ public class KolDO extends BaseEntity {
 
   public void setConfigVersion(Integer value) {
     this.configVersion = value;
+  }
+
+  public String getPromotionRemark() {
+    return promotionRemark;
+  }
+
+  public void setPromotionRemark(String value) {
+    this.promotionRemark = value;
+  }
+
+  public Integer getAutoCleanupDays() {
+    return autoCleanupDays;
+  }
+
+  public void setAutoCleanupDays(Integer value) {
+    this.autoCleanupDays = value;
   }
 
   public Integer getRegisterSource() {

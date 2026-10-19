@@ -36,8 +36,6 @@ public enum ErrorCode {
   KOL_TRANSFER_NOT_SCHEDULED(409, "Only scheduled BD transfers can be cancelled"),
   KOL_INVALID_BD_USER(422, "BD must be an enabled STAFF account with OWN data scope and kol:edit"),
   KOL_REGISTER_CODE_INVALID(404, "Register link is invalid or no longer usable"),
-  KOL_EMAIL_CODE_TOO_FREQUENT(429, "Email verification code was requested too recently"),
-  KOL_EMAIL_CODE_INVALID(400, "Email verification code is wrong, expired, or already used"),
   KOL_REGISTER_TOO_FREQUENT(429, "Too many registration attempts; try again later"),
   KOL_MULTIPLE_PRIMARY(400, "At most one social account can be the primary one"),
   LINK_TEMPLATE_INVALID(400, "Link template must be an enabled template of this company"),
@@ -89,9 +87,6 @@ public enum ErrorCode {
   KOL_PROMO_SHEET_INVALID(400, "Promo sheet is not a readable .xlsx workbook"),
   KOL_PROMO_SHEET_TOO_LARGE(400, "Promo sheet exceeds 300 MB"),
   KOL_PROMO_UPLOAD_EXPIRED(410, "Upload preview has expired; upload the sheet again"),
-  KOL_PROMOTION_CONFIG_INCOMPLETE(
-      422, "Promotion config is incomplete for PROMOTING relation status"),
-  KOL_ALREADY_CLAIMED(409, "KOL has already been claimed by another BD"),
   COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
   KOL_REVIEW_ALREADY_DONE(409, "KOL review is already done"),
   KOL_REVIEW_REQUIRED(409, "KOL must be reviewed before promotion config can be saved"),

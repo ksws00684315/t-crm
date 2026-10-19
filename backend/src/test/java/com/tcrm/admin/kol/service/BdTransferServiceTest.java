@@ -124,6 +124,8 @@ class BdTransferServiceTest {
     r.setToBdUserId(6L);
     r.setEffectiveAt(effective);
     r.setStatus(BdTransferStatus.SCHEDULED);
+    r.setTenantId(1L);
+    r.setCreateBy(1L);
     when(transfers.selectById(21L)).thenReturn(r);
     return r;
   }
@@ -287,7 +289,7 @@ class BdTransferServiceTest {
     var next = ArgumentCaptor.forClass(KolBdHistoryDO.class);
     verify(history).insert(next.capture());
     assertThat(next.getValue().getBdUserId()).isNull();
-    verifyNoInteractions(bds);
+    verify(bds).getById(5L);
   }
 
   @ParameterizedTest
@@ -335,7 +337,7 @@ class BdTransferServiceTest {
     verify(history).insert(next.capture());
     assertThat(next.getValue().getBdUserId()).isNull();
     verify(history).closeCurrent(11L, NOW, 1L);
-    verify(transfers, times(2)).update(isNull(), any());
+    verify(transfers).update(isNull(), any());
     verify(audit)
         .recordTenantWriteOperation(
             eq(1L),

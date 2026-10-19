@@ -5,32 +5,26 @@ import java.time.Instant;
 
 public record OperLogVO(
     Long id,
-    Long userId,
-    String username,
     String module,
     String action,
+    String operatorName,
     String method,
-    String requestUri,
-    String requestParams,
-    String result,
-    String errorMsg,
-    String ip,
-    Long costMs,
-    Instant operTime) {
+    String path,
+    String summary,
+    boolean success,
+    Instant operTime,
+    String ip) {
   static OperLogVO from(OperLogDTO l) {
     return new OperLogVO(
         l.id(),
-        l.userId(),
-        l.username(),
         l.module(),
         l.action(),
+        l.operatorName(),
         l.method(),
-        l.requestUri(),
-        l.requestParams(),
-        l.result(),
-        l.errorMsg(),
-        l.ip(),
-        l.costMs(),
-        l.operTime());
+        l.path(),
+        l.summary(),
+        l.success(),
+        l.operTime(),
+        l.ip());
   }
 }

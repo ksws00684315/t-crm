@@ -11,5 +11,6 @@ public record PromotingKolDTO(
     String kolCode,
     String name,
     Long bdUserId,
+    Integer autoCleanupDays,
     Instant lastPromotingAt,
     Instant fallbackIdleAt) {}

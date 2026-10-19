@@ -77,7 +77,7 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 | 变量 | 说明 |
 |---|---|
 | `TCRM_MAIL_API_KEY` | Resend API Key；**为空时使用日志兜底**：邮件只写后台日志、不真正发出（仅限本机开发） |
-| `TCRM_MAIL_FROM` | 发件人，例如 `T-CRM <no-reply@你的域名>`；配置了 Key 却没配本项时后台启动失败 |
+| `TCRM_MAIL_FROM` | 发件人，例如 `SparkTrack <no-reply@你的域名>`；配置了 Key 却没配本项时后台启动失败 |
 | `TCRM_KOL_PORTAL_BASE_URL` | 必填，无末尾斜杠的 HTTPS 达人端地址（生产为 `https://kol.<域名>`）；缺失或格式不对时后台启动失败。邀请邮件链接 `{该地址}/activate?token=…`，重置邮件链接 `{该地址}/reset?token=…` |
 
 配置步骤：

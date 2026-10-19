@@ -4,12 +4,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Idle-KOL cleanup collaborators for the order module (task 25a / 29): config read, promoting-KOL
+ * Idle-KOL cleanup collaborators for the order module (task 33): per-KOL thresholds, promoting-KOL
  * listing, lock/soft-delete, and visibility checks for manual cleanup.
  */
 public interface KolCleanupApi {
-  /** Current company's cleanup config; defaults to disabled / 90 days when no row exists. */
-  KolCleanupConfigDTO getCleanupConfig();
+  /** Sets this KOL's automatic cleanup threshold; null disables automatic cleanup. */
+  void setAutoCleanupDays(long kolId, Integer days);
 
   /**
    * Undeleted KOLs whose stored relation status is {@code PROMOTING}, ordered by id. {@code
@@ -38,5 +38,6 @@ public interface KolCleanupApi {
   boolean softDeleteLockedKol(long kolId);
 
   /** Snapshot used while cleaning (before soft-delete). */
-  record CleanupKolSnapshot(long id, String kolCode, String name, Long bdUserId) {}
+  record CleanupKolSnapshot(
+      long id, String kolCode, String name, Long bdUserId, Integer autoCleanupDays) {}
 }
