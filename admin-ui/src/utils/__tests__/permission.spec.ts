@@ -328,6 +328,16 @@ describe("kolAbilities", () => {
       canChangeBd: false,
       canAssignBd: false,
       canFilterBd: false,
+      canRegisterLink: false,
+      canCopyToken: false,
+      canClaimKol: true,
+      canManageCleanup: false
+    });
+    expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit", "kol:register-link"]))).toEqual({
+      canWrite: true,
+      canChangeBd: false,
+      canAssignBd: false,
+      canFilterBd: false,
       canRegisterLink: true,
       canCopyToken: false,
       canClaimKol: true,
@@ -363,6 +373,13 @@ describe("kolAbilities", () => {
       canClaimKol: false,
       canManageCleanup: false
     });
+  });
+
+  it("hides the registration link when an OWN-scope BD lacks kol:register-link", () => {
+    expect(kolAbilities(staff("OWN", ["kol:view", "kol:edit"])).canRegisterLink).toBe(false);
+    expect(
+      kolAbilities(staff("OWN", ["kol:view", "kol:edit", "kol:register-link"])).canRegisterLink
+    ).toBe(true);
   });
 
   it("gives claiming only to an enabled OWN-scope BD with kol:edit (25a §4.4)", () => {

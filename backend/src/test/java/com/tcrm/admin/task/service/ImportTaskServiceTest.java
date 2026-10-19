@@ -27,6 +27,7 @@ import com.tcrm.admin.task.model.TaskFileDO;
 import com.tcrm.admin.task.model.TaskFileKind;
 import com.tcrm.admin.task.model.TaskStatus;
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -150,6 +151,7 @@ class ImportTaskServiceTest {
     when(tasks.selectById(TASK_ID)).thenReturn(waiting);
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
+    input.setContentType(ImportTaskApi.XLSX_CONTENT_TYPE);
     input.setContent(content);
     when(files.selectOne(any())).thenReturn(input);
   }
@@ -273,6 +275,27 @@ class ImportTaskServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    verify(tasks, never()).insert(any(TaskDO.class));
+    assertThat(queued).isEmpty();
+  }
+
+  @Test
+  void shouldRejectCsvDisguisedAsXlsx_whenKolImport() {
+    // KOL import must not accept CSV bytes even when the extension claims xlsx.
+    String csv = String.join(",", headersZh) + "\nKOL0001,Alice\n";
+    byte[] content = csv.getBytes(StandardCharsets.UTF_8);
+
+    assertThatThrownBy(
+            () ->
+                service.submitImport(
+                    TaskType.KOL_IMPORT,
+                    HEADER_KEYS,
+                    new ImportFileDTO("达人.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, content),
+                    () -> null,
+                    TaskType.KOL_IMPORT.maxRows()))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.TASK_FILE_INVALID);
     verify(tasks, never()).insert(any(TaskDO.class));
     assertThat(queued).isEmpty();
   }

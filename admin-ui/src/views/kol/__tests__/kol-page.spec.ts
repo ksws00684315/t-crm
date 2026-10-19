@@ -309,8 +309,8 @@ describe("KOL list page", () => {
     wrapper.unmount();
   });
 
-  it("shows the registration link only to an enabled OWN-scope BD with kol:edit", async () => {
-    signIn("STAFF", "ALL", ["kol:view", "kol:edit"]);
+  it("shows the registration link only to an enabled OWN-scope BD with kol:edit and kol:register-link", async () => {
+    signIn("STAFF", "ALL", ["kol:view", "kol:edit", "kol:register-link"]);
     const writer = await mountPage();
     expect(writer.find('[data-test="register-link"]').exists()).toBe(false);
     writer.unmount();
@@ -321,6 +321,11 @@ describe("KOL list page", () => {
     admin.unmount();
 
     signIn("STAFF", "OWN", ["kol:view", "kol:edit"]);
+    const noPerm = await mountPage();
+    expect(noPerm.find('[data-test="register-link"]').exists()).toBe(false);
+    noPerm.unmount();
+
+    signIn("STAFF", "OWN", ["kol:view", "kol:edit", "kol:register-link"]);
     vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
       code: "old-code",
       url: "https://kol.example/register?c=old-code",

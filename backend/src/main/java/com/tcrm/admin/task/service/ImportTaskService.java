@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -90,13 +91,17 @@ public class ImportTaskService implements ImportTaskApi {
       int maxRows) {
     boolean allowCsv = type == TaskType.ORDER_IMPORT || type == TaskType.REFUND_IMPORT;
     excel.check(file, allowCsv);
+    boolean asCsv =
+        allowCsv
+            && file.fileName() != null
+            && file.fileName().toLowerCase(Locale.ROOT).endsWith(".csv");
     // The file must carry one full template language; the worker later re-reads the same variant.
     List<List<String>> variants =
         new ArrayList<>(variants(headerKeys, AppLocale.ZH_CN, AppLocale.EN_US));
     if (legacyHeaderKeys != null && !legacyHeaderKeys.isEmpty()) {
       variants.addAll(variants(legacyHeaderKeys, AppLocale.ZH_CN, AppLocale.EN_US));
     }
-    ExcelFiles.SheetData sheet = excel.read(file.content(), List.copyOf(variants), maxRows);
+    ExcelFiles.SheetData sheet = excel.read(file.content(), List.copyOf(variants), maxRows, asCsv);
     int total = sheet.rows().size();
     TaskDO task = new TaskDO();
     task.setTaskType(type);
@@ -109,13 +114,7 @@ public class ImportTaskService implements ImportTaskApi {
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
     input.setFileName(fileName(file.fileName()));
-    String storedType =
-        allowCsv
-                && file.fileName() != null
-                && file.fileName().toLowerCase(java.util.Locale.ROOT).endsWith(".csv")
-            ? "text/csv"
-            : XLSX_CONTENT_TYPE;
-    input.setContentType(storedType);
+    input.setContentType(asCsv ? "text/csv" : XLSX_CONTENT_TYPE);
     input.setContent(file.content());
     tx.executeWithoutResult(
         status -> {
@@ -196,7 +195,9 @@ public class ImportTaskService implements ImportTaskApi {
       tasks.updateById(running);
       ExcelFiles.SheetData sheet;
       try {
-        sheet = excel.read(input(id), List.of(headers), maxRows);
+        TaskFileDO inputFile = inputFile(id);
+        boolean asCsv = "text/csv".equals(inputFile.getContentType());
+        sheet = excel.read(inputFile.getContent(), List.of(headers), maxRows, asCsv);
       } catch (BusinessException e) {
         finish(id, null, TaskStatus.FAILED, MESSAGE_UNREADABLE);
         return;
@@ -260,7 +261,7 @@ public class ImportTaskService implements ImportTaskApi {
     }
   }
 
-  private byte[] input(Long id) {
+  private TaskFileDO inputFile(Long id) {
     TaskFileDO file =
         files.selectOne(
             new LambdaQueryWrapper<TaskFileDO>()
@@ -269,7 +270,7 @@ public class ImportTaskService implements ImportTaskApi {
     if (file == null) {
       throw new IllegalStateException("Input file missing for task " + id);
     }
-    return file.getContent();
+    return file;
   }
 
   private void progress(Long id, int done, int failed) {

@@ -102,19 +102,33 @@ public class ExcelFiles {
   public record SheetData(List<String> matchedHeaders, List<List<String>> rows) {}
 
   /**
-   * Reads the first sheet: the header row must equal one of {@code headerVariants} exactly (the
-   * Chinese and the English template; mixing languages is a mismatch); the following non-blank rows
-   * are returned as trimmed texts padded to the header count (extra columns are ignored).
+   * Reads the first sheet as xlsx. Non-xlsx bytes are rejected with {@code TASK_FILE_INVALID}.
    *
    * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
    *     TASK_FILE_TOO_MANY_ROWS
    */
   public SheetData read(byte[] content, List<List<String>> headerVariants, int maxRows) {
+    return read(content, headerVariants, maxRows, false);
+  }
+
+  /**
+   * Reads the first sheet. When {@code asCsv} is true (order / refund imports whose stored
+   * contentType is {@code text/csv}), parse with {@link CsvFiles}; otherwise require an xlsx zip
+   * and reject other content with {@code TASK_FILE_INVALID} (task 28 review).
+   *
+   * @throws BusinessException TASK_FILE_INVALID, TASK_FILE_HEADER_MISMATCH, TASK_FILE_EMPTY or
+   *     TASK_FILE_TOO_MANY_ROWS
+   */
+  public SheetData read(
+      byte[] content, List<List<String>> headerVariants, int maxRows, boolean asCsv) {
     if (maxRows < 1) {
       throw new IllegalArgumentException("maxRows must be positive");
     }
-    if (looksLikeCsv(content)) {
+    if (asCsv) {
       return CsvFiles.read(content, headerVariants, maxRows);
+    }
+    if (looksLikeCsv(content)) {
+      throw new BusinessException(ErrorCode.TASK_FILE_INVALID);
     }
     RowCollector collector = new RowCollector(headerVariants, maxRows);
     try {

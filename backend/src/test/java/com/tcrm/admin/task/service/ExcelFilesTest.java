@@ -287,7 +287,7 @@ class ExcelFilesTest {
     System.arraycopy(bom, 0, csv, 0, bom.length);
     System.arraycopy(bodyBytes, 0, csv, bom.length, bodyBytes.length);
 
-    ExcelFiles.SheetData sheet = excel.read(csv, VARIANTS, 10);
+    ExcelFiles.SheetData sheet = excel.read(csv, VARIANTS, 10, true);
     assertThat(sheet.matchedHeaders()).isEqualTo(HEADERS);
     assertThat(sheet.rows())
         .containsExactly(List.of("1234567890123456789", "张,三", "a\"b@example.com"));
@@ -296,6 +296,13 @@ class ExcelFilesTest {
   @Test
   void shouldRejectCsv_whenHeaderMismatches() {
     byte[] csv = "姓名,编号,邮箱\na,b,c\n".getBytes(StandardCharsets.UTF_8);
-    assertError(() -> excel.read(csv, VARIANTS, 10), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+    assertError(() -> excel.read(csv, VARIANTS, 10, true), ErrorCode.TASK_FILE_HEADER_MISMATCH);
+  }
+
+  @Test
+  void shouldRejectCsvContent_whenReadingAsXlsx() {
+    byte[] csv = "编号,姓名,邮箱\nKOL1,张三,a@example.com\n".getBytes(StandardCharsets.UTF_8);
+    assertError(() -> excel.read(csv, VARIANTS, 10), ErrorCode.TASK_FILE_INVALID);
+    assertError(() -> excel.read(csv, VARIANTS, 10, false), ErrorCode.TASK_FILE_INVALID);
   }
 }
