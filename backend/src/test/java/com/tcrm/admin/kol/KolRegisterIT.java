@@ -189,7 +189,8 @@ class KolRegisterIT {
     rejected(first.path("code").asText());
     mvc.perform(get("/kol-api/register/" + rotated))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.bdUserName").isString());
+        .andExpect(jsonPath("$.data.bdUserName").isString())
+        .andExpect(jsonPath("$.data.tenantName").isString());
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_oper_log WHERE module = 'KOL' AND action IN"

@@ -63,10 +63,11 @@ public class KolSelfRegisterService {
     this.auth = auth;
   }
 
-  /** BD display name for a link that is still usable; anything else is a 404. */
+  /** BD display name and company name for a link that is still usable; anything else is a 404. */
   public KolRegisterPreview preview(String rawCode, String clientIp) {
     emailCodes.requirePreviewIp(clientIp);
-    return new KolRegisterPreview(requireLink(rawCode).bdUserName());
+    Resolved link = requireLink(rawCode);
+    return new KolRegisterPreview(link.bdUserName(), link.tenantName());
   }
 
   public void sendEmailCode(String rawCode, String email, String clientIp) {

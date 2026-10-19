@@ -52,10 +52,10 @@ public class KolRegisterController {
         KolLoginVO.from(registration.register(body.toRegistration(), clientIps.resolve(request))));
   }
 
-  /** Only the BD display name. The code, the BD id and the company stay on the server. */
-  public record KolRegisterPreviewVO(String bdUserName) {
+  /** BD display name and company name only. The code and BD id stay on the server. */
+  public record KolRegisterPreviewVO(String bdUserName, String tenantName) {
     static KolRegisterPreviewVO from(KolRegisterPreview preview) {
-      return new KolRegisterPreviewVO(preview.bdUserName());
+      return new KolRegisterPreviewVO(preview.bdUserName(), preview.tenantName());
     }
   }
 }

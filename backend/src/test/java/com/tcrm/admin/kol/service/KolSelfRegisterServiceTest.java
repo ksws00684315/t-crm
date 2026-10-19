@@ -86,7 +86,9 @@ class KolSelfRegisterServiceTest {
 
   @Test
   void shouldPreviewOnlyAUsableLink() {
-    assertThat(service.preview(CODE, "127.0.0.1").bdUserName()).isEqualTo("BD");
+    var preview = service.preview(CODE, "127.0.0.1");
+    assertThat(preview.bdUserName()).isEqualTo("BD");
+    assertThat(preview.tenantName()).isEqualTo("Acme");
   }
 
   @Test

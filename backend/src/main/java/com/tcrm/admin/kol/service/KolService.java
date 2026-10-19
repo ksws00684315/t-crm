@@ -23,6 +23,8 @@ import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -116,9 +118,9 @@ public class KolService {
     Map<Long, List<KolDTO.PlatformDTO>> platformsMap =
         platformsByKol(rows.stream().map(KolDO::getId).toList(), templates);
     Map<Long, BdUserDTO> bdUsable = bdUsableById(rows.stream().map(KolDO::getBdUserId));
-    java.util.Set<String> locked =
+    Set<String> locked =
         loginFailures.findLockedUsernames(
-            rows.stream().map(KolDO::getEmail).filter(java.util.Objects::nonNull).toList());
+            rows.stream().map(KolDO::getEmail).filter(Objects::nonNull).toList());
     return new PageResult<>(
         rows.stream()
             .map(kol -> toDto(kol, names, templates, platformsMap, bdUsable, locked))
@@ -143,7 +145,7 @@ public class KolService {
     Map<Long, List<KolDTO.PlatformDTO>> platformsMap =
         platformsByKol(List.of(kol.getId()), templateMap);
     Map<Long, BdUserDTO> bdUsable = bdUsableById(Stream.of(kol.getBdUserId()));
-    java.util.Set<String> locked =
+    Set<String> locked =
         loginFailures.findLockedUsernames(
             kol.getEmail() == null ? List.of() : List.of(kol.getEmail()));
     return new KolDetailDTO(
@@ -199,7 +201,7 @@ public class KolService {
         templateMap,
         platformsByKol(selfId, templateMap),
         bdUsableById(Stream.of(bd)),
-        java.util.Set.of());
+        Set.of());
   }
 
   /**
@@ -393,7 +395,7 @@ public class KolService {
       Map<Long, String> templates,
       Map<Long, List<KolDTO.PlatformDTO>> platformsMap,
       Map<Long, BdUserDTO> bdUsable,
-      java.util.Set<String> lockedEmails) {
+      Set<String> lockedEmails) {
     Long bdId = kol.getBdUserId();
     BdUserDTO bd = bdId == null ? null : bdUsable.get(bdId);
     String review =
@@ -445,7 +447,7 @@ public class KolService {
     return bdNames.get(bdId);
   }
 
-  private static String deriveLoginStatus(KolDO kol, java.util.Set<String> lockedEmails) {
+  private static String deriveLoginStatus(KolDO kol, Set<String> lockedEmails) {
     if (kol.getStatus() != null && kol.getStatus() == 0) {
       return LoginStatus.FROZEN.name();
     }
@@ -467,7 +469,7 @@ public class KolService {
     List<KolPlatformDO> rows =
         platforms.selectList(
             new LambdaQueryWrapper<KolPlatformDO>().in(KolPlatformDO::getKolId, kolIds));
-    java.util.Set<Long> needed = new java.util.HashSet<>();
+    Set<Long> needed = new HashSet<>();
     for (KolPlatformDO row : rows) {
       if (!templateNames.containsKey(row.getLinkTemplateId())) {
         needed.add(row.getLinkTemplateId());
@@ -477,7 +479,7 @@ public class KolService {
     Map<Long, String> allNames = new HashMap<>(templateNames);
     allNames.putAll(extra);
     for (KolPlatformDO row : rows) {
-      out.computeIfAbsent(row.getKolId(), id -> new java.util.ArrayList<>())
+      out.computeIfAbsent(row.getKolId(), id -> new ArrayList<>())
           .add(
               new KolDTO.PlatformDTO(
                   row.getLinkTemplateId(),
@@ -485,7 +487,7 @@ public class KolService {
                   row.getAddress()));
     }
     for (List<KolDTO.PlatformDTO> list : out.values()) {
-      list.sort(java.util.Comparator.comparing(KolDTO.PlatformDTO::templateId));
+      list.sort(Comparator.comparing(KolDTO.PlatformDTO::templateId));
     }
     return out;
   }

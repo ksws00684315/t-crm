@@ -128,7 +128,7 @@ class IdleKolCleanupServiceTest {
     verify(cleanup).lockPromotingKol(9L);
     verify(cleanup).softDeleteLockedKol(9L);
     verify(items).closeCurrentMappingsForKol(eq(9L), any(), isNull());
-    verify(cleanupItems).processAllPendingForKol(eq(9L), any());
+    verify(cleanupItems).enqueueDeletesForKol(9L);
   }
 
   @Test
@@ -206,7 +206,7 @@ class IdleKolCleanupServiceTest {
         .createPendingItems(
             eq(9L), eq("KOL-DDD009"), eq(5L), eq("MANUAL"), eq("idle account"), any(), eq(1L));
     verify(items).closeCurrentMappingsForKol(eq(9L), any(), eq(1L));
-    verify(cleanupItems).processAllPendingForKol(eq(9L), any());
+    verify(cleanupItems).enqueueDeletesForKol(9L);
   }
 
   @Test
@@ -278,6 +278,7 @@ class IdleKolCleanupServiceTest {
                     5L,
                     1L,
                     2L,
+                    null,
                     "w1",
                     "FAILED",
                     "AUTO",
@@ -302,6 +303,7 @@ class IdleKolCleanupServiceTest {
                     99L,
                     1L,
                     2L,
+                    null,
                     "w1",
                     "FAILED",
                     "AUTO",
@@ -324,6 +326,7 @@ class IdleKolCleanupServiceTest {
                     5L,
                     1L,
                     2L,
+                    null,
                     "w1",
                     "SUCCESS",
                     "AUTO",

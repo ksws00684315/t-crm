@@ -5,31 +5,41 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.api.KolCleanupItemApi;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
-import com.tcrm.admin.product.api.WeidianItemCopyApi;
-import com.tcrm.admin.product.api.WeidianItemCopyApi.DeleteResult;
 import com.tcrm.admin.product.mapper.KolCleanupItemMapper;
+import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.KolCleanupItemDO;
+import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Cleanup detail persistence and Weidian delete worker (task 29 / ADR-025). */
+/** Cleanup detail persistence and enqueue to the Weidian-delete worker (task 29 / ADR-025). */
 @Service
 public class KolCleanupItemService implements KolCleanupItemApi {
   private final KolCleanupItemMapper items;
   private final KolItemLookupService links;
-  private final WeidianItemCopyApi weidian;
+  private final ShopMapper shops;
+  private final KolCleanupWorker worker;
 
   public KolCleanupItemService(
-      KolCleanupItemMapper items, KolItemLookupService links, WeidianItemCopyApi weidian) {
+      KolCleanupItemMapper items,
+      KolItemLookupService links,
+      ShopMapper shops,
+      KolCleanupWorker worker) {
     this.items = items;
     this.links = links;
-    this.weidian = weidian;
+    this.shops = shops;
+    this.worker = worker;
   }
 
   @Override
@@ -66,35 +76,45 @@ public class KolCleanupItemService implements KolCleanupItemApi {
   }
 
   @Override
-  public void processAllPendingForKol(long kolId, Instant cleanupTime) {
-    List<KolCleanupItemDO> pending =
-        items.selectList(
-            new LambdaQueryWrapper<KolCleanupItemDO>()
-                .eq(KolCleanupItemDO::getKolId, kolId)
-                .eq(KolCleanupItemDO::getCleanupTime, cleanupTime)
-                .eq(KolCleanupItemDO::getStatus, "PENDING")
-                .orderByAsc(KolCleanupItemDO::getId));
-    for (KolCleanupItemDO row : pending) {
-      applyDelete(row);
-    }
+  public void enqueueDeletesForKol(long kolId) {
+    worker.submit(kolId);
   }
 
   @Override
-  public java.util.Optional<KolCleanupItemDTO> getById(long id) {
+  public Optional<KolCleanupItemDTO> getById(long id) {
     KolCleanupItemDO row = items.selectById(id);
-    return row == null ? java.util.Optional.empty() : java.util.Optional.of(toDto(row));
+    if (row == null) {
+      return Optional.empty();
+    }
+    Map<Long, String> names = shopNames(Set.of(row.getShopId()));
+    return Optional.of(toDto(row, names));
   }
 
   @Override
   public void retryFailed(long cleanupItemId) {
+    Instant now = Instant.now();
+    int claimed =
+        items.update(
+            null,
+            new LambdaUpdateWrapper<KolCleanupItemDO>()
+                .eq(KolCleanupItemDO::getId, cleanupItemId)
+                .eq(KolCleanupItemDO::getStatus, "FAILED")
+                .set(KolCleanupItemDO::getStatus, "PENDING")
+                .set(KolCleanupItemDO::getFailReason, null)
+                .set(KolCleanupItemDO::getFinishTime, null)
+                .set(KolCleanupItemDO::getUpdateTime, now));
+    if (claimed != 1) {
+      KolCleanupItemDO row = items.selectById(cleanupItemId);
+      if (row == null) {
+        throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      }
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     KolCleanupItemDO row = items.selectById(cleanupItemId);
     if (row == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    if (!"FAILED".equals(row.getStatus())) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
-    applyDelete(row);
+    worker.submit(row.getKolId());
   }
 
   @Override
@@ -113,29 +133,33 @@ public class KolCleanupItemService implements KolCleanupItemApi {
       query.eq(KolCleanupItemDO::getBdUserId, bdUserIdScope);
     }
     var result = items.selectPage(new Page<>(page, size), query);
-    return new PageResult<>(
-        result.getRecords().stream().map(this::toDto).toList(), result.getTotal(), page, size);
-  }
-
-  private void applyDelete(KolCleanupItemDO row) {
-    DeleteResult result = weidian.deleteItem(row.getShopId(), row.getWeidianItemId());
-    Instant now = Instant.now();
-    LambdaUpdateWrapper<KolCleanupItemDO> update =
-        new LambdaUpdateWrapper<KolCleanupItemDO>()
-            .eq(KolCleanupItemDO::getId, row.getId())
-            .set(KolCleanupItemDO::getFinishTime, now)
-            .set(KolCleanupItemDO::getUpdateTime, now);
-    if (result.success()) {
-      update.set(KolCleanupItemDO::getStatus, "SUCCESS").set(KolCleanupItemDO::getFailReason, null);
-    } else {
-      update
-          .set(KolCleanupItemDO::getStatus, "FAILED")
-          .set(KolCleanupItemDO::getFailReason, truncate(result.failReason(), 500));
+    Set<Long> shopIds = new HashSet<>();
+    for (KolCleanupItemDO row : result.getRecords()) {
+      if (row.getShopId() != null) {
+        shopIds.add(row.getShopId());
+      }
     }
-    items.update(null, update);
+    Map<Long, String> names = shopNames(shopIds);
+    return new PageResult<>(
+        result.getRecords().stream().map(row -> toDto(row, names)).toList(),
+        result.getTotal(),
+        page,
+        size);
   }
 
-  private KolCleanupItemDTO toDto(KolCleanupItemDO row) {
+  private Map<Long, String> shopNames(Set<Long> shopIds) {
+    Map<Long, String> names = new HashMap<>();
+    if (shopIds == null || shopIds.isEmpty()) {
+      return names;
+    }
+    for (ShopDO shop :
+        shops.selectList(new LambdaQueryWrapper<ShopDO>().in(ShopDO::getId, shopIds))) {
+      names.put(shop.getId(), shop.getShopName());
+    }
+    return names;
+  }
+
+  private KolCleanupItemDTO toDto(KolCleanupItemDO row, Map<Long, String> shopNames) {
     return new KolCleanupItemDTO(
         row.getId(),
         row.getKolId(),
@@ -143,6 +167,7 @@ public class KolCleanupItemService implements KolCleanupItemApi {
         row.getBdUserId(),
         row.getKolItemId(),
         row.getShopId(),
+        row.getShopId() == null ? null : shopNames.get(row.getShopId()),
         row.getWeidianItemId(),
         row.getStatus(),
         row.getTriggerType(),
@@ -150,12 +175,5 @@ public class KolCleanupItemService implements KolCleanupItemApi {
         row.getFailReason(),
         row.getCleanupTime(),
         row.getFinishTime());
-  }
-
-  private static String truncate(String value, int max) {
-    if (value == null) {
-      return null;
-    }
-    return value.length() <= max ? value : value.substring(0, max);
   }
 }

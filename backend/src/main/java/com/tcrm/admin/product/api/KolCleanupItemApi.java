@@ -3,10 +3,11 @@ package com.tcrm.admin.product.api;
 import com.tcrm.admin.shared.PageResult;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Cleanup detail rows (task 29 / ADR-025). Order orchestrates cleanup; product owns the table and
- * Weidian delete worker.
+ * the background Weidian-delete worker.
  */
 public interface KolCleanupItemApi {
   /**
@@ -22,14 +23,21 @@ public interface KolCleanupItemApi {
       Instant cleanupTime,
       Long actorId);
 
-  /** Processes all PENDING rows for a KOL created at this cleanup time. */
-  void processAllPendingForKol(long kolId, Instant cleanupTime);
+  /**
+   * Enqueues background deletes for PENDING rows of this KOL. Returns immediately; the HTTP caller
+   * must not wait for Weidian.
+   */
+  void enqueueDeletesForKol(long kolId);
 
-  /** Retries one FAILED row (Weidian delete once; no business auto-retry). */
+  /**
+   * Atomically moves one FAILED row back to PENDING (affected rows must be 1) and enqueues
+   * background delete. The API returns success while the row still shows as pending until the
+   * worker finishes.
+   */
   void retryFailed(long cleanupItemId);
 
   /** Returns the row or empty when missing. */
-  java.util.Optional<KolCleanupItemDTO> getById(long id);
+  Optional<KolCleanupItemDTO> getById(long id);
 
   PageResult<KolCleanupItemDTO> page(
       String kolCode, String status, Long bdUserIdScope, int page, int size);
@@ -41,6 +49,7 @@ public interface KolCleanupItemApi {
       Long bdUserId,
       Long kolItemId,
       Long shopId,
+      String shopName,
       String weidianItemId,
       String status,
       String trigger,

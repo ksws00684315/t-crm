@@ -6,6 +6,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -15,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -119,18 +121,45 @@ public class LoginFailures implements LoginFailureCounter {
     if (usernames == null || usernames.isEmpty()) {
       return Set.of();
     }
-    Set<String> locked = new HashSet<>();
+    List<String> ordered = new ArrayList<>();
+    List<String> lockKeys = new ArrayList<>();
     for (String username : usernames) {
       if (username == null || username.isBlank()) {
         continue;
       }
+      ordered.add(username);
       String user = digest(username.toLowerCase(Locale.ROOT));
-      String lockKey = keyPrefix + ":fail:user:" + user + ":lock";
-      if (Boolean.TRUE.equals(redis.hasKey(lockKey))) {
-        locked.add(username);
+      lockKeys.add(keyPrefix + ":fail:user:" + user + ":lock");
+    }
+    if (lockKeys.isEmpty()) {
+      return Set.of();
+    }
+    List<Object> flags =
+        redis.executePipelined(
+            (RedisCallback<Object>)
+                connection -> {
+                  for (String lockKey : lockKeys) {
+                    connection.keyCommands().exists(lockKey.getBytes(StandardCharsets.UTF_8));
+                  }
+                  return null;
+                });
+    Set<String> locked = new HashSet<>();
+    for (int i = 0; i < ordered.size(); i++) {
+      if (isPresent(flags.get(i))) {
+        locked.add(ordered.get(i));
       }
     }
     return locked;
+  }
+
+  private static boolean isPresent(Object flag) {
+    if (flag instanceof Boolean b) {
+      return b;
+    }
+    if (flag instanceof Number n) {
+      return n.longValue() > 0;
+    }
+    return false;
   }
 
   private record Scope(String key, int limit) {}

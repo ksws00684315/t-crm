@@ -148,7 +148,7 @@ public class IdleKolCleanupService {
                   return cleanup.softDeleteLockedKol(snap.id());
                 }));
     if (ok) {
-      cleanupItems.processAllPendingForKol(kolId, now);
+      cleanupItems.enqueueDeletesForKol(kolId);
       audit.recordTenantWriteOperation(
           user.tenantId(),
           user.id(),
@@ -217,7 +217,7 @@ public class IdleKolCleanupService {
               return cleanup.softDeleteLockedKol(kolId);
             });
     if (Boolean.TRUE.equals(deleted)) {
-      cleanupItems.processAllPendingForKol(kolId, now);
+      cleanupItems.enqueueDeletesForKol(kolId);
       return true;
     }
     return false;

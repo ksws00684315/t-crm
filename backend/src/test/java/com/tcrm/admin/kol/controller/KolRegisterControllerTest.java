@@ -37,10 +37,11 @@ class KolRegisterControllerTest {
   void shouldPreviewWithoutAToken() throws Exception {
     when(registration.preview(
             org.mockito.ArgumentMatchers.eq(CODE), org.mockito.ArgumentMatchers.anyString()))
-        .thenReturn(new KolRegisterPreview("Acme"));
+        .thenReturn(new KolRegisterPreview("Acme BD", "Acme"));
     mvc.perform(get("/kol-api/register/" + CODE))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.bdUserName").value("Acme"))
+        .andExpect(jsonPath("$.data.bdUserName").value("Acme BD"))
+        .andExpect(jsonPath("$.data.tenantName").value("Acme"))
         .andExpect(jsonPath("$.data.code").doesNotExist());
   }
 

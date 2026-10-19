@@ -112,6 +112,12 @@ crm:
     default-quota: 1
     default-valid-minutes: 1440
   # External product-link APIs (task 17b / design §6.5).
+  # KOL cleanup Weidian-delete worker (task 29 / ADR-025).
+  kol-cleanup:
+    worker-threads: 2
+    worker-queue: 200
+    claim-lease-seconds: 300
+    stale-scan-ms: 300000
   product-links:
     ip-rate-per-minute: 120
     convert-token-rate-per-minute: 10
