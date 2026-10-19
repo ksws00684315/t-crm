@@ -16,14 +16,19 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
-const code = computed(() => (typeof route.query.c === "string" ? route.query.c : ""));
-const tenantName = ref("");
-const linkState = ref<"checking" | "ready" | "invalid">("checking");
+const linkedCode = computed(() => (typeof route.query.code === "string" ? route.query.code : ""));
+const code = ref(linkedCode.value.toUpperCase());
+const bdUserName = ref("");
+const linkState = ref<"checking" | "ready" | "invalid" | "empty">(
+  linkedCode.value ? "checking" : "empty"
+);
+const previewError = ref("");
 const email = ref("");
 const emailCode = ref("");
 const password = ref("");
 const confirm = ref("");
 const whatsapp = ref("");
+const phone = ref("");
 const platform = ref("");
 const handle = ref("");
 const profileUrl = ref("");
@@ -32,6 +37,7 @@ const country = ref("");
 const seconds = ref(0);
 const emailExists = ref(false);
 const { busy, validation, errorText, submit } = useSubmission();
+const rateLimitError = ref("");
 let timer: ReturnType<typeof setInterval> | undefined;
 
 function blank(value: string): string | null {
@@ -41,16 +47,29 @@ function blank(value: string): string | null {
 
 async function loadPreview() {
   emailExists.value = false;
-  if (!/^[0-9A-Za-z]{32}$/.test(code.value)) {
+  previewError.value = "";
+  code.value = code.value.toUpperCase();
+  if (!code.value) {
+    linkState.value = "empty";
+    bdUserName.value = "";
+    return;
+  }
+  if (!/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code.value)) {
+    linkState.value = "invalid";
+    return;
+  }
+  if (code.value.length !== 8) {
     linkState.value = "invalid";
     return;
   }
   linkState.value = "checking";
   try {
-    tenantName.value = (await previewRegister(code.value)).tenantName;
+    bdUserName.value = (await previewRegister(code.value)).bdUserName;
     linkState.value = "ready";
-  } catch {
+  } catch (error) {
     linkState.value = "invalid";
+    if (error instanceof ApiError && error.status === 429)
+      previewError.value = t("register.tryLater");
   }
 }
 
@@ -66,6 +85,11 @@ function startCountdown() {
 function sendCode() {
   return submit(async () => {
     emailExists.value = false;
+    rateLimitError.value = "";
+    if (linkState.value !== "ready") {
+      validation.value = "register.codeInvalid";
+      return;
+    }
     if (!validEmail(email.value.trim())) {
       validation.value = "auth.emailInvalid";
       return;
@@ -76,6 +100,10 @@ function sendCode() {
     } catch (error) {
       if (error instanceof ApiError && error.errorCode === "KOL_EMAIL_EXISTS") {
         emailExists.value = true;
+        return;
+      }
+      if (error instanceof ApiError && error.status === 429) {
+        rateLimitError.value = t("register.tryLater");
         return;
       }
       throw error;
@@ -89,6 +117,18 @@ function register() {
     const address = email.value.trim();
     const url = profileUrl.value.trim();
     const region = country.value.trim();
+    if (!/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code.value)) {
+      validation.value = "register.codeInvalid";
+      return;
+    }
+    if (linkState.value !== "ready") {
+      validation.value = "register.codeInvalid";
+      return;
+    }
+    if (!name.value.trim() || name.value.trim().length > 64) {
+      validation.value = "register.nameRequired";
+      return;
+    }
     if (!validEmail(address)) {
       validation.value = "auth.emailInvalid";
       return;
@@ -105,16 +145,16 @@ function register() {
       validation.value = "auth.passwordMismatch";
       return;
     }
-    if (!/^\+[0-9]{8,15}$/.test(whatsapp.value.trim())) {
+    if (whatsapp.value.trim() && !/^\+[0-9]{8,15}$/.test(whatsapp.value.trim())) {
       validation.value = "register.whatsappInvalid";
       return;
     }
-    if (!platform.value) {
-      validation.value = "register.platformRequired";
+    if (phone.value.trim() && !/^\+[0-9]{8,15}$/.test(phone.value.trim())) {
+      validation.value = "register.phoneInvalid";
       return;
     }
-    if (!handle.value.trim() || handle.value.trim().length > 64) {
-      validation.value = "register.handleRequired";
+    if (!!platform.value !== !!handle.value.trim()) {
+      validation.value = "register.socialPairRequired";
       return;
     }
     if (url && !/^https:\/\/[^\s/?#]+\S*$/.test(url)) {
@@ -131,11 +171,12 @@ function register() {
         email: address,
         emailCode: emailCode.value.trim(),
         password: password.value,
-        whatsapp: whatsapp.value.trim(),
-        primaryPlatform: platform.value,
-        primaryHandle: handle.value.trim(),
+        phone: blank(phone.value),
+        whatsapp: blank(whatsapp.value),
+        primaryPlatform: blank(platform.value),
+        primaryHandle: blank(handle.value),
         primaryUrl: blank(url),
-        name: blank(name.value),
+        name: name.value.trim(),
         country: blank(region)
       });
       session.acceptSession(result);
@@ -145,12 +186,26 @@ function register() {
         emailExists.value = true;
         return;
       }
+      if (error instanceof ApiError && error.status === 429) {
+        rateLimitError.value = t("register.tryLater");
+        return;
+      }
       throw error;
     }
   });
 }
 
-watch(code, () => void loadPreview(), { immediate: true });
+watch(
+  linkedCode,
+  value => {
+    code.value = value.toUpperCase();
+    void loadPreview();
+  },
+  { immediate: true }
+);
+watch(code, () => {
+  if (!linkedCode.value) void loadPreview();
+});
 onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
@@ -158,10 +213,24 @@ onUnmounted(() => {
 
 <template>
   <AuthShell :title="t('register.title')">
-    <p v-if="linkState === 'invalid'" class="register-invalid">{{ t("register.invalidLink") }}</p>
-    <template v-else-if="linkState === 'ready'">
-      <p class="register-join">{{ t("register.join", { company: tenantName }) }}</p>
-      <el-alert v-if="errorText" role="alert" type="error" :closable="false" :title="errorText" />
+    <p v-if="linkedCode && linkState === 'invalid' && !previewError" class="register-invalid">
+      {{ t("register.invalidLink") }}
+    </p>
+    <template v-else-if="!linkedCode || linkState === 'ready' || !!previewError">
+      <p v-if="linkedCode" class="register-join">
+        {{ t("register.invitedBy", { name: bdUserName }) }}
+      </p>
+      <p v-if="!linkedCode && linkState === 'invalid'" class="register-invalid">
+        {{ t("register.invalidCode") }}
+      </p>
+      <p v-if="previewError" class="register-invalid">{{ previewError }}</p>
+      <el-alert
+        v-if="errorText || rateLimitError"
+        role="alert"
+        type="error"
+        :closable="false"
+        :title="rateLimitError || errorText"
+      />
       <el-alert v-if="emailExists" type="warning" :closable="false">
         {{ t("register.emailExists") }}
         <RouterLink class="register-login" :to="{ path: '/login', query: { email: email.trim() } }">
@@ -169,6 +238,19 @@ onUnmounted(() => {
         </RouterLink>
       </el-alert>
       <el-form label-position="top" novalidate @submit.prevent="register">
+        <el-form-item :label="t('register.inviteCode')" for="register-code">
+          <el-input
+            id="register-code"
+            v-model="code"
+            maxlength="8"
+            :readonly="!!linkedCode"
+            :disabled="busy || !!linkedCode"
+            autocomplete="off"
+          />
+        </el-form-item>
+        <el-form-item :label="t('register.name')" for="register-name">
+          <el-input id="register-name" v-model="name" maxlength="64" :disabled="busy" />
+        </el-form-item>
         <el-form-item :label="t('auth.email')" for="register-email">
           <div class="register-email">
             <el-input
@@ -229,6 +311,9 @@ onUnmounted(() => {
             :disabled="busy"
           />
         </el-form-item>
+        <el-form-item :label="t('register.phone')" for="register-phone">
+          <el-input id="register-phone" v-model="phone" autocomplete="tel" :disabled="busy" />
+        </el-form-item>
         <el-form-item :label="t('register.platformLabel')">
           <el-select
             v-model="platform"
@@ -258,9 +343,6 @@ onUnmounted(() => {
         </el-form-item>
         <el-collapse>
           <el-collapse-item :title="t('register.more')" name="more">
-            <el-form-item :label="t('register.name')" for="register-name">
-              <el-input id="register-name" v-model="name" maxlength="64" :disabled="busy" />
-            </el-form-item>
             <el-form-item :label="t('register.country')" for="register-country">
               <el-input id="register-country" v-model="country" maxlength="2" :disabled="busy" />
             </el-form-item>

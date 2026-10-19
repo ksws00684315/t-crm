@@ -3,7 +3,6 @@ import { nextTick } from "vue";
 import ElementPlus, { ElMessage } from "element-plus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
-import * as promotionApi from "@/api/kol/promotion";
 import * as templateApi from "@/api/link/template";
 import type { KolVO, LinkTemplateVO } from "@/api/types";
 import { i18n } from "@/locales";
@@ -45,12 +44,21 @@ const kol: KolVO = {
   status: 1,
   remark: null,
   whatsapp: null,
+  phone: null,
   linkTemplateId: disabled.id,
   linkTemplateName: disabled.templateName,
   inviteCode: null,
   sheetUrl: null,
   registerSource: 1,
   accountStatus: 0,
+  reviewStatus: "PENDING",
+  relationStatus: "PENDING_PROMOTION",
+  displayRelationStatus: "PENDING_PROMOTION",
+  loginStatus: "NORMAL",
+  platforms: [],
+  jumpTemplateId: null,
+  configVersion: null,
+  inviteTime: "2026-10-05T01:02:03Z",
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
@@ -88,6 +96,7 @@ describe("KOL form dialog", () => {
     document.body.innerHTML = "";
     vi.mocked(kolApi.createKol).mockReset();
     vi.mocked(kolApi.editKol).mockReset();
+    vi.mocked(kolApi.reviewKol).mockReset();
   });
 
   afterEach(() => {
@@ -137,6 +146,7 @@ describe("KOL form dialog", () => {
       defaultRate: null,
       remark: null,
       whatsapp: "+8613800000000",
+      phone: null,
       linkTemplateId: null,
       inviteCode: "ABC123",
       sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
@@ -173,45 +183,37 @@ describe("KOL form dialog", () => {
       wrapper.unmount();
     });
 
-    it("approve saves the profile and then moves the status to PENDING_PROMOTION", async () => {
+    it("saves profile fields through the single review endpoint", async () => {
       const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
-      vi.mocked(kolApi.editKol).mockResolvedValue(null);
+      vi.mocked(kolApi.reviewKol).mockResolvedValue(null);
       const wrapper = await openDialog(kol, true);
       await input("review-approve").trigger("click");
       await flushPromises();
-      expect(kolApi.editKol).toHaveBeenCalledTimes(1);
-      expect(promotionApi.updatePromotionStatus).toHaveBeenCalledWith(kol.id, "PENDING_PROMOTION");
-      expect(success).toHaveBeenCalledWith("资料已保存，状态已改为待推广");
+      expect(kolApi.reviewKol).toHaveBeenCalledWith(kol.id, {
+        name: "Alice",
+        phone: null,
+        whatsapp: null,
+        primaryPlatform: null,
+        primaryHandle: null,
+        country: "US",
+        remark: null
+      });
+      expect(success).toHaveBeenCalledWith("资料已保存，审核通过");
       expect(wrapper.emitted("saved")).toHaveLength(1);
       expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([false]);
       wrapper.unmount();
     });
 
-    it("approve stops after the first step when the profile save fails", async () => {
-      const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
-      vi.mocked(kolApi.editKol).mockRejectedValue(
-        new ApiError({ status: 400, errorCode: "COMMON_VALIDATION_FAILED", traceId: "t" })
+    it("refreshes and reports when the creator has already been reviewed", async () => {
+      const info = vi.spyOn(ElMessage, "info").mockImplementation(() => ({}) as never);
+      vi.mocked(kolApi.reviewKol).mockRejectedValue(
+        new ApiError({ status: 409, errorCode: "KOL_REVIEW_ALREADY_DONE", traceId: "t" })
       );
       const wrapper = await openDialog(kol, true);
       await input("review-approve").trigger("click");
       await flushPromises();
-      expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
-      expect(error).toHaveBeenCalledWith("资料保存失败，状态未修改");
-      expect(wrapper.emitted("update:modelValue")?.at(-1)).toBeUndefined();
-      wrapper.unmount();
-    });
-
-    it("approve explains when the profile saved but the status change failed", async () => {
-      const error = vi.spyOn(ElMessage, "error").mockImplementation(() => ({}) as never);
-      vi.mocked(kolApi.editKol).mockResolvedValue(null);
-      vi.mocked(promotionApi.updatePromotionStatus).mockRejectedValue(
-        new ApiError({ status: 500, errorCode: "COMMON_INTERNAL_ERROR", traceId: "t" })
-      );
-      const wrapper = await openDialog(kol, true);
-      await input("review-approve").trigger("click");
-      await flushPromises();
-      expect(kolApi.editKol).toHaveBeenCalledTimes(1);
-      expect(error).toHaveBeenCalledWith("资料已保存，但修改状态失败");
+      expect(info).toHaveBeenCalledWith("该达人已审核");
+      expect(wrapper.emitted("saved")).toHaveLength(1);
       wrapper.unmount();
     });
   });

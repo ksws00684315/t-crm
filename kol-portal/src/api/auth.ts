@@ -7,6 +7,7 @@ export interface KolProfile {
   country: string | null;
   tenantName: string;
   whatsapp?: string | null;
+  phone?: string | null;
   sheetUrl?: string | null;
 }
 

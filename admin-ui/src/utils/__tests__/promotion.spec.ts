@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { looksLikeKolCode, validateKolCode, validateLandingUrl } from "../kol-validation";
+import { looksLikeKolCode, validateKolCode } from "../kol-validation";
 import {
+  DISPLAY_RELATION_STATUSES,
   incompletePromotionFields,
   missingPromotionFields,
   promotionFieldDiffs,
-  promotionTagType,
-  DISPLAY_STATUSES,
-  PROMOTION_STATUSES
+  relationTagType,
+  RELATION_STATUS_OPTIONS
 } from "../promotion";
 
 describe("creator code validation (ADR-023 §1)", () => {
@@ -30,137 +30,95 @@ describe("creator code validation (ADR-023 §1)", () => {
   });
 });
 
-describe("landing page validation", () => {
-  it("allows empty and https, rejects other schemes and overlong values", () => {
-    expect(validateLandingUrl("")).toBeNull();
-    expect(validateLandingUrl("https://brand.example/ada")).toBeNull();
-    expect(validateLandingUrl("http://brand.example/ada")).not.toBeNull();
-    expect(validateLandingUrl("brand.example")).not.toBeNull();
-    expect(validateLandingUrl(`https://brand.example/${"a".repeat(510)}`)).not.toBeNull();
-  });
-});
-
-describe("promotion status helpers", () => {
-  it("gives each shown status its own tag color", () => {
-    const colors = DISPLAY_STATUSES.map(promotionTagType);
-    expect(new Set(colors).size).toBe(DISPLAY_STATUSES.length);
-    expect(promotionTagType("PENDING_UPDATE")).toBe("danger");
-  });
-
-  it("lists the stored statuses inside the display statuses", () => {
-    expect(DISPLAY_STATUSES).toHaveLength(PROMOTION_STATUSES.length + 1);
-    expect(DISPLAY_STATUSES).toContain("PENDING_UPDATE");
+describe("relation status helpers", () => {
+  it("lists the three editable states and adds pending update for display", () => {
+    expect(RELATION_STATUS_OPTIONS).toEqual(["PENDING_PROMOTION", "PROMOTING", "INVALID"]);
+    expect(DISPLAY_RELATION_STATUSES).toEqual([
+      "PENDING_PROMOTION",
+      "PROMOTING",
+      "INVALID",
+      "PENDING_UPDATE"
+    ]);
+    expect(new Set(DISPLAY_RELATION_STATUSES.map(relationTagType)).size).toBe(4);
+    expect(relationTagType("PENDING_UPDATE")).toBe("danger");
   });
 });
 
 describe("promotionFieldDiffs", () => {
-  it("shows only the changed fields, formatted for display", () => {
+  it("shows only changed fields, including rate and configured platforms", () => {
     const diffs = promotionFieldDiffs(
-      {
-        defaultRate: null,
-        platformTemplateIds: [],
-        landingUrl: null,
-        inviteCode: null,
-        sheetUrl: null,
-        status: "PENDING_PROMOTION"
-      },
+      { defaultRate: null, platforms: [], inviteCode: null, sheetUrl: null },
       {
         defaultRate: "0.1550",
-        platformTemplateIds: ["7"],
-        landingUrl: null,
+        platforms: [{ templateId: "7", templateName: "AgentOne", address: "https://shop/ada" }],
         inviteCode: "ADA",
-        sheetUrl: null,
-        status: "PROMOTING"
-      },
-      id => (id === "7" ? "AgentOne" : id)
+        sheetUrl: null
+      }
     );
     const map = new Map(diffs.map(diff => [diff.key, diff]));
-    expect([...map.keys()].sort()).toEqual([
-      "defaultRate",
-      "inviteCode",
-      "platformTemplateIds",
-      "status"
-    ]);
+    expect([...map.keys()].sort()).toEqual(["defaultRate", "inviteCode", "platforms"]);
     expect(map.get("defaultRate")).toMatchObject({ from: "-", to: "15.5%" });
-    expect(map.get("platformTemplateIds")).toMatchObject({ from: "-", to: "AgentOne" });
-    expect(map.get("status")).toMatchObject({ from: "PENDING_PROMOTION", to: "PROMOTING" });
+    expect(map.get("platforms")?.to).toContain("AgentOne");
+    expect(map.get("platforms")?.to).toContain("https://shop/ada");
   });
 
-  it("reads the backend's own promotionStatus key as the status field", () => {
-    // Real records store the live status under `promotionStatus`, not `status`.
-    const snapshot = {
-      defaultRate: null,
-      platformTemplateIds: [],
-      landingUrl: null,
-      inviteCode: null,
-      sheetUrl: null
-    };
+  it("reports platform order changes and keeps unknown backend fields visible", () => {
     const diffs = promotionFieldDiffs(
-      { ...snapshot, promotionStatus: "PENDING_PROMOTION" },
-      { ...snapshot, promotionStatus: "PROMOTING" }
+      { platforms: [{ templateId: "8" }, { templateId: "7" }], extra: "a" },
+      { platforms: [{ templateId: "7" }, { templateId: "8" }], extra: "b" }
     );
-    expect(diffs).toEqual([{ key: "status", from: "PENDING_PROMOTION", to: "PROMOTING" }]);
+    expect(diffs.map(diff => diff.key)).toEqual(["platforms", "extra"]);
   });
 
-  it("keeps platform order irrelevant and keeps unknown fields from a newer backend", () => {
-    const diffs = promotionFieldDiffs(
-      { platformTemplateIds: ["8", "7"], extra: "a" },
-      { platformTemplateIds: ["7", "8"], extra: "b" }
-    );
-    expect(diffs).toEqual([{ key: "extra", from: "a", to: "b" }]);
-  });
-
-  it("treats a missing snapshot as fully empty", () => {
-    const diffs = promotionFieldDiffs(null, { inviteCode: "ADA" });
-    expect(diffs).toEqual([{ key: "inviteCode", from: "-", to: "ADA" }]);
+  it("treats a missing snapshot as empty", () => {
+    expect(promotionFieldDiffs(null, { inviteCode: "ADA" })).toContainEqual({
+      key: "inviteCode",
+      from: "-",
+      to: "ADA"
+    });
   });
 });
 
-describe("missingPromotionFields", () => {
-  it("reads several plausible 422 payload shapes", () => {
-    expect(missingPromotionFields({ missingFields: ["defaultRate", "landingUrl"] })).toEqual([
+describe("missing and incomplete promotion fields", () => {
+  it("reads the backend's field array and removes duplicates", () => {
+    expect(missingPromotionFields(["defaultRate", "platformAddress", "defaultRate"])).toEqual([
       "defaultRate",
-      "landingUrl"
+      "platformAddress"
     ]);
-    expect(missingPromotionFields(["inviteCode"])).toEqual(["inviteCode"]);
-    expect(missingPromotionFields([{ field: "platformTemplateIds", message: "empty" }])).toEqual([
-      "platformTemplateIds"
+    expect(missingPromotionFields({ data: ["review", "sheetUrl"] })).toEqual([
+      "review",
+      "sheetUrl"
     ]);
-    expect(missingPromotionFields({ fields: ["defaultRate", "defaultRate"] })).toEqual([
-      "defaultRate"
-    ]);
+    expect(missingPromotionFields({ detail: "unreadable" })).toEqual([]);
   });
 
-  it("returns nothing for unreadable payloads so the plain message is shown", () => {
-    expect(missingPromotionFields(null)).toEqual([]);
-    expect(missingPromotionFields({})).toEqual([]);
-    expect(missingPromotionFields({ detail: "nope" })).toEqual([]);
-  });
-});
-
-describe("incompletePromotionFields", () => {
-  it("mirrors the backend rule for starting promotion (25a §4.2)", () => {
-    expect(incompletePromotionFields({})).toEqual([
+  it("requires all configuration fields and review before promotion starts", () => {
+    expect(incompletePromotionFields({ review: false })).toEqual([
       "defaultRate",
-      "platformTemplateIds",
-      "landingUrl",
       "inviteCode",
-      "jumpTemplateId"
+      "platforms",
+      "sheetUrl",
+      "review"
     ]);
     expect(
       incompletePromotionFields({
         defaultRate: "0.1000",
-        platformTemplateIds: ["7"],
-        landingUrl: "https://brand.example",
         inviteCode: "ADA",
-        jumpTemplateId: "7"
+        platforms: [{ templateId: "7", address: "https://shop.example/ada" }],
+        jumpTemplateId: "7",
+        sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+        review: true
       })
     ).toEqual([]);
-    expect(incompletePromotionFields({ defaultRate: "0.1000", platformTemplateIds: [] })).toEqual([
-      "platformTemplateIds",
-      "landingUrl",
-      "inviteCode",
-      "jumpTemplateId"
-    ]);
+    expect(
+      incompletePromotionFields({
+        defaultRate: "0.1",
+        inviteCode: "ADA",
+        platforms: [{ templateId: "7", address: "" }],
+        jumpTemplateId: "7",
+        sheetUrl: "sheet",
+        review: true
+      })
+    ).toEqual(["platformAddress"]);
   });
 });

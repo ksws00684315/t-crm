@@ -13,7 +13,7 @@ const found = {
   kolCode: "KOL-ASD001",
   name: "Alice",
   maskedEmail: "a***@example.com",
-  displayStatus: "PENDING_REVIEW" as const
+  displayRelationStatus: "PENDING_PROMOTION" as const
 };
 
 function element(testId: string): DOMWrapper<Element> {
@@ -73,7 +73,7 @@ describe("claim creator dialog", () => {
     expect(text).toContain("KOL-ASD001");
     expect(text).toContain("Alice");
     expect(text).toContain("a***@example.com");
-    expect(text).toContain("待审核");
+    expect(text).toContain("待推广");
     expect(element("claim-confirm").exists()).toBe(true);
     wrapper.unmount();
   });

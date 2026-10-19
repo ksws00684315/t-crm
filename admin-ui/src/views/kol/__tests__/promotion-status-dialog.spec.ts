@@ -22,14 +22,21 @@ const kol: KolVO = {
   status: 1,
   remark: null,
   whatsapp: null,
+  phone: null,
   linkTemplateId: null,
   linkTemplateName: null,
   inviteCode: null,
   sheetUrl: null,
   registerSource: 2,
   accountStatus: 1,
-  displayStatus: "PENDING_PROMOTION",
-  promotionStatus: "PENDING_PROMOTION",
+  reviewStatus: "APPROVED",
+  relationStatus: "PENDING_PROMOTION",
+  displayRelationStatus: "PENDING_PROMOTION",
+  loginStatus: "NORMAL",
+  platforms: [],
+  jumpTemplateId: null,
+  configVersion: null,
+  inviteTime: "2026-10-05T01:02:03Z",
   createTime: "2026-10-05T01:02:03Z",
   updateTime: "2026-10-05T01:02:03Z"
 };
@@ -66,8 +73,8 @@ async function pickStatus(label: string) {
 describe("promotion status dialog", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
-    vi.mocked(promotionApi.updatePromotionStatus).mockReset();
-    vi.mocked(promotionApi.updatePromotionStatus).mockResolvedValue(null);
+    vi.mocked(promotionApi.updateRelationStatus).mockReset();
+    vi.mocked(promotionApi.updateRelationStatus).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -75,35 +82,35 @@ describe("promotion status dialog", () => {
     vi.restoreAllMocks();
   });
 
-  it("offers every stored status and requires a target", async () => {
+  it("offers only the three relationship statuses and requires a target", async () => {
     const wrapper = await openDialog();
     await element("status-target").find(".el-select__wrapper").trigger("click");
     await flushPromises();
     const options = [...document.body.querySelectorAll(".el-select-dropdown__item")].map(
       item => item.textContent
     );
-    expect(options).toEqual(["待推广", "推广中", "合作结束"]);
+    expect(options).toEqual(["待推广", "推广中", "无效"]);
 
     await element("status-submit").trigger("click");
     await flushPromises();
-    expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
+    expect(promotionApi.updateRelationStatus).not.toHaveBeenCalled();
     expect(element("status-error").text()).toContain("请选择目标状态");
     wrapper.unmount();
   });
 
-  it("switches the status after confirmation", async () => {
+  it("switches the relation status after confirmation", async () => {
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
     const wrapper = await openDialog();
-    await pickStatus("合作结束");
+    await pickStatus("无效");
     await element("status-submit").trigger("click");
     await flushPromises();
     expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining("改为「合作结束」"),
-      "修改达人状态",
+      expect.stringContaining("改为「无效」"),
+      "修改关系状态",
       expect.anything()
     );
-    expect(promotionApi.updatePromotionStatus).toHaveBeenCalledWith(kol.id, "ENDED");
+    expect(promotionApi.updateRelationStatus).toHaveBeenCalledWith(kol.id, "INVALID");
     expect(success).toHaveBeenCalledWith("状态已修改");
     expect(wrapper.emitted("changed")).toHaveLength(1);
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([false]);
@@ -116,18 +123,18 @@ describe("promotion status dialog", () => {
     await pickStatus("推广中");
     await element("status-submit").trigger("click");
     await flushPromises();
-    expect(promotionApi.updatePromotionStatus).not.toHaveBeenCalled();
+    expect(promotionApi.updateRelationStatus).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 
   it("lists the missing settings on 422 and jumps to them via the button", async () => {
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
-    vi.mocked(promotionApi.updatePromotionStatus).mockRejectedValue(
+    vi.mocked(promotionApi.updateRelationStatus).mockRejectedValue(
       new ApiError({
         status: 422,
         errorCode: "KOL_PROMOTION_CONFIG_INCOMPLETE",
         traceId: "t-2",
-        payload: { missingFields: ["defaultRate", "platformTemplateIds"] }
+        payload: ["defaultRate", "platformAddress"]
       })
     );
     const wrapper = await openDialog();
@@ -135,7 +142,7 @@ describe("promotion status dialog", () => {
     await element("status-submit").trigger("click");
     await flushPromises();
     expect(element("status-error").text()).toContain("佣金比例");
-    expect(element("status-error").text()).toContain("代购平台");
+    expect(element("status-error").text()).toContain("代购平台地址");
     await element("go-config").trigger("click");
     await flushPromises();
     expect(wrapper.emitted("openConfig")).toHaveLength(1);
@@ -145,7 +152,7 @@ describe("promotion status dialog", () => {
 
   it("still offers the settings button when the 422 payload is unreadable", async () => {
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
-    vi.mocked(promotionApi.updatePromotionStatus).mockRejectedValue(
+    vi.mocked(promotionApi.updateRelationStatus).mockRejectedValue(
       new ApiError({
         status: 422,
         errorCode: "KOL_PROMOTION_CONFIG_INCOMPLETE",

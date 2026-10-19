@@ -3,8 +3,7 @@ import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { createKol, editKol } from "@/api/kol/kol";
-import { updatePromotionStatus } from "@/api/kol/promotion";
+import { createKol, editKol, reviewKol } from "@/api/kol/kol";
 import { listLinkTemplates } from "@/api/link/template";
 import type { BdUserVO, KolVO, LinkTemplateVO } from "@/api/types";
 import {
@@ -19,6 +18,7 @@ import {
   validateWhatsapp,
   withPrimary
 } from "@/utils/kol-validation";
+import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import { percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
 import { rule, serverFieldErrors } from "@/utils/validation";
@@ -72,6 +72,7 @@ const form = reactive({
   percent: "",
   remark: "",
   whatsapp: "",
+  phone: "",
   linkTemplateId: null as string | null,
   inviteCode: "",
   sheetUrl: "",
@@ -85,6 +86,7 @@ const rules: FormRules = {
   percent: [rule(validatePercent)],
   remark: [rule(validateRemark)],
   whatsapp: [rule(validateWhatsapp)],
+  phone: [rule(validateWhatsapp)],
   inviteCode: [rule(validateInviteCode)],
   sheetUrl: [rule(validateSheetUrl)]
 };
@@ -113,6 +115,7 @@ watch(
     form.percent = rateToPercent(current?.defaultRate);
     form.remark = current?.remark ?? "";
     form.whatsapp = current?.whatsapp ?? "";
+    form.phone = current?.phone ?? "";
     form.linkTemplateId = current?.linkTemplateId ?? null;
     form.inviteCode = current?.inviteCode ?? "";
     form.sheetUrl = current?.sheetUrl ?? "";
@@ -203,7 +206,8 @@ async function persistProfile(): Promise<boolean> {
           primary: account.primary
         })),
         remark: form.remark.trim() || null,
-        whatsapp: form.whatsapp.trim() || null
+        whatsapp: form.whatsapp.trim() || null,
+        phone: form.phone.trim() || null
       });
     } else {
       await createKol({
@@ -220,6 +224,7 @@ async function persistProfile(): Promise<boolean> {
         defaultRate: percentToRate(form.percent),
         remark: form.remark.trim() || null,
         whatsapp: form.whatsapp.trim() || null,
+        phone: form.phone.trim() || null,
         linkTemplateId: form.linkTemplateId,
         inviteCode: form.inviteCode.trim() || null,
         sheetUrl: form.sheetUrl.trim() || null,
@@ -236,6 +241,7 @@ async function persistProfile(): Promise<boolean> {
       "defaultRate",
       "remark",
       "whatsapp",
+      "phone",
       "linkTemplateId",
       "inviteCode",
       "sheetUrl"
@@ -248,23 +254,34 @@ async function persistProfile(): Promise<boolean> {
   }
 }
 
-/** Two steps (task 25b §3.3): save the profile, then set the status to PENDING_PROMOTION. */
+/** Review and profile update are one operation on the contract endpoint. */
 async function approveReview() {
   const kol = props.kol;
   if (!kol) return;
-  if (!(await persistProfile())) {
-    ElMessage.error(t("kol.reviewSaveFailed"));
-    return;
-  }
+  serverErrors.value = {};
+  const valid = formRef.value ? await formRef.value.validate().catch(() => false) : false;
+  if (!checkSocialAccounts() || !valid) return;
   approving.value = true;
   try {
-    await updatePromotionStatus(kol.id, "PENDING_PROMOTION");
+    const primary = form.socialAccounts.find(account => account.primary);
+    await reviewKol(kol.id, {
+      name: form.name.trim(),
+      phone: form.phone.trim() || null,
+      whatsapp: form.whatsapp.trim() || null,
+      primaryPlatform: primary?.platform.trim() || null,
+      primaryHandle: primary?.handle.trim() || null,
+      country: form.country.trim() ? form.country.trim().toUpperCase() : null,
+      remark: form.remark.trim() || null
+    });
     ElMessage.success(t("kol.reviewApproved"));
     emit("saved");
     close();
   } catch (error) {
-    ElMessage.error(t("kol.reviewStatusFailed"));
-    notifyError(error);
+    if (error instanceof ApiError && error.errorCode === "KOL_REVIEW_ALREADY_DONE") {
+      ElMessage.info(t("kol.reviewAlreadyDone"));
+      emit("saved");
+      close();
+    } else notifyError(error);
   } finally {
     approving.value = false;
   }
@@ -343,6 +360,14 @@ async function approveReview() {
           data-test="whatsapp"
           maxlength="32"
           :placeholder="t('kol.whatsappPlaceholder')"
+        />
+      </el-form-item>
+      <el-form-item :label="t('kol.phone')" prop="phone" :error="serverErrors.phone">
+        <el-input
+          v-model="form.phone"
+          data-test="phone"
+          maxlength="32"
+          :placeholder="t('kol.phonePlaceholder')"
         />
       </el-form-item>
       <el-form-item
@@ -438,15 +463,19 @@ async function approveReview() {
     </el-form>
     <template #footer>
       <el-button @click="close">{{ t("common.cancel") }}</el-button>
-      <el-button type="primary" data-test="kol-save" :loading="saving" @click="submit">{{
-        t("common.save")
-      }}</el-button>
       <el-button
-        v-if="review"
+        v-if="!review"
+        type="primary"
+        data-test="kol-save"
+        :loading="saving"
+        @click="submit"
+        >{{ t("common.save") }}</el-button
+      >
+      <el-button
+        v-else
         type="success"
         data-test="review-approve"
         :loading="approving"
-        :disabled="saving"
         @click="approveReview"
         >{{ t("kol.approveReview") }}</el-button
       >

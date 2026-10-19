@@ -1,175 +1,117 @@
-/*
- * Promotion status display and change-record helpers (task 25, ADR-023 §2–§3). Pure functions so
- * the list, the config drawer and the status dialog share one set of rules.
- */
-
-import type { DisplayStatus, PromotionStatus } from "@/api/types";
+import type { DisplayRelationStatus, RelationStatus } from "@/api/types";
 import { formatRate } from "@/utils/rate";
 
-/** Every stored status, in the order pickers show them. */
-/** Statuses offered in the change-status dialog (task 28 §3.3: no PENDING_REVIEW). */
-export const PROMOTION_STATUS_OPTIONS: readonly PromotionStatus[] = [
+export const RELATION_STATUS_OPTIONS: readonly RelationStatus[] = [
   "PENDING_PROMOTION",
   "PROMOTING",
-  "ENDED"
+  "INVALID"
+];
+export const DISPLAY_RELATION_STATUSES: readonly DisplayRelationStatus[] = [
+  "PENDING_PROMOTION",
+  "PROMOTING",
+  "INVALID",
+  "PENDING_UPDATE"
 ];
 
-export const PROMOTION_STATUSES: readonly PromotionStatus[] = [
-  "PENDING_REVIEW",
-  ...PROMOTION_STATUS_OPTIONS
-];
-
-/** Stored statuses plus the computed "no active BD" state shown in lists. */
-export const DISPLAY_STATUSES: readonly DisplayStatus[] = [...PROMOTION_STATUSES, "PENDING_UPDATE"];
-
-/** Message-pack key of a shown status. */
-export function promotionStatusLabelKey(status: DisplayStatus): string {
-  return `kol.promotionStatusOption.${status}`;
+export function relationStatusLabelKey(status: DisplayRelationStatus): string {
+  return `kol.relationStatusOption.${status}`;
 }
 
-/** One distinct tag color per shown status (task 25b §3.2). */
-export function promotionTagType(
-  status: DisplayStatus
+export function relationTagType(
+  status: DisplayRelationStatus
 ): "success" | "primary" | "warning" | "info" | "danger" {
   switch (status) {
-    case "PENDING_REVIEW":
-      return "warning";
     case "PENDING_PROMOTION":
       return "primary";
     case "PROMOTING":
       return "success";
-    case "ENDED":
+    case "INVALID":
       return "info";
-    default:
+    case "PENDING_UPDATE":
       return "danger";
   }
 }
 
-/** Keys a promotion record may hold; unknown keys from a newer backend are still rendered. */
-const RECORD_FIELD_KEYS = [
-  "defaultRate",
-  "platformTemplateIds",
-  "landingUrl",
-  "inviteCode",
-  "sheetUrl",
-  "jumpTemplateId",
-  "status"
-] as const;
-
-/** One changed field of a record: raw values already rendered to display strings. */
 export interface PromotionFieldDiff {
   key: string;
   from: string;
   to: string;
 }
 
-function renderValue(key: string, value: unknown, platformName: (id: string) => string): string {
+const RECORD_FIELDS = [
+  "defaultRate",
+  "inviteCode",
+  "platforms",
+  "platformAddress",
+  "jumpTemplateId",
+  "sheetUrl",
+  "relationStatus",
+  "reviewStatus",
+  "name",
+  "phone",
+  "whatsapp",
+  "primaryPlatform",
+  "primaryHandle",
+  "country",
+  "remark"
+];
+
+function renderValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
   if (key === "defaultRate") return formatRate(typeof value === "string" ? value : null);
-  if (key === "platformTemplateIds" && Array.isArray(value)) {
-    const names = value.map(item => platformName(String(item)));
-    return names.length > 0 ? names.join("、") : "-";
-  }
+  if (Array.isArray(value))
+    return value
+      .map(item => {
+        if (!item || typeof item !== "object") return String(item);
+        const platform = item as { templateName?: string; address?: string };
+        return [platform.templateName, platform.address].filter(Boolean).join(" — ");
+      })
+      .join("、");
   return String(value);
 }
 
-function sameValue(key: string, before: unknown, after: unknown): boolean {
-  if (key === "platformTemplateIds") {
-    const left = Array.isArray(before) ? [...before].sort().join(",") : String(before ?? "");
-    const right = Array.isArray(after) ? [...after].sort().join(",") : String(after ?? "");
-    return left === right;
-  }
-  return String(before ?? "") === String(after ?? "");
-}
-
-/**
- * Field-by-field changes between the `before` and `after` snapshots of a record, in the fixed
- * field order. Status values stay as label keys so the caller can translate them per language.
- */
 export function promotionFieldDiffs(
   before: Record<string, unknown> | null,
-  after: Record<string, unknown> | null,
-  platformName: (id: string) => string = id => id
+  after: Record<string, unknown> | null
 ): PromotionFieldDiff[] {
-  const keys = new Set<string>([
-    ...RECORD_FIELD_KEYS,
-    ...Object.keys(before ?? {}).map(normalizeFieldKey),
-    ...Object.keys(after ?? {}).map(normalizeFieldKey)
-  ]);
-  const diffs: PromotionFieldDiff[] = [];
-  for (const key of keys) {
-    const from = snapshotValue(before, key);
-    const to = snapshotValue(after, key);
-    if (sameValue(key, from, to)) continue;
-    diffs.push({
-      key,
-      from: renderValue(key, from, platformName),
-      to: renderValue(key, to, platformName)
-    });
-  }
-  return diffs;
+  const keys = [
+    ...new Set([...RECORD_FIELDS, ...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
+  ];
+  return keys.flatMap(key => {
+    const from = before?.[key];
+    const to = after?.[key];
+    if (JSON.stringify(from ?? null) === JSON.stringify(to ?? null)) return [];
+    return [{ key, from: renderValue(key, from), to: renderValue(key, to) }];
+  });
 }
 
-/** The backend writes the live status as `promotionStatus`; both names mean the same field. */
-function normalizeFieldKey(key: string): string {
-  return key === "promotionStatus" ? "status" : key;
-}
-
-/** Reads the value of a normalized field, accepting the backend's own field name too. */
-function snapshotValue(snapshot: Record<string, unknown> | null, key: string): unknown {
-  if (!snapshot) return undefined;
-  if (key in snapshot) return snapshot[key];
-  const alias = key === "status" ? "promotionStatus" : null;
-  return alias && alias in snapshot ? snapshot[alias] : undefined;
-}
-
-/**
- * Field keys the backend listed in a 422 `KOL_PROMOTION_CONFIG_INCOMPLETE`. The contract does not
- * fix the payload shape, so several plausible ones are accepted; anything else yields an empty
- * list and the caller shows the plain message.
- */
 export function missingPromotionFields(payload: unknown): string[] {
-  const source: unknown[] = Array.isArray(payload)
+  const source = Array.isArray(payload)
     ? payload
-    : isStringArray((payload as { missingFields?: unknown })?.missingFields)
-      ? ((payload as { missingFields: string[] }).missingFields as unknown[])
-      : isStringArray((payload as { fields?: unknown })?.fields)
-        ? ((payload as { fields: string[] }).fields as unknown[])
-        : [];
-  const keys: string[] = [];
-  for (const item of source) {
-    if (typeof item === "string") keys.push(item);
-    else if (
-      item &&
-      typeof item === "object" &&
-      typeof (item as { field?: unknown }).field === "string"
-    )
-      keys.push((item as { field: string }).field);
-  }
-  return [...new Set(keys)];
+    : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)
+      ? (payload as { data: unknown[] }).data
+      : [];
+  return [...new Set(source.filter((field): field is string => typeof field === "string"))];
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every(item => typeof item === "string");
-}
-
-/** The four fields that must be set before a creator may promote (25a §4.2). */
 export interface PromotionCompletenessInput {
   defaultRate?: string | null;
-  platformTemplateIds?: string[] | null;
-  landingUrl?: string | null;
   inviteCode?: string | null;
+  platforms?: Array<{ templateId: string; address: string }>;
   jumpTemplateId?: string | null;
+  sheetUrl?: string | null;
+  review?: boolean;
 }
 
-/** Client mirror of the backend rule; the 422 answer stays the authority. */
 export function incompletePromotionFields(config: PromotionCompletenessInput): string[] {
   const missing: string[] = [];
   if (!config.defaultRate) missing.push("defaultRate");
-  if (!config.platformTemplateIds || config.platformTemplateIds.length === 0)
-    missing.push("platformTemplateIds");
-  if (!config.landingUrl) missing.push("landingUrl");
   if (!config.inviteCode) missing.push("inviteCode");
-  if (!config.jumpTemplateId) missing.push("jumpTemplateId");
+  if (!config.platforms?.length || config.platforms.some(platform => !platform.templateId))
+    missing.push("platforms");
+  if (config.platforms?.some(platform => !platform.address)) missing.push("platformAddress");
+  if (config.platforms?.length && !config.jumpTemplateId) missing.push("jumpTemplateId");
+  if (!config.sheetUrl) missing.push("sheetUrl");
+  if (config.review === false) missing.push("review");
   return missing;
 }

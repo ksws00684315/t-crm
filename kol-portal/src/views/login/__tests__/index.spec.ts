@@ -31,7 +31,7 @@ describe("login page", () => {
     expect(wrapper.text()).toContain("Sign in");
     expect(wrapper.text()).toContain("Forgot password?");
     expect(wrapper.find("input[type=email]").attributes("disabled")).toBeUndefined();
-    expect(wrapper.find('a[href="/register"]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/register"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("Create your account");
   });
 
@@ -45,7 +45,7 @@ describe("login page", () => {
     expect(wrapper.text()).toContain("登录");
     expect(wrapper.text()).toContain("忘记密码？");
     expect(wrapper.find("button[type=submit]").attributes("disabled")).toBeUndefined();
-    expect(wrapper.text()).not.toContain("注册");
+    expect(wrapper.text()).toContain("注册账号");
   });
 
   it("prefills the email from the query string", async () => {

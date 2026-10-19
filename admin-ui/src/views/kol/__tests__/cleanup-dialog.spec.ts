@@ -59,7 +59,7 @@ describe("cleanup config dialog", () => {
     const wrapper = await openDialog();
     expect(promotionApi.getCleanupConfig).toHaveBeenCalledTimes(1);
     const text = document.body.textContent ?? "";
-    expect(text).toContain("逻辑删除");
+    expect(text).toContain("逐条删除其微店专属商品");
     expect(text).toContain("订单与佣金历史保留");
     expect(element("cleanup-days").find("input").element).toBeDefined();
     wrapper.unmount();

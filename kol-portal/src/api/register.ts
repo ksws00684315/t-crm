@@ -2,7 +2,7 @@ import type { AuthSession } from "./auth";
 import { http } from "./http";
 
 export interface RegisterPreview {
-  tenantName: string;
+  bdUserName: string;
 }
 
 export interface RegisterBody {
@@ -10,11 +10,12 @@ export interface RegisterBody {
   email: string;
   emailCode: string;
   password: string;
-  whatsapp: string;
-  primaryPlatform: string;
-  primaryHandle: string;
+  phone: string | null;
+  whatsapp: string | null;
+  primaryPlatform: string | null;
+  primaryHandle: string | null;
   primaryUrl: string | null;
-  name: string | null;
+  name: string;
   country: string | null;
 }
 

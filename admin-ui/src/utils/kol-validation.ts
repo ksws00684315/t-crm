@@ -49,15 +49,6 @@ export function looksLikeKolCode(value: string): boolean {
   return /^KOL/i.test(value.trim());
 }
 
-/** Creator landing page: optional, https, at most 512 characters. */
-export function validateLandingUrl(value: string): string | null {
-  const text = value.trim();
-  if (!text) return null;
-  if (length(text) > 512 || !HTTPS_URL_PATTERN.test(text))
-    return translate("validation.landingUrl");
-  return null;
-}
-
 /** Optional. A non-blank value must be two letters; the backend also checks the ISO list. */
 export function validateCountry(value: string): string | null {
   if (blank(value)) return null;

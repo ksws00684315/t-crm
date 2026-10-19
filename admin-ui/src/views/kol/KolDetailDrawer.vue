@@ -14,7 +14,7 @@ import { kolAbilities } from "@/utils/permission";
 import CopyTokenCreateDialog from "@/views/product/copy-token/CopyTokenCreateDialog.vue";
 import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
 import { formatRate } from "@/utils/rate";
-import { promotionStatusLabelKey, promotionTagType } from "@/utils/promotion";
+import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
 
 defineOptions({ name: "KolDetailDrawer" });
 
@@ -40,7 +40,9 @@ const promoSheetButton = computed(() => {
 });
 
 /** Promotion settings stay editable after promoting (ADR-023 §3), so offer them here too. */
-const canEditConfig = computed(() => kolAbilities(me.user).canWrite);
+const canEditConfig = computed(
+  () => kolAbilities(me.user).canWrite && detail.value?.reviewStatus === "APPROVED"
+);
 
 const inviteVisible = computed(() => {
   const kol = detail.value;
@@ -147,6 +149,10 @@ const historyColumns = computed<DataColumn[]>(() => [
             <CopyText v-if="detail.whatsapp" :value="detail.whatsapp" />
             <span v-else>-</span>
           </el-descriptions-item>
+          <el-descriptions-item :label="t('kol.phone')">
+            <CopyText v-if="detail.phone" :value="detail.phone" />
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item :label="t('kol.agentPlatform')">
             {{ detail.linkTemplateName || "-" }}
           </el-descriptions-item>
@@ -170,15 +176,13 @@ const historyColumns = computed<DataColumn[]>(() => [
           <el-descriptions-item :label="t('kol.registerSource')">
             {{ sourceText(detail.registerSource) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.promotionStatus')">
+          <el-descriptions-item :label="t('kol.relationStatus')">
             <el-tag
-              v-if="detail.displayStatus"
-              :type="promotionTagType(detail.displayStatus)"
+              :type="relationTagType(detail.displayRelationStatus)"
               data-test="detail-display-status"
             >
-              {{ t(promotionStatusLabelKey(detail.displayStatus)) }}
+              {{ t(relationStatusLabelKey(detail.displayRelationStatus)) }}
             </el-tag>
-            <span v-else>-</span>
             <el-button
               v-if="canEditConfig"
               type="primary"
@@ -189,15 +193,12 @@ const historyColumns = computed<DataColumn[]>(() => [
               {{ t("promotion.configTitle") }}
             </el-button>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('promotion.landingUrl')">
-            <a
-              v-if="detail.landingUrl"
-              :href="detail.landingUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              >{{ detail.landingUrl }}</a
-            >
-            <span v-else>-</span>
+          <el-descriptions-item :label="t('promotion.platforms')">
+            <div v-for="platform in detail.platforms" :key="platform.templateId">
+              <a :href="platform.address" target="_blank" rel="noopener noreferrer"
+                >{{ platform.templateName }}: {{ platform.address }}</a
+              >
+            </div>
           </el-descriptions-item>
           <el-descriptions-item :label="t('kol.account')">
             <span data-test="account-status">{{ accountText(detail.accountStatus) }}</span>

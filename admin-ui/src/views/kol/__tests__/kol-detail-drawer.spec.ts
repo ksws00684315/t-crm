@@ -30,12 +30,21 @@ function detail(overrides: Partial<KolDetailVO> = {}): KolDetailVO {
     status: 1,
     remark: null,
     whatsapp: "+8613800000000",
+    phone: null,
     linkTemplateId: "7",
     linkTemplateName: "AgentOne",
     inviteCode: "ABC123",
     sheetUrl: sheet,
     registerSource: 1,
     accountStatus: 0,
+    reviewStatus: "APPROVED",
+    relationStatus: "PENDING_PROMOTION",
+    displayRelationStatus: "PENDING_PROMOTION",
+    loginStatus: "NORMAL",
+    platforms: [],
+    jumpTemplateId: null,
+    configVersion: null,
+    inviteTime: "2026-10-05T01:02:03Z",
     createTime: "2026-10-05T01:02:03Z",
     updateTime: "2026-10-05T01:02:03Z",
     bdHistory: [],
@@ -152,22 +161,24 @@ describe("KOL detail drawer", () => {
     conflict.unmount();
   });
 
-  it("shows the promotion status and the landing page (task 25b)", async () => {
+  it("shows the relation status and configured platform address", async () => {
     const wrapper = await open(
       detail({
-        displayStatus: "PENDING_UPDATE",
-        promotionStatus: "PROMOTING",
-        landingUrl: "https://brand.example/ada"
+        displayRelationStatus: "PENDING_UPDATE",
+        relationStatus: "PROMOTING",
+        platforms: [
+          { templateId: "7", templateName: "AgentOne", address: "https://shop.example/ada" }
+        ]
       })
     );
     const text = document.body.textContent ?? "";
     expect(wrapper.find('[data-test="detail-display-status"]').text()).toBe("待更新");
-    expect(text).toContain("https://brand.example/ada");
+    expect(text).toContain("https://shop.example/ada");
     wrapper.unmount();
   });
 
   it("offers the promotion settings from the detail drawer to editors (task 25b)", async () => {
-    const wrapper = await open(detail({ displayStatus: "PROMOTING" }));
+    const wrapper = await open(detail({ displayRelationStatus: "PROMOTING" }));
     const button = wrapper.find('[data-test="detail-edit-config"]');
     expect(button.exists()).toBe(true);
     await button.trigger("click");
