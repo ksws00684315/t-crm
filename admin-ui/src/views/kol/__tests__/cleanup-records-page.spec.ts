@@ -12,6 +12,7 @@ const failed: CleanupItemVO = {
   id: "9007199254740993",
   kolCode: "KOL-ASD001",
   shopId: "SHOP-01",
+  shopName: "独立站旗舰店",
   weidianItemId: "WD-123",
   status: "FAILED",
   trigger: "MANUAL",
@@ -54,7 +55,13 @@ describe("cleanup records page", () => {
       page: 1,
       size: 20
     });
-    for (const value of ["KOL-ASD001", "SHOP-01", "WD-123", "微店接口暂不可用", "客户要求移除"])
+    for (const value of [
+      "KOL-ASD001",
+      "独立站旗舰店",
+      "WD-123",
+      "微店接口暂不可用",
+      "客户要求移除"
+    ])
       expect(text).toContain(value);
     expect(wrapper.find('[data-test="cleanup-retry"]').exists()).toBe(true);
     wrapper.unmount();

@@ -115,6 +115,7 @@ export interface CleanupItemVO {
   id: string;
   kolCode: string;
   shopId: string;
+  shopName: string | null;
   weidianItemId: string;
   status: "PENDING" | "SUCCESS" | "FAILED";
   trigger: "AUTO" | "MANUAL";

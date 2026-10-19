@@ -136,7 +136,7 @@ onMounted(() => void load());
       @update:size="changeSize"
       @refresh="load"
     >
-      <template #cell-shop="{ row: item }">{{ row(item).shopId }}</template>
+      <template #cell-shop="{ row: item }">{{ row(item).shopName || row(item).shopId }}</template>
       <template #cell-item="{ row: item }">{{ row(item).weidianItemId }}</template>
       <template #cell-status="{ row: item }">
         <el-tag
