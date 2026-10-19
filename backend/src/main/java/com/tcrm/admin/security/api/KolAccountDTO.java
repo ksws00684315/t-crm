@@ -18,10 +18,11 @@ public record KolAccountDTO(
     Long tenantId,
     String tenantName,
     boolean tenantEnabled,
+    String phone,
     String whatsapp,
     String sheetUrl) {
 
-  /** Snapshot without the profile fields shown on GET /kol-api/me (whatsapp, sheetUrl). */
+  /** Snapshot without the profile fields shown on GET /kol-api/me (phone, whatsapp, sheetUrl). */
   public KolAccountDTO(
       Long id,
       String kolCode,
@@ -50,6 +51,7 @@ public record KolAccountDTO(
         tenantId,
         tenantName,
         tenantEnabled,
+        null,
         null,
         null);
   }
@@ -80,6 +82,7 @@ public record KolAccountDTO(
         tenantId,
         tenantName,
         tenantEnabled,
+        phone,
         whatsapp,
         sheetUrl);
   }

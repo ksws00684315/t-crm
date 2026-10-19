@@ -117,6 +117,7 @@ public class KolAccountStoreService implements KolAccountStore {
         kol.getTenantId(),
         tenant == null ? null : tenant.name(),
         tenant != null && tenant.enabled(),
+        kol.getPhone(),
         kol.getWhatsapp(),
         kol.getSheetUrl());
   }

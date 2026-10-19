@@ -47,6 +47,7 @@ class KolAuthControllerTest {
         2L,
         "Acme",
         true,
+        "+15550002222",
         "+15550001111",
         "https://docs.google.com/spreadsheets/d/abc");
   }
@@ -173,6 +174,7 @@ class KolAuthControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
         .andExpect(jsonPath("$.data.tenantName").value("Acme"))
+        .andExpect(jsonPath("$.data.phone").value("+15550002222"))
         .andExpect(jsonPath("$.data.whatsapp").value("+15550001111"))
         .andExpect(jsonPath("$.data.sheetUrl").value("https://docs.google.com/spreadsheets/d/abc"));
     mvc.perform(post("/kol-api/auth/logout").header(KolMvcSupport.TOKEN_HEADER, token))
