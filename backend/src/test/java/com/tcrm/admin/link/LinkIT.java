@@ -938,14 +938,28 @@ class LinkIT {
    */
   private void editKol(String kolCode, Long templateId, String inviteCode) throws Exception {
     long kolId = id("SELECT id FROM crm_kol WHERE kol_code = ?", kolCode);
+    mvc.perform(
+            post("/admin-api/kol/kols/" + kolId + "/review")
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"LinkIT\"}"))
+        .andExpect(
+            result -> {
+              int s = result.getResponse().getStatus();
+              if (s != 200 && s != 409) {
+                throw new AssertionError("review failed: " + s);
+              }
+            });
     StringBuilder body = new StringBuilder();
     body.append(
-        "{\"defaultRate\":null,\"landingUrl\":\"https://landing.example/\",\"sheetUrl\":null,\"remark\":null");
+        "{\"defaultRate\":\"0.1000\",\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/1/edit\",\"remark\":null");
     if (templateId != null) {
-      body.append(",\"platformTemplateIds\":[").append(templateId).append("]");
+      body.append(",\"platforms\":[{\"templateId\":\"")
+          .append(templateId)
+          .append("\",\"address\":\"https://landing.example/\"}]");
       body.append(",\"jumpTemplateId\":").append(templateId);
     } else {
-      body.append(",\"platformTemplateIds\":[]");
+      body.append(",\"platforms\":[]");
       body.append(",\"jumpTemplateId\":null");
     }
     if (inviteCode != null) {

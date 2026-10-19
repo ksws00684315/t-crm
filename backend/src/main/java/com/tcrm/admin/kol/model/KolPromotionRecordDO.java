@@ -26,6 +26,12 @@ public class KolPromotionRecordDO {
 
   private String remark;
 
+  /** Config version; only for CONFIG rows. */
+  private Integer versionNo;
+
+  /** Effective time of the config version; only for CONFIG rows. */
+  private Instant effectiveTime;
+
   @TableField(fill = FieldFill.INSERT)
   private Long createBy;
 
@@ -102,5 +108,21 @@ public class KolPromotionRecordDO {
 
   public void setCreateTime(Instant value) {
     this.createTime = value;
+  }
+
+  public Integer getVersionNo() {
+    return versionNo;
+  }
+
+  public void setVersionNo(Integer value) {
+    this.versionNo = value;
+  }
+
+  public Instant getEffectiveTime() {
+    return effectiveTime;
+  }
+
+  public void setEffectiveTime(Instant value) {
+    this.effectiveTime = value;
   }
 }

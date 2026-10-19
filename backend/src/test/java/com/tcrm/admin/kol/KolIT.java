@@ -743,10 +743,10 @@ class KolIT {
                     .getContentAsString())
             .at("/data/id")
             .asText();
-    // New KOLs start PENDING_REVIEW; unbound shows as PENDING_UPDATE.
+    // New KOLs start PENDING review + PENDING_PROMOTION relation; unbound shows PENDING_UPDATE.
     mvc.perform(
             get("/admin-api/kol/kols")
-                .param("displayStatus", "PENDING_UPDATE")
+                .param("relationStatus", "PENDING_UPDATE")
                 .param("keyword", "free-filter@example.com")
                 .header(TOKEN, admin))
         .andExpect(status().isOk())
@@ -754,7 +754,7 @@ class KolIT {
         .andExpect(jsonPath("$.data.items[0].id").value(unbound));
     mvc.perform(
             get("/admin-api/kol/kols")
-                .param("displayStatus", "PENDING_REVIEW")
+                .param("reviewStatus", "PENDING")
                 .param("keyword", "bound-filter@example.com")
                 .header(TOKEN, admin))
         .andExpect(status().isOk())
@@ -762,7 +762,7 @@ class KolIT {
         .andExpect(jsonPath("$.data.items[0].id").value(withBd));
     mvc.perform(
             get("/admin-api/kol/kols")
-                .param("displayStatus", "PENDING_REVIEW")
+                .param("relationStatus", "PENDING_PROMOTION")
                 .param("keyword", "free-filter@example.com")
                 .header(TOKEN, admin))
         .andExpect(status().isOk())

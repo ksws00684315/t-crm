@@ -53,12 +53,18 @@ public class KolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String sheetUrl;
 
-  /** Promotion workflow status (ADR-023); default PENDING_REVIEW for new rows. */
-  private String promotionStatus;
+  /** Review status (ADR-025); default PENDING for new rows. */
+  private String reviewStatus;
 
-  /** Dedicated landing page URL; nullable and clearable. */
+  /** Relation status (ADR-025); default PENDING_PROMOTION for new rows. */
+  private String relationStatus;
+
+  /** Phone, E.164; nullable and clearable. */
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private String landingUrl;
+  private String phone;
+
+  /** Current promotion config version; null until first config save. */
+  private Integer configVersion;
 
   /** 1 entered in admin, 2 self-registered; fixed after creation. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
@@ -187,20 +193,36 @@ public class KolDO extends BaseEntity {
     this.sheetUrl = value;
   }
 
-  public String getPromotionStatus() {
-    return promotionStatus;
+  public String getReviewStatus() {
+    return reviewStatus;
   }
 
-  public void setPromotionStatus(String value) {
-    this.promotionStatus = value;
+  public void setReviewStatus(String value) {
+    this.reviewStatus = value;
   }
 
-  public String getLandingUrl() {
-    return landingUrl;
+  public String getRelationStatus() {
+    return relationStatus;
   }
 
-  public void setLandingUrl(String value) {
-    this.landingUrl = value;
+  public void setRelationStatus(String value) {
+    this.relationStatus = value;
+  }
+
+  public String getPhone() {
+    return phone;
+  }
+
+  public void setPhone(String value) {
+    this.phone = value;
+  }
+
+  public Integer getConfigVersion() {
+    return configVersion;
+  }
+
+  public void setConfigVersion(Integer value) {
+    this.configVersion = value;
   }
 
   public Integer getRegisterSource() {

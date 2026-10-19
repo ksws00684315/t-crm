@@ -165,9 +165,9 @@ class KolRegisterIT {
   void shouldIssueOnceAndRotate() throws Exception {
     String token = bd().token();
     JsonNode first = link(token);
-    assertThat(first.path("code").asText()).matches("[0-9A-Za-z]{32}");
+    assertThat(first.path("code").asText()).matches("[2-9A-HJ-NP-Z]{8}");
     assertThat(first.path("url").asText())
-        .isEqualTo("https://kol.example.com/register?c=" + first.path("code").asText());
+        .isEqualTo("https://kol.example.com/register?code=" + first.path("code").asText());
     assertThat(first.path("status").asInt()).isEqualTo(1);
     assertThat(link(token).path("code").asText()).isEqualTo(first.path("code").asText());
 
@@ -189,7 +189,8 @@ class KolRegisterIT {
     rejected(first.path("code").asText());
     mvc.perform(get("/kol-api/register/" + rotated))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.tenantName").value("默认公司"));
+        .andExpect(jsonPath("$.data.bdUserName").isString())
+        .andExpect(jsonPath("$.data.tenantName").isString());
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_oper_log WHERE module = 'KOL' AND action IN"
@@ -428,14 +429,14 @@ class KolRegisterIT {
   }
 
   @Test
-  void shouldStoreTheHandleWhenTheNameIsBlank() throws Exception {
+  void shouldRejectBlankName_whenRegistering() throws Exception {
     String code = link(bd().token()).path("code").asText();
     String email = "noname@example.com";
-    register(code, email, sendCode(code, email), "plain_handle", null, "   ");
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT name FROM crm_kol WHERE lower(email) = ?", String.class, email))
-        .isEqualTo("plain_handle");
+    mvc.perform(
+            post("/kol-api/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(code, email, sendCode(code, email), "plain_handle", null, "   ")))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -534,7 +535,7 @@ class KolRegisterIT {
 
   @Test
   void shouldLimitByIpAndByEmail() throws Exception {
-    String missing = "E".repeat(32);
+    String missing = "E2F3G4H5";
     for (int i = 0; i < 20; i++) {
       mvc.perform(
               post("/kol-api/register/email-codes")

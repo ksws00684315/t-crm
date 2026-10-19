@@ -181,6 +181,7 @@ class SystemIT {
             "crm_kol_bd_history:NO",
             "crm_kol_bd_transfer:NO",
             "crm_kol_cleanup_config:NO",
+            "crm_kol_cleanup_item:NO",
             "crm_kol_copy_token:NO",
             "crm_kol_item:NO",
             "crm_kol_platform:NO",

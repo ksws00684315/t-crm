@@ -10,9 +10,18 @@ public record PromotionRecordVO(
     Map<String, Object> after,
     String remark,
     String operatorName,
-    Instant createTime) {
+    Instant createTime,
+    Integer versionNo,
+    Instant effectiveTime) {
   static PromotionRecordVO from(KolPromotionService.PromotionRecordDTO d) {
     return new PromotionRecordVO(
-        d.changeType(), d.before(), d.after(), d.remark(), d.operatorName(), d.createTime());
+        d.changeType(),
+        d.before(),
+        d.after(),
+        d.remark(),
+        d.operatorName(),
+        d.createTime(),
+        d.versionNo(),
+        d.effectiveTime());
   }
 }

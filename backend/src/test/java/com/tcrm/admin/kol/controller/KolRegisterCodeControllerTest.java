@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 
 class KolRegisterCodeControllerTest {
-  private static final String CODE = "C".repeat(32);
+  private static final String CODE = "C2D3E4F5";
 
   private final KolRegisterCodeService codes = mock(KolRegisterCodeService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
@@ -30,11 +30,12 @@ class KolRegisterCodeControllerTest {
   void shouldReturnTheLink_forABd() throws Exception {
     String token = AdminMvcSupport.actAs(current, 8L, Role.STAFF, DataScope.OWN);
     when(codes.current())
-        .thenReturn(new KolRegisterCodeDTO(CODE, "https://kol.example.com/register?c=" + CODE, 1));
+        .thenReturn(
+            new KolRegisterCodeDTO(CODE, "https://kol.example.com/register?code=" + CODE, 1));
     mvc.perform(get("/admin-api/kol/register-code").header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.code").value(CODE))
-        .andExpect(jsonPath("$.data.url").value("https://kol.example.com/register?c=" + CODE))
+        .andExpect(jsonPath("$.data.url").value("https://kol.example.com/register?code=" + CODE))
         .andExpect(jsonPath("$.data.status").value(1));
   }
 
@@ -42,7 +43,8 @@ class KolRegisterCodeControllerTest {
   void shouldRotate_forABd() throws Exception {
     String token = AdminMvcSupport.actAs(current, 8L, Role.STAFF, DataScope.OWN);
     when(codes.rotate())
-        .thenReturn(new KolRegisterCodeDTO(CODE, "https://kol.example.com/register?c=" + CODE, 1));
+        .thenReturn(
+            new KolRegisterCodeDTO(CODE, "https://kol.example.com/register?code=" + CODE, 1));
     mvc.perform(post("/admin-api/kol/register-code").header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value(1));

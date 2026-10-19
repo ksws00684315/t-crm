@@ -11,7 +11,9 @@ import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPlatformDO;
 import com.tcrm.admin.kol.model.KolPromotionRecordDO;
 import com.tcrm.admin.kol.model.PromotionChangeType;
-import com.tcrm.admin.kol.model.PromotionStatus;
+import com.tcrm.admin.kol.model.RelationStatus;
+import com.tcrm.admin.kol.model.ReviewStatus;
+import com.tcrm.admin.kol.service.KolPromotionSupport.PlatformRef;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.AuditSanitizer;
@@ -39,11 +41,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Promotion status, config, and append-only records (task 25a / ADR-023). */
+/** Review, relation status, promotion config and versioned records (task 29 / ADR-025). */
 @Service
 public class KolPromotionService {
   private static final JsonMapper JSON = JsonMapper.builder().build();
-  private static final int MAX_LANDING = 512;
+  private static final int MAX_ADDRESS = 512;
   private static final int MAX_REMARK = 500;
 
   private final KolMapper kols;
@@ -82,8 +84,7 @@ public class KolPromotionService {
 
   public PromotionConfigDTO getConfig(Long id) {
     KolDO kol = requireVisible(id, current.user());
-    List<Long> platformIds = platformIds(id);
-    return toConfig(kol, platformIds);
+    return toConfig(kol, platformRefs(id));
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -92,62 +93,96 @@ public class KolPromotionService {
     tx.executeWithoutResult(
         status -> {
           KolDO kol = requireVisible(id, user);
-          List<Long> beforePlatforms = platformIds(id);
+          if (!ReviewStatus.APPROVED.name().equals(kol.getReviewStatus())) {
+            throw new BusinessException(ErrorCode.KOL_REVIEW_REQUIRED);
+          }
+          List<PlatformRef> beforePlatforms = platformRefs(id);
           Map<String, Object> before = KolPromotionSupport.snapshot(kol, beforePlatforms);
           String beforeInvite = kol.getInviteCode();
           Long beforeJump = kol.getLinkTemplateId();
-          applyConfig(kol, command, user.id());
-          List<Long> afterPlatforms = platformIds(id);
+          Instant now = Instant.now();
+          int nextVersion = (kol.getConfigVersion() == null ? 0 : kol.getConfigVersion()) + 1;
+          applyConfig(kol, command, user.id(), nextVersion, now);
+          List<PlatformRef> afterPlatforms = platformRefs(id);
           KolDO after = kols.selectById(id);
           Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, afterPlatforms);
-          insertRecord(
-              id,
-              PromotionChangeType.CONFIG,
-              before,
-              afterSnap,
-              blankToNull(command.remark()),
-              user.id());
+          insertConfigRecord(
+              id, before, afterSnap, blankToNull(command.remark()), user.id(), nextVersion, now);
           boolean targetChanged =
               !Objects.equals(beforeInvite, after.getInviteCode())
                   || !Objects.equals(beforeJump, after.getLinkTemplateId());
           if (targetChanged) {
             TransactionalEvents.publish(events, new KolLinkTargetChangedEvent(id));
           }
-          recordAudit("Save promotion config", Map.of("kolId", id));
+          recordAudit("Save promotion config", Map.of("kolId", id, "version", nextVersion));
         });
   }
 
   @Transactional(rollbackFor = Exception.class)
-  public void updateStatus(Long id, PromotionStatus status) {
+  public void updateRelationStatus(Long id, RelationStatus status) {
     AccountDTO user = current.user();
     tx.executeWithoutResult(
         txStatus -> {
           KolDO kol = requireVisible(id, user);
-          if (status == PromotionStatus.PENDING_REVIEW
-              && !PromotionStatus.PENDING_REVIEW.name().equals(kol.getPromotionStatus())) {
-            throw new BusinessException(ErrorCode.KOL_REVIEW_ALREADY_DONE);
-          }
-          List<Long> platformIds = platformIds(id);
-          if (status == PromotionStatus.PROMOTING) {
-            List<String> missing = KolPromotionSupport.missingConfigFields(kol, platformIds);
+          List<PlatformRef> platformRefs = platformRefs(id);
+          if (status == RelationStatus.PROMOTING) {
+            List<String> missing = KolPromotionSupport.missingConfigFields(kol, platformRefs);
             if (!missing.isEmpty()) {
               throw new BusinessException(ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE, missing);
             }
           }
-          Map<String, Object> before = KolPromotionSupport.snapshot(kol, platformIds);
+          Map<String, Object> before = KolPromotionSupport.snapshot(kol, platformRefs);
           Instant now = Instant.now();
           int updated =
               kols.update(
                   null,
                   scoped(id, user)
-                      .set(KolDO::getPromotionStatus, status.name())
+                      .set(KolDO::getRelationStatus, status.name())
                       .set(KolDO::getUpdateBy, user.id())
                       .set(KolDO::getUpdateTime, now));
           requireUpdated(updated, user);
           KolDO after = kols.selectById(id);
-          Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, platformIds);
+          Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, platformRefs);
           insertRecord(id, PromotionChangeType.STATUS, before, afterSnap, null, user.id());
-          recordAudit("Change promotion status", Map.of("kolId", id, "status", status.name()));
+          recordAudit("Change relation status", Map.of("kolId", id, "status", status.name()));
+        });
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public void review(Long id, ReviewCommand command) {
+    AccountDTO user = current.user();
+    tx.executeWithoutResult(
+        txStatus -> {
+          KolDO kol = requireVisible(id, user);
+          if (!ReviewStatus.PENDING.name().equals(kol.getReviewStatus())) {
+            throw new BusinessException(ErrorCode.KOL_REVIEW_ALREADY_DONE);
+          }
+          Map<String, Object> before = KolPromotionSupport.profileSnapshot(kol);
+          String social =
+              SocialAccountsJson.write(
+                  primarySocial(command.primaryPlatform(), command.primaryHandle(), kol));
+          Instant now = Instant.now();
+          int updated =
+              kols.update(
+                  null,
+                  scoped(id, user)
+                      .set(KolDO::getName, command.name().strip())
+                      .set(KolDO::getPhone, blankToNull(command.phone()))
+                      .set(KolDO::getWhatsapp, blankToNull(command.whatsapp()))
+                      .set(KolDO::getCountry, country(command.country()))
+                      .set(KolDO::getRemark, blankToNull(command.remark()))
+                      .set(
+                          KolDO::getSocialAccounts,
+                          social,
+                          "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
+                      .set(KolDO::getReviewStatus, ReviewStatus.APPROVED.name())
+                      .set(KolDO::getUpdateBy, user.id())
+                      .set(KolDO::getUpdateTime, now));
+          requireUpdated(updated, user);
+          KolDO after = kols.selectById(id);
+          Map<String, Object> afterSnap = KolPromotionSupport.profileSnapshot(after);
+          insertRecord(id, PromotionChangeType.REVIEW, before, afterSnap, null, user.id());
+          recordAudit("Review KOL", Map.of("kolId", id));
         });
   }
 
@@ -179,16 +214,18 @@ public class KolPromotionService {
                         parseJson(r.getAfterJson()),
                         r.getRemark(),
                         r.getCreateBy() == null ? null : names.get(r.getCreateBy()),
-                        r.getCreateTime()))
+                        r.getCreateTime(),
+                        r.getVersionNo(),
+                        r.getEffectiveTime()))
             .toList(),
         result.getTotal(),
         page,
         size);
   }
 
-  private void applyConfig(KolDO kol, PromotionConfigCommand command, Long actorId) {
+  private void applyConfig(
+      KolDO kol, PromotionConfigCommand command, Long actorId, int version, Instant now) {
     BigDecimal rate = parseRate(command.defaultRate());
-    String landing = requireHttps(command.landingUrl());
     String invite = blankToNull(command.inviteCode());
     if (invite != null && !invite.matches(KolRules.INVITE_CODE_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -197,29 +234,27 @@ public class KolPromotionService {
     if (sheet != null && !sheet.matches(KolRules.SHEET_URL_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    List<Long> templateIds = normalizeTemplateIds(command.platformTemplateIds());
-    Long jumpId = resolveJumpTemplateId(command.jumpTemplateId(), templateIds);
-    Instant now = Instant.now();
+    List<PlatformInput> platformInputs = normalizePlatforms(command.platforms());
+    Long jumpId =
+        resolveJumpTemplateId(
+            command.jumpTemplateId(),
+            platformInputs.stream().map(PlatformInput::templateId).toList());
     AccountDTO user = current.user();
     int updated =
         kols.update(
             null,
             scoped(kol.getId(), user)
                 .set(KolDO::getDefaultRate, rate)
-                .set(KolDO::getLandingUrl, landing)
                 .set(KolDO::getInviteCode, invite)
                 .set(KolDO::getSheetUrl, sheet)
                 .set(KolDO::getLinkTemplateId, jumpId)
+                .set(KolDO::getConfigVersion, version)
                 .set(KolDO::getUpdateBy, actorId)
                 .set(KolDO::getUpdateTime, now));
     requireUpdated(updated, user);
-    replacePlatforms(kol.getId(), templateIds, actorId);
+    replacePlatforms(kol.getId(), platformInputs, actorId);
   }
 
-  /**
-   * Jump platform must be one of the selected platforms. A single selection auto-picks it; multiple
-   * platforms without an explicit jump return a validation error (task 28 §3.2).
-   */
   private Long resolveJumpTemplateId(Long requested, List<Long> templateIds) {
     if (templateIds.isEmpty()) {
       return null;
@@ -240,50 +275,77 @@ public class KolPromotionService {
     return requested;
   }
 
-  private List<Long> normalizeTemplateIds(List<Long> raw) {
+  private List<PlatformInput> normalizePlatforms(List<PlatformInput> raw) {
     if (raw == null || raw.isEmpty()) {
       return List.of();
     }
     Set<Long> seen = new HashSet<>();
-    List<Long> out = new ArrayList<>();
-    for (Long id : raw) {
-      if (id == null || id <= 0 || !seen.add(id)) {
+    List<PlatformInput> out = new ArrayList<>();
+    for (PlatformInput p : raw) {
+      if (p == null || p.templateId() == null || p.templateId() <= 0 || !seen.add(p.templateId())) {
         continue;
       }
-      templates.usableTemplate(id);
-      out.add(id);
+      templates.usableTemplate(p.templateId());
+      String address = requireHttps(p.address());
+      out.add(new PlatformInput(p.templateId(), address));
     }
-    out.sort(Long::compareTo);
+    out.sort((a, b) -> Long.compare(a.templateId(), b.templateId()));
     return out;
   }
 
-  private void replacePlatforms(Long kolId, List<Long> templateIds, Long actorId) {
+  private void replacePlatforms(Long kolId, List<PlatformInput> platformInputs, Long actorId) {
     List<KolPlatformDO> existing =
         platforms.selectList(
             new LambdaQueryWrapper<KolPlatformDO>().eq(KolPlatformDO::getKolId, kolId));
-    Set<Long> keep = new HashSet<>(templateIds);
+    Set<Long> keep =
+        platformInputs.stream().map(PlatformInput::templateId).collect(Collectors.toSet());
     for (KolPlatformDO row : existing) {
       if (!keep.contains(row.getLinkTemplateId())) {
         platforms.deleteById(row.getId());
       }
     }
-    Set<Long> have =
+    Map<Long, KolPlatformDO> byTemplate =
         existing.stream()
             .filter(r -> keep.contains(r.getLinkTemplateId()))
-            .map(KolPlatformDO::getLinkTemplateId)
-            .collect(Collectors.toSet());
-    for (Long templateId : templateIds) {
-      if (have.contains(templateId)) {
-        continue;
+            .collect(Collectors.toMap(KolPlatformDO::getLinkTemplateId, r -> r, (a, b) -> a));
+    for (PlatformInput input : platformInputs) {
+      KolPlatformDO row = byTemplate.get(input.templateId());
+      if (row == null) {
+        row = new KolPlatformDO();
+        row.setKolId(kolId);
+        row.setLinkTemplateId(input.templateId());
+        row.setAddress(input.address());
+        row.setCreateBy(actorId);
+        row.setUpdateBy(actorId);
+        row.setDeleted(false);
+        platforms.insert(row);
+      } else {
+        row.setAddress(input.address());
+        row.setUpdateBy(actorId);
+        row.setUpdateTime(Instant.now());
+        platforms.updateById(row);
       }
-      KolPlatformDO row = new KolPlatformDO();
-      row.setKolId(kolId);
-      row.setLinkTemplateId(templateId);
-      row.setCreateBy(actorId);
-      row.setUpdateBy(actorId);
-      row.setDeleted(false);
-      platforms.insert(row);
     }
+  }
+
+  private void insertConfigRecord(
+      Long kolId,
+      Map<String, Object> before,
+      Map<String, Object> after,
+      String remark,
+      Long actorId,
+      int version,
+      Instant effectiveTime) {
+    KolPromotionRecordDO row = new KolPromotionRecordDO();
+    row.setKolId(kolId);
+    row.setChangeType(PromotionChangeType.CONFIG.name());
+    row.setBeforeJson(writeJson(before));
+    row.setAfterJson(writeJson(after));
+    row.setRemark(remark);
+    row.setVersionNo(version);
+    row.setEffectiveTime(effectiveTime);
+    row.setCreateBy(actorId);
+    records.insert(row);
   }
 
   private void insertRecord(
@@ -303,24 +365,44 @@ public class KolPromotionService {
     records.insert(row);
   }
 
-  private List<Long> platformIds(Long kolId) {
+  private List<PlatformRef> platformRefs(Long kolId) {
     return platforms
         .selectList(new LambdaQueryWrapper<KolPlatformDO>().eq(KolPlatformDO::getKolId, kolId))
         .stream()
-        .map(KolPlatformDO::getLinkTemplateId)
-        .sorted()
+        .map(r -> new PlatformRef(r.getLinkTemplateId(), r.getAddress()))
+        .sorted((a, b) -> Long.compare(a.templateId(), b.templateId()))
         .toList();
   }
 
-  private static PromotionConfigDTO toConfig(KolDO kol, List<Long> platformIds) {
+  private static PromotionConfigDTO toConfig(KolDO kol, List<PlatformRef> platformRefs) {
     return new PromotionConfigDTO(
         KolRules.rateText(kol.getDefaultRate()),
-        platformIds,
-        kol.getLandingUrl(),
+        platformRefs.stream().map(p -> new PlatformInput(p.templateId(), p.address())).toList(),
         kol.getInviteCode(),
         kol.getSheetUrl(),
         kol.getLinkTemplateId(),
         null);
+  }
+
+  private List<SocialAccountDTO> primarySocial(String platform, String handle, KolDO existing) {
+    List<SocialAccountDTO> current = SocialAccountsJson.read(existing.getSocialAccounts());
+    if (platform == null || platform.isBlank()) {
+      if (handle != null && !handle.isBlank()) {
+        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+      }
+      return current;
+    }
+    if (handle == null || handle.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    List<SocialAccountDTO> out = new ArrayList<>();
+    out.add(new SocialAccountDTO(platform, handle.strip(), null, null, true));
+    for (SocialAccountDTO a : current) {
+      if (!a.primary()) {
+        out.add(a);
+      }
+    }
+    return out;
   }
 
   private KolDO requireVisible(Long id, AccountDTO user) {
@@ -382,7 +464,7 @@ public class KolPromotionService {
     if (value == null) {
       return null;
     }
-    if (KolRules.length(value) > MAX_LANDING || !value.matches(KolRules.HTTPS_URL_PATTERN)) {
+    if (KolRules.length(value) > MAX_ADDRESS || !value.matches(KolRules.HTTPS_URL_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return value;
@@ -416,10 +498,17 @@ public class KolPromotionService {
     return value == null || value.isBlank() ? null : value.strip();
   }
 
+  private static String country(String value) {
+    return value == null || value.isBlank()
+        ? null
+        : value.strip().toUpperCase(java.util.Locale.ROOT);
+  }
+
+  public record PlatformInput(Long templateId, String address) {}
+
   public record PromotionConfigCommand(
       String defaultRate,
-      List<Long> platformTemplateIds,
-      String landingUrl,
+      List<PlatformInput> platforms,
       String inviteCode,
       String sheetUrl,
       Long jumpTemplateId,
@@ -427,8 +516,7 @@ public class KolPromotionService {
 
   public record PromotionConfigDTO(
       String defaultRate,
-      List<Long> platformTemplateIds,
-      String landingUrl,
+      List<PlatformInput> platforms,
       String inviteCode,
       String sheetUrl,
       Long jumpTemplateId,
@@ -440,5 +528,16 @@ public class KolPromotionService {
       Map<String, Object> after,
       String remark,
       String operatorName,
-      Instant createTime) {}
+      Instant createTime,
+      Integer versionNo,
+      Instant effectiveTime) {}
+
+  public record ReviewCommand(
+      String name,
+      String phone,
+      String whatsapp,
+      String primaryPlatform,
+      String primaryHandle,
+      String country,
+      String remark) {}
 }

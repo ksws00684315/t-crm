@@ -67,6 +67,7 @@ class KolControllerTest {
         "KOL-AAA001",
         "Alice",
         "alice@example.com",
+        "+8613800138000",
         "US",
         List.of(new SocialAccountDTO("TikTok", "@a", null, 9007199254740993L, false)),
         5L,
@@ -79,10 +80,13 @@ class KolControllerTest {
         "kakobuy",
         "aff-01",
         "https://docs.google.com/spreadsheets/d/1/edit",
+        "APPROVED",
         "PROMOTING",
         "PROMOTING",
-        "https://landing.example/alice",
-        List.of(77L),
+        "NORMAL",
+        List.of(new KolDTO.PlatformDTO(77L, "kakobuy", "https://landing.example/alice")),
+        1,
+        Instant.parse("2026-10-05T00:00:00Z"),
         1,
         0,
         Instant.parse("2026-10-05T00:00:00Z"),
@@ -124,10 +128,10 @@ class KolControllerTest {
                 .param("country", "us")
                 .param("status", "1")
                 .param("bdUserId", "5")
-                .param("displayStatus", "PENDING_UPDATE")
+                .param("relationStatus", "PENDING_UPDATE")
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isOk());
-    verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, "PENDING_UPDATE", 1, 20));
+    verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, null, "PENDING_UPDATE", null, 1, 20));
   }
 
   @ParameterizedTest
@@ -137,7 +141,7 @@ class KolControllerTest {
     "status, 2",
     "country, USA",
     "bdUserId, 0",
-    "displayStatus, FOO"
+    "relationStatus, FOO"
   })
   void shouldReturn400_whenListParameterIsInvalid(String name, String value) throws Exception {
     mvc.perform(
@@ -191,8 +195,8 @@ class KolControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL-AAA001"))
         .andExpect(jsonPath("$.data.whatsapp").value("+12345678"))
-        .andExpect(jsonPath("$.data.linkTemplateId").value("77"))
-        .andExpect(jsonPath("$.data.linkTemplateName").value("kakobuy"))
+        .andExpect(jsonPath("$.data.jumpTemplateId").value("77"))
+        .andExpect(jsonPath("$.data.jumpTemplateName").value("kakobuy"))
         .andExpect(jsonPath("$.data.inviteCode").value("aff-01"))
         .andExpect(jsonPath("$.data.registerSource").value(1))
         .andExpect(jsonPath("$.data.accountStatus").value(0));
@@ -344,7 +348,7 @@ class KolControllerTest {
                     "{\"name\":\"A\",\"country\":\"gb\",\"socialAccounts\":[],\"remark\":null,\"whatsapp\":null}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
-    verify(kols).update(11L, new EditKolCommand("A", "gb", List.of(), null, null));
+    verify(kols).update(11L, new EditKolCommand("A", null, "gb", List.of(), null, null));
     mvc.perform(
             json(put(BASE + "/11/status"), "{\"status\":0}")
                 .header(AdminMvcSupport.TOKEN_HEADER, token))

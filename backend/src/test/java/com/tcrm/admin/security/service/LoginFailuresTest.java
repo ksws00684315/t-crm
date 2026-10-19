@@ -15,8 +15,10 @@ import static org.mockito.Mockito.when;
 import com.tcrm.admin.shared.BusinessException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
@@ -168,5 +170,14 @@ class LoginFailuresTest {
   @Test
   void shouldKeepAuthenticationAvailable_whenRedisScriptReturnsNoCount() {
     assertThatCode(() -> failures.fail("operator", "198.51.100.8")).doesNotThrowAnyException();
+  }
+
+  @Test
+  void shouldBatchExists_whenFindingLockedUsernames() {
+    when(redis.executePipelined(any(RedisCallback.class))).thenReturn(List.of(true, false, true));
+    Set<String> locked = failures.findLockedUsernames(List.of("a@x.com", "b@x.com", "c@x.com"));
+    assertThat(locked).containsExactlyInAnyOrder("a@x.com", "c@x.com");
+    verify(redis).executePipelined(any(RedisCallback.class));
+    verify(redis, never()).hasKey(anyString());
   }
 }

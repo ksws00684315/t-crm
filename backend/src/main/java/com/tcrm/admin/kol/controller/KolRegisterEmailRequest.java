@@ -7,6 +7,6 @@ import jakarta.validation.constraints.Size;
 
 /** Body of {@code POST /kol-api/register/email-codes}. */
 public record KolRegisterEmailRequest(
-    @NotBlank @Pattern(regexp = "[0-9A-Za-z]{32}") String code,
+    @NotBlank @Pattern(regexp = "[2-9A-HJ-NP-Za-hj-np-z]{8}") String code,
     @NotBlank @Size(max = KolRules.MAX_EMAIL) @Pattern(regexp = KolRules.EMAIL_PATTERN)
         String email) {}

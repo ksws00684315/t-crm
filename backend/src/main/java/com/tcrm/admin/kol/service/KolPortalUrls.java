@@ -28,9 +28,9 @@ public class KolPortalUrls {
     return baseUrl + "/reset?token=" + token;
   }
 
-  /** {@code {base}/register?c=...} for a BD's register link (task 12c). The code is Base62. */
+  /** {@code {base}/register?code=...} for a BD's invite link (task 29). Eight-char code. */
   public String registerUrl(String code) {
-    return baseUrl + "/register?c=" + code;
+    return baseUrl + "/register?code=" + code;
   }
 
   /** Returns the value unchanged when it is a valid base URL; throws naming the variable. */

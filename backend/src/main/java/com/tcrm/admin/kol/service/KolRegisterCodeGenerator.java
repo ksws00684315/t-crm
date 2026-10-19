@@ -1,12 +1,15 @@
 package com.tcrm.admin.kol.service;
 
 import java.security.SecureRandom;
+import java.util.Locale;
 
-/** 32-character Base62 register codes (task 12c). {@link SecureRandom} supplies the bytes. */
+/**
+ * 8-character register / invite codes (task 29 / ADR-025). Alphabet is uppercase letters and digits
+ * without {@code 0 O 1 I L}. Input is matched case-insensitively after normalizing to uppercase.
+ */
 final class KolRegisterCodeGenerator {
-  static final int LENGTH = 32;
-  private static final char[] ALPHABET =
-      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".toCharArray();
+  static final int LENGTH = 8;
+  private static final char[] ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ".toCharArray();
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private KolRegisterCodeGenerator() {}
@@ -18,5 +21,13 @@ final class KolRegisterCodeGenerator {
       out[i] = ALPHABET[RANDOM.nextInt(ALPHABET.length)];
     }
     return new String(out);
+  }
+
+  /** Uppercases and strips; returns null when blank. Does not validate charset. */
+  static String normalize(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    return raw.strip().toUpperCase(Locale.ROOT);
   }
 }
