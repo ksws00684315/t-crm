@@ -387,10 +387,18 @@ onMounted(() => {
       <template #actions>
         <!-- The promo sheet uploads under /kol/kols/{id}/... (kol:edit, OWN covers own KOLs);
              the bulk mapping Excel needs product:edit. -->
-        <el-button v-if="kolTools.canWrite" data-test="upload-promo-sheet" @click="kolPickerVisible = true">
+        <el-button
+          v-if="kolTools.canWrite"
+          data-test="upload-promo-sheet"
+          @click="kolPickerVisible = true"
+        >
           {{ t("promoSheet.open") }}
         </el-button>
-        <el-button v-if="abilities.canImportMapping" data-test="import" @click="importVisible = true">
+        <el-button
+          v-if="abilities.canImportMapping"
+          data-test="import"
+          @click="importVisible = true"
+        >
           {{ t("mapping.import") }}
         </el-button>
         <el-button
