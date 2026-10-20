@@ -250,8 +250,6 @@ const zhCN: MessageSchema = {
     KOL_ALREADY_CLAIMED: "该达人已被其他商务认领",
     KOL_PROMOTION_CONFIG_INCOMPLETE: "推广配置不完整，无法改为推广中",
     KOL_REGISTER_CODE_INVALID: "注册链接无效或已失效，请联系您的商务获取新链接",
-    KOL_EMAIL_CODE_TOO_FREQUENT: "验证码发送过于频繁，请稍后再试",
-    KOL_EMAIL_CODE_INVALID: "验证码错误、已过期或已使用",
     KOL_REGISTER_TOO_FREQUENT: "注册尝试过于频繁，请稍后再试",
     generic: "操作失败，请稍后重试。",
     network: "网络异常，请检查网络连接后重试。",

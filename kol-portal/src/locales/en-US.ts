@@ -256,9 +256,6 @@ const enUS = {
     KOL_PROMOTION_CONFIG_INCOMPLETE: "Promotion config is incomplete for PROMOTING status",
     KOL_REGISTER_CODE_INVALID:
       "This registration link is invalid or has expired. Please contact your representative for a new link.",
-    KOL_EMAIL_CODE_TOO_FREQUENT:
-      "A verification code was sent too recently. Please wait and try again.",
-    KOL_EMAIL_CODE_INVALID: "The verification code is wrong, expired, or already used.",
     KOL_REGISTER_TOO_FREQUENT: "Too many registration attempts. Please try again later.",
     generic: "The operation failed. Please try again later.",
     network: "Network error. Please check your connection and try again.",

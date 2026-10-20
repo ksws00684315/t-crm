@@ -216,9 +216,6 @@ const enUS: MessageSchema = {
     KOL_INVALID_BD_USER:
       "BD must be an enabled staff account with Own Data Only and creator-edit permission.",
     KOL_REGISTER_CODE_INVALID: "The registration link is invalid or has expired.",
-    KOL_EMAIL_CODE_TOO_FREQUENT:
-      "A verification code was sent too recently. Please wait and try again.",
-    KOL_EMAIL_CODE_INVALID: "The verification code is wrong, expired, or already used.",
     KOL_REGISTER_TOO_FREQUENT: "Too many registration attempts. Please try again later.",
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
     KOL_REVIEW_ALREADY_DONE: "This creator has already been reviewed.",

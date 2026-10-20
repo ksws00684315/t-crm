@@ -219,8 +219,6 @@ const zhCN = {
     KOL_TRANSFER_NOT_SCHEDULED: "只能取消预约中的商务转移",
     KOL_INVALID_BD_USER: "负责商务必须是已启用的子账号（仅本人数据，且有达人编辑权限）",
     KOL_REGISTER_CODE_INVALID: "注册链接无效或已失效",
-    KOL_EMAIL_CODE_TOO_FREQUENT: "验证码发送过于频繁，请稍后再试",
-    KOL_EMAIL_CODE_INVALID: "验证码错误、已过期或已使用",
     KOL_REGISTER_TOO_FREQUENT: "注册尝试过于频繁，请稍后再试",
     KOL_MULTIPLE_PRIMARY: "最多只能将一个社媒账号设为主阵地",
     KOL_REVIEW_ALREADY_DONE: "该达人已审核",
