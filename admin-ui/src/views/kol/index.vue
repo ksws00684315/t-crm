@@ -2,13 +2,13 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { updateKolStatus } from "@/api/kol/kol";
+import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { accessOf, kolAbilities } from "@/utils/permission";
 import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
@@ -25,7 +25,7 @@ defineOptions({ name: "KolListPage" });
 
 /**
  * The creator list after the owner's 2026-10-20 review (task 32 §2.2): the layout follows the original
- * system, the columns and the six fixed row actions follow 1018 rows 7–15. The super
+ * system, the columns and row actions follow the latest customer supplement. The super
  * administrator also gets the creator-management tab that transfers creators between BDs; the
  * transfer history itself lives in the audit log.
  */
@@ -39,6 +39,7 @@ const isBd = computed(() => accessOf(me.user).isOwnScope);
 const loading = ref(false);
 const rows = ref<KolVO[]>([]);
 const total = ref(0);
+const cleanupRemaining = ref<Record<string, number>>({});
 const activeTab = ref("list");
 
 /**
@@ -75,6 +76,10 @@ async function load() {
     });
     rows.value = page.items;
     total.value = Number(page.total);
+    const configured = page.items.filter(row => row.autoCleanupDays != null).map(row => row.id);
+    cleanupRemaining.value = configured.length
+      ? await getCleanupRemaining(configured).catch(() => ({}))
+      : {};
   } catch (error) {
     notifyError(error);
   } finally {
@@ -145,7 +150,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 112) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   { key: "relation", label: t("kol.relationStatus"), width: px(80, 120) },
-  { key: "actions", label: t("common.actions"), width: px(344, 476) }
+  { key: "actions", label: t("common.actions"), width: px(296, 416) }
 ]);
 
 function asKol(row: object): KolVO {
@@ -206,18 +211,14 @@ function openCleanup(row: KolVO) {
   cleanupVisible.value = true;
 }
 
-/** Only "pending promotion" opens the commission dialog from the status tag (04.03). */
-function relationClickable(row: KolVO): boolean {
-  return (
-    row.displayRelationStatus === "PENDING_PROMOTION" &&
-    abilities.value.canWrite &&
-    row.reviewStatus === "APPROVED" &&
-    rowOwned(row)
-  );
+function cleanupLabel(row: KolVO): string {
+  if (row.autoCleanupDays == null) return t("kol.actionCleanup");
+  const remaining = cleanupRemaining.value[row.id] ?? row.autoCleanupDays;
+  return t("kol.cleanupRemaining", { days: remaining });
 }
 
-function handleRelationClick(row: KolVO): void {
-  if (relationClickable(row)) openCommission(row);
+function reviewClickable(row: KolVO): boolean {
+  return abilities.value.canWrite && row.reviewStatus === "PENDING";
 }
 
 async function toggleStatus(row: KolVO) {
@@ -316,15 +317,22 @@ onMounted(() => {
             <span class="developing">{{ t("common.developing") }}</span>
           </template>
           <template #cell-inviteTime="{ row }">
-            <span data-test="invite-time">{{ formatInstant(asKol(row).inviteTime) }}</span>
+            <span data-test="invite-time">{{ formatInstantToMinute(asKol(row).inviteTime) }}</span>
           </template>
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
-            <el-tag
-              :type="asKol(row).reviewStatus === 'APPROVED' ? 'success' : 'warning'"
-              data-test="review-status"
-              >{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag
+            <button
+              v-if="reviewClickable(asKol(row))"
+              type="button"
+              class="review-entry"
+              data-test="review-entry"
+              @click="openReview(asKol(row))"
             >
+              <el-tag type="warning">{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag>
+            </button>
+            <el-tag v-else type="success" data-test="review-status">{{
+              reviewStatusText(asKol(row).reviewStatus)
+            }}</el-tag>
           </template>
           <template #cell-login="{ row }">
             <el-tag
@@ -340,15 +348,7 @@ onMounted(() => {
             >
           </template>
           <template #cell-relation="{ row }">
-            <span
-              class="relation"
-              :class="{ 'relation--clickable': relationClickable(asKol(row)) }"
-              :role="relationClickable(asKol(row)) ? 'button' : undefined"
-              :tabindex="relationClickable(asKol(row)) ? 0 : -1"
-              :title="relationClickable(asKol(row)) ? t('promotion.configTitle') : undefined"
-              @click="handleRelationClick(asKol(row))"
-              @keydown.enter.prevent="handleRelationClick(asKol(row))"
-            >
+            <span class="relation">
               <el-tag
                 data-test="relation-status"
                 :type="
@@ -361,7 +361,7 @@ onMounted(() => {
             </span>
           </template>
           <template #actions="{ row }">
-            <!-- 04.01: keep all six actions in order; the wider column lets the Chinese
+            <!-- The review entry is in its status column; the wider column lets the Chinese
                  labels fit on one line while longer translations may wrap naturally. -->
             <div class="actions-cell" data-test="row-actions">
               <el-button
@@ -371,14 +371,6 @@ onMounted(() => {
                 :disabled="!abilities.canWrite"
                 @click="openEdit(asKol(row))"
                 >{{ t("kol.actionEdit") }}</el-button
-              >
-              <el-button
-                link
-                type="primary"
-                data-test="action-review"
-                :disabled="!(abilities.canWrite && asKol(row).reviewStatus === 'PENDING')"
-                @click="openReview(asKol(row))"
-                >{{ t("kol.actionReview") }}</el-button
               >
               <el-button
                 link
@@ -405,9 +397,10 @@ onMounted(() => {
                 link
                 type="primary"
                 data-test="action-cleanup"
+                :class="{ 'cleanup-countdown': asKol(row).autoCleanupDays != null }"
                 :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
                 @click="openCleanup(asKol(row))"
-                >{{ t("kol.actionCleanup") }}</el-button
+                >{{ cleanupLabel(asKol(row)) }}</el-button
               >
               <el-button
                 link
@@ -467,10 +460,13 @@ onMounted(() => {
 .developing {
   color: var(--tcrm-color-text-secondary);
 }
-.relation--clickable {
+.review-entry {
+  border: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
 }
-.relation--clickable:focus-visible {
+.review-entry:focus-visible {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
@@ -500,5 +496,8 @@ onMounted(() => {
 }
 .action-disabled {
   display: inline-flex;
+}
+.cleanup-countdown {
+  color: var(--el-color-danger);
 }
 </style>

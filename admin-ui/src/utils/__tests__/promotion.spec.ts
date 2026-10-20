@@ -59,7 +59,7 @@ describe("promotionFieldDiffs", () => {
     expect([...map.keys()].sort()).toEqual(["defaultRate", "inviteCode", "platforms"]);
     expect(map.get("defaultRate")).toMatchObject({ from: "-", to: "15.5%" });
     expect(map.get("platforms")?.to).toContain("AgentOne");
-    expect(map.get("platforms")?.to).toContain("https://shop/ada");
+    expect(map.get("platforms")?.to).not.toContain("https://shop/ada");
   });
 
   it("reports platform order changes and keeps unknown backend fields visible", () => {
@@ -92,10 +92,9 @@ describe("missing and incomplete promotion fields", () => {
     expect(missingPromotionFields({ detail: "unreadable" })).toEqual([]);
   });
 
-  it("requires all configuration fields and review before promotion starts", () => {
+  it("requires rate, platform selection, sheet and review but not invite code or address", () => {
     expect(incompletePromotionFields({ review: false })).toEqual([
       "defaultRate",
-      "inviteCode",
       "platforms",
       "sheetUrl",
       "review"
@@ -103,8 +102,7 @@ describe("missing and incomplete promotion fields", () => {
     expect(
       incompletePromotionFields({
         defaultRate: "0.1000",
-        inviteCode: "ADA",
-        platforms: [{ templateId: "7", address: "https://shop.example/ada" }],
+        platforms: [{ templateId: "7" }],
         sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
         review: true
       })
@@ -112,11 +110,10 @@ describe("missing and incomplete promotion fields", () => {
     expect(
       incompletePromotionFields({
         defaultRate: "0.1",
-        inviteCode: "ADA",
-        platforms: [{ templateId: "7", address: "" }],
+        platforms: [{ templateId: "7" }],
         sheetUrl: "sheet",
         review: true
       })
-    ).toEqual(["platformAddress"]);
+    ).toEqual([]);
   });
 });

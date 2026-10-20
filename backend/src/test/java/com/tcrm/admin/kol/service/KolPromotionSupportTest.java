@@ -38,15 +38,15 @@ class KolPromotionSupportTest {
     kol.setReviewStatus(ReviewStatus.APPROVED.name());
     List<String> missing = KolPromotionSupport.missingConfigFields(kol, List.of());
     assertTrue(missing.contains("defaultRate"));
-    assertTrue(missing.contains("inviteCode"));
+    assertFalse(missing.contains("inviteCode"));
     assertTrue(missing.contains("platforms"));
     assertTrue(missing.contains("sheetUrl"));
-    assertTrue(missing.contains("remark"));
+    assertFalse(missing.contains("remark"));
     assertFalse(missing.contains("review"));
   }
 
   @Test
-  void missingConfigFields_requiresReviewAndAddresses() {
+  void missingConfigFields_requiresReviewButNotHiddenAddress() {
     KolDO kol = new KolDO();
     kol.setReviewStatus(ReviewStatus.PENDING.name());
     kol.setDefaultRate(new BigDecimal("0.1000"));
@@ -56,7 +56,7 @@ class KolPromotionSupportTest {
     List<PlatformRef> platforms = List.of(new PlatformRef(7L, null));
     List<String> missing = KolPromotionSupport.missingConfigFields(kol, platforms);
     assertTrue(missing.contains("review"));
-    assertTrue(missing.contains("platformAddress"));
+    assertFalse(missing.contains("platformAddress"));
   }
 
   @Test

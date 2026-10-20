@@ -1,5 +1,6 @@
 package com.tcrm.admin.kol.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,7 @@ import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.kol.model.KolPlatformDO;
 import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.kol.service.KolPromotionService.PlatformInput;
@@ -91,6 +93,47 @@ class KolPromotionServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.KOL_REVIEW_ALREADY_DONE);
+  }
+
+  @Test
+  void usesExistingAddressBeforePlatformAddressWhenHiddenInputIsEmpty() {
+    KolPlatformDO existing = new KolPlatformDO();
+    existing.setLinkTemplateId(7L);
+    existing.setAddress("https://old.example/item/{PRODUCT_ID}");
+    when(platforms.selectList(any())).thenReturn(List.of(existing));
+    when(templates.usableTemplate(7L))
+        .thenReturn(
+            new LinkTemplateDTO(
+                7L,
+                "kakobuy",
+                "KakoBuy",
+                "https://new.example/item/{PRODUCT_ID}",
+                "WEIDIAN",
+                0,
+                1,
+                null));
+
+    assertThat(service.normalizePlatforms(1L, List.of(new PlatformInput(7L, null))))
+        .containsExactly(new PlatformInput(7L, "https://old.example/item/{PRODUCT_ID}"));
+  }
+
+  @Test
+  void usesMaintainedPlatformAddressForNewCreator() {
+    when(platforms.selectList(any())).thenReturn(List.of());
+    when(templates.usableTemplate(7L))
+        .thenReturn(
+            new LinkTemplateDTO(
+                7L,
+                "kakobuy",
+                "KakoBuy",
+                "https://new.example/item/{PRODUCT_ID}",
+                "WEIDIAN",
+                0,
+                1,
+                null));
+
+    assertThat(service.normalizePlatforms(1L, List.of(new PlatformInput(7L, null))))
+        .containsExactly(new PlatformInput(7L, "https://new.example/item/{PRODUCT_ID}"));
   }
 
   private static KolDO baseKol() {

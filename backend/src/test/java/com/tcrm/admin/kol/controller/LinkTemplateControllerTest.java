@@ -54,7 +54,8 @@ class LinkTemplateControllerTest {
         "https://item.kakobuy.com/i/{PRODUCT_ID}?aff={INVITE_CODE}",
         "WEIDIAN",
         0,
-        1);
+        1,
+        java.time.Instant.parse("2026-10-20T12:00:00Z"));
   }
 
   @Test

@@ -14,12 +14,12 @@ import java.util.List;
 public record PromotionConfigRequest(
     @NotBlank @Size(max = 16) String defaultRate,
     @NotEmpty List<@Valid PlatformAddressRequest> platforms,
-    @NotBlank @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
+    @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
         String inviteCode,
     @NotBlank @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_PATTERN)
         String sheetUrl,
     @Min(1) Long jumpTemplateId,
-    @NotBlank @Size(max = KolRules.MAX_REMARK) String remark) {
+    @Size(max = KolRules.MAX_REMARK) String remark) {
   KolPromotionService.PromotionConfigCommand toCommand() {
     List<PlatformInput> platformInputs =
         platforms == null
@@ -44,6 +44,5 @@ public record PromotionConfigRequest(
 
   public record PlatformAddressRequest(
       @NotBlank @Size(max = 32) String templateId,
-      @NotBlank @Size(max = KolRules.MAX_URL) @Pattern(regexp = KolRules.HTTPS_URL_PATTERN)
-          String address) {}
+      @Size(max = KolRules.MAX_URL) @Pattern(regexp = KolRules.HTTPS_URL_PATTERN) String address) {}
 }

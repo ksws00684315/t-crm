@@ -34,30 +34,18 @@ final class KolPromotionSupport {
 
   /** Missing field names for a complete promotion configuration. A jump template is optional. */
   static List<String> missingConfigFields(KolDO kol, List<PlatformRef> platforms) {
-    List<String> missing = new ArrayList<>(7);
+    List<String> missing = new ArrayList<>(4);
     if (!ReviewStatus.APPROVED.name().equals(kol.getReviewStatus())) {
       missing.add("review");
     }
     if (kol.getDefaultRate() == null) {
       missing.add("defaultRate");
     }
-    if (kol.getInviteCode() == null || kol.getInviteCode().isBlank()) {
-      missing.add("inviteCode");
-    }
     if (platforms == null || platforms.isEmpty()) {
       missing.add("platforms");
-    } else {
-      boolean anyBlank =
-          platforms.stream().anyMatch(p -> p.address() == null || p.address().isBlank());
-      if (anyBlank) {
-        missing.add("platformAddress");
-      }
     }
     if (kol.getSheetUrl() == null || kol.getSheetUrl().isBlank()) {
       missing.add("sheetUrl");
-    }
-    if (kol.getPromotionRemark() == null || kol.getPromotionRemark().isBlank()) {
-      missing.add("remark");
     }
     return List.copyOf(missing);
   }

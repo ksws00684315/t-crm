@@ -187,6 +187,7 @@ public class LinkTemplateService {
         template.getTemplateUrl(),
         template.getChannelCode(),
         template.getSortOrder(),
-        template.getStatus());
+        template.getStatus(),
+        template.getCreateTime());
   }
 }

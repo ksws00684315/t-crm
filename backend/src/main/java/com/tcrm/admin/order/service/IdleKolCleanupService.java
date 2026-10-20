@@ -13,6 +13,7 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.ExternalAuditApi;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -79,6 +81,40 @@ public class IdleKolCleanupService {
           sanitizer.sanitize(Map.of("cleaned", cleaned)));
     }
     return cleaned;
+  }
+
+  /** Days until the same idle threshold used by the scheduled cleanup, scoped to visible KOLs. */
+  public Map<Long, Integer> remainingDays(List<Long> ids) {
+    if (ids == null || ids.isEmpty() || ids.size() > 100) {
+      return Map.of();
+    }
+    AccountDTO user = current.user();
+    Set<Long> wanted = Set.copyOf(ids);
+    List<PromotingKolDTO> promoting =
+        cleanup.listPromotingWithLastPromotingAt().stream()
+            .filter(kol -> wanted.contains(kol.id()))
+            .filter(kol -> !user.ownScope() || user.id().equals(kol.bdUserId()))
+            .toList();
+    Map<Long, Instant> lastPay = lastPayByKol(promoting.stream().map(PromotingKolDTO::id).toList());
+    Instant now = Instant.now();
+    Map<Long, Integer> result = new HashMap<>();
+    for (PromotingKolDTO kol : promoting) {
+      Instant idleSince = lastPay.get(kol.id());
+      if (idleSince == null) {
+        idleSince = kol.lastPromotingAt();
+      }
+      if (idleSince == null) {
+        idleSince = kol.fallbackIdleAt();
+      }
+      if (idleSince == null || kol.autoCleanupDays() == null) {
+        continue;
+      }
+      long seconds =
+          Duration.between(now, idleSince.plus(kol.autoCleanupDays(), ChronoUnit.DAYS))
+              .getSeconds();
+      result.put(kol.id(), (int) Math.max(0, (seconds + 86_399) / 86_400));
+    }
+    return result;
   }
 
   /** Manual cleanup for one KOL (task 29). Same effect as auto; reason required. */

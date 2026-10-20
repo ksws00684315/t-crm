@@ -14,6 +14,12 @@ export function formatInstant(value: string | null | undefined): string {
   }).format(date);
 }
 
+/** Display an instant through minute precision, as requested for creator invitations. */
+export function formatInstantToMinute(value: string | null | undefined): string {
+  const full = formatInstant(value);
+  return full === "-" ? full : full.slice(0, -3);
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", GBP: "£" };
 
 /** Display price with its currency: "¥12.50", "$60.00", or "12.50 JPY" without a known symbol. */

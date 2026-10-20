@@ -94,6 +94,18 @@ class KolPromotionControllerTest {
     verify(promotions).review(eq(10L), org.mockito.ArgumentMatchers.any());
   }
 
+  @Test
+  void shouldAcceptHiddenOptionalPromotionFields() throws Exception {
+    mvc.perform(
+            put("/admin-api/kol/kols/10/promotion-config")
+                .header(AdminMvcSupport.TOKEN_HEADER, token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"defaultRate\":\"0.1000\",\"platforms\":[{\"templateId\":\"3\",\"address\":null}],\"inviteCode\":null,\"sheetUrl\":\"https://docs.google.com/spreadsheets/d/abc\",\"remark\":null}"))
+        .andExpect(status().isOk());
+    verify(promotions).updateConfig(eq(10L), org.mockito.ArgumentMatchers.any());
+  }
+
   private String viewOnlyToken() {
     return AdminMvcSupport.actAs(
         current, 1L, Role.STAFF, DataScope.OWN, java.util.Set.of("kol:view"));

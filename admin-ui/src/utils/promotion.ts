@@ -63,8 +63,8 @@ function renderValue(key: string, value: unknown): string {
     return value
       .map(item => {
         if (!item || typeof item !== "object") return String(item);
-        const platform = item as { templateName?: string; address?: string };
-        return [platform.templateName, platform.address].filter(Boolean).join(" — ");
+        const platform = item as { templateId?: string; templateName?: string; address?: string };
+        return platform.templateName ?? platform.templateId ?? "-";
       })
       .join("、");
   return String(value);
@@ -96,8 +96,7 @@ export function missingPromotionFields(payload: unknown): string[] {
 
 export interface PromotionCompletenessInput {
   defaultRate?: string | null;
-  inviteCode?: string | null;
-  platforms?: Array<{ templateId: string; address: string }>;
+  platforms?: Array<{ templateId: string }>;
   sheetUrl?: string | null;
   review?: boolean;
 }
@@ -105,10 +104,8 @@ export interface PromotionCompletenessInput {
 export function incompletePromotionFields(config: PromotionCompletenessInput): string[] {
   const missing: string[] = [];
   if (!config.defaultRate) missing.push("defaultRate");
-  if (!config.inviteCode) missing.push("inviteCode");
   if (!config.platforms?.length || config.platforms.some(platform => !platform.templateId))
     missing.push("platforms");
-  if (config.platforms?.some(platform => !platform.address)) missing.push("platformAddress");
   if (!config.sheetUrl) missing.push("sheetUrl");
   if (config.review === false) missing.push("review");
   return missing;

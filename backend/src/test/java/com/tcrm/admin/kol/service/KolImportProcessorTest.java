@@ -119,7 +119,8 @@ class KolImportProcessorTest {
                 "https://item.kakobuy.com/i/{PRODUCT_ID}",
                 "WEIDIAN",
                 0,
-                1));
+                1,
+                null));
     assertThat(
             processor(false)
                 .process(

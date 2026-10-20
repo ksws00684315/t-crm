@@ -1,6 +1,7 @@
 package com.tcrm.admin.kol.controller;
 
 import com.tcrm.admin.kol.service.LinkTemplateDTO;
+import java.time.Instant;
 
 /** One agent link template; {@code status} 1 enabled, 0 disabled. */
 public record LinkTemplateVO(
@@ -10,7 +11,8 @@ public record LinkTemplateVO(
     String templateUrl,
     String channelCode,
     Integer sortOrder,
-    Integer status) {
+    Integer status,
+    Instant createTime) {
   static LinkTemplateVO from(LinkTemplateDTO t) {
     return new LinkTemplateVO(
         t.id(),
@@ -19,6 +21,7 @@ public record LinkTemplateVO(
         t.templateUrl(),
         t.channelCode(),
         t.sortOrder(),
-        t.status());
+        t.status(),
+        t.createTime());
   }
 }

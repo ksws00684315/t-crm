@@ -7,6 +7,7 @@ import type { LinkTemplateVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import { notifyError } from "@/utils/notify";
+import { formatInstantToMinute } from "@/utils/format";
 import LinkTemplateFormDialog from "./LinkTemplateFormDialog.vue";
 
 defineOptions({ name: "SystemLinkTemplatePage" });
@@ -14,6 +15,8 @@ defineOptions({ name: "SystemLinkTemplatePage" });
 const { t } = useI18n();
 const loading = ref(false);
 const rows = ref<LinkTemplateVO[]>([]);
+const query = ref("");
+const appliedQuery = ref("");
 const formVisible = ref(false);
 const editing = ref<LinkTemplateVO | null>(null);
 
@@ -26,9 +29,8 @@ const columns = computed<DataColumn[]>(() => [
     key: "templateCode",
     label: t("linkTemplate.code"),
     prop: "templateCode",
-    width: 140
+    minWidth: 160
   },
-  { key: "templateName", label: t("linkTemplate.name"), prop: "templateName", minWidth: 140 },
   {
     key: "templateUrl",
     label: t("linkTemplate.url"),
@@ -36,10 +38,26 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 280,
     tooltip: true
   },
-  { key: "sortOrder", label: t("linkTemplate.sort"), prop: "sortOrder", width: 90 },
+  { key: "createTime", label: t("linkTemplate.createTime"), width: 180 },
   { key: "status", label: t("common.status"), width: 90 },
   { key: "actions", label: t("common.actions"), width: 160 }
 ]);
+
+const visibleRows = computed(() => {
+  const term = appliedQuery.value.toLocaleLowerCase();
+  return term
+    ? rows.value.filter(row => row.templateCode.toLocaleLowerCase().includes(term))
+    : rows.value;
+});
+
+function search() {
+  appliedQuery.value = query.value.trim();
+}
+
+function reset() {
+  query.value = "";
+  appliedQuery.value = "";
+}
 
 async function load() {
   loading.value = true;
@@ -69,7 +87,7 @@ async function toggleStatus(row: LinkTemplateVO) {
     await ElMessageBox.confirm(
       disabling
         ? t("linkTemplate.confirmDisable")
-        : t("linkTemplate.confirmEnable", { name: row.templateName }),
+        : t("linkTemplate.confirmEnable", { name: row.templateCode }),
       disabling ? t("linkTemplate.disableTitle") : t("linkTemplate.enableTitle"),
       { type: "warning" }
     );
@@ -90,9 +108,11 @@ onMounted(() => void load());
 
 <template>
   <div class="list-page">
-    <ListSearch @search="load" @reset="load">
+    <ListSearch @search="search" @reset="reset">
       <template #primary>
-        <span class="hint">{{ t("linkTemplate.hint") }}</span>
+        <el-form-item :label="t('linkTemplate.code')">
+          <el-input v-model="query" clearable :placeholder="t('linkTemplate.searchPlaceholder')" />
+        </el-form-item>
       </template>
       <template #actions>
         <el-button type="primary" data-test="create" @click="openCreate">
@@ -103,13 +123,16 @@ onMounted(() => void load());
 
     <DataTable
       table-id="link-templates"
-      :rows="rows"
+      :rows="visibleRows"
       :columns="columns"
       :loading="loading"
-      :total="rows.length"
+      :total="visibleRows.length"
       :paged="false"
       @refresh="load"
     >
+      <template #cell-createTime="{ row }">{{
+        formatInstantToMinute(asTemplate(row).createTime)
+      }}</template>
       <template #cell-status="{ row }">
         <el-tag :type="asTemplate(row).status === 1 ? 'success' : 'info'">
           {{ asTemplate(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
@@ -133,10 +156,3 @@ onMounted(() => void load());
     <LinkTemplateFormDialog v-model="formVisible" :template="editing" @saved="load" />
   </div>
 </template>
-
-<style scoped>
-.hint {
-  color: var(--el-text-color-secondary);
-  line-height: 32px;
-}
-</style>
