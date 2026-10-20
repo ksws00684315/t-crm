@@ -95,17 +95,17 @@ describe("document title", () => {
 
   it("translates the route title key into English", async () => {
     await navigate(false, "/login");
-    expect(document.title).toBe("Sign in | T-CRM Creator Portal");
+    expect(document.title).toBe("Sign in | SparkTrack Creator Portal");
   });
 
   it("translates the route title key into Chinese", async () => {
     useLocaleStore().setLocale("zh-CN");
     await navigate(true, "/");
-    expect(document.title).toBe("首页 | T-CRM Creator Portal");
+    expect(document.title).toBe("首页 | SparkTrack Creator Portal");
   });
 
   it("uses the app name alone when a route has no title key", () => {
     applyDocumentTitle({});
-    expect(document.title).toBe("T-CRM Creator Portal");
+    expect(document.title).toBe("SparkTrack Creator Portal");
   });
 });

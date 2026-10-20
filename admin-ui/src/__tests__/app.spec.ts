@@ -48,9 +48,9 @@ describe("app root", () => {
     await mountApp();
     useLocaleStore().setLocale("en-US");
     await nextTick();
-    expect(document.title).toBe("Sign in | T-CRM Admin");
+    expect(document.title).toBe("Sign in | SparkTrack Admin");
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(document.title).toBe("登录 | T-CRM 管理端");
+    expect(document.title).toBe("登录 | SparkTrack 管理端");
   });
 });

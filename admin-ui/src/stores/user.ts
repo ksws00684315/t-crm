@@ -2,7 +2,6 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import * as authApi from "@/api/auth";
 import type { PermissionCode, UserVO } from "@/api/types";
-import { useLockStore } from "@/stores/lock";
 import { useReauthStore } from "@/stores/reauth";
 import { accessOf, type AccessProfile } from "@/utils/permission";
 import { clearStoredSession, loadSession, saveSession } from "@/utils/session";
@@ -38,8 +37,6 @@ export const useUserStore = defineStore("user", () => {
     expiresAt.value = 0;
     user.value = null;
     clearStoredSession();
-    // A lock belongs to a session; the next sign-in starts unlocked.
-    useLockStore().unlock();
     useReauthStore().close();
   }
 

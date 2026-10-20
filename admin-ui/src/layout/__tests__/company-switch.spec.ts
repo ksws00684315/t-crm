@@ -15,7 +15,6 @@ import { useUserStore } from "@/stores/user";
 import { ApiError } from "@/utils/http/error";
 import { saveSession } from "@/utils/session";
 import { tablePrefsKey } from "@/utils/table-prefs";
-import { THEME_STORAGE_KEY } from "@/utils/theme";
 import Layout from "../index.vue";
 
 vi.mock("@/api/auth");
@@ -138,11 +137,10 @@ describe("header company switch", () => {
   });
 
   it("switches: new menu, only the home tab, home page, message and a broadcast", async () => {
-    localStorage.setItem(THEME_STORAGE_KEY, "dark");
     localStorage.setItem(tablePrefsKey("kols"), JSON.stringify({ size: 50 }));
     const { wrapper, router, store, tabs } = await mountAs(inA);
     expect(tabs.tabs.map(tab => tab.path)).toEqual(["/home", "/system/users"]);
-    expect(wrapper.text()).toContain("用户管理");
+    expect(wrapper.text()).toContain("账号管理");
     vi.mocked(authApi.switchCompany).mockResolvedValue(inB);
 
     companyDropdown(wrapper)!.vm.$emit("command", "2");
@@ -153,13 +151,12 @@ describe("header company switch", () => {
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/home"));
     await flushPromises();
     expect(tabs.tabs.map(tab => tab.path)).toEqual(["/home"]);
-    expect(wrapper.text()).not.toContain("用户管理");
+    expect(wrapper.text()).not.toContain("账号管理");
     expect(wrapper.text()).toContain("达人管理");
     expect(messages.success).toHaveBeenCalledWith("已切换到 B 公司");
     expect(FakeChannel.instances[0].name).toBe("tcrm-admin-company");
     expect(FakeChannel.instances[0].posted).toEqual([{ type: "switched", tenantId: "2" }]);
     // Personal preferences survive the switch.
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
     expect(localStorage.getItem(tablePrefsKey("kols"))).toBe(JSON.stringify({ size: 50 }));
   });
 

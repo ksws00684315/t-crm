@@ -7,7 +7,6 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
-import { useThemeStore } from "@/stores/theme";
 import { useUserStore } from "@/stores/user";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
 import Layout from "../index.vue";
@@ -114,16 +113,10 @@ describe("content watermark", () => {
     expect(wrapper.find("[data-test=watermark-close]").exists()).toBe(false);
   });
 
-  it("follows the text color when the theme changes", async () => {
+  it("uses the fixed ink color (no theme switch since task 32)", async () => {
     const wrapper = await mountLayout();
     expect(wrapper.getComponent(ElWatermark).props("font")).toMatchObject({
-      color: watermarkInk("#15181d")
-    });
-    document.documentElement.style.setProperty("--tcrm-color-text", "#E7E9EC");
-    useThemeStore().cycle();
-    await nextTick();
-    expect(wrapper.getComponent(ElWatermark).props("font")).toMatchObject({
-      color: watermarkInk("#E7E9EC"),
+      color: watermarkInk("#15181d"),
       fontSize: 14
     });
   });

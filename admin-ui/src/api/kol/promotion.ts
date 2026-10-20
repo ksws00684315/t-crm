@@ -1,13 +1,5 @@
 import { http } from "../http";
-import type { PageResult, RelationStatus } from "../types";
-
-export function updateRelationStatus(id: string, status: RelationStatus): Promise<null> {
-  return http.request<null>({
-    method: "put",
-    url: `/kol/kols/${id}/relation-status`,
-    data: { status }
-  });
-}
+import type { PageResult } from "../types";
 
 export interface PromotionPlatform {
   templateId: string;
@@ -43,7 +35,7 @@ export function savePromotionConfig(id: string, request: PromotionConfigRequest)
 }
 
 export interface PromotionRecordVO {
-  changeType: "CONFIG" | "STATUS" | "REVIEW";
+  changeType: "CONFIG" | "STATUS" | "REVIEW" | "AUTO_CLEANUP";
   versionNo: number | null;
   effectiveTime: string | null;
   before: Record<string, unknown> | null;
@@ -61,87 +53,19 @@ export function listPromotionRecords(id: string, query: { page: number; size: nu
   });
 }
 
-export interface ClaimableKolVO {
-  id: string;
-  kolCode: string;
-  name: string;
-  maskedEmail: string;
-  displayRelationStatus: "PENDING_PROMOTION" | "PROMOTING" | "INVALID" | "PENDING_UPDATE";
-}
-
-export function findClaimableKol(keyword: string) {
-  return http.request<ClaimableKolVO | null>({
-    method: "get",
-    url: "/kol/claimable",
-    params: { keyword }
+/**
+ * Per-creator auto cleanup (task 33 §3.2): `days` null turns it off, 1–365 otherwise. The
+ * company-level configuration and the cleanup-record queries are gone with the old page.
+ */
+export function updateAutoCleanup(id: string, days: number | null): Promise<null> {
+  return http.request<null>({
+    method: "put",
+    url: `/kol/kols/${id}/auto-cleanup`,
+    data: { days }
   });
 }
 
-export function claimKol(id: string): Promise<null> {
-  return http.request<null>({ method: "post", url: `/kol/kols/${id}/claim` });
-}
-
-export interface CleanupConfigVO {
-  enabled: boolean;
-  idleDays: number;
-}
-
-export function getCleanupConfig() {
-  return http.request<CleanupConfigVO>({ method: "get", url: "/kol/cleanup-config" });
-}
-
-export function saveCleanupConfig(config: CleanupConfigVO) {
-  return http.request<null>({ method: "put", url: "/kol/cleanup-config", data: config });
-}
-
-export interface CleanupPreviewVO {
-  id: string;
-  kolCode: string;
-  name: string;
-  bdUserName: string | null;
-  lastOrderAt: string | null;
-  idleSince: string;
-}
-
-export function listCleanupPreview(query: { page: number; size: number }) {
-  return http.request<PageResult<CleanupPreviewVO>>({
-    method: "get",
-    url: "/kol/cleanup-preview",
-    params: query
-  });
-}
-
-export interface CleanupItemVO {
-  id: string;
-  kolCode: string;
-  shopId: string;
-  shopName: string | null;
-  weidianItemId: string;
-  status: "PENDING" | "SUCCESS" | "FAILED";
-  trigger: "AUTO" | "MANUAL";
-  reason: string | null;
-  failReason: string | null;
-  cleanupTime: string;
-  finishTime: string | null;
-}
-
-export function listCleanupItems(query: {
-  kolCode?: string;
-  status?: CleanupItemVO["status"];
-  page: number;
-  size: number;
-}) {
-  return http.request<PageResult<CleanupItemVO>>({
-    method: "get",
-    url: "/kol/cleanup-items",
-    params: query
-  });
-}
-
-export function retryCleanupItem(id: string) {
-  return http.request<null>({ method: "post", url: `/kol/cleanup-items/${id}/retry` });
-}
-
+/** Immediate cleanup; deletes the creator's Weidian product links in the background. */
 export function cleanupKol(id: string, reason: string) {
   return http.request<null>({ method: "post", url: `/kol/kols/${id}/cleanup`, data: { reason } });
 }

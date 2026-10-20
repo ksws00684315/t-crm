@@ -89,9 +89,9 @@ describe("menu search dialog", () => {
     const { wrapper } = await mountDialog();
     useMenuSearchStore().open();
     await flushPromises();
-    await typeQuery("用户");
+    await typeQuery("账号");
     expect(document.body.textContent).toContain("没有匹配的菜单");
-    expect(document.body.textContent).not.toContain("用户管理");
+    expect(document.body.textContent).not.toContain("账号管理");
 
     wrapper.unmount();
     localStorage.clear();
@@ -100,8 +100,8 @@ describe("menu search dialog", () => {
     const again = await mountDialog();
     useMenuSearchStore().open();
     await flushPromises();
-    await typeQuery("用户");
-    expect(document.body.textContent).toContain("用户管理");
+    await typeQuery("账号");
+    expect(document.body.textContent).toContain("账号管理");
     again.wrapper.unmount();
   });
 
@@ -117,7 +117,7 @@ describe("menu search dialog", () => {
     const items = document.body.querySelectorAll("[data-test=menu-search-item]");
     expect(items).toHaveLength(2);
     expect(items[0].textContent).toContain("店铺管理");
-    expect(document.body.textContent).not.toContain("用户管理");
+    expect(document.body.textContent).not.toContain("账号管理");
 
     press("ArrowDown");
     press("Enter");

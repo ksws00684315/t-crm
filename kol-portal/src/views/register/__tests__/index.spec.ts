@@ -15,10 +15,14 @@ import RegisterPage from "../index.vue";
 
 vi.mock("@/api/register", () => ({
   previewRegister: vi.fn(),
-  sendRegisterCode: vi.fn(),
   registerKol: vi.fn()
 }));
 
+/**
+ * Registration form after 02.01 (task 32 §2.5): the fields are exactly the invitation code,
+ * account name, email, password and confirm password (required) plus phone, WhatsApp, main
+ * platform and social account (optional). No e-mail verification step, no country field.
+ */
 const CODE = "ABCDEFGH";
 const session: AuthSession = {
   tokenName: "X-Kol-Token",
@@ -75,31 +79,75 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("register page", () => {
-  it("allows manual code entry without a link and shows invalid links with a code", async () => {
-    const missing = await page("/register");
-    expect(missing.wrapper.find("#register-code").exists()).toBe(true);
-    expect(registerApi.previewRegister).not.toHaveBeenCalled();
+describe("register page (02.01)", () => {
+  it("renders exactly the 02.01 fields: no verification code, no country", async () => {
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
+    const { wrapper } = await page(`/register?code=${CODE}`);
+    const labels = wrapper.findAll(".el-form-item__label").map(item => item.text());
+    expect(labels).toEqual([
+      "Invitation code",
+      "Name",
+      "Email",
+      "New password",
+      "Confirm password",
+      "Phone number (optional)",
+      "WhatsApp (optional)",
+      "Main platform (optional)",
+      "Social account"
+    ]);
+    expect(wrapper.find("#register-email-code").exists()).toBe(false);
+    expect(wrapper.find("#register-country").exists()).toBe(false);
+    expect(wrapper.find("#register-url").exists()).toBe(false);
+    expect(wrapper.find("form").text()).not.toContain("verification");
+  });
 
+  it("fills the code read-only from the link, required and editable without a link", async () => {
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
+    const linked = await page(`/register?code=${CODE}`);
+    const linkedCode = linked.wrapper.get("#register-code");
+    expect((linkedCode.element as HTMLInputElement).value).toBe(CODE);
+    expect(linkedCode.attributes("readonly")).toBeDefined();
+    expect(linked.wrapper.text()).toContain("Filled from your invitation link");
+
+    const manual = await page("/register");
+    const manualCode = manual.wrapper.get("#register-code");
+    expect((manualCode.element as HTMLInputElement).value).toBe("");
+    expect(manualCode.attributes("readonly")).toBeUndefined();
+    // Submitting without a code never reaches the API.
+    await manual.wrapper.get("form").trigger("submit");
+    await flushPromises();
+    expect(registerApi.registerKol).not.toHaveBeenCalled();
+  });
+
+  it("shows the inviting BD, or the tenant when the code belongs to the super admin", async () => {
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
+    const withBd = await page(`/register?code=${CODE}`);
+    expect(withBd.wrapper.text()).toContain("Invited by Alex");
+
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: null,
+      tenantName: "Acme"
+    });
+    const withoutBd = await page(`/register?code=${CODE}`);
+    expect(withoutBd.wrapper.text()).toContain("Invited by Acme");
+  });
+
+  it("shows invalid links with a code and keeps the form closed", async () => {
     vi.mocked(registerApi.previewRegister).mockRejectedValue(
       failure("KOL_REGISTER_CODE_INVALID", 404)
     );
     const rejected = await page(`/register?code=${CODE}`);
     expect(rejected.wrapper.text()).toContain("registration link is invalid");
-    useLocaleStore().setLocale("zh-CN");
-    await flushPromises();
-    expect(rejected.wrapper.text()).toContain("注册链接无效或已失效，请联系您的商务获取新链接");
-  });
-
-  it("shows the inviting BD when the link is valid", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
-    const { wrapper } = await page(`/register?code=${CODE}`);
-    expect(wrapper.find("h1").text()).toBe("Create your account");
-    expect(wrapper.text()).toContain("Invited by Alex");
-    useLocaleStore().setLocale("zh-CN");
-    await flushPromises();
-    expect(wrapper.find("h1").text()).toBe("创建账号");
-    expect(wrapper.text()).toContain("邀请人：Alex");
+    expect(rejected.wrapper.find("#register-email").exists()).toBe(false);
   });
 
   it("shows a retry-later message when invitation preview is rate limited", async () => {
@@ -109,26 +157,11 @@ describe("register page", () => {
     expect(wrapper.find("#register-email").exists()).toBe(true);
   });
 
-  it("keeps the send button usable and shows the API message on a repeat click", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
-    vi.mocked(registerApi.sendRegisterCode).mockResolvedValue(null);
-    const { wrapper } = await page(`/register?code=${CODE}`);
-    await wrapper.get("#register-email").setValue("ada@example.com");
-    await wrapper.get("#register-send").trigger("click");
-    await flushPromises();
-    expect(wrapper.text()).toContain("Resend in 60s");
-    expect(wrapper.get("#register-send").attributes("disabled")).toBeUndefined();
-    vi.mocked(registerApi.sendRegisterCode).mockRejectedValue(
-      failure("KOL_EMAIL_CODE_TOO_FREQUENT", 429)
-    );
-    await wrapper.get("#register-send").trigger("click");
-    await flushPromises();
-    expect(registerApi.sendRegisterCode).toHaveBeenCalledTimes(2);
-    expect(wrapper.text()).toContain("Too many attempts. Please try again later.");
-  });
-
   it("validates the form before calling the API", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
     const { wrapper } = await page(`/register?code=${CODE}`);
     await wrapper.get("#register-name").setValue("Ada");
     await wrapper.get("form").trigger("submit");
@@ -138,13 +171,15 @@ describe("register page", () => {
   });
 
   it("signs in and opens home after a successful registration", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
     vi.mocked(registerApi.registerKol).mockResolvedValue(session);
     const { wrapper, router } = await page(`/register?code=${CODE}`);
     await fill(wrapper, {
       "register-name": "Ada",
       "register-email": "ada@example.com",
-      "register-email-code": "123456",
       "register-password": "register-pass-1",
       "register-confirm": "register-pass-1",
       "register-whatsapp": "+15551234567",
@@ -158,51 +193,46 @@ describe("register page", () => {
     expect(registerApi.registerKol).toHaveBeenCalledWith({
       code: CODE,
       email: "ada@example.com",
-      emailCode: "123456",
       password: "register-pass-1",
+      name: "Ada",
       phone: null,
       whatsapp: "+15551234567",
       primaryPlatform: "TikTok",
-      primaryHandle: "ada",
-      primaryUrl: null,
-      name: "Ada",
-      country: null
+      primaryHandle: "ada"
     });
     expect(useSessionStore().getToken()).toBe("reg-token");
     expect(loadSession()?.token).toBe("reg-token");
   });
 
   it("offers sign-in with the email when the address is already registered", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
     vi.mocked(registerApi.registerKol).mockRejectedValue(failure("KOL_EMAIL_EXISTS", 409));
     const { wrapper } = await page(`/register?code=${CODE}`);
     await fill(wrapper, {
       "register-name": "Ada",
       "register-email": "ada@example.com",
-      "register-email-code": "123456",
       "register-password": "register-pass-1",
-      "register-confirm": "register-pass-1",
-      "register-whatsapp": "+15551234567",
-      "register-handle": "ada"
+      "register-confirm": "register-pass-1"
     });
-    choosePlatform(wrapper, "TikTok");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
     expect(wrapper.text()).toContain("This email is already registered. Please sign in.");
     expect(wrapper.get("a.register-login").attributes("href")).toBe("/login?email=ada@example.com");
-    useLocaleStore().setLocale("zh-CN");
-    await flushPromises();
-    expect(wrapper.text()).toContain("该邮箱已注册，请直接登录");
   });
 
   it("allows optional contact and social fields to stay blank", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
     vi.mocked(registerApi.registerKol).mockResolvedValue(session);
     const { wrapper } = await page(`/register?code=${CODE}`);
     await fill(wrapper, {
       "register-name": "Ada",
       "register-email": "ada@example.com",
-      "register-email-code": "123456",
       "register-password": "long-enough-pw",
       "register-confirm": "long-enough-pw"
     });
@@ -220,13 +250,16 @@ describe("register page", () => {
   });
 
   it("requires an invite code when registering without a link", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
+    vi.mocked(registerApi.registerKol).mockResolvedValue(session);
     const { wrapper } = await page("/register");
     await fill(wrapper, {
       "register-code": CODE,
       "register-name": "Ada",
       "register-email": "ada@example.com",
-      "register-email-code": "123456",
       "register-password": "long-enough-pw",
       "register-confirm": "long-enough-pw"
     });
@@ -238,12 +271,14 @@ describe("register page", () => {
   });
 
   it("asks for both social fields when only one is filled", async () => {
-    vi.mocked(registerApi.previewRegister).mockResolvedValue({ bdUserName: "Alex" });
+    vi.mocked(registerApi.previewRegister).mockResolvedValue({
+      bdUserName: "Alex",
+      tenantName: "Acme"
+    });
     const { wrapper } = await page(`/register?code=${CODE}`);
     await fill(wrapper, {
       "register-name": "Ada",
       "register-email": "ada@example.com",
-      "register-email-code": "123456",
       "register-password": "long-enough-pw",
       "register-confirm": "long-enough-pw",
       "register-handle": "@ada"

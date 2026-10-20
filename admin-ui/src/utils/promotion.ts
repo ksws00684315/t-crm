@@ -98,7 +98,6 @@ export interface PromotionCompletenessInput {
   defaultRate?: string | null;
   inviteCode?: string | null;
   platforms?: Array<{ templateId: string; address: string }>;
-  jumpTemplateId?: string | null;
   sheetUrl?: string | null;
   review?: boolean;
 }
@@ -110,7 +109,6 @@ export function incompletePromotionFields(config: PromotionCompletenessInput): s
   if (!config.platforms?.length || config.platforms.some(platform => !platform.templateId))
     missing.push("platforms");
   if (config.platforms?.some(platform => !platform.address)) missing.push("platformAddress");
-  if (config.platforms?.length && !config.jumpTemplateId) missing.push("jumpTemplateId");
   if (!config.sheetUrl) missing.push("sheetUrl");
   if (config.review === false) missing.push("review");
   return missing;

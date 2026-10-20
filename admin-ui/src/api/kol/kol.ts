@@ -2,11 +2,17 @@ import { http } from "../http";
 import type { DownloadedFile } from "@/utils/http";
 import type { DisplayRelationStatus, KolDetailVO, KolVO, PageResult, ReviewStatus } from "../types";
 
-/** `KolQuery`; omitted fields mean "no filter". The backend ignores `bdUserId` for a BD. */
+/**
+ * `KolQuery`; omitted fields mean "no filter". The three search fields combine with AND
+ * (1018 row 12, combined query per the 2026-10-20 review); `bdUserId` is ignored for a BD.
+ */
 export interface KolQuery {
   page?: number;
   size?: number;
   keyword?: string;
+  kolCode?: string;
+  name?: string;
+  email?: string;
   bdUserId?: string;
   reviewStatus?: ReviewStatus;
   relationStatus?: DisplayRelationStatus;

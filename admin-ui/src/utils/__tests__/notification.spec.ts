@@ -73,7 +73,7 @@ describe("notification text", () => {
         params: {},
         bizId: "77"
       })
-    ).toBe("/fund/payout-accounts?id=77");
+    ).toBe("/fund/payouts?id=77");
     expect(notificationHref({ type: "ORDER_SYNC_FAILED", params: {}, bizId: null })).toBe(
       "/order/orders"
     );
@@ -83,7 +83,7 @@ describe("notification text", () => {
         params: { kolCode: "KOL 1" },
         bizId: "2"
       })
-    ).toBe("/kol/bd-transfers?kolCode=KOL%201");
+    ).toBe("/system/oper-logs?module=KOL&keyword=KOL%201");
     expect(canOpenNotification("KOLS_UNASSIGNED", accessOf(staff))).toBe(true);
     expect(canOpenNotification("ORDER_SYNC_FAILED", accessOf(staff))).toBe(false);
     expect(canOpenNotification("BD_TRANSFER_CANCELLED", accessOf(superAdmin))).toBe(true);
