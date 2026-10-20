@@ -53,10 +53,11 @@ function filtersFromRoute() {
 }
 
 /**
- * The transfer quick filter matches the Chinese word the backend writes into transfer summaries.
- * It lives in the language pack so the source stays copy-free (the residual-copy test).
+ * The transfer quick filter matches the word the backend writes into every transfer summary
+ * ("达人…转至…", verified against the joint-debugging backend); the visible button keeps the
+ * 转移记录 label. The literal lives here as a lookup key, exempted in the residual-copy test.
  */
-const TRANSFER_KEYWORD = "转移";
+const TRANSFER_KEYWORD = "转至";
 
 const transferFilterActive = computed(
   () => applied.value.module === "KOL" && applied.value.keyword === TRANSFER_KEYWORD

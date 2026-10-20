@@ -59,10 +59,12 @@ describe("oper-log filters (task 32 §2.3)", () => {
     const { wrapper } = await mountPage();
     await wrapper.get('[data-test="transfer-filter"]').trigger("click");
     await flushPromises();
+    // The backend transfer summaries read "达人…转至…" (joint debugging, 33 §3.3), so the
+    // quick filter matches 转至 rather than 转移.
     expect(operLogApi.listOperLogs).toHaveBeenLastCalledWith(
       1,
       20,
-      expect.objectContaining({ module: "KOL", keyword: "转移" })
+      expect.objectContaining({ module: "KOL", keyword: "转至" })
     );
     wrapper.unmount();
   });
