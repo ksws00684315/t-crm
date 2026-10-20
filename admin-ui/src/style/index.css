@@ -93,6 +93,14 @@ body {
   font-weight: 400;
 }
 
+/* Status tags are the one place 12px belongs: they sit inside 14px table rows. */
+#app .el-tag,
+.el-overlay .el-tag,
+.el-popper .el-tag {
+  font-size: var(--tcrm-font-size-help) !important;
+  line-height: 18px !important;
+}
+
 #app .el-form-item__error,
 #app .el-form-item__description,
 #app .el-alert__description,

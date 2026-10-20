@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@element-plus/icons-vue";
 import type { TableInstance } from "element-plus";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   PAGE_SIZES,
@@ -109,6 +109,71 @@ defineExpose({ clearSelection });
 
 const { t } = useI18n();
 const fullscreen = ref(false);
+
+/**
+ * Card height follows the rows (the owner's 2026-10-20 review compares the console with the
+ * generated preview, where the pager sits directly under the last row). The page still owns a
+ * definite height, so the table gets a measured ceiling instead of the old `height: 100%`:
+ * short pages shrink, long pages scroll inside the body and keep the pager on screen.
+ */
+const rootEl = ref<HTMLElement | null>(null);
+const tableMaxHeight = ref<number | null>(null);
+let resizeObserver: ResizeObserver | null = null;
+let measureFrame = 0;
+
+function measureHeights(): void {
+  if (props.plain) {
+    tableMaxHeight.value = null;
+    return;
+  }
+  const el = rootEl.value;
+  const host = el?.parentElement;
+  if (!el || !host) return;
+  const pageHeight = host.clientHeight;
+  if (!pageHeight) return;
+  const toolbar = el.querySelector<HTMLElement>(".data-table__toolbar")?.offsetHeight ?? 0;
+  const pager = el.querySelector<HTMLElement>(".data-table__pager")?.offsetHeight ?? 0;
+  const style = getComputedStyle(el);
+  const frameHeight =
+    parseFloat(style.paddingTop || "0") +
+    parseFloat(style.paddingBottom || "0") +
+    parseFloat(style.borderTopWidth || "0") +
+    parseFloat(style.borderBottomWidth || "0");
+  const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
+  const gap = parseFloat(style.rowGap || "0") || 0;
+  const ceiling = pageHeight - toolbar - pager - frameHeight - gap * gapCount;
+  tableMaxHeight.value = Math.max(160, Math.round(ceiling));
+}
+
+function scheduleMeasure(): void {
+  if (measureFrame) return;
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0;
+    measureHeights();
+  });
+}
+
+onMounted(async () => {
+  await nextTick();
+  measureHeights();
+  const host = rootEl.value?.parentElement;
+  if (host && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(scheduleMeasure);
+    resizeObserver.observe(host);
+    resizeObserver.observe(rootEl.value as HTMLElement);
+  }
+  window.addEventListener("resize", scheduleMeasure);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  if (measureFrame) cancelAnimationFrame(measureFrame);
+  window.removeEventListener("resize", scheduleMeasure);
+});
+
+watch(() => [props.rows, props.plain, props.paged, props.exportable], scheduleMeasure);
+watch(fullscreen, scheduleMeasure);
 
 const locked = computed(() => {
   const keys = new Set<string>();
@@ -220,6 +285,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
 
 <template>
   <section
+    ref="rootEl"
     class="data-table"
     :class="[{ 'is-fullscreen': fullscreen, 'is-plain': plain }, `density-${prefs.density}`]"
   >
@@ -316,7 +382,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :data="rows"
         :row-key="rowKey"
         size="default"
-        :height="plain ? undefined : '100%'"
+        :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
         stripe
         @selection-change="onSelection"
@@ -396,8 +462,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-2);
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 100%;
   height: auto;
   padding: var(--tcrm-space-3);
   background: var(--tcrm-color-card);
@@ -455,9 +522,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
   color: var(--tcrm-color-text-secondary);
 }
 .data-table__body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  /* el-table height=100% owns vertical and horizontal scroll; no outer overflow */
+  /* el-table owns vertical and horizontal scrolling; the card clips nothing itself. */
   overflow: hidden;
 }
 .data-table__columns {
@@ -471,6 +538,25 @@ function canMove(index: number, delta: -1 | 1): boolean {
 }
 .data-table :deep(.el-table__header th) {
   background: var(--tcrm-color-muted);
+}
+.data-table :deep(.el-table th.el-table__cell) {
+  height: 40px;
+  padding-block: 0;
+}
+/* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
+   its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
+   left shadow — without it a clipped column reads as a rendering bug. */
+.data-table :deep(.el-scrollbar__bar.is-horizontal) {
+  display: block !important;
+  height: 6px;
+  opacity: 1 !important;
+}
+.data-table :deep(.el-scrollbar__bar.is-horizontal > div) {
+  background: #c2c8d2;
+  border-radius: 3px;
+}
+.data-table :deep(.el-table-fixed-column--right.is-first-column) {
+  box-shadow: inset 10px 0 8px -8px rgba(21, 24, 29, 0.16);
 }
 .data-table :deep(.el-table .el-table__cell) {
   padding-block: 12px;

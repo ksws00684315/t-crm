@@ -6,6 +6,7 @@ import { updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -120,21 +121,31 @@ function rowOwned(row: KolVO): boolean {
   return row.bdUserId === me.user?.id;
 }
 
-/** The roster preserves useful scan widths; the table scrolls inside its card when needed. */
+/**
+ * Widths are measured against the rendered 14px text. Chinese fits a 1844px desktop exactly
+ * (1558px of columns in a 1562px card), which is the size of the preview the owner reviewed on
+ * 2026-10-20: no header wraps and the six row actions keep one line. English labels are longer, so
+ * that locale gets wider columns and, as before, scrolls inside the card. Emails, phone numbers and
+ * social handles are the only values that ellipsize either way; the visual guide allows that as long
+ * as the tooltip shows the rest.
+ */
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("kol.kolId"), width: 148, tooltip: true },
-  { key: "name", label: t("kol.kolName"), prop: "name", width: 160, tooltip: true },
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: 164, tooltip: true },
-  { key: "email", label: t("kol.email"), width: 240, tooltip: true },
-  { key: "platform", label: t("kol.primaryPlatform"), width: 200, tooltip: true },
-  { key: "rate", label: t("kol.defaultRate"), width: 120 },
-  { key: "prepay", label: t("kol.prepay"), width: 120 },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: 184, tooltip: true },
-  { key: "inviter", label: t("kol.inviter"), width: 144, tooltip: true },
-  { key: "review", label: t("kol.reviewStatus"), width: 120 },
-  { key: "login", label: t("kol.loginStatus"), width: 120 },
-  { key: "relation", label: t("kol.relationStatus"), width: 136 },
-  { key: "actions", label: t("common.actions"), width: 380 }
+  { key: "kolCode", label: t("kol.kolId"), width: px(108, 124), tooltip: true },
+  { key: "name", label: t("kol.kolName"), prop: "name", width: px(76, 132), tooltip: true },
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(112, 146), tooltip: true },
+  { key: "email", label: t("kol.email"), width: px(120, 168), tooltip: true },
+  { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
+  { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
+  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: px(158, 136), tooltip: true },
+  { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
+  { key: "review", label: t("kol.reviewStatus"), width: px(80, 112) },
+  { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
+  { key: "relation", label: t("kol.relationStatus"), width: px(80, 120) },
+  { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 
 function asKol(row: object): KolVO {
@@ -310,6 +321,7 @@ onMounted(() => {
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
             <el-tag
+              size="small"
               :type="asKol(row).reviewStatus === 'APPROVED' ? 'success' : 'warning'"
               data-test="review-status"
               >{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag
@@ -317,6 +329,7 @@ onMounted(() => {
           </template>
           <template #cell-login="{ row }">
             <el-tag
+              size="small"
               :type="
                 asKol(row).loginStatus === 'NORMAL'
                   ? 'success'
@@ -339,6 +352,7 @@ onMounted(() => {
               @keydown.enter.prevent="handleRelationClick(asKol(row))"
             >
               <el-tag
+                size="small"
                 data-test="relation-status"
                 :type="
                   asKol(row).displayRelationStatus
@@ -463,9 +477,11 @@ onMounted(() => {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
-/* Keep headers intact and let the table's own viewport provide horizontal scrolling. */
+/* Keep headers intact and let the table's own viewport provide horizontal scrolling. The 10px
+   side padding buys four more characters per column than the 12px default without widening the
+   card, which is what keeps the timestamps readable at 1844px. */
 .kol-fit :deep(.el-table .cell) {
-  padding-inline: 12px;
+  padding-inline: 10px;
 }
 .kol-fit :deep(th.el-table__cell .cell) {
   white-space: nowrap;
@@ -473,7 +489,7 @@ onMounted(() => {
 .actions-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 0 4px;
   align-items: center;
 }
 .actions-cell .el-button {

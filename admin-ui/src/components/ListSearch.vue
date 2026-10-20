@@ -100,6 +100,7 @@ function onEnter(event: KeyboardEvent): void {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  width: clamp(200px, 16vw, 288px);
   margin: 0;
 }
 .list-search__form :deep(.el-form-item__label) {
