@@ -150,7 +150,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 112) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   { key: "relation", label: t("kol.relationStatus"), width: px(80, 120) },
-  { key: "actions", label: t("common.actions"), width: px(296, 416) }
+  { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 
 function asKol(row: object): KolVO {
@@ -484,7 +484,7 @@ onMounted(() => {
 }
 .actions-cell {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0 4px;
   align-items: center;
 }
