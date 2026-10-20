@@ -125,7 +125,6 @@ public class KolController {
 
   @PutMapping("/{id}/auto-cleanup")
   @SaCheckPermission("kol:edit")
-  @AuditLog(module = "KOL", action = "Set KOL auto cleanup")
   public R<Void> autoCleanup(
       @PathVariable @Min(1) Long id, @Valid @RequestBody AutoCleanupRequest r) {
     cleanup.setAutoCleanupDays(id, r.days());

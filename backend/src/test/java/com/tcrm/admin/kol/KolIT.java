@@ -770,6 +770,62 @@ class KolIT {
   }
 
   @Test
+  void shouldSearchUnboundKolByExactCodeOrEmailForOwnBd() throws Exception {
+    String admin = companyAdmin();
+    String bd = createBd(admin, "bd-exact-search");
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType("application/json")
+                            .content(
+                                "{\"name\":\"Exact Free\",\"email\":\"exact-free@example.com\","
+                                    + "\"country\":\"US\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    String code =
+        jdbc.queryForObject(
+            "SELECT kol_code FROM crm_kol WHERE id = ?", String.class, Long.valueOf(kolId));
+    String bdToken = login("bd-exact-search", PASSWORD);
+
+    mvc.perform(
+            get("/admin-api/kol/kols").param("kolCode", code.toLowerCase()).header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].id").value(kolId));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code)
+                .param("email", "EXACT-FREE@EXAMPLE.COM")
+                .param("name", "Exact")
+                .header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code)
+                .param("email", "EXACT-FREE@EXAMPLE.COM")
+                .param("name", "No match")
+                .header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+    mvc.perform(get("/admin-api/kol/kols").param("name", "Exact").header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code.substring(0, 7))
+                .header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+  }
+
+  @Test
   void shouldSetPerKolCleanupAndRemoveCompanyCleanupEndpoints() throws Exception {
     String admin = companyAdmin();
     String bdId = createBd(admin, "bd-cleanup-own");
@@ -797,6 +853,19 @@ class KolIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"days\":30}"))
         .andExpect(status().isOk());
+    String kolCode =
+        jdbc.queryForObject(
+            "SELECT kol_code FROM crm_kol WHERE id = ?", String.class, Long.valueOf(kolId));
+    String firstCleanupSummary =
+        jdbc.queryForObject(
+            "SELECT request_params::jsonb ->> 'summary' FROM sys_oper_log WHERE action = 'Set KOL auto cleanup' ORDER BY id DESC LIMIT 1",
+            String.class);
+    assertThat(firstCleanupSummary).contains(kolCode, "30 天");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_oper_log WHERE action = 'Set KOL auto cleanup'",
+                Integer.class))
+        .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
                 "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",
@@ -816,6 +885,16 @@ class KolIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"days\":null}"))
         .andExpect(status().isOk());
+    String closeSummary =
+        jdbc.queryForObject(
+            "SELECT request_params::jsonb ->> 'summary' FROM sys_oper_log WHERE action = 'Set KOL auto cleanup' ORDER BY id DESC LIMIT 1",
+            String.class);
+    assertThat(closeSummary).contains(kolCode, "关闭");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_oper_log WHERE action = 'Set KOL auto cleanup'",
+                Integer.class))
+        .isEqualTo(2);
     assertThat(
             jdbc.queryForObject(
                 "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",

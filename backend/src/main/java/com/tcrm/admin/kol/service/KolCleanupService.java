@@ -95,14 +95,24 @@ public class KolCleanupService implements KolCleanupApi {
     record.setRemark(null);
     record.setCreateBy(user.id());
     records.insert(record);
+    String cleanupValue = days == null ? "关闭" : days + " 天";
     audit.recordTenantWriteOperation(
         user.tenantId(),
         user.id(),
         "KOL",
-        "Save KOL auto cleanup",
+        "Set KOL auto cleanup",
         "PUT",
         "/admin-api/kol/kols/" + kolId + "/auto-cleanup",
-        sanitizer.sanitize(Map.of("kolId", kolId, "days", days == null ? "disabled" : days)));
+        sanitizer.sanitize(
+            Map.of(
+                "kolId",
+                kolId,
+                "kolCode",
+                kol.getKolCode(),
+                "days",
+                days == null ? "disabled" : days,
+                "summary",
+                "达人 " + kol.getKolCode() + " 自动清理设置为 " + cleanupValue)));
   }
 
   @Override

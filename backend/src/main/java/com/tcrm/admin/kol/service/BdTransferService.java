@@ -179,17 +179,20 @@ public class BdTransferService {
       transfers.insert(row);
       changedKols.add(kol);
     }
-    record(
-        "Create BD transfer",
-        "POST",
-        new TransferAuditDTO(
-            changedKols.size(),
-            c.fromBdUserId(),
-            c.toBdUserId(),
-            effective,
-            c.reason(),
-            changedKols.stream().map(KolDO::getBdUserId).distinct().toList(),
-            transferSummary(changedKols, effective, c.toBdUserId(), c.reason(), scheduled)));
+    if (!changedKols.isEmpty()) {
+      record(
+          "Create BD transfer",
+          "POST",
+          new TransferAuditDTO(
+              changedKols.size(),
+              c.fromBdUserId(),
+              c.toBdUserId(),
+              effective,
+              c.reason(),
+              changedKols.stream().map(KolDO::getBdUserId).distinct().toList(),
+              transferSummary(
+                  changedKols, effective, c.toBdUserId(), c.reason(), scheduled, skipped)));
+    }
     int changed = changedKols.size();
     return new BdTransferResultDTO(scheduled ? 0 : changed, scheduled ? changed : 0, skipped);
   }
@@ -470,17 +473,20 @@ public class BdTransferService {
       Instant effectiveAt,
       Long targetBdUserId,
       String reason,
-      boolean scheduled) {
+      boolean scheduled,
+      int skipped) {
     List<String> codes = rows.stream().map(KolDO::getKolCode).filter(Objects::nonNull).toList();
     List<Long> sourceIds = rows.stream().map(KolDO::getBdUserId).distinct().toList();
     String from = sourceIds.stream().map(this::bdName).distinct().collect(Collectors.joining("、"));
-    return String.format(
-        "达人%s从%s转至%s，%s生效，原因：%s",
-        codesSummary(codes),
-        from.isBlank() ? "未分配" : from,
-        bdName(targetBdUserId),
-        scheduled ? "预约于 " + formatTransferTime(effectiveAt) : "立即",
-        reason == null || reason.isBlank() ? "未填写" : reason);
+    String summary =
+        String.format(
+            "达人%s从%s转至%s，%s生效，原因：%s",
+            codesSummary(codes),
+            from.isBlank() ? "未分配" : from,
+            bdName(targetBdUserId),
+            scheduled ? "预约于 " + formatTransferTime(effectiveAt) : "立即",
+            reason == null || reason.isBlank() ? "未填写" : reason);
+    return skipped == 0 ? summary : summary + "；另有 " + skipped + " 位无变化，已跳过";
   }
 
   private String transferSummary(KolBdTransferDO row, KolDO kol, String outcome, String reason) {
