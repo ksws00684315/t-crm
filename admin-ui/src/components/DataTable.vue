@@ -131,6 +131,19 @@ function measureHeights(): void {
   if (!el || !host) return;
   const pageHeight = host.clientHeight;
   if (!pageHeight) return;
+  const hostStyle = getComputedStyle(host);
+  const inFlowChildren = [...host.children].filter(child => {
+    const childStyle = getComputedStyle(child);
+    return childStyle.display !== "none" && !["absolute", "fixed"].includes(childStyle.position);
+  });
+  const siblingHeight = inFlowChildren.reduce(
+    (height, child) => height + (child === el ? 0 : (child as HTMLElement).offsetHeight),
+    0
+  );
+  const hostPadding =
+    parseFloat(hostStyle.paddingTop || "0") + parseFloat(hostStyle.paddingBottom || "0");
+  const hostGap =
+    (parseFloat(hostStyle.rowGap || "0") || 0) * Math.max(0, inFlowChildren.length - 1);
   const toolbar = el.querySelector<HTMLElement>(".data-table__toolbar")?.offsetHeight ?? 0;
   const pager = el.querySelector<HTMLElement>(".data-table__pager")?.offsetHeight ?? 0;
   const style = getComputedStyle(el);
@@ -141,7 +154,15 @@ function measureHeights(): void {
     parseFloat(style.borderBottomWidth || "0");
   const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
   const gap = parseFloat(style.rowGap || "0") || 0;
-  const ceiling = pageHeight - toolbar - pager - frameHeight - gap * gapCount;
+  const ceiling =
+    pageHeight -
+    hostPadding -
+    siblingHeight -
+    hostGap -
+    toolbar -
+    pager -
+    frameHeight -
+    gap * gapCount;
   tableMaxHeight.value = Math.max(160, Math.round(ceiling));
 }
 

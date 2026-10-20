@@ -12,6 +12,35 @@ const columns = [
 ];
 
 describe("DataTable", () => {
+  it("reserves space for filters when capping a long list", async () => {
+    const host = document.createElement("div");
+    const search = document.createElement("div");
+    document.body.append(host);
+    Object.defineProperty(search, "offsetHeight", { value: 100, configurable: true });
+
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: { tableId: "measured", rows: [], columns, total: 0 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      parent.prepend(search);
+      Object.defineProperty(parent, "clientHeight", { value: 600, configurable: true });
+      const toolbar = wrapper.get(".data-table__toolbar").element;
+      const pager = wrapper.get(".data-table__pager").element;
+      Object.defineProperty(toolbar, "offsetHeight", { value: 40, configurable: true });
+      Object.defineProperty(pager, "offsetHeight", { value: 40, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(420);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   it("shows the page range and an Element Plus pagination", async () => {
     const wrapper = mount(DataTable, {
       props: {

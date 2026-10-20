@@ -321,7 +321,6 @@ onMounted(() => {
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
             <el-tag
-              size="small"
               :type="asKol(row).reviewStatus === 'APPROVED' ? 'success' : 'warning'"
               data-test="review-status"
               >{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag
@@ -329,7 +328,6 @@ onMounted(() => {
           </template>
           <template #cell-login="{ row }">
             <el-tag
-              size="small"
               :type="
                 asKol(row).loginStatus === 'NORMAL'
                   ? 'success'
@@ -352,7 +350,6 @@ onMounted(() => {
               @keydown.enter.prevent="handleRelationClick(asKol(row))"
             >
               <el-tag
-                size="small"
                 data-test="relation-status"
                 :type="
                   asKol(row).displayRelationStatus
@@ -485,6 +482,9 @@ onMounted(() => {
 }
 .kol-fit :deep(th.el-table__cell .cell) {
   white-space: nowrap;
+}
+.kol-fit :deep(.el-tag) {
+  padding-inline: 4px;
 }
 .actions-cell {
   display: flex;

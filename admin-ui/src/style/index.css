@@ -23,7 +23,7 @@ body {
   box-sizing: border-box;
 }
 
-/* List pages: search keeps its height; the table card fills the remaining flex space. */
+/* List pages: search keeps its height; the table card can use the remaining space. */
 .list-page {
   display: flex;
   flex-direction: column;
@@ -91,14 +91,6 @@ body {
 #app .el-table td.el-table__cell,
 #app .actions-cell .el-button {
   font-weight: 400;
-}
-
-/* Status tags are the one place 12px belongs: they sit inside 14px table rows. */
-#app .el-tag,
-.el-overlay .el-tag,
-.el-popper .el-tag {
-  font-size: var(--tcrm-font-size-help) !important;
-  line-height: 18px !important;
 }
 
 #app .el-form-item__error,
