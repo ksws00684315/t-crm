@@ -223,9 +223,9 @@ const enUS: MessageSchema = {
     KOL_PROMOTION_CONFIG_INCOMPLETE:
       "The promotion settings are incomplete, so the creator cannot start promoting yet.",
     KOL_ALREADY_CLAIMED: "Another BD just claimed this creator. Refresh and try again.",
-    LINK_TEMPLATE_INVALID: "The agent template must be an enabled template of this company.",
-    LINK_TEMPLATE_NOT_FOUND: "The agent template was not found.",
-    LINK_TEMPLATE_CODE_EXISTS: "This template code already exists.",
+    LINK_TEMPLATE_INVALID: "The agent platform must be an enabled platform of this company.",
+    LINK_TEMPLATE_NOT_FOUND: "The agent platform was not found.",
+    LINK_TEMPLATE_CODE_EXISTS: "This platform name already exists.",
     TASK_QUEUE_FULL: "Too many tasks are waiting. Please try again later.",
     TASK_FILE_INVALID: "The file format is not valid. Upload an .xlsx Excel file.",
     TASK_FILE_TOO_LARGE: "The file is larger than 20MB. Split it and upload again.",
@@ -325,7 +325,7 @@ const enUS: MessageSchema = {
       "The sheet URL must start with https://docs.google.com/spreadsheets/ and be at most 512 characters.",
     templateCode: "Code must be 2-32 lowercase letters, digits, or hyphens.",
     templateUrl:
-      "Template URL must be an https link, contain {'{'}PRODUCT_ID{'}'}, and be at most 512 characters.",
+      "Platform URL must be an https link, contain {'{'}PRODUCT_ID{'}'}, and be at most 512 characters.",
     sortOrder: "Sort order must be an integer from 0 to 9999.",
     socialPlatformRequired: "Enter a social platform.",
     socialPlatformTooLong: "Social platform cannot exceed 32 characters.",
@@ -799,10 +799,10 @@ const enUS: MessageSchema = {
     fallback:
       "When the creator has no invite code, the link falls back to the Weidian product page.",
     confirmDisable:
-      "After this template is disabled, creator links that use it will open the Weidian product page instead.",
-    disableTitle: "Disable template",
-    confirmEnable: 'Enable template "{name}"?',
-    enableTitle: "Enable template",
+      "After this platform is disabled, creator links that use it will open the Weidian product page instead.",
+    disableTitle: "Disable platform",
+    confirmEnable: 'Enable platform "{name}"?',
+    enableTitle: "Enable platform",
     saved: "Saved.",
     created: "Created.",
     disabled: "Disabled.",

@@ -117,8 +117,8 @@ describe("link template page", () => {
     await dataRow!.get('[data-test="status"]').trigger("click");
     await flushPromises();
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      "停用后，使用该模板的达人链接将改为跳转到微店商品页。",
-      "停用模板",
+      "停用后，使用该平台的达人链接将改为跳转到微店商品页。",
+      "停用平台",
       { type: "warning" }
     );
     expect(templateApi.updateLinkTemplateStatus).toHaveBeenCalledWith(row.id, 0);
