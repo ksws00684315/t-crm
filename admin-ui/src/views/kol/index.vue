@@ -140,16 +140,19 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   { key: "kolCode", label: t("kol.kolId"), width: px(108, 124), tooltip: true },
   { key: "name", label: t("kol.kolName"), prop: "name", width: px(76, 132), tooltip: true },
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(112, 146), tooltip: true },
-  { key: "email", label: t("kol.email"), width: px(120, 168), tooltip: true },
+  // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
+  // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
+  // those pixels: its values ellipsize with a tooltip either way.
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(140, 146), tooltip: true },
+  { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true },
   { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
   { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
   { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: px(158, 136), tooltip: true },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 136), tooltip: true },
   { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
-  { key: "review", label: t("kol.reviewStatus"), width: px(80, 112) },
+  { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
-  { key: "relation", label: t("kol.relationStatus"), width: px(80, 120) },
+  { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },
   { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 

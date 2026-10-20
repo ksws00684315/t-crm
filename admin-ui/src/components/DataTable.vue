@@ -163,7 +163,28 @@ function measureHeights(): void {
     pager -
     frameHeight -
     gap * gapCount;
-  tableMaxHeight.value = Math.max(160, Math.round(ceiling));
+  const rounded = Math.max(160, Math.round(ceiling));
+  tableMaxHeight.value = snapToWholeRows(rounded);
+}
+
+/**
+ * A long page scrolls inside the body, and the ceiling rarely lands on a row boundary: the next row
+ * then shows as a 6px sliver above the pager, which reads as a clipped table. Round the ceiling down
+ * to whole rows once the rows actually overflow; a table that fits keeps the measured height.
+ */
+function snapToWholeRows(ceiling: number): number {
+  const table = tableRef.value?.$el as HTMLElement | undefined;
+  const header = table?.querySelector<HTMLElement>(".el-table__header-wrapper");
+  const bodyRows = table?.querySelectorAll<HTMLElement>(".el-table__body tbody tr").length ?? 0;
+  const row = table?.querySelector<HTMLElement>(".el-table__body tbody tr");
+  const headerHeight = header?.offsetHeight ?? 0;
+  const rowHeight = row?.offsetHeight ?? 0;
+  if (!headerHeight || !rowHeight || !bodyRows) return ceiling;
+  const contentHeight = headerHeight + bodyRows * rowHeight;
+  if (contentHeight <= ceiling) return ceiling;
+  const bodySpace = ceiling - headerHeight;
+  if (bodySpace < rowHeight) return ceiling;
+  return headerHeight + Math.floor(bodySpace / rowHeight) * rowHeight;
 }
 
 function scheduleMeasure(): void {
@@ -220,6 +241,9 @@ watch(columnKeys, keys => {
   const merged = loadTablePrefs(props.tableId, keys, prefs.value.pageSize);
   prefs.value = { ...merged, columns: normalize(merged.columns) };
 });
+
+// Density changes the row height that the height ceiling is rounded to, so it re-measures too.
+watch(() => prefs.value.density, scheduleMeasure);
 
 watch(
   prefs,
@@ -590,5 +614,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
 }
 .data-table :deep(.el-table__body tr:hover > td) {
   background: var(--tcrm-color-muted);
+}
+/* A link button carries a 28px box next to 22px cell text, so rows with a link (the creator column
+   of the order list, the download action of the import list) were 4px taller than rows without one.
+   Drop the button onto the text line and every row keeps one height. */
+.data-table :deep(.el-table .cell .el-button.is-link) {
+  height: auto;
+  padding: 0;
+  line-height: var(--tcrm-line-height-body);
+  vertical-align: baseline;
 }
 </style>

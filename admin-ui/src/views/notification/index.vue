@@ -124,30 +124,33 @@ onMounted(load);
         {{ t("notification.markAll") }}
       </el-button>
     </div>
-    <p v-if="!loading && rows.length === 0" class="notification-page__empty">
-      {{ t("notification.empty") }}
-    </p>
-    <button
-      v-for="item in rows"
-      :key="item.id"
-      type="button"
-      class="notification-page__item"
-      :class="{ 'notification-page__item--unread': !item.readTime }"
-      data-test="notification-item"
-      @click="openItem(item)"
-    >
-      <el-icon><component :is="icons[item.type]" /></el-icon>
-      <span>{{ notificationText(item) }}</span>
-      <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
-    </button>
-    <el-pagination
-      v-if="total > size"
-      layout="prev, pager, next"
-      :total="total"
-      :page-size="size"
-      :current-page="page"
-      @current-change="onPage"
-    />
+    <div class="notification-page__card">
+      <p v-if="!loading && rows.length === 0" class="notification-page__empty">
+        {{ t("notification.empty") }}
+      </p>
+      <button
+        v-for="item in rows"
+        :key="item.id"
+        type="button"
+        class="notification-page__item"
+        :class="{ 'notification-page__item--unread': !item.readTime }"
+        data-test="notification-item"
+        @click="openItem(item)"
+      >
+        <el-icon><component :is="icons[item.type]" /></el-icon>
+        <span>{{ notificationText(item) }}</span>
+        <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
+      </button>
+      <el-pagination
+        v-if="total > size"
+        class="notification-page__pager"
+        layout="prev, pager, next"
+        :total="total"
+        :page-size="size"
+        :current-page="page"
+        @current-change="onPage"
+      />
+    </div>
   </section>
 </template>
 
@@ -155,7 +158,11 @@ onMounted(load);
 .notification-page {
   display: flex;
   flex-direction: column;
-  gap: var(--tcrm-space-3);
+  flex: 1;
+  gap: var(--tcrm-space-4);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .notification-page__toolbar {
@@ -164,8 +171,25 @@ onMounted(load);
   gap: var(--tcrm-space-3);
 }
 
+/* Same surface as the list and filter cards: the message list was the only page that rendered
+   straight onto the page background, so its empty state floated without a frame. */
+.notification-page__card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tcrm-space-3);
+  background: var(--tcrm-color-card);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+}
+
+/* Centred in whatever space the card has left, the way the table's empty state reads. */
 .notification-page__empty {
-  margin: 0;
+  margin: auto;
+  padding: var(--tcrm-space-6) 0;
+  text-align: center;
   color: var(--el-text-color-secondary);
 }
 
@@ -178,8 +202,23 @@ onMounted(load);
   border: 0;
   border-bottom: 1px solid var(--el-border-color-lighter);
   background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: start;
   cursor: pointer;
+}
+
+.notification-page__item:last-of-type {
+  border-bottom: 0;
+}
+
+.notification-page__item:hover {
+  background: var(--el-fill-color-light);
+}
+
+.notification-page__item:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
 }
 
 .notification-page__item--unread {
@@ -189,5 +228,10 @@ onMounted(load);
 .notification-page__time {
   font-weight: 400;
   color: var(--el-text-color-secondary);
+}
+
+.notification-page__pager {
+  align-self: flex-end;
+  padding-top: var(--tcrm-space-3);
 }
 </style>
