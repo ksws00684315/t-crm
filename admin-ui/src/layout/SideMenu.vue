@@ -98,6 +98,25 @@ const { t } = useI18n();
 .side__menu :deep(.el-sub-menu__title) {
   color: var(--tcrm-color-text-secondary);
 }
+/*
+ * Element Plus gives the arrow `width: inherit`. As long as the title width is `auto` that resolves
+ * to shrink-to-fit, but we set an explicit width on the title, so the arrow inherited the whole
+ * 191px row, stretched across it and painted on top of the label. Pin the box instead.
+ */
+.side__menu :deep(.el-sub-menu__icon-arrow) {
+  width: 14px;
+  height: 14px;
+  right: 16px;
+  margin-top: -7px;
+  color: inherit;
+}
+/* Long translations must not reach the arrow: the label ellipsizes inside its own box. */
+.side__menu :deep(.el-sub-menu__title) span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .side__menu :deep(.el-menu-item.is-active) {
   background: var(--tcrm-color-muted);
   color: var(--tcrm-color-primary-text);
