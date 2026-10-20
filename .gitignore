@@ -32,6 +32,7 @@ deploy/www/
 deploy/www-preview/
 deploy/.env.preview
 deploy/backups/
+deploy/local-backups/
 
 # Customer samples kept locally only (too large for GitHub, or duplicates of the tracked zip)
 docs/00-需求/客户补充资料-1015/测试专用【达人名称A】.xlsx

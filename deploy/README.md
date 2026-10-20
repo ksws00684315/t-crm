@@ -3,35 +3,69 @@
 | 文件 | 用途 |
 |---|---|
 | `.env.example` | 全部环境变量（名称与 backend / redirect 实际使用的一致）；复制为 `deploy/.env` 后填写，`.env` 不入库 |
-| `docker-compose.dev.yml` | 本地开发依赖：PostgreSQL 17.11、Redis 7.4.5 |
+| `docker-compose.dev.yml` | 本地共享中间件：PostgreSQL 17.11、Redis 7.4.5 |
 | `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis |
 | `docker-compose.preview.yml` | 本地预览：与生产相同的五个服务，只绑定 `127.0.0.1:8890/8891/8892` |
 | `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
 | `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
+| `scripts/local-infra.sh` | 本地共享中间件的启动、停止、备份、恢复与维护命令 |
 | `backup/pg-backup.sh` | 每日 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 R2） |
 | `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
 
-## 本地开发
+## 本地共享中间件与开发
 
 ```bash
-cp deploy/.env.example deploy/.env          # 填写 TCRM_DB_USERNAME / TCRM_DB_PASSWORD 等
-docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env up -d
-docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 healthy
+deploy/scripts/local-infra.sh up       # 首次生成 deploy/.env.local（权限 600）并启动 PostgreSQL、Redis
+deploy/scripts/local-infra.sh status
+deploy/scripts/local-infra.sh backup
+deploy/scripts/local-infra.sh down     # 只停止容器，保留数据
 ```
 
-宿主机端口由 `TCRM_DB_PORT`（默认 5432）、`TCRM_REDIS_PORT`（默认 6379）决定，只绑定 `127.0.0.1`；本机已有 PostgreSQL / Redis 占用端口时，在 `deploy/.env` 中改这两个变量即可，在本机启动的后台和跳转服务读取同名变量连接。库 `tcrm` 与应用账号由 PostgreSQL 镜像根据 `TCRM_DB_NAME`、`TCRM_DB_USERNAME`、`TCRM_DB_PASSWORD` 创建；表由后台启动时的 Flyway 创建，这里不挂载初始化 SQL。
+该项目固定为 `tcrm-local`，网络为 `tcrm-local`，数据卷为 `tcrm-local_pgdata` 和 `tcrm-local_redisdata`。宿主端口只绑定 `127.0.0.1:55432`（PostgreSQL）和 `127.0.0.1:46391`（Redis）。`deploy/.env.local` 保存数据库和 Redis 凭证、加密主密钥、IP 哈希盐及初始管理员凭证，首次随机生成后后续启动不覆盖。预览容器通过 `tcrm-postgres:5432`、`tcrm-redis:6379` 访问同一实例；本机运行的后台和跳转服务从该文件导出变量，以 `localhost` 和上述端口连接。后台本地运行示例：
+
+```bash
+set -a
+source deploy/.env.local
+set +a
+cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Vite 开发服务器仍按 `admin-ui/`、`kol-portal/` 各自原有命令启动。Flyway 本地配置允许忽略其他分支产生但当前代码没有的迁移，并按顺序补跑较早版本迁移。这只能缓解版本先后和缺失问题；删除的列或改掉的约束不会自动恢复，需要用 `backup` / `restore` 处理。
+
+### 代理联调规则
+
+- 联调与浏览器验证统一使用 `deploy/.env.local` 和共享中间件；后端、Vite 使用各自任务分配的端口。
+- 测试账号和测试达人统一加任务前缀，例如用户名 `t34_…`、邮箱 `t34_…@example.com`。
+- 收尾时只删除自己创建的数据；不得停止或删除共享中间件的容器和数据卷，不得执行 `down -v`。派发任务前，架构负责人会先运行 `local-infra.sh backup`。
+- 自动化集成测试 `mvn verify -Pdocker-it` 仍使用 Testcontainers 临时容器，与共享中间件无关。
+
+维护命令：
+
+```bash
+deploy/scripts/local-infra.sh psql
+deploy/scripts/local-infra.sh restore deploy/local-backups/tcrm-local-<时间>.sql.gz  # 输入 yes 确认
+```
+
+备份写入带时间戳的 PostgreSQL SQL 压缩文件和 Redis RDB 到已忽略的 `deploy/local-backups/`。用同名 `.sql.gz` 恢复时，脚本也会恢复配套 `.rdb`：停止 Redis、替换 RDB、清理旧 AOF 状态，再用临时 Redis 7.4 根据备份 RDB 重建 AOF 后启动共享 Redis。脚本没有删除数据卷的命令。确需清空时，先备份，再手动执行：
+
+```bash
+docker compose -p tcrm-local -f deploy/docker-compose.dev.yml --env-file deploy/.env.local down
+docker volume rm tcrm-local_pgdata tcrm-local_redisdata
+```
+
+这会永久删除共享数据。
 
 ## 本地预览
 
-只用于在本机查看**当前工作目录**的源码，不用于任何服务器。一条命令从源码构建并启动管理端、达人端、后台、跳转服务、PostgreSQL 与 Redis。
+只用于在本机查看**当前工作目录**的源码，不用于任何服务器。从源码构建并启动管理端、达人端、后台和跳转服务，共用本地共享中间件的 PostgreSQL 与 Redis。
 
 前置条件：Docker（含 Compose 插件）、Node.js、pnpm、openssl。
 
 ```bash
 deploy/scripts/preview.sh up      # 构建并启动。可在任意目录执行（脚本按自身位置定位仓库根）
-deploy/scripts/preview.sh down    # 停止容器，保留数据卷；下次 up 数据还在
-deploy/scripts/preview.sh reset   # 停止并删除数据卷、预览镜像与 deploy/.env.preview，回到全新状态；须输入 yes
+deploy/scripts/preview.sh down    # 只停止预览容器；不停止共享中间件
+deploy/scripts/preview.sh reset   # 删除本预览项目容器和本地镜像；须输入 yes，不改共享数据
 ```
 
 | 站点 | 地址 |
@@ -40,21 +74,33 @@ deploy/scripts/preview.sh reset   # 停止并删除数据卷、预览镜像与 d
 | 达人端 | http://localhost:8891 |
 | 跳转服务 | http://localhost:8892 （`/t/…`、`/i/…`、`/healthz`） |
 
-PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端口写死在预览配置里，不能改。Compose 项目名是 `tcrm-preview`。
+预览端口默认是 `8890`、`8891`、`8892`，Compose 项目名默认 `tcrm-preview`。需要临时并行运行或排障时，可设置 `TCRM_PREVIEW_ADMIN_PORT`、`TCRM_PREVIEW_KOL_PORT`、`TCRM_PREVIEW_REDIRECT_PORT`，以及共享中间件的 `TCRM_LOCAL_INFRA_PROJECT`、`TCRM_LOCAL_INFRA_NETWORK`、`TCRM_LOCAL_INFRA_DB_PORT`、`TCRM_LOCAL_INFRA_REDIS_PORT`。并行预览若遇到网段冲突，可设置 `TCRM_PREVIEW_SUBNET`，其默认值为 `172.30.0.0/24`，代理信任范围会同步使用该值。默认共享网络为 `tcrm-local`，PostgreSQL 和 Redis 的宿主端口为 `55432` / `46391`。
 
-`deploy/.env.preview` 不存在、且本机还没有预览数据卷时，`up` 会随机生成数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号，文件权限 `600`。已存在则不覆盖。平台管理员用户名和密码**只在刚生成该文件时在终端打印一次**，之后查看 `deploy/.env.preview`。该文件与构建产物 `deploy/www-preview/` 不入库，不要把密码写进文档或提交。
+预览与本机开发共用 `deploy/.env.local` 的数据库账号、Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT` 和平台管理员账号。不要替换主密钥或 IP 哈希盐，否则旧凭证无法解密或旧哈希无法匹配。文件权限 `600`，与构建产物 `deploy/www-preview/` 和备份文件都不入库。
 
 首次使用：用平台管理员登录管理端（登录验证码保持开启，与生产一致）→ 在平台管理里为默认公司创建超级管理员 → 退出后用超级管理员登录。预览不做演示数据。
 
 后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
 
-看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。数据卷 `tcrm-preview_pgdata` 在所有目录之间共用，PostgreSQL 只在数据卷为空时写入账号。如果这个目录还没有 `deploy/.env.preview`，但本机已经有这份数据卷，`up` 不会生成新密码，而是直接退出并提示：已有预览数据（可能来自其他目录）。请从原目录复制 `deploy/.env.preview` 到这里，或执行 `preview.sh reset` 清空后重建。
+看某个分支：切到该分支或进入其工作树，再执行 `preview.sh up`。不同工作树的预览容器共用同一套数据库。Flyway 设置只能缓解分支迁移的版本顺序与记录缺失；如果迁移造成结构破坏，先备份并恢复兼容的备份。
+
+### 从旧预览迁移
+
+架构负责人切换负责人环境时，在旧预览数据所在目录核对目标项目和旧卷后，执行一次性迁移。默认 `tcrm-preview` 需要负责人显式授权；旧卷保留到负责人确认后手动删除：
+
+```bash
+TCRM_ALLOW_OWNER_PREVIEW_MIGRATION=yes deploy/scripts/local-infra.sh migrate-from-preview
+deploy/scripts/local-infra.sh status
+deploy/scripts/local-infra.sh psql
+```
+
+迁移会备份旧 PostgreSQL 与 Redis 数据，把 `.env.preview` 中的数据库凭证、加密主密钥、IP 哈希盐和管理员配置迁入 `.env.local`，停止旧预览容器，将旧数据卷复制到共享中间件卷并启动共享中间件。核对达人、用户数和主要页面无误前，保留旧卷；不要对旧预览执行 `down -v`。
 
 `deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：预览构建不设置 `VITE_UPLOAD_BASE_URL`，上传走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
-排障：预览网络是 `172.30.0.0/24`，与生产模板相同。本机如果已经有网络占用这个网段，启动会失败。这种情况少见；出现时先处理占用该网段的网络，不要改预览配置里的网段。
+排障：预览网络默认是 `172.30.0.0/24`，与生产模板相同。如果本机已有网络占用该网段，给并行预览设置一个未占用的 `TCRM_PREVIEW_SUBNET`；脚本会把同一网段用于预览网络和代理信任范围。
 
 ## 生产部署（模板，使用前逐项审阅）
 
