@@ -33,11 +33,13 @@ defineProps<{ title: string }>();
 }
 h1 {
   margin: 0 0 24px;
-  font-size: 22px;
+  font-size: 20px;
+  line-height: 28px;
   text-align: center;
 }
 :deep(.el-button) {
   min-height: 44px;
+  margin-block: 2px;
 }
 :deep(.el-input__wrapper) {
   min-height: 44px;

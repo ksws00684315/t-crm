@@ -177,7 +177,7 @@ async function openItem(item: NotificationVO) {
 
 .notification-bell__time {
   grid-column: 2;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--el-text-color-secondary);
 }

@@ -22,7 +22,6 @@ export interface DataColumn {
   prop?: string;
   width?: number | string;
   minWidth?: number | string;
-  mono?: boolean;
   amount?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
@@ -158,10 +157,6 @@ const hiddenCount = computed(
     prefs.value.columns.filter(column => !column.visible && !locked.value.has(column.key)).length
 );
 
-const tableSize = computed(() =>
-  prefs.value.density === "default" ? "default" : prefs.value.density
-);
-
 const range = computed(() => {
   if (!props.paged || props.total === 0) return { from: 0, to: 0 };
   const from = (props.page - 1) * props.size + 1;
@@ -224,7 +219,10 @@ function canMove(index: number, delta: -1 | 1): boolean {
 </script>
 
 <template>
-  <section class="data-table" :class="{ 'is-fullscreen': fullscreen, 'is-plain': plain }">
+  <section
+    class="data-table"
+    :class="[{ 'is-fullscreen': fullscreen, 'is-plain': plain }, `density-${prefs.density}`]"
+  >
     <header v-if="!plain" class="data-table__toolbar">
       <div v-if="selectable && selected.length" class="data-table__batch" data-test="batch-bar">
         <span class="data-table__batch-count">{{
@@ -317,7 +315,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         v-loading="loading"
         :data="rows"
         :row-key="rowKey"
-        :size="tableSize"
+        size="default"
         :height="plain ? undefined : '100%'"
         :default-expand-all="defaultExpandAll"
         border
@@ -353,7 +351,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
           "
           :align="column.amount ? 'right' : undefined"
           :show-overflow-tooltip="column.tooltip"
-          :class-name="column.mono ? 'tcrm-mono' : column.amount ? 'tcrm-amount' : undefined"
+          :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
@@ -418,6 +416,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
 }
 .data-table__batch-hint {
   font-size: 12px;
+  line-height: 20px;
   color: var(--tcrm-color-text-secondary);
 }
 .data-table.is-plain {
@@ -472,6 +471,15 @@ function canMove(index: number, delta: -1 | 1): boolean {
 }
 .data-table :deep(.el-table__header th) {
   background: var(--tcrm-color-muted);
+}
+.data-table :deep(.el-table .el-table__cell) {
+  padding-block: 12px;
+}
+.data-table.density-small :deep(.el-table .el-table__cell) {
+  padding-block: 8px;
+}
+.data-table.density-large :deep(.el-table .el-table__cell) {
+  padding-block: 16px;
 }
 .data-table :deep(.el-table__body tr:hover > td) {
   background: var(--tcrm-color-muted);

@@ -1,5 +1,7 @@
 # T-CRM 管理端（admin-ui）
 
+前端字体、字号、间距与响应式规则遵守 [统一前端视觉与布局规范](../docs/05-工程规范/10-前端视觉与布局规范.md)。
+
 > **来源**：[pure-admin/pure-admin-thin](https://github.com/pure-admin/pure-admin-thin)（精简版、非国际化版本，MIT）
 > **版本**：tag `v6.2.0`（提交 `f0ff132561ab684bb78379239adf29f9a38ac7f1`，2025-10-30 发布，当时最新稳定 tag；`git ls-remote --tags` 核对过没有更高的 tag）
 > **获取日期**：2026-10-05（以 `git clone --depth 1 --branch v6.2.0` 取得，不含上游 `.git`）

@@ -354,7 +354,8 @@ load();
 }
 .payout__head h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--tcrm-font-size-title);
+  line-height: var(--tcrm-line-height-title);
 }
 .payout__limit {
   margin: -8px 0 0;
@@ -401,7 +402,7 @@ load();
 }
 .payout__account-value {
   overflow-wrap: anywhere;
-  font-family: var(--el-font-family-mono, monospace);
+  font-family: var(--tcrm-font-sans);
 }
 .payout__reject {
   margin-top: 12px;

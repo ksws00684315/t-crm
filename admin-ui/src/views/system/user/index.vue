@@ -61,8 +61,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "permissions", label: t("user.permissionCount"), width: 100 },
   { key: "dataScope", label: t("user.dataScope"), width: 110 },
   { key: "status", label: t("common.status"), width: 80 },
-  { key: "lastLogin", label: t("user.lastLogin"), width: 170, mono: true },
-  { key: "createdAt", label: t("common.createdAt"), width: 170, mono: true },
+  { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
+  { key: "createdAt", label: t("common.createdAt"), width: 170 },
   { key: "actions", label: t("common.actions"), width: 300 }
 ]);
 

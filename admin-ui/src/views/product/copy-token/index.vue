@@ -94,9 +94,9 @@ const columns = computed<DataColumn[]>(() => {
     { key: "shop", label: t("copyToken.shop"), minWidth: 120 },
     { key: "usage", label: t("copyToken.usage"), width: 110 },
     { key: "validMinutes", label: t("copyToken.validMinutes"), width: 100 },
-    { key: "expiresAt", label: t("copyToken.expiresAt"), width: 170, mono: true },
+    { key: "expiresAt", label: t("copyToken.expiresAt"), width: 170 },
     { key: "status", label: t("common.status"), width: 100 },
-    { key: "createTime", label: t("common.createdAt"), width: 170, mono: true }
+    { key: "createTime", label: t("common.createdAt"), width: 170 }
   ];
   if (canManage.value) {
     list.push({ key: "actions", label: t("common.actions"), width: 100 });
@@ -344,7 +344,7 @@ onMounted(() => {
       @clear-filters="reset"
     >
       <template #cell-hint="{ row }">
-        <span class="tcrm-mono">{{ asRow(row).tokenHint }}</span>
+        <span class="">{{ asRow(row).tokenHint }}</span>
         <button
           type="button"
           class="link-btn"

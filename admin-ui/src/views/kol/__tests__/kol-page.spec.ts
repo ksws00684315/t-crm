@@ -178,16 +178,14 @@ describe("creator list page (task 32 §2.2)", () => {
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
-    // 1440px fit (2026-10-20 review item 1): every column is width-fixed and their sum stays
-    // within the table area of a 1440px window (1440 - sidebar 224 - paddings ≈ 1160), so
-    // nothing scrolls horizontally.
-    // Element Plus carries the column widths on the colgroup <col> elements.
+    // The grid retains widths that keep the labels readable; it scrolls inside the table.
+    // Element Plus carries each configured width on the corresponding colgroup <col> element.
     const fixed = wrapper
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
     expect(fixed.length).toBe(13);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(1160);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1160);
     wrapper.unmount();
   });
 

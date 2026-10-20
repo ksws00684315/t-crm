@@ -29,7 +29,9 @@
   --tcrm-space-3: 12px;
   --tcrm-space-4: 16px;
   --tcrm-space-5: 24px;
+  --tcrm-space-6: 32px;
   --tcrm-control-height: 32px;
+  --tcrm-control-height-mobile: 44px;
   --tcrm-radius-card: 12px;
   --tcrm-radius-control: 8px;
   --tcrm-radius-tag: 6px;
@@ -37,9 +39,16 @@
   --tcrm-sidebar-collapsed: 64px;
   --tcrm-header-height: 56px;
   --tcrm-font-sans:
-    "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
     sans-serif;
-  --tcrm-font-mono: "SFMono-Regular", Consolas, Menlo, ui-monospace, monospace;
+  --tcrm-font-size-body: 14px;
+  --tcrm-line-height-body: 22px;
+  --tcrm-font-size-title: 20px;
+  --tcrm-line-height-title: 28px;
+  --tcrm-font-size-section: 16px;
+  --tcrm-line-height-section: 24px;
+  --tcrm-font-size-help: 12px;
+  --tcrm-line-height-help: 20px;
 
   --el-color-primary: var(--tcrm-color-primary);
   --el-color-success: var(--tcrm-color-success);
@@ -72,6 +81,12 @@
   --el-border-radius-base: var(--tcrm-radius-control);
   --el-border-radius-small: var(--tcrm-radius-tag);
   --el-component-size: var(--tcrm-control-height);
+  --el-font-family: var(--tcrm-font-sans);
+  --el-font-size-base: var(--tcrm-font-size-body);
+  --el-font-size-extra-large: var(--tcrm-font-size-title);
+  --el-font-size-large: var(--tcrm-font-size-section);
+  --el-font-size-medium: var(--tcrm-font-size-body);
+  --el-font-size-small: var(--tcrm-font-size-help);
   --el-box-shadow: var(--tcrm-shadow-overlay);
   --el-box-shadow-light: var(--tcrm-shadow-overlay);
   color-scheme: light;

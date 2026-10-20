@@ -31,7 +31,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "shopName", label: t("order.syncShop"), prop: "shopName", minWidth: 140 },
   { key: "enabled", label: t("order.syncEnabled"), width: 90 },
   { key: "authorized", label: t("order.syncAuthorized"), width: 90 },
-  { key: "lastSuccessAt", label: t("order.syncLastSuccess"), width: 170, mono: true },
+  { key: "lastSuccessAt", label: t("order.syncLastSuccess"), width: 170 },
   { key: "lastError", label: t("order.syncLastError"), minWidth: 120 },
   { key: "actions", label: t("common.actions"), width: 110 }
 ]);

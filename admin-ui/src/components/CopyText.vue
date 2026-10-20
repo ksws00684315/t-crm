@@ -20,7 +20,7 @@ async function onCopy(): Promise<void> {
 
 <template>
   <span class="copy-text">
-    <span class="tcrm-mono">{{ value }}</span>
+    <span class="">{{ value }}</span>
     <el-button
       v-if="value"
       link

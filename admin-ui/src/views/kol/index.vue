@@ -120,33 +120,22 @@ function rowOwned(row: KolVO): boolean {
   return row.bdUserId === me.user?.id;
 }
 
-/**
- * The 04.01 columns sized to fit a 1440px window with no horizontal scrolling (2026-10-20
- * review): narrow cells, capped text columns with hover tooltips, the invite time on two
- * lines, and the six actions wrapped as two rows of three (~200px).
- */
+/** The roster preserves useful scan widths; the table scrolls inside its card when needed. */
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("kol.kolId"), width: 100, mono: true, tooltip: true },
-  { key: "name", label: t("kol.kolName"), prop: "name", width: 72, tooltip: true },
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: 100, tooltip: true },
-  { key: "email", label: t("kol.email"), width: 118, mono: true, tooltip: true },
-  { key: "platform", label: t("kol.primaryPlatform"), width: 112, tooltip: true },
-  { key: "rate", label: t("kol.defaultRate"), width: 60 },
-  { key: "prepay", label: t("kol.prepay"), width: 60 },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: 84, mono: true },
-  { key: "inviter", label: t("kol.inviter"), width: 70, tooltip: true },
-  { key: "review", label: t("kol.reviewStatus"), width: 60 },
-  { key: "login", label: t("kol.loginStatus"), width: 60 },
-  { key: "relation", label: t("kol.relationStatus"), width: 60 },
-  { key: "actions", label: t("common.actions"), width: 200 }
+  { key: "kolCode", label: t("kol.kolId"), width: 148, tooltip: true },
+  { key: "name", label: t("kol.kolName"), prop: "name", width: 160, tooltip: true },
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: 164, tooltip: true },
+  { key: "email", label: t("kol.email"), width: 240, tooltip: true },
+  { key: "platform", label: t("kol.primaryPlatform"), width: 200, tooltip: true },
+  { key: "rate", label: t("kol.defaultRate"), width: 120 },
+  { key: "prepay", label: t("kol.prepay"), width: 120 },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: 184, tooltip: true },
+  { key: "inviter", label: t("kol.inviter"), width: 144, tooltip: true },
+  { key: "review", label: t("kol.reviewStatus"), width: 120 },
+  { key: "login", label: t("kol.loginStatus"), width: 120 },
+  { key: "relation", label: t("kol.relationStatus"), width: 136 },
+  { key: "actions", label: t("common.actions"), width: 320 }
 ]);
-
-/** Splits "2026/10/05 01:02:03" for the two-line invite-time cell. */
-function instantLines(value: string): string[] {
-  const text = formatInstant(value);
-  const split = text.indexOf(" ");
-  return split < 0 ? [text] : [text.slice(0, split), text.slice(split + 1)];
-}
 
 function asKol(row: object): KolVO {
   return row as KolVO;
@@ -316,11 +305,7 @@ onMounted(() => {
             <span class="developing">{{ t("common.developing") }}</span>
           </template>
           <template #cell-inviteTime="{ row }">
-            <span class="invite-time" data-test="invite-time">
-              <span v-for="line in instantLines(asKol(row).inviteTime)" :key="line">{{
-                line
-              }}</span>
-            </span>
+            <span data-test="invite-time">{{ formatInstant(asKol(row).inviteTime) }}</span>
           </template>
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
@@ -478,32 +463,23 @@ onMounted(() => {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
-/* Dense cells so all 13 columns fit a 1440px window without horizontal scrolling. */
+/* Keep headers intact and let the table's own viewport provide horizontal scrolling. */
 .kol-fit :deep(.el-table .cell) {
-  padding: 0 6px;
+  padding-inline: 12px;
 }
 .kol-fit :deep(th.el-table__cell .cell) {
-  white-space: normal;
-  word-break: break-all;
-  line-height: 16px;
-}
-.invite-time {
-  display: inline-flex;
-  flex-direction: column;
-  font-size: 11px;
-  line-height: 15px;
+  white-space: nowrap;
 }
 .actions-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
+  gap: 4px 12px;
   align-items: center;
 }
 .actions-cell .el-button {
   margin: 0;
   padding: 0;
   height: auto;
-  font-size: 12px;
 }
 .action-disabled {
   display: inline-flex;

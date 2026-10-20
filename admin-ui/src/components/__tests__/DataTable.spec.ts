@@ -6,7 +6,7 @@ import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
 
 const columns = [
-  { key: "code", label: "编号", prop: "code", mono: true },
+  { key: "code", label: "编号", prop: "code" },
   { key: "name", label: "名称" },
   { key: "actions", label: "操作" }
 ];

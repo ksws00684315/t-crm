@@ -42,9 +42,9 @@ function asAdmin(row: object): TenantAdminVO {
 const columns = computed<DataColumn[]>(() => [
   { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
   { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
-  { key: "email", label: t("common.email"), minWidth: 180, mono: true },
+  { key: "email", label: t("common.email"), minWidth: 180 },
   { key: "status", label: t("common.status"), width: 90 },
-  { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180, mono: true },
+  { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180 },
   { key: "actions", label: t("common.actions"), width: 110 }
 ]);
 const createVisible = ref(false);

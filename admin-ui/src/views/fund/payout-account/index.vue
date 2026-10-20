@@ -47,14 +47,13 @@ const columns = computed<DataColumn[]>(() => [
     key: "accountMasked",
     label: t("payout.account"),
     prop: "accountMasked",
-    minWidth: 150,
-    mono: true
+    minWidth: 150
   },
   { key: "holderName", label: t("payout.holder"), prop: "holderName", minWidth: 110 },
   { key: "status", label: t("common.status"), width: 100 },
   { key: "defaultAccount", label: t("payout.defaultColumn"), width: 80 },
-  { key: "lastSubmittedAt", label: t("payout.submittedAt"), width: 170, mono: true },
-  { key: "reviewedTime", label: t("payout.reviewedAt"), width: 170, mono: true },
+  { key: "lastSubmittedAt", label: t("payout.submittedAt"), width: 170 },
+  { key: "reviewedTime", label: t("payout.reviewedAt"), width: 170 },
   ...(canReview.value ? [{ key: "actions", label: t("common.actions"), width: 90 }] : [])
 ]);
 

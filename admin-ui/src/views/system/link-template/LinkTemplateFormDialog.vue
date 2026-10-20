@@ -227,7 +227,7 @@ async function submit() {
 }
 
 .preview {
-  font-family: var(--tcrm-font-mono, ui-monospace, monospace);
+  font-family: var(--tcrm-font-sans);
   overflow-wrap: anywhere;
 }
 

@@ -88,15 +88,15 @@ function onEnter(event: KeyboardEvent): void {
 
 <style scoped>
 .list-search {
-  padding: var(--tcrm-space-3);
+  padding: var(--tcrm-space-4);
   margin-bottom: 0;
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
 .list-search__form :deep(.el-form-item) {
-  margin-right: var(--tcrm-space-3);
-  margin-bottom: var(--tcrm-space-2);
+  margin-right: var(--tcrm-space-4);
+  margin-bottom: var(--tcrm-space-3);
 }
 .list-search__row,
 .list-search__actions,
@@ -107,6 +107,6 @@ function onEnter(event: KeyboardEvent): void {
   gap: var(--tcrm-space-2);
 }
 .list-search__chips {
-  margin-top: var(--tcrm-space-2);
+  margin-top: var(--tcrm-space-3);
 }
 </style>

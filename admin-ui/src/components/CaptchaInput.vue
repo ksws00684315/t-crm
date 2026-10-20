@@ -147,8 +147,8 @@ onBeforeUnmount(() => {
 }
 .captcha__failed {
   padding: 0 4px;
-  font-size: 12px;
-  line-height: 1.2;
+  font-size: 14px;
+  line-height: 22px;
   color: var(--el-color-danger);
 }
 </style>

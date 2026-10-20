@@ -39,11 +39,11 @@ function asShop(row: object): ShopVO {
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
     { key: "shopName", label: t("shop.name"), prop: "shopName", minWidth: 140 },
-    { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140, mono: true },
+    { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140 },
     { key: "status", label: t("common.status"), width: 90 },
     { key: "copyTarget", label: t("shop.copyTarget"), width: 110 },
     { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 160, tooltip: true },
-    { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
+    { key: "updatedAt", label: t("common.updatedAt"), width: 170 }
   ];
   if (abilities.value.canManageShop) {
     list.push({ key: "actions", label: t("common.actions"), width: 280 });
@@ -253,6 +253,7 @@ onMounted(() => void load());
 <style scoped>
 .hint {
   color: var(--tcrm-color-text-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 </style>

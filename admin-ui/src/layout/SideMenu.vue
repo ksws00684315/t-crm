@@ -72,7 +72,8 @@ const { t } = useI18n();
   display: flex;
   align-items: center;
   padding: 0 var(--tcrm-space-4);
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 28px;
   font-weight: 600;
   color: var(--tcrm-color-text);
 }

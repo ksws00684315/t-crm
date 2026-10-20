@@ -26,8 +26,7 @@ const columns = computed<DataColumn[]>(() => [
     key: "templateCode",
     label: t("linkTemplate.code"),
     prop: "templateCode",
-    width: 140,
-    mono: true
+    width: 140
   },
   { key: "templateName", label: t("linkTemplate.name"), prop: "templateName", minWidth: 140 },
   {
@@ -35,7 +34,6 @@ const columns = computed<DataColumn[]>(() => [
     label: t("linkTemplate.url"),
     prop: "templateUrl",
     minWidth: 280,
-    mono: true,
     tooltip: true
   },
   { key: "sortOrder", label: t("linkTemplate.sort"), prop: "sortOrder", width: 90 },

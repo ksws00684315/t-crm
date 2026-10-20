@@ -26,11 +26,11 @@ function asTenant(row: object): TenantVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "tenantCode", label: t("tenant.code"), minWidth: 150, mono: true },
+  { key: "tenantCode", label: t("tenant.code"), minWidth: 150 },
   { key: "name", label: t("tenant.name"), prop: "name", minWidth: 160 },
   { key: "status", label: t("common.status"), width: 100 },
   { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 200, tooltip: true },
-  { key: "createdAt", label: t("common.createdAt"), width: 180, mono: true },
+  { key: "createdAt", label: t("common.createdAt"), width: 180 },
   { key: "actions", label: t("common.actions"), width: 290 }
 ]);
 

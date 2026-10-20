@@ -39,6 +39,6 @@ const problems = computed(
 
 .muted {
   color: var(--tcrm-color-text-secondary);
-  font-size: 13px;
+  font-size: 14px;
 }
 </style>

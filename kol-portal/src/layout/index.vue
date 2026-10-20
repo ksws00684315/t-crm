@@ -92,8 +92,9 @@ async function signOut() {
   padding: 12px 16px;
 }
 .shell__brand {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
+  line-height: 28px;
 }
 .shell__actions {
   display: flex;
@@ -113,7 +114,7 @@ async function signOut() {
 .shell__nav-link {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: 18px;
   white-space: nowrap;
@@ -174,6 +175,8 @@ async function signOut() {
   max-width: 960px;
   margin: 0 auto;
   padding: 16px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 @media (min-width: 768px) {
   .shell__top {
@@ -183,7 +186,17 @@ async function signOut() {
     padding: 0 32px 8px;
   }
   .shell__main {
-    padding: 24px 32px;
+    padding: 24px 16px;
+  }
+}
+@media (min-width: 1280px) {
+  .shell__main {
+    padding-inline: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .shell__main {
+    padding: 12px;
   }
 }
 </style>

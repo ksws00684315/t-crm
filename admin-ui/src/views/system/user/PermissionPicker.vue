@@ -137,7 +137,7 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
 .perm-exclusive {
   margin: 8px 0 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 22px;
 }
 </style>

@@ -325,12 +325,14 @@ onMounted(() => void load());
 
 .hint {
   color: var(--tcrm-color-text-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 
 .error {
   color: var(--el-color-danger);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 
 .hidden-input {

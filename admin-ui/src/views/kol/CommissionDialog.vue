@@ -117,7 +117,7 @@ function fieldLabel(key: string): string {
 
 const recordColumns = computed<DataColumn[]>(() => [
   { key: "version", label: t("promotion.version"), width: 85 },
-  { key: "effective", label: t("promotion.effectiveTime"), width: 170, mono: true },
+  { key: "effective", label: t("promotion.effectiveTime"), width: 170 },
   { key: "operator", label: t("promotion.recordOperator"), width: 120 },
   { key: "changes", label: t("promotion.recordChanges"), minWidth: 280 }
 ]);

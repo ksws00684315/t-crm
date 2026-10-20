@@ -120,8 +120,8 @@ async function sendInvite() {
 
 const historyColumns = computed<DataColumn[]>(() => [
   { key: "bd", label: t("kol.bdColumn"), minWidth: 120 },
-  { key: "startedAt", label: t("kol.startedAt"), width: 170, mono: true },
-  { key: "endedAt", label: t("kol.endedAt"), width: 170, mono: true }
+  { key: "startedAt", label: t("kol.startedAt"), width: 170 },
+  { key: "endedAt", label: t("kol.endedAt"), width: 170 }
 ]);
 </script>
 
