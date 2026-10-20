@@ -318,7 +318,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         size="default"
         :height="plain ? undefined : '100%'"
         :default-expand-all="defaultExpandAll"
-        border
+        stripe
         @selection-change="onSelection"
       >
         <el-table-column

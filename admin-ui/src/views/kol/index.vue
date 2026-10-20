@@ -134,7 +134,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "review", label: t("kol.reviewStatus"), width: 120 },
   { key: "login", label: t("kol.loginStatus"), width: 120 },
   { key: "relation", label: t("kol.relationStatus"), width: 136 },
-  { key: "actions", label: t("common.actions"), width: 320 }
+  { key: "actions", label: t("common.actions"), width: 380 }
 ]);
 
 function asKol(row: object): KolVO {
@@ -350,8 +350,8 @@ onMounted(() => {
             </span>
           </template>
           <template #actions="{ row }">
-            <!-- 04.01: six fixed actions, this order, disabled when not applicable; wrapped
-                 as two rows of three so the column stays ~200px (2026-10-20 review). -->
+            <!-- 04.01: keep all six actions in order; the wider column lets the Chinese
+                 labels fit on one line while longer translations may wrap naturally. -->
             <div class="actions-cell" data-test="row-actions">
               <el-button
                 link
@@ -473,13 +473,14 @@ onMounted(() => {
 .actions-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 4px 8px;
   align-items: center;
 }
 .actions-cell .el-button {
   margin: 0;
   padding: 0;
   height: auto;
+  white-space: nowrap;
 }
 .action-disabled {
   display: inline-flex;

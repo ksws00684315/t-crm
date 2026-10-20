@@ -62,7 +62,9 @@ function onEnter(event: KeyboardEvent): void {
           >
             {{ expanded ? t("search.collapse") : t("search.expand") }}
           </el-button>
-          <slot name="actions" />
+          <div v-if="$slots.actions" class="list-search__extra">
+            <slot name="actions" />
+          </div>
         </div>
       </div>
       <div v-show="expanded" class="list-search__row" data-test="search-more">
@@ -95,8 +97,20 @@ function onEnter(event: KeyboardEvent): void {
   border-radius: var(--tcrm-radius-card);
 }
 .list-search__form :deep(.el-form-item) {
-  margin-right: var(--tcrm-space-4);
-  margin-bottom: var(--tcrm-space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+}
+.list-search__form :deep(.el-form-item__label) {
+  height: auto;
+  margin-bottom: var(--tcrm-space-1);
+  line-height: var(--tcrm-line-height-body);
+}
+.list-search__form :deep(.el-form-item__content) {
+  width: 100%;
+  min-width: 0;
+  margin-left: 0 !important;
 }
 .list-search__row,
 .list-search__actions,
@@ -105,6 +119,19 @@ function onEnter(event: KeyboardEvent): void {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tcrm-space-2);
+}
+.list-search__row {
+  column-gap: var(--tcrm-space-4);
+  row-gap: var(--tcrm-space-3);
+}
+.list-search__actions {
+  flex: 1;
+  align-self: flex-end;
+  min-width: min(100%, 180px);
+}
+.list-search__extra {
+  display: flex;
+  margin-left: auto;
 }
 .list-search__chips {
   margin-top: var(--tcrm-space-3);
