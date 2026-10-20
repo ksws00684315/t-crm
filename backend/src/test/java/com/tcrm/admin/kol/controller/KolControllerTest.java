@@ -126,13 +126,30 @@ class KolControllerTest {
     mvc.perform(
             get(BASE)
                 .param("keyword", "ali")
+                .param("kolCode", "KOL-AAA")
+                .param("name", "Alice")
+                .param("email", "ali@example.com")
                 .param("country", "us")
                 .param("status", "1")
                 .param("bdUserId", "5")
                 .param("relationStatus", "PENDING_UPDATE")
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.OWN)))
         .andExpect(status().isOk());
-    verify(kols).page(new KolFilterDTO("ali", "us", 1, 5L, null, "PENDING_UPDATE", null, 1, 20));
+    verify(kols)
+        .page(
+            new KolFilterDTO(
+                "ali",
+                "KOL-AAA",
+                "Alice",
+                "ali@example.com",
+                "us",
+                1,
+                5L,
+                null,
+                "PENDING_UPDATE",
+                null,
+                1,
+                20));
   }
 
   @ParameterizedTest

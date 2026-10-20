@@ -91,6 +91,12 @@ public class KolService {
     Long bd = user.ownScope() ? null : filter.bdUserId();
     String keyword = filter.keyword() == null ? "" : filter.keyword().strip();
     String pattern = "%" + escapeLike(keyword) + "%";
+    String kolCode = filter.kolCode() == null ? "" : filter.kolCode().strip();
+    String kolCodePattern = "%" + escapeLike(kolCode) + "%";
+    String name = filter.name() == null ? "" : filter.name().strip();
+    String namePattern = "%" + escapeLike(name) + "%";
+    String email = filter.email() == null ? "" : filter.email().strip();
+    String emailPattern = "%" + escapeLike(email) + "%";
     var query =
         new LambdaQueryWrapper<KolDO>()
             .and(
@@ -118,6 +124,10 @@ public class KolService {
                 filter.country() == null ? null : filter.country().strip().toUpperCase(Locale.ROOT))
             .eq(filter.status() != null, KolDO::getStatus, filter.status())
             .eq(bd != null, KolDO::getBdUserId, bd);
+    query
+        .apply(!kolCode.isEmpty(), "kol_code ILIKE {0}", kolCodePattern)
+        .apply(!name.isEmpty(), "name ILIKE {0}", namePattern)
+        .apply(!email.isEmpty(), "email ILIKE {0}", emailPattern);
     if (user.ownScope()) {
       query.and(
           w ->
@@ -134,7 +144,17 @@ public class KolService {
                                           .or()
                                           .apply(
                                               "lower(email) = {0}",
-                                              keyword.toLowerCase(Locale.ROOT)))));
+                                              keyword.toLowerCase(Locale.ROOT))))
+                  .or(
+                      !kolCode.isEmpty(),
+                      x ->
+                          x.isNull(KolDO::getBdUserId)
+                              .apply("lower(kol_code) = {0}", kolCode.toLowerCase(Locale.ROOT)))
+                  .or(
+                      !email.isEmpty(),
+                      x ->
+                          x.isNull(KolDO::getBdUserId)
+                              .apply("lower(email) = {0}", email.toLowerCase(Locale.ROOT))));
     }
     if (filter.reviewStatus() != null && !filter.reviewStatus().isBlank()) {
       query.eq(KolDO::getReviewStatus, filter.reviewStatus().strip());

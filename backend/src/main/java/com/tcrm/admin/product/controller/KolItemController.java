@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Kol item mapping query (task 05 §5). A staff account with OWN scope is denied by the service. */
+/** Kol item mapping query (task 05 §5). OWN-scope staff see mappings for their assigned KOLs. */
 @RestController
 @RequestMapping("/admin-api/product/kol-items")
 public class KolItemController {

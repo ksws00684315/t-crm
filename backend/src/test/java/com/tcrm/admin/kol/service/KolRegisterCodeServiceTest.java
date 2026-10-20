@@ -44,7 +44,7 @@ class KolRegisterCodeServiceTest {
   void setUp() {
     when(current.user()).thenReturn(account(8L));
     when(bdUsers.getById(8L)).thenReturn(new BdUserDTO(8L, "bd", "BD", true));
-    when(codes.lockByBd(8L)).thenReturn(java.util.List.of());
+    when(codes.lockByBd(1L, 8L)).thenReturn(java.util.List.of());
   }
 
   @Test
@@ -57,7 +57,7 @@ class KolRegisterCodeServiceTest {
     ArgumentCaptor<KolRegisterCodeDO> inserted = ArgumentCaptor.forClass(KolRegisterCodeDO.class);
     verify(codes).insert(inserted.capture());
     assertThat(inserted.getValue().getBdUserId()).isEqualTo(8L);
-    assertThat(inserted.getValue().getTenantId()).isNull();
+    assertThat(inserted.getValue().getTenantId()).isEqualTo(1L);
     assertThat(inserted.getValue().getCreateBy()).isEqualTo(8L);
     assertThat(inserted.getValue().getStatus()).isEqualTo(KolRegisterCodeDO.STATUS_ACTIVE);
   }
@@ -98,7 +98,7 @@ class KolRegisterCodeServiceTest {
     when(codes.selectOne(any())).thenReturn(null);
     KolRegisterCodeDTO dto = service.rotate();
     assertThat(dto.code()).matches("[2-9A-HJ-NP-Z]{8}");
-    verify(codes).revokeActive(eq(8L), eq(8L), any());
+    verify(codes).revokeActive(eq(1L), eq(8L), eq(8L), any());
     verify(codes).insert(any(KolRegisterCodeDO.class));
   }
 
@@ -112,7 +112,7 @@ class KolRegisterCodeServiceTest {
     assertThatThrownBy(service::rotate)
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.KOL_INVALID_BD_USER.message());
-    verify(codes, never()).lockByBd(anyLong());
+    verify(codes, never()).lockByBd(anyLong(), anyLong());
   }
 
   private static AccountDTO account(long id) {

@@ -244,6 +244,11 @@ class BdTransferIT {
     assertThat(create(Map.of("fromBdUserId", source, "toBdUserId", source)).get("skipped").asInt())
         .isEqualTo(2);
     assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_oper_log WHERE action = 'Create BD transfer'",
+                Integer.class))
+        .isZero();
+    assertThat(
             create(Map.of("fromBdUserId", source, "toBdUserId", target)).get("immediate").asInt())
         .isEqualTo(2);
     assertThat(owner(11L)).isEqualTo(target);
@@ -259,6 +264,25 @@ class BdTransferIT {
         .isEqualTo(2);
     continuous(11L);
     continuous(12L);
+  }
+
+  @Test
+  void shouldAuditOnlyChangedKolsAndMentionPartialSkips() throws Exception {
+    create(Map.of("kolIds", List.of(11L), "toBdUserId", target));
+    JsonNode result = create(Map.of("kolIds", List.of(11L, 12L), "toBdUserId", target));
+
+    assertThat(result.get("immediate").asInt()).isEqualTo(1);
+    assertThat(result.get("skipped").asInt()).isEqualTo(1);
+    String summary =
+        jdbc.queryForObject(
+            "SELECT request_params::jsonb ->> 'summary' FROM sys_oper_log WHERE action = 'Create BD transfer' ORDER BY id DESC LIMIT 1",
+            String.class);
+    assertThat(summary).contains("KOL-AAA012", "另有 1 位无变化，已跳过").doesNotContain("KOL-AAA011");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT request_params::jsonb ->> 'kolCount' FROM sys_oper_log WHERE action = 'Create BD transfer' ORDER BY id DESC LIMIT 1",
+                String.class))
+        .isEqualTo("1");
   }
 
   @Test

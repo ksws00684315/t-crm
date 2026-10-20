@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
@@ -85,6 +86,78 @@ class KolItemServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(ex -> ((BusinessException) ex).getErrorCode())
         .isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
+  }
+
+  @Test
+  void shouldLimitOwnScopeToAssignedKolMappingsWithoutPrecisionFilter() {
+    when(current.user())
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "bd",
+                null,
+                "BD",
+                null,
+                Role.STAFF,
+                DataScope.OWN,
+                1,
+                null,
+                null,
+                0,
+                1L,
+                null,
+                true));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(11L, "KOL-AAA001", "Alice", true, null)));
+    when(items.selectPage(any(), any()))
+        .thenAnswer(
+            inv -> {
+              Page<KolItemDO> page = inv.getArgument(0);
+              page.setRecords(List.of());
+              page.setTotal(0);
+              return page;
+            });
+
+    service.page(new KolItemFilterDTO(null, null, null, null, null, true, 1, 20));
+
+    var query =
+        org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+    verify(items).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("kol_id IN");
+    assertThat(
+            String.valueOf(
+                ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>)
+                        query.getValue())
+                    .getParamNameValuePairs()
+                    .values()))
+        .contains("11");
+  }
+
+  @Test
+  void shouldReturnEmptyWithoutQuery_whenOwnScopeHasNoAssignedKols() {
+    when(current.user())
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "bd",
+                null,
+                "BD",
+                null,
+                Role.STAFF,
+                DataScope.OWN,
+                1,
+                null,
+                null,
+                0,
+                1L,
+                null,
+                true));
+    when(kols.listByBdUserId(7L)).thenReturn(List.of());
+
+    var result = service.page(new KolItemFilterDTO(null, null, null, null, null, true, 1, 20));
+
+    assertThat(result.items()).isEmpty();
+    verifyNoInteractions(items);
   }
 
   @ParameterizedTest

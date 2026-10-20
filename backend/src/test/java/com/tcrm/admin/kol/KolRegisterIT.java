@@ -150,7 +150,7 @@ class KolRegisterIT {
                 String.class))
         .contains(
             "uk_crm_kol_register_code_code",
-            "uk_crm_kol_register_code_active_bd",
+            "uk_crm_kol_register_code_active_tenant_bd",
             "idx_crm_kol_register_code_bd");
     assertThat(
             jdbc.queryForObject(
@@ -252,6 +252,81 @@ class KolRegisterIT {
             jdbc.queryForObject(
                 "SELECT tenant_id FROM crm_kol_register_code WHERE code = ?", Long.class, codeB))
         .isEqualTo(companyB.tenantId());
+  }
+
+  @Test
+  void shouldKeepSuperAdminCodesIndependentAcrossCompanies() throws Exception {
+    var companyA =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-a"), name("admin-a"));
+    var companyB =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-b"), name("admin-b"));
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    addMember(platform, companyB.tenantId(), companyA.userId(), "SUPER_ADMIN", null);
+    String token = CompanySessions.login(mvc, json, companyA.username(), PASSWORD);
+
+    String codeA = link(token).path("code").asText();
+    switchCompany(token, companyB.tenantId()).andExpect(status().isOk());
+    String codeB = link(token).path("code").asText();
+    String rotatedB = rotate(token);
+
+    assertThat(codeB).isNotEqualTo(codeA);
+    assertThat(rotatedB).isNotEqualTo(codeB);
+    assertActiveCode(companyA.tenantId(), companyA.userId(), codeA);
+    assertActiveCode(companyB.tenantId(), companyA.userId(), rotatedB);
+    mvc.perform(get("/kol-api/register/" + codeA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.bdUserName").value(org.hamcrest.Matchers.nullValue()));
+
+    switchCompany(token, companyA.tenantId()).andExpect(status().isOk());
+    String email = name("super-kol") + "@example.com";
+    register(codeA, email, "", "handle", null);
+    assertThat(
+            jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT bd_user_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isNull();
+  }
+
+  @Test
+  void shouldKeepBdCodesIndependentAcrossCompanies() throws Exception {
+    var companyA =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-a"), name("admin-a"));
+    var companyB =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-b"), name("admin-b"));
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    long bdUserId =
+        CompanySessions.createStaff(
+            mvc, json, companyA.token(), PASSWORD, name("bd-shared"), "BD", null, null);
+    String username =
+        jdbc.queryForObject("SELECT username FROM sys_user WHERE id = ?", String.class, bdUserId);
+    addMember(platform, companyB.tenantId(), bdUserId, "STAFF", "BD");
+    String token = CompanySessions.login(mvc, json, username, PASSWORD);
+
+    String codeA = link(token).path("code").asText();
+    switchCompany(token, companyB.tenantId()).andExpect(status().isOk());
+    String codeB = link(token).path("code").asText();
+    String rotatedB = rotate(token);
+
+    assertThat(codeB).isNotEqualTo(codeA);
+    assertThat(rotatedB).isNotEqualTo(codeB);
+    assertActiveCode(companyA.tenantId(), bdUserId, codeA);
+    assertActiveCode(companyB.tenantId(), bdUserId, rotatedB);
+    switchCompany(token, companyA.tenantId()).andExpect(status().isOk());
+    String email = name("bd-kol") + "@example.com";
+    register(codeA, email, "", "handle", null);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT tenant_id FROM crm_kol_register_code WHERE code = ?", Long.class, codeA))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT bd_user_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(bdUserId);
   }
 
   @Test
@@ -567,6 +642,54 @@ class KolRegisterIT {
             .getResponse()
             .getContentAsString();
     return json.readTree(body).path("data");
+  }
+
+  private String rotate(String token) throws Exception {
+    String body =
+        mvc.perform(post("/admin-api/kol/register-code").header(ADMIN, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return json.readTree(body).at("/data/code").asText();
+  }
+
+  private void assertActiveCode(long tenantId, long ownerId, String code) {
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_register_code WHERE tenant_id = ? AND bd_user_id = ?"
+                    + " AND code = ? AND status = 1",
+                Integer.class,
+                tenantId,
+                ownerId,
+                code))
+        .isEqualTo(1);
+  }
+
+  private void addMember(
+      String platform, long tenantId, long userId, String role, String postTemplate)
+      throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("userId", Long.toString(userId));
+    body.put("role", role);
+    if (postTemplate != null) {
+      body.put("postTemplate", postTemplate);
+    }
+    mvc.perform(
+            post("/admin-api/platform/tenants/" + tenantId + "/members")
+                .header(ADMIN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(body)))
+        .andExpect(status().isOk());
+  }
+
+  private org.springframework.test.web.servlet.ResultActions switchCompany(String token, long id)
+      throws Exception {
+    return mvc.perform(
+        post("/admin-api/auth/company")
+            .header(ADMIN, token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("tenantId", Long.toString(id)))));
   }
 
   private Bd bd() throws Exception {

@@ -12,6 +12,9 @@ public record KolQuery(
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size,
     @Size(max = 128) String keyword,
+    @Size(max = 64) String kolCode,
+    @Size(max = 128) String name,
+    @Size(max = 254) String email,
     @Pattern(regexp = "[A-Za-z]{2}") String country,
     @Min(0) @Max(1) Integer status,
     @Min(1) Long bdUserId,
@@ -25,6 +28,17 @@ public record KolQuery(
 
   KolFilterDTO toFilter() {
     return new KolFilterDTO(
-        keyword, country, status, bdUserId, reviewStatus, relationStatus, loginStatus, page, size);
+        keyword,
+        kolCode,
+        name,
+        email,
+        country,
+        status,
+        bdUserId,
+        reviewStatus,
+        relationStatus,
+        loginStatus,
+        page,
+        size);
   }
 }
