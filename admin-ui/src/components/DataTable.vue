@@ -262,6 +262,17 @@ const visibleColumns = computed(() =>
     .filter((column): column is DataColumn => Boolean(column))
 );
 
+/**
+ * Column widths are a floor, not a fixed size. Element Plus only stretches flex columns
+ * (`min-width`), so fixed `width` left a blank band on the right of the card on wide monitors.
+ * Every column except the action cell shares the surplus; the action column keeps its own width
+ * so its buttons stay on the card's right edge instead of drifting into a stretched cell.
+ */
+const isFlexColumn = (column: DataColumn) => column.key !== "actions";
+const columnWidth = (column: DataColumn) => (isFlexColumn(column) ? undefined : column.width);
+const columnMinWidth = (column: DataColumn) =>
+  isFlexColumn(column) ? (column.minWidth ?? column.width) : column.minWidth;
+
 const hiddenCount = computed(
   () =>
     prefs.value.columns.filter(column => !column.visible && !locked.value.has(column.key)).length
@@ -455,8 +466,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
           :key="column.key"
           :prop="column.key === 'actions' ? undefined : (column.prop ?? column.key)"
           :label="column.label"
-          :width="column.width"
-          :min-width="column.minWidth"
+          :width="columnWidth(column)"
+          :min-width="columnMinWidth(column)"
           :fixed="
             column.key === 'actions' ? 'right' : column.key === columns[0]?.key ? 'left' : undefined
           "
