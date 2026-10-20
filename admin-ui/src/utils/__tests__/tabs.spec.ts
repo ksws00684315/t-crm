@@ -101,7 +101,7 @@ describe("tabs", () => {
     sessionStorage.clear();
   });
 
-  it("pins 公司管理 for a platform administrator and 首页 otherwise", () => {
+  it("pins 公司管理 for a platform administrator and 工作台 otherwise", () => {
     expect(affixFor(true).path).toBe("/platform/tenants");
     expect(affixFor(false).path).toBe("/home");
   });

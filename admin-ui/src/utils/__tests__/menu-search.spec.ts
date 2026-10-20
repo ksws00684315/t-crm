@@ -9,7 +9,7 @@ import {
 } from "../menu-search";
 
 const menu: MenuItem[] = [
-  { path: "/home", title: "首页" },
+  { path: "/home", title: "工作台" },
   {
     path: "/product",
     title: "商品",

@@ -195,7 +195,6 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.kolItems",
               permission: "product:view",
-              hideForOwn: true,
               componentName: "KolItemListPage"
             }
           },

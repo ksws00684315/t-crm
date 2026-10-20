@@ -86,16 +86,22 @@ describe("resolveAccess", () => {
   });
 
   it("allows any signed-in company account when the route declares no permission", () => {
-    expect(resolveAccess(target("/home", { title: "首页" }), session(viewer))).toBe(true);
+    expect(resolveAccess(target("/home", { title: "工作台" }), session(viewer))).toBe(true);
   });
 
-  it("rejects OWN on hideForOwn routes (same as the menu)", () => {
+  it("keeps hideForOwn semantics for routes that still declare it", () => {
     expect(
       resolveAccess(
-        target("/kol/kol-items", { permission: "product:view", hideForOwn: true }),
+        target("/product/legacy", { permission: "product:view", hideForOwn: true }),
         session(productOwn)
       )
     ).toBe("/403");
+    expect(
+      resolveAccess(
+        target("/product/legacy", { permission: "product:view", hideForOwn: true }),
+        session(productAll)
+      )
+    ).toBe(true);
   });
 
   it("allows a non-OWN account that has product:view on hideForOwn routes", () => {
@@ -135,11 +141,8 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
-  it("redirects OWN away from /kol/kol-items to 403", async () => {
-    expect((await navigate(productOwn, "/kol/kol-items")).path).toBe("/403");
-  });
-
-  it("opens /kol/kol-items for a non-OWN account with product:view", async () => {
+  it("opens /kol/kol-items for OWN too (creator products host the promo-sheet upload)", async () => {
+    expect((await navigate(productOwn, "/kol/kol-items")).name).toBe("KolItemList");
     expect((await navigate(productAll, "/kol/kol-items")).name).toBe("KolItemList");
   });
 

@@ -165,7 +165,7 @@ describe("togglePermission", () => {
 describe("buildMenu", () => {
   it("shows every company page to the super administrator", () => {
     expect(titles(superAdmin)).toEqual([
-      "首页",
+      "工作台",
       "经营分析",
       "店铺表现",
       "畅销商品",
@@ -225,14 +225,14 @@ describe("buildMenu", () => {
   it("shows home, the creator list and uploads to a sub-account that has kol:view", () => {
     // Uploads carries no permission code: every company account sees its own import tasks.
     expect(titles(staff("ALL", ["kol:view"]))).toEqual([
-      "首页",
+      "工作台",
       "达人管理",
       "达人列表",
       "系统管理",
       "上传文件"
     ]);
     expect(titles(staff("OWN", ["kol:view"]))).toEqual([
-      "首页",
+      "工作台",
       "达人管理",
       "达人列表",
       "系统管理",
@@ -240,9 +240,9 @@ describe("buildMenu", () => {
     ]);
   });
 
-  it("hides creator products for an OWN sub-account that can view products", () => {
-    expect(titles(staff("ALL", ["product:view"]))).toEqual([
-      "首页",
+  it("shows creator products to any product:view account (BDs upload there)", () => {
+    const expected = [
+      "工作台",
       "商品管理",
       "店铺管理",
       "商品任务",
@@ -250,20 +250,14 @@ describe("buildMenu", () => {
       "达人商品",
       "系统管理",
       "上传文件"
-    ]);
-    expect(titles(staff("OWN", ["product:view"]))).toEqual([
-      "首页",
-      "商品管理",
-      "店铺管理",
-      "商品任务",
-      "系统管理",
-      "上传文件"
-    ]);
+    ];
+    expect(titles(staff("ALL", ["product:view"]))).toEqual(expected);
+    expect(titles(staff("OWN", ["product:view"]))).toEqual(expected);
   });
 
   it("shows the payouts page to either of its two permission codes", () => {
     expect(titles(staff("ALL", ["payout-account:review"]))).toEqual([
-      "首页",
+      "工作台",
       "财务结算",
       "达人提现",
       "系统管理",
@@ -271,7 +265,7 @@ describe("buildMenu", () => {
     ]);
     // commission:view also opens the creator-income and settlement placeholders.
     expect(titles(staff("OWN", ["commission:view"]))).toEqual([
-      "首页",
+      "工作台",
       "达人管理",
       "达人收入",
       "财务结算",
@@ -289,7 +283,7 @@ describe("buildMenu", () => {
 
   it("shows order query to anyone with order:view (the pool is a tab now)", () => {
     expect(titles(staff("ALL", ["order:view"]))).toEqual([
-      "首页",
+      "工作台",
       "订单管理",
       "订单查询",
       "退款查询",

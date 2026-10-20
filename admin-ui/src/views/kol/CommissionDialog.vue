@@ -29,6 +29,7 @@ const RECORD_FIELD_KEYS = [
   "inviteCode",
   "sheetUrl",
   "jumpTemplateId",
+  "configVersion",
   "relationStatus",
   "reviewStatus",
   "name",
@@ -133,7 +134,13 @@ function changeLine(diff: { key: string; from: string; to: string }): string {
         : key === "reviewStatus"
           ? `kol.reviewStatusOption.${value}`
           : "";
-    return messageKey && te(messageKey) ? t(messageKey) : value;
+    if (messageKey && te(messageKey)) return t(messageKey);
+    // Old records may carry the jump-platform id; show the template name, not the raw id.
+    if (key === "jumpTemplateId") {
+      const id = String(value);
+      return id === "-" ? value : templateName(id);
+    }
+    return value;
   };
   return t("promotion.changeLine", {
     label: fieldLabel(diff.key),
