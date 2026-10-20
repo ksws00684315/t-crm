@@ -6,7 +6,8 @@
  */
 const enUS = {
   app: {
-    title: "SparkTrack Creator Portal"
+    title: "SparkTrack Creator Portal",
+    titleSuffix: " Creator Portal"
   },
   common: {
     language: "Language",
@@ -141,7 +142,7 @@ const enUS = {
     createTitle: "Add payout account",
     editTitle: "Edit payout account",
     empty: "Add a PayPal or USDT account; once approved it is used to pay you.",
-    limitReached: "You can keep at most 5 active payout accounts.",
+    limitReached: "The configured payout account limit has been reached.",
     submitted: "Submitted. Your representative will review it.",
     account: "Account / address",
     holder: "Receiver name",
@@ -245,7 +246,7 @@ const enUS = {
       "This link is invalid or expired. Please contact your representative for a new link.",
     AUTH_OLD_PASSWORD_INCORRECT: "Your current password is incorrect.",
     KOL_LOGIN_SELECTION_INVALID: "Company selection has expired. Please sign in again.",
-    PAYOUT_ACCOUNT_LIMIT: "You can keep at most 5 active payout accounts.",
+    PAYOUT_ACCOUNT_LIMIT: "The configured payout account limit has been reached.",
     PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",
     PAYOUT_ACCOUNT_NOT_APPROVED: "Only approved accounts can be the default.",
     FILE_INVALID: "The file must be a PNG or JPEG image.",

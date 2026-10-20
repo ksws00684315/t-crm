@@ -15,6 +15,7 @@ import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,7 +29,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +55,7 @@ public class ProductLinkService {
   private final WeidianItemCopyApi copies;
   private final JdbcTemplate jdbc;
   private final SecureRandom random;
-  private final String linkBaseUrl;
+  private final SystemConfigApi configs;
 
   @Autowired
   public ProductLinkService(
@@ -69,20 +69,19 @@ public class ProductLinkService {
       CopyJobProgress progress,
       WeidianItemCopyApi copies,
       JdbcTemplate jdbc,
-      @Value("${crm.link.base-url}") String linkBaseUrl) {
-    this(
-        tokens,
-        jobs,
-        items,
-        shops,
-        kolItems,
-        rates,
-        worker,
-        progress,
-        copies,
-        jdbc,
-        linkBaseUrl,
-        new SecureRandom());
+      SystemConfigApi configs) {
+    this.tokens = tokens;
+    this.jobs = jobs;
+    this.items = items;
+    this.shops = shops;
+    this.kolItems = kolItems;
+    this.rates = rates;
+    this.worker = worker;
+    this.progress = progress;
+    this.copies = copies;
+    this.jdbc = jdbc;
+    this.configs = configs;
+    this.random = new SecureRandom();
   }
 
   ProductLinkService(
@@ -108,7 +107,18 @@ public class ProductLinkService {
     this.progress = progress;
     this.copies = copies;
     this.jdbc = jdbc;
-    this.linkBaseUrl = linkBaseUrl == null ? "" : linkBaseUrl.replaceAll("/+$", "");
+    this.configs =
+        new SystemConfigApi() {
+          @Override
+          public String getValue(String key) {
+            return linkBaseUrl == null ? "" : linkBaseUrl.replaceAll("/+$", "");
+          }
+
+          @Override
+          public int getInt(String key) {
+            return 0;
+          }
+        };
     this.random = random;
   }
 
@@ -123,7 +133,7 @@ public class ProductLinkService {
             "tcrm-relay",
             TCR_TEMPLATE_CODE,
             "SparkTrack 中转",
-            linkBaseUrl + "/i/{PRODUCT_ID}",
+            configs.getValue("url.link") + "/i/{PRODUCT_ID}",
             channel,
             0));
     // Merge enabled company templates, dedupe by template_url (system scope: public platform URLs).
@@ -150,7 +160,7 @@ public class ProductLinkService {
                     channel,
                     channel));
     Set<String> seenUrls = new HashSet<>();
-    seenUrls.add(linkBaseUrl + "/i/{PRODUCT_ID}");
+    seenUrls.add(configs.getValue("url.link") + "/i/{PRODUCT_ID}");
     for (LinkTemplateView row : platforms) {
       if (row.templateUrl() == null || !seenUrls.add(row.templateUrl())) {
         continue;

@@ -3,7 +3,8 @@ import type { MessageSchema } from "./zh-CN";
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
 const enUS: MessageSchema = {
   app: {
-    title: "SparkTrack Admin"
+    title: "SparkTrack Admin",
+    titleSuffix: " Admin"
   },
   common: {
     language: "Language",
@@ -147,6 +148,7 @@ const enUS: MessageSchema = {
     login: "Sign in",
     home: "Home",
     tenants: "Companies",
+    systemConfigs: "System Config",
     analytics: "Analytics",
     shopPerformance: "Shop Performance",
     bestSellers: "Best Sellers",
@@ -185,6 +187,7 @@ const enUS: MessageSchema = {
     notifications: "Notifications"
   },
   errors: {
+    SYSTEM_CONFIG_INVALID: "This system configuration value is invalid.",
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
     COMMON_NOT_FOUND: "The requested item does not exist.",
     COMMON_METHOD_NOT_ALLOWED: "This action is not supported.",
@@ -234,7 +237,7 @@ const enUS: MessageSchema = {
       "The header does not match the template. Download the latest template.",
     TASK_FILE_EMPTY: "The file has no data rows.",
     TASK_FILE_EXPIRED: "The error file is older than 30 days and has been removed.",
-    SHOP_LIMIT_REACHED: "The shop limit has been reached (at most 3).",
+    SHOP_LIMIT_REACHED: "The configured shop limit has been reached.",
     SHOP_WEIDIAN_ID_EXISTS: "This Weidian shop ID already exists.",
     WEIDIAN_APP_NOT_CONFIGURED: "The Weidian service app is not configured.",
     WEIDIAN_SHOP_NOT_AUTHORIZED: "The Weidian shop is not authorized.",
@@ -273,7 +276,7 @@ const enUS: MessageSchema = {
     PRODUCT_IS_EXCLUSIVE_ITEM: "This Weidian item ID is an exclusive item and cannot be a product.",
     ORDER_SYNC_RUNNING: "Order synchronization is already running for this shop.",
     LINK_REBUILD_RUNNING: "A tracking-link index rebuild is already running. Try again later.",
-    PAYOUT_ACCOUNT_LIMIT: "At most 5 active payout accounts are allowed.",
+    PAYOUT_ACCOUNT_LIMIT: "The configured payout account limit has been reached.",
     PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",
     PAYOUT_ACCOUNT_NOT_PENDING:
       "The account was changed or already reviewed. Refresh and try again.",
@@ -341,6 +344,7 @@ const enUS: MessageSchema = {
   },
   login: {
     title: "SparkTrack Admin",
+    titleSuffix: "Admin",
     username: "Username",
     password: "Password",
     submit: "Sign in"
@@ -356,6 +360,61 @@ const enUS: MessageSchema = {
     welcome: "Welcome to SparkTrack",
     greeting: "Hello, {nickname}. Current role: {role}.",
     body: "More features will arrive in later releases. Account management is available now."
+  },
+  systemConfig: {
+    notice:
+      "Changes take effect immediately without a restart. Secrets remain in server environment variables.",
+    groups: {
+      site: "Site",
+      url: "URLs",
+      business: "Business Defaults and Limits",
+      security: "Rate Limits and Security"
+    },
+    items: {
+      site_name: "System name",
+      mail_from: "Mail sender",
+      url_kol_portal: "Creator portal URL",
+      url_link: "Tracking link URL",
+      url_admin: "Admin console URL",
+      url_upload: "Promo sheet upload URL",
+      url_redirect_fallback: "Redirect fallback URL",
+      copy_token_default_quota: "Default copy-token quota",
+      copy_token_default_valid_minutes: "Default token validity (minutes)",
+      copy_token_max_quota: "Maximum copy-token quota",
+      copy_token_max_valid_minutes: "Maximum token validity (minutes)",
+      shop_max_per_company: "Maximum shops per company",
+      payout_account_max_per_kol: "Maximum payout accounts per creator",
+      kol_invite_ttl_hours: "Creator invitation validity (hours)",
+      oper_log_retention_days: "Operation log retention (days)",
+      login_fail_pair_limit: "Login failures per account and IP",
+      login_fail_ip_limit: "Login failures per IP",
+      login_fail_account_limit: "Login failures per account",
+      login_fail_window_minutes: "Login failure window (minutes)",
+      captcha_issue_per_minute: "Captcha issues per minute",
+      kol_register_ip_per_hour: "Creator registrations per IP per hour",
+      kol_register_preview_ip_per_hour: "Registration previews per IP per hour",
+      kol_forgot_email_limit: "Password recovery per email",
+      kol_forgot_email_window_minutes: "Password recovery email window (minutes)",
+      kol_forgot_ip_limit: "Password recovery per IP",
+      kol_forgot_ip_window_minutes: "Password recovery IP window (minutes)",
+      product_links_ip_per_minute: "Copy API requests per IP per minute",
+      product_links_convert_token_per_minute: "Token conversions per minute",
+      product_links_resolve_token_per_minute: "Token resolutions per minute",
+      weidian_qps: "Weidian requests per second"
+    },
+    currentValue: "Current",
+    defaultValue: "Default",
+    range: "Range",
+    overridden: "Modified",
+    restoreDefault: "Restore default",
+    editPrompt: "Enter a new value",
+    integerRequired: "Enter an integer",
+    saved: "Saved and applied immediately",
+    restored: "Restored to default",
+    resetTitle: "Restore default",
+    resetConfirm: "Restore “{name}” to its default value?",
+    adminUrlTitle: "Confirm admin URL change",
+    adminUrlWarning: "Update the callback domain registered with the Weidian Open Platform as well."
   },
   layout: {
     changePassword: "Change Password",
@@ -906,7 +965,7 @@ const enUS: MessageSchema = {
     setCopyTargetDone: "Set as default copy shop",
     clearCopyTarget: "Clear default copy shop",
     clearCopyTargetDone: "Cleared default copy shop",
-    hint: "At most 3 shops in the whole system. A disabled shop cannot receive product or mapping imports.",
+    hint: "The shop limit is managed in system configuration. A disabled shop cannot receive product or mapping imports.",
     confirmDisable: 'Disable shop "{name}"?',
     confirmEnable: 'Enable shop "{name}"?',
     disableTitle: "Disable shop",

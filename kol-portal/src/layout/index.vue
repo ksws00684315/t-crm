@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useSessionStore } from "@/stores/session";
+import { siteName } from "@/stores/site-config";
 import { NAV_ITEMS } from "./nav";
 
 defineOptions({ name: "AppLayout" });
@@ -39,7 +40,7 @@ async function signOut() {
   <div class="shell">
     <header class="shell__header">
       <div class="shell__top">
-        <span class="shell__brand">{{ t("app.title") }}</span>
+        <span class="shell__brand">{{ siteName }}{{ t("app.titleSuffix") }}</span>
         <div class="shell__actions">
           <LocaleSwitch />
           <span v-if="session.kol" class="shell__identity"

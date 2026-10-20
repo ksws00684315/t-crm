@@ -55,6 +55,7 @@ services:
       TCRM_CORS_ALLOWED_ORIGINS: ${TCRM_CORS_ALLOWED_ORIGINS:-}
       # Required: https://t.<domain>, no trailing slash; startup fails when missing or malformed.
       TCRM_LINK_BASE_URL: ${TCRM_LINK_BASE_URL}
+      TCRM_UPLOAD_BASE_URL: ${TCRM_UPLOAD_BASE_URL:-}
       # Required KOL portal base (https, no trailing slash) for invitation and reset mail links.
       TCRM_KOL_PORTAL_BASE_URL: ${TCRM_KOL_PORTAL_BASE_URL}
       # Required Weidian OAuth callback base (https, no trailing slash).

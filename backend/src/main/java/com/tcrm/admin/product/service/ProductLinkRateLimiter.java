@@ -2,12 +2,13 @@ package com.tcrm.admin.product.service;
 
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -36,31 +37,44 @@ public class ProductLinkRateLimiter {
   }
 
   private final StringRedisTemplate redis;
-  private final int ipPerMinute;
-  private final int convertTokenPerMinute;
-  private final int resolveTokenPerMinute;
+  private final SystemConfigApi configs;
+  private final int[] testLimits;
 
-  public ProductLinkRateLimiter(
-      StringRedisTemplate redis,
-      @Value("${crm.product-links.ip-rate-per-minute:120}") int ipPerMinute,
-      @Value("${crm.product-links.convert-token-rate-per-minute:10}") int convertTokenPerMinute,
-      @Value("${crm.product-links.resolve-token-rate-per-minute:120}") int resolveTokenPerMinute) {
+  @Autowired
+  public ProductLinkRateLimiter(StringRedisTemplate redis, SystemConfigApi configs) {
     this.redis = redis;
-    this.ipPerMinute = ipPerMinute;
-    this.convertTokenPerMinute = convertTokenPerMinute;
-    this.resolveTokenPerMinute = resolveTokenPerMinute;
+    this.configs = configs;
+    this.testLimits = null;
+  }
+
+  ProductLinkRateLimiter(
+      StringRedisTemplate redis,
+      int ipPerMinute,
+      int convertTokenPerMinute,
+      int resolveTokenPerMinute) {
+    this.redis = redis;
+    this.configs = null;
+    this.testLimits = new int[] {ipPerMinute, convertTokenPerMinute, resolveTokenPerMinute};
   }
 
   public void checkIp(String clientIp) {
-    check("product-links:ip:" + digest(clientIp), ipPerMinute);
+    check("product-links:ip:" + digest(clientIp), limit("product-links.ip-per-minute", 0));
   }
 
   public void checkConvertToken(long tokenId) {
-    check("product-links:token:convert:" + tokenId, convertTokenPerMinute);
+    check(
+        "product-links:token:convert:" + tokenId,
+        limit("product-links.convert-token-per-minute", 1));
   }
 
   public void checkResolveToken(long tokenId) {
-    check("product-links:token:resolve:" + tokenId, resolveTokenPerMinute);
+    check(
+        "product-links:token:resolve:" + tokenId,
+        limit("product-links.resolve-token-per-minute", 2));
+  }
+
+  private int limit(String key, int index) {
+    return configs == null ? testLimits[index] : configs.getInt(key);
   }
 
   private void check(String key, int limit) {

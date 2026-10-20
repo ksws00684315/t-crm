@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -24,7 +25,15 @@ import org.springframework.data.redis.core.script.RedisScript;
 
 class LoginFailuresTest {
   private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
-  private final LoginFailures failures = new LoginFailures(redis);
+  private final SystemConfigApi configs = mock(SystemConfigApi.class);
+  private final LoginFailures failures = new LoginFailures(redis, "auth", configs);
+
+  LoginFailuresTest() {
+    when(configs.getInt("login.fail.pair-limit")).thenReturn(5);
+    when(configs.getInt("login.fail.ip-limit")).thenReturn(20);
+    when(configs.getInt("login.fail.account-limit")).thenReturn(50);
+    when(configs.getInt("login.fail.window-minutes")).thenReturn(15);
+  }
 
   @SuppressWarnings("unchecked")
   private List<List<String>> counterKeysOfFailure() {

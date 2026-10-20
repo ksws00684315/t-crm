@@ -3,6 +3,7 @@ package com.tcrm.admin.security.service;
 import com.tcrm.admin.security.api.LoginFailureCounter;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -42,7 +43,6 @@ public class LoginFailures implements LoginFailureCounter {
   static final int PAIR_LIMIT = 5;
   static final int IP_LIMIT = 20;
   static final int ACCOUNT_LIMIT = 50;
-  private static final long WINDOW_MS = 15 * 60 * 1000;
   private static final DefaultRedisScript<Long> FAIL =
       new DefaultRedisScript<>(
           """
@@ -63,17 +63,23 @@ public class LoginFailures implements LoginFailureCounter {
           Long.class);
   private final StringRedisTemplate redis;
   private final String keyPrefix;
+  private final SystemConfigApi configs;
 
   /** Administrator namespace ({@code auth:fail:*}); the KOL bean uses the two-argument factory. */
   @Autowired
-  public LoginFailures(StringRedisTemplate redis) {
-    this(redis, "auth");
+  public LoginFailures(StringRedisTemplate redis, SystemConfigApi configs) {
+    this(redis, "auth", configs);
   }
 
   /** Shared core; {@code keyPrefix} separates the administrator and KOL namespaces. */
   public LoginFailures(StringRedisTemplate redis, String keyPrefix) {
+    this(redis, keyPrefix, null);
+  }
+
+  public LoginFailures(StringRedisTemplate redis, String keyPrefix, SystemConfigApi configs) {
     this.redis = redis;
     this.keyPrefix = keyPrefix;
+    this.configs = configs;
   }
 
   /** Throws AUTH_ACCOUNT_LOCKED (429) while any scope of this attempt is locked. */
@@ -98,7 +104,7 @@ public class LoginFailures implements LoginFailureCounter {
               FAIL,
               List.of(scope.key(), scope.key() + ":lock"),
               Long.toString(System.currentTimeMillis()),
-              Long.toString(WINDOW_MS),
+              Long.toString(windowMs()),
               UUID.randomUUID().toString(),
               Integer.toString(scope.limit()));
       locked |= count != null && count >= scope.limit();
@@ -168,9 +174,20 @@ public class LoginFailures implements LoginFailureCounter {
     String user = digest(username.toLowerCase(Locale.ROOT));
     String address = digest(ip);
     return List.of(
-        new Scope(keyPrefix + ":fail:user-ip:" + user + ":" + address, PAIR_LIMIT),
-        new Scope(keyPrefix + ":fail:ip:" + address, IP_LIMIT),
-        new Scope(keyPrefix + ":fail:user:" + user, ACCOUNT_LIMIT));
+        new Scope(
+            keyPrefix + ":fail:user-ip:" + user + ":" + address,
+            limit("login.fail.pair-limit", PAIR_LIMIT)),
+        new Scope(keyPrefix + ":fail:ip:" + address, limit("login.fail.ip-limit", IP_LIMIT)),
+        new Scope(
+            keyPrefix + ":fail:user:" + user, limit("login.fail.account-limit", ACCOUNT_LIMIT)));
+  }
+
+  private int limit(String key, int fallback) {
+    return configs == null ? fallback : configs.getInt(key);
+  }
+
+  private long windowMs() {
+    return (configs == null ? 15 : configs.getInt("login.fail.window-minutes")) * 60_000L;
   }
 
   private static String digest(String value) {

@@ -44,6 +44,7 @@ describe("cacheable route component names", () => {
         "NotificationPage",
         "OrderQueryPage",
         "PlatformTenantPage",
+        "PlatformSystemConfigPage",
         "ShopManagementPage",
         "SystemImportTaskPage",
         "SystemLinkTemplatePage",

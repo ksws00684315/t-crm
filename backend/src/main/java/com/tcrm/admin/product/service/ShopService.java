@@ -15,6 +15,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.MissingTenantException;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -26,18 +27,23 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Shop management (task 05 §4.1). At most 3 shops; only SUPER_ADMIN may write (controller). */
+/** Shop management (task 05 §4.1). The per-company shop limit is system-configurable. */
 @Service
 public class ShopService implements ShopAccessApi, CopyTargetShopApi {
   private final ShopMapper shops;
   private final CurrentUserContext current;
   private final ApplicationEventPublisher events;
+  private final SystemConfigApi configs;
 
   public ShopService(
-      ShopMapper shops, CurrentUserContext current, ApplicationEventPublisher events) {
+      ShopMapper shops,
+      CurrentUserContext current,
+      ApplicationEventPublisher events,
+      SystemConfigApi configs) {
     this.shops = shops;
     this.current = current;
     this.events = events;
+    this.configs = configs;
   }
 
   public List<ShopDTO> list() {
@@ -48,8 +54,8 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
 
   /**
    * Creates a shop. The count check and the insert run in one transaction behind a
-   * transaction-level advisory lock, so concurrent requests cannot exceed {@link
-   * ProductRules#MAX_SHOPS}.
+   * transaction-level advisory lock, so concurrent requests cannot exceed the current configured
+   * shop limit.
    */
   @Transactional(rollbackFor = Exception.class)
   public ShopDTO create(CreateShopCommand c) {
@@ -58,7 +64,7 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
       throw new MissingTenantException("shop creation requires a company");
     }
     shops.lockForCreate(tenantId);
-    if (shops.countAlive() >= ProductRules.MAX_SHOPS) {
+    if (shops.countAlive() >= configs.getInt("shop.max-per-company")) {
       throw new BusinessException(ErrorCode.SHOP_LIMIT_REACHED);
     }
     String weidianId = c.weidianShopId().strip();

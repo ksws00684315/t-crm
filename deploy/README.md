@@ -46,15 +46,38 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 
 首次使用：用平台管理员登录管理端（登录验证码保持开启，与生产一致）→ 在平台管理里为默认公司创建超级管理员 → 退出后用超级管理员登录。预览不做演示数据。
 
-后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
+预览地址由环境变量提供系统配置默认值；可在平台管理员的「系统配置」里改为 `http://localhost[:端口]` 并立即生效。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
 
 看某个分支：切到该分支，或进入该分支的工作树，再执行同一条 `preview.sh up`。脚本使用其所在仓库的源码，不使用别的目录。数据卷 `tcrm-preview_pgdata` 在所有目录之间共用，PostgreSQL 只在数据卷为空时写入账号。如果这个目录还没有 `deploy/.env.preview`，但本机已经有这份数据卷，`up` 不会生成新密码，而是直接退出并提示：已有预览数据（可能来自其他目录）。请从原目录复制 `deploy/.env.preview` 到这里，或执行 `preview.sh reset` 清空后重建。
 
-`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：预览构建不设置 `VITE_UPLOAD_BASE_URL`，上传走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：上传地址由「系统配置」的 `url.upload` 运行时决定，默认空值走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
 排障：预览网络是 `172.30.0.0/24`，与生产模板相同。本机如果已经有网络占用这个网段，启动会失败。这种情况少见；出现时先处理占用该网段的网络，不要改预览配置里的网段。
+
+## 系统配置（任务 34）
+
+平台管理员菜单中的「系统配置」用于修改非敏感且无需重启即可生效的值。系统配置全平台共用，存储被覆盖的项；无覆盖记录时使用下表的环境变量或代码默认值。配置变更写入操作日志。邀请邮件有效期遵循安全规范，范围为 1～72 小时。
+
+### 可在界面修改（§3.1）
+
+| 分组 | 配置键 | 默认值/来源 |
+|---|---|---|
+| 站点 | `site.name`、`mail.from` | `SparkTrack`；`TCRM_MAIL_FROM` |
+| 地址 | `url.kol-portal`、`url.link`、`url.admin`、`url.upload`、`url.redirect-fallback` | 分别为 `TCRM_KOL_PORTAL_BASE_URL`、`TCRM_LINK_BASE_URL`、`TCRM_ADMIN_BASE_URL`、`TCRM_UPLOAD_BASE_URL`、`TCRM_REDIRECT_FALLBACK_URL`；上传地址默认空值 |
+| 业务默认值与上限 | `copy-token.default-quota`（1）、`copy-token.default-valid-minutes`（1440）、`copy-token.max-quota`（100000）、`copy-token.max-valid-minutes`（10080）、`shop.max-per-company`（3）、`payout-account.max-per-kol`（5）、`kol.invite-ttl-hours`（72，最大 72）、`oper-log.retention-days`（180） | 代码默认值；操作日志保留期按安全规范至少 180 天 |
+| 限流与安全 | `login.fail.pair-limit`（5）、`login.fail.ip-limit`（20）、`login.fail.account-limit`（50）、`login.fail.window-minutes`（15）、`captcha.issue-per-minute`（120）、`kol.register.ip-per-hour`（20）、`kol.register-preview.ip-per-hour`（20）、`kol.forgot.email-limit`（3）、`kol.forgot.email-window-minutes`（10）、`kol.forgot.ip-limit`（20）、`kol.forgot.ip-window-minutes`（60）、`product-links.ip-per-minute`（120）、`product-links.convert-token-per-minute`（10）、`product-links.resolve-token-per-minute`（120）、`weidian.qps`（5） | 代码默认值；`captcha.issue-per-minute` 可由 `crm.auth.captcha.issue-per-minute` 覆盖默认值 |
+
+地址默认值与覆盖值必须为 HTTPS host-only URL（不带路径、查询、片段或尾斜杠）；本地允许 `http://localhost[:端口]` 与 `http://127.0.0.1[:端口]`。修改管理端地址后，须同步更新微店开放平台登记的回调域名。上传子域名应设置为 Cloudflare「仅 DNS」，并确认 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端来源。
+
+### 不在界面修改（§3.2）
+
+- 密钥与凭证：数据库/Redis 密码、`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT`、邮件 API Key、首次平台管理员账号。
+- 必须重启的基础设施：数据库和 Redis 地址/端口、服务端口、跨域来源、可信代理、客户端 IP 头、线程池大小/队列、定时任务时间、点击流长度、达人登录会话时长与令牌名。
+- 生产开关：登录验证码开关、邮件链接写日志开关。
+- 第三方接口地址：微店、Google、汇率、Resend。
+- 技术常量：字段长度、加密参数、与 Nginx 和 Spring multipart 绑定的文件大小上限。
 
 ## 生产部署（模板，使用前逐项审阅）
 
@@ -68,7 +91,7 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
-8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`TCRM_CERT_DIR` 的证书覆盖该子域名；管理端镜像构建时已注入 `VITE_UPLOAD_BASE_URL=https://upload.<域名>`（未注入时上传会走 `admin.<域名>`，超过 100 MB 的文件会被 Cloudflare 拒绝）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
+8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`TCRM_CERT_DIR` 的证书覆盖该子域名；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
 
 ## 邮件服务（Resend）
 
@@ -77,7 +100,7 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 | 变量 | 说明 |
 |---|---|
 | `TCRM_MAIL_API_KEY` | Resend API Key；**为空时使用日志兜底**：邮件只写后台日志、不真正发出（仅限本机开发） |
-| `TCRM_MAIL_FROM` | 发件人，例如 `SparkTrack <no-reply@你的域名>`；配置了 Key 却没配本项时后台启动失败 |
+| `TCRM_MAIL_FROM` | 系统配置 `mail.from` 的默认发件人，例如 `SparkTrack <no-reply@你的域名>`；配置了 Key 却未在默认值或系统配置中提供发件人时后台启动失败 |
 | `TCRM_KOL_PORTAL_BASE_URL` | 必填，无末尾斜杠的 HTTPS 达人端地址（生产为 `https://kol.<域名>`）；缺失或格式不对时后台启动失败。邀请邮件链接 `{该地址}/activate?token=…`，重置邮件链接 `{该地址}/reset?token=…` |
 
 配置步骤：
@@ -101,7 +124,7 @@ PostgreSQL、Redis、后台、跳转服务的端口不映射到宿主机。端�
 
 - `t.<域名>` 只转发 `/t/…`、`/i/…`（客户表格脚本写入的按复制商品 ID 中转链接，ADR-019）与 `/healthz` 到 crm-redirect，其余返回 404。`/t/` 与 `/i/` 共用同一限速区，按客户端 IP 限速 30 次/秒、突发 60，超出返回 429；`/healthz` 不限速。阈值偏松，是为了不误伤移动网络中大量用户共用出口 IP（CGNAT）的情况。边缘层（Cloudflare 频率限制规则）是主要防线，Nginx 限速是源站兜底；阈值可按实际流量调整。
 - `kol.<域名>` / `admin.<域名>`：静态资源 + 单页应用回退；`/kol-api/`、`/admin-api/` 转发到 crm-admin；登录接口有 10 次/分钟（突发 5）的频率限制；登录验证码签发接口 `/admin-api/auth/captchas` 有 120 次/分钟（突发 30）的频率限制，后台另按每 IP 每分钟 120 张限制（`crm.auth.captcha.issue-per-minute`，ADR-017）。
-- **推广表上传子域名（任务 26，ADR-024；负责人 2026-10-18 决定）**：上传走独立的 `upload.<域名>`，在 Cloudflare 中设为「仅 DNS」不代理（免费计划的代理会拒绝约 100 MB 以上的请求体）。该 server 只放行 `POST /admin-api/kol/kols/{id}/promo-sheet-uploads`（含浏览器先发的 CORS 预检 OPTIONS），`client_max_body_size 300m`、`proxy_read_timeout 300s`；其它路径一律 404。`admin.<域名>` 保持 `client_max_body_size 21m` 默认（导入 20 MB + 表单开销），不再为上传放宽。后端侧 Spring multipart 上限同为 300 MB（`file-size-threshold` 极小，先落临时文件），各接口仍在代码层校验各自业务上限：Excel 导入 20 MB、业务图片 2 MB、推广表 300 MB。管理端构建时用 `VITE_UPLOAD_BASE_URL=https://upload.<域名>` 指向上传域名；未配置时回退当前域名（本地开发不受影响）。跨域上传要求 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端源。
+- **推广表上传子域名（任务 26，ADR-024；负责人 2026-10-18 决定）**：上传走独立的 `upload.<域名>`，在 Cloudflare 中设为「仅 DNS」不代理（免费计划的代理会拒绝约 100 MB 以上的请求体）。该 server 只放行 `POST /admin-api/kol/kols/{id}/promo-sheet-uploads`（含浏览器先发的 CORS 预检 OPTIONS），`client_max_body_size 300m`、`proxy_read_timeout 300s`；其它路径一律 404。`admin.<域名>` 保持 `client_max_body_size 21m` 默认（导入 20 MB + 表单开销），不再为上传放宽。后端侧 Spring multipart 上限同为 300 MB（`file-size-threshold` 极小，先落临时文件），各接口仍在代码层校验各自业务上限：Excel 导入 20 MB、业务图片 2 MB、推广表 300 MB。管理端从系统配置读取 `url.upload` 并在运行时选择上传域名；默认空值回退当前域名。跨域上传要求 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端源。
 - 响应头（规范 06）：`X-Content-Type-Options`、`Referrer-Policy`、HSTS（一年）、`X-Frame-Options`，两个前端另加 `Content-Security-Policy`。
 - 客户端 IP：本模板用 `proxy.conf` 把转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` **一律重写为 `$remote_addr`**，客户端自带的转发头到不了应用（这是防伪造的实际手段）。`cloudflare-real-ip.conf` 的 `set_real_ip_from` 只决定对哪些对端采用 `CF-Connecting-IP` 来解析 `$remote_addr`，**并不限制谁可以连上 Nginx**。compose 网络固定 `172.30.0.0/24`，生产中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已写死为该网段。
 - `${TCRM_DOMAIN}` 由 nginx 镜像在启动时替换（`NGINX_ENVSUBST_FILTER=^TCRM_`）。

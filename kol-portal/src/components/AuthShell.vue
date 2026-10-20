@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
+import { siteName } from "@/stores/site-config";
 defineProps<{ title: string }>();
 </script>
 
@@ -7,6 +8,7 @@ defineProps<{ title: string }>();
   <main class="auth-shell">
     <div class="auth-shell__bar"><LocaleSwitch /></div>
     <el-card class="auth-shell__card" shadow="never">
+      <div class="auth-shell__brand">{{ siteName }}</div>
       <h1>{{ title }}</h1>
       <slot />
     </el-card>
@@ -34,6 +36,13 @@ defineProps<{ title: string }>();
 h1 {
   margin: 0 0 24px;
   font-size: 22px;
+  text-align: center;
+}
+.auth-shell__brand {
+  margin-bottom: 8px;
+  color: var(--el-color-primary);
+  font-size: 15px;
+  font-weight: 600;
   text-align: center;
 }
 :deep(.el-button) {

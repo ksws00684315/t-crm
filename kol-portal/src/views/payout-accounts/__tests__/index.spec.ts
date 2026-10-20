@@ -151,7 +151,7 @@ describe("payout accounts page", () => {
     }
   });
 
-  it("disables creating more accounts at five and explains the limit", async () => {
+  it("lets the backend enforce the currently configured account limit", async () => {
     const five = [
       account({ id: "31" }),
       account({ id: "32" }),
@@ -161,10 +161,8 @@ describe("payout accounts page", () => {
     ];
     const wrapper = await page(five);
     const button = wrapper.get('[data-test="create"]');
-    expect(button.attributes("disabled")).toBeDefined();
-    expect(wrapper.get('[data-test="limit-hint"]').text()).toBe(
-      "You can keep at most 5 active payout accounts."
-    );
+    expect(button.attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="limit-hint"]').exists()).toBe(false);
   });
 
   it("asks for confirmation before disabling and reloads afterwards", async () => {

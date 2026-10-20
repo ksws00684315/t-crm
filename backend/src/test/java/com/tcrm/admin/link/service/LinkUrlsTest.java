@@ -69,8 +69,10 @@ class LinkUrlsTest {
   }
 
   @Test
-  void shouldAcceptBaseUrlWithPath_whenNoTrailingSlash() {
-    assertThat(LinkUrls.validate("https://example.com/go")).isEqualTo("https://example.com/go");
+  void shouldRejectBaseUrlWithPath() {
+    assertThatThrownBy(() -> new LinkUrls("https://example.com/go"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("TCRM_LINK_BASE_URL");
   }
 
   @ParameterizedTest

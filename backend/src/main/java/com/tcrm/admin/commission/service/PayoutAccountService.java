@@ -18,6 +18,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
 import com.tcrm.admin.shared.TransactionalEvents;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.time.Instant;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class PayoutAccountService {
   private static final Logger LOG = LoggerFactory.getLogger(PayoutAccountService.class);
-  static final int MAX_ACCOUNTS = 5;
+  private final SystemConfigApi configs;
 
   /** KOL-side write payload after bean validation; one shape per account type. */
   public record SaveCommand(
@@ -118,6 +120,7 @@ public class PayoutAccountService {
   private final ExternalAuditApi audit;
   private final ApplicationEventPublisher events;
 
+  @Autowired
   public PayoutAccountService(
       PayoutAccountMapper accounts,
       BizFileService files,
@@ -125,7 +128,8 @@ public class PayoutAccountService {
       SecretCipher cipher,
       TransactionTemplate tx,
       ExternalAuditApi audit,
-      ApplicationEventPublisher events) {
+      ApplicationEventPublisher events,
+      SystemConfigApi configs) {
     this.accounts = accounts;
     this.files = files;
     this.kols = kols;
@@ -133,6 +137,36 @@ public class PayoutAccountService {
     this.tx = tx;
     this.audit = audit;
     this.events = events;
+    this.configs = configs;
+  }
+
+  PayoutAccountService(
+      PayoutAccountMapper accounts,
+      BizFileService files,
+      KolApi kols,
+      SecretCipher cipher,
+      TransactionTemplate tx,
+      ExternalAuditApi audit,
+      ApplicationEventPublisher events) {
+    this(
+        accounts,
+        files,
+        kols,
+        cipher,
+        tx,
+        audit,
+        events,
+        new SystemConfigApi() {
+          @Override
+          public String getValue(String key) {
+            return "5";
+          }
+
+          @Override
+          public int getInt(String key) {
+            return 5;
+          }
+        });
   }
 
   // --------------------------------------------------------------------- KOL side
@@ -167,7 +201,7 @@ public class PayoutAccountService {
           if (!kols.lockKol(kolId)) {
             throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
           }
-          if (activeCount(kolId) >= MAX_ACCOUNTS) {
+          if (activeCount(kolId) >= configs.getInt("payout-account.max-per-kol")) {
             throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LIMIT);
           }
           accounts.insert(account);

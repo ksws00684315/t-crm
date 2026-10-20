@@ -7,6 +7,7 @@ import { setupHttp } from "./api/setup";
 import { i18n } from "./locales";
 import router from "./router";
 import { useLocaleStore } from "./stores/locale";
+import { loadSiteConfig, startSiteConfigRefresh } from "./stores/site-config";
 import "./style/index.css";
 
 const app = createApp(App);
@@ -15,6 +16,8 @@ app.use(createPinia());
 // <html lang> before the first render.
 useLocaleStore();
 setupHttp(router);
+void loadSiteConfig();
+startSiteConfigRefresh();
 app.use(router);
 app.use(ElementPlus);
 app.use(i18n);

@@ -2,6 +2,7 @@ package com.tcrm.admin.kol.service;
 
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Duration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -10,21 +11,24 @@ import org.springframework.stereotype.Component;
 @Component
 public class KolRegistrationRateLimiter {
   private static final Duration WINDOW = Duration.ofHours(1);
-  private static final int REGISTER_IP_LIMIT = 20;
-  private static final int PREVIEW_IP_LIMIT = 20;
-
   private final StringRedisTemplate redis;
+  private final SystemConfigApi configs;
 
-  public KolRegistrationRateLimiter(StringRedisTemplate redis) {
+  public KolRegistrationRateLimiter(StringRedisTemplate redis, SystemConfigApi configs) {
     this.redis = redis;
+    this.configs = configs;
   }
 
   public void requireRegisterIp(String clientIp) {
-    require("kol:register:rate:reg-ip:" + SecureTokens.hash(clientIp), REGISTER_IP_LIMIT);
+    require(
+        "kol:register:rate:reg-ip:" + SecureTokens.hash(clientIp),
+        configs.getInt("kol.register.ip-per-hour"));
   }
 
   public void requirePreviewIp(String clientIp) {
-    require("kol:register:rate:preview-ip:" + SecureTokens.hash(clientIp), PREVIEW_IP_LIMIT);
+    require(
+        "kol:register:rate:preview-ip:" + SecureTokens.hash(clientIp),
+        configs.getInt("kol.register-preview.ip-per-hour"));
   }
 
   private void require(String key, int limit) {

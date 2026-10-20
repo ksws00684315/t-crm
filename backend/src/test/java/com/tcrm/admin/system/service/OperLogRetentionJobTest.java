@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.shared.DistributedLocks;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -20,8 +21,13 @@ class OperLogRetentionJobTest {
 
   private final SysOperLogMapper logs = mock(SysOperLogMapper.class);
   private final DistributedLocks locks = mock(DistributedLocks.class);
+  private final SystemConfigApi configs = mock(SystemConfigApi.class);
   private final OperLogRetentionJob job =
-      new OperLogRetentionJob(logs, mock(PlatformTransactionManager.class), locks);
+      new OperLogRetentionJob(logs, mock(PlatformTransactionManager.class), locks, configs);
+
+  OperLogRetentionJobTest() {
+    when(configs.getInt("oper-log.retention-days")).thenReturn(180);
+  }
 
   @Test
   void shouldDeleteInBatches_untilABatchIsShorterThanTheLimit() {
@@ -31,9 +37,7 @@ class OperLogRetentionJobTest {
     job.cleanup(NOW);
 
     verify(logs, times(3))
-        .deleteOlderThan(
-            NOW.minus(OperLogRetentionJob.RETENTION_DAYS, ChronoUnit.DAYS),
-            OperLogRetentionJob.BATCH_SIZE);
+        .deleteOlderThan(NOW.minus(180, ChronoUnit.DAYS), OperLogRetentionJob.BATCH_SIZE);
   }
 
   @Test

@@ -91,6 +91,10 @@ crm:
     # values set or prove a KOL password: NEVER enable in production. Off, the mail log has neither
     # the recipient nor the body.
     log-links: false
+  upload:
+    base-url: ${TCRM_UPLOAD_BASE_URL:}
+  redirect:
+    fallback-url: ${TCRM_REDIRECT_FALLBACK_URL}
   # Public base of the KOL portal: https, no trailing slash (prod: https://kol.<domain>). Required;
   # startup fails when it is missing or malformed. Invitation and reset links point here.
   kol-portal:

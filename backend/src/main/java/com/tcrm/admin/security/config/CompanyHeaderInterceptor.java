@@ -20,6 +20,7 @@ class CompanyHeaderInterceptor implements HandlerInterceptor {
   static final String[] EXCLUDED = {
     "/admin-api/auth/**",
     "/admin-api/platform/**",
+    "/admin-api/public/site-config",
     "/admin-api/integration/weidian/oauth/callback",
     "/admin-api/external/**"
   };

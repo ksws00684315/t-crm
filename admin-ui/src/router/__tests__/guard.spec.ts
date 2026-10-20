@@ -1,6 +1,6 @@
 import { createMemoryHistory, createRouter } from "vue-router";
 import { describe, expect, it } from "vitest";
-import { accessOf, type AbilitySubject } from "@/utils/permission";
+import { accessOf, buildMenu, type AbilitySubject } from "@/utils/permission";
 import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
 
@@ -44,6 +44,23 @@ function target(path: string, meta: Record<string, unknown> = {}) {
 }
 
 describe("resolveAccess", () => {
+  it("shows system configuration only to the platform administrator", () => {
+    const route = routes[1].children?.find(item => item.name === "PlatformSystemConfigs");
+    expect(route?.meta?.platformAdmin).toBe(true);
+    expect(
+      resolveAccess(target("/platform/system-configs", route?.meta), session(platformAdmin))
+    ).toBe(true);
+    expect(
+      resolveAccess(target("/platform/system-configs", route?.meta), session(superAdmin))
+    ).toBe("/403");
+    expect(buildMenu(routes, accessOf(platformAdmin)).map(item => item.path)).toContain(
+      "/platform/system-configs"
+    );
+    expect(buildMenu(routes, accessOf(superAdmin)).map(item => item.path)).not.toContain(
+      "/platform/system-configs"
+    );
+  });
+
   it("redirects a signed-out user to /login and remembers the target", () => {
     expect(resolveAccess(target("/system/users", { superAdmin: true }), signedOut)).toEqual({
       path: "/login",
@@ -170,6 +187,7 @@ describe("installGuard with the real route table", () => {
     expect(flags).toEqual([
       ["home", null, false, false, false],
       ["platform/tenants", null, false, true, false],
+      ["platform/system-configs", null, false, true, false],
       ["analytics", null, false, false, false],
       ["product", null, false, false, false],
       ["order", null, false, false, false],

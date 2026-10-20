@@ -18,6 +18,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,7 +160,7 @@ class CaptchaServiceTest {
     Logger logger = (Logger) LoggerFactory.getLogger(CaptchaService.class);
     logger.addAppender(logs);
     try {
-      new CaptchaService(redis, generator, false, 120);
+      new CaptchaService(redis, generator, false, mock(SystemConfigApi.class));
       assertThat(logs.list)
           .singleElement()
           .satisfies(
