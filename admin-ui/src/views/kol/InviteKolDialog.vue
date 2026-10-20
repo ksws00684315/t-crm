@@ -72,7 +72,9 @@ async function rotate() {
     width="560px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <p class="hint">{{ t("kol.registerLinkHint") }}</p>
+    <!-- The auto-assign hint would contradict the super-administrator note below it, so a
+         super administrator sees only that note (2026-10-20 review item 3). -->
+    <p v-if="!isSuperAdmin" class="hint">{{ t("kol.registerLinkHint") }}</p>
     <el-alert
       v-if="isSuperAdmin"
       class="hint"

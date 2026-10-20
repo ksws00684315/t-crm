@@ -128,20 +128,27 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("sends one condition as the keyword and refuses two at once", async () => {
+  it("sends the three 03.02 conditions together as an AND query", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
-    const warning = vi.spyOn(ElMessage, "warning").mockImplementation(() => ({}) as never);
     const wrapper = await mountPage();
     await element("filter-kol-id").setValue("KOL-ASD001");
     wrapper.getComponent({ name: "ListSearch" }).vm.$emit("search");
     await flushPromises();
     expect(kolApi.listKols).toHaveBeenLastCalledWith(
-      expect.objectContaining({ keyword: "KOL-ASD001" })
+      expect.objectContaining({ kolCode: "KOL-ASD001" })
     );
     await element("filter-name").setValue("Alice");
+    await element("filter-email").setValue("alice@example.com");
     wrapper.getComponent({ name: "ListSearch" }).vm.$emit("search");
     await flushPromises();
-    expect(warning).toHaveBeenCalledWith("一次只能填写一个查询条件，请清空其余条件");
+    // The backend combines the three parameters with AND (2026-10-20 review item 2).
+    expect(kolApi.listKols).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kolCode: "KOL-ASD001",
+        name: "Alice",
+        email: "alice@example.com"
+      })
+    );
     wrapper.unmount();
   });
 
@@ -171,6 +178,16 @@ describe("creator list page (task 32 §2.2)", () => {
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
+    // 1440px fit (2026-10-20 review item 1): every column is width-fixed and their sum stays
+    // within the table area of a 1440px window (1440 - sidebar 224 - paddings ≈ 1160), so
+    // nothing scrolls horizontally.
+    // Element Plus carries the column widths on the colgroup <col> elements.
+    const fixed = wrapper
+      .findAll(".el-table__header colgroup col")
+      .map(col => Number(col.element.getAttribute("width") ?? 0))
+      .filter(w => w > 0);
+    expect(fixed.length).toBe(13);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(1160);
     wrapper.unmount();
   });
 
@@ -273,8 +290,20 @@ describe("creator list page (task 32 §2.2)", () => {
     expect(document.body.textContent).toContain("商务专属邀请码");
     expect(document.body.textContent).toContain("ABCD1234");
     expect(element("register-qr").text()).toContain("开发中");
+    // Super administrator sees only the "not bound to a BD" note (review item 3)…
     expect(element("super-invite-hint").text()).toContain("不绑定商务");
+    expect(document.body.textContent).not.toContain("自动归属到你名下");
     wrapper.unmount();
+
+    // …while a qualifying BD sees the auto-assign hint.
+    signIn("STAFF", "OWN", BD);
+    vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "0", page: 1, size: 20 });
+    const bdWrapper = await mountPage();
+    await element("invite-kol").trigger("click");
+    await flushPromises();
+    expect(document.body.textContent).toContain("自动归属到你名下");
+    expect(document.body.querySelector('[data-test="super-invite-hint"]')).toBeNull();
+    bdWrapper.unmount();
   });
 
   it("keeps the manage tab for the super administrator only", async () => {

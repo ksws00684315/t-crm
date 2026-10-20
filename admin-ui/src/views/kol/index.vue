@@ -40,7 +40,9 @@ const rows = ref<KolVO[]>([]);
 const total = ref(0);
 const activeTab = ref("list");
 
-/** 03.02: creator ID, name and email. The backend takes a single keyword, so one field at a time. */
+/**
+ * 03.02 combined query: creator ID, name and email, ANDed by the backend (2026-10-20 review).
+ */
 const query = reactive({
   page: 1,
   size: readPageSize("kol", 20),
@@ -49,27 +51,16 @@ const query = reactive({
   email: ""
 });
 
-const applied = ref({ field: "", keyword: "" });
+const applied = ref({ kolId: "", name: "", email: "" });
 
 const chips = computed<SearchChip[]>(() => {
+  const list: SearchChip[] = [];
   const current = applied.value;
-  if (!current.keyword) return [];
-  const label =
-    current.field === "kolId"
-      ? t("kol.kolId")
-      : current.field === "name"
-        ? t("kol.kolName")
-        : t("kol.email");
-  return [{ key: "field", label, text: current.keyword }];
+  if (current.kolId) list.push({ key: "kolId", label: t("kol.kolId"), text: current.kolId });
+  if (current.name) list.push({ key: "name", label: t("kol.kolName"), text: current.name });
+  if (current.email) list.push({ key: "email", label: t("kol.email"), text: current.email });
+  return list;
 });
-
-function filledFields(): string[] {
-  const fields: string[] = [];
-  if (query.kolId.trim()) fields.push("kolId");
-  if (query.name.trim()) fields.push("name");
-  if (query.email.trim()) fields.push("email");
-  return fields;
-}
 
 async function load() {
   loading.value = true;
@@ -77,7 +68,9 @@ async function load() {
     const page = await listKols({
       page: query.page,
       size: query.size,
-      keyword: applied.value.keyword || undefined
+      kolCode: applied.value.kolId || undefined,
+      name: applied.value.name || undefined,
+      email: applied.value.email || undefined
     });
     rows.value = page.items;
     total.value = Number(page.total);
@@ -89,19 +82,10 @@ async function load() {
 }
 
 function search() {
-  const fields = filledFields();
-  if (fields.length > 1) {
-    ElMessage.warning(t("kol.singleCondition"));
-    return;
-  }
   applied.value = {
-    field: fields[0] ?? "",
-    keyword:
-      fields[0] === "kolId"
-        ? query.kolId.trim()
-        : fields[0] === "name"
-          ? query.name.trim()
-          : query.email.trim()
+    kolId: query.kolId.trim(),
+    name: query.name.trim(),
+    email: query.email.trim()
   };
   query.page = 1;
   void load();
@@ -114,11 +98,10 @@ function reset() {
   search();
 }
 
-function removeChip(): void {
-  applied.value = { field: "", keyword: "" };
-  query.kolId = "";
-  query.name = "";
-  query.email = "";
+function removeChip(key: string): void {
+  if (key === "kolId") query.kolId = "";
+  if (key === "name") query.name = "";
+  if (key === "email") query.email = "";
   search();
 }
 
@@ -137,21 +120,33 @@ function rowOwned(row: KolVO): boolean {
   return row.bdUserId === me.user?.id;
 }
 
+/**
+ * The 04.01 columns sized to fit a 1440px window with no horizontal scrolling (2026-10-20
+ * review): narrow cells, capped text columns with hover tooltips, the invite time on two
+ * lines, and the six actions wrapped as two rows of three (~200px).
+ */
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("kol.kolId"), width: 150, mono: true },
-  { key: "name", label: t("kol.kolName"), prop: "name", minWidth: 120 },
-  { key: "contact", label: t("kol.phoneWhatsapp"), minWidth: 150 },
-  { key: "email", label: t("kol.email"), minWidth: 200, mono: true },
-  { key: "platform", label: t("kol.primaryPlatform"), minWidth: 170 },
-  { key: "rate", label: t("kol.defaultRate"), width: 100 },
-  { key: "prepay", label: t("kol.prepay"), width: 90 },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: 170, mono: true },
-  { key: "inviter", label: t("kol.inviter"), minWidth: 110 },
-  { key: "review", label: t("kol.reviewStatus"), width: 90 },
-  { key: "login", label: t("kol.loginStatus"), width: 90 },
-  { key: "relation", label: t("kol.relationStatus"), width: 100 },
-  { key: "actions", label: t("common.actions"), width: 340 }
+  { key: "kolCode", label: t("kol.kolId"), width: 100, mono: true, tooltip: true },
+  { key: "name", label: t("kol.kolName"), prop: "name", width: 72, tooltip: true },
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: 100, tooltip: true },
+  { key: "email", label: t("kol.email"), width: 118, mono: true, tooltip: true },
+  { key: "platform", label: t("kol.primaryPlatform"), width: 112, tooltip: true },
+  { key: "rate", label: t("kol.defaultRate"), width: 60 },
+  { key: "prepay", label: t("kol.prepay"), width: 60 },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: 84, mono: true },
+  { key: "inviter", label: t("kol.inviter"), width: 70, tooltip: true },
+  { key: "review", label: t("kol.reviewStatus"), width: 60 },
+  { key: "login", label: t("kol.loginStatus"), width: 60 },
+  { key: "relation", label: t("kol.relationStatus"), width: 60 },
+  { key: "actions", label: t("common.actions"), width: 200 }
 ]);
+
+/** Splits "2026/10/05 01:02:03" for the two-line invite-time cell. */
+function instantLines(value: string): string[] {
+  const text = formatInstant(value);
+  const split = text.indexOf(" ");
+  return split < 0 ? [text] : [text.slice(0, split), text.slice(split + 1)];
+}
 
 function asKol(row: object): KolVO {
   return row as KolVO;
@@ -295,6 +290,7 @@ onMounted(() => {
         </ListSearch>
 
         <DataTable
+          class="kol-fit"
           table-id="kol"
           :rows="rows"
           :columns="columns"
@@ -319,7 +315,13 @@ onMounted(() => {
           <template #cell-prepay>
             <span class="developing">{{ t("common.developing") }}</span>
           </template>
-          <template #cell-inviteTime="{ row }">{{ formatInstant(asKol(row).inviteTime) }}</template>
+          <template #cell-inviteTime="{ row }">
+            <span class="invite-time" data-test="invite-time">
+              <span v-for="line in instantLines(asKol(row).inviteTime)" :key="line">{{
+                line
+              }}</span>
+            </span>
+          </template>
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
             <el-tag
@@ -363,60 +365,63 @@ onMounted(() => {
             </span>
           </template>
           <template #actions="{ row }">
-            <!-- 04.01: six fixed actions, this order, disabled when not applicable. -->
-            <el-button
-              link
-              type="primary"
-              data-test="action-edit"
-              :disabled="!abilities.canWrite"
-              @click="openEdit(asKol(row))"
-              >{{ t("kol.actionEdit") }}</el-button
-            >
-            <el-button
-              link
-              type="primary"
-              data-test="action-review"
-              :disabled="!(abilities.canWrite && asKol(row).reviewStatus === 'PENDING')"
-              @click="openReview(asKol(row))"
-              >{{ t("kol.actionReview") }}</el-button
-            >
-            <el-button
-              link
-              type="primary"
-              data-test="action-commission"
-              :disabled="
-                !(
-                  abilities.canWrite &&
-                  asKol(row).reviewStatus === 'APPROVED' &&
-                  rowOwned(asKol(row))
-                )
-              "
-              @click="openCommission(asKol(row))"
-              >{{ t("kol.actionCommission") }}</el-button
-            >
-            <el-tooltip :content="t('common.developing')" placement="top">
-              <span class="action-disabled">
-                <el-button link type="primary" data-test="action-prepay" disabled>{{
-                  t("kol.actionPrepay")
-                }}</el-button>
-              </span>
-            </el-tooltip>
-            <el-button
-              link
-              type="primary"
-              data-test="action-cleanup"
-              :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-              @click="openCleanup(asKol(row))"
-              >{{ t("kol.actionCleanup") }}</el-button
-            >
-            <el-button
-              link
-              :type="asKol(row).status === 1 ? 'danger' : 'success'"
-              data-test="action-freeze"
-              :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-              @click="toggleStatus(asKol(row))"
-              >{{ asKol(row).status === 1 ? t("kol.freeze") : t("kol.unfreeze") }}</el-button
-            >
+            <!-- 04.01: six fixed actions, this order, disabled when not applicable; wrapped
+                 as two rows of three so the column stays ~200px (2026-10-20 review). -->
+            <div class="actions-cell" data-test="row-actions">
+              <el-button
+                link
+                type="primary"
+                data-test="action-edit"
+                :disabled="!abilities.canWrite"
+                @click="openEdit(asKol(row))"
+                >{{ t("kol.actionEdit") }}</el-button
+              >
+              <el-button
+                link
+                type="primary"
+                data-test="action-review"
+                :disabled="!(abilities.canWrite && asKol(row).reviewStatus === 'PENDING')"
+                @click="openReview(asKol(row))"
+                >{{ t("kol.actionReview") }}</el-button
+              >
+              <el-button
+                link
+                type="primary"
+                data-test="action-commission"
+                :disabled="
+                  !(
+                    abilities.canWrite &&
+                    asKol(row).reviewStatus === 'APPROVED' &&
+                    rowOwned(asKol(row))
+                  )
+                "
+                @click="openCommission(asKol(row))"
+                >{{ t("kol.actionCommission") }}</el-button
+              >
+              <el-tooltip :content="t('common.developing')" placement="top">
+                <span class="action-disabled">
+                  <el-button link type="primary" data-test="action-prepay" disabled>{{
+                    t("kol.actionPrepay")
+                  }}</el-button>
+                </span>
+              </el-tooltip>
+              <el-button
+                link
+                type="primary"
+                data-test="action-cleanup"
+                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
+                @click="openCleanup(asKol(row))"
+                >{{ t("kol.actionCleanup") }}</el-button
+              >
+              <el-button
+                link
+                :type="asKol(row).status === 1 ? 'danger' : 'success'"
+                data-test="action-freeze"
+                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
+                @click="toggleStatus(asKol(row))"
+                >{{ asKol(row).status === 1 ? t("kol.freeze") : t("kol.unfreeze") }}</el-button
+              >
+            </div>
           </template>
         </DataTable>
       </el-tab-pane>
@@ -473,7 +478,34 @@ onMounted(() => {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
+/* Dense cells so all 13 columns fit a 1440px window without horizontal scrolling. */
+.kol-fit :deep(.el-table .cell) {
+  padding: 0 6px;
+}
+.kol-fit :deep(th.el-table__cell .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 16px;
+}
+.invite-time {
+  display: inline-flex;
+  flex-direction: column;
+  font-size: 11px;
+  line-height: 15px;
+}
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: center;
+}
+.actions-cell .el-button {
+  margin: 0;
+  padding: 0;
+  height: auto;
+  font-size: 12px;
+}
 .action-disabled {
-  margin-right: 12px;
+  display: inline-flex;
 }
 </style>

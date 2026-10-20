@@ -565,7 +565,6 @@ const zhCN = {
     idPlaceholder: "如 KOL-ASD001",
     namePlaceholder: "达人名称",
     emailPlaceholder: "name{'@'}example.com",
-    singleCondition: "一次只能填写一个查询条件，请清空其余条件",
     bd: "负责商务",
     defaultRate: "佣金比例",
     code: "达人ID",

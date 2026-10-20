@@ -579,7 +579,6 @@ const enUS: MessageSchema = {
     idPlaceholder: "e.g. KOL-ASD001",
     namePlaceholder: "Creator name",
     emailPlaceholder: "name{'@'}example.com",
-    singleCondition: "Only one search condition can be used at a time; clear the others",
     bd: "BD",
     defaultRate: "Commission",
     code: "Creator ID",
