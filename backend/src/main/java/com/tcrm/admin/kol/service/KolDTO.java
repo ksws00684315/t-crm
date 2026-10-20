@@ -29,6 +29,7 @@ public record KolDTO(
     String loginStatus,
     List<PlatformDTO> platforms,
     Integer configVersion,
+    Integer autoCleanupDays,
     Instant inviteTime,
     Integer registerSource,
     Integer accountStatus,

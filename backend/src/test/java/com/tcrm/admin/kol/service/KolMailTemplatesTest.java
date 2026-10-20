@@ -24,7 +24,8 @@ class KolMailTemplatesTest {
     assertThat(mail.text())
         .contains("https://kol.example.com/activate?token=raw-token")
         .contains("72 小时内有效")
-        .contains("邀请您加入其达人合作计划");
+        .contains("邀请您加入其达人合作计划（SparkTrack）")
+        .doesNotContain("T-CRM");
     assertThat(mail.html())
         .contains("https://kol.example.com/activate?token=raw-token")
         .contains("<strong>Acme &amp; Co</strong>");
@@ -44,7 +45,9 @@ class KolMailTemplatesTest {
         .contains("Reset the account of Beta")
         .contains("https://kol.example.com/reset?token=token-b")
         .contains("重置 Alpha 的账号密码")
-        .contains("https://kol.example.com/reset?token=token-b");
+        .contains("https://kol.example.com/reset?token=token-b")
+        .contains("SparkTrack")
+        .doesNotContain("T-CRM");
     assertThat(mail.text().indexOf("Hello,")).isLessThan(mail.text().indexOf("您好，"));
   }
 
@@ -52,23 +55,6 @@ class KolMailTemplatesTest {
   void shouldEscapeHtmlInCompanyNames() {
     MailMessage mail = templates.reset("kol@example.com", List.of(new ResetLink("A<b>", "t")));
     assertThat(mail.html()).contains("<strong>A&lt;b&gt;</strong>");
-  }
-
-  @Test
-  void shouldRenderTheRegistrationCodeInBothLanguages() {
-    MailMessage mail = templates.registerCode("kol@example.com", "Acme & Co", "654321");
-    assertThat(mail.template()).isEqualTo("kol-register-code");
-    assertThat(mail.subject()).isEqualTo("[Acme & Co] Your verification code / 您的验证码");
-    assertThat(mail.text().indexOf("Hello,")).isLessThan(mail.text().indexOf("您好，"));
-    assertThat(mail.text())
-        .contains("Your verification code for joining Acme & Co on T-CRM is:")
-        .contains("654321")
-        .contains("valid for 10 minutes")
-        .contains("您加入 Acme & Co（T-CRM）的验证码是：")
-        .contains("验证码 10 分钟内有效，仅可使用一次。");
-    assertThat(mail.html())
-        .contains("<strong>Acme &amp; Co</strong>")
-        .contains("<strong>654321</strong>");
   }
 
   @Test

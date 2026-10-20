@@ -12,7 +12,6 @@ import com.tcrm.admin.kol.model.BdTransferStatus;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
-import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.AuditSanitizer;
@@ -28,6 +27,7 @@ import com.tcrm.admin.system.api.StaffDisabledEvent;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -114,48 +114,6 @@ public class BdTransferService {
             createInTransaction(new BdTransferCommand(List.of(kolId), null, target, null, null)));
   }
 
-  /**
-   * Usable BD claims an unbound (or bound-to-unusable-BD) KOL for themselves (ADR-023 §4). Row lock
-   * serializes concurrent claims; the loser gets 409 KOL_ALREADY_CLAIMED.
-   */
-  @Transactional(rollbackFor = Exception.class)
-  public void claim(Long kolId) {
-    AccountDTO user = current.user();
-    BdUserDTO self = bds.getById(user.id());
-    if (self == null || !self.usable()) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    tx.executeWithoutResult(
-        status -> {
-          KolDO kol = lockKol(kolId);
-          if (!isClaimable(kol)) {
-            throw new BusinessException(ErrorCode.KOL_ALREADY_CLAIMED);
-          }
-          Instant now = now();
-          changeOwnership(kol, user.id(), now, user.id());
-          KolBdTransferDO row = new KolBdTransferDO();
-          row.setKolId(kol.getId());
-          row.setFromBdUserId(kol.getBdUserId());
-          row.setToBdUserId(user.id());
-          row.setEffectiveAt(now);
-          row.setStatus(BdTransferStatus.DONE);
-          row.setExecutedAt(now);
-          row.setReason("claim");
-          row.setDeleted(false);
-          transfers.insert(row);
-          record("Claim KOL", "POST", new CancelAuditDTO(kolId));
-        });
-  }
-
-  /** True when the KOL has no usable BD (unassigned or BD no longer usable). */
-  boolean isClaimable(KolDO kol) {
-    if (kol.getBdUserId() == null) {
-      return true;
-    }
-    BdUserDTO bd = bds.getById(kol.getBdUserId());
-    return bd == null || !bd.usable();
-  }
-
   private BdTransferResultDTO createInTransaction(BdTransferCommand c) {
     // User row before KOL rows: serialize target disable with every assignment (design §4.13).
     requireTarget(c.toBdUserId());
@@ -199,6 +157,7 @@ public class BdTransferService {
       }
     }
     int skipped = 0;
+    List<KolDO> changedKols = new ArrayList<>();
     for (KolDO kol : locked) {
       if (!scheduled && Objects.equals(kol.getBdUserId(), c.toBdUserId())) {
         skipped++;
@@ -218,18 +177,23 @@ public class BdTransferService {
         cancelForKol(kol.getId(), "被立即转移取代", current.user().id());
       }
       transfers.insert(row);
+      changedKols.add(kol);
     }
-    record(
-        "Create BD transfer",
-        "POST",
-        new TransferAuditDTO(
-            locked.size(),
-            c.fromBdUserId(),
-            c.toBdUserId(),
-            effective,
-            c.reason(),
-            locked.stream().map(KolDO::getBdUserId).distinct().toList()));
-    int changed = locked.size() - skipped;
+    if (!changedKols.isEmpty()) {
+      record(
+          "Create BD transfer",
+          "POST",
+          new TransferAuditDTO(
+              changedKols.size(),
+              c.fromBdUserId(),
+              c.toBdUserId(),
+              effective,
+              c.reason(),
+              changedKols.stream().map(KolDO::getBdUserId).distinct().toList(),
+              transferSummary(
+                  changedKols, effective, c.toBdUserId(), c.reason(), scheduled, skipped)));
+    }
+    int changed = changedKols.size();
     return new BdTransferResultDTO(scheduled ? 0 : changed, scheduled ? changed : 0, skipped);
   }
 
@@ -332,7 +296,10 @@ public class BdTransferService {
           if (changed != 1) {
             throw new BusinessException(ErrorCode.KOL_TRANSFER_NOT_SCHEDULED);
           }
-          record("Cancel BD transfer", "DELETE", new CancelAuditDTO(id));
+          record(
+              "Cancel BD transfer",
+              "DELETE",
+              new CancelAuditDTO(id, transferSummary(before, "取消预约", "手动取消")));
         });
   }
 
@@ -366,6 +333,13 @@ public class BdTransferService {
                     .eq(KolBdTransferDO::getId, id)
                     .set(KolBdTransferDO::getStatus, BdTransferStatus.DONE)
                     .set(KolBdTransferDO::getExecutedAt, now()));
+            record(
+                "Execute BD transfer",
+                "SYSTEM",
+                new CancelAuditDTO(
+                    row.getId(), transferSummary(row, kol, "预约转移已执行", row.getReason())),
+                row.getTenantId(),
+                row.getCreateBy());
           }
         });
   }
@@ -418,12 +392,28 @@ public class BdTransferService {
         scheduledUpdate(current.user().id())
             .eq(KolBdTransferDO::getFromBdUserId, userId)
             .set(KolBdTransferDO::getFromBdUserId, null));
-    transfers.update(
-        null,
-        scheduledUpdate(current.user().id())
-            .eq(KolBdTransferDO::getToBdUserId, userId)
-            .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
-            .set(KolBdTransferDO::getCancelReason, "目标商务已停用"));
+    List<KolBdTransferDO> toDisabled =
+        transfers.selectList(
+            scheduled()
+                .eq(KolBdTransferDO::getToBdUserId, userId)
+                .orderByAsc(KolBdTransferDO::getId));
+    for (KolBdTransferDO row : toDisabled) {
+      int cancelled =
+          transfers.update(
+              null,
+              scheduledUpdate(current.user().id())
+                  .eq(KolBdTransferDO::getId, row.getId())
+                  .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+                  .set(KolBdTransferDO::getCancelReason, "目标商务已停用"));
+      if (cancelled == 1) {
+        record(
+            "Cancel scheduled BD transfer",
+            "SYSTEM",
+            new CancelAuditDTO(row.getId(), transferSummary(row, "预约转移已取消", "目标商务已停用")),
+            event.tenantId(),
+            current.user().id());
+      }
+    }
     record("Unassign disabled staff KOLs", "SYSTEM", new DisabledAuditDTO(userId, count));
     if (count > 0) {
       publishUnassigned(event, count);
@@ -469,7 +459,81 @@ public class BdTransferService {
             .eq(KolBdTransferDO::getId, row.getId())
             .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
             .set(KolBdTransferDO::getCancelReason, reason));
+    record(
+        "Cancel scheduled BD transfer",
+        "SYSTEM",
+        new CancelAuditDTO(row.getId(), transferSummary(row, kol, "预约转移已取消", reason)),
+        row.getTenantId(),
+        row.getCreateBy());
     publishCancelled(row, kol, reason);
+  }
+
+  private String transferSummary(
+      List<KolDO> rows,
+      Instant effectiveAt,
+      Long targetBdUserId,
+      String reason,
+      boolean scheduled,
+      int skipped) {
+    List<String> codes = rows.stream().map(KolDO::getKolCode).filter(Objects::nonNull).toList();
+    List<Long> sourceIds = rows.stream().map(KolDO::getBdUserId).distinct().toList();
+    String from = sourceIds.stream().map(this::bdName).distinct().collect(Collectors.joining("、"));
+    String summary =
+        String.format(
+            "达人%s从%s转至%s，%s生效，原因：%s",
+            codesSummary(codes),
+            from.isBlank() ? "未分配" : from,
+            bdName(targetBdUserId),
+            scheduled ? "预约于 " + formatTransferTime(effectiveAt) : "立即",
+            reason == null || reason.isBlank() ? "未填写" : reason);
+    return skipped == 0 ? summary : summary + "；另有 " + skipped + " 位无变化，已跳过";
+  }
+
+  private String transferSummary(KolBdTransferDO row, KolDO kol, String outcome, String reason) {
+    return String.format(
+        "达人%s从%s转至%s，%s，生效时间：%s，原因：%s",
+        kol.getKolCode() == null ? "未知编号" : kol.getKolCode(),
+        bdName(row.getFromBdUserId()),
+        bdName(row.getToBdUserId()),
+        outcome,
+        formatTransferTime(row.getEffectiveAt()),
+        reason == null || reason.isBlank() ? "未填写" : reason);
+  }
+
+  private String transferSummary(KolBdTransferDO row, String outcome, String reason) {
+    KolDO kol = kols.selectById(row.getKolId());
+    String code = kol == null ? null : kol.getKolCode();
+    return String.format(
+        "达人%s从%s转至%s，%s，生效时间：%s，原因：%s",
+        code == null ? "未知编号" : code,
+        bdName(row.getFromBdUserId()),
+        bdName(row.getToBdUserId()),
+        outcome,
+        formatTransferTime(row.getEffectiveAt()),
+        reason == null || reason.isBlank() ? "未填写" : reason);
+  }
+
+  private String bdName(Long id) {
+    if (id == null) {
+      return "未分配";
+    }
+    BdUserDTO bd = bds.getById(id);
+    if (bd == null) {
+      return "未分配";
+    }
+    return bd.nickname() == null || bd.nickname().isBlank() ? bd.username() : bd.nickname();
+  }
+
+  private static String codesSummary(List<String> codes) {
+    int shown = Math.min(20, codes.size());
+    String summary = String.join("、", codes.subList(0, shown));
+    return codes.size() > shown ? summary + "等 " + (codes.size() - shown) + " 位" : summary;
+  }
+
+  private static String formatTransferTime(Instant instant) {
+    return DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+        .withZone(ZoneOffset.UTC)
+        .format(instant);
   }
 
   private void publishCancelled(KolBdTransferDO row, KolDO kol, String reason) {
@@ -510,12 +574,25 @@ public class BdTransferService {
   }
 
   private void cancelForKol(Long kolId, String reason, Long actor) {
-    transfers.update(
-        null,
-        scheduledUpdate(actor)
-            .eq(KolBdTransferDO::getKolId, kolId)
-            .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
-            .set(KolBdTransferDO::getCancelReason, reason));
+    List<KolBdTransferDO> rows =
+        transfers.selectList(scheduled().eq(KolBdTransferDO::getKolId, kolId));
+    for (KolBdTransferDO row : rows) {
+      int cancelled =
+          transfers.update(
+              null,
+              scheduledUpdate(actor)
+                  .eq(KolBdTransferDO::getId, row.getId())
+                  .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
+                  .set(KolBdTransferDO::getCancelReason, reason));
+      if (cancelled == 1) {
+        record(
+            "Cancel scheduled BD transfer",
+            "SYSTEM",
+            new CancelAuditDTO(row.getId(), transferSummary(row, "预约转移已取消", reason)),
+            row.getTenantId(),
+            actor);
+      }
+    }
   }
 
   private LambdaUpdateWrapper<KolBdTransferDO> scheduledUpdate(Long actor) {
@@ -582,9 +659,13 @@ public class BdTransferService {
 
   private void record(String action, String method, Object params) {
     var user = current.user();
+    record(action, method, params, user.tenantId(), user.id());
+  }
+
+  private void record(String action, String method, Object params, long tenantId, Long actorId) {
     audit.recordTenantWriteOperation(
-        user.tenantId(),
-        user.id(),
+        tenantId,
+        actorId,
         "KOL",
         action,
         method,
@@ -602,9 +683,10 @@ public class BdTransferService {
       Long toBdUserId,
       Instant effectiveAt,
       String reason,
-      List<Long> sourceBdUserIds) {}
+      List<Long> sourceBdUserIds,
+      String summary) {}
 
   private record DisabledAuditDTO(long disabledUserId, int kolCount) {}
 
-  private record CancelAuditDTO(Long transferId) {}
+  private record CancelAuditDTO(Long transferId, String summary) {}
 }

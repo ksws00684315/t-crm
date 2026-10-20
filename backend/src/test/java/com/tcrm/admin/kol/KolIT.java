@@ -770,14 +770,145 @@ class KolIT {
   }
 
   @Test
-  void shouldPreviewIdleCleanup_onlyWhenAllScopeAndEnabledPath() throws Exception {
+  void shouldSearchUnboundKolByExactCodeOrEmailForOwnBd() throws Exception {
     String admin = companyAdmin();
-    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, admin))
+    String bd = createBd(admin, "bd-exact-search");
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType("application/json")
+                            .content(
+                                "{\"name\":\"Exact Free\",\"email\":\"exact-free@example.com\","
+                                    + "\"country\":\"US\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    String code =
+        jdbc.queryForObject(
+            "SELECT kol_code FROM crm_kol WHERE id = ?", String.class, Long.valueOf(kolId));
+    String bdToken = login("bd-exact-search", PASSWORD);
+
+    mvc.perform(
+            get("/admin-api/kol/kols").param("kolCode", code.toLowerCase()).header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].id").value(kolId));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code)
+                .param("email", "EXACT-FREE@EXAMPLE.COM")
+                .param("name", "Exact")
+                .header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code)
+                .param("email", "EXACT-FREE@EXAMPLE.COM")
+                .param("name", "No match")
+                .header(TOKEN, bdToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("0"));
-    createBd(admin, "bd-cleanup-own");
-    String bdToken = login("bd-cleanup-own", PASSWORD);
-    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, bdToken))
-        .andExpect(status().isForbidden());
+    mvc.perform(get("/admin-api/kol/kols").param("name", "Exact").header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+    mvc.perform(
+            get("/admin-api/kol/kols")
+                .param("kolCode", code.substring(0, 7))
+                .header(TOKEN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+  }
+
+  @Test
+  void shouldSetPerKolCleanupAndRemoveCompanyCleanupEndpoints() throws Exception {
+    String admin = companyAdmin();
+    String bdId = createBd(admin, "bd-cleanup-own");
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                "{\"name\":\"Cleanup\",\"email\":\"cleanup@example.com\","
+                                    + "\"country\":\"US\",\"bdUserId\":\""
+                                    + bdId
+                                    + "\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+
+    mvc.perform(
+            put("/admin-api/kol/kols/" + kolId + "/auto-cleanup")
+                .header(TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"days\":30}"))
+        .andExpect(status().isOk());
+    String kolCode =
+        jdbc.queryForObject(
+            "SELECT kol_code FROM crm_kol WHERE id = ?", String.class, Long.valueOf(kolId));
+    String firstCleanupSummary =
+        jdbc.queryForObject(
+            "SELECT request_params::jsonb ->> 'summary' FROM sys_oper_log WHERE action = 'Set KOL auto cleanup' ORDER BY id DESC LIMIT 1",
+            String.class);
+    assertThat(firstCleanupSummary).contains(kolCode, "30 天");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_oper_log WHERE action = 'Set KOL auto cleanup'",
+                Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isEqualTo(30);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_promotion_record WHERE kol_id = ? AND change_type = 'AUTO_CLEANUP'",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isEqualTo(1);
+
+    mvc.perform(
+            put("/admin-api/kol/kols/" + kolId + "/auto-cleanup")
+                .header(TOKEN, admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"days\":null}"))
+        .andExpect(status().isOk());
+    String closeSummary =
+        jdbc.queryForObject(
+            "SELECT request_params::jsonb ->> 'summary' FROM sys_oper_log WHERE action = 'Set KOL auto cleanup' ORDER BY id DESC LIMIT 1",
+            String.class);
+    assertThat(closeSummary).contains(kolCode, "关闭");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM sys_oper_log WHERE action = 'Set KOL auto cleanup'",
+                Integer.class))
+        .isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT auto_cleanup_days FROM crm_kol WHERE id = ?",
+                Integer.class,
+                Long.valueOf(kolId)))
+        .isNull();
+
+    mvc.perform(get("/admin-api/kol/cleanup-config").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/admin-api/kol/cleanup-preview").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/admin-api/kol/cleanup-items").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
+    mvc.perform(post("/admin-api/kol/cleanup-items/9/retry").header(TOKEN, admin))
+        .andExpect(status().isNotFound());
   }
 }

@@ -114,7 +114,15 @@ public class BdUserService implements BdUserApi {
             && Integer.valueOf(1).equals(member.getStatus())
             && Integer.valueOf(1).equals(member.getAccountStatus())
             && kolEdit;
-    return new BdUserDTO(member.getUserId(), member.getUsername(), member.getNickname(), usable);
+    return new BdUserDTO(
+        member.getUserId(),
+        member.getUsername(),
+        member.getNickname(),
+        usable,
+        member.getRole(),
+        member.getDataScope(),
+        Integer.valueOf(1).equals(member.getStatus())
+            && Integer.valueOf(1).equals(member.getAccountStatus()));
   }
 
   private Set<Long> editorsAmong(Collection<Long> ids, long tenantId) {

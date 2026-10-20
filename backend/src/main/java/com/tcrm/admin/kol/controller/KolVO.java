@@ -33,6 +33,7 @@ public record KolVO(
     String loginStatus,
     List<PlatformVO> platforms,
     Integer configVersion,
+    Integer autoCleanupDays,
     Instant inviteTime,
     Integer registerSource,
     Integer accountStatus,
@@ -70,6 +71,7 @@ public record KolVO(
                         p.address()))
             .toList(),
         k.configVersion(),
+        k.autoCleanupDays(),
         k.inviteTime(),
         k.registerSource(),
         k.accountStatus(),

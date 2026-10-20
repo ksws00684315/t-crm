@@ -236,8 +236,8 @@ class PermissionIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("1"));
     mvc.perform(get("/admin-api/product/kol-items").param("kolCode", own).header(TOKEN, token))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
     mvc.perform(get("/admin-api/link/links").param("kolCode", own).header(TOKEN, token))
         .andExpect(status().isOk());
     mvc.perform(get("/admin-api/link/links").param("kolCode", other).header(TOKEN, token))

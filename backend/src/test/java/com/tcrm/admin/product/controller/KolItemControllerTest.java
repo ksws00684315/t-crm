@@ -53,11 +53,10 @@ class KolItemControllerTest {
   }
 
   @Test
-  void shouldReturn403_whenOwnOperatorReads() throws Exception {
-    doThrow(new BusinessException(ErrorCode.AUTH_FORBIDDEN)).when(items).page(any());
-    mvc.perform(list(as(Role.STAFF, DataScope.OWN)).param("kolCode", "KOL0001"))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+  void shouldList_whenOwnOperatorReads() throws Exception {
+    when(items.page(any())).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
+    mvc.perform(list(as(Role.STAFF, DataScope.OWN))).andExpect(status().isOk());
+    verify(items).page(any());
   }
 
   @Test

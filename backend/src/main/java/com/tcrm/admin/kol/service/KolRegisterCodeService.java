@@ -5,6 +5,7 @@ import com.tcrm.admin.kol.mapper.KolRegisterCodeMapper;
 import com.tcrm.admin.kol.model.KolRegisterCodeDO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
@@ -16,9 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The signed-in BD's register link (task 12c §4.2). Only an account {@link BdUserApi} treats as a
- * usable BD may hold one; everyone else, including a super administrator, is {@code
- * KOL_INVALID_BD_USER}.
+ * The signed-in account's company-scoped register link. Usable BDs and company super administrators
+ * may hold a link; platform administrators and other staff are rejected.
  */
 @Service
 public class KolRegisterCodeService {
@@ -56,23 +56,25 @@ public class KolRegisterCodeService {
   }
 
   private KolRegisterCodeDTO loadOrCreate(AccountDTO user) {
-    codes.lockByBd(user.id());
-    KolRegisterCodeDO active = findActive(user.id());
-    return active == null ? toDto(insert(user.id(), user.id())) : toDto(active);
+    long tenantId = user.tenantId();
+    codes.lockByBd(tenantId, user.id());
+    KolRegisterCodeDO active = findActive(tenantId, user.id());
+    return active == null ? toDto(insert(tenantId, user.id(), user.id())) : toDto(active);
   }
 
   private KolRegisterCodeDTO replace(AccountDTO user) {
-    codes.lockByBd(user.id());
-    codes.revokeActive(user.id(), user.id(), Instant.now());
-    return toDto(insert(user.id(), user.id()));
+    long tenantId = user.tenantId();
+    codes.lockByBd(tenantId, user.id());
+    codes.revokeActive(tenantId, user.id(), user.id(), Instant.now());
+    return toDto(insert(tenantId, user.id(), user.id()));
   }
 
-  /**
-   * Same predicate as the BD picker: enabled staff, OWN scope, {@code kol:edit}, this company. The
-   * tenant plugin limits {@code getById} to the caller's company.
-   */
+  /** Same predicate as the BD picker, except company super administrators may also hold a code. */
   private AccountDTO requireBd() {
     AccountDTO user = current.user();
+    if (user.role() == Role.SUPER_ADMIN && !user.ownScope()) {
+      return user;
+    }
     BdUserDTO bd = bdUsers.getById(user.id());
     if (bd == null || !bd.usable()) {
       throw new BusinessException(ErrorCode.KOL_INVALID_BD_USER);
@@ -80,16 +82,18 @@ public class KolRegisterCodeService {
     return user;
   }
 
-  private KolRegisterCodeDO findActive(long bdUserId) {
+  private KolRegisterCodeDO findActive(long tenantId, long bdUserId) {
     return codes.selectOne(
         new LambdaQueryWrapper<KolRegisterCodeDO>()
+            .eq(KolRegisterCodeDO::getTenantId, tenantId)
             .eq(KolRegisterCodeDO::getBdUserId, bdUserId)
             .eq(KolRegisterCodeDO::getStatus, KolRegisterCodeDO.STATUS_ACTIVE));
   }
 
-  private KolRegisterCodeDO insert(long bdUserId, long actor) {
+  private KolRegisterCodeDO insert(long tenantId, long bdUserId, long actor) {
     Instant now = Instant.now();
     KolRegisterCodeDO row = new KolRegisterCodeDO();
+    row.setTenantId(tenantId);
     row.setBdUserId(bdUserId);
     row.setCode(KolRegisterCodeGenerator.next());
     row.setStatus(KolRegisterCodeDO.STATUS_ACTIVE);

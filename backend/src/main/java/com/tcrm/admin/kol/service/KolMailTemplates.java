@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 public class KolMailTemplates {
   public static final String INVITE_TEMPLATE = "kol-invite";
   public static final String RESET_TEMPLATE = "kol-reset";
-  public static final String REGISTER_TEMPLATE = "kol-register-code";
 
   private final KolPortalUrls links;
 
@@ -28,7 +27,7 @@ public class KolMailTemplates {
     String text =
         "Hello,\n\n"
             + company
-            + " invites you to join its creator program on T-CRM.\n\n"
+            + " invites you to join its creator program on SparkTrack.\n\n"
             + "Set up your account password (the link is valid for 72 hours and can be used once):\n"
             + url
             + "\n\n"
@@ -36,13 +35,13 @@ public class KolMailTemplates {
             + "----\n"
             + "您好，\n\n"
             + company
-            + " 邀请您加入其达人合作计划（T-CRM）。\n\n"
+            + " 邀请您加入其达人合作计划（SparkTrack）。\n\n"
             + "请设置您的账号密码（链接 72 小时内有效，仅可使用一次）：\n"
             + url
             + "\n\n"
             + "如果您没有预期收到这封邮件，请忽略它。\n";
     String html =
-        "<p>Hello,</p><p><strong>%s</strong> invites you to join its creator program on T-CRM.</p>"
+        "<p>Hello,</p><p><strong>%s</strong> invites you to join its creator program on SparkTrack.</p>"
                 .formatted(escape(company))
             + "<p>Set up your account password (the link is valid for 72 hours and can be used"
             + " once):</p>"
@@ -50,7 +49,8 @@ public class KolMailTemplates {
             + url
             + "\">Set up my account / 设置我的账号</a></p>"
             + "<p>If you were not expecting this email, you can ignore it.</p><hr>"
-            + "<p>您好，</p><p><strong>%s</strong> 邀请您加入其达人合作计划（T-CRM）。</p>".formatted(escape(company))
+            + "<p>您好，</p><p><strong>%s</strong> 邀请您加入其达人合作计划（SparkTrack）。</p>"
+                .formatted(escape(company))
             + "<p>请设置您的账号密码（链接 72 小时内有效，仅可使用一次）：</p>"
             + "<p><a href=\""
             + url
@@ -70,10 +70,10 @@ public class KolMailTemplates {
     String company = resetLinks.getFirst().company();
     String subject = "[" + company + "] Reset your password / 重置密码";
     StringBuilder text =
-        new StringBuilder("Hello,\n\nWe received a request to reset your T-CRM password.\n\n");
+        new StringBuilder("Hello,\n\nWe received a request to reset your SparkTrack password.\n\n");
     StringBuilder html =
         new StringBuilder(
-            "<p>Hello,</p><p>We received a request to reset your T-CRM password.</p>");
+            "<p>Hello,</p><p>We received a request to reset your SparkTrack password.</p>");
     for (ResetLink link : resetLinks) {
       String url = links.resetUrl(link.token());
       text.append("Reset the account of ")
@@ -89,9 +89,9 @@ public class KolMailTemplates {
           .append("\">Reset password / 重置密码</a></p>");
     }
     text.append("If you did not request this, you can ignore this email.\n\n----\n您好，\n\n")
-        .append("我们收到了重置 T-CRM 密码的请求。\n\n");
+        .append("我们收到了重置 SparkTrack 密码的请求。\n\n");
     html.append("<p>If you did not request this, you can ignore this email.</p><hr>")
-        .append("<p>您好，</p><p>我们收到了重置 T-CRM 密码的请求。</p>");
+        .append("<p>您好，</p><p>我们收到了重置 SparkTrack 密码的请求。</p>");
     for (ResetLink link : resetLinks) {
       String url = links.resetUrl(link.token());
       text.append("重置 ")
@@ -109,49 +109,6 @@ public class KolMailTemplates {
     text.append("如果这不是您本人的操作，请忽略这封邮件。\n");
     html.append("<p>如果这不是您本人的操作，请忽略这封邮件。</p>");
     return new MailMessage(to, RESET_TEMPLATE, subject, text.toString(), html.toString());
-  }
-
-  /**
-   * Email verification code for self-registration. English first, then Chinese; the code is valid
-   * for 10 minutes. The code is secret material and reaches a log only when {@code
-   * crm.mail.log-links} is on.
-   */
-  public MailMessage registerCode(String to, String company, String code) {
-    String subject = "[" + company + "] Your verification code / 您的验证码";
-    String text =
-        "Hello,\n\n"
-            + "Your verification code for joining "
-            + company
-            + " on T-CRM is:\n\n"
-            + code
-            + "\n\n"
-            + "The code is valid for 10 minutes and can be used once.\n\n"
-            + "If you were not expecting this email, you can ignore it.\n\n"
-            + "----\n"
-            + "您好，\n\n"
-            + "您加入 "
-            + company
-            + "（T-CRM）的验证码是：\n\n"
-            + code
-            + "\n\n"
-            + "验证码 10 分钟内有效，仅可使用一次。\n\n"
-            + "如果您没有预期收到这封邮件，请忽略它。\n";
-    String html =
-        "<p>Hello,</p><p>Your verification code for joining <strong>"
-            + escape(company)
-            + "</strong> on T-CRM is:</p><p><strong>"
-            + escape(code)
-            + "</strong></p>"
-            + "<p>The code is valid for 10 minutes and can be used once.</p>"
-            + "<p>If you were not expecting this email, you can ignore it.</p><hr>"
-            + "<p>您好，</p><p>您加入 <strong>"
-            + escape(company)
-            + "</strong>（T-CRM）的验证码是：</p><p><strong>"
-            + escape(code)
-            + "</strong></p>"
-            + "<p>验证码 10 分钟内有效，仅可使用一次。</p>"
-            + "<p>如果您没有预期收到这封邮件，请忽略它。</p>";
-    return new MailMessage(to, REGISTER_TEMPLATE, subject, text, html);
   }
 
   private static String escape(String value) {

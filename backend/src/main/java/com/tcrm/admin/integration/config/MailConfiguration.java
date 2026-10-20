@@ -27,7 +27,7 @@ public class MailConfiguration {
     }
     if (from == null || from.isBlank()) {
       throw new IllegalStateException(
-          "TCRM_MAIL_FROM must be set (e.g. \"T-CRM <no-reply@example.com>\") when"
+          "TCRM_MAIL_FROM must be set (e.g. \"SparkTrack <no-reply@example.com>\") when"
               + " TCRM_MAIL_API_KEY is configured");
     }
     return new ResendMailSender(apiKey, from, json);

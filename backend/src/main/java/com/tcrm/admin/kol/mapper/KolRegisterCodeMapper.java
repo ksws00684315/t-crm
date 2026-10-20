@@ -12,16 +12,21 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface KolRegisterCodeMapper extends BaseMapper<KolRegisterCodeDO> {
   /**
-   * Locks every link of this BD for the rest of the transaction so a concurrent issue or rotate
-   * waits. An empty result locks nothing; the partial unique index still rejects a second insert.
+   * Locks the account's links in this company for the rest of the transaction. An empty result
+   * locks nothing; the tenant/account partial unique index still rejects a duplicate insert.
    */
-  @Select("SELECT id FROM crm_kol_register_code WHERE bd_user_id = #{bdUserId} FOR UPDATE")
-  List<Long> lockByBd(@Param("bdUserId") long bdUserId);
+  @Select(
+      "SELECT id FROM crm_kol_register_code WHERE tenant_id = #{tenantId}"
+          + " AND bd_user_id = #{bdUserId} FOR UPDATE")
+  List<Long> lockByBd(@Param("tenantId") long tenantId, @Param("bdUserId") long bdUserId);
 
-  /** Revokes the active link, if any. The company predicate is added by the tenant plugin. */
+  /** Revokes only the active link owned by this account in this company. */
   @Update(
       "UPDATE crm_kol_register_code SET status = 0, update_by = #{actor}, update_time = #{time}"
-          + " WHERE bd_user_id = #{bdUserId} AND status = 1")
+          + " WHERE tenant_id = #{tenantId} AND bd_user_id = #{bdUserId} AND status = 1")
   int revokeActive(
-      @Param("bdUserId") long bdUserId, @Param("actor") long actor, @Param("time") Instant time);
+      @Param("tenantId") long tenantId,
+      @Param("bdUserId") long bdUserId,
+      @Param("actor") long actor,
+      @Param("time") Instant time);
 }

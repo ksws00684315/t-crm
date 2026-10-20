@@ -47,6 +47,7 @@ public class UserService {
   private final BCryptPasswordEncoder passwords;
   private final CurrentUserContext current;
   private final UserPermissionService permissions;
+  private final PostTemplateService postTemplates;
   private final ApplicationEventPublisher events;
 
   public UserService(
@@ -55,12 +56,14 @@ public class UserService {
       BCryptPasswordEncoder passwords,
       CurrentUserContext current,
       UserPermissionService permissions,
+      PostTemplateService postTemplates,
       ApplicationEventPublisher events) {
     this.users = users;
     this.members = members;
     this.passwords = passwords;
     this.current = current;
     this.permissions = permissions;
+    this.postTemplates = postTemplates;
     this.events = events;
   }
 
@@ -98,8 +101,9 @@ public class UserService {
    */
   @Transactional(rollbackFor = Exception.class)
   public UserDTO create(CreateUserCommand r) {
-    MemberRole resolved = resolve(r.role(), r.postTemplate(), r.dataScope(), r.permissions(), true);
     long tenantId = tenantId();
+    MemberRole resolved =
+        resolve(r.role(), r.postTemplate(), r.dataScope(), r.permissions(), true, tenantId);
     if (users.countByUsername(r.username()) > 0) {
       throw new BusinessException(ErrorCode.USER_USERNAME_EXISTS);
     }
@@ -293,6 +297,39 @@ public class UserService {
   private MemberRole resolve(
       Role role, PostTemplate template, DataScope scope, List<String> requested, boolean creating) {
     MemberRole resolved = MemberRole.resolve(role, template, scope);
+    if (creating && resolved.role() == Role.STAFF) {
+      PostTemplateService.PostTemplateView defaults =
+          postTemplates.getDefault(template, current.user().tenantId());
+      resolved =
+          new MemberRole(
+              Role.STAFF,
+              scope == null ? defaults.dataScope() : scope,
+              template,
+              defaults.permissions());
+    }
+    if (resolved.role() == Role.STAFF && creating && requested != null) {
+      return resolved.withCodes(permissions.canonical(requested));
+    }
+    return resolved;
+  }
+
+  private MemberRole resolve(
+      Role role,
+      PostTemplate template,
+      DataScope scope,
+      List<String> requested,
+      boolean creating,
+      long tenantId) {
+    MemberRole resolved = MemberRole.resolve(role, template, scope);
+    if (creating && resolved.role() == Role.STAFF) {
+      PostTemplateService.PostTemplateView defaults = postTemplates.getDefault(template, tenantId);
+      resolved =
+          new MemberRole(
+              Role.STAFF,
+              scope == null ? defaults.dataScope() : scope,
+              template,
+              defaults.permissions());
+    }
     if (resolved.role() == Role.STAFF && creating && requested != null) {
       return resolved.withCodes(permissions.canonical(requested));
     }

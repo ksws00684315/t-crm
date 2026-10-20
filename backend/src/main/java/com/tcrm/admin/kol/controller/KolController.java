@@ -2,7 +2,7 @@ package com.tcrm.admin.kol.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
-import com.tcrm.admin.kol.service.KolClaimService;
+import com.tcrm.admin.kol.service.KolCleanupService;
 import com.tcrm.admin.kol.service.KolPromotionService;
 import com.tcrm.admin.kol.service.KolService;
 import com.tcrm.admin.shared.AuditLog;
@@ -30,12 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class KolController {
   private final KolService kols;
   private final KolPromotionService promotions;
-  private final KolClaimService claims;
+  private final KolCleanupService cleanup;
 
-  public KolController(KolService kols, KolPromotionService promotions, KolClaimService claims) {
+  public KolController(KolService kols, KolPromotionService promotions, KolCleanupService cleanup) {
     this.kols = kols;
     this.promotions = promotions;
-    this.claims = claims;
+    this.cleanup = cleanup;
   }
 
   @GetMapping
@@ -99,15 +99,6 @@ public class KolController {
     return R.ok(null);
   }
 
-  @PutMapping("/{id}/relation-status")
-  @SaCheckPermission("kol:edit")
-  @AuditLog(module = "KOL", action = "Change relation status")
-  public R<Void> relationStatus(
-      @PathVariable @Min(1) Long id, @Valid @RequestBody RelationStatusRequest r) {
-    promotions.updateRelationStatus(id, r.status());
-    return R.ok(null);
-  }
-
   @GetMapping("/{id}/promotion-config")
   @SaCheckPermission("kol:view")
   public R<PromotionConfigVO> promotionConfig(@PathVariable @Min(1) Long id) {
@@ -132,11 +123,13 @@ public class KolController {
     return R.ok(promotions.pageRecords(id, page, size).map(PromotionRecordVO::from));
   }
 
-  @PostMapping("/{id}/claim")
+  @PutMapping("/{id}/auto-cleanup")
   @SaCheckPermission("kol:edit")
-  @AuditLog(module = "KOL", action = "Claim KOL")
-  public R<Void> claim(@PathVariable @Min(1) Long id) {
-    claims.claim(id);
+  public R<Void> autoCleanup(
+      @PathVariable @Min(1) Long id, @Valid @RequestBody AutoCleanupRequest r) {
+    cleanup.setAutoCleanupDays(id, r.days());
     return R.ok(null);
   }
+
+  public record AutoCleanupRequest(@Min(1) @jakarta.validation.constraints.Max(365) Integer days) {}
 }

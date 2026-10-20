@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -365,6 +366,49 @@ class ProductLinkIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("ready"))
         .andExpect(jsonPath("$.data.items[0].status").value("already_applied"));
+  }
+
+  @Test
+  void shouldListOnlyAssignedKolItems_forOwnScopeBd() throws Exception {
+    long bdId =
+        CompanySessions.createStaff(
+            mvc, json, admin, PASSWORD, "bd-kol-items", "BD", "OWN", List.of("product:view"));
+    long otherBdId =
+        CompanySessions.createStaff(
+            mvc, json, admin, PASSWORD, "other-kol-items", "BD", "OWN", List.of("product:view"));
+    long shopId = createShop("1003", "Items");
+    long productId = insertProduct(shopId, "10003", "Mapped product");
+    long ownKolId = createKol("Own item KOL", "own-item@example.com");
+    long otherKolId = createKol("Other item KOL", "other-item@example.com");
+    String otherKolCode =
+        jdbc.queryForObject("SELECT kol_code FROM crm_kol WHERE id = ?", String.class, otherKolId);
+    jdbc.update("UPDATE crm_kol SET bd_user_id = ? WHERE id = ?", bdId, ownKolId);
+    jdbc.update("UPDATE crm_kol SET bd_user_id = ? WHERE id = ?", otherBdId, otherKolId);
+    jdbc.update(
+        "INSERT INTO crm_kol_item(id, tenant_id, kol_id, product_id, shop_id, weidian_item_id,"
+            + " source, valid_from, create_time, update_time)"
+            + " VALUES (17011, 1, ?, ?, ?, '91003', 'IMPORT', now(), now(), now()),"
+            + " (17012, 1, ?, ?, ?, '91004', 'IMPORT', now(), now(), now())",
+        ownKolId,
+        productId,
+        shopId,
+        otherKolId,
+        productId,
+        shopId);
+    String bdToken = CompanySessions.login(mvc, json, "bd-kol-items", PASSWORD);
+
+    mvc.perform(get("/admin-api/product/kol-items").header(ADMIN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].kolId").value(Long.toString(ownKolId)))
+        .andExpect(
+            jsonPath("$.data.items[0].kolCode").value(org.hamcrest.Matchers.startsWith("KOL-")));
+    mvc.perform(
+            get("/admin-api/product/kol-items")
+                .param("kolCode", otherKolCode)
+                .header(ADMIN, bdToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
   }
 
   @Test

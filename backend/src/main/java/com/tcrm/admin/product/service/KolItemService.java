@@ -17,6 +17,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -25,9 +26,9 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
 /**
- * Kol item mapping query (task 05 §4.3, §4.4). A staff account with OWN scope is rejected. List
- * requires at least one of kolCode / productCode / weidianItemId (shopId and current only combine
- * with those) to avoid full-table COUNT at design capacity.
+ * Kol item mapping query (task 05 §4.3, §4.4). OWN-scope staff are limited to their assigned KOLs.
+ * Other scopes require at least one of kolCode / productCode / weidianItemId to avoid full-table
+ * COUNT at design capacity.
  */
 @Service
 public class KolItemService {
@@ -51,8 +52,18 @@ public class KolItemService {
   }
 
   public PageResult<KolItemDTO> page(KolItemFilterDTO filter) {
-    requireReader();
-    if (blank(filter.kolCode()) && blank(filter.productCode()) && blank(filter.weidianItemId())) {
+    AccountDTO user = current.user();
+    List<Long> ownKolIds =
+        user.ownScope()
+            ? kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).toList()
+            : List.of();
+    if (user.ownScope() && ownKolIds.isEmpty()) {
+      return new PageResult<>(List.of(), 0, filter.page(), filter.size());
+    }
+    if (!user.ownScope()
+        && blank(filter.kolCode())
+        && blank(filter.productCode())
+        && blank(filter.weidianItemId())) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     Long kolId = null;
@@ -79,6 +90,7 @@ public class KolItemService {
     }
     var query =
         new LambdaQueryWrapper<KolItemDO>()
+            .in(user.ownScope(), KolItemDO::getKolId, ownKolIds)
             .eq(kolId != null, KolItemDO::getKolId, kolId)
             .eq(productId != null, KolItemDO::getProductId, productId)
             .eq(filter.shopId() != null, KolItemDO::getShopId, filter.shopId())
@@ -102,14 +114,6 @@ public class KolItemService {
         result.getTotal(),
         filter.page(),
         filter.size());
-  }
-
-  AccountDTO requireReader() {
-    AccountDTO user = current.user();
-    if (user.ownScope()) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-    return user;
   }
 
   private Map<Long, KolRefDTO> kolMap(Stream<Long> ids) {

@@ -35,6 +35,7 @@ public class PlatformService {
   private final SysUserMapper users;
   private final SysUserTenantMapper members;
   private final UserPermissionService permissions;
+  private final PostTemplateService postTemplates;
   private final BCryptPasswordEncoder passwords;
   private final CurrentUserContext current;
 
@@ -43,12 +44,14 @@ public class PlatformService {
       SysUserMapper users,
       SysUserTenantMapper members,
       UserPermissionService permissions,
+      PostTemplateService postTemplates,
       BCryptPasswordEncoder passwords,
       CurrentUserContext current) {
     this.tenants = tenants;
     this.users = users;
     this.members = members;
     this.permissions = permissions;
+    this.postTemplates = postTemplates;
     this.passwords = passwords;
     this.current = current;
   }
@@ -184,11 +187,21 @@ public class PlatformService {
   @Transactional(rollbackFor = Exception.class)
   public PlatformUserDTO addMember(
       Long tenantId, Long userId, Role role, PostTemplate template, DataScope scope) {
-    MemberRole resolved = MemberRole.resolve(role, template, scope);
     require(tenantId);
     return TenantScope.callSystem(
         "add an existing account to a company",
         () -> {
+          MemberRole resolved = MemberRole.resolve(role, template, scope);
+          if (resolved.role() == Role.STAFF) {
+            PostTemplateService.PostTemplateView defaults =
+                postTemplates.getDefault(template, tenantId);
+            resolved =
+                new MemberRole(
+                    Role.STAFF,
+                    scope == null ? defaults.dataScope() : scope,
+                    template,
+                    defaults.permissions());
+          }
           SysUserDO user = requireUser(userId);
           if (user.getRole() != AccountType.MEMBER) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);

@@ -88,23 +88,74 @@ public class KolService {
 
   public PageResult<KolDTO> page(KolFilterDTO filter) {
     AccountDTO user = current.user();
-    Long bd = user.ownScope() ? user.id() : filter.bdUserId();
+    Long bd = user.ownScope() ? null : filter.bdUserId();
     String keyword = filter.keyword() == null ? "" : filter.keyword().strip();
     String pattern = "%" + escapeLike(keyword) + "%";
+    String kolCode = filter.kolCode() == null ? "" : filter.kolCode().strip();
+    String kolCodePattern = "%" + escapeLike(kolCode) + "%";
+    String name = filter.name() == null ? "" : filter.name().strip();
+    String namePattern = "%" + escapeLike(name) + "%";
+    String email = filter.email() == null ? "" : filter.email().strip();
+    String emailPattern = "%" + escapeLike(email) + "%";
     var query =
         new LambdaQueryWrapper<KolDO>()
-            .apply(
+            .and(
                 !keyword.isEmpty(),
-                "(kol_code ILIKE {0} OR name ILIKE {1} OR email ILIKE {2})",
-                pattern,
-                pattern,
-                pattern)
+                w ->
+                    w.apply(
+                            "(kol_code ILIKE {0} OR name ILIKE {1} OR email ILIKE {2})",
+                            pattern, pattern, pattern)
+                        .or(
+                            user.ownScope(),
+                            x ->
+                                x.isNull(KolDO::getBdUserId)
+                                    .and(
+                                        y ->
+                                            y.apply(
+                                                    "lower(kol_code) = {0}",
+                                                    keyword.toLowerCase(Locale.ROOT))
+                                                .or()
+                                                .apply(
+                                                    "lower(email) = {0}",
+                                                    keyword.toLowerCase(Locale.ROOT)))))
             .eq(
                 filter.country() != null && !filter.country().isBlank(),
                 KolDO::getCountry,
                 filter.country() == null ? null : filter.country().strip().toUpperCase(Locale.ROOT))
             .eq(filter.status() != null, KolDO::getStatus, filter.status())
             .eq(bd != null, KolDO::getBdUserId, bd);
+    query
+        .apply(!kolCode.isEmpty(), "kol_code ILIKE {0}", kolCodePattern)
+        .apply(!name.isEmpty(), "name ILIKE {0}", namePattern)
+        .apply(!email.isEmpty(), "email ILIKE {0}", emailPattern);
+    if (user.ownScope()) {
+      query.and(
+          w ->
+              w.eq(KolDO::getBdUserId, user.id())
+                  .or(
+                      !keyword.isEmpty(),
+                      x ->
+                          x.isNull(KolDO::getBdUserId)
+                              .and(
+                                  y ->
+                                      y.apply(
+                                              "lower(kol_code) = {0}",
+                                              keyword.toLowerCase(Locale.ROOT))
+                                          .or()
+                                          .apply(
+                                              "lower(email) = {0}",
+                                              keyword.toLowerCase(Locale.ROOT))))
+                  .or(
+                      !kolCode.isEmpty(),
+                      x ->
+                          x.isNull(KolDO::getBdUserId)
+                              .apply("lower(kol_code) = {0}", kolCode.toLowerCase(Locale.ROOT)))
+                  .or(
+                      !email.isEmpty(),
+                      x ->
+                          x.isNull(KolDO::getBdUserId)
+                              .apply("lower(email) = {0}", email.toLowerCase(Locale.ROOT))));
+    }
     if (filter.reviewStatus() != null && !filter.reviewStatus().isBlank()) {
       query.eq(KolDO::getReviewStatus, filter.reviewStatus().strip());
     }
@@ -131,7 +182,7 @@ public class KolService {
   }
 
   public KolDetailDTO get(Long id) {
-    KolDO kol = requireVisible(id, current.user());
+    KolDO kol = requireProfileVisible(id, current.user());
     List<KolBdHistoryDO> periods =
         history.selectList(
             new LambdaQueryWrapper<KolBdHistoryDO>()
@@ -225,14 +276,14 @@ public class KolService {
    */
   public void update(Long id, EditKolCommand c) {
     AccountDTO user = current.user();
-    requireVisible(id, user);
+    requireProfileVisible(id, user);
     Instant now = Instant.now();
     tx.executeWithoutResult(
         txStatus -> {
           int updated =
               kols.update(
                   null,
-                  scoped(id, user)
+                  scopedProfile(id, user)
                       .set(KolDO::getName, c.name().strip())
                       .set(KolDO::getPhone, blankToNull(c.phone()))
                       .set(KolDO::getCountry, country(c.country()))
@@ -295,6 +346,14 @@ public class KolService {
         .eq(user.ownScope(), KolDO::getBdUserId, user.id());
   }
 
+  private static LambdaUpdateWrapper<KolDO> scopedProfile(Long id, AccountDTO user) {
+    return new LambdaUpdateWrapper<KolDO>()
+        .eq(KolDO::getId, id)
+        .and(
+            user.ownScope(),
+            w -> w.eq(KolDO::getBdUserId, user.id()).or().isNull(KolDO::getBdUserId));
+  }
+
   /** No row updated: the KOL left the BD's scope meanwhile (403), or no longer exists (404). */
   private static void requireUpdated(int updated, AccountDTO user) {
     if (updated == 0) {
@@ -316,17 +375,18 @@ public class KolService {
     List<Long> usable =
         bdUsers.listUsable().stream().map(BdUserDTO::id).filter(Objects::nonNull).toList();
     if (RelationStatus.DISPLAY_PENDING_UPDATE.equals(status)) {
-      query.ne(KolDO::getRelationStatus, RelationStatus.INVALID.name());
+      query.eq(KolDO::getStatus, 1);
       if (usable.isEmpty()) {
         return;
       }
       query.and(w -> w.isNull(KolDO::getBdUserId).or().notIn(KolDO::getBdUserId, usable));
       return;
     }
-    query.eq(KolDO::getRelationStatus, status);
     if (RelationStatus.INVALID.name().equals(status)) {
+      query.eq(KolDO::getStatus, 0);
       return;
     }
+    query.eq(KolDO::getStatus, 1).eq(KolDO::getRelationStatus, status);
     if (usable.isEmpty()) {
       query.apply("1 = 0");
     } else {
@@ -366,6 +426,17 @@ public class KolService {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     if (user.ownScope() && !user.id().equals(kol.getBdUserId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    return kol;
+  }
+
+  private KolDO requireProfileVisible(Long id, AccountDTO user) {
+    KolDO kol = kols.selectById(id);
+    if (kol == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (user.ownScope() && kol.getBdUserId() != null && !user.id().equals(kol.getBdUserId())) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return kol;
@@ -425,10 +496,11 @@ public class KolService {
         kol.getSheetUrl(),
         review,
         relation,
-        KolPromotionSupport.displayRelationStatus(relation, bd),
+        KolPromotionSupport.displayRelationStatus(kol.getStatus(), relation, bd),
         login,
         platformsMap.getOrDefault(kol.getId(), List.of()),
         kol.getConfigVersion(),
+        kol.getAutoCleanupDays(),
         kol.getCreateTime(),
         kol.getRegisterSource(),
         kol.getAccountStatus() == null ? 0 : kol.getAccountStatus(),

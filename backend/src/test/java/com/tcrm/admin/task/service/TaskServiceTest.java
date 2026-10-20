@@ -14,6 +14,7 @@ import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.task.api.TaskType;
 import com.tcrm.admin.task.mapper.TaskFileMapper;
 import com.tcrm.admin.task.mapper.TaskMapper;
@@ -30,7 +31,8 @@ class TaskServiceTest {
   private final TaskMapper tasks = mock(TaskMapper.class);
   private final TaskFileMapper files = mock(TaskFileMapper.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
-  private final TaskService service = new TaskService(tasks, files, current);
+  private final BdUserApi users = mock(BdUserApi.class);
+  private final TaskService service = new TaskService(tasks, files, current, users);
 
   @BeforeAll
   static void tableInfo() {

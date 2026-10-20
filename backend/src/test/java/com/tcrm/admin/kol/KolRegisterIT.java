@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -151,7 +150,7 @@ class KolRegisterIT {
                 String.class))
         .contains(
             "uk_crm_kol_register_code_code",
-            "uk_crm_kol_register_code_active_bd",
+            "uk_crm_kol_register_code_active_tenant_bd",
             "idx_crm_kol_register_code_bd");
     assertThat(
             jdbc.queryForObject(
@@ -203,8 +202,8 @@ class KolRegisterIT {
   void shouldRejectAccountsThatCannotBeABd() throws Exception {
     String admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     mvc.perform(get("/admin-api/kol/register-code").header(ADMIN, admin))
-        .andExpect(status().is(422))
-        .andExpect(jsonPath("$.errorCode").value("KOL_INVALID_BD_USER"));
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value(1));
 
     String allScope = staff(admin, "OPERATOR", "ALL", List.of("kol:register-link", "kol:edit"));
     mvc.perform(get("/admin-api/kol/register-code").header(ADMIN, allScope))
@@ -253,6 +252,81 @@ class KolRegisterIT {
             jdbc.queryForObject(
                 "SELECT tenant_id FROM crm_kol_register_code WHERE code = ?", Long.class, codeB))
         .isEqualTo(companyB.tenantId());
+  }
+
+  @Test
+  void shouldKeepSuperAdminCodesIndependentAcrossCompanies() throws Exception {
+    var companyA =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-a"), name("admin-a"));
+    var companyB =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-b"), name("admin-b"));
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    addMember(platform, companyB.tenantId(), companyA.userId(), "SUPER_ADMIN", null);
+    String token = CompanySessions.login(mvc, json, companyA.username(), PASSWORD);
+
+    String codeA = link(token).path("code").asText();
+    switchCompany(token, companyB.tenantId()).andExpect(status().isOk());
+    String codeB = link(token).path("code").asText();
+    String rotatedB = rotate(token);
+
+    assertThat(codeB).isNotEqualTo(codeA);
+    assertThat(rotatedB).isNotEqualTo(codeB);
+    assertActiveCode(companyA.tenantId(), companyA.userId(), codeA);
+    assertActiveCode(companyB.tenantId(), companyA.userId(), rotatedB);
+    mvc.perform(get("/kol-api/register/" + codeA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.bdUserName").value(org.hamcrest.Matchers.nullValue()));
+
+    switchCompany(token, companyA.tenantId()).andExpect(status().isOk());
+    String email = name("super-kol") + "@example.com";
+    register(codeA, email, "", "handle", null);
+    assertThat(
+            jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT bd_user_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isNull();
+  }
+
+  @Test
+  void shouldKeepBdCodesIndependentAcrossCompanies() throws Exception {
+    var companyA =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-a"), name("admin-a"));
+    var companyB =
+        CompanySessions.openCompany(mvc, json, PASSWORD, name("tenant-b"), name("admin-b"));
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    long bdUserId =
+        CompanySessions.createStaff(
+            mvc, json, companyA.token(), PASSWORD, name("bd-shared"), "BD", null, null);
+    String username =
+        jdbc.queryForObject("SELECT username FROM sys_user WHERE id = ?", String.class, bdUserId);
+    addMember(platform, companyB.tenantId(), bdUserId, "STAFF", "BD");
+    String token = CompanySessions.login(mvc, json, username, PASSWORD);
+
+    String codeA = link(token).path("code").asText();
+    switchCompany(token, companyB.tenantId()).andExpect(status().isOk());
+    String codeB = link(token).path("code").asText();
+    String rotatedB = rotate(token);
+
+    assertThat(codeB).isNotEqualTo(codeA);
+    assertThat(rotatedB).isNotEqualTo(codeB);
+    assertActiveCode(companyA.tenantId(), bdUserId, codeA);
+    assertActiveCode(companyB.tenantId(), bdUserId, rotatedB);
+    switchCompany(token, companyA.tenantId()).andExpect(status().isOk());
+    String email = name("bd-kol") + "@example.com";
+    register(codeA, email, "", "handle", null);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT tenant_id FROM crm_kol_register_code WHERE code = ?", Long.class, codeA))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(companyA.tenantId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT bd_user_id FROM crm_kol WHERE email = ?", Long.class, email))
+        .isEqualTo(bdUserId);
   }
 
   @Test
@@ -323,59 +397,16 @@ class KolRegisterIT {
   }
 
   @Test
-  void shouldEnforceTheEmailCodeRules() throws Exception {
-    String code = link(bd().token()).path("code").asText();
-    String email = "code-rules@example.com";
-    String verification = sendCode(code, email);
+  void shouldRegisterWithoutEmailCode_andReturnNotFoundForRemovedEndpoint() throws Exception {
     mvc.perform(
             post("/kol-api/register/email-codes")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("code", code, "email", email))))
-        .andExpect(status().isTooManyRequests())
-        .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_CODE_TOO_FREQUENT"));
-    assertThat(mails("kol-register-code")).hasSize(1);
-
-    redis.delete(cooldownKey(1L, email));
-    String replacement = sendCode(code, email);
-    assertThat(replacement).isNotEqualTo(verification);
-
-    for (int attempt = 0; attempt < 5; attempt++) {
-      mvc.perform(
-              post("/kol-api/register")
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(code, email, "000000", "handle", null)))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_CODE_INVALID"));
-    }
-    mvc.perform(
-            post("/kol-api/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body(code, email, replacement, "handle", null)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_CODE_INVALID"));
-
-    redis.delete(cooldownKey(1L, email));
-    String once = sendCode(code, email);
-    register(code, email, once, "handle", null);
-    assertThat(redis.hasKey(codeKey(1L, email))).isFalse();
-    // The address is already registered, and that check runs before the code is read.
-    mvc.perform(
-            post("/kol-api/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body(code, email, once, "handle", null)))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_EXISTS"));
-
-    String fresh = "fresh-code@example.com";
-    redis.delete(cooldownKey(1L, fresh));
-    sendCode(code, fresh);
-    redis.delete(codeKey(1L, fresh));
-    mvc.perform(
-            post("/kol-api/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body(code, fresh, "123456", "fresh", null)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_CODE_INVALID"));
+                .content("{}"))
+        .andExpect(status().isNotFound());
+    Bd owner = bd();
+    String code = link(owner.token()).path("code").asText();
+    register(code, "no-code@example.com", "", "handle", "US");
+    assertThat(mails("kol-register-code")).isEmpty();
   }
 
   @Test
@@ -440,7 +471,7 @@ class KolRegisterIT {
   }
 
   @Test
-  void shouldNotMailAnAddressThatAlreadyExists() throws Exception {
+  void shouldRejectDuplicateEmailWithoutEmailCodeEndpoint() throws Exception {
     String admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     Bd owner = bd(admin);
     mvc.perform(
@@ -452,31 +483,14 @@ class KolRegisterIT {
                         + "\"bdUserId\":\""
                         + owner.id()
                         + "\"}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.accountStatus").value(0))
-        .andExpect(jsonPath("$.data.registerSource").value(1));
+        .andExpect(status().isOk());
     String code = link(owner.token()).path("code").asText();
-    int before = CapturedMails.SENT.size();
-    mvc.perform(
-            post("/kol-api/register/email-codes")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    json.writeValueAsString(Map.of("code", code, "email", "Taken@Example.com"))))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_EXISTS"));
-    assertThat(CapturedMails.SENT).hasSize(before);
-    assertThat(redis.hasKey(cooldownKey(1L, "taken@example.com"))).isFalse();
     mvc.perform(
             post("/kol-api/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(code, "taken@example.com", "123456", "taken", null)))
+                .content(body(code, "taken@example.com", "ignored", "taken", null)))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.errorCode").value("KOL_EMAIL_EXISTS"));
-
-    mvc.perform(
-            get("/admin-api/kol/kols").header(ADMIN, admin).param("keyword", "taken@example.com"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].accountStatus").value(0));
   }
 
   @Test
@@ -534,39 +548,29 @@ class KolRegisterIT {
   }
 
   @Test
-  void shouldLimitByIpAndByEmail() throws Exception {
+  void shouldLimitRegistrationPreviewAndRegisterByIp() throws Exception {
     String missing = "E2F3G4H5";
     for (int i = 0; i < 20; i++) {
-      mvc.perform(
-              post("/kol-api/register/email-codes")
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(
-                      json.writeValueAsString(
-                          Map.of("code", missing, "email", "ip" + i + "@example.com"))))
-          .andExpect(status().isNotFound());
+      mvc.perform(get("/kol-api/register/" + missing)).andExpect(status().isNotFound());
     }
-    mvc.perform(
-            post("/kol-api/register/email-codes")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    json.writeValueAsString(Map.of("code", missing, "email", "over@example.com"))))
+    mvc.perform(get("/kol-api/register/" + missing))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.errorCode").value("KOL_REGISTER_TOO_FREQUENT"));
 
     try (var connection = redis.getConnectionFactory().getConnection()) {
       connection.serverCommands().flushDb();
     }
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 20; i++) {
       mvc.perform(
               post("/kol-api/register")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(missing, "same@example.com", "123456", "h" + i, null)))
+                  .content(body(missing, "same@example.com", "ignored", "h" + i, null)))
           .andExpect(status().isNotFound());
     }
     mvc.perform(
             post("/kol-api/register")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(missing, "same@example.com", "123456", "hover", null)))
+                .content(body(missing, "same@example.com", "ignored", "hover", null)))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.errorCode").value("KOL_REGISTER_TOO_FREQUENT"));
   }
@@ -598,7 +602,6 @@ class KolRegisterIT {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("code", code);
     payload.put("email", email);
-    payload.put("emailCode", emailCode);
     payload.put("password", REGISTER_PASSWORD);
     payload.put("whatsapp", "+15551234567");
     payload.put("primaryPlatform", "TikTok");
@@ -612,30 +615,17 @@ class KolRegisterIT {
     return json.writeValueAsString(payload);
   }
 
-  private String sendCode(String code, String email) throws Exception {
-    int before = mails("kol-register-code").size();
-    mvc.perform(
-            post("/kol-api/register/email-codes")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("code", code, "email", email))))
-        .andExpect(status().isOk());
-    Matcher matcher = DIGITS.matcher(awaitMail("kol-register-code", before + 1).text());
-    assertThat(matcher.find()).isTrue();
-    return matcher.group(1);
+  private String sendCode(String code, String email) {
+    // Registration no longer accepts or sends an email verification code.
+    return "";
   }
 
   private void rejected(String code) throws Exception {
     mvc.perform(get("/kol-api/register/" + code))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errorCode").value("KOL_REGISTER_CODE_INVALID"));
-    mvc.perform(
-            post("/kol-api/register/email-codes")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    json.writeValueAsString(
-                        Map.of("code", code, "email", name("x") + "@example.com"))))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.errorCode").value("KOL_REGISTER_CODE_INVALID"));
+    mvc.perform(post("/kol-api/register/email-codes").content("{}"))
+        .andExpect(status().isNotFound());
     mvc.perform(
             post("/kol-api/register")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -652,6 +642,54 @@ class KolRegisterIT {
             .getResponse()
             .getContentAsString();
     return json.readTree(body).path("data");
+  }
+
+  private String rotate(String token) throws Exception {
+    String body =
+        mvc.perform(post("/admin-api/kol/register-code").header(ADMIN, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return json.readTree(body).at("/data/code").asText();
+  }
+
+  private void assertActiveCode(long tenantId, long ownerId, String code) {
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_register_code WHERE tenant_id = ? AND bd_user_id = ?"
+                    + " AND code = ? AND status = 1",
+                Integer.class,
+                tenantId,
+                ownerId,
+                code))
+        .isEqualTo(1);
+  }
+
+  private void addMember(
+      String platform, long tenantId, long userId, String role, String postTemplate)
+      throws Exception {
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("userId", Long.toString(userId));
+    body.put("role", role);
+    if (postTemplate != null) {
+      body.put("postTemplate", postTemplate);
+    }
+    mvc.perform(
+            post("/admin-api/platform/tenants/" + tenantId + "/members")
+                .header(ADMIN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(body)))
+        .andExpect(status().isOk());
+  }
+
+  private org.springframework.test.web.servlet.ResultActions switchCompany(String token, long id)
+      throws Exception {
+    return mvc.perform(
+        post("/admin-api/auth/company")
+            .header(ADMIN, token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("tenantId", Long.toString(id)))));
   }
 
   private Bd bd() throws Exception {

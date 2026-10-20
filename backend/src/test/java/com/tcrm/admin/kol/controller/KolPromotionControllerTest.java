@@ -12,16 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.AdminMvcSupport;
-import com.tcrm.admin.kol.model.RelationStatus;
-import com.tcrm.admin.kol.service.KolClaimService;
+import com.tcrm.admin.kol.service.KolCleanupService;
 import com.tcrm.admin.kol.service.KolPromotionService;
 import com.tcrm.admin.kol.service.KolPromotionService.PlatformInput;
 import com.tcrm.admin.kol.service.KolService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
-import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.util.List;
 import java.util.Map;
@@ -32,43 +29,14 @@ import org.springframework.test.web.servlet.MockMvc;
 class KolPromotionControllerTest {
   private final KolService kols = mock(KolService.class);
   private final KolPromotionService promotions = mock(KolPromotionService.class);
-  private final KolClaimService claims = mock(KolClaimService.class);
+  private final KolCleanupService cleanup = mock(KolCleanupService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final MockMvc mvc =
-      AdminMvcSupport.build(current, new KolController(kols, promotions, claims));
+      AdminMvcSupport.build(current, new KolController(kols, promotions, cleanup));
 
   private String token() {
     return AdminMvcSupport.actAs(
         current, 1L, Role.STAFF, DataScope.OWN, java.util.Set.of("kol:edit", "kol:view"));
-  }
-
-  @Test
-  void shouldChangeRelationStatus() throws Exception {
-    mvc.perform(
-            put("/admin-api/kol/kols/10/relation-status")
-                .header(AdminMvcSupport.TOKEN_HEADER, token())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"PENDING_PROMOTION\"}"))
-        .andExpect(status().isOk());
-    verify(promotions).updateRelationStatus(10L, RelationStatus.PENDING_PROMOTION);
-  }
-
-  @Test
-  void shouldReturn422_whenPromotionConfigIncomplete() throws Exception {
-    org.mockito.Mockito.doThrow(
-            new BusinessException(
-                ErrorCode.KOL_PROMOTION_CONFIG_INCOMPLETE, List.of("platforms", "inviteCode")))
-        .when(promotions)
-        .updateRelationStatus(eq(10L), eq(RelationStatus.PROMOTING));
-    mvc.perform(
-            put("/admin-api/kol/kols/10/relation-status")
-                .header(AdminMvcSupport.TOKEN_HEADER, token())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"PROMOTING\"}"))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.errorCode").value("KOL_PROMOTION_CONFIG_INCOMPLETE"))
-        .andExpect(jsonPath("$.data[0]").value("platforms"))
-        .andExpect(jsonPath("$.data[1]").value("inviteCode"));
   }
 
   @Test
@@ -180,12 +148,6 @@ class KolPromotionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     "{\"defaultRate\":\"0.1000\",\"platforms\":[{\"templateId\":3,\"address\":\"https://x\"}],\"inviteCode\":\"inv\"}"))
-        .andExpect(status().isForbidden());
-    mvc.perform(
-            put("/admin-api/kol/kols/10/relation-status")
-                .header(AdminMvcSupport.TOKEN_HEADER, token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"PROMOTING\"}"))
         .andExpect(status().isForbidden());
     mvc.perform(
             post("/admin-api/kol/kols/10/review")
