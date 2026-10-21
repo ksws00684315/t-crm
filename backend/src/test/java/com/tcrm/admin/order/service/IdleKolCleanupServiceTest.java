@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class IdleKolCleanupServiceTest {
@@ -74,7 +75,7 @@ class IdleKolCleanupServiceTest {
   void shouldReportRemainingDaysUsingIdleBaselineAndRespectOwnScope() {
     Instant now = Instant.now();
     when(current.user()).thenReturn(user(Role.STAFF, DataScope.OWN, 5L));
-    when(cleanup.listPromotingWithLastPromotingAt())
+    when(cleanup.listPromotingWithLastPromotingAt(Set.of(1L, 2L)))
         .thenReturn(
             List.of(
                 new PromotingKolDTO(
@@ -84,13 +85,15 @@ class IdleKolCleanupServiceTest {
     when(orders.lastAttributedPayTimes(List.of(1L))).thenReturn(List.of());
 
     assertThat(service.remainingDays(List.of(1L, 2L))).containsOnlyKeys(1L).containsEntry(1L, 7);
+    // The countdown must scope the promoting-KOL query to the requested page, not the company.
+    verify(cleanup, never()).listPromotingWithLastPromotingAt();
   }
 
   @Test
   void shouldUseLastOrderOrFallbackAndClampOverdueCountdown() {
     Instant now = Instant.now();
     when(current.user()).thenReturn(user(Role.SUPER_ADMIN, DataScope.ALL, 5L));
-    when(cleanup.listPromotingWithLastPromotingAt())
+    when(cleanup.listPromotingWithLastPromotingAt(Set.of(1L, 2L, 3L, 4L, 99L)))
         .thenReturn(
             List.of(
                 new PromotingKolDTO(

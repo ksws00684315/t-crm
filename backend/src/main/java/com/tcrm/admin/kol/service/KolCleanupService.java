@@ -18,6 +18,7 @@ import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -117,12 +118,20 @@ public class KolCleanupService implements KolCleanupApi {
 
   @Override
   public List<PromotingKolDTO> listPromotingWithLastPromotingAt() {
-    List<KolDO> promoting =
-        kols.selectList(
-            new LambdaQueryWrapper<KolDO>()
-                .eq(KolDO::getRelationStatus, RelationStatus.PROMOTING.name())
-                .isNotNull(KolDO::getAutoCleanupDays)
-                .orderByAsc(KolDO::getId));
+    return listPromotingWithLastPromotingAt(null);
+  }
+
+  @Override
+  public List<PromotingKolDTO> listPromotingWithLastPromotingAt(Collection<Long> ids) {
+    LambdaQueryWrapper<KolDO> query =
+        new LambdaQueryWrapper<KolDO>()
+            .eq(KolDO::getRelationStatus, RelationStatus.PROMOTING.name())
+            .isNotNull(KolDO::getAutoCleanupDays)
+            .orderByAsc(KolDO::getId);
+    if (ids != null && !ids.isEmpty()) {
+      query.in(KolDO::getId, ids);
+    }
+    List<KolDO> promoting = kols.selectList(query);
     List<PromotingKolDTO> out = new ArrayList<>(promoting.size());
     for (KolDO kol : promoting) {
       Instant fallback = kol.getUpdateTime() == null ? kol.getCreateTime() : kol.getUpdateTime();

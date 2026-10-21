@@ -1,5 +1,6 @@
 -- Customer 10-20 supplement: invite code, per-platform address and remark are optional.
 -- Reclassify historical rows to match the current service-side completeness rule.
+-- Soft-deleted KOLs keep their last stored status; the update only touches live rows.
 UPDATE crm_kol k
 SET relation_status = CASE
   WHEN k.review_status = 'APPROVED'
@@ -11,4 +12,5 @@ SET relation_status = CASE
    )
   THEN 'PROMOTING'
   ELSE 'PENDING_PROMOTION'
-END;
+END
+WHERE k.is_deleted = FALSE;

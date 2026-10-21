@@ -136,6 +136,28 @@ class KolPromotionServiceTest {
         .containsExactly(new PlatformInput(7L, "https://new.example/item/{PRODUCT_ID}"));
   }
 
+  @Test
+  void fallsBackToTemplateUrlWhenStoredPlatformAddressIsNull() {
+    KolPlatformDO existing = new KolPlatformDO();
+    existing.setLinkTemplateId(7L);
+    existing.setAddress(null);
+    when(platforms.selectList(any())).thenReturn(List.of(existing));
+    when(templates.usableTemplate(7L))
+        .thenReturn(
+            new LinkTemplateDTO(
+                7L,
+                "kakobuy",
+                "KakoBuy",
+                "https://template.example/item/{PRODUCT_ID}",
+                "WEIDIAN",
+                0,
+                1,
+                null));
+
+    assertThat(service.normalizePlatforms(1L, List.of(new PlatformInput(7L, null))))
+        .containsExactly(new PlatformInput(7L, "https://template.example/item/{PRODUCT_ID}"));
+  }
+
   private static KolDO baseKol() {
     KolDO kol = new KolDO();
     kol.setId(1L);

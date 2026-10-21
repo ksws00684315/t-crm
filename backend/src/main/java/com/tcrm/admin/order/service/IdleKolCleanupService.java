@@ -90,9 +90,10 @@ public class IdleKolCleanupService {
     }
     AccountDTO user = current.user();
     Set<Long> wanted = Set.copyOf(ids);
+    // The ids-scoped query keeps promotion-record lookups proportional to the current page
+    // instead of every promoting KOL of the company.
     List<PromotingKolDTO> promoting =
-        cleanup.listPromotingWithLastPromotingAt().stream()
-            .filter(kol -> wanted.contains(kol.id()))
+        cleanup.listPromotingWithLastPromotingAt(wanted).stream()
             .filter(kol -> !user.ownScope() || user.id().equals(kol.bdUserId()))
             .toList();
     Map<Long, Instant> lastPay = lastPayByKol(promoting.stream().map(PromotingKolDTO::id).toList());

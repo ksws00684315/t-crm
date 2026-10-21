@@ -254,11 +254,17 @@ public class KolPromotionService {
     }
     Set<Long> seen = new HashSet<>();
     List<PlatformInput> out = new ArrayList<>();
-    Map<Long, String> existingAddresses =
-        platforms
-            .selectList(new LambdaQueryWrapper<KolPlatformDO>().eq(KolPlatformDO::getKolId, kolId))
-            .stream()
-            .collect(Collectors.toMap(KolPlatformDO::getLinkTemplateId, KolPlatformDO::getAddress));
+    // crm_kol_platform.address is nullable (V202610191002); a null stored address falls back to
+    // the link-template URL, so rows without an address are skipped instead of collected —
+    // Collectors.toMap rejects null values.
+    Map<Long, String> existingAddresses = new HashMap<>();
+    for (KolPlatformDO row :
+        platforms.selectList(
+            new LambdaQueryWrapper<KolPlatformDO>().eq(KolPlatformDO::getKolId, kolId))) {
+      if (row.getAddress() != null) {
+        existingAddresses.put(row.getLinkTemplateId(), row.getAddress());
+      }
+    }
     for (PlatformInput p : raw) {
       if (p == null || p.templateId() == null || p.templateId() <= 0 || !seen.add(p.templateId())) {
         throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
