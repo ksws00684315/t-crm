@@ -7,10 +7,12 @@ import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.product.mapper.CopyJobItemMapper;
 import com.tcrm.admin.product.mapper.CopyJobMapper;
 import com.tcrm.admin.product.mapper.KolItemMapper;
+import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.CopyJobDO;
 import com.tcrm.admin.product.model.CopyJobItemDO;
 import com.tcrm.admin.product.model.KolItemDO;
+import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -54,6 +56,8 @@ public class ProductLinkService {
   private final CopyJobProgress progress;
   private final WeidianItemCopyApi copies;
   private final JdbcTemplate jdbc;
+  private final ProductMapper products;
+  private final CopyJobFailureRecorder failures;
   private final SecureRandom random;
   private final SystemConfigApi configs;
 
@@ -69,6 +73,8 @@ public class ProductLinkService {
       CopyJobProgress progress,
       WeidianItemCopyApi copies,
       JdbcTemplate jdbc,
+      ProductMapper products,
+      CopyJobFailureRecorder failures,
       SystemConfigApi configs) {
     this.tokens = tokens;
     this.jobs = jobs;
@@ -80,6 +86,8 @@ public class ProductLinkService {
     this.progress = progress;
     this.copies = copies;
     this.jdbc = jdbc;
+    this.products = products;
+    this.failures = failures;
     this.configs = configs;
     this.random = new SecureRandom();
   }
@@ -95,6 +103,8 @@ public class ProductLinkService {
       CopyJobProgress progress,
       WeidianItemCopyApi copies,
       JdbcTemplate jdbc,
+      ProductMapper products,
+      CopyJobFailureRecorder failures,
       String linkBaseUrl,
       SecureRandom random) {
     this.tokens = tokens;
@@ -107,6 +117,8 @@ public class ProductLinkService {
     this.progress = progress;
     this.copies = copies;
     this.jdbc = jdbc;
+    this.products = products;
+    this.failures = failures;
     this.configs =
         new SystemConfigApi() {
           @Override
@@ -183,7 +195,7 @@ public class ProductLinkService {
     return TenantScope.callCompany(
         grant.tenantId(),
         () -> {
-          long targetShopId = resolveTargetShop(grant);
+          long targetShopId = resolveTargetShop(grant, command);
           Instant now = Instant.now();
           String jobCode = newJobCode();
           // Deduplicate by sourceProductId within the job (first wins).
@@ -209,6 +221,7 @@ public class ProductLinkService {
           job.setCallerPlatform(
               blank(command.callerPlatform()) ? "unknown" : command.callerPlatform().strip());
           job.setTargetShopId(targetShopId);
+          job.setTargetChannel(channelOf(grant.targetChannel()));
           job.setStatus(CopyJobDO.STATUS_PROCESSING);
           job.setTotalCount(unique.size());
           job.setSuccessCount(0);
@@ -226,6 +239,9 @@ public class ProductLinkService {
                     : item.sourceChannelCode().strip().toUpperCase(Locale.ROOT);
             row.setSourceChannel(channel);
             row.setSourceProductId(item.sourceProductId().strip());
+            if (CHANNEL_WEIDIAN.equals(channel)) {
+              row.setSourceShopId(uniqueSourceShop(item.sourceProductId().strip()));
+            }
             row.setRuleId(blank(item.ruleId()) ? null : item.ruleId().strip());
             if (!CHANNEL_WEIDIAN.equals(channel)) {
               row.setStatus(CopyJobItemDO.STATUS_FAILED);
@@ -383,7 +399,7 @@ public class ProductLinkService {
     }
   }
 
-  private long resolveTargetShop(CopyTokenGrantDTO grant) {
+  private long resolveTargetShop(CopyTokenGrantDTO grant, ConvertCommand command) {
     Long shopId = grant.targetShopId();
     if (shopId == null) {
       ShopDO defaults =
@@ -397,6 +413,16 @@ public class ProductLinkService {
       }
       shopId = defaults.getId();
     }
+    try {
+      assertShopReady(shopId);
+    } catch (BusinessException ex) {
+      failures.record(failedJob(grant, command, shopId, ex));
+      throw ex;
+    }
+    return shopId;
+  }
+
+  private void assertShopReady(long shopId) {
     ShopDO shop = shops.selectById(shopId);
     if (shop == null) {
       throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
@@ -407,7 +433,68 @@ public class ProductLinkService {
     if (!copies.isShopAuthorized(shopId)) {
       throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
     }
-    return shopId;
+  }
+
+  /** One live original product for this item id. Several shops, or none, stay empty. */
+  private Long uniqueSourceShop(String weidianItemId) {
+    List<ProductDO> found =
+        products.selectList(
+            new LambdaQueryWrapper<ProductDO>().eq(ProductDO::getWeidianItemId, weidianItemId));
+    if (found == null || found.isEmpty()) {
+      return null;
+    }
+    Set<Long> shopIds = new HashSet<>();
+    for (ProductDO product : found) {
+      if (product.getShopId() != null) {
+        shopIds.add(product.getShopId());
+      }
+    }
+    if (shopIds.size() != 1) {
+      return null;
+    }
+    return shopIds.iterator().next();
+  }
+
+  private CopyJobDO failedJob(
+      CopyTokenGrantDTO grant, ConvertCommand command, long shopId, BusinessException error) {
+    Instant now = Instant.now();
+    CopyJobDO job = new CopyJobDO();
+    job.setTenantId(grant.tenantId());
+    job.setKolId(grant.kolId());
+    job.setTokenId(grant.tokenId());
+    job.setJobCode(newJobCode());
+    job.setCallerPlatform(
+        blank(command.callerPlatform()) ? "unknown" : command.callerPlatform().strip());
+    job.setTargetShopId(shopId);
+    job.setTargetChannel(channelOf(grant.targetChannel()));
+    job.setStatus(CopyJobDO.STATUS_FAILED);
+    job.setTotalCount(0);
+    job.setSuccessCount(0);
+    job.setFailCount(0);
+    job.setErrorMessage(taskError(grant, error));
+    job.setCreateTime(now);
+    job.setUpdateTime(now);
+    job.setFinishTime(now);
+    return job;
+  }
+
+  private static String channelOf(String channel) {
+    return blank(channel) ? CHANNEL_WEIDIAN : channel.strip();
+  }
+
+  private static String taskError(CopyTokenGrantDTO grant, BusinessException error) {
+    // The script still receives the original exception. A named shop that is not in the
+    // database shares that exception with "no default shop", which would misstate this row.
+    if (error.getErrorCode() == ErrorCode.COPY_TARGET_SHOP_MISSING
+        && grant.targetShopId() != null) {
+      return ProductLinkMessages.TARGET_NOT_FOUND;
+    }
+    String message = error.getMessage();
+    if (blank(message)) {
+      message = ProductLinkMessages.zh(error.getErrorCode());
+    }
+    String trimmed = message.strip();
+    return trimmed.length() > 500 ? trimmed.substring(0, 500) : trimmed;
   }
 
   private CopyJobDO requireJob(String jobCode) {

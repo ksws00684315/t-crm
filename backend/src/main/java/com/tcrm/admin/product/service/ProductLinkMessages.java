@@ -13,6 +13,7 @@ final class ProductLinkMessages {
   static final String TOKEN_QUOTA = "复制令牌额度已用尽";
   static final String KOL_DISABLED = "达人账号已停用";
   static final String TARGET_MISSING = "未配置默认复制店铺，且令牌未指定目标店铺";
+  static final String TARGET_NOT_FOUND = "指定的目标店铺不存在";
   static final String TARGET_DISABLED = "目标店铺已停用";
   static final String TARGET_UNAUTHORIZED = "目标店铺未完成微店授权";
   static final String JOB_NOT_FOUND = "任务编号不存在";

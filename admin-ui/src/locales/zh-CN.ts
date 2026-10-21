@@ -940,6 +940,51 @@ const zhCN = {
     invalidSheet: "请填写表格地址或表格 ID",
     requiredFields: "请填写名称和页签名"
   },
+  copyJob: {
+    jobCode: "任务编号",
+    targetChannel: "目标渠道",
+    status: "状态",
+    result: "结果",
+    error: "错误原因",
+    createTime: "创建时间",
+    finishTime: "完成时间",
+    viewItems: "查看明细",
+    total: "总 {n}",
+    success: "成功 {n}",
+    fail: "失败 {n}",
+    completedHasFailures: "含失败项，请查看明细",
+    detailTitle: "任务明细：{jobCode}",
+    seq: "序号",
+    sourceChannel: "来源渠道",
+    sourceProductId: "旧商品 ID",
+    sourceShop: "来源店铺",
+    sourceMerchantNo: "来源商户号",
+    targetShop: "目标店铺",
+    targetItemId: "新商品 ID",
+    targetItemUrl: "新商品链接",
+    failReason: "失败原因",
+    open: "打开",
+    none: "-",
+    kolId: "达人 ID",
+    kolCode: "达人编号",
+    kolName: "达人名称",
+    targetShopCode: "目标店铺编码",
+    targetShopName: "目标店铺名称",
+    channel: {
+      WEIDIAN: "微店"
+    },
+    jobStatus: {
+      processing: "处理中",
+      completed: "已完成",
+      partial_failed: "部分失败",
+      failed: "失败"
+    },
+    itemStatus: {
+      pending: "待处理",
+      success: "成功",
+      failed: "失败"
+    }
+  },
   shop: {
     copyTarget: "默认复制",
     setCopyTarget: "设为默认复制店铺",

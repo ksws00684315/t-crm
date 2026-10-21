@@ -17,10 +17,12 @@ import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.product.mapper.CopyJobItemMapper;
 import com.tcrm.admin.product.mapper.CopyJobMapper;
 import com.tcrm.admin.product.mapper.KolItemMapper;
+import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.mapper.ShopMapper;
 import com.tcrm.admin.product.model.CopyJobDO;
 import com.tcrm.admin.product.model.CopyJobItemDO;
 import com.tcrm.admin.product.model.KolItemDO;
+import com.tcrm.admin.product.model.ProductDO;
 import com.tcrm.admin.product.model.ShopDO;
 import com.tcrm.admin.product.service.ProductLinkService.ConvertCommand;
 import com.tcrm.admin.product.service.ProductLinkService.ConvertItem;
@@ -48,6 +50,7 @@ class ProductLinkServiceTest {
   private final CopyJobProgress progress = mock(CopyJobProgress.class);
   private final WeidianItemCopyApi copies = mock(WeidianItemCopyApi.class);
   private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+  private final ProductMapper products = mock(ProductMapper.class);
   private final AtomicLong ids = new AtomicLong(100);
   private ProductLinkService service;
 
@@ -65,6 +68,8 @@ class ProductLinkServiceTest {
             progress,
             copies,
             jdbc,
+            products,
+            new CopyJobFailureRecorder(jobs),
             "https://t.example",
             new SecureRandom(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}));
     when(jobs.insert(any(CopyJobDO.class)))
@@ -112,6 +117,7 @@ class ProductLinkServiceTest {
               assertThat(be.getErrorCode()).isEqualTo(ErrorCode.COPY_TARGET_SHOP_MISSING);
               assertThat(be.getMessage()).contains("默认复制店铺");
             });
+    verify(jobs, never()).insert(any(CopyJobDO.class));
     verify(worker, never()).submit(anyLong());
   }
 
@@ -141,6 +147,7 @@ class ProductLinkServiceTest {
     ArgumentCaptor<CopyJobDO> jobCap = ArgumentCaptor.forClass(CopyJobDO.class);
     verify(jobs).insert(jobCap.capture());
     assertThat(jobCap.getValue().getTotalCount()).isEqualTo(2);
+    assertThat(jobCap.getValue().getTargetChannel()).isEqualTo("WEIDIAN");
     assertThat(jobCap.getValue().getCallerPlatform()).isEqualTo("google_sheet_plugin");
     verify(items, org.mockito.Mockito.times(2)).insert(any(CopyJobItemDO.class));
     verify(worker).submit(jobCap.getValue().getId());
@@ -247,6 +254,15 @@ class ProductLinkServiceTest {
               assertThat(be.getErrorCode()).isEqualTo(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
               assertThat(be.getMessage()).contains("未完成微店授权");
             });
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getErrorMessage()).contains("未完成微店授权");
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
+    assertThat(failed.getValue().getTargetChannel()).isEqualTo("WEIDIAN");
+    assertThat(failed.getValue().getTotalCount()).isZero();
+    verify(items, never()).insert(any(CopyJobItemDO.class));
+    verify(worker, never()).submit(anyLong());
   }
 
   @Test
@@ -268,6 +284,87 @@ class ProductLinkServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.SHOP_DISABLED);
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getErrorMessage()).contains("已停用");
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
+    verify(worker, never()).submit(anyLong());
+  }
+
+  @Test
+  void shouldRecordMissingNamedShop_withoutChangingTheScriptMessage() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    when(shops.selectById(5L)).thenReturn(null);
+
+    assertThatThrownBy(
+            () ->
+                service.convert(
+                    new ConvertCommand(
+                        "tok",
+                        "google_sheet_plugin",
+                        List.of(new ConvertItem("WEIDIAN", "1", null)))))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e -> {
+              BusinessException be = (BusinessException) e;
+              assertThat(be.getErrorCode()).isEqualTo(ErrorCode.COPY_TARGET_SHOP_MISSING);
+              assertThat(be.getMessage()).isEqualTo("未配置默认复制店铺，且令牌未指定目标店铺");
+            });
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getErrorMessage()).isEqualTo("指定的目标店铺不存在");
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
+    verify(items, never()).insert(any(CopyJobItemDO.class));
+  }
+
+  @Test
+  void shouldRecordSourceShop_whenExactlyOneOriginalProduct() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(1);
+    when(shops.selectById(5L)).thenReturn(shop);
+    when(copies.isShopAuthorized(5L)).thenReturn(true);
+    ProductDO product = new ProductDO();
+    product.setShopId(8L);
+    product.setWeidianItemId("111");
+    when(products.selectList(any())).thenReturn(List.of(product));
+
+    service.convert(
+        new ConvertCommand(
+            "tok", "google_sheet_plugin", List.of(new ConvertItem("WEIDIAN", "111", null))));
+
+    ArgumentCaptor<CopyJobItemDO> itemCap = ArgumentCaptor.forClass(CopyJobItemDO.class);
+    verify(items).insert(itemCap.capture());
+    assertThat(itemCap.getValue().getSourceShopId()).isEqualTo(8L);
+  }
+
+  @Test
+  void shouldLeaveSourceShopEmpty_whenSeveralShopsHaveTheItem() {
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(1);
+    when(shops.selectById(5L)).thenReturn(shop);
+    when(copies.isShopAuthorized(5L)).thenReturn(true);
+    ProductDO first = new ProductDO();
+    first.setShopId(8L);
+    ProductDO second = new ProductDO();
+    second.setShopId(9L);
+    when(products.selectList(any())).thenReturn(List.of(first, second));
+
+    service.convert(
+        new ConvertCommand(
+            "tok", "google_sheet_plugin", List.of(new ConvertItem("WEIDIAN", "111", null))));
+
+    ArgumentCaptor<CopyJobItemDO> itemCap = ArgumentCaptor.forClass(CopyJobItemDO.class);
+    verify(items).insert(itemCap.capture());
+    assertThat(itemCap.getValue().getSourceShopId()).isNull();
   }
 
   @Test
