@@ -54,10 +54,25 @@ async function mountPage() {
   vi.mocked(shopApi.listShops).mockResolvedValue([
     {
       id: "1",
+      shopCode: "SHOP-100001",
       shopName: "旗舰店",
+      channel: "WEIDIAN",
       weidianShopId: "100",
       status: 1,
-      copyTarget: false,
+      isSource: false,
+      copyPoolStatus: "EXITED",
+      maxItems: 20000,
+      currentItems: 0,
+      itemsRefreshedAt: null,
+      authStatus: "UNAUTHORIZED",
+      authExpiresAt: null,
+      apiStatus: {
+        product: { ok: null, checkedAt: null, error: null },
+        order: { ok: null, checkedAt: null, error: null },
+        refund: { ok: null, checkedAt: null, error: null }
+      },
+      copyEligible: false,
+      copyIneligibleReason: "UNAUTHORIZED",
       remark: null,
       createTime: "2026-10-01T00:00:00Z",
       updateTime: "2026-10-01T00:00:00Z"

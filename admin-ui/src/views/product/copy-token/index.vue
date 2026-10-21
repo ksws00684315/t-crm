@@ -366,7 +366,11 @@ onMounted(() => {
         {{ channelText(asRow(row).targetChannel) }}
       </template>
       <template #cell-shop="{ row }">
-        {{ asRow(row).targetShopName || t("copyToken.shopAuto") }}
+        {{
+          asRow(row).targetShopName
+            ? `${asRow(row).targetShopName} (${asRow(row).targetShopCode ?? ""})`
+            : t("copyToken.shopAuto")
+        }}
       </template>
       <template #cell-usage="{ row }">
         <span data-test="usage">{{ asRow(row).used }} / {{ asRow(row).quota }}</span>

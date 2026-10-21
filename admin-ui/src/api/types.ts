@@ -208,16 +208,59 @@ export interface TaskVO {
   finishedAt: string | null;
 }
 
-/** `ShopVO`. */
+export type ShopChannel = "WEIDIAN";
+export type ShopAuthStatus = "UNAUTHORIZED" | "AUTHORIZED" | "EXPIRED";
+export type CopyPoolStatus = "JOINED" | "EXITED" | "NOT_APPLICABLE";
+export type CopyIneligibleReason =
+  "DISABLED" | "UNAUTHORIZED" | "AUTH_EXPIRED" | "SOURCE_SHOP" | "POOL_EXITED" | "CAPACITY_FULL";
+
+export interface ShopApiCheckVO {
+  ok: boolean | null;
+  checkedAt: string | null;
+  error: string | null;
+}
+
+/** `ShopVO`; mirrors `GET /admin-api/product/shops`. */
 export interface ShopVO {
   id: string;
+  shopCode: string;
   shopName: string;
-  weidianShopId: string;
+  channel: ShopChannel;
+  weidianShopId: string | null;
   status: 0 | 1;
-  copyTarget: boolean;
+  isSource: boolean;
+  copyPoolStatus: CopyPoolStatus;
+  maxItems: number;
+  currentItems: number;
+  itemsRefreshedAt: string | null;
+  authStatus: ShopAuthStatus;
+  authExpiresAt: string | null;
+  apiStatus: {
+    product: ShopApiCheckVO;
+    order: ShopApiCheckVO;
+    refund: ShopApiCheckVO;
+  };
+  copyEligible: boolean;
+  copyIneligibleReason: CopyIneligibleReason | null;
   remark: string | null;
   createTime: string;
   updateTime: string;
+}
+
+export interface CopyChannelShopVO {
+  id: string;
+  shopCode: string;
+  shopName: string;
+  remainingCapacity: number;
+}
+
+/** Optional defaults are supplied by the backend when available. */
+export interface CopyChannelVO {
+  channel: ShopChannel;
+  remainingCapacity: number;
+  shops: CopyChannelShopVO[];
+  defaultQuota?: number;
+  defaultValidMinutes?: number;
 }
 
 /** `ProductVO`. `price` 2 decimals; `rate` fraction 4 decimals or null. */
@@ -332,6 +375,7 @@ export interface CopyTokenVO {
   targetChannel: string;
   targetShopId: string | null;
   targetShopName: string | null;
+  targetShopCode: string | null;
   used: number;
   quota: number;
   validMinutes: number;
