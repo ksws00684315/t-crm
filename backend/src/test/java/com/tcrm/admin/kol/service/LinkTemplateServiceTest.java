@@ -81,6 +81,15 @@ class LinkTemplateServiceTest {
   }
 
   @Test
+  void namesByIdsUsesOriginalCodeAsCustomerFacingPlatformName() {
+    LinkTemplateDO existing = template();
+    existing.setTemplateName("KakoBuy");
+    when(templates.selectBatchIds(List.of(77L))).thenReturn(List.of(existing));
+
+    assertThat(service.namesByIds(List.of(77L))).containsEntry(77L, "kakobuy");
+  }
+
+  @Test
   @SuppressWarnings("unchecked")
   void shouldListAllTemplates_orderedBySortThenId() {
     LinkTemplateDO first = template();

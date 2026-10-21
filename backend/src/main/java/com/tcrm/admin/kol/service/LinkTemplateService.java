@@ -153,14 +153,14 @@ public class LinkTemplateService {
     return toDto(template);
   }
 
-  /** Template names keyed by id for display; unknown ids are skipped. */
+  /** Customer-facing platform names use the original template codes; unknown ids are skipped. */
   public Map<Long, String> namesByIds(Collection<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return Map.of();
     }
     Map<Long, String> names = new HashMap<>();
     for (LinkTemplateDO template : templates.selectBatchIds(ids)) {
-      names.put(template.getId(), template.getTemplateName());
+      names.put(template.getId(), template.getTemplateCode());
     }
     return names;
   }

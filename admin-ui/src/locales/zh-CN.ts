@@ -315,7 +315,7 @@ const zhCN = {
     sheetUrlRequired: "请输入达人推广表格地址",
     inviteCode: "邀请码为 1～64 位字母、数字、下划线或连字符",
     sheetUrl: "推广表格地址须以 https://docs.google.com/spreadsheets/ 开头，且不超过 512 个字符",
-    templateCode: "编码须为 2～32 位小写字母、数字或连字符",
+    templateCode: "平台名须为 2～32 位小写字母、数字或连字符",
     templateUrl: "平台地址须为 https 链接，包含 {'{'}PRODUCT_ID{'}'}，且不超过 512 个字符",
     sortOrder: "排序须为 0～9999 的整数",
     socialPlatformRequired: "请输入社媒平台",

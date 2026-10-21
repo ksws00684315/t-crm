@@ -179,7 +179,7 @@ onMounted(load);
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--tcrm-space-3);
+  padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);

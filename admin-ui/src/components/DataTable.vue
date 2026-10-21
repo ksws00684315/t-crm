@@ -175,16 +175,18 @@ function measureHeights(): void {
 function snapToWholeRows(ceiling: number): number {
   const table = tableRef.value?.$el as HTMLElement | undefined;
   const header = table?.querySelector<HTMLElement>(".el-table__header-wrapper");
-  const bodyRows = table?.querySelectorAll<HTMLElement>(".el-table__body tbody tr").length ?? 0;
-  const row = table?.querySelector<HTMLElement>(".el-table__body tbody tr");
+  const body = table?.querySelector<HTMLElement>(".el-table__body");
+  const rows = [...(body?.querySelectorAll<HTMLElement>(":scope > tbody > tr") ?? [])];
   const headerHeight = header?.offsetHeight ?? 0;
-  const rowHeight = row?.offsetHeight ?? 0;
-  if (!headerHeight || !rowHeight || !bodyRows) return ceiling;
-  const contentHeight = headerHeight + bodyRows * rowHeight;
-  if (contentHeight <= ceiling) return ceiling;
-  const bodySpace = ceiling - headerHeight;
-  if (bodySpace < rowHeight) return ceiling;
-  return headerHeight + Math.floor(bodySpace / rowHeight) * rowHeight;
+  const heights = rows.map(row => row.offsetHeight);
+  if (!headerHeight || !heights.length || heights.some(height => height === 0)) return ceiling;
+  if (headerHeight + heights.reduce((sum, height) => sum + height, 0) <= ceiling) return ceiling;
+  let completeHeight = headerHeight;
+  for (const height of heights) {
+    if (completeHeight + height > ceiling) break;
+    completeHeight += height;
+  }
+  return completeHeight > headerHeight ? completeHeight : ceiling;
 }
 
 function scheduleMeasure(): void {

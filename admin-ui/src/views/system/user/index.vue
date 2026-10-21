@@ -65,10 +65,10 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
   { key: "createdAt", label: t("common.createdAt"), width: 170 },
-  // Five actions on a BD row need 286px of Chinese text plus the 20px cell padding; the count and
+  // Five actions on a BD row need room for Chinese text, 8px gaps and cell padding; the count and
   // scope columns only show a short value, so their slack pays for it and the row keeps one line.
   // English labels are about a third longer, so that locale gets a wider column and scrolls.
-  { key: "actions", label: t("common.actions"), width: px(326, 430) }
+  { key: "actions", label: t("common.actions"), width: px(340, 444) }
 ]);
 
 const applied = ref({
@@ -531,16 +531,16 @@ onMounted(load);
    BD row (five actions) keeps the same 49px height as the three-action super administrator row. */
 .actions-cell {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0 6px;
+  gap: 0 var(--tcrm-space-2);
   white-space: nowrap;
 }
 .actions-cell .el-button {
   margin: 0;
   padding: 0;
   height: auto;
-  line-height: 1.5;
+  line-height: var(--tcrm-line-height-body);
 }
 .reset-locked {
   display: inline-flex;

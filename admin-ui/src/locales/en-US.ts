@@ -323,7 +323,7 @@ const enUS: MessageSchema = {
     inviteCode: "Invite code must be 1-64 letters, digits, underscores, or hyphens.",
     sheetUrl:
       "The sheet URL must start with https://docs.google.com/spreadsheets/ and be at most 512 characters.",
-    templateCode: "Code must be 2-32 lowercase letters, digits, or hyphens.",
+    templateCode: "Platform name must be 2-32 lowercase letters, digits, or hyphens.",
     templateUrl:
       "Platform URL must be an https link, contain {'{'}PRODUCT_ID{'}'}, and be at most 512 characters.",
     sortOrder: "Sort order must be an integer from 0 to 9999.",
