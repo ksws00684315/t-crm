@@ -328,7 +328,8 @@ function close() {
 .qr-hint {
   margin: 8px 0 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: 20px;
 }
 .qr-input {
   display: none;

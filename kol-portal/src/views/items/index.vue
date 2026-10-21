@@ -130,8 +130,9 @@ onMounted(loadItems);
   min-width: 0;
 }
 .items-page h1 {
-  font-size: 24px;
-  margin: 0 0 20px;
+  font-size: var(--tcrm-font-size-title);
+  line-height: var(--tcrm-line-height-title);
+  margin: 0 0 16px;
 }
 .search {
   display: flex;
@@ -164,7 +165,8 @@ onMounted(loadItems);
 }
 .empty-hint {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 .item-list {
   display: grid;
@@ -192,7 +194,7 @@ onMounted(loadItems);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 600;
   color: var(--el-text-color-secondary);
 }
@@ -213,7 +215,7 @@ onMounted(loadItems);
   flex-wrap: wrap;
   gap: 12px;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-body);
 }
 .item-card__id {
   font-variant-numeric: tabular-nums;

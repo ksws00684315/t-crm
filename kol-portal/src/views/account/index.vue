@@ -139,7 +139,8 @@ dd {
 }
 h2 {
   margin-top: 0;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
 }
 .el-alert {
   margin-bottom: 16px;

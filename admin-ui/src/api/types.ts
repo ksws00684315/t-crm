@@ -164,6 +164,7 @@ export interface LinkTemplateVO {
   channelCode: string;
   sortOrder: number;
   status: 0 | 1;
+  createTime: string;
 }
 
 /** `BdHistoryVO`: one ownership period; null `bdUserId` = unassigned, null `endTime` = current. */

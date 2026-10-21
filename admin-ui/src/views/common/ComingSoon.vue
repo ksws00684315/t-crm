@@ -38,7 +38,8 @@ const title = computed(() => (route.meta.title ? translate(String(route.meta.tit
 }
 .coming-soon__title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
+  line-height: 24px;
   font-weight: 600;
   color: var(--tcrm-color-text);
 }

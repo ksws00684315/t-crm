@@ -16,7 +16,8 @@ const row: LinkTemplateVO = {
   templateUrl: "https://shop.example/item/{PRODUCT_ID}?code={INVITE_CODE}",
   channelCode: "WEIDIAN",
   sortOrder: 10,
-  status: 1
+  status: 1,
+  createTime: "2026-10-20T12:00:00Z"
 };
 
 function field(testId: string): DOMWrapper<HTMLInputElement> {
@@ -55,7 +56,7 @@ describe("link template page", () => {
     wrapper.unmount();
   });
 
-  it("lets the code be entered on create and shows the encoded preview", async () => {
+  it("creates a platform from its name and address without a preview", async () => {
     vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     vi.mocked(templateApi.createLinkTemplate).mockResolvedValue(row);
     const wrapper = await mountPage();
@@ -63,26 +64,14 @@ describe("link template page", () => {
     await nextTick();
     expect(field("template-code").element.disabled).toBe(false);
     await field("template-code").setValue("agent-one");
-    await field("template-name").setValue("AgentOne");
     await field("template-url").setValue(row.templateUrl);
-    await field("sample-invite").setValue("A B~");
     await nextTick();
-    expect(document.body.querySelector('[data-test="template-preview"]')?.textContent).toContain(
-      "code=A+B%7E"
-    );
-    expect(document.body.querySelector('[data-test="template-preview"]')?.textContent).toContain(
-      "7849640325"
-    );
-    await field("sample-invite").setValue("");
-    await nextTick();
-    expect(document.body.querySelector('[data-test="template-fallback"]')?.textContent).toContain(
-      "该达人未设置邀请码时，链接会回退为微店商品页。"
-    );
+    expect(document.body.querySelector('[data-test="template-preview"]')).toBeNull();
     await field("template-save").trigger("click");
     await flushPromises();
     expect(templateApi.createLinkTemplate).toHaveBeenCalledWith({
       templateCode: "agent-one",
-      templateName: "AgentOne",
+      templateName: "agent-one",
       templateUrl: row.templateUrl,
       sortOrder: 0
     });
@@ -97,14 +86,25 @@ describe("link template page", () => {
     await dataRow!.get('[data-test="edit"]').trigger("click");
     await nextTick();
     expect(field("template-code").element.disabled).toBe(true);
-    await field("template-name").setValue("Renamed");
+    await field("template-url").setValue("https://shop.example/new/{PRODUCT_ID}");
     await field("template-save").trigger("click");
     await flushPromises();
     expect(templateApi.editLinkTemplate).toHaveBeenCalledWith(row.id, {
-      templateName: "Renamed",
-      templateUrl: row.templateUrl,
+      templateName: "AgentOne",
+      templateUrl: "https://shop.example/new/{PRODUCT_ID}",
       sortOrder: 10
     });
+    wrapper.unmount();
+  });
+
+  it("filters by platform name and shows first-maintained time", async () => {
+    const wrapper = await mountPage([row, { ...row, id: "8", templateCode: "other" }]);
+    expect(wrapper.text()).toContain("平台维护时间");
+    expect(wrapper.text()).toContain("2026/10/20");
+    await wrapper.find(".list-search input").setValue("agent");
+    wrapper.getComponent({ name: "ListSearch" }).vm.$emit("search");
+    await flushPromises();
+    expect(wrapper.getComponent({ name: "DataTable" }).props("rows")).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -117,8 +117,8 @@ describe("link template page", () => {
     await dataRow!.get('[data-test="status"]').trigger("click");
     await flushPromises();
     expect(ElMessageBox.confirm).toHaveBeenCalledWith(
-      "停用后，使用该模板的达人链接将改为跳转到微店商品页。",
-      "停用模板",
+      "停用后，使用该平台的达人链接将改为跳转到微店商品页。",
+      "停用平台",
       { type: "warning" }
     );
     expect(templateApi.updateLinkTemplateStatus).toHaveBeenCalledWith(row.id, 0);

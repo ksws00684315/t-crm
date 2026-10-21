@@ -33,7 +33,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 1. **范围**：只做任务要求的内容。不加未要求的功能、抽象、配置项、依赖。发现范围外的问题，写进报告，不顺手改。
 2. **架构**（规范 01）：后台根包 `com.tcrm.admin` 的直接子包是模块；模块内分 `controller/service/mapper/model/api`；调用方向 controller → service → mapper；模块之间只能依赖对方的 `api` 包；`*DO` 不出现在接口入参出参。
-3. **编码**（规范 02）：Google Java Style（Spotless）；禁止通配符导入、`public` 实例字段、Lombok、字段注入、`System.out`；金额用 `BigDecimal`，时间用 `Instant`（UTC）。前端界面文字从语言包读取（中英文），不写死。
+3. **编码**（规范 02、10）：Google Java Style（Spotless）；禁止通配符导入、`public` 实例字段、Lombok、字段注入、`System.out`；金额用 `BigDecimal`，时间用 `Instant`（UTC）。前端界面文字从语言包读取（中英文），不写死；字体、字号、间距及响应式布局遵守 `docs/05-工程规范/10-前端视觉与布局规范.md`。
 4. **接口**（规范 03）：路径复数 kebab-case；统一信封 `{code,msg,data,errorCode,traceId}`；错误码登记在 `shared.ErrorCode`；分页 `{items,total,page,size}`；ID 与金额序列化为字符串。
 5. **数据库**（规范 04）：只通过 Flyway 迁移，脚本名 `V{yyyyMMddHHmm}__描述.sql`；**已合并的脚本不得修改**；表和字段必须有注释；只用参数绑定；业务表必须有 `tenant_id`（所属公司）。
 6. **测试**（规范 05）：业务规则必须有单元测试；集成测试命名 `*IT` 并标注 `@Tag("docker")`；修复缺陷先写复现测试；不得跳过或弱化失败的测试；覆盖率门槛不得降低。

@@ -120,8 +120,8 @@ async function sendInvite() {
 
 const historyColumns = computed<DataColumn[]>(() => [
   { key: "bd", label: t("kol.bdColumn"), minWidth: 120 },
-  { key: "startedAt", label: t("kol.startedAt"), width: 170, mono: true },
-  { key: "endedAt", label: t("kol.endedAt"), width: 170, mono: true }
+  { key: "startedAt", label: t("kol.startedAt"), width: 170 },
+  { key: "endedAt", label: t("kol.endedAt"), width: 170 }
 ]);
 </script>
 
@@ -153,10 +153,10 @@ const historyColumns = computed<DataColumn[]>(() => [
             <CopyText v-if="detail.phone" :value="detail.phone" />
             <span v-else>-</span>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.agentPlatform')">
-            {{ detail.linkTemplateName || "-" }}
+          <el-descriptions-item v-if="detail.linkTemplateName" :label="t('kol.agentPlatform')">
+            {{ detail.linkTemplateName }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.inviteCode')">
+          <el-descriptions-item :label="t('promotion.creatorInviteCode')">
             <CopyText v-if="detail.inviteCode" :value="detail.inviteCode" />
             <span v-else>-</span>
           </el-descriptions-item>
@@ -195,7 +195,12 @@ const historyColumns = computed<DataColumn[]>(() => [
           </el-descriptions-item>
           <el-descriptions-item :label="t('promotion.platforms')">
             <div v-for="platform in detail.platforms" :key="platform.templateId">
-              <a :href="platform.address" target="_blank" rel="noopener noreferrer"
+              <!-- An empty platform address is stored as the link template URL (with the
+                   {PRODUCT_ID} placeholder) — show a dash instead of that non-working link. -->
+              <template v-if="platform.address?.includes('{PRODUCT_ID}')">
+                {{ platform.templateName }}: -
+              </template>
+              <a v-else :href="platform.address" target="_blank" rel="noopener noreferrer"
                 >{{ platform.templateName }}: {{ platform.address }}</a
               >
             </div>

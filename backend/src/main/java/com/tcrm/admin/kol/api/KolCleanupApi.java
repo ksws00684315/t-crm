@@ -1,5 +1,6 @@
 package com.tcrm.admin.kol.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +19,13 @@ public interface KolCleanupApi {
    * when there is no attributed order and no promoting record.
    */
   List<PromotingKolDTO> listPromotingWithLastPromotingAt();
+
+  /**
+   * Same as {@link #listPromotingWithLastPromotingAt()} but the KOL query is restricted to the
+   * given ids, so promotion records are only read for those KOLs. Page-scoped countdowns must use
+   * this variant instead of loading every promoting KOL of the company.
+   */
+  List<PromotingKolDTO> listPromotingWithLastPromotingAt(Collection<Long> ids);
 
   /**
    * Locks the KOL and returns it when still PROMOTING (relation status). Empty when missing or not

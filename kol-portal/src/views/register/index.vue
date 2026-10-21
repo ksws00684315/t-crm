@@ -297,7 +297,7 @@ watch(code, () => {
 .register-code-note {
   width: 100%;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
   color: var(--el-text-color-secondary);
 }
 .register-platform {

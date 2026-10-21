@@ -306,7 +306,7 @@ onMounted(loadBdUsers);
   width: 100%;
 }
 .effective__tz {
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
   color: var(--tcrm-color-text-secondary);
 }
 .conflicts {

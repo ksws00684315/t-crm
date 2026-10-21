@@ -85,14 +85,14 @@ const chips = computed<SearchChip[]>(() => {
 });
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "time", label: t("audit.time"), width: 170, mono: true },
+  { key: "time", label: t("audit.time"), width: 170 },
   { key: "operator", label: t("audit.operator"), width: 130 },
   { key: "module", label: t("audit.module"), width: 100 },
   { key: "action", label: t("audit.action"), minWidth: 140 },
   { key: "summary", label: t("audit.summary"), minWidth: 280, tooltip: true },
   { key: "result", label: t("audit.result"), width: 90 },
   { key: "path", label: t("audit.uri"), minWidth: 200, tooltip: true },
-  { key: "ip", label: t("audit.ip"), width: 140, mono: true }
+  { key: "ip", label: t("audit.ip"), width: 140 }
 ]);
 
 async function load() {

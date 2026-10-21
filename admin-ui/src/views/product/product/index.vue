@@ -53,15 +53,15 @@ function asProduct(row: object): ProductVO {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "productCode", label: t("product.code"), width: 130, mono: true },
+    { key: "productCode", label: t("product.code"), width: 130 },
     { key: "name", label: t("product.name"), prop: "name", minWidth: 160 },
     { key: "shopName", label: t("product.shop"), prop: "shopName", minWidth: 120 },
-    { key: "weidianItemId", label: t("product.weidianItemId"), minWidth: 130, mono: true },
+    { key: "weidianItemId", label: t("product.weidianItemId"), minWidth: 130 },
     { key: "category", label: t("product.category"), prop: "category", width: 100 },
     { key: "price", label: t("product.price"), width: 100, amount: true },
     { key: "rate", label: t("product.rate"), width: 100, amount: true },
     { key: "status", label: t("common.status"), width: 80 },
-    { key: "updatedAt", label: t("common.updatedAt"), width: 170, mono: true }
+    { key: "updatedAt", label: t("common.updatedAt"), width: 170 }
   ];
   if (showActions.value) {
     list.push({ key: "actions", label: t("common.actions"), width: 140 });

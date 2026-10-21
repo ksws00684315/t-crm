@@ -35,18 +35,20 @@ defineProps<{ title: string }>();
 }
 h1 {
   margin: 0 0 24px;
-  font-size: 22px;
+  font-size: var(--tcrm-font-size-title);
+  line-height: 28px;
   text-align: center;
 }
 .auth-shell__brand {
   margin-bottom: 8px;
   color: var(--el-color-primary);
-  font-size: 15px;
+  font-size: var(--tcrm-font-size-body);
   font-weight: 600;
   text-align: center;
 }
 :deep(.el-button) {
   min-height: 44px;
+  margin-block: 2px;
 }
 :deep(.el-input__wrapper) {
   min-height: 44px;

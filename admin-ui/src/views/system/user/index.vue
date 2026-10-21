@@ -7,6 +7,7 @@ import { listKols } from "@/api/kol/kol";
 import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
@@ -31,8 +32,10 @@ import UserFormDialog from "./UserFormDialog.vue";
 
 defineOptions({ name: "SystemUserPage" });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const me = useUserStore();
+/** Widths are tuned for the 14px Chinese labels; English needs more room and scrolls instead. */
+const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const exportAllowed = computed(() => canExport(me.user));
 const loading = ref(false);
 const rows = ref<UserVO[]>([]);
@@ -58,12 +61,15 @@ const columns = computed<DataColumn[]>(() => [
   { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
   { key: "role", label: t("user.role"), width: 120 },
   { key: "post", label: t("user.post"), width: 90 },
-  { key: "permissions", label: t("user.permissionCount"), width: 100 },
-  { key: "dataScope", label: t("user.dataScope"), width: 110 },
+  { key: "permissions", label: t("user.permissionCount"), width: 92 },
+  { key: "dataScope", label: t("user.dataScope"), width: 92 },
   { key: "status", label: t("common.status"), width: 80 },
-  { key: "lastLogin", label: t("user.lastLogin"), width: 170, mono: true },
-  { key: "createdAt", label: t("common.createdAt"), width: 170, mono: true },
-  { key: "actions", label: t("common.actions"), width: 300 }
+  { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
+  { key: "createdAt", label: t("common.createdAt"), width: 170 },
+  // Five actions on a BD row need room for Chinese text, 8px gaps and cell padding; the count and
+  // scope columns only show a short value, so their slack pays for it and the row keeps one line.
+  // English labels are about a third longer, so that locale gets a wider column and scrolls.
+  { key: "actions", label: t("common.actions"), width: px(340, 444) }
 ]);
 
 const applied = ref({
@@ -272,6 +278,51 @@ function openPermissions(row: UserVO) {
   permissionsVisible.value = true;
 }
 
+/** Row actions in their original order; entries beyond the first two fold into the dropdown. */
+function rowActions(row: UserVO): RowAction[] {
+  return [
+    {
+      key: "edit",
+      label: t("common.edit"),
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "permissions",
+      label: t("user.permissionsTitle"),
+      testId: `permissions-${row.id}`,
+      hidden: !isStaff(row),
+      onClick: () => openPermissions(row)
+    },
+    {
+      key: "transfer",
+      label: t("bdTransfer.transferKols"),
+      type: "warning",
+      testId: `transfer-kols-${row.id}`,
+      hidden: !isBdRow(row),
+      disabled: bdCount(row) === 0,
+      tooltip: t("bdTransfer.noKols"),
+      onClick: () => openTransfer(row)
+    },
+    {
+      key: "status",
+      label: row.status === 1 ? t("common.disable") : t("common.enable"),
+      type: row.status === 1 ? "danger" : "success",
+      testId: `status-${row.id}`,
+      disabled: row.id === me.user?.id,
+      onClick: () => toggleStatus(row)
+    },
+    {
+      key: "reset",
+      label: t("user.resetPassword"),
+      type: "warning",
+      testId: `reset-password-${row.id}`,
+      disabled: isMultiCompany(row),
+      tooltip: isMultiCompany(row) ? t("user.multiCompanyHint") : undefined,
+      onClick: () => openReset(row)
+    }
+  ];
+}
+
 async function toggleStatus(row: UserVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
@@ -388,7 +439,11 @@ onMounted(load);
         >
       </template>
       <template #cell-username="{ row }">
-        <span>{{ asUser(row).username }}</span>
+        <!-- At 1440 the column sits on its 130px minimum and long logins such as demo_bd_b_0d221
+             wrapped to a second line, which made only those rows taller. Ellipsize instead. -->
+        <span class="user-page__name" :title="asUser(row).username">
+          {{ asUser(row).username }}
+        </span>
         <el-tooltip
           v-if="isMultiCompany(asUser(row))"
           :content="t('user.multiCompanyHint')"
@@ -433,65 +488,7 @@ onMounted(load);
       <template #cell-lastLogin="{ row }">{{ formatInstant(asUser(row).lastLoginTime) }}</template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asUser(row).createTime) }}</template>
       <template #actions="{ row }">
-        <el-button link type="primary" @click="openEdit(asUser(row))">{{
-          t("common.edit")
-        }}</el-button>
-        <el-button
-          v-if="isStaff(asUser(row))"
-          link
-          type="primary"
-          data-test="permissions"
-          @click="openPermissions(asUser(row))"
-        >
-          {{ t("user.permissionsTitle") }}
-        </el-button>
-        <el-tooltip
-          v-if="isBdRow(asUser(row))"
-          placement="top"
-          :disabled="bdCount(asUser(row)) !== 0"
-          :content="t('bdTransfer.noKols')"
-        >
-          <span class="user-page__transfer">
-            <el-button
-              link
-              type="warning"
-              data-test="transfer-kols"
-              :disabled="bdCount(asUser(row)) === 0"
-              @click="openTransfer(asUser(row))"
-            >
-              {{ t("bdTransfer.transferKols") }}
-            </el-button>
-          </span>
-        </el-tooltip>
-        <el-button
-          link
-          :type="asUser(row).status === 1 ? 'danger' : 'success'"
-          :disabled="asUser(row).id === me.user?.id"
-          @click="toggleStatus(asUser(row))"
-        >
-          {{ asUser(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
-        </el-button>
-        <el-tooltip
-          v-if="isMultiCompany(asUser(row))"
-          :content="t('user.multiCompanyHint')"
-          placement="top"
-        >
-          <!-- A disabled button swallows hover events; the wrapper keeps the hint reachable. -->
-          <span class="reset-locked">
-            <el-button link type="warning" disabled data-test="reset-password">
-              {{ t("user.resetPassword") }}
-            </el-button>
-          </span>
-        </el-tooltip>
-        <el-button
-          v-else
-          link
-          type="warning"
-          data-test="reset-password"
-          @click="openReset(asUser(row))"
-        >
-          {{ t("user.resetPassword") }}
-        </el-button>
+        <RowActions :actions="rowActions(asUser(row))" />
       </template>
     </DataTable>
 
@@ -506,15 +503,14 @@ onMounted(load);
 .multi-company {
   margin-left: 6px;
 }
-.reset-locked {
-  display: inline-flex;
-  margin-left: 12px;
+.user-page__name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-/* Element Plus tooltips ignore disabled buttons, so the button sits in a span. */
-.user-page__transfer {
-  margin-left: 12px;
-}
-.user-page__transfer :deep(.el-button) {
-  margin-left: 0;
-}
+/* Same row-action treatment as the creator list: tight gaps, no Element Plus button margins, so a
+   BD row (five actions) keeps the same 49px height as the three-action super administrator row. */
 </style>

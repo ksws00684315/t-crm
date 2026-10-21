@@ -206,13 +206,14 @@ onMounted(loadOrders);
   min-width: 0;
 }
 .orders-page h1 {
-  font-size: 24px;
-  margin: 0 0 20px;
+  font-size: var(--tcrm-font-size-title);
+  line-height: var(--tcrm-line-height-title);
+  margin: 0 0 16px;
 }
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--tcrm-space-3) var(--tcrm-space-4);
   margin-bottom: 16px;
 }
 .empty-state {

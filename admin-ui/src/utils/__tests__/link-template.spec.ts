@@ -32,12 +32,12 @@ describe("link template preview", () => {
 });
 
 describe("link template validation", () => {
-  it("checks the code, name, url and sort order", () => {
+  it("checks the platform name, legacy name, url and sort order", () => {
     expect(validateTemplateCode(" weidian ")).toBeNull();
-    expect(validateTemplateCode("a")).toContain("编码");
-    expect(validateTemplateCode("AB")).toContain("编码");
-    expect(validateTemplateCode("a_b")).toContain("编码");
-    expect(validateTemplateCode("a".repeat(33))).toContain("编码");
+    expect(validateTemplateCode("a")).toContain("平台名");
+    expect(validateTemplateCode("AB")).toContain("平台名");
+    expect(validateTemplateCode("a_b")).toContain("平台名");
+    expect(validateTemplateCode("a".repeat(33))).toContain("平台名");
 
     expect(validateTemplateName("")).toBe("请输入名称");
     expect(validateTemplateName("名".repeat(64))).toBeNull();

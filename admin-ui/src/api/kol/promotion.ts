@@ -3,7 +3,7 @@ import type { PageResult } from "../types";
 
 export interface PromotionPlatform {
   templateId: string;
-  address: string;
+  address: string | null;
 }
 
 export interface PromotionConfigVO {

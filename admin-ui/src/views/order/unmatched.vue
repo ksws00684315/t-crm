@@ -50,9 +50,9 @@ function asOrder(row: object): OrderVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "weidianOrderId", label: t("order.orderId"), width: 150, mono: true },
+  { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
   { key: "shopName", label: t("order.shop"), prop: "shopName", minWidth: 120 },
-  { key: "payTime", label: t("order.payTime"), width: 170, mono: true },
+  { key: "payTime", label: t("order.payTime"), width: 170 },
   { key: "orderStatus", label: t("order.orderStatus"), width: 110 },
   { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
   { key: "refundAmount", label: t("order.refundTotal"), width: 100, amount: true },

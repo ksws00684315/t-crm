@@ -84,6 +84,15 @@ export function listKols(query: KolQuery): Promise<PageResult<KolVO>> {
   return http.request<PageResult<KolVO>>({ method: "get", url: "/kol/kols", params: query });
 }
 
+/** Remaining days for enabled automatic cleanup, keyed by creator id. */
+export function getCleanupRemaining(ids: string[]): Promise<Record<string, number>> {
+  return http.request<Record<string, number>>({
+    method: "get",
+    url: "/kol/kols/cleanup-remaining",
+    params: { ids: ids.join(",") }
+  });
+}
+
 export function getKol(id: string): Promise<KolDetailVO> {
   return http.request<KolDetailVO>({ method: "get", url: `/kol/kols/${id}` });
 }

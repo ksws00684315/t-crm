@@ -125,15 +125,15 @@ const skipReasonOptions: PromoSheetSkipReason[] = [
 
 const newColumns = computed<DataColumn[]>(() => [
   { key: "shopName", label: t("promoSheet.shop"), prop: "shopName", minWidth: 110 },
-  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110, mono: true },
-  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150, mono: true },
+  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110 },
+  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150 },
   { key: "itemName", label: t("promoSheet.itemName"), minWidth: 160 },
-  { key: "productCode", label: t("mapping.productCode"), minWidth: 130, mono: true }
+  { key: "productCode", label: t("mapping.productCode"), minWidth: 130 }
 ]);
 
 const conflictColumns = computed<DataColumn[]>(() => [
-  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110, mono: true },
-  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150, mono: true },
+  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110 },
+  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150 },
   { key: "itemName", label: t("promoSheet.itemName"), minWidth: 150 },
   { key: "owner", label: t("promoSheet.ownerKol"), minWidth: 180 }
 ]);
@@ -286,7 +286,7 @@ const dialogVisible = computed({
 .hint {
   margin-top: 12px;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-body);
 }
 .file-input {
   display: none;
@@ -308,17 +308,17 @@ const dialogVisible = computed({
 }
 .count-card__value {
   display: block;
-  font-size: 20px;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 600;
 }
 .count-card__label {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
 }
 .skip-counts {
   margin: 0 0 8px;
   padding-left: 18px;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--tcrm-font-size-body);
 }
 </style>

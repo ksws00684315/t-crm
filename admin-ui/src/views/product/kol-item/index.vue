@@ -61,15 +61,15 @@ function asItem(row: object): KolItemVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("mapping.kolCode"), width: 140, mono: true },
+  { key: "kolCode", label: t("mapping.kolCode"), width: 140 },
   { key: "kolName", label: t("mapping.kolName"), prop: "kolName", minWidth: 110 },
-  { key: "productCode", label: t("mapping.productCode"), width: 150, mono: true },
+  { key: "productCode", label: t("mapping.productCode"), width: 150 },
   { key: "productName", label: t("mapping.productName"), prop: "productName", minWidth: 140 },
   { key: "shopName", label: t("mapping.shop"), prop: "shopName", minWidth: 110 },
-  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150, mono: true },
+  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150 },
   { key: "source", label: t("mapping.source"), width: 120 },
-  { key: "validFrom", label: t("mapping.validFrom"), width: 170, mono: true },
-  { key: "validTo", label: t("mapping.validTo"), width: 170, mono: true },
+  { key: "validFrom", label: t("mapping.validFrom"), width: 170 },
+  { key: "validTo", label: t("mapping.validTo"), width: 170 },
   { key: "actions", label: t("common.actions"), width: 160 }
 ]);
 

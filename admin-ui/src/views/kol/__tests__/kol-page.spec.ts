@@ -19,7 +19,7 @@ vi.mock("@/api/system/bd-user");
 
 /**
  * The creator list after task 32 §2.2: three query conditions, the 04.01 columns in order,
- * the six fixed row actions with their enable rules, and the super-administrator transfer tab.
+ * the row actions with their enable rules, and the super-administrator transfer tab.
  */
 const row: KolVO = {
   id: "9007199254740993",
@@ -76,6 +76,7 @@ function signIn(role: Role, dataScope: "ALL" | "OWN", permissions: string[] = []
 
 async function mountPage(total = "1", items: KolVO[] = [row]) {
   vi.mocked(kolApi.listKols).mockResolvedValue({ items, total, page: 1, size: 20 });
+  vi.mocked(kolApi.getCleanupRemaining).mockResolvedValue({ [row.id]: 7 });
   vi.mocked(bdApi.listBdUsers).mockResolvedValue([
     { id: "5", username: "bd5", nickname: "BD Five" }
   ]);
@@ -164,7 +165,7 @@ describe("creator list page (task 32 §2.2)", () => {
       "达人名称",
       "Phone/WhatsApp",
       "邮箱",
-      "核心社媒平台及社媒ID",
+      "社媒平台/ID",
       "佣金比例",
       "预付金额",
       "邀请时间",
@@ -178,16 +179,14 @@ describe("creator list page (task 32 §2.2)", () => {
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
-    // 1440px fit (2026-10-20 review item 1): every column is width-fixed and their sum stays
-    // within the table area of a 1440px window (1440 - sidebar 224 - paddings ≈ 1160), so
-    // nothing scrolls horizontally.
-    // Element Plus carries the column widths on the colgroup <col> elements.
+    // The grid retains widths that keep the labels readable; it scrolls inside the table.
+    // Element Plus carries each configured width on the corresponding colgroup <col> element.
     const fixed = wrapper
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
     expect(fixed.length).toBe(13);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(1160);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1160);
     wrapper.unmount();
   });
 
@@ -211,43 +210,40 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("locks the six actions to their rules, with prepay always disabled", async () => {
+  it("moves review into its status and keeps prepay disabled", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
       { ...row, reviewStatus: "PENDING", id: "1" },
       { ...row, id: "2" },
       { ...row, reviewStatus: "APPROVED", id: "3", bdUserId: "1", bdUserName: "Me" }
     ]);
-    // Review only lights up for a pending creator.
-    expect(rowButtons("action-review").map(item => item.disabled)).toEqual([false, true, true]);
+    expect(rowButtons("action-review")).toHaveLength(0);
+    expect(document.body.querySelectorAll('[data-test="review-entry"]')).toHaveLength(1);
     // Commission only for an approved creator.
     expect(rowButtons("action-commission").map(item => item.disabled)).toEqual([
       true,
       false,
       false
     ]);
-    // Prepay is under development: disabled everywhere with the tooltip.
-    expect(rowButtons("action-prepay").map(item => item.disabled)).toEqual([true, true, true]);
-    expect(document.body.textContent).toContain("开发中");
+    // Prepay is under development: disabled in the "more" dropdown with a hint on every row.
+    const prepay = ["1", "2", "3"].map(id =>
+      document.body.querySelector(`[data-test="action-prepay-${id}"]`)
+    );
+    expect(prepay).toHaveLength(3);
+    expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
+    expect(prepay.every(item => item?.getAttribute("title") === "开发中")).toBe(true);
     wrapper.unmount();
   });
 
-  it("keeps the relation tag clickable only for pending promotion with review done", async () => {
+  it("keeps relation status read-only for every row", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
       { ...row, id: "1", displayRelationStatus: "PENDING_PROMOTION", reviewStatus: "APPROVED" },
       { ...row, id: "2", displayRelationStatus: "PROMOTING", relationStatus: "PROMOTING" },
       { ...row, id: "3", displayRelationStatus: "PENDING_UPDATE" }
     ]);
-    const clickable = relationTags().map(tag =>
-      tag.closest(".relation")?.classList.contains("relation--clickable")
-    );
-    expect(clickable).toEqual([true, false, false]);
-    relationTags()[0]
-      .closest(".relation")
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await flushPromises();
-    expect(document.body.textContent).toContain("佣金信息 - KOL-ASD001");
+    expect(relationTags()).toHaveLength(3);
+    expect(document.body.querySelectorAll(".relation--clickable")).toHaveLength(0);
     wrapper.unmount();
   });
 
@@ -258,11 +254,17 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", bdUserId: null, bdUserName: null }
     ]);
     const disabled = (id: string) => rowButtons(id).map(item => item.disabled);
+    const menuDisabled = (id: string, rowId: string) =>
+      document.body
+        .querySelector(`[data-test="${id}-${rowId}"]`)
+        ?.classList.contains("is-disabled");
     expect(disabled("action-edit")).toEqual([false, false]);
-    expect(disabled("action-review")).toEqual([true, true]);
+    expect(disabled("action-review")).toEqual([]);
     expect(disabled("action-commission")).toEqual([false, true]);
-    expect(disabled("action-cleanup")).toEqual([false, true]);
-    expect(disabled("action-freeze")).toEqual([false, true]);
+    expect(menuDisabled("action-cleanup", "1")).toBe(false);
+    expect(menuDisabled("action-cleanup", "2")).toBe(true);
+    expect(menuDisabled("action-freeze", "1")).toBe(false);
+    expect(menuDisabled("action-freeze", "2")).toBe(true);
     wrapper.unmount();
   });
 
@@ -344,7 +346,7 @@ describe("creator list page (task 32 §2.2)", () => {
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue({ action: "confirm" } as never);
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const wrapper = await mountPage();
-    await element("action-freeze").trigger("click");
+    await element(`action-freeze-${row.id}`).trigger("click");
     await flushPromises();
     expect(kolApi.updateKolStatus).toHaveBeenCalledWith(row.id, 0);
     expect(success).toHaveBeenCalledWith("达人已冻结");
@@ -354,7 +356,7 @@ describe("creator list page (task 32 §2.2)", () => {
   it("shows the review entry only while pending and opens the shared profile dialog", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("1", [{ ...row, reviewStatus: "PENDING" }]);
-    await element("action-review").trigger("click");
+    await element("review-entry").trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("审核达人 KOL-ASD001");
     // Email and creator ID are read-only in the dialog.
@@ -375,10 +377,18 @@ describe("creator list page (task 32 §2.2)", () => {
   it("opens the per-creator cleanup dialog from the row", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage();
-    await element("action-cleanup").trigger("click");
+    expect(element(`action-cleanup-${row.id}`).text()).toContain("剩余7天");
+    await element(`action-cleanup-${row.id}`).trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("清理配置");
     expect(document.body.textContent).toContain("立即清理");
+    wrapper.unmount();
+  });
+
+  it("shows the settings label when automatic cleanup is off", async () => {
+    signIn("SUPER_ADMIN", "ALL", SUPER);
+    const wrapper = await mountPage("1", [{ ...row, autoCleanupDays: null }]);
+    expect(element(`action-cleanup-${row.id}`).text()).toContain("清理配置");
     wrapper.unmount();
   });
 });

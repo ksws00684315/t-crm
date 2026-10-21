@@ -14,7 +14,7 @@ import type { KolVO, LinkTemplateVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
-import { validateInviteCode, validateSheetUrl } from "@/utils/kol-validation";
+import { validateSheetUrl } from "@/utils/kol-validation";
 import { notifyError } from "@/utils/notify";
 import { incompletePromotionFields, promotionFieldDiffs } from "@/utils/promotion";
 import { percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
@@ -25,8 +25,6 @@ defineOptions({ name: "CommissionDialog" });
 const RECORD_FIELD_KEYS = [
   "defaultRate",
   "platforms",
-  "platformAddress",
-  "inviteCode",
   "sheetUrl",
   "jumpTemplateId",
   "configVersion",
@@ -43,7 +41,7 @@ const RECORD_FIELD_KEYS = [
 
 /**
  * Commission (04.03, task 32 §2.2): one dialog, two tabs — the configuration and its change
- * history. Every field is required; there is no jump-platform picker (the backend takes the
+ * history. Required fields follow the customer supplement; there is no jump-platform picker (the backend takes the
  * first platform) and the only button is Save: a complete save flips the relation status to
  * "promoting" on the backend (task 33 §3.9).
  */
@@ -72,7 +70,7 @@ const incompleteKeys = ref<string[]>([]);
 
 const form = reactive({
   percent: "",
-  /** Selected platform ids; one address row exists per id. */
+  /** Selected platform ids; persisted addresses stay hidden and are reused on save. */
   platformIds: [] as string[],
   platforms: [] as Array<{ templateId: string; address: string }>,
   inviteCode: "",
@@ -82,14 +80,9 @@ const form = reactive({
 
 const rules: FormRules = {
   percent: [rule(validatePercent)],
-  inviteCode: [
-    // Required since 04.03 (task 32 §2.2); the pattern check is the shared validator.
-    rule(value => (value.trim() ? validateInviteCode(value) : t("validation.inviteCodeRequired")))
-  ],
   sheetUrl: [
     rule(value => (value.trim() ? validateSheetUrl(value) : t("validation.sheetUrlRequired")))
-  ],
-  note: [rule(value => (value.trim() ? null : t("promotion.noteRequired")))]
+  ]
 };
 
 const title = computed(() =>
@@ -102,12 +95,12 @@ const title = computed(() =>
 const templateOptions = computed(() =>
   templates.value
     .filter(item => item.status === 1)
-    .map(item => ({ id: item.id, label: item.templateName }))
+    .map(item => ({ id: item.id, label: item.templateCode }))
 );
 
 function templateName(id: string): string {
   const known = templates.value.find(item => item.id === id);
-  if (known) return known.templateName;
+  if (known) return known.templateCode;
   return props.kol?.platforms.find(item => item.templateId === id)?.templateName ?? id;
 }
 
@@ -117,7 +110,7 @@ function fieldLabel(key: string): string {
 
 const recordColumns = computed<DataColumn[]>(() => [
   { key: "version", label: t("promotion.version"), width: 85 },
-  { key: "effective", label: t("promotion.effectiveTime"), width: 170, mono: true },
+  { key: "effective", label: t("promotion.effectiveTime"), width: 170 },
   { key: "operator", label: t("promotion.recordOperator"), width: 120 },
   { key: "changes", label: t("promotion.recordChanges"), minWidth: 280 }
 ]);
@@ -149,6 +142,12 @@ function changeLine(diff: { key: string; from: string; to: string }): string {
   });
 }
 
+function visibleChanges(record: PromotionRecordVO) {
+  return promotionFieldDiffs(record.before, record.after).filter(
+    diff => diff.key !== "inviteCode" && diff.key !== "platformAddress"
+  );
+}
+
 watch(
   () => props.modelValue,
   open => {
@@ -163,9 +162,13 @@ watch(
 
 /** Selecting a platform adds its address row; deselecting removes it (04.03). */
 function syncPlatforms(ids: string[]): void {
+  form.platformIds = ids;
   form.platforms = ids.map(id => ({
     templateId: id,
-    address: form.platforms.find(row => row.templateId === id)?.address ?? ""
+    address:
+      form.platforms.find(row => row.templateId === id)?.address ??
+      templates.value.find(item => item.id === id)?.templateUrl ??
+      ""
   }));
 }
 
@@ -183,7 +186,7 @@ async function loadAll() {
     form.percent = rateToPercent(config.defaultRate);
     form.platforms = (config.platforms ?? []).map(item => ({
       templateId: item.templateId,
-      address: item.address
+      address: item.address ?? ""
     }));
     form.platformIds = form.platforms.map(item => item.templateId);
     form.inviteCode = config.inviteCode ?? "";
@@ -232,14 +235,9 @@ async function save() {
   const missing = incompletePromotionFields({
     defaultRate: percentToRate(form.percent),
     platforms: form.platforms,
-    inviteCode: form.inviteCode.trim() || null,
     sheetUrl: form.sheetUrl.trim() || null,
     review: props.kol?.reviewStatus === "APPROVED"
   });
-  for (const platform of form.platforms) {
-    if (platform.address && !/^https:\/\/[^\s/?#]+\S*$/.test(platform.address.trim()))
-      missing.push("platformAddress");
-  }
   if (missing.length) {
     showIncomplete(missing);
     return;
@@ -250,9 +248,9 @@ async function save() {
       defaultRate: percentToRate(form.percent),
       platforms: form.platforms.map(platform => ({
         templateId: platform.templateId,
-        address: platform.address.trim()
+        address: platform.address.trim() || null
       })),
-      inviteCode: form.inviteCode.trim(),
+      inviteCode: form.inviteCode.trim() || null,
       // No jump platform any more: the backend defaults to the first selected platform (33 §3.10).
       jumpTemplateId: null,
       sheetUrl: form.sheetUrl.trim(),
@@ -328,20 +326,6 @@ function onRecordsPage(page: number): void {
                 />
               </el-select>
             </el-form-item>
-            <el-form-item
-              v-for="(platform, index) in form.platforms"
-              :key="platform.templateId"
-              :label="templateName(platform.templateId)"
-            >
-              <el-input
-                v-model="platform.address"
-                :placeholder="t('promotion.platformAddressPlaceholder')"
-                :data-test="`platform-address-${index}`"
-              />
-            </el-form-item>
-            <el-form-item :label="t('promotion.creatorInviteCode')" prop="inviteCode">
-              <el-input v-model="form.inviteCode" data-test="creator-invite-code" maxlength="64" />
-            </el-form-item>
             <el-form-item :label="t('promotion.field.sheetUrl')" prop="sheetUrl">
               <el-input
                 v-model="form.sheetUrl"
@@ -380,12 +364,7 @@ function onRecordsPage(page: number): void {
             <template #cell-operator="{ row }">{{ asRecord(row).operatorName ?? "-" }}</template>
             <template #cell-changes="{ row }">
               <div class="changes">
-                <div
-                  v-for="line in promotionFieldDiffs(asRecord(row).before, asRecord(row).after).map(
-                    changeLine
-                  )"
-                  :key="line"
-                >
+                <div v-for="line in visibleChanges(asRecord(row)).map(changeLine)" :key="line">
                   {{ line }}
                 </div>
               </div>

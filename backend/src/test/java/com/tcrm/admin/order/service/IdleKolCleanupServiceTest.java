@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class IdleKolCleanupServiceTest {
@@ -68,6 +69,55 @@ class IdleKolCleanupServiceTest {
     var idle = service.findIdle(now);
 
     assertThat(idle).extracting(IdleKolCleanupService.IdleKol::id).containsExactly(1L, 2L);
+  }
+
+  @Test
+  void shouldReportRemainingDaysUsingIdleBaselineAndRespectOwnScope() {
+    Instant now = Instant.now();
+    when(current.user()).thenReturn(user(Role.STAFF, DataScope.OWN, 5L));
+    when(cleanup.listPromotingWithLastPromotingAt(Set.of(1L, 2L)))
+        .thenReturn(
+            List.of(
+                new PromotingKolDTO(
+                    1L, "KOL-AAA001", "A", 5L, 10, now.minus(3, ChronoUnit.DAYS), now),
+                new PromotingKolDTO(
+                    2L, "KOL-BBB002", "B", 99L, 10, now.minus(3, ChronoUnit.DAYS), now)));
+    when(orders.lastAttributedPayTimes(List.of(1L))).thenReturn(List.of());
+
+    assertThat(service.remainingDays(List.of(1L, 2L))).containsOnlyKeys(1L).containsEntry(1L, 7);
+    // The countdown must scope the promoting-KOL query to the requested page, not the company.
+    verify(cleanup, never()).listPromotingWithLastPromotingAt();
+  }
+
+  @Test
+  void shouldUseLastOrderOrFallbackAndClampOverdueCountdown() {
+    Instant now = Instant.now();
+    when(current.user()).thenReturn(user(Role.SUPER_ADMIN, DataScope.ALL, 5L));
+    when(cleanup.listPromotingWithLastPromotingAt(Set.of(1L, 2L, 3L, 4L, 99L)))
+        .thenReturn(
+            List.of(
+                new PromotingKolDTO(
+                    1L, "KOL-AAA001", "A", 5L, 10, now.minus(20, ChronoUnit.DAYS), now),
+                new PromotingKolDTO(
+                    2L, "KOL-BBB002", "B", 5L, 10, null, now.minus(20, ChronoUnit.DAYS)),
+                new PromotingKolDTO(3L, "KOL-CCC003", "C", 5L, null, null, now),
+                new PromotingKolDTO(4L, "KOL-DDD004", "D", 5L, 10, null, null)));
+    OrderMapper.KolLastPayRow pay = new OrderMapper.KolLastPayRow();
+    pay.setKolId(1L);
+    pay.setPayTime(now.minus(2, ChronoUnit.DAYS));
+    when(orders.lastAttributedPayTimes(List.of(1L, 2L, 3L, 4L))).thenReturn(List.of(pay));
+
+    assertThat(service.remainingDays(List.of(1L, 2L, 3L, 4L, 99L)))
+        .containsOnlyKeys(1L, 2L)
+        .containsEntry(1L, 8)
+        .containsEntry(2L, 0);
+  }
+
+  @Test
+  void shouldRejectUnboundedCountdownRequests() {
+    assertThat(service.remainingDays(null)).isEmpty();
+    assertThat(service.remainingDays(List.of())).isEmpty();
+    assertThat(service.remainingDays(java.util.Collections.nCopies(101, 1L))).isEmpty();
   }
 
   @Test

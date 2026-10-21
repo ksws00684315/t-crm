@@ -107,7 +107,7 @@ public class KolPromotionService {
           KolDO after = kols.selectById(id);
           Map<String, Object> afterSnap = KolPromotionSupport.snapshot(after, afterPlatforms);
           insertConfigRecord(
-              id, before, afterSnap, command.remark().strip(), user.id(), nextVersion, now);
+              id, before, afterSnap, blankToNull(command.remark()), user.id(), nextVersion, now);
           boolean targetChanged =
               !Objects.equals(beforeInvite, after.getInviteCode())
                   || !Objects.equals(beforeJump, after.getLinkTemplateId());
@@ -197,6 +197,9 @@ public class KolPromotionService {
       KolDO kol, PromotionConfigCommand command, Long actorId, int version, Instant now) {
     BigDecimal rate = parseRate(command.defaultRate());
     String invite = blankToNull(command.inviteCode());
+    if (invite == null) {
+      invite = kol.getInviteCode();
+    }
     if (invite != null && !invite.matches(KolRules.INVITE_CODE_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -204,7 +207,7 @@ public class KolPromotionService {
     if (sheet != null && !sheet.matches(KolRules.SHEET_URL_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    List<PlatformInput> platformInputs = normalizePlatforms(command.platforms());
+    List<PlatformInput> platformInputs = normalizePlatforms(kol.getId(), command.platforms());
     Long jumpId =
         resolveJumpTemplateId(
             command.jumpTemplateId(),
@@ -212,9 +215,7 @@ public class KolPromotionService {
     AccountDTO user = current.user();
     String remark = blankToNull(command.remark());
     if (rate == null
-        || invite == null
         || sheet == null
-        || remark == null
         || platformInputs.isEmpty()
         || platformInputs.stream().anyMatch(p -> p.address() == null)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -247,18 +248,34 @@ public class KolPromotionService {
     return resolved;
   }
 
-  private List<PlatformInput> normalizePlatforms(List<PlatformInput> raw) {
+  List<PlatformInput> normalizePlatforms(Long kolId, List<PlatformInput> raw) {
     if (raw == null || raw.isEmpty()) {
       return List.of();
     }
     Set<Long> seen = new HashSet<>();
     List<PlatformInput> out = new ArrayList<>();
+    // crm_kol_platform.address is nullable (V202610191002); a null stored address falls back to
+    // the link-template URL, so rows without an address are skipped instead of collected —
+    // Collectors.toMap rejects null values.
+    Map<Long, String> existingAddresses = new HashMap<>();
+    for (KolPlatformDO row :
+        platforms.selectList(
+            new LambdaQueryWrapper<KolPlatformDO>().eq(KolPlatformDO::getKolId, kolId))) {
+      if (row.getAddress() != null) {
+        existingAddresses.put(row.getLinkTemplateId(), row.getAddress());
+      }
+    }
     for (PlatformInput p : raw) {
       if (p == null || p.templateId() == null || p.templateId() <= 0 || !seen.add(p.templateId())) {
         throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
       }
-      templates.usableTemplate(p.templateId());
-      String address = requireHttps(p.address());
+      LinkTemplateDTO template = templates.usableTemplate(p.templateId());
+      String requested = blankToNull(p.address());
+      String address =
+          requireHttps(
+              requested != null
+                  ? requested
+                  : existingAddresses.getOrDefault(p.templateId(), template.templateUrl()));
       out.add(new PlatformInput(p.templateId(), address));
     }
     return out;

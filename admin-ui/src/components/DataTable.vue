@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@element-plus/icons-vue";
 import type { TableInstance } from "element-plus";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   PAGE_SIZES,
@@ -22,7 +22,6 @@ export interface DataColumn {
   prop?: string;
   width?: number | string;
   minWidth?: number | string;
-  mono?: boolean;
   amount?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
@@ -111,6 +110,115 @@ defineExpose({ clearSelection });
 const { t } = useI18n();
 const fullscreen = ref(false);
 
+/**
+ * Card height follows the rows (the owner's 2026-10-20 review compares the console with the
+ * generated preview, where the pager sits directly under the last row). The page still owns a
+ * definite height, so the table gets a measured ceiling instead of the old `height: 100%`:
+ * short pages shrink, long pages scroll inside the body and keep the pager on screen.
+ */
+const rootEl = ref<HTMLElement | null>(null);
+const tableMaxHeight = ref<number | null>(null);
+let resizeObserver: ResizeObserver | null = null;
+let measureFrame = 0;
+
+function measureHeights(): void {
+  if (props.plain) {
+    tableMaxHeight.value = null;
+    return;
+  }
+  const el = rootEl.value;
+  const host = el?.parentElement;
+  if (!el || !host) return;
+  const pageHeight = host.clientHeight;
+  if (!pageHeight) return;
+  const hostStyle = getComputedStyle(host);
+  const inFlowChildren = [...host.children].filter(child => {
+    const childStyle = getComputedStyle(child);
+    return childStyle.display !== "none" && !["absolute", "fixed"].includes(childStyle.position);
+  });
+  const siblingHeight = inFlowChildren.reduce(
+    (height, child) => height + (child === el ? 0 : (child as HTMLElement).offsetHeight),
+    0
+  );
+  const hostPadding =
+    parseFloat(hostStyle.paddingTop || "0") + parseFloat(hostStyle.paddingBottom || "0");
+  const hostGap =
+    (parseFloat(hostStyle.rowGap || "0") || 0) * Math.max(0, inFlowChildren.length - 1);
+  const toolbar = el.querySelector<HTMLElement>(".data-table__toolbar")?.offsetHeight ?? 0;
+  const pager = el.querySelector<HTMLElement>(".data-table__pager")?.offsetHeight ?? 0;
+  const style = getComputedStyle(el);
+  const frameHeight =
+    parseFloat(style.paddingTop || "0") +
+    parseFloat(style.paddingBottom || "0") +
+    parseFloat(style.borderTopWidth || "0") +
+    parseFloat(style.borderBottomWidth || "0");
+  const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
+  const gap = parseFloat(style.rowGap || "0") || 0;
+  const ceiling =
+    pageHeight -
+    hostPadding -
+    siblingHeight -
+    hostGap -
+    toolbar -
+    pager -
+    frameHeight -
+    gap * gapCount;
+  const rounded = Math.max(160, Math.round(ceiling));
+  tableMaxHeight.value = snapToWholeRows(rounded);
+}
+
+/**
+ * A long page scrolls inside the body, and the ceiling rarely lands on a row boundary: the next row
+ * then shows as a 6px sliver above the pager, which reads as a clipped table. Round the ceiling down
+ * to whole rows once the rows actually overflow; a table that fits keeps the measured height.
+ */
+function snapToWholeRows(ceiling: number): number {
+  const table = tableRef.value?.$el as HTMLElement | undefined;
+  const header = table?.querySelector<HTMLElement>(".el-table__header-wrapper");
+  const body = table?.querySelector<HTMLElement>(".el-table__body");
+  const rows = [...(body?.querySelectorAll<HTMLElement>(":scope > tbody > tr") ?? [])];
+  const headerHeight = header?.offsetHeight ?? 0;
+  const heights = rows.map(row => row.offsetHeight);
+  if (!headerHeight || !heights.length || heights.some(height => height === 0)) return ceiling;
+  if (headerHeight + heights.reduce((sum, height) => sum + height, 0) <= ceiling) return ceiling;
+  let completeHeight = headerHeight;
+  for (const height of heights) {
+    if (completeHeight + height > ceiling) break;
+    completeHeight += height;
+  }
+  return completeHeight > headerHeight ? completeHeight : ceiling;
+}
+
+function scheduleMeasure(): void {
+  if (measureFrame) return;
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0;
+    measureHeights();
+  });
+}
+
+onMounted(async () => {
+  await nextTick();
+  measureHeights();
+  const host = rootEl.value?.parentElement;
+  if (host && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(scheduleMeasure);
+    resizeObserver.observe(host);
+    resizeObserver.observe(rootEl.value as HTMLElement);
+  }
+  window.addEventListener("resize", scheduleMeasure);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  if (measureFrame) cancelAnimationFrame(measureFrame);
+  window.removeEventListener("resize", scheduleMeasure);
+});
+
+watch(() => [props.rows, props.plain, props.paged, props.exportable], scheduleMeasure);
+watch(fullscreen, scheduleMeasure);
+
 const locked = computed(() => {
   const keys = new Set<string>();
   if (props.columns[0]) keys.add(props.columns[0].key);
@@ -136,6 +244,9 @@ watch(columnKeys, keys => {
   prefs.value = { ...merged, columns: normalize(merged.columns) };
 });
 
+// Density changes the row height that the height ceiling is rounded to, so it re-measures too.
+watch(() => prefs.value.density, scheduleMeasure);
+
 watch(
   prefs,
   value => {
@@ -153,13 +264,20 @@ const visibleColumns = computed(() =>
     .filter((column): column is DataColumn => Boolean(column))
 );
 
+/**
+ * Column widths are a floor, not a fixed size. Element Plus only stretches flex columns
+ * (`min-width`), so fixed `width` left a blank band on the right of the card on wide monitors.
+ * Every column except the action cell shares the surplus; the action column keeps its own width
+ * so its buttons stay on the card's right edge instead of drifting into a stretched cell.
+ */
+const isFlexColumn = (column: DataColumn) => column.key !== "actions";
+const columnWidth = (column: DataColumn) => (isFlexColumn(column) ? undefined : column.width);
+const columnMinWidth = (column: DataColumn) =>
+  isFlexColumn(column) ? (column.minWidth ?? column.width) : column.minWidth;
+
 const hiddenCount = computed(
   () =>
     prefs.value.columns.filter(column => !column.visible && !locked.value.has(column.key)).length
-);
-
-const tableSize = computed(() =>
-  prefs.value.density === "default" ? "default" : prefs.value.density
 );
 
 const range = computed(() => {
@@ -224,7 +342,11 @@ function canMove(index: number, delta: -1 | 1): boolean {
 </script>
 
 <template>
-  <section class="data-table" :class="{ 'is-fullscreen': fullscreen, 'is-plain': plain }">
+  <section
+    ref="rootEl"
+    class="data-table"
+    :class="[{ 'is-fullscreen': fullscreen, 'is-plain': plain }, `density-${prefs.density}`]"
+  >
     <header v-if="!plain" class="data-table__toolbar">
       <div v-if="selectable && selected.length" class="data-table__batch" data-test="batch-bar">
         <span class="data-table__batch-count">{{
@@ -317,10 +439,10 @@ function canMove(index: number, delta: -1 | 1): boolean {
         v-loading="loading"
         :data="rows"
         :row-key="rowKey"
-        :size="tableSize"
-        :height="plain ? undefined : '100%'"
+        size="default"
+        :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
-        border
+        stripe
         @selection-change="onSelection"
       >
         <el-table-column
@@ -346,14 +468,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
           :key="column.key"
           :prop="column.key === 'actions' ? undefined : (column.prop ?? column.key)"
           :label="column.label"
-          :width="column.width"
-          :min-width="column.minWidth"
+          :width="columnWidth(column)"
+          :min-width="columnMinWidth(column)"
           :fixed="
             column.key === 'actions' ? 'right' : column.key === columns[0]?.key ? 'left' : undefined
           "
           :align="column.amount ? 'right' : undefined"
           :show-overflow-tooltip="column.tooltip"
-          :class-name="column.mono ? 'tcrm-mono' : column.amount ? 'tcrm-amount' : undefined"
+          :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
@@ -398,8 +520,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-2);
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 100%;
   height: auto;
   padding: var(--tcrm-space-3);
   background: var(--tcrm-color-card);
@@ -417,7 +540,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
   color: var(--tcrm-color-primary-text, var(--el-color-primary));
 }
 .data-table__batch-hint {
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
+  line-height: 20px;
   color: var(--tcrm-color-text-secondary);
 }
 .data-table.is-plain {
@@ -456,9 +580,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
   color: var(--tcrm-color-text-secondary);
 }
 .data-table__body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  /* el-table height=100% owns vertical and horizontal scroll; no outer overflow */
+  /* el-table owns vertical and horizontal scrolling; the card clips nothing itself. */
   overflow: hidden;
 }
 .data-table__columns {
@@ -473,7 +597,44 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table :deep(.el-table__header th) {
   background: var(--tcrm-color-muted);
 }
+.data-table :deep(.el-table th.el-table__cell) {
+  height: 40px;
+  padding-block: 0;
+}
+/* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
+   its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
+   left shadow — without it a clipped column reads as a rendering bug. */
+.data-table :deep(.el-scrollbar__bar.is-horizontal) {
+  display: block !important;
+  height: 6px;
+  opacity: 1 !important;
+}
+.data-table :deep(.el-scrollbar__bar.is-horizontal > div) {
+  background: #c2c8d2;
+  border-radius: 3px;
+}
+.data-table :deep(.el-table-fixed-column--right.is-first-column) {
+  box-shadow: inset 10px 0 8px -8px rgba(21, 24, 29, 0.16);
+}
+.data-table :deep(.el-table .el-table__cell) {
+  padding-block: 12px;
+}
+.data-table.density-small :deep(.el-table .el-table__cell) {
+  padding-block: 8px;
+}
+.data-table.density-large :deep(.el-table .el-table__cell) {
+  padding-block: 16px;
+}
 .data-table :deep(.el-table__body tr:hover > td) {
   background: var(--tcrm-color-muted);
+}
+/* A link button carries a 28px box next to 22px cell text, so rows with a link (the creator column
+   of the order list, the download action of the import list) were 4px taller than rows without one.
+   Drop the button onto the text line and every row keeps one height. */
+.data-table :deep(.el-table .cell .el-button.is-link) {
+  height: auto;
+  padding: 0;
+  line-height: var(--tcrm-line-height-body);
+  vertical-align: baseline;
 }
 </style>

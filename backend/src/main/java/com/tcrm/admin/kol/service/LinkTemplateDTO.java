@@ -1,5 +1,7 @@
 package com.tcrm.admin.kol.service;
 
+import java.time.Instant;
+
 /** One agent link template of the current company (task 11 §4.2). */
 public record LinkTemplateDTO(
     Long id,
@@ -8,4 +10,5 @@ public record LinkTemplateDTO(
     String templateUrl,
     String channelCode,
     Integer sortOrder,
-    Integer status) {}
+    Integer status,
+    Instant createTime) {}

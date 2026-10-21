@@ -6,12 +6,105 @@ import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
 
 const columns = [
-  { key: "code", label: "编号", prop: "code", mono: true },
+  { key: "code", label: "编号", prop: "code" },
   { key: "name", label: "名称" },
   { key: "actions", label: "操作" }
 ];
 
 describe("DataTable", () => {
+  it("keeps the action column fixed while data columns can fill a wide card", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "flex-columns",
+        rows: [{ id: "1", code: "KOL0001", name: "Ada" }],
+        columns: [
+          { key: "code", label: "编号", width: 120 },
+          { key: "name", label: "名称", minWidth: 100 },
+          { key: "actions", label: "操作", width: 80 }
+        ],
+        total: 1
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    const rendered = wrapper.findAllComponents({ name: "ElTableColumn" });
+    expect(rendered.map(column => [column.props("width"), column.props("minWidth")])).toEqual([
+      ["", 120],
+      ["", 100],
+      [80, ""]
+    ]);
+    wrapper.unmount();
+  });
+
+  it("caps a mixed-height list at the last complete row", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: {
+        tableId: "mixed-rows",
+        rows: Array.from({ length: 6 }, (_, index) => ({ id: String(index), code: String(index) })),
+        columns,
+        total: 6
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      Object.defineProperty(parent, "clientHeight", { value: 360, configurable: true });
+      const toolbar = wrapper.get(".data-table__toolbar").element;
+      const pager = wrapper.get(".data-table__pager").element;
+      Object.defineProperty(toolbar, "offsetHeight", { value: 40, configurable: true });
+      Object.defineProperty(pager, "offsetHeight", { value: 40, configurable: true });
+      const header = wrapper.get(".el-table__header-wrapper").element;
+      Object.defineProperty(header, "offsetHeight", { value: 40, configurable: true });
+      const rows = wrapper.findAll(".el-table__body tbody tr");
+      expect(rows).toHaveLength(6);
+      [50, 80, 50, 80, 50, 80].forEach((height, index) =>
+        Object.defineProperty(rows[index].element, "offsetHeight", {
+          value: height,
+          configurable: true
+        })
+      );
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(220);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
+  it("reserves space for filters when capping a long list", async () => {
+    const host = document.createElement("div");
+    const search = document.createElement("div");
+    document.body.append(host);
+    Object.defineProperty(search, "offsetHeight", { value: 100, configurable: true });
+
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: { tableId: "measured", rows: [], columns, total: 0 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      parent.prepend(search);
+      Object.defineProperty(parent, "clientHeight", { value: 600, configurable: true });
+      const toolbar = wrapper.get(".data-table__toolbar").element;
+      const pager = wrapper.get(".data-table__pager").element;
+      Object.defineProperty(toolbar, "offsetHeight", { value: 40, configurable: true });
+      Object.defineProperty(pager, "offsetHeight", { value: 40, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(420);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   it("shows the page range and an Element Plus pagination", async () => {
     const wrapper = mount(DataTable, {
       props: {

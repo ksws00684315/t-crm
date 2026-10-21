@@ -339,9 +339,9 @@ onBeforeUnmount(() => {
   padding: 0 6px;
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-tag);
-  font-family: var(--tcrm-font-mono);
-  font-size: 12px;
-  line-height: 18px;
+  font-family: var(--tcrm-font-sans);
+  font-size: var(--tcrm-font-size-body);
+  line-height: 22px;
   color: var(--tcrm-color-text-secondary);
   background: var(--tcrm-color-muted);
 }
@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
 }
 .layout__company-role {
   color: var(--tcrm-color-text-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-body);
 }
 .layout__main {
   display: flex;
@@ -403,6 +403,9 @@ onBeforeUnmount(() => {
   padding: var(--tcrm-space-4);
   min-height: 0;
   overflow: hidden;
+}
+.layout__main :deep(.el-main) {
+  padding: 0;
 }
 .layout__watermark {
   flex: 1;
@@ -413,10 +416,23 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
 }
+.layout__watermark :deep(> .home) {
+  height: auto;
+}
 @media (max-width: 991px) {
   .layout__label,
   .layout__kbd {
     display: none;
+  }
+}
+@media (max-width: 767px) {
+  .layout__header {
+    gap: var(--tcrm-space-2);
+    padding-inline: var(--tcrm-space-3);
+  }
+
+  .layout__actions {
+    gap: var(--tcrm-space-1);
   }
 }
 </style>

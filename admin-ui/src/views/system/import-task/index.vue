@@ -75,8 +75,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "successRows", label: t("importTask.successRows"), width: 90 },
   { key: "failedRows", label: t("importTask.failedRows"), width: 90 },
   { key: "submitter", label: t("importTask.submitter"), prop: "operatorName", width: 120 },
-  { key: "submitTime", label: t("importTask.submitTime"), width: 170, mono: true },
-  { key: "finishTime", label: t("importTask.finishTime"), width: 170, mono: true },
+  { key: "submitTime", label: t("importTask.submitTime"), width: 170 },
+  { key: "finishTime", label: t("importTask.finishTime"), width: 170 },
   { key: "actions", label: t("common.actions"), width: 130 }
 ]);
 

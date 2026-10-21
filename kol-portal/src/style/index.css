@@ -8,12 +8,108 @@ body,
 body {
   -webkit-text-size-adjust: 100%;
   font-family:
-    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
     sans-serif;
+  font-size: var(--tcrm-font-size-body);
+  font-weight: 400;
+  line-height: 22px;
   color: #303133;
   background: #f5f7fa;
 }
 
 * {
   box-sizing: border-box;
+}
+
+:root {
+  --tcrm-space-1: 4px;
+  --tcrm-space-2: 8px;
+  --tcrm-space-3: 12px;
+  --tcrm-space-4: 16px;
+  --tcrm-space-5: 24px;
+  --tcrm-space-6: 32px;
+  --tcrm-control-height: 32px;
+  --tcrm-control-height-mobile: 44px;
+  --tcrm-font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
+    sans-serif;
+  --tcrm-font-size-body: 14px;
+  --tcrm-line-height-body: 22px;
+  --tcrm-font-size-title: 20px;
+  --tcrm-line-height-title: 28px;
+  --tcrm-font-size-section: 16px;
+  --tcrm-line-height-section: 24px;
+  --tcrm-font-size-help: 12px;
+  --tcrm-line-height-help: 20px;
+  --el-font-family: var(--tcrm-font-sans);
+  --el-font-size-base: var(--tcrm-font-size-body);
+  --el-font-size-extra-large: var(--tcrm-font-size-title);
+  --el-font-size-large: var(--tcrm-font-size-section);
+  --el-font-size-medium: var(--tcrm-font-size-body);
+  --el-font-size-small: var(--tcrm-font-size-help);
+  --el-component-size: var(--tcrm-control-height);
+}
+
+/* Keep typography stable across page-level scoped styles and body-mounted overlays. */
+#app *,
+.el-overlay *,
+.el-popper * {
+  font-family: var(--tcrm-font-sans) !important;
+  font-size: var(--tcrm-font-size-body) !important;
+  line-height: var(--tcrm-line-height-body) !important;
+}
+
+#app h1,
+#app .shell__brand {
+  font-size: var(--tcrm-font-size-title) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-title) !important;
+}
+
+#app h2,
+#app .el-dialog__title,
+#app .el-drawer__title,
+.el-overlay h1,
+.el-overlay h2,
+.el-overlay .el-dialog__title,
+.el-overlay .el-drawer__title {
+  font-size: var(--tcrm-font-size-section) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-section) !important;
+}
+
+#app .el-button,
+#app .el-table th.el-table__cell,
+#app .shell__nav-link[aria-current="page"] {
+  font-weight: 600;
+}
+
+#app .el-table td.el-table__cell {
+  font-weight: 400;
+}
+
+#app .el-form-item__error,
+#app .el-form-item__description,
+#app .el-alert__description,
+#app .empty-hint {
+  font-size: var(--tcrm-font-size-help) !important;
+  line-height: var(--tcrm-line-height-help) !important;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --tcrm-control-height: var(--tcrm-control-height-mobile);
+  }
+
+  #app .el-button,
+  #app .el-input__wrapper,
+  #app .el-select__wrapper,
+  #app .el-textarea__inner {
+    min-height: var(--tcrm-control-height-mobile);
+  }
+
+  #app .el-pagination {
+    flex-wrap: wrap;
+    row-gap: var(--tcrm-space-2);
+  }
 }

@@ -7,12 +7,11 @@ body,
 
 body {
   font-family: var(--tcrm-font-sans);
+  font-size: var(--tcrm-font-size-body);
+  font-weight: 400;
+  line-height: var(--tcrm-line-height-body);
   color: var(--tcrm-color-text);
   background: var(--tcrm-color-page);
-}
-
-.tcrm-mono {
-  font-family: var(--tcrm-font-mono);
 }
 
 .tcrm-amount {
@@ -24,13 +23,120 @@ body {
   box-sizing: border-box;
 }
 
-/* List pages: search keeps its height; the table card fills the rest so el-table can fix the header.
- * Height uses the viewport minus header (56) + tab bar (40) + main padding (16*2), so the page does
- * not depend on every ancestor passing height:100% through Transition/KeepAlive. */
+/* List pages: search keeps its height; the table card can use the remaining space. */
 .list-page {
   display: flex;
   flex-direction: column;
-  gap: var(--tcrm-space-3);
-  height: calc(100vh - var(--tcrm-header-height) - 40px - 32px);
-  min-height: 320px;
+  gap: var(--tcrm-space-4);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+@media (min-width: 1280px) {
+  .layout__main {
+    padding: var(--tcrm-space-5);
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --tcrm-control-height: var(--tcrm-control-height-mobile);
+  }
+
+  .layout__main {
+    padding: var(--tcrm-space-3);
+  }
+}
+
+/* Keep typography stable across page-level scoped styles and Element Plus overlays. */
+#app *,
+.el-overlay *,
+.el-popper * {
+  font-family: var(--tcrm-font-sans) !important;
+  font-size: var(--tcrm-font-size-body) !important;
+  line-height: var(--tcrm-line-height-body) !important;
+}
+
+#app h1,
+#app .login__title,
+#app .side__brand,
+#app .shell__brand {
+  font-size: var(--tcrm-font-size-title) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-title) !important;
+}
+
+#app h2,
+#app .el-dialog__title,
+#app .el-drawer__title,
+#app .coming-soon__title,
+.el-overlay h1,
+.el-overlay h2,
+.el-overlay .el-dialog__title,
+.el-overlay .el-drawer__title {
+  font-size: var(--tcrm-font-size-section) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-section) !important;
+}
+
+#app .el-result__title p {
+  font-size: var(--tcrm-font-size-title) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-title) !important;
+}
+
+#app .el-button,
+#app .el-table th.el-table__cell,
+#app .el-menu-item.is-active,
+#app .el-tabs__item.is-active {
+  font-weight: 600;
+}
+
+#app .el-table td.el-table__cell,
+#app .actions-cell .el-button {
+  font-weight: 400;
+}
+
+#app .el-form-item__error,
+#app .el-form-item__description,
+#app .el-alert__description,
+#app .hint,
+#app .error,
+#app .form-help,
+#app .empty-hint {
+  font-size: var(--tcrm-font-size-help) !important;
+  line-height: var(--tcrm-line-height-help) !important;
+}
+
+#app .layout__company-role,
+#app .data-table__batch-hint,
+#app .notification-bell__time,
+#app .layout__kbd,
+.el-overlay .el-form-item__error,
+.el-popper .el-form-item__error {
+  font-size: var(--tcrm-font-size-help) !important;
+  line-height: var(--tcrm-line-height-help) !important;
+  font-weight: 400;
+}
+
+.list-page > *,
+.layout__watermark,
+.layout__main > * {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  #app .el-pagination {
+    flex-wrap: wrap;
+    row-gap: var(--tcrm-space-2);
+  }
+
+  #app .el-button,
+  #app .el-input__wrapper,
+  #app .el-select__wrapper,
+  #app .el-textarea__inner {
+    min-height: var(--tcrm-control-height-mobile);
+  }
 }

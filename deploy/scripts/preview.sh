@@ -48,7 +48,7 @@ wait_healthy() {
 
 cmd_up() {
   require_docker
-  for cmd in pnpm node openssl; do
+  for cmd in pnpm node openssl curl; do
     command -v "$cmd" >/dev/null 2>&1 || { echo "缺少命令：${cmd}。" >&2; exit 1; }
   done
   TCRM_LOCAL_ENV_FILE="$ENV_FILE" "$ROOT/deploy/scripts/local-infra.sh" up
@@ -57,6 +57,12 @@ cmd_up() {
   compose up -d --build
   wait_healthy crm-admin
   wait_healthy crm-redirect
+  # Compose may recreate the Java containers without recreating Nginx. Nginx resolves the static
+  # proxy_pass hostnames when it loads its config, so it otherwise keeps the old container IP and
+  # serves 502 even though both Java health checks pass.
+  compose exec -T nginx nginx -s reload
+  curl --fail --silent --show-error --max-time 5 --retry 3 --retry-delay 1 --request POST \
+    --output /dev/null "http://127.0.0.1:${TCRM_PREVIEW_ADMIN_PORT}/admin-api/auth/captchas"
   compose ps
   echo "管理端    http://localhost:${TCRM_PREVIEW_ADMIN_PORT:-8890}"
   echo "达人端    http://localhost:${TCRM_PREVIEW_KOL_PORT:-8891}"

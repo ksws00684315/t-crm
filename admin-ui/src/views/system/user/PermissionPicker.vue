@@ -123,7 +123,7 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
 
 .perm-item__desc {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
 }
 
 .perm-group :deep(.el-checkbox) {
@@ -137,7 +137,7 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
 .perm-exclusive {
   margin: 8px 0 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--tcrm-font-size-body);
+  line-height: 22px;
 }
 </style>

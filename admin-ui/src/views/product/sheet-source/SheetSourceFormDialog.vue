@@ -210,6 +210,6 @@ async function save() {
 .hint {
   margin-left: 8px;
   color: var(--tcrm-color-text-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
 }
 </style>

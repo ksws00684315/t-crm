@@ -2,12 +2,14 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { updateKolStatus } from "@/api/kol/kol";
+import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { accessOf, kolAbilities } from "@/utils/permission";
 import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
@@ -24,7 +26,7 @@ defineOptions({ name: "KolListPage" });
 
 /**
  * The creator list after the owner's 2026-10-20 review (task 32 §2.2): the layout follows the original
- * system, the columns and the six fixed row actions follow 1018 rows 7–15. The super
+ * system, the columns and row actions follow the latest customer supplement. The super
  * administrator also gets the creator-management tab that transfers creators between BDs; the
  * transfer history itself lives in the audit log.
  */
@@ -38,6 +40,7 @@ const isBd = computed(() => accessOf(me.user).isOwnScope);
 const loading = ref(false);
 const rows = ref<KolVO[]>([]);
 const total = ref(0);
+const cleanupRemaining = ref<Record<string, number>>({});
 const activeTab = ref("list");
 
 /**
@@ -74,6 +77,10 @@ async function load() {
     });
     rows.value = page.items;
     total.value = Number(page.total);
+    const configured = page.items.filter(row => row.autoCleanupDays != null).map(row => row.id);
+    cleanupRemaining.value = configured.length
+      ? await getCleanupRemaining(configured).catch(() => ({}))
+      : {};
   } catch (error) {
     notifyError(error);
   } finally {
@@ -121,32 +128,34 @@ function rowOwned(row: KolVO): boolean {
 }
 
 /**
- * The 04.01 columns sized to fit a 1440px window with no horizontal scrolling (2026-10-20
- * review): narrow cells, capped text columns with hover tooltips, the invite time on two
- * lines, and the six actions wrapped as two rows of three (~200px).
+ * Widths are measured against the rendered 14px text. Chinese fits a 1844px desktop exactly
+ * (1558px of columns in a 1562px card), which is the size of the preview the owner reviewed on
+ * 2026-10-20: no header wraps and the six row actions keep one line. English labels are longer, so
+ * that locale gets wider columns and, as before, scrolls inside the card. Emails, phone numbers and
+ * social handles are the only values that ellipsize either way; the visual guide allows that as long
+ * as the tooltip shows the rest.
  */
-const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("kol.kolId"), width: 100, mono: true, tooltip: true },
-  { key: "name", label: t("kol.kolName"), prop: "name", width: 72, tooltip: true },
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: 100, tooltip: true },
-  { key: "email", label: t("kol.email"), width: 118, mono: true, tooltip: true },
-  { key: "platform", label: t("kol.primaryPlatform"), width: 112, tooltip: true },
-  { key: "rate", label: t("kol.defaultRate"), width: 60 },
-  { key: "prepay", label: t("kol.prepay"), width: 60 },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: 84, mono: true },
-  { key: "inviter", label: t("kol.inviter"), width: 70, tooltip: true },
-  { key: "review", label: t("kol.reviewStatus"), width: 60 },
-  { key: "login", label: t("kol.loginStatus"), width: 60 },
-  { key: "relation", label: t("kol.relationStatus"), width: 60 },
-  { key: "actions", label: t("common.actions"), width: 200 }
-]);
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
-/** Splits "2026/10/05 01:02:03" for the two-line invite-time cell. */
-function instantLines(value: string): string[] {
-  const text = formatInstant(value);
-  const split = text.indexOf(" ");
-  return split < 0 ? [text] : [text.slice(0, split), text.slice(split + 1)];
-}
+const columns = computed<DataColumn[]>(() => [
+  { key: "kolCode", label: t("kol.kolId"), width: px(108, 124), tooltip: true },
+  { key: "name", label: t("kol.kolName"), prop: "name", width: px(76, 132), tooltip: true },
+  // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
+  // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
+  // those pixels: its values ellipsize with a tooltip either way.
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(140, 146), tooltip: true },
+  { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true },
+  { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
+  { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
+  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
+  { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 136), tooltip: true },
+  { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
+  { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
+  { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
+  { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },
+  { key: "actions", label: t("common.actions"), width: px(168, 208) }
+]);
 
 function asKol(row: object): KolVO {
   return row as KolVO;
@@ -206,18 +215,57 @@ function openCleanup(row: KolVO) {
   cleanupVisible.value = true;
 }
 
-/** Only "pending promotion" opens the commission dialog from the status tag (04.03). */
-function relationClickable(row: KolVO): boolean {
-  return (
-    row.displayRelationStatus === "PENDING_PROMOTION" &&
-    abilities.value.canWrite &&
-    row.reviewStatus === "APPROVED" &&
-    rowOwned(row)
-  );
+function cleanupLabel(row: KolVO): string {
+  if (row.autoCleanupDays == null) return t("kol.actionCleanup");
+  const remaining = cleanupRemaining.value[row.id] ?? row.autoCleanupDays;
+  return t("kol.cleanupRemaining", { days: remaining });
 }
 
-function handleRelationClick(row: KolVO): void {
-  if (relationClickable(row)) openCommission(row);
+/** Edit and commission stay inline; the rest folds into the "more" dropdown (visual spec §3). */
+function rowActions(row: KolVO): RowAction[] {
+  return [
+    {
+      key: "edit",
+      label: t("kol.actionEdit"),
+      testId: "action-edit",
+      disabled: !abilities.value.canWrite,
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "commission",
+      label: t("kol.actionCommission"),
+      testId: "action-commission",
+      disabled: !(abilities.value.canWrite && row.reviewStatus === "APPROVED" && rowOwned(row)),
+      onClick: () => openCommission(row)
+    },
+    {
+      key: "prepay",
+      label: t("kol.actionPrepay"),
+      testId: `action-prepay-${row.id}`,
+      disabled: true,
+      tooltip: t("common.developing")
+    },
+    {
+      key: "cleanup",
+      label: cleanupLabel(row),
+      testId: `action-cleanup-${row.id}`,
+      danger: row.autoCleanupDays != null,
+      disabled: !(abilities.value.canWrite && rowOwned(row)),
+      onClick: () => openCleanup(row)
+    },
+    {
+      key: "freeze",
+      label: row.status === 1 ? t("kol.freeze") : t("kol.unfreeze"),
+      testId: `action-freeze-${row.id}`,
+      type: row.status === 1 ? "danger" : "success",
+      disabled: !(abilities.value.canWrite && rowOwned(row)),
+      onClick: () => toggleStatus(row)
+    }
+  ];
+}
+
+function reviewClickable(row: KolVO): boolean {
+  return abilities.value.canWrite && row.reviewStatus === "PENDING";
 }
 
 async function toggleStatus(row: KolVO) {
@@ -316,19 +364,22 @@ onMounted(() => {
             <span class="developing">{{ t("common.developing") }}</span>
           </template>
           <template #cell-inviteTime="{ row }">
-            <span class="invite-time" data-test="invite-time">
-              <span v-for="line in instantLines(asKol(row).inviteTime)" :key="line">{{
-                line
-              }}</span>
-            </span>
+            <span data-test="invite-time">{{ formatInstantToMinute(asKol(row).inviteTime) }}</span>
           </template>
           <template #cell-inviter="{ row }">{{ asKol(row).bdUserName ?? "-" }}</template>
           <template #cell-review="{ row }">
-            <el-tag
-              :type="asKol(row).reviewStatus === 'APPROVED' ? 'success' : 'warning'"
-              data-test="review-status"
-              >{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag
+            <button
+              v-if="reviewClickable(asKol(row))"
+              type="button"
+              class="review-entry"
+              data-test="review-entry"
+              @click="openReview(asKol(row))"
             >
+              <el-tag type="warning">{{ reviewStatusText(asKol(row).reviewStatus) }}</el-tag>
+            </button>
+            <el-tag v-else type="success" data-test="review-status">{{
+              reviewStatusText(asKol(row).reviewStatus)
+            }}</el-tag>
           </template>
           <template #cell-login="{ row }">
             <el-tag
@@ -344,15 +395,7 @@ onMounted(() => {
             >
           </template>
           <template #cell-relation="{ row }">
-            <span
-              class="relation"
-              :class="{ 'relation--clickable': relationClickable(asKol(row)) }"
-              :role="relationClickable(asKol(row)) ? 'button' : undefined"
-              :tabindex="relationClickable(asKol(row)) ? 0 : -1"
-              :title="relationClickable(asKol(row)) ? t('promotion.configTitle') : undefined"
-              @click="handleRelationClick(asKol(row))"
-              @keydown.enter.prevent="handleRelationClick(asKol(row))"
-            >
+            <span class="relation">
               <el-tag
                 data-test="relation-status"
                 :type="
@@ -365,63 +408,9 @@ onMounted(() => {
             </span>
           </template>
           <template #actions="{ row }">
-            <!-- 04.01: six fixed actions, this order, disabled when not applicable; wrapped
-                 as two rows of three so the column stays ~200px (2026-10-20 review). -->
-            <div class="actions-cell" data-test="row-actions">
-              <el-button
-                link
-                type="primary"
-                data-test="action-edit"
-                :disabled="!abilities.canWrite"
-                @click="openEdit(asKol(row))"
-                >{{ t("kol.actionEdit") }}</el-button
-              >
-              <el-button
-                link
-                type="primary"
-                data-test="action-review"
-                :disabled="!(abilities.canWrite && asKol(row).reviewStatus === 'PENDING')"
-                @click="openReview(asKol(row))"
-                >{{ t("kol.actionReview") }}</el-button
-              >
-              <el-button
-                link
-                type="primary"
-                data-test="action-commission"
-                :disabled="
-                  !(
-                    abilities.canWrite &&
-                    asKol(row).reviewStatus === 'APPROVED' &&
-                    rowOwned(asKol(row))
-                  )
-                "
-                @click="openCommission(asKol(row))"
-                >{{ t("kol.actionCommission") }}</el-button
-              >
-              <el-tooltip :content="t('common.developing')" placement="top">
-                <span class="action-disabled">
-                  <el-button link type="primary" data-test="action-prepay" disabled>{{
-                    t("kol.actionPrepay")
-                  }}</el-button>
-                </span>
-              </el-tooltip>
-              <el-button
-                link
-                type="primary"
-                data-test="action-cleanup"
-                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-                @click="openCleanup(asKol(row))"
-                >{{ t("kol.actionCleanup") }}</el-button
-              >
-              <el-button
-                link
-                :type="asKol(row).status === 1 ? 'danger' : 'success'"
-                data-test="action-freeze"
-                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-                @click="toggleStatus(asKol(row))"
-                >{{ asKol(row).status === 1 ? t("kol.freeze") : t("kol.unfreeze") }}</el-button
-              >
-            </div>
+            <!-- The review entry is in its status column; order, permissions, and disabled
+                 rules of the row actions are declared in rowActions above. -->
+            <RowActions :actions="rowActions(asKol(row))" />
           </template>
         </DataTable>
       </el-tab-pane>
@@ -471,41 +460,29 @@ onMounted(() => {
 .developing {
   color: var(--tcrm-color-text-secondary);
 }
-.relation--clickable {
+.review-entry {
+  border: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
 }
-.relation--clickable:focus-visible {
+.review-entry:focus-visible {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
-/* Dense cells so all 13 columns fit a 1440px window without horizontal scrolling. */
+/* Keep headers intact and let the table's own viewport provide horizontal scrolling. The 10px
+   side padding buys four more characters per column than the 12px default without widening the
+   card, which is what keeps the timestamps readable at 1844px. */
 .kol-fit :deep(.el-table .cell) {
-  padding: 0 6px;
+  /* Header cells keep 10px padding on each side, so a column's width floor is the measured
+     header text plus 20px; below that the header itself gets ellipsized, which reads worse
+     than truncating values. Narrow floors must take pixels from adjacent ellipsis columns. */
+  padding-inline: 10px;
 }
 .kol-fit :deep(th.el-table__cell .cell) {
-  white-space: normal;
-  word-break: break-all;
-  line-height: 16px;
+  white-space: nowrap;
 }
-.invite-time {
-  display: inline-flex;
-  flex-direction: column;
-  font-size: 11px;
-  line-height: 15px;
-}
-.actions-cell {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  align-items: center;
-}
-.actions-cell .el-button {
-  margin: 0;
-  padding: 0;
-  height: auto;
-  font-size: 12px;
-}
-.action-disabled {
-  display: inline-flex;
+.kol-fit :deep(.el-tag) {
+  padding-inline: 4px;
 }
 </style>

@@ -34,6 +34,8 @@ const row: UserVO = {
 describe("user management page", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    // Teleported dropdown menus can outlive a wrapper in jsdom; start every test clean.
+    document.body.querySelectorAll(".el-popper").forEach(el => el.remove());
     // BD rows ask for their creator count; unknown by default (no assertion depends on it).
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "0", page: 1, size: 1 });
   });
@@ -45,10 +47,16 @@ describe("user management page", () => {
     return wrapper;
   }
 
-  function actionButton(wrapper: Awaited<ReturnType<typeof mountPage>>, text: string) {
-    const button = wrapper.findAll("button").find(item => item.text() === text);
-    if (!button) throw new Error(`missing action ${text}`);
-    return button;
+  /** Entries folded into the row "more" dropdown teleport to body as list items. */
+  function bodyItem(testId: string): HTMLElement {
+    const el = document.body.querySelector<HTMLElement>(`[data-test="${testId}"]`);
+    if (!el) throw new Error(`missing dropdown entry ${testId}`);
+    return el;
+  }
+
+  async function clickBodyItem(testId: string) {
+    bodyItem(testId).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
   }
 
   it("loads the first page and renders the rows in Chinese", async () => {
@@ -74,8 +82,9 @@ describe("user management page", () => {
     expect(text).toContain("1 项");
     expect(text).toContain("仅本人");
     expect(text).toContain("启用");
-    expect(text).toContain("重置密码");
+    expect(document.body.textContent).toContain("重置密码");
     expect(text).toContain("权限设置");
+    wrapper.unmount();
   });
 
   it("converts a string total from the API so el-pagination renders", async () => {
@@ -94,6 +103,7 @@ describe("user management page", () => {
     expect(pagination.props("total")).toBe(42);
     expect(typeof pagination.props("total")).toBe("number");
     expect(wrapper.find(".el-pagination").exists()).toBe(true);
+    wrapper.unmount();
   });
 
   it("renders the user list in English", async () => {
@@ -112,9 +122,10 @@ describe("user management page", () => {
     expect(text).toContain("1 items");
     expect(text).toContain("Own only");
     expect(text).toContain("Enabled");
-    expect(text).toContain("Reset Password");
+    expect(document.body.textContent).toContain("Reset Password");
     expect(text).toContain("Create User");
     expect(text).toContain("Permissions");
+    wrapper.unmount();
   });
 
   it("shows every permission for a super administrator and no permission action", async () => {
@@ -123,8 +134,9 @@ describe("user management page", () => {
     ]);
     expect(wrapper.text()).toContain("超级管理员");
     expect(wrapper.text()).toContain("全部");
-    expect(wrapper.find('[data-test="permissions"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="transfer-kols"]').exists()).toBe(false);
+    expect(document.body.querySelector('[data-test="permissions-9007199254740993"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="transfer-kols-9007199254740993"]')).toBeNull();
+    wrapper.unmount();
   });
 
   it("keeps platform administrator out of selectable company roles", () => {
@@ -133,13 +145,17 @@ describe("user management page", () => {
   });
 
   it("asks for the creator count of every BD row once per load", async () => {
-    await mountPage([row, { ...row, id: "2", username: "bob", postTemplate: "BD" }]);
+    const wrapper = await mountPage([
+      row,
+      { ...row, id: "2", username: "bob", postTemplate: "BD" }
+    ]);
     expect(kolApi.listKols).toHaveBeenCalledWith({
       bdUserId: "9007199254740993",
       page: 1,
       size: 1
     });
     expect(kolApi.listKols).toHaveBeenCalledWith({ bdUserId: "2", page: 1, size: 1 });
+    wrapper.unmount();
   });
 
   it("shows the list before the creator counts arrive and updates the row once they do", async () => {
@@ -155,11 +171,13 @@ describe("user management page", () => {
     // the row is on screen and the transfer action is not yet disabled.
     expect(wrapper.findComponent({ name: "DataTable" }).props("loading")).toBe(false);
     expect(wrapper.text()).toContain("alice");
-    expect(wrapper.get('[data-test="transfer-kols"]').attributes("disabled")).toBeUndefined();
+    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(
+      false
+    );
 
     resolveCount({ items: [], total: "0", page: 1, size: 1 });
     await flushPromises();
-    expect(wrapper.get('[data-test="transfer-kols"]').attributes("disabled")).toBeDefined();
+    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(true);
     wrapper.unmount();
   });
 
@@ -167,7 +185,7 @@ describe("user management page", () => {
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "3", page: 1, size: 1 });
     const wrapper = await mountPage();
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
-    await actionButton(wrapper, "停用").trigger("click");
+    await clickBodyItem("status-9007199254740993");
     await flushPromises();
     expect(confirm).toHaveBeenCalled();
     const message = confirm.mock.calls[0][0] as string;
@@ -181,7 +199,7 @@ describe("user management page", () => {
   it("keeps the plain confirmation when the BD owns no creators", async () => {
     const wrapper = await mountPage();
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
-    await actionButton(wrapper, "停用").trigger("click");
+    await clickBodyItem("status-9007199254740993");
     await flushPromises();
     const message = confirm.mock.calls[0][0] as string;
     expect(message).toBe("确定要停用用户 alice 吗？");
@@ -191,7 +209,7 @@ describe("user management page", () => {
   it("keeps the plain confirmation for a non-BD staff account", async () => {
     const wrapper = await mountPage([{ ...row, dataScope: "ALL" }]);
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
-    await actionButton(wrapper, "停用").trigger("click");
+    await clickBodyItem("status-9007199254740993");
     await flushPromises();
     const message = confirm.mock.calls[0][0] as string;
     expect(message).toBe("确定要停用用户 alice 吗？");
@@ -202,7 +220,7 @@ describe("user management page", () => {
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "3", page: 1, size: 1 });
     vi.mocked(bdApi.listBdUsers).mockResolvedValue([]);
     const wrapper = await mountPage();
-    await actionButton(wrapper, "转移名下达人").trigger("click");
+    await clickBodyItem("transfer-kols-9007199254740993");
     await flushPromises();
     const dialog = wrapper.findComponent({ name: "BdTransferDialog" });
     expect(dialog.props("modelValue")).toBe(true);
@@ -216,8 +234,7 @@ describe("user management page", () => {
 
   it("disables the transfer action when the BD owns no creators", async () => {
     const wrapper = await mountPage();
-    const button = wrapper.get('[data-test="transfer-kols"]');
-    expect(button.attributes("disabled")).toBeDefined();
+    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(true);
     wrapper.unmount();
   });
 });
