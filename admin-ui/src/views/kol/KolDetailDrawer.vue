@@ -200,11 +200,7 @@ const historyColumns = computed<DataColumn[]>(() => [
               <template v-if="platform.address?.includes('{PRODUCT_ID}')">
                 {{ platform.templateName }}: -
               </template>
-              <a
-                v-else
-                :href="platform.address"
-                target="_blank"
-                rel="noopener noreferrer"
+              <a v-else :href="platform.address" target="_blank" rel="noopener noreferrer"
                 >{{ platform.templateName }}: {{ platform.address }}</a
               >
             </div>

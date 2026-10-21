@@ -42,7 +42,7 @@ h1 {
 .auth-shell__brand {
   margin-bottom: 8px;
   color: var(--el-color-primary);
-  font-size: 15px;
+  font-size: var(--tcrm-font-size-body);
   font-weight: 600;
   text-align: center;
 }

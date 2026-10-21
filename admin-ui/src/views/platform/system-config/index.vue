@@ -153,7 +153,19 @@ onMounted(load);
 }
 .config-group h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+}
+/* The spec defines only 400 and 600 weights; the item name uses the semibold emphasis. */
+.config-card__heading strong {
+  font-weight: 600;
+}
+/* The page notice is auxiliary text, not body copy. The #app prefix outspecifies the
+   global `#app *` body-size rule that also carries !important. */
+#app .config-page :deep(.el-alert__title) {
+  font-size: var(--tcrm-font-size-help) !important;
+  line-height: var(--tcrm-line-height-help) !important;
+  font-weight: 400;
 }
 .config-card__heading,
 .config-card__values,
