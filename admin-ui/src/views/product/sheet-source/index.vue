@@ -15,6 +15,7 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import { messageForErrorCode } from "@/api/error-codes";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -61,7 +62,12 @@ const columns = computed<DataColumn[]>(() => {
     { key: "lastRead", label: t("sheetSource.lastRead"), minWidth: 220 }
   ];
   if (canRead.value || canConfigure.value) {
-    list.push({ key: "actions", label: t("common.actions"), width: 220 });
+    // Five inline actions measured at 14px: 248px in Chinese, 349px in English (ADR-029).
+    list.push({
+      key: "actions",
+      label: t("common.actions"),
+      width: useLocaleStore().locale === "zh-CN" ? 256 : 360
+    });
   }
   return list;
 });
@@ -114,7 +120,7 @@ function openCreate() {
   formVisible.value = true;
 }
 
-/** Reading stays inline; configuration entries beyond the first two fold into the dropdown. */
+/** Row actions, all inline (ADR-029). */
 function rowActions(row: SheetSourceVO): RowAction[] {
   return [
     {

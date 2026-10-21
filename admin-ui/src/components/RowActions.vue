@@ -4,14 +4,14 @@ export interface RowAction {
   key: string;
   label: string;
   testId?: string;
-  /** Link color for visible entries; also tints the dropdown item for warning/danger types. */
+  /** Link color; defaults to primary. */
   type?: "primary" | "danger" | "warning" | "success";
-  /** Red label regardless of type — the cleanup countdown must stay readable in the dropdown. */
+  /** Red label regardless of type — e.g. the cleanup countdown. */
   danger?: boolean;
   disabled?: boolean;
   /** Hint for disabled entries (e.g. "under development" or "no KOLs to transfer"). */
   tooltip?: string;
-  /** Row-level visibility; hidden entries are removed before splitting visible/overflow. */
+  /** Row-level visibility; hidden entries are not rendered. */
   hidden?: boolean;
   onClick?: () => void;
 }
@@ -19,32 +19,18 @@ export interface RowAction {
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
 
 /**
- * Row action links following the visual spec: up to `maxVisible` common actions render
- * directly, the remaining ones collapse into a "More" dropdown so the action column keeps
- * its narrow width. The dropdown opens on click and disabled entries keep their tooltip.
+ * Row action links. Every visible action renders inline in the declared order; there is no
+ * "More" menu (owner decision 2026-10-21, ADR-029), so pages size their action column to fit.
  */
-const props = withDefaults(defineProps<{ actions: RowAction[]; maxVisible?: number }>(), {
-  maxVisible: 2
-});
+const props = defineProps<{ actions: RowAction[] }>();
 
-const { t } = useI18n();
 const items = computed(() => props.actions.filter(action => !action.hidden));
-const visible = computed(() => items.value.slice(0, props.maxVisible));
-const overflow = computed(() => items.value.slice(props.maxVisible));
 
 function run(action: RowAction): void {
   if (!action.disabled) {
     action.onClick?.();
-  }
-}
-
-function runByKey(key: string | number | object): void {
-  const action = items.value.find(item => item.key === key);
-  if (action) {
-    run(action);
   }
 }
 </script>
@@ -52,7 +38,7 @@ function runByKey(key: string | number | object): void {
 <template>
   <div class="actions-cell" data-test="row-actions">
     <el-tooltip
-      v-for="action in visible"
+      v-for="action in items"
       :key="action.key"
       :disabled="!action.tooltip"
       :content="action.tooltip ?? ''"
@@ -70,29 +56,6 @@ function runByKey(key: string | number | object): void {
         >
       </span>
     </el-tooltip>
-    <el-dropdown v-if="overflow.length" trigger="click" @command="runByKey">
-      <el-button link type="primary" data-test="more-actions">{{
-        t("common.moreActions")
-      }}</el-button>
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item
-            v-for="action in overflow"
-            :key="action.key"
-            :command="action.key"
-            :disabled="action.disabled"
-            :data-test="action.testId"
-            :title="action.disabled ? action.tooltip : undefined"
-            :class="{
-              'actions-cell__danger': action.danger,
-              'actions-cell__warning': action.type === 'warning'
-            }"
-          >
-            {{ action.label }}
-          </el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
   </div>
 </template>
 

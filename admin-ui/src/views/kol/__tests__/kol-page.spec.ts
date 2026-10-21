@@ -225,13 +225,15 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    // Prepay is under development: disabled in the "more" dropdown with a hint on every row.
-    const prepay = ["1", "2", "3"].map(id =>
-      document.body.querySelector(`[data-test="action-prepay-${id}"]`)
-    );
-    expect(prepay).toHaveLength(3);
+    // Prepay is under development: shown inline but disabled on every row, with the hint as its
+    // tooltip.
+    const prepay = ["1", "2", "3"].map(id => rowButtons(`action-prepay-${id}`)[0]);
     expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
-    expect(prepay.every(item => item?.getAttribute("title") === "开发中")).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents({ name: "ElTooltip" })
+        .filter(tip => tip.props("content") === "开发中").length
+    ).toBeGreaterThanOrEqual(3);
     wrapper.unmount();
   });
 
