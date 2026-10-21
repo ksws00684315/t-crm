@@ -60,6 +60,9 @@ services:
       TCRM_KOL_PORTAL_BASE_URL: ${TCRM_KOL_PORTAL_BASE_URL}
       # Required Weidian OAuth callback base (https, no trailing slash).
       TCRM_ADMIN_BASE_URL: ${TCRM_ADMIN_BASE_URL}
+      # Required default for the system configuration url.redirect-fallback (task 34); the backend
+      # publishes the effective value to Redis for crm-redirect.
+      TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
       # Required 32-byte Base64 AES-256-GCM key for encrypted integration credentials.
       TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}
       # Shared with crm-redirect: buyer ID hashes use the same protected salt.
