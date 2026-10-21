@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import type { MenuItem } from "@/utils/permission";
+import { siteName } from "@/stores/site-config";
 
 defineOptions({ name: "SideMenu" });
 
@@ -17,7 +18,7 @@ const { t } = useI18n();
 <template>
   <div class="side" :class="{ 'is-collapsed': collapse }">
     <div class="side__brand">
-      <span v-if="!collapse">{{ t("app.title") }}</span>
+      <span v-if="!collapse">{{ siteName }}{{ t("app.titleSuffix") }}</span>
     </div>
     <el-menu
       :default-active="active"

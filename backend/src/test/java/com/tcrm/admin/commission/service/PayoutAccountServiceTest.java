@@ -167,7 +167,7 @@ class PayoutAccountServiceTest {
 
   @Test
   void shouldRejectTheSixthActiveAccount() {
-    when(accounts.selectCount(any())).thenReturn((long) PayoutAccountService.MAX_ACCOUNTS);
+    when(accounts.selectCount(any())).thenReturn(5L);
     assertThatThrownBy(() -> service.create(KOL, paypal("a@x.io"), AUDIT))
         .hasMessage(ErrorCode.PAYOUT_ACCOUNT_LIMIT.message());
     verify(accounts, never()).insert(any(PayoutAccountDO.class));
@@ -534,7 +534,7 @@ class PayoutAccountServiceTest {
   @Test
   void shouldCheckTheLimitUnderTheKolRowLock() {
     when(kols.lockKol(KOL)).thenReturn(true);
-    when(accounts.selectCount(any())).thenReturn((long) PayoutAccountService.MAX_ACCOUNTS);
+    when(accounts.selectCount(any())).thenReturn(5L);
 
     assertThatThrownBy(() -> service.create(KOL, paypal("new@example.com"), AUDIT))
         .hasMessage(ErrorCode.PAYOUT_ACCOUNT_LIMIT.message());

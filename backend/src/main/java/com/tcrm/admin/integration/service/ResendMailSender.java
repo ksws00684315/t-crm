@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.function.Supplier;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -27,14 +28,22 @@ public class ResendMailSender implements MailSender {
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
   private final ObjectMapper json;
   private final String apiKey;
-  private final String from;
+  private final Supplier<String> from;
   private final String baseUrl;
 
   public ResendMailSender(String apiKey, String from, ObjectMapper json) {
-    this(apiKey, from, json, DEFAULT_BASE_URL);
+    this(apiKey, () -> from, json, DEFAULT_BASE_URL);
   }
 
   ResendMailSender(String apiKey, String from, ObjectMapper json, String baseUrl) {
+    this(apiKey, () -> from, json, baseUrl);
+  }
+
+  public ResendMailSender(String apiKey, Supplier<String> from, ObjectMapper json) {
+    this(apiKey, from, json, DEFAULT_BASE_URL);
+  }
+
+  ResendMailSender(String apiKey, Supplier<String> from, ObjectMapper json, String baseUrl) {
     this.apiKey = apiKey;
     this.from = from;
     this.json = json;
@@ -44,7 +53,7 @@ public class ResendMailSender implements MailSender {
   @Override
   public void send(MailMessage message) {
     ObjectNode body = json.createObjectNode();
-    body.put("from", from);
+    body.put("from", from.get());
     ArrayNode to = body.putArray("to");
     to.add(message.to());
     body.put("subject", message.subject());

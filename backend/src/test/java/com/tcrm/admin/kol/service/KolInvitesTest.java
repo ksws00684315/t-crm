@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.tcrm.admin.kol.model.KolAuthTokenDO;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.security.api.KolAccountStore;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -16,7 +17,8 @@ class KolInvitesTest {
   private final KolAccountStore accounts = mock(KolAccountStore.class);
   private final KolAuthTokens tokens = mock(KolAuthTokens.class);
   private final KolMails mails = mock(KolMails.class);
-  private final KolInvites invites = new KolInvites(accounts, tokens, mails);
+  private final SystemConfigApi configs = mock(SystemConfigApi.class);
+  private final KolInvites invites = new KolInvites(accounts, tokens, mails, configs);
 
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
@@ -25,6 +27,7 @@ class KolInvitesTest {
 
   @Test
   void shouldIssueTokenWith72hExpiry_andMailTheKol() {
+    when(configs.getInt("kol.invite-ttl-hours")).thenReturn(72);
     when(accounts.getById(7L)).thenReturn(kol());
     when(tokens.issue(
             org.mockito.ArgumentMatchers.eq(2L),
@@ -41,8 +44,30 @@ class KolInvitesTest {
             org.mockito.ArgumentMatchers.eq(KolAuthTokenDO.PURPOSE_INVITE),
             expiry.capture());
     assertThat(java.time.Duration.between(Instant.now(), expiry.getValue()))
-        .isCloseTo(KolInvites.INVITE_TTL, java.time.Duration.ofSeconds(5));
+        .isCloseTo(java.time.Duration.ofHours(72), java.time.Duration.ofSeconds(5));
     verify(mails).sendInvite("kol@example.com", "Tenant", "raw-token");
+  }
+
+  @Test
+  void shouldUseCurrentConfiguredInviteTtlWithoutRecreatingService() {
+    when(accounts.getById(7L)).thenReturn(kol());
+    when(tokens.issue(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn("raw-token");
+    when(configs.getInt("kol.invite-ttl-hours")).thenReturn(12);
+    invites.issueAndSend(7L);
+    var expiry = ArgumentCaptor.forClass(Instant.class);
+    verify(tokens)
+        .issue(
+            org.mockito.ArgumentMatchers.eq(2L),
+            org.mockito.ArgumentMatchers.eq(7L),
+            org.mockito.ArgumentMatchers.eq(KolAuthTokenDO.PURPOSE_INVITE),
+            expiry.capture());
+    assertThat(java.time.Duration.between(Instant.now(), expiry.getValue()))
+        .isCloseTo(java.time.Duration.ofHours(12), java.time.Duration.ofSeconds(5));
   }
 
   @Test

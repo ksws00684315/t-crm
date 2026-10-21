@@ -6,7 +6,8 @@
  */
 const zhCN = {
   app: {
-    title: "SparkTrack 管理端"
+    title: "SparkTrack 管理端",
+    titleSuffix: " 管理端"
   },
   common: {
     language: "语言",
@@ -154,6 +155,7 @@ const zhCN = {
     login: "登录",
     home: "工作台",
     tenants: "公司管理",
+    systemConfigs: "系统配置",
     analytics: "经营分析",
     shopPerformance: "店铺表现",
     bestSellers: "畅销商品",
@@ -192,6 +194,7 @@ const zhCN = {
     notifications: "站内消息"
   },
   errors: {
+    SYSTEM_CONFIG_INVALID: "系统配置无效，请检查后重试",
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试",
     COMMON_NOT_FOUND: "请求的内容不存在",
     COMMON_METHOD_NOT_ALLOWED: "不支持该操作",
@@ -238,7 +241,7 @@ const zhCN = {
     TASK_FILE_HEADER_MISMATCH: "表头与模板不一致，请下载最新模板后填写",
     TASK_FILE_EMPTY: "文件中没有数据行",
     TASK_FILE_EXPIRED: "错误文件已超过 30 天，已被清理",
-    SHOP_LIMIT_REACHED: "店铺数量已达上限（最多 3 个）",
+    SHOP_LIMIT_REACHED: "已达到系统配置的店铺数量上限",
     SHOP_WEIDIAN_ID_EXISTS: "该微店店铺 ID 已存在",
     WEIDIAN_APP_NOT_CONFIGURED: "尚未配置微店服务型应用",
     WEIDIAN_SHOP_NOT_AUTHORIZED: "微店店铺尚未授权或授权已失效",
@@ -272,7 +275,7 @@ const zhCN = {
     PRODUCT_IS_EXCLUSIVE_ITEM: "该微店商品 ID 已是专属商品，不能登记为原商品",
     ORDER_SYNC_RUNNING: "该店铺的订单同步正在进行，请稍后重试。",
     LINK_REBUILD_RUNNING: "链接索引正在重建，请稍后再试",
-    PAYOUT_ACCOUNT_LIMIT: "收款账户最多 5 个（不含已停用）",
+    PAYOUT_ACCOUNT_LIMIT: "已达到系统配置的收款账户数量上限",
     PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个",
     PAYOUT_ACCOUNT_NOT_PENDING: "账户已被修改或已审核，请刷新后重试",
     PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认",
@@ -335,6 +338,7 @@ const zhCN = {
   },
   login: {
     title: "SparkTrack 管理端",
+    titleSuffix: "管理端",
     username: "用户名",
     password: "密码",
     submit: "登录"
@@ -350,6 +354,55 @@ const zhCN = {
     welcome: "欢迎使用 SparkTrack",
     greeting: "{nickname}，你好。当前角色：{role}。",
     body: "业务功能将在后续阶段陆续上线，目前可使用账号管理相关功能。"
+  },
+  systemConfig: {
+    notice: "保存后立即生效，无需重启。密钥类配置不在此处，仍由服务器环境变量管理。",
+    groups: { site: "站点", url: "地址", business: "业务默认值与上限", security: "限流与安全" },
+    items: {
+      site_name: "系统名称",
+      mail_from: "邮件发件人",
+      url_kol_portal: "达人端地址",
+      url_link: "中转链接地址",
+      url_admin: "管理端地址",
+      url_upload: "推广表上传地址",
+      url_redirect_fallback: "跳转回退地址",
+      copy_token_default_quota: "复制令牌默认额度",
+      copy_token_default_valid_minutes: "复制令牌默认有效分钟",
+      copy_token_max_quota: "复制令牌额度上限",
+      copy_token_max_valid_minutes: "复制令牌有效期上限（分钟）",
+      shop_max_per_company: "每家公司店铺上限",
+      payout_account_max_per_kol: "每位达人收款账户上限",
+      kol_invite_ttl_hours: "达人邀请有效期（小时）",
+      oper_log_retention_days: "操作日志保留天数",
+      login_fail_pair_limit: "账号与 IP 失败次数上限",
+      login_fail_ip_limit: "IP 失败次数上限",
+      login_fail_account_limit: "账号失败次数上限",
+      login_fail_window_minutes: "登录失败窗口（分钟）",
+      captcha_issue_per_minute: "验证码每分钟签发上限",
+      kol_register_ip_per_hour: "达人注册每 IP 每小时上限",
+      kol_register_preview_ip_per_hour: "注册预览每 IP 每小时上限",
+      kol_forgot_email_limit: "找回密码邮箱次数上限",
+      kol_forgot_email_window_minutes: "找回密码邮箱窗口（分钟）",
+      kol_forgot_ip_limit: "找回密码 IP 次数上限",
+      kol_forgot_ip_window_minutes: "找回密码 IP 窗口（分钟）",
+      product_links_ip_per_minute: "复制接口每 IP 每分钟上限",
+      product_links_convert_token_per_minute: "令牌转换每分钟上限",
+      product_links_resolve_token_per_minute: "令牌解析每分钟上限",
+      weidian_qps: "微店接口每秒请求数"
+    },
+    currentValue: "当前值",
+    defaultValue: "默认值",
+    range: "允许范围",
+    overridden: "已修改",
+    restoreDefault: "恢复默认",
+    editPrompt: "请输入新的配置值",
+    integerRequired: "请输入整数",
+    saved: "配置已保存并立即生效",
+    restored: "已恢复默认值",
+    resetTitle: "恢复默认",
+    resetConfirm: "确定将“{name}”恢复为默认值吗？",
+    adminUrlTitle: "确认修改管理端地址",
+    adminUrlWarning: "微店开放平台登记的回调域名需同步修改。"
   },
   layout: {
     changePassword: "修改密码",
@@ -894,7 +947,7 @@ const zhCN = {
     setCopyTargetDone: "已设为默认复制店铺",
     clearCopyTarget: "取消默认复制店铺",
     clearCopyTargetDone: "已取消默认复制店铺",
-    hint: "全系统最多 3 个店铺；停用后不可再导入商品或对应关系。",
+    hint: "店铺数量上限由系统配置维护；停用后不可再导入商品或对应关系。",
     confirmDisable: "确定要停用店铺「{name}」吗？",
     confirmEnable: "确定要启用店铺「{name}」吗？",
     disableTitle: "停用店铺",
@@ -1126,6 +1179,7 @@ const zhCN = {
     time: "操作时间",
     operator: "操作人",
     module: "模块",
+    platformModule: "平台",
     action: "操作",
     result: "结果",
     uri: "请求地址",

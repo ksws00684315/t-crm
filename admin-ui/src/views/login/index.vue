@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import CaptchaInput from "@/components/CaptchaInput.vue";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { useUserStore } from "@/stores/user";
+import { siteName } from "@/stores/site-config";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 import {
@@ -65,7 +66,7 @@ async function submit() {
 <template>
   <div class="login">
     <el-card class="login__card" shadow="always">
-      <h1 class="login__title">{{ t("login.title") }}</h1>
+      <h1 class="login__title">{{ siteName }} {{ t("login.titleSuffix") }}</h1>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
         <el-form-item :label="t('login.username')" prop="username">
           <el-input v-model="form.username" autocomplete="username" maxlength="64" />

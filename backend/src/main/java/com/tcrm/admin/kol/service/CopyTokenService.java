@@ -19,6 +19,7 @@ import com.tcrm.admin.shared.MissingTenantException;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -27,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +51,7 @@ public class CopyTokenService implements CopyTokenApi {
   private final int defaultValidMinutes;
   private final CopyTokenPlaintexts plaintexts;
   private final Clock clock;
+  private final SystemConfigApi configs;
 
   @Autowired
   public CopyTokenService(
@@ -59,18 +60,17 @@ public class CopyTokenService implements CopyTokenApi {
       CopyTargetShopApi shops,
       SecretCipher cipher,
       CurrentUserContext current,
-      @Value("${crm.copy-token.default-quota:1}") int defaultQuota,
-      @Value("${crm.copy-token.default-valid-minutes:1440}") int defaultValidMinutes) {
-    this(
-        tokens,
-        kols,
-        shops,
-        cipher,
-        current,
-        defaultQuota,
-        defaultValidMinutes,
-        new CopyTokenPlaintexts(),
-        Clock.systemUTC());
+      SystemConfigApi configs) {
+    this.tokens = tokens;
+    this.kols = kols;
+    this.shops = shops;
+    this.cipher = cipher;
+    this.current = current;
+    this.defaultQuota = 1;
+    this.defaultValidMinutes = 1440;
+    this.plaintexts = new CopyTokenPlaintexts();
+    this.clock = Clock.systemUTC();
+    this.configs = configs;
   }
 
   CopyTokenService(
@@ -92,6 +92,7 @@ public class CopyTokenService implements CopyTokenApi {
     this.defaultValidMinutes = defaultValidMinutes;
     this.plaintexts = plaintexts;
     this.clock = clock;
+    this.configs = null;
   }
 
   public PageResult<CopyTokenRowDTO> page(CopyTokenFilterDTO filter) {
@@ -133,12 +134,18 @@ public class CopyTokenService implements CopyTokenApi {
     if (tenantId == null) {
       throw new MissingTenantException("copy token creation requires a company");
     }
-    int quota = command.quota() == null ? defaultQuota : command.quota();
-    int minutes = command.validMinutes() == null ? defaultValidMinutes : command.validMinutes();
+    int quota =
+        command.quota() == null
+            ? configInt("copy-token.default-quota", defaultQuota)
+            : command.quota();
+    int minutes =
+        command.validMinutes() == null
+            ? configInt("copy-token.default-valid-minutes", defaultValidMinutes)
+            : command.validMinutes();
     if (quota < MIN_QUOTA
-        || quota > MAX_QUOTA
+        || quota > configInt("copy-token.max-quota", MAX_QUOTA)
         || minutes < MIN_MINUTES
-        || minutes > MAX_MINUTES
+        || minutes > configInt("copy-token.max-valid-minutes", MAX_MINUTES)
         || command.kolId() == null
         || command.kolId() <= 0) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -179,6 +186,10 @@ public class CopyTokenService implements CopyTokenApi {
       return new CreatedCopyTokenDTO(plaintext, toRow(row, kolMap, shopMap, now));
     }
     throw new IllegalStateException("Unable to allocate a unique copy token");
+  }
+
+  private int configInt(String key, int fallback) {
+    return configs == null ? fallback : configs.getInt(key);
   }
 
   public String reveal(long id) {

@@ -26,6 +26,10 @@ public class ClickRedis {
     return (String) redis.opsForHash().get("link:" + kolCode, productCode);
   }
 
+  public String getValue(String key) {
+    return redis.opsForValue().get(key);
+  }
+
   /** Reads the copied-item index {@code linkitem:{nn}} (design §7.4, ADR-019). */
   public String lookupItem(String weidianItemId) {
     return (String) redis.opsForHash().get(itemKey(weidianItemId), weidianItemId);

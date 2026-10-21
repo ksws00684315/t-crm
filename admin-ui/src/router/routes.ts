@@ -43,6 +43,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "platform/system-configs",
+        name: "PlatformSystemConfigs",
+        component: () => import("@/views/platform/system-config/index.vue"),
+        meta: {
+          title: "route.systemConfigs",
+          icon: "Setting",
+          platformAdmin: true,
+          componentName: "PlatformSystemConfigPage"
+        }
+      },
+      {
         path: "analytics",
         name: "AnalyticsGroup",
         redirect: "/analytics/shop-performance",
@@ -309,6 +320,7 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.auditLogs",
               superAdmin: true,
+              platformAdmin: true,
               componentName: "SystemOperLogPage"
             }
           }

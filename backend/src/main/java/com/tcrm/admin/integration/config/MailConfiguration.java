@@ -3,6 +3,7 @@ package com.tcrm.admin.integration.config;
 import com.tcrm.admin.integration.service.LoggingMailSender;
 import com.tcrm.admin.integration.service.ResendMailSender;
 import com.tcrm.admin.shared.MailSender;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,9 +20,10 @@ public class MailConfiguration {
   @Bean
   public MailSender mailSender(
       @Value("${crm.mail.api-key:}") String apiKey,
-      @Value("${crm.mail.from:}") String from,
       @Value("${crm.mail.log-links:false}") boolean logLinks,
-      ObjectMapper json) {
+      ObjectMapper json,
+      SystemConfigApi configs) {
+    String from = configs.getValue("mail.from");
     if (apiKey == null || apiKey.isBlank()) {
       return new LoggingMailSender(logLinks);
     }
@@ -30,6 +32,6 @@ public class MailConfiguration {
           "TCRM_MAIL_FROM must be set (e.g. \"SparkTrack <no-reply@example.com>\") when"
               + " TCRM_MAIL_API_KEY is configured");
     }
-    return new ResendMailSender(apiKey, from, json);
+    return new ResendMailSender(apiKey, () -> configs.getValue("mail.from"), json);
   }
 }

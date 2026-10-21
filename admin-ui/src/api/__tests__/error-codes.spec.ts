@@ -65,7 +65,8 @@ describe("error code messages", () => {
       "USER_PERMISSION_INVALID",
       "KOL_PROMOTION_CONFIG_INCOMPLETE",
       "KOL_ALREADY_CLAIMED",
-      "KOL_REVIEW_REQUIRED"
+      "KOL_REVIEW_REQUIRED",
+      "SYSTEM_CONFIG_INVALID"
     ].filter(code => !backend.includes(code));
     expect(extra.sort()).toEqual(pending.sort());
   });

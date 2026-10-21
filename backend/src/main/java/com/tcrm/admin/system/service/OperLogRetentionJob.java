@@ -2,6 +2,7 @@ package com.tcrm.admin.system.service;
 
 import com.tcrm.admin.shared.DistributedLocks;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -14,14 +15,11 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Deletes operation logs older than {@link #RETENTION_DAYS} days (task 06b §4.4). The table is
- * append-only; this job is the only delete.
+ * Deletes operation logs older than the current configured retention period (task 06b §4.4). The
+ * table is append-only; this job is the only delete.
  */
 @Component
 public class OperLogRetentionJob {
-  /** Retention for sys_oper_log; not configurable (engineering spec 06, section 4). */
-  public static final int RETENTION_DAYS = 180;
-
   static final int BATCH_SIZE = 10_000;
   static final String LOCK = "system:oper-log-retention";
   private static final Logger LOG = LoggerFactory.getLogger(OperLogRetentionJob.class);
@@ -29,11 +27,16 @@ public class OperLogRetentionJob {
   private final SysOperLogMapper logs;
   private final TransactionTemplate tx;
   private final DistributedLocks locks;
+  private final SystemConfigApi configs;
 
   public OperLogRetentionJob(
-      SysOperLogMapper logs, PlatformTransactionManager transactions, DistributedLocks locks) {
+      SysOperLogMapper logs,
+      PlatformTransactionManager transactions,
+      DistributedLocks locks,
+      SystemConfigApi configs) {
     this.logs = logs;
     this.locks = locks;
+    this.configs = configs;
     this.tx = new TransactionTemplate(transactions);
     this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -48,7 +51,8 @@ public class OperLogRetentionJob {
    * Deletes logs whose oper_time is strictly before now minus retention. Package-visible for tests.
    */
   void cleanup(Instant now) {
-    Instant cutoff = now.minus(RETENTION_DAYS, ChronoUnit.DAYS);
+    int retentionDays = configs.getInt("oper-log.retention-days");
+    Instant cutoff = now.minus(retentionDays, ChronoUnit.DAYS);
     long total = 0;
     int deleted;
     do {
@@ -60,6 +64,6 @@ public class OperLogRetentionJob {
       total += deleted;
     } while (deleted >= BATCH_SIZE);
     LOG.info(
-        "Deleted {} operation logs older than {} days (before {})", total, RETENTION_DAYS, cutoff);
+        "Deleted {} operation logs older than {} days (before {})", total, retentionDays, cutoff);
   }
 }

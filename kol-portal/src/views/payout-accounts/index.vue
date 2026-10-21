@@ -19,9 +19,6 @@ defineOptions({ name: "PayoutAccountsPage" });
 
 const { t, locale } = useI18n();
 
-/** A creator keeps at most 5 accounts that are not disabled (task 15b §4.1.3). */
-const ACCOUNT_LIMIT = 5;
-
 const accounts = ref<PayoutAccountVO[]>([]);
 const loadRequest = useSubmission();
 const listError = computed(() => (accounts.value.length === 0 ? loadRequest.errorText.value : ""));
@@ -32,8 +29,6 @@ const editing = ref<PayoutAccountVO | null>(null);
 const actingId = ref<string | null>(null);
 const qrViewUrl = ref<string | null>(null);
 const qrViewLoading = ref(false);
-
-const atLimit = computed(() => accounts.value.length >= ACCOUNT_LIMIT);
 
 function load() {
   return loadRequest.submit(async () => {
@@ -176,20 +171,10 @@ load();
   <section class="payout">
     <div class="payout__head">
       <h1>{{ t("payoutAccounts.title") }}</h1>
-      <el-button
-        type="primary"
-        data-test="create"
-        :disabled="atLimit"
-        :title="atLimit ? t('payoutAccounts.limitReached') : undefined"
-        @click="openCreate"
-      >
+      <el-button type="primary" data-test="create" @click="openCreate">
         {{ t("payoutAccounts.create") }}
       </el-button>
     </div>
-    <p v-if="atLimit" class="payout__limit" data-test="limit-hint">
-      {{ t("payoutAccounts.limitReached") }}
-    </p>
-
     <el-alert
       v-if="listError"
       role="alert"

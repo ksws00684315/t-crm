@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.tcrm.admin.kol.service.KolMailTemplates.ResetLink;
 import com.tcrm.admin.shared.MailMessage;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +62,16 @@ class KolMailTemplatesTest {
   void shouldRefuseResetMailWithoutLinks() {
     assertThatThrownBy(() -> templates.reset("kol@example.com", List.of()))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void shouldUseCurrentSiteNameInMail() {
+    SystemConfigApi configs = org.mockito.Mockito.mock(SystemConfigApi.class);
+    org.mockito.Mockito.when(configs.getValue("site.name")).thenReturn("North Star CRM");
+    org.mockito.Mockito.when(configs.getInt("kol.invite-ttl-hours")).thenReturn(36);
+    MailMessage mail =
+        new KolMailTemplates(new KolPortalUrls("https://kol.example.com"), configs)
+            .invite("kol@example.com", "Acme", "token");
+    assertThat(mail.text()).contains("on North Star CRM", "36 hours", "（North Star CRM）");
   }
 }

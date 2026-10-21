@@ -17,7 +17,6 @@ public final class ProductRules {
   public static final int MAX_NAME = 200;
   public static final int MAX_CATEGORY = 64;
   public static final int MAX_IMAGE_URL = 512;
-  public static final int MAX_SHOPS = 3;
 
   private static final Pattern CODE = Pattern.compile("^" + CODE_PATTERN + "$");
   private static final Pattern WEIDIAN = Pattern.compile("^" + WEIDIAN_ID_PATTERN + "$");

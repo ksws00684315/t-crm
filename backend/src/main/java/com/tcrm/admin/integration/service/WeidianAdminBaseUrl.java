@@ -1,23 +1,19 @@
 package com.tcrm.admin.integration.service;
 
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.net.URI;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class WeidianAdminBaseUrl {
-  private final String value;
+  private final SystemConfigApi configs;
 
-  public WeidianAdminBaseUrl(@Value("${crm.weidian.admin-base-url:}") String value) {
-    if (!isValid(value)) {
-      throw new IllegalStateException(
-          "TCRM_ADMIN_BASE_URL must be an https URL without a trailing slash");
-    }
-    this.value = value;
+  public WeidianAdminBaseUrl(SystemConfigApi configs) {
+    this.configs = configs;
   }
 
   public String callbackUrl() {
-    return value + "/admin-api/integration/weidian/oauth/callback";
+    return configs.getValue("url.admin") + "/admin-api/integration/weidian/oauth/callback";
   }
 
   static boolean isValid(String value) {
@@ -26,11 +22,15 @@ public class WeidianAdminBaseUrl {
     }
     try {
       URI uri = URI.create(value);
-      return "https".equals(uri.getScheme())
+      boolean localHttp =
+          "http".equals(uri.getScheme())
+              && ("localhost".equalsIgnoreCase(uri.getHost()) || "127.0.0.1".equals(uri.getHost()));
+      return ("https".equals(uri.getScheme()) || localHttp)
           && uri.getHost() != null
           && uri.getRawUserInfo() == null
           && uri.getRawQuery() == null
-          && uri.getRawFragment() == null;
+          && uri.getRawFragment() == null
+          && (uri.getRawPath() == null || uri.getRawPath().isEmpty());
     } catch (IllegalArgumentException e) {
       return false;
     }

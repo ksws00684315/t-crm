@@ -34,7 +34,7 @@ describe("layout header", () => {
     const wrapper = mountLayout();
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack Creator Portal");
+    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack 达人端");
     expect(wrapper.find("button").text()).toContain("退出登录");
   });
 });

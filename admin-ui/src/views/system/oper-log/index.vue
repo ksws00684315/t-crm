@@ -19,7 +19,7 @@ defineOptions({ name: "SystemOperLogPage" });
 const { t } = useI18n();
 const route = useRoute();
 
-const MODULES = ["KOL", "Product", "Order", "System"] as const;
+const MODULES = ["KOL", "Product", "Order", "System", "Platform"] as const;
 
 const loading = ref(false);
 const rows = ref<OperLogVO[]>([]);
@@ -40,6 +40,10 @@ const applied = ref<OperLogQuery & { module: string; keyword: string; operator: 
 
 function asLog(row: object): OperLogVO {
   return row as OperLogVO;
+}
+
+function moduleLabel(module: (typeof MODULES)[number]): string {
+  return module === "Platform" ? t("audit.platformModule") : module;
 }
 
 /** `?module=KOL&keyword=<transfer keyword>` opens with the BD-transfer quick filter. */
@@ -201,7 +205,12 @@ onMounted(() => {
             data-test="filter-module"
             style="width: 140px"
           >
-            <el-option v-for="module in MODULES" :key="module" :label="module" :value="module" />
+            <el-option
+              v-for="module in MODULES"
+              :key="module"
+              :label="moduleLabel(module)"
+              :value="module"
+            />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('audit.keyword')">
