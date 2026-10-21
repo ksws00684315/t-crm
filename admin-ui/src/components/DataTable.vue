@@ -540,7 +540,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
   color: var(--tcrm-color-primary-text, var(--el-color-primary));
 }
 .data-table__batch-hint {
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
   line-height: 20px;
   color: var(--tcrm-color-text-secondary);
 }

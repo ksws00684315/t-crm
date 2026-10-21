@@ -6,6 +6,7 @@ import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstantToMinute } from "@/utils/format";
@@ -153,7 +154,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },
-  { key: "actions", label: t("common.actions"), width: px(344, 476) }
+  { key: "actions", label: t("common.actions"), width: px(168, 208) }
 ]);
 
 function asKol(row: object): KolVO {
@@ -218,6 +219,49 @@ function cleanupLabel(row: KolVO): string {
   if (row.autoCleanupDays == null) return t("kol.actionCleanup");
   const remaining = cleanupRemaining.value[row.id] ?? row.autoCleanupDays;
   return t("kol.cleanupRemaining", { days: remaining });
+}
+
+/** Edit and commission stay inline; the rest folds into the "more" dropdown (visual spec §3). */
+function rowActions(row: KolVO): RowAction[] {
+  return [
+    {
+      key: "edit",
+      label: t("kol.actionEdit"),
+      testId: "action-edit",
+      disabled: !abilities.value.canWrite,
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "commission",
+      label: t("kol.actionCommission"),
+      testId: "action-commission",
+      disabled: !(abilities.value.canWrite && row.reviewStatus === "APPROVED" && rowOwned(row)),
+      onClick: () => openCommission(row)
+    },
+    {
+      key: "prepay",
+      label: t("kol.actionPrepay"),
+      testId: `action-prepay-${row.id}`,
+      disabled: true,
+      tooltip: t("common.developing")
+    },
+    {
+      key: "cleanup",
+      label: cleanupLabel(row),
+      testId: `action-cleanup-${row.id}`,
+      danger: row.autoCleanupDays != null,
+      disabled: !(abilities.value.canWrite && rowOwned(row)),
+      onClick: () => openCleanup(row)
+    },
+    {
+      key: "freeze",
+      label: row.status === 1 ? t("kol.freeze") : t("kol.unfreeze"),
+      testId: `action-freeze-${row.id}`,
+      type: row.status === 1 ? "danger" : "success",
+      disabled: !(abilities.value.canWrite && rowOwned(row)),
+      onClick: () => toggleStatus(row)
+    }
+  ];
 }
 
 function reviewClickable(row: KolVO): boolean {
@@ -364,56 +408,9 @@ onMounted(() => {
             </span>
           </template>
           <template #actions="{ row }">
-            <!-- The review entry is in its status column; the wider column lets the Chinese
-                 labels fit on one line while longer translations may wrap naturally. -->
-            <div class="actions-cell" data-test="row-actions">
-              <el-button
-                link
-                type="primary"
-                data-test="action-edit"
-                :disabled="!abilities.canWrite"
-                @click="openEdit(asKol(row))"
-                >{{ t("kol.actionEdit") }}</el-button
-              >
-              <el-button
-                link
-                type="primary"
-                data-test="action-commission"
-                :disabled="
-                  !(
-                    abilities.canWrite &&
-                    asKol(row).reviewStatus === 'APPROVED' &&
-                    rowOwned(asKol(row))
-                  )
-                "
-                @click="openCommission(asKol(row))"
-                >{{ t("kol.actionCommission") }}</el-button
-              >
-              <el-tooltip :content="t('common.developing')" placement="top">
-                <span class="action-disabled">
-                  <el-button link type="primary" data-test="action-prepay" disabled>{{
-                    t("kol.actionPrepay")
-                  }}</el-button>
-                </span>
-              </el-tooltip>
-              <el-button
-                link
-                type="primary"
-                data-test="action-cleanup"
-                :class="{ 'cleanup-countdown': asKol(row).autoCleanupDays != null }"
-                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-                @click="openCleanup(asKol(row))"
-                >{{ cleanupLabel(asKol(row)) }}</el-button
-              >
-              <el-button
-                link
-                :type="asKol(row).status === 1 ? 'danger' : 'success'"
-                data-test="action-freeze"
-                :disabled="!(abilities.canWrite && rowOwned(asKol(row)))"
-                @click="toggleStatus(asKol(row))"
-                >{{ asKol(row).status === 1 ? t("kol.freeze") : t("kol.unfreeze") }}</el-button
-              >
-            </div>
+            <!-- The review entry is in its status column; order, permissions, and disabled
+                 rules of the row actions are declared in rowActions above. -->
+            <RowActions :actions="rowActions(asKol(row))" />
           </template>
         </DataTable>
       </el-tab-pane>
@@ -477,6 +474,9 @@ onMounted(() => {
    side padding buys four more characters per column than the 12px default without widening the
    card, which is what keeps the timestamps readable at 1844px. */
 .kol-fit :deep(.el-table .cell) {
+  /* Header cells keep 10px padding on each side, so a column's width floor is the measured
+     header text plus 20px; below that the header itself gets ellipsized, which reads worse
+     than truncating values. Narrow floors must take pixels from adjacent ellipsis columns. */
   padding-inline: 10px;
 }
 .kol-fit :deep(th.el-table__cell .cell) {
@@ -484,23 +484,5 @@ onMounted(() => {
 }
 .kol-fit :deep(.el-tag) {
   padding-inline: 4px;
-}
-.actions-cell {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0 4px;
-  align-items: center;
-}
-.actions-cell .el-button {
-  margin: 0;
-  padding: 0;
-  height: auto;
-  white-space: nowrap;
-}
-.action-disabled {
-  display: inline-flex;
-}
-.cleanup-countdown {
-  color: var(--el-color-danger);
 }
 </style>

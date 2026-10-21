@@ -286,7 +286,7 @@ const dialogVisible = computed({
 .hint {
   margin-top: 12px;
   color: var(--el-text-color-secondary);
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
 }
 .file-input {
   display: none;
@@ -308,17 +308,17 @@ const dialogVisible = computed({
 }
 .count-card__value {
   display: block;
-  font-size: 16px;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 600;
 }
 .count-card__label {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
 }
 .skip-counts {
   margin: 0 0 8px;
   padding-left: 18px;
   color: var(--el-text-color-secondary);
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
 }
 </style>

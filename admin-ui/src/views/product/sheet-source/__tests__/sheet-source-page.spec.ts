@@ -113,7 +113,7 @@ describe("source sheet page", () => {
       "reader@tcrm.iam.gserviceaccount.com"
     );
     expect(wrapper.find('[data-test="create"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="edit"]').exists()).toBe(true);
+    expect(document.body.querySelector('[data-test="edit-5"]')).not.toBeNull();
     expect(wrapper.find('[data-test="read"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("链接 E · 名称 B · 价格 D");
     expect(wrapper.find('[data-test="skipped-link"]').text()).toContain("跳过 2 行");

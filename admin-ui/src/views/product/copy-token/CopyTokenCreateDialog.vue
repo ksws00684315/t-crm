@@ -264,7 +264,7 @@ function close() {
 .hint {
   margin: 0;
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--tcrm-font-size-help);
 }
 .result-token {
   margin: 12px 0;

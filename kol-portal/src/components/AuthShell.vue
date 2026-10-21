@@ -33,7 +33,7 @@ defineProps<{ title: string }>();
 }
 h1 {
   margin: 0 0 24px;
-  font-size: 20px;
+  font-size: var(--tcrm-font-size-title);
   line-height: 28px;
   text-align: center;
 }

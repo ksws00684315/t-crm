@@ -7,6 +7,7 @@ import { listKols } from "@/api/kol/kol";
 import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
@@ -277,6 +278,51 @@ function openPermissions(row: UserVO) {
   permissionsVisible.value = true;
 }
 
+/** Row actions in their original order; entries beyond the first two fold into the dropdown. */
+function rowActions(row: UserVO): RowAction[] {
+  return [
+    {
+      key: "edit",
+      label: t("common.edit"),
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "permissions",
+      label: t("user.permissionsTitle"),
+      testId: `permissions-${row.id}`,
+      hidden: !isStaff(row),
+      onClick: () => openPermissions(row)
+    },
+    {
+      key: "transfer",
+      label: t("bdTransfer.transferKols"),
+      type: "warning",
+      testId: `transfer-kols-${row.id}`,
+      hidden: !isBdRow(row),
+      disabled: bdCount(row) === 0,
+      tooltip: t("bdTransfer.noKols"),
+      onClick: () => openTransfer(row)
+    },
+    {
+      key: "status",
+      label: row.status === 1 ? t("common.disable") : t("common.enable"),
+      type: row.status === 1 ? "danger" : "success",
+      testId: `status-${row.id}`,
+      disabled: row.id === me.user?.id,
+      onClick: () => toggleStatus(row)
+    },
+    {
+      key: "reset",
+      label: t("user.resetPassword"),
+      type: "warning",
+      testId: `reset-password-${row.id}`,
+      disabled: isMultiCompany(row),
+      tooltip: isMultiCompany(row) ? t("user.multiCompanyHint") : undefined,
+      onClick: () => openReset(row)
+    }
+  ];
+}
+
 async function toggleStatus(row: UserVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
@@ -442,69 +488,7 @@ onMounted(load);
       <template #cell-lastLogin="{ row }">{{ formatInstant(asUser(row).lastLoginTime) }}</template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asUser(row).createTime) }}</template>
       <template #actions="{ row }">
-        <!-- One flex row: the default 12px button margins plus the wrapper margins below pushed the
-             five actions of a BD account onto three lines, which made those rows 28px taller. -->
-        <div class="actions-cell" data-test="row-actions">
-          <el-button link type="primary" @click="openEdit(asUser(row))">{{
-            t("common.edit")
-          }}</el-button>
-          <el-button
-            v-if="isStaff(asUser(row))"
-            link
-            type="primary"
-            data-test="permissions"
-            @click="openPermissions(asUser(row))"
-          >
-            {{ t("user.permissionsTitle") }}
-          </el-button>
-          <el-tooltip
-            v-if="isBdRow(asUser(row))"
-            placement="top"
-            :disabled="bdCount(asUser(row)) !== 0"
-            :content="t('bdTransfer.noKols')"
-          >
-            <span class="user-page__transfer">
-              <el-button
-                link
-                type="warning"
-                data-test="transfer-kols"
-                :disabled="bdCount(asUser(row)) === 0"
-                @click="openTransfer(asUser(row))"
-              >
-                {{ t("bdTransfer.transferKols") }}
-              </el-button>
-            </span>
-          </el-tooltip>
-          <el-button
-            link
-            :type="asUser(row).status === 1 ? 'danger' : 'success'"
-            :disabled="asUser(row).id === me.user?.id"
-            @click="toggleStatus(asUser(row))"
-          >
-            {{ asUser(row).status === 1 ? t("common.disable") : t("common.enable") }}
-          </el-button>
-          <el-tooltip
-            v-if="isMultiCompany(asUser(row))"
-            :content="t('user.multiCompanyHint')"
-            placement="top"
-          >
-            <!-- A disabled button swallows hover events; the wrapper keeps the hint reachable. -->
-            <span class="reset-locked">
-              <el-button link type="warning" disabled data-test="reset-password">
-                {{ t("user.resetPassword") }}
-              </el-button>
-            </span>
-          </el-tooltip>
-          <el-button
-            v-else
-            link
-            type="warning"
-            data-test="reset-password"
-            @click="openReset(asUser(row))"
-          >
-            {{ t("user.resetPassword") }}
-          </el-button>
-        </div>
+        <RowActions :actions="rowActions(asUser(row))" />
       </template>
     </DataTable>
 
@@ -529,26 +513,4 @@ onMounted(load);
 }
 /* Same row-action treatment as the creator list: tight gaps, no Element Plus button margins, so a
    BD row (five actions) keeps the same 49px height as the three-action super administrator row. */
-.actions-cell {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0 var(--tcrm-space-2);
-  white-space: nowrap;
-}
-.actions-cell .el-button {
-  margin: 0;
-  padding: 0;
-  height: auto;
-  line-height: var(--tcrm-line-height-body);
-}
-.reset-locked {
-  display: inline-flex;
-  margin-left: 0;
-}
-/* Element Plus tooltips ignore disabled buttons, so the button sits in a span. */
-.user-page__transfer {
-  display: inline-flex;
-  margin-left: 0;
-}
 </style>

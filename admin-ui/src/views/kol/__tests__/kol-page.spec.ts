@@ -225,9 +225,13 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    // Prepay is under development: disabled everywhere with the tooltip.
-    expect(rowButtons("action-prepay").map(item => item.disabled)).toEqual([true, true, true]);
-    expect(document.body.textContent).toContain("开发中");
+    // Prepay is under development: disabled in the "more" dropdown with a hint on every row.
+    const prepay = ["1", "2", "3"].map(id =>
+      document.body.querySelector(`[data-test="action-prepay-${id}"]`)
+    );
+    expect(prepay).toHaveLength(3);
+    expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
+    expect(prepay.every(item => item?.getAttribute("title") === "开发中")).toBe(true);
     wrapper.unmount();
   });
 
@@ -250,11 +254,17 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", bdUserId: null, bdUserName: null }
     ]);
     const disabled = (id: string) => rowButtons(id).map(item => item.disabled);
+    const menuDisabled = (id: string, rowId: string) =>
+      document.body
+        .querySelector(`[data-test="${id}-${rowId}"]`)
+        ?.classList.contains("is-disabled");
     expect(disabled("action-edit")).toEqual([false, false]);
     expect(disabled("action-review")).toEqual([]);
     expect(disabled("action-commission")).toEqual([false, true]);
-    expect(disabled("action-cleanup")).toEqual([false, true]);
-    expect(disabled("action-freeze")).toEqual([false, true]);
+    expect(menuDisabled("action-cleanup", "1")).toBe(false);
+    expect(menuDisabled("action-cleanup", "2")).toBe(true);
+    expect(menuDisabled("action-freeze", "1")).toBe(false);
+    expect(menuDisabled("action-freeze", "2")).toBe(true);
     wrapper.unmount();
   });
 
@@ -336,7 +346,7 @@ describe("creator list page (task 32 §2.2)", () => {
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue({ action: "confirm" } as never);
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const wrapper = await mountPage();
-    await element("action-freeze").trigger("click");
+    await element(`action-freeze-${row.id}`).trigger("click");
     await flushPromises();
     expect(kolApi.updateKolStatus).toHaveBeenCalledWith(row.id, 0);
     expect(success).toHaveBeenCalledWith("达人已冻结");
@@ -367,8 +377,8 @@ describe("creator list page (task 32 §2.2)", () => {
   it("opens the per-creator cleanup dialog from the row", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage();
-    expect(element("action-cleanup").text()).toContain("剩余7天");
-    await element("action-cleanup").trigger("click");
+    expect(element(`action-cleanup-${row.id}`).text()).toContain("剩余7天");
+    await element(`action-cleanup-${row.id}`).trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("清理配置");
     expect(document.body.textContent).toContain("立即清理");
@@ -378,7 +388,7 @@ describe("creator list page (task 32 §2.2)", () => {
   it("shows the settings label when automatic cleanup is off", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("1", [{ ...row, autoCleanupDays: null }]);
-    expect(element("action-cleanup").text()).toContain("清理配置");
+    expect(element(`action-cleanup-${row.id}`).text()).toContain("清理配置");
     wrapper.unmount();
   });
 });

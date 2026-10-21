@@ -12,6 +12,7 @@ import { listShops } from "@/api/product/shop";
 import type { GoogleCredentialVO, SheetSourceVO, ShopVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import { messageForErrorCode } from "@/api/error-codes";
 import { useUserStore } from "@/stores/user";
@@ -111,6 +112,50 @@ async function onKeyFile(event: Event) {
 function openCreate() {
   editing.value = null;
   formVisible.value = true;
+}
+
+/** Reading stays inline; configuration entries beyond the first two fold into the dropdown. */
+function rowActions(row: SheetSourceVO): RowAction[] {
+  return [
+    {
+      key: "read",
+      label: t("sheetSource.read"),
+      testId: "read",
+      hidden: !canRead.value,
+      disabled: row.status !== 1,
+      onClick: () => openRead(row)
+    },
+    {
+      key: "missing",
+      label: t("sheetSource.missing"),
+      testId: "missing",
+      hidden: !canRead.value,
+      onClick: () => openMissing(row)
+    },
+    {
+      key: "edit",
+      label: t("common.edit"),
+      testId: `edit-${row.id}`,
+      hidden: !canConfigure.value,
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "status",
+      label: row.status === 1 ? t("common.disable") : t("common.enable"),
+      type: row.status === 1 ? "danger" : "success",
+      testId: `status-${row.id}`,
+      hidden: !canConfigure.value,
+      onClick: () => toggleStatus(row)
+    },
+    {
+      key: "delete",
+      label: t("common.delete"),
+      type: "danger",
+      testId: `delete-${row.id}`,
+      hidden: !canConfigure.value,
+      onClick: () => remove(row)
+    }
+  ];
 }
 
 function openEdit(row: SheetSourceVO) {
@@ -267,41 +312,7 @@ onMounted(() => void load());
         </span>
       </template>
       <template #actions="{ row }">
-        <el-button
-          v-if="canRead"
-          link
-          type="primary"
-          :disabled="asSource(row).status !== 1"
-          data-test="read"
-          @click="openRead(asSource(row))"
-        >
-          {{ t("sheetSource.read") }}
-        </el-button>
-        <el-button
-          v-if="canRead"
-          link
-          type="primary"
-          data-test="missing"
-          @click="openMissing(asSource(row))"
-        >
-          {{ t("sheetSource.missing") }}
-        </el-button>
-        <template v-if="canConfigure">
-          <el-button link type="primary" data-test="edit" @click="openEdit(asSource(row))">
-            {{ t("common.edit") }}
-          </el-button>
-          <el-button
-            link
-            :type="asSource(row).status === 1 ? 'danger' : 'success'"
-            data-test="status"
-            @click="toggleStatus(asSource(row))"
-          >
-            {{ asSource(row).status === 1 ? t("common.disable") : t("common.enable") }}
-          </el-button>
-          <el-button link type="danger" data-test="delete" @click="remove(asSource(row))">
-            {{ t("common.delete") }}
-          </el-button>
-        </template>
+        <RowActions :actions="rowActions(asSource(row))" />
       </template>
     </DataTable>
 

@@ -13,6 +13,7 @@ import {
 import type { ShopVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
@@ -124,6 +125,40 @@ async function unmarkCopyTarget(row: ShopVO) {
   }
 }
 
+/** Edit and the copy-target switch stay inline; the status toggle folds into the dropdown. */
+function rowActions(row: ShopVO): RowAction[] {
+  return [
+    {
+      key: "edit",
+      label: t("common.edit"),
+      testId: "edit",
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "set-copy-target",
+      label: t("shop.setCopyTarget"),
+      testId: "set-copy-target",
+      hidden: !(row.status === 1 && !row.copyTarget),
+      onClick: () => markCopyTarget(row)
+    },
+    {
+      key: "clear-copy-target",
+      label: t("shop.clearCopyTarget"),
+      type: "warning",
+      testId: "clear-copy-target",
+      hidden: !row.copyTarget,
+      onClick: () => unmarkCopyTarget(row)
+    },
+    {
+      key: "status",
+      label: row.status === 1 ? t("common.disable") : t("common.enable"),
+      type: row.status === 1 ? "danger" : "success",
+      testId: `status-${row.id}`,
+      onClick: () => toggleStatus(row)
+    }
+  ];
+}
+
 async function toggleStatus(row: ShopVO) {
   const target = row.status === 1 ? 0 : 1;
   const disabling = target === 0;
@@ -188,35 +223,7 @@ onMounted(() => void load());
       </template>
       <template #cell-updatedAt="{ row }">{{ formatInstant(asShop(row).updateTime) }}</template>
       <template v-if="abilities.canManageShop" #actions="{ row }">
-        <el-button link type="primary" data-test="edit" @click="openEdit(asShop(row))">
-          {{ t("common.edit") }}
-        </el-button>
-        <el-button
-          v-if="asShop(row).status === 1 && !asShop(row).copyTarget"
-          link
-          type="primary"
-          data-test="set-copy-target"
-          @click="markCopyTarget(asShop(row))"
-        >
-          {{ t("shop.setCopyTarget") }}
-        </el-button>
-        <el-button
-          v-if="asShop(row).copyTarget"
-          link
-          type="warning"
-          data-test="clear-copy-target"
-          @click="unmarkCopyTarget(asShop(row))"
-        >
-          {{ t("shop.clearCopyTarget") }}
-        </el-button>
-        <el-button
-          link
-          :type="asShop(row).status === 1 ? 'danger' : 'success'"
-          data-test="status"
-          @click="toggleStatus(asShop(row))"
-        >
-          {{ asShop(row).status === 1 ? t("common.disable") : t("common.enable") }}
-        </el-button>
+        <RowActions :actions="rowActions(asShop(row))" />
       </template>
     </DataTable>
 

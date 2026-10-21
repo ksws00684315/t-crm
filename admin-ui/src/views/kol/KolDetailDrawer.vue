@@ -195,7 +195,16 @@ const historyColumns = computed<DataColumn[]>(() => [
           </el-descriptions-item>
           <el-descriptions-item :label="t('promotion.platforms')">
             <div v-for="platform in detail.platforms" :key="platform.templateId">
-              <a :href="platform.address" target="_blank" rel="noopener noreferrer"
+              <!-- An empty platform address is stored as the link template URL (with the
+                   {PRODUCT_ID} placeholder) — show a dash instead of that non-working link. -->
+              <template v-if="platform.address?.includes('{PRODUCT_ID}')">
+                {{ platform.templateName }}: -
+              </template>
+              <a
+                v-else
+                :href="platform.address"
+                target="_blank"
+                rel="noopener noreferrer"
                 >{{ platform.templateName }}: {{ platform.address }}</a
               >
             </div>

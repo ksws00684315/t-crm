@@ -13,6 +13,7 @@ const enUS: MessageSchema = {
     save: "Save",
     confirm: "Confirm",
     close: "Close",
+    moreActions: "More",
     edit: "Edit",
     create: "Create",
     delete: "Delete",

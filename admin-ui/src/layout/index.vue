@@ -340,7 +340,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-tag);
   font-family: var(--tcrm-font-sans);
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
   line-height: 22px;
   color: var(--tcrm-color-text-secondary);
   background: var(--tcrm-color-muted);
@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
 }
 .layout__company-role {
   color: var(--tcrm-color-text-secondary);
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
 }
 .layout__main {
   display: flex;

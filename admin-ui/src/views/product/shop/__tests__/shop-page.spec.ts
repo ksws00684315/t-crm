@@ -54,7 +54,8 @@ describe("shop list buttons", () => {
     const admin = await mountPage();
     expect(admin.find('[data-test="create"]').exists()).toBe(true);
     expect(admin.find('[data-test="edit"]').exists()).toBe(true);
-    expect(admin.find('[data-test="status"]').exists()).toBe(true);
+    // The status toggle folds into the row "more" dropdown, which teleports to body.
+    expect(document.body.querySelector('[data-test="status-1"]')).not.toBeNull();
 
     signIn("STAFF", ["product:view", "product:edit", "product:status"]);
     const staff = await mountPage();

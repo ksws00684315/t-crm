@@ -34,11 +34,11 @@ const problems = computed(
 <style scoped>
 .skipped h4 {
   margin: 12px 0 8px;
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
 }
 
 .muted {
   color: var(--tcrm-color-text-secondary);
-  font-size: 14px;
+  font-size: var(--tcrm-font-size-body);
 }
 </style>

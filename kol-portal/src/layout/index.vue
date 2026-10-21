@@ -92,7 +92,7 @@ async function signOut() {
   padding: 12px 16px;
 }
 .shell__brand {
-  font-size: 20px;
+  font-size: var(--tcrm-font-size-title);
   font-weight: 600;
   line-height: 28px;
 }

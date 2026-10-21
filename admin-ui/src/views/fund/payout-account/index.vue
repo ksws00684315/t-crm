@@ -280,6 +280,5 @@ watch(
 <style scoped>
 .kol-name {
   color: var(--tcrm-color-text-secondary);
-  font-size: 12px;
 }
 </style>

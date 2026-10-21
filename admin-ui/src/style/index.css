@@ -104,7 +104,6 @@ body {
 #app .el-alert__description,
 #app .hint,
 #app .error,
-#app .kol-name,
 #app .form-help,
 #app .empty-hint {
   font-size: var(--tcrm-font-size-help) !important;
