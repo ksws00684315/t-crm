@@ -588,9 +588,10 @@ export interface KindSyncVO {
   source: SyncSource | null;
   lastSuccessAt: string | null;
   lastError: string | null;
-  failures24h: number;
+  /** Counts arrive as strings: the backend serializes every long that way (spec 03). */
+  failures24h: number | string;
   /** Missing-field record counts by field name (dictionary in design §4.6a). */
-  missingFields: Record<string, number>;
+  missingFields: Record<string, number | string>;
 }
 
 /** The shop's latest import and its declared data cutoff (task 40 §3.5). */

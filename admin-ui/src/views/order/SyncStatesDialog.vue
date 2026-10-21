@@ -55,7 +55,9 @@ interface StateRow {
 
 /** The spec shows one count; the backend reports per-field counts (design §4.6a). */
 function missingFieldCount(kind: KindSyncVO | null): number {
-  return kind ? Object.values(kind.missingFields ?? {}).reduce((sum, count) => sum + count, 0) : 0;
+  return kind
+    ? Object.values(kind.missingFields ?? {}).reduce<number>((sum, count) => sum + Number(count), 0)
+    : 0;
 }
 
 const stateRows = computed<StateRow[]>(() => {
