@@ -1041,7 +1041,46 @@ const enUS: MessageSchema = {
       SHEET_UPLOAD: "Sheet upload",
       COPY: "Copy"
     },
-    noProduct: "No original product"
+    noProduct: "No original product",
+    linkCode: "Link Code",
+    kol: "Creator",
+    kolPlaceholder: "Name / code / email",
+    targetShop: "Target Shop",
+    targetChannel: "Target Channel",
+    targetItemId: "New Item ID",
+    targetItemUrl: "New Item Link",
+    sourceItemId: "Source Item ID",
+    sourceChannel: "Source Channel",
+    currentRate: "Current Commission Rate",
+    salesQuantity: "Sales",
+    payAmount: "Pay Amount",
+    status: "Status",
+    cleanupStatus: "Cleanup Status",
+    createTime: "Created",
+    view: "View",
+    open: "Open",
+    product: "Product",
+    detailTitle: "Item Link Detail",
+    sourceItemUrl: "Source Link",
+    visitCount: "Visits",
+    totalPayAmount: "Cumulative Pay Amount",
+    refundAmount: "Cumulative Refund",
+    cleanupTime: "Cleanup Time",
+    cleanupReason: "Cleanup Reason",
+    cleanupFailReason: "Cleanup Failure Reason",
+    statuses: {
+      ENABLED: "Enabled",
+      DISABLED: "Disabled"
+    },
+    cleanups: {
+      NONE: "Not cleaned",
+      PENDING: "Cleaning",
+      DONE: "Cleaned",
+      FAILED: "Cleanup failed"
+    },
+    channels: {
+      WEIDIAN: "Weidian"
+    }
   },
   promoSheet: {
     title: "Upload Promo Sheet",

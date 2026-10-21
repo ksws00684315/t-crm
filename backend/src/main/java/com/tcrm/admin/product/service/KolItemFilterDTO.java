@@ -1,11 +1,5 @@
 package com.tcrm.admin.product.service;
 
+/** Creator-item list filter (task 39). Blank text is already null. */
 public record KolItemFilterDTO(
-    String kolCode,
-    String productCode,
-    Long shopId,
-    String weidianItemId,
-    String source,
-    boolean currentOnly,
-    int page,
-    int size) {}
+    String linkCode, String kolKeyword, Long shopId, int page, int size) {}

@@ -246,6 +246,7 @@ class CopyJobWorkerTest {
     verify(kolItems).insert(inserted.capture());
     assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
     assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90099");
+    assertThat(inserted.getValue().getLinkCode()).matches("KPL-[0-9A-F]{12}");
     verify(copies, times(1)).copy(5L, "10001", 5L);
   }
 

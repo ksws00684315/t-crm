@@ -2,6 +2,7 @@ package com.tcrm.admin.kol.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRateDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
@@ -89,6 +90,40 @@ public class KolLookupService implements KolApi {
   @Override
   public boolean lockKol(long kolId) {
     return kols.lockById(kolId) != null;
+  }
+
+  @Override
+  public List<Long> findIdsByKeyword(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return List.of();
+    }
+    String raw = keyword.strip();
+    String pattern = "%" + KolService.escapeLike(raw) + "%";
+    return kols
+        .selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(KolDO::getId)
+                .apply(
+                    "(name ILIKE {0} OR upper(kol_code) = {1} OR lower(email) = {2})",
+                    pattern, raw.toUpperCase(Locale.ROOT), raw.toLowerCase(Locale.ROOT)))
+        .stream()
+        .map(KolDO::getId)
+        .toList();
+  }
+
+  @Override
+  public List<KolRateDTO> listRatesByIds(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return List.of();
+    }
+    return kols
+        .selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(KolDO::getId, KolDO::getDefaultRate)
+                .in(KolDO::getId, ids))
+        .stream()
+        .map(kol -> new KolRateDTO(kol.getId(), KolRules.rateText(kol.getDefaultRate())))
+        .toList();
   }
 
   private List<KolRefDTO> toDto(List<KolDO> rows) {

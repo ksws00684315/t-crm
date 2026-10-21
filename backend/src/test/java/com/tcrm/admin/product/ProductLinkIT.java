@@ -405,7 +405,7 @@ class ProductLinkIT {
             jsonPath("$.data.items[0].kolCode").value(org.hamcrest.Matchers.startsWith("KOL-")));
     mvc.perform(
             get("/admin-api/product/kol-items")
-                .param("kolCode", otherKolCode)
+                .param("kolKeyword", otherKolCode)
                 .header(ADMIN, bdToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("0"));

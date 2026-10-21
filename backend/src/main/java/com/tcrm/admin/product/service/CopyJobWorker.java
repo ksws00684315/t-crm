@@ -242,7 +242,7 @@ public class CopyJobWorker implements ApplicationRunner {
       neu.setCreateTime(now);
       neu.setUpdateTime(now);
       neu.setTenantId(job.getTenantId());
-      kolItems.insert(neu);
+      KolItemCodes.insertNew(kolItems, neu);
       TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
       markSuccess(fresh.getId(), newItemId, copied.detailWarning());
     } catch (RuntimeException e) {

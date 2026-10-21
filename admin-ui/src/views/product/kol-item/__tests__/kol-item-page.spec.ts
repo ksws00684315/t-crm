@@ -1,35 +1,56 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as kolApi from "@/api/kol/kol";
 import * as linkApi from "@/api/link/link";
 import * as kolItemApi from "@/api/product/kol-item";
 import * as shopApi from "@/api/product/shop";
-import type { DataScope, KolItemVO, Role } from "@/api/types";
+import type { DataScope, KolItemDetailVO, KolItemVO, KolVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
+import { notifyError } from "@/utils/notify";
 import KolItemPage from "../index.vue";
 
+vi.mock("@/api/kol/kol");
 vi.mock("@/api/link/link");
 vi.mock("@/api/product/kol-item");
 vi.mock("@/api/product/shop");
+vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 const row: KolItemVO = {
   id: "1",
+  linkCode: "KPL-ABCDEF123456",
+  itemName: "A very long product name for the creator item cell",
+  imageUrl: null,
   kolId: "11",
-  kolCode: "KOL0001",
+  kolCode: "KOL-TAA001",
   kolName: "Alice",
-  productId: "22",
-  productCode: "P000001",
-  productName: "鞋",
-  shopId: "1",
-  shopName: "旗舰店",
-  weidianShopId: "100",
-  weidianItemId: "123456",
-  itemName: null,
-  source: "IMPORT",
-  validFrom: "2026-10-05T01:02:03Z",
-  validTo: null
+  targetShopId: "1",
+  targetShopName: "旗舰店",
+  targetShopCode: null,
+  targetChannel: "WEIDIAN",
+  targetItemId: "90010001",
+  targetItemUrl: "https://weidian.com/item.html?itemID=90010001",
+  sourceItemId: "80010001",
+  sourceChannel: "WEIDIAN",
+  currentRate: "0.1500",
+  salesQuantity: "3",
+  payAmount: "14.00",
+  status: "ENABLED",
+  cleanupStatus: "FAILED",
+  createTime: "2026-10-21T00:00:00Z"
+};
+
+const detail: KolItemDetailVO = {
+  ...row,
+  sourceItemUrl: "https://weidian.com/item.html?itemID=80010001",
+  visitCount: "1",
+  totalPayAmount: "14.00",
+  refundAmount: "3.50",
+  cleanupTime: "2026-10-20T00:00:00Z",
+  cleanupReason: "closed",
+  cleanupFailReason: "rejected"
 };
 
 function signIn(role: Role, dataScope: DataScope, permissions: string[] = []) {
@@ -50,7 +71,21 @@ function signIn(role: Role, dataScope: DataScope, permissions: string[] = []) {
   };
 }
 
-async function mountPage() {
+function dataRow(wrapper: VueWrapper, text: string) {
+  const found = wrapper.findAll("tr").find(item => item.text().includes(text));
+  if (!found) throw new Error(`missing row ${text}`);
+  return found;
+}
+
+function findTest(wrapper: VueWrapper, testId: string) {
+  const local = wrapper.find(`[data-test="${testId}"]`);
+  if (local.exists()) return local;
+  const element = document.body.querySelector(`[data-test="${testId}"]`);
+  if (!element) throw new Error(`missing ${testId}`);
+  return new DOMWrapper(element);
+}
+
+async function mountPage(items: KolItemVO[] = [row]) {
   vi.mocked(shopApi.listShops).mockResolvedValue([
     {
       id: "1",
@@ -64,8 +99,8 @@ async function mountPage() {
     }
   ]);
   vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
-    items: [row],
-    total: "1",
+    items,
+    total: String(items.length),
     page: 1,
     size: 20
   });
@@ -74,138 +109,176 @@ async function mountPage() {
   return wrapper;
 }
 
-describe("Kol item mapping page", () => {
+describe("Kol item page", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    vi.mocked(kolItemApi.listKolItems).mockClear();
-    vi.spyOn(ElMessage, "warning").mockImplementation(() => ({}) as never);
+    i18n.global.locale.value = "zh-CN";
+    vi.clearAllMocks();
   });
 
-  it("does not fetch mappings on open and shows the search tip", async () => {
+  it("loads the list on open and shows the task columns", async () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
-    expect(kolItemApi.listKolItems).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("请输入达人编号、原商品编码或专属商品 ID 查询");
-  });
-
-  it("tips and skips the request when search has no precision filter", async () => {
-    signIn("STAFF", "ALL", ["product:view"]);
-    const wrapper = await mountPage();
-    await wrapper.find('[data-test="search"]').trigger("click");
-    await flushPromises();
-    expect(ElMessage.warning).toHaveBeenCalledWith("请输入达人编号、原商品编码或专属商品 ID 查询");
-    expect(kolItemApi.listKolItems).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
-  });
-
-  it("filters by source and marks mappings without an original product", async () => {
-    signIn("SUPER_ADMIN", "ALL");
-    const wrapper = await mountPage();
-    vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
-      items: [
-        row,
-        {
-          ...row,
-          id: "2",
-          productId: null,
-          productCode: null,
-          productName: null,
-          itemName: "快照商品",
-          source: "SHEET_UPLOAD"
-        }
-      ],
-      total: "2",
+    expect(kolItemApi.listKolItems).toHaveBeenCalledWith({
       page: 1,
-      size: 20
+      size: 20,
+      linkCode: undefined,
+      kolKeyword: undefined,
+      shopId: undefined
     });
-    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
-    const sourceSelect = wrapper.findComponent('[data-test="source-filter"]');
-    // The select's v-model is driven by its update:modelValue event.
-    (sourceSelect as unknown as { vm: { $emit: (event: string, value: string) => void } }).vm.$emit(
-      "update:modelValue",
-      "SHEET_UPLOAD"
-    );
-    await flushPromises();
-    await wrapper.find('[data-test="search"]').trigger("click");
-    await flushPromises();
-    expect(kolItemApi.listKolItems).toHaveBeenCalledWith(
-      expect.objectContaining({ source: "SHEET_UPLOAD" })
-    );
-    expect(wrapper.text()).toContain("未关联原商品");
-    expect(wrapper.text()).toContain("快照商品");
-    expect(wrapper.text()).toContain("上传推广表");
+    expect(wrapper.text()).toContain("链接编码");
+    expect(wrapper.text()).toContain("商品");
+    expect(wrapper.text()).toContain("支付金额");
+    expect(wrapper.text()).toContain("清理状态");
+    expect(wrapper.text()).toContain("KPL-ABCDEF123456");
+    expect(wrapper.text()).toContain("Alice（KOL-TAA001）");
+    expect(wrapper.text()).toContain("14.00");
+    expect(wrapper.text()).toContain("清理失败");
+    expect(wrapper.find('[data-test="image-placeholder"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="copy"]').exists()).toBe(true);
   });
 
-  it("includes COPY in the source filter and shows the copy label", async () => {
+  it("shows English headers", async () => {
     signIn("SUPER_ADMIN", "ALL");
+    i18n.global.locale.value = "en-US";
     const wrapper = await mountPage();
-    vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
-      items: [{ ...row, id: "3", source: "COPY" }],
+    expect(wrapper.text()).toContain("Link Code");
+    expect(wrapper.text()).toContain("Pay Amount");
+    expect(wrapper.text()).toContain("Cleanup failed");
+    expect(wrapper.text()).toContain("Weidian");
+  });
+
+  it("sends the link code, selected creator code and shop", async () => {
+    signIn("STAFF", "ALL", ["product:view"]);
+    vi.mocked(kolApi.listKols).mockResolvedValue({
+      items: [{ id: "11", name: "Alice", kolCode: "KOL-TAA001" } as KolVO],
       total: "1",
       page: 1,
       size: 20
     });
-    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
-    const sourceSelect = wrapper.findComponent('[data-test="source-filter"]');
-    (sourceSelect as unknown as { vm: { $emit: (event: string, value: string) => void } }).vm.$emit(
-      "update:modelValue",
-      "COPY"
-    );
-    await flushPromises();
-    await wrapper.find('[data-test="search"]').trigger("click");
-    await flushPromises();
-    expect(kolItemApi.listKolItems).toHaveBeenCalledWith(
-      expect.objectContaining({ source: "COPY" })
-    );
-    expect(wrapper.text()).toContain("复制");
-  });
-
-  it("queries when a precision filter is set and shows page total", async () => {
-    signIn("STAFF", "ALL", ["product:view"]);
     const wrapper = await mountPage();
-    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
+    await wrapper.find('[data-test="link-code"]').setValue("kpl-abcdef123456");
+    const [kolSelect, shopSelect] = wrapper.findAllComponents({ name: "ElSelect" });
+    await kolSelect.props("remoteMethod")("alice");
+    await flushPromises();
+    await kolSelect.vm.$emit("update:modelValue", "11");
+    await shopSelect.vm.$emit("update:modelValue", "1");
     await wrapper.find('[data-test="search"]').trigger("click");
     await flushPromises();
-    expect(kolItemApi.listKolItems).toHaveBeenCalledWith({
-      page: 1,
-      size: 20,
-      kolCode: "KOL0001",
-      productCode: undefined,
-      shopId: undefined,
-      weidianItemId: undefined,
-      source: undefined,
-      current: true
-    });
-    expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("KOL0001");
-    const pagination = wrapper.findComponent({ name: "ElPagination" });
-    expect(pagination.props("total")).toBe(1);
+    expect(kolItemApi.listKolItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        page: 1,
+        linkCode: "kpl-abcdef123456",
+        kolKeyword: "KOL-TAA001",
+        shopId: "1"
+      })
+    );
   });
 
-  it("returns to the tip state on reset without requesting", async () => {
+  it("keeps the selected creator after the remote list is cleared", async () => {
+    signIn("STAFF", "ALL", ["product:view"]);
+    vi.mocked(kolApi.listKols).mockResolvedValue({
+      items: [{ id: "11", name: "Alice", kolCode: "KOL-TAA001" } as KolVO],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    const [kolSelect] = wrapper.findAllComponents({ name: "ElSelect" });
+    await kolSelect.props("remoteMethod")("alice");
+    await flushPromises();
+    await kolSelect.vm.$emit("update:modelValue", "11");
+    await kolSelect.props("remoteMethod")("");
+    await flushPromises();
+    await wrapper.find('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolItemApi.listKolItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, kolKeyword: "KOL-TAA001" })
+    );
+  });
+
+  it("reloads the first page on reset", async () => {
     signIn("SUPER_ADMIN", "ALL");
     const wrapper = await mountPage();
-    await wrapper.find('[data-test="product-code"]').setValue("P000001");
+    await wrapper.find('[data-test="link-code"]').setValue("KPL-ABCDEF123456");
     await wrapper.find('[data-test="search"]').trigger("click");
     await flushPromises();
-    expect(kolItemApi.listKolItems).toHaveBeenCalledTimes(1);
     await wrapper.find('[data-test="reset"]').trigger("click");
     await flushPromises();
-    expect(kolItemApi.listKolItems).toHaveBeenCalledTimes(1);
-    expect(wrapper.find('[data-test="search-tip"]').exists()).toBe(true);
+    expect(kolItemApi.listKolItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, linkCode: undefined, kolKeyword: undefined })
+    );
+  });
+
+  it("opens the new item link and the detail drawer", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.mocked(kolItemApi.getKolItem).mockResolvedValue(detail);
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const wrapper = await mountPage();
+    const line = dataRow(wrapper, row.linkCode);
+    await line.get('[data-test="open-target"]').trigger("click");
+    expect(open).toHaveBeenCalledWith(row.targetItemUrl, "_blank", "noopener");
+    await line.get('[data-test="view"]').trigger("click");
+    await flushPromises();
+    expect(kolItemApi.getKolItem).toHaveBeenCalledWith("1");
+    const drawer = findTest(wrapper, "detail-drawer");
+    expect(drawer.find('[data-test="detail-image"]').exists()).toBe(true);
+    expect(drawer.text()).toContain("访问次数");
+    expect(drawer.text()).toContain("累计支付金额");
+    expect(drawer.text()).toContain("累计退款");
+    expect(drawer.text()).toContain("3.50");
+    expect(drawer.text()).toContain("closed");
+    expect(drawer.text()).toContain("rejected");
+    await findTest(wrapper, "open-source").trigger("click");
+    expect(open).toHaveBeenCalledWith(detail.sourceItemUrl, "_blank", "noopener");
+    open.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("reports a list failure and closes the drawer when detail fails", async () => {
+    signIn("STAFF", "ALL", ["product:view"]);
+    vi.mocked(shopApi.listShops).mockResolvedValue([]);
+    vi.mocked(kolItemApi.listKolItems).mockRejectedValue(new Error("down"));
+    mount(KolItemPage, { global: { plugins: [ElementPlus, i18n] } });
+    await flushPromises();
+    expect(notifyError).toHaveBeenCalled();
+
+    vi.mocked(kolItemApi.listKolItems).mockResolvedValue({
+      items: [row],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    vi.mocked(kolItemApi.getKolItem).mockRejectedValue(new Error("missing"));
+    const wrapper = await mountPage();
+    await dataRow(wrapper, row.linkCode).get('[data-test="view"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="detail-drawer"]').exists()).toBe(false);
+    expect(document.body.querySelector('[data-test="detail-drawer"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("shows the shop code when the API provides one", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage([{ ...row, targetShopCode: "S001" }]);
+    expect(wrapper.text()).toContain("旗舰店（S001）");
+  });
+
+  it("keeps view for a BD and hides import, commission and rebuild", async () => {
+    signIn("STAFF", "OWN", ["product:view"]);
+    const wrapper = await mountPage();
+    expect(kolItemApi.listKolItems).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="view"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="commission"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="rebuild-index"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="upload-promo-sheet"]').exists()).toBe(false);
   });
 
   it("shows rebuild only to the super administrator", async () => {
     signIn("SUPER_ADMIN", "ALL");
     expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(true);
-  });
-
-  it("hides rebuild from a sub-account that can edit or only view mappings", async () => {
-    signIn("STAFF", "ALL", ["product:view", "product:edit"]);
-    expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(false);
-    signIn("STAFF", "ALL", ["product:view"]);
-    expect((await mountPage()).find('[data-test="rebuild-index"]').exists()).toBe(false);
   });
 
   it("shows mapping import for product:edit and hides it without that code", async () => {
@@ -215,23 +288,18 @@ describe("Kol item mapping page", () => {
     expect((await mountPage()).find('[data-test="import"]').exists()).toBe(false);
   });
 
-  async function search(wrapper: Awaited<ReturnType<typeof mountPage>>) {
-    await wrapper.find('[data-test="kol-code"]').setValue("KOL0001");
-    await wrapper.find('[data-test="search"]').trigger("click");
-    await flushPromises();
-  }
-
-  it("shows export after a query only when the account has data:export", async () => {
+  it("shows export on load only when the account has data:export", async () => {
     signIn("STAFF", "ALL", ["product:view", "data:export"]);
-    const allowed = await mountPage();
-    expect(allowed.find('[data-test="export"]').exists()).toBe(false);
-    await search(allowed);
-    expect(allowed.find('[data-test="export"]').exists()).toBe(true);
-
+    expect((await mountPage()).find('[data-test="export"]').exists()).toBe(true);
     signIn("STAFF", "ALL", ["product:view"]);
-    const denied = await mountPage();
-    await search(denied);
-    expect(denied.find('[data-test="export"]').exists()).toBe(false);
+    expect((await mountPage()).find('[data-test="export"]').exists()).toBe(false);
+  });
+
+  it("shows the promo sheet upload for an account that can edit creators", async () => {
+    signIn("STAFF", "ALL", ["product:view", "kol:edit"]);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="upload-promo-sheet"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="commission"]').exists()).toBe(true);
   });
 
   it("starts a rebuild after confirmation", async () => {
@@ -248,7 +316,6 @@ describe("Kol item mapping page", () => {
 
   it("does not rebuild when the confirmation is cancelled", async () => {
     signIn("SUPER_ADMIN", "ALL");
-    vi.mocked(linkApi.rebuildLinkIndex).mockClear();
     vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
     const wrapper = await mountPage();
     await wrapper.find('[data-test="rebuild-index"]').trigger("click");

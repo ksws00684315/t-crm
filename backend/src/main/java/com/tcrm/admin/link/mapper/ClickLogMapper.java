@@ -3,6 +3,7 @@ package com.tcrm.admin.link.mapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.link.model.ClickCountRow;
 import com.tcrm.admin.link.model.ClickLogDO;
+import com.tcrm.admin.link.model.KolItemVisitRow;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -79,6 +80,24 @@ public interface ClickLogMapper {
       @Param("kolId") long kolId,
       @Param("productIds") Collection<Long> productIds,
       @Param("since") Instant since);
+
+  /**
+   * Valid visits of the given mappings (task 39). Bot and duplicate clicks are excluded. Counts by
+   * {@code kol_item_id}, the trace key of the creator-item page. {@code ids} must be non-empty.
+   */
+  @Select(
+      """
+      <script>
+      SELECT kol_item_id AS kol_item_id, COUNT(*) AS visit_count
+      FROM crm_click_log
+      WHERE NOT is_bot
+        AND NOT is_dup
+        AND kol_item_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      GROUP BY kol_item_id
+      </script>
+      """)
+  List<KolItemVisitRow> countVisitsByKolItemIds(@Param("ids") Collection<Long> ids);
 
   /**
    * Names of the partitions currently attached to crm_click_log. Catalog tables have no tenant_id;
