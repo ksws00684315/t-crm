@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
+import QRCode from "qrcode";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRegisterCode, rotateRegisterCode, type RegisterCodeVO } from "@/api/kol/kol";
@@ -12,7 +13,7 @@ defineOptions({ name: "InviteKolDialog" });
 
 /**
  * The "+ invite creator" dialog (01.01, task 32 §2.2): the exclusive invitation code, the registration link,
- * a QR-code placeholder (under development) and the regenerate action. The super administrator
+ * its QR code and the regenerate action. The super administrator
  * gets the extra hint that registrations through this link stay unassigned.
  */
 const props = defineProps<{ modelValue: boolean }>();
@@ -24,6 +25,8 @@ const isSuperAdmin = accessOf(me.user).isSuperAdmin;
 const loading = ref(false);
 const rotating = ref(false);
 const link = ref<RegisterCodeVO | null>(null);
+/** PNG data URL of the registration link; empty while loading or when rendering failed. */
+const qrDataUrl = ref("");
 
 watch(
   () => props.modelValue,
@@ -33,6 +36,17 @@ watch(
     void load();
   }
 );
+
+// Rotating the code changes the link, so the QR code always follows the link shown above it.
+watch(link, async value => {
+  qrDataUrl.value = "";
+  if (!value) return;
+  try {
+    qrDataUrl.value = await QRCode.toDataURL(value.url, { margin: 1, width: 240 });
+  } catch {
+    qrDataUrl.value = "";
+  }
+});
 
 async function load() {
   loading.value = true;
@@ -92,9 +106,15 @@ async function rotate() {
         <div class="label">{{ t("kol.registerLinkUrl") }}</div>
         <CopyText :value="link.url" />
       </div>
-      <div class="field" data-test="register-qr">
+      <div v-if="link" class="field" data-test="register-qr">
         <div class="label">{{ t("kol.registerQr") }}</div>
-        <div class="qr">{{ t("common.developing") }}</div>
+        <img
+          v-if="qrDataUrl"
+          class="qr"
+          :src="qrDataUrl"
+          :alt="t('kol.registerQr')"
+          data-test="register-qr-image"
+        />
       </div>
     </div>
     <template #footer>
@@ -120,13 +140,10 @@ async function rotate() {
   font-weight: 500;
 }
 .qr {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 120px;
-  height: 120px;
-  border: 1px dashed var(--tcrm-color-border);
+  display: block;
+  width: 160px;
+  height: 160px;
+  border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-control);
-  color: var(--tcrm-color-text-secondary);
 }
 </style>

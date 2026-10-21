@@ -56,13 +56,14 @@ describe("multi-company accounts in user management", () => {
     const tags = wrapper.findAll('[data-test="multi-company"]');
     expect(tags).toHaveLength(1);
     expect(tags[0].text()).toBe("多公司");
-    // Reset lives in the row "more" dropdown; the multi-company row carries the hint as a
-    // title on its disabled entry, the single-company row stays enabled.
-    const multiReset = document.body.querySelector<HTMLElement>('[data-test="reset-password-9"]');
-    expect(multiReset?.classList.contains("is-disabled")).toBe(true);
-    expect(multiReset?.getAttribute("title")).toBe(HINT);
-    const singleReset = document.body.querySelector<HTMLElement>('[data-test="reset-password-10"]');
-    expect(singleReset?.classList.contains("is-disabled")).toBe(false);
+    // The multi-company row's reset is disabled with the hint as its tooltip; the
+    // single-company row stays enabled.
+    const multiReset = wrapper.find('[data-test="reset-password-9"]');
+    expect(multiReset.classes()).toContain("is-disabled");
+    expect(
+      wrapper.findAllComponents({ name: "ElTooltip" }).some(tip => tip.props("content") === HINT)
+    ).toBe(true);
+    expect(wrapper.find('[data-test="reset-password-10"]').classes()).not.toContain("is-disabled");
   });
 
   async function openForm(user: UserVO | null) {

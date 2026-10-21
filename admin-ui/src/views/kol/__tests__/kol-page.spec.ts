@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
+import QRCode from "qrcode";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as bdApi from "@/api/system/bd-user";
 import * as bdTransferApi from "@/api/kol/bd-transfer";
@@ -16,6 +17,10 @@ vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");
 vi.mock("@/api/link/template");
 vi.mock("@/api/system/bd-user");
+// jsdom has no canvas; the dialog only needs the data URL the library returns.
+vi.mock("qrcode", () => ({
+  default: { toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,UVI=") }
+}));
 
 /**
  * The creator list after task 32 §2.2: three query conditions, the 04.01 columns in order,
@@ -225,13 +230,15 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    // Prepay is under development: disabled in the "more" dropdown with a hint on every row.
-    const prepay = ["1", "2", "3"].map(id =>
-      document.body.querySelector(`[data-test="action-prepay-${id}"]`)
-    );
-    expect(prepay).toHaveLength(3);
+    // Prepay is under development: shown inline but disabled on every row, with the hint as its
+    // tooltip.
+    const prepay = ["1", "2", "3"].map(id => rowButtons(`action-prepay-${id}`)[0]);
     expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
-    expect(prepay.every(item => item?.getAttribute("title") === "开发中")).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents({ name: "ElTooltip" })
+        .filter(tip => tip.props("content") === "开发中").length
+    ).toBeGreaterThanOrEqual(3);
     wrapper.unmount();
   });
 
@@ -280,7 +287,7 @@ describe("creator list page (task 32 §2.2)", () => {
     bdWrapper.unmount();
   });
 
-  it("opens the invite dialog with the QR placeholder and the super-administrator hint", async () => {
+  it("opens the invite dialog with the registration QR code and the super-administrator hint", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
       code: "ABCD1234",
@@ -291,7 +298,11 @@ describe("creator list page (task 32 §2.2)", () => {
     await flushPromises();
     expect(document.body.textContent).toContain("商务专属邀请码");
     expect(document.body.textContent).toContain("ABCD1234");
-    expect(element("register-qr").text()).toContain("开发中");
+    expect(element("register-qr-image").attributes("src")).toBe("data:image/png;base64,UVI=");
+    expect(QRCode.toDataURL).toHaveBeenCalledWith(
+      expect.stringContaining("ABCD1234"),
+      expect.anything()
+    );
     // Super administrator sees only the "not bound to a BD" note (review item 3)…
     expect(element("super-invite-hint").text()).toContain("不绑定商务");
     expect(document.body.textContent).not.toContain("自动归属到你名下");

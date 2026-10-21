@@ -12,67 +12,51 @@ afterEach(() => {
   wrapper = undefined;
 });
 
-function mountActions(actions: RowAction[], maxVisible?: number) {
+function mountActions(actions: RowAction[]) {
   wrapper = mount(RowActions, {
-    props: maxVisible === undefined ? { actions } : { actions, maxVisible },
+    props: { actions },
     global: { plugins: [ElementPlus, i18n] }
   });
   return wrapper;
 }
 
 describe("RowActions", () => {
-  it("shows the first two actions as links and folds the rest behind 更多", () => {
+  it("shows every action inline in the declared order without a More menu", () => {
     const view = mountActions([
-      { key: "edit", label: "编辑", testId: "action-edit" },
-      { key: "freeze", label: "冻结", testId: "action-freeze" },
+      { key: "edit", label: "资料编辑", testId: "action-edit" },
+      { key: "commission", label: "佣金信息", testId: "action-commission" },
+      { key: "prepay", label: "预付金额", testId: "action-prepay", disabled: true },
       { key: "cleanup", label: "剩余7天", testId: "action-cleanup", danger: true },
-      { key: "prepay", label: "预付", testId: "action-prepay", disabled: true }
+      { key: "freeze", label: "冻结", testId: "action-freeze" }
     ]);
 
-    expect(view.find('[data-test="action-edit"]').exists()).toBe(true);
-    expect(view.find('[data-test="action-freeze"]').exists()).toBe(true);
-    expect(view.find('[data-test="more-actions"]').exists()).toBe(true);
-    // The dropdown menu is teleported to body; overflow entries live there.
-    const cleanup = document.body.querySelector('[data-test="action-cleanup"]');
-    expect(cleanup).not.toBeNull();
-    expect(cleanup?.className).toContain("actions-cell__danger");
+    expect(view.findAll("button").map(button => button.text())).toEqual([
+      "资料编辑",
+      "佣金信息",
+      "预付金额",
+      "剩余7天",
+      "冻结"
+    ]);
+    expect(view.text()).not.toContain("更多");
+    expect(view.find('[data-test="action-cleanup"]').classes()).toContain("actions-cell__danger");
   });
 
-  it("drops hidden actions before splitting visible and overflow entries", () => {
+  it("does not render hidden actions", () => {
     const view = mountActions([
       { key: "edit", label: "编辑" },
       { key: "secret", label: "隐藏", hidden: true },
-      { key: "freeze", label: "冻结" },
-      { key: "remove", label: "删除" }
+      { key: "freeze", label: "冻结" }
     ]);
 
     expect(view.text()).not.toContain("隐藏");
-    expect(document.body.textContent).not.toContain("隐藏");
-    expect(view.find('[data-test="more-actions"]').exists()).toBe(true);
+    expect(view.findAll("button")).toHaveLength(2);
   });
 
-  it("runs visible actions on click and keeps disabled ones inert", async () => {
+  it("runs enabled actions on click and keeps disabled ones inert", async () => {
     const onEdit = vi.fn();
-    const onFrozen = vi.fn();
-    const view = mountActions([
-      { key: "edit", label: "编辑", onClick: onEdit },
-      { key: "freeze", label: "冻结", disabled: true, onClick: onFrozen }
-    ]);
-
-    const buttons = view.findAll("button");
-    await buttons[0].trigger("click");
-    await buttons[1].trigger("click");
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onFrozen).not.toHaveBeenCalled();
-  });
-
-  it("runs overflow actions from the dropdown and keeps disabled hints reachable", async () => {
-    const onCleanup = vi.fn();
     const onPrepay = vi.fn();
-    mountActions([
-      { key: "edit", label: "编辑" },
-      { key: "commission", label: "佣金" },
-      { key: "cleanup", label: "剩余7天", testId: "action-cleanup", onClick: onCleanup },
+    const view = mountActions([
+      { key: "edit", label: "编辑", testId: "action-edit", onClick: onEdit },
       {
         key: "prepay",
         label: "预付",
@@ -83,18 +67,10 @@ describe("RowActions", () => {
       }
     ]);
 
-    expect(document.body.textContent).toContain("剩余7天");
-    const prepayItem = document.body.querySelector<HTMLElement>('[data-test="action-prepay"]');
-    expect(prepayItem?.getAttribute("title")).toBe("开发中");
-    expect(prepayItem?.className).toContain("is-disabled");
-
-    const cleanup = document.body.querySelector<HTMLElement>('[data-test="action-cleanup"]');
-    cleanup?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
-    expect(onCleanup).toHaveBeenCalledTimes(1);
-
-    prepayItem?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await Promise.resolve();
+    await view.find('[data-test="action-edit"]').trigger("click");
+    await view.find('[data-test="action-prepay"]').trigger("click");
+    expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onPrepay).not.toHaveBeenCalled();
+    expect(view.find('[data-test="action-prepay"]').attributes("disabled")).toBeDefined();
   });
 });
