@@ -15,6 +15,8 @@ import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.task.api.ImportReason;
+import com.tcrm.admin.task.api.ImportTaskOutcome;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -26,6 +28,8 @@ import org.mockito.ArgumentCaptor;
 class OrderImportProcessorTest {
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final OrderWriter writer = mock(OrderWriter.class);
+  private final OrderImportStateWriter importStates = mock(OrderImportStateWriter.class);
+  private final OrderSyncFailureWriter syncFailures = mock(OrderSyncFailureWriter.class);
   private OrderImportProcessor processor;
 
   @BeforeAll
@@ -38,7 +42,9 @@ class OrderImportProcessorTest {
 
   @BeforeEach
   void setup() {
-    processor = new OrderImportProcessor(99L, shops, writer);
+    processor =
+        new OrderImportProcessor(
+            99L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     when(shops.findEnabledByWeidianShopId("100"))
         .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1));
   }
@@ -138,7 +144,9 @@ class OrderImportProcessorTest {
     String second = cap.getAllValues().get(1).items().getFirst().getSubOrderId();
     assertThat(first).isNotEqualTo(second);
     // Re-run a fresh processor (same file again) must regenerate the first key.
-    OrderImportProcessor again = new OrderImportProcessor(99L, shops, writer);
+    OrderImportProcessor again =
+        new OrderImportProcessor(
+            99L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     assertThat(again.process(validPaid())).isEmpty();
     verify(writer, org.mockito.Mockito.times(3)).save(cap.capture());
     assertThat(cap.getAllValues().get(2).items().getFirst().getSubOrderId()).isEqualTo(first);
@@ -187,7 +195,9 @@ class OrderImportProcessorTest {
     verify(writer).save(firstCap.capture());
     String keyB = firstCap.getValue().items().getFirst().getSubOrderId();
 
-    OrderImportProcessor again = new OrderImportProcessor(99L, shops, writer);
+    OrderImportProcessor again =
+        new OrderImportProcessor(
+            99L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     List<String> fixedA = validPaid();
     fixedA.set(OrderImportColumn.ITEM_ID.ordinal(), "9001");
     fixedA.set(OrderImportColumn.SKU_ID.ordinal(), "skuA");
@@ -210,5 +220,30 @@ class OrderImportProcessorTest {
     verify(writer).save(cap.capture());
     assertThat(cap.getValue().order().getOrderTime()).isNotNull();
     assertThat(cap.getValue().order().getPayTime()).isNotNull();
+  }
+
+  @Test
+  void shouldRecordImportCutoffOncePerShop_whenRowsResolveShops() {
+    assertThat(processor.process(validPaid())).isEmpty();
+    assertThat(processor.process(validPaid())).isEmpty();
+    verify(importStates, org.mockito.Mockito.times(1))
+        .record(10L, "ORDER", 99L, Instant.parse("2026-10-21T00:00:00Z"));
+  }
+
+  @Test
+  void shouldRecordFailure_whenImportFinishesWithFailures() {
+    processor.onFinish(new ImportTaskOutcome(10, 10, 3, ImportTaskOutcome.Status.PARTIAL));
+    verify(syncFailures)
+        .record(
+            org.mockito.ArgumentMatchers.isNull(),
+            eq(com.tcrm.admin.order.model.OrderSyncFailureKind.ORDER_IMPORT),
+            org.mockito.ArgumentMatchers.contains("3 of 10"),
+            eq(99L));
+  }
+
+  @Test
+  void shouldNotRecordFailure_whenImportFinishesSuccessfully() {
+    processor.onFinish(new ImportTaskOutcome(10, 10, 0, ImportTaskOutcome.Status.SUCCESS));
+    org.mockito.Mockito.verifyNoInteractions(syncFailures);
   }
 }

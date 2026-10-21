@@ -406,4 +406,73 @@ class OrderSyncTest {
     assertThat(state.getLastError())
         .isEqualTo("Order synchronization failed for order 100: WEIDIAN_RATE_LIMITED");
   }
+
+  @Test
+  void shouldRecordPhaseKind_whenSynchronizationFails() {
+    for (var failure :
+        List.of(
+            new PhaseCase("ORDER_SYNC") {
+              @Override
+              void stub(WeidianBusinessApi api) {
+                when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenThrow(new IllegalStateException("boom"));
+              }
+            },
+            new PhaseCase("REFUND_SYNC") {
+              @Override
+              void stub(WeidianBusinessApi api) {
+                when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenReturn(
+                        new WeidianBusinessApi.OrderListResponse(
+                            0, 0, List.of(), false, null, null));
+                when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenThrow(new IllegalStateException("boom"));
+              }
+            })) {
+      var api = mock(WeidianBusinessApi.class);
+      var states = mock(OrderSyncStateMapper.class);
+      var state = new OrderSyncStateDO();
+      state.setLastSuccessAt(Instant.parse("2026-10-15T00:00:00Z"));
+      state.setLastError(null);
+      when(states.selectOne(any())).thenReturn(state);
+      failure.stub(api);
+      var failuresWriter = mock(OrderSyncFailureWriter.class);
+      var tx = mock(org.springframework.transaction.support.TransactionTemplate.class);
+      org.mockito.Mockito.doAnswer(
+              call -> {
+                call.getArgument(0, java.util.function.Consumer.class).accept(null);
+                return null;
+              })
+          .when(tx)
+          .executeWithoutResult(any());
+      var sync =
+          new OrderSync(
+              api,
+              states,
+              mock(OrderWriter.class),
+              new OrderNormalizer("test"),
+              Clock.fixed(Instant.parse("2026-10-16T00:00:00Z"), ZoneOffset.UTC),
+              null,
+              null,
+              tx,
+              failuresWriter);
+      assertThat(sync.synchronize(1L)).isFalse();
+      verify(failuresWriter)
+          .record(
+              1L,
+              com.tcrm.admin.order.model.OrderSyncFailureKind.valueOf(failure.kind),
+              "Order synchronization failed: inspect API status logs",
+              null);
+    }
+  }
+
+  private abstract static class PhaseCase {
+    final String kind;
+
+    PhaseCase(String kind) {
+      this.kind = kind;
+    }
+
+    abstract void stub(WeidianBusinessApi api);
+  }
 }

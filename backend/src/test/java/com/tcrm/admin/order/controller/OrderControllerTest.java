@@ -70,12 +70,32 @@ class OrderControllerTest {
 
   @Test
   void shouldReturnEveryShopWithSyncStatus_whenQueryingSyncStates() throws Exception {
+    var since = Instant.parse("2026-10-16T00:00:00Z");
     when(orders.listSyncStates())
         .thenReturn(
             List.of(
                 new OrderSyncStateDTO(
-                    10L, "Main shop", true, true, Instant.parse("2026-10-16T00:00:00Z"), null),
-                new OrderSyncStateDTO(20L, "Backup shop", false, false, null, null)));
+                    10L,
+                    "Main shop",
+                    true,
+                    true,
+                    since,
+                    null,
+                    new OrderSyncStateDTO.KindSyncDTO(
+                        "API", since, null, 2L, java.util.Map.of("payTime", 1L)),
+                    new OrderSyncStateDTO.KindSyncDTO(
+                        "IMPORT", since, null, 0L, java.util.Map.of("orderItemId", 3L)),
+                    new OrderSyncStateDTO.ImportCutoffDTO("ORDER", since, 33L)),
+                new OrderSyncStateDTO(
+                    20L,
+                    "Backup shop",
+                    false,
+                    false,
+                    null,
+                    null,
+                    new OrderSyncStateDTO.KindSyncDTO(null, null, null, 0L, java.util.Map.of()),
+                    new OrderSyncStateDTO.KindSyncDTO(null, null, null, 0L, java.util.Map.of()),
+                    null)));
     mvc.perform(get("/admin-api/order/sync-states").header(AdminMvcSupport.TOKEN_HEADER, admin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.length()").value(2))
@@ -84,10 +104,35 @@ class OrderControllerTest {
         .andExpect(jsonPath("$.data[0].enabled").value(true))
         .andExpect(jsonPath("$.data[0].authorized").value(true))
         .andExpect(jsonPath("$.data[0].lastSuccessAt").value("2026-10-16T00:00:00Z"))
+        .andExpect(jsonPath("$.data[0].orders.source").value("API"))
+        .andExpect(jsonPath("$.data[0].orders.failures24h").value(2))
+        .andExpect(jsonPath("$.data[0].orders.missingFields.payTime").value(1))
+        .andExpect(jsonPath("$.data[0].refunds.source").value("IMPORT"))
+        .andExpect(jsonPath("$.data[0].refunds.missingFields.orderItemId").value(3))
+        .andExpect(jsonPath("$.data[0].lastImport.kind").value("ORDER"))
+        .andExpect(jsonPath("$.data[0].lastImport.taskId").value("33"))
         .andExpect(jsonPath("$.data[1].shopId").value("20"))
         .andExpect(jsonPath("$.data[1].lastSuccessAt").isEmpty())
-        .andExpect(jsonPath("$.data[1].lastError").isEmpty());
+        .andExpect(jsonPath("$.data[1].lastError").isEmpty())
+        .andExpect(jsonPath("$.data[1].lastImport").isEmpty());
     verify(orders).listSyncStates();
+  }
+
+  @Test
+  void shouldReturnRecentFailures_whenQueryingSyncFailures() throws Exception {
+    when(orders.listSyncFailures())
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.service.SyncFailureDTO(
+                    1L, 10L, "Main shop", "ORDER_SYNC", "token expired", null, Instant.EPOCH)));
+    mvc.perform(get("/admin-api/order/sync-failures").header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].kind").value("ORDER_SYNC"))
+        .andExpect(jsonPath("$.data[0].shopName").value("Main shop"))
+        .andExpect(jsonPath("$.data[0].error").value("token expired"))
+        .andExpect(jsonPath("$.data[0].taskId").isEmpty());
+    verify(orders).listSyncFailures();
   }
 
   @Test
@@ -144,8 +189,12 @@ class OrderControllerTest {
     for (MockHttpServletRequestBuilder request :
         List.of(
             get("/admin-api/order/orders"),
+            get("/admin-api/order/orders/10"),
+            get("/admin-api/order/orders/10/chain"),
             get("/admin-api/order/unmatched"),
+            get("/admin-api/order/unmatched/20/evidence"),
             get("/admin-api/order/sync-states"),
+            get("/admin-api/order/sync-failures"),
             post("/admin-api/order/syncs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shopId\":5}"),

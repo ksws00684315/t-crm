@@ -8,15 +8,19 @@ import static com.tcrm.admin.order.service.RefundImportColumn.REFUND_TIME;
 import static com.tcrm.admin.order.service.RefundImportColumn.SHOP_ID;
 import static com.tcrm.admin.order.service.RefundImportColumn.SUB_ORDER_NO;
 
+import com.tcrm.admin.order.model.OrderSyncFailureKind;
 import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
+import com.tcrm.admin.task.api.ImportTaskOutcome;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 
 /** Imports one completed refund per Excel row (task 18 §4.3); {@code raw_status} is always 10. */
@@ -41,10 +45,27 @@ class RefundImportProcessor implements ImportRowProcessor {
 
   private final ShopAccessApi shops;
   private final OrderWriter writer;
+  private final OrderImportStateWriter importStates;
+  private final OrderSyncFailureWriter syncFailures;
+  private final long taskId;
+  private final Instant dataCutoffAt;
 
-  RefundImportProcessor(ShopAccessApi shops, OrderWriter writer) {
+  /** Shops whose import state was already written by this file; each shop is written once. */
+  private final Set<Long> importShops = new HashSet<>();
+
+  RefundImportProcessor(
+      long taskId,
+      ShopAccessApi shops,
+      OrderWriter writer,
+      OrderImportStateWriter importStates,
+      OrderSyncFailureWriter syncFailures,
+      Instant dataCutoffAt) {
+    this.taskId = taskId;
     this.shops = shops;
     this.writer = writer;
+    this.importStates = importStates;
+    this.syncFailures = syncFailures;
+    this.dataCutoffAt = dataCutoffAt;
   }
 
   @Override
@@ -60,6 +81,8 @@ class RefundImportProcessor implements ImportRowProcessor {
       shop = shops.findEnabledByWeidianShopId(shopWeidian);
       if (shop == null) {
         errors.add(ImportReason.of(SHOP_MISSING));
+      } else if (importShops.add(shop.id())) {
+        importStates.record(shop.id(), "REFUND", taskId, dataCutoffAt);
       }
     }
     String refundNo = REFUND_NO.of(row);
@@ -133,5 +156,22 @@ class RefundImportProcessor implements ImportRowProcessor {
       return List.of(ImportReason.of(REFUND_EXISTS));
     }
     return List.of();
+  }
+
+  @Override
+  public void onFinish(ImportTaskOutcome outcome) {
+    if (outcome.status() != ImportTaskOutcome.Status.SUCCESS) {
+      syncFailures.record(
+          null,
+          OrderSyncFailureKind.REFUND_IMPORT,
+          "Refund import finished "
+              + outcome.status()
+              + ": "
+              + outcome.failed()
+              + " of "
+              + outcome.total()
+              + " rows failed",
+          taskId);
+    }
   }
 }
