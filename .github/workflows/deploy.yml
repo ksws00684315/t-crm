@@ -2,10 +2,10 @@ name: Deploy
 on:
   pull_request:
     branches: [main]
-    paths: ['deploy/**', 'backend/Dockerfile', 'redirect/Dockerfile', '.dockerignore', '.github/workflows/deploy.yml']
+    paths: ['deploy/**', 'backend/Dockerfile', 'redirect/Dockerfile', 'backend/src/main/resources/application*.yml', 'redirect/src/main/resources/application*.yml', '.dockerignore', '.github/workflows/deploy.yml']
   push:
     branches: [main]
-    paths: ['deploy/**', 'backend/Dockerfile', 'redirect/Dockerfile', '.dockerignore', '.github/workflows/deploy.yml']
+    paths: ['deploy/**', 'backend/Dockerfile', 'redirect/Dockerfile', 'backend/src/main/resources/application*.yml', 'redirect/src/main/resources/application*.yml', '.dockerignore', '.github/workflows/deploy.yml']
 permissions:
   contents: read
 jobs:
@@ -25,6 +25,8 @@ jobs:
           docker compose -f deploy/docker-compose.preview.yml --env-file deploy/.env.example config -q
       - name: Assert healthchecks use bash (not dash CMD-SHELL)
         run: python3 deploy/scripts/check-healthchecks.py
+      - name: Assert required application variables are passed to each service
+        run: python3 deploy/scripts/check-compose-env.py
       - name: Backup retention rule
         run: bash deploy/backup/test-retention.sh
       - name: Set up Docker Buildx
