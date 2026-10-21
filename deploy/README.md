@@ -60,7 +60,7 @@ docker volume rm tcrm-local_pgdata tcrm-local_redisdata
 
 只用于在本机查看**当前工作目录**的源码，不用于任何服务器。从源码构建并启动管理端、达人端、后台和跳转服务，共用本地共享中间件的 PostgreSQL 与 Redis。
 
-前置条件：Docker（含 Compose 插件）、Node.js、pnpm、openssl。
+前置条件：Docker（含 Compose 插件）、Node.js、pnpm、openssl、curl。
 
 ```bash
 deploy/scripts/preview.sh up      # 构建并启动。可在任意目录执行（脚本按自身位置定位仓库根）
@@ -82,7 +82,7 @@ deploy/scripts/preview.sh reset   # 删除本预览项目容器和本地镜像�
 
 后台要求 `TCRM_LINK_BASE_URL`、`TCRM_KOL_PORTAL_BASE_URL`、`TCRM_ADMIN_BASE_URL` 为 https。预览填占位地址 `https://t.preview.invalid`、`https://kol.preview.invalid`、`https://admin.preview.invalid`，因此预览里生成的推广链接、邮件链接和注册链接不能直接打开。跳转服务请用 `http://localhost:8892/t/…` 手动验证；达人注册把链接里的占位域名换成 `http://localhost:8891`。`TCRM_MAIL_API_KEY` 为空，邮件不真正发出，只走日志兜底，且默认不记录正文（生产禁止打开 `crm.mail.log-links`）。
 
-看某个分支：切到该分支或进入其工作树，再执行 `preview.sh up`。不同工作树的预览容器共用同一套数据库。Flyway 设置只能缓解分支迁移的版本顺序与记录缺失；如果迁移造成结构破坏，先备份并恢复兼容的备份。
+看某个分支：切到该分支或进入其工作树，再执行 `preview.sh up`。命令在重建后端后重新加载 Nginx 的上游地址，并通过管理端验证码接口验证反向代理；若后端健康但验证码返回 502，可重新执行 `preview.sh up`。不同工作树的预览容器共用同一套数据库。Flyway 设置只能缓解分支迁移的版本顺序与记录缺失；如果迁移造成结构破坏，先备份并恢复兼容的备份。
 
 ### 从旧预览迁移
 
