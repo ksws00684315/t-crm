@@ -1063,7 +1063,7 @@ const zhCN = {
     },
     payTime: "支付时间",
     orderStatus: "订单状态",
-    payAmount: "实付",
+    payAmount: "支付金额",
     refundTotal: "退款合计",
     kol: "达人",
     bd: "所属商务",

@@ -1087,7 +1087,7 @@ const enUS: MessageSchema = {
     },
     payTime: "Paid at",
     orderStatus: "Order Status",
-    payAmount: "Paid",
+    payAmount: "Paid amount",
     refundTotal: "Refunds",
     kol: "Creator",
     bd: "Owner BD",
