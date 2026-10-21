@@ -158,6 +158,10 @@ describe("installGuard with the real route table", () => {
     expect((await navigate(superAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
   });
 
+  it("allows the platform administrator to open the platform-scoped audit page", async () => {
+    expect((await navigate(platformAdmin, "/system/oper-logs")).name).toBe("SystemOperLogs");
+  });
+
   it("opens /kol/kol-items for OWN too (creator products host the promo-sheet upload)", async () => {
     expect((await navigate(productOwn, "/kol/kol-items")).name).toBe("KolItemList");
     expect((await navigate(productAll, "/kol/kol-items")).name).toBe("KolItemList");

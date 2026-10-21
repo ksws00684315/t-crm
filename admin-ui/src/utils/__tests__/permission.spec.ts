@@ -293,7 +293,7 @@ describe("buildMenu", () => {
   });
 
   it("shows company management and system configuration to the platform administrator", () => {
-    expect(titles(platformAdmin)).toEqual(["公司管理", "系统配置"]);
+    expect(titles(platformAdmin)).toEqual(["公司管理", "系统配置", "系统管理", "操作日志"]);
   });
 });
 

@@ -360,6 +360,9 @@ class TenantIsolationIT {
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
     }
+    mvc.perform(get("/admin-api/system/oper-logs").header(TOKEN, platform))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
     for (String key : platformPaths) {
       MvcResult result = perform(key, tokenA, null).andReturn();
       assertThat(result.getResponse().getStatus()).as("platform endpoint %s", key).isEqualTo(403);
@@ -547,6 +550,7 @@ class TenantIsolationIT {
         || path.equals("/admin-api/auth/me")
         || path.equals("/admin-api/auth/password")
         || path.equals("/admin-api/public/site-config")
+        || path.equals("/admin-api/system/oper-logs")
         || path.equals("/admin-api/integration/weidian/oauth/callback")
         || path.startsWith("/admin-api/external/");
   }

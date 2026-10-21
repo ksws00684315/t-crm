@@ -320,6 +320,7 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.auditLogs",
               superAdmin: true,
+              platformAdmin: true,
               componentName: "SystemOperLogPage"
             }
           }

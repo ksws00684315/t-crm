@@ -22,6 +22,8 @@ docker compose -f deploy/docker-compose.dev.yml ps    # postgres、redis 应为 
 
 宿主机端口由 `TCRM_DB_PORT`（默认 5432）、`TCRM_REDIS_PORT`（默认 6379）决定，只绑定 `127.0.0.1`；本机已有 PostgreSQL / Redis 占用端口时，在 `deploy/.env` 中改这两个变量即可，在本机启动的后台和跳转服务读取同名变量连接。库 `tcrm` 与应用账号由 PostgreSQL 镜像根据 `TCRM_DB_NAME`、`TCRM_DB_USERNAME`、`TCRM_DB_PASSWORD` 创建；表由后台启动时的 Flyway 创建，这里不挂载初始化 SQL。
 
+多个本地后台进程共用数据库时，系统配置缓存按进程维护；在一个后台修改后会立即刷新该进程和跳转服务的 Redis 回退地址，其他后台进程需重启后读取新值。生产按单后台实例部署，不受此限制。
+
 ## 本地预览
 
 只用于在本机查看**当前工作目录**的源码，不用于任何服务器。一条命令从源码构建并启动管理端、达人端、后台、跳转服务、PostgreSQL 与 Redis。

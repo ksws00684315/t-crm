@@ -1173,6 +1173,7 @@ const zhCN = {
     time: "操作时间",
     operator: "操作人",
     module: "模块",
+    platformModule: "平台",
     action: "操作",
     result: "结果",
     uri: "请求地址",

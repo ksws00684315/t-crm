@@ -14,14 +14,19 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Platform-wide configuration registry, cache, validation, and persistence (task 34). */
 @Service
 public class SystemConfigService implements SystemConfigApi {
+  private static final Logger LOG = LoggerFactory.getLogger(SystemConfigService.class);
   public static final String REDIRECT_FALLBACK_REDIS_KEY = "crm:config:redirect-fallback-url";
   private final SysConfigMapper configs;
   private final Environment environment;
@@ -131,10 +136,7 @@ public class SystemConfigService implements SystemConfigApi {
             configs.updateById(row);
           }
         });
-    values.put(key, normalizedValue);
-    if ("url.redirect-fallback".equals(key)) {
-      redis.opsForValue().set(REDIRECT_FALLBACK_REDIS_KEY, normalizedValue);
-    }
+    refreshAfterCommit(key, normalizedValue);
     writeAudit(definition, oldValue, normalizedValue);
   }
 
@@ -152,11 +154,23 @@ public class SystemConfigService implements SystemConfigApi {
         () ->
             configs.delete(
                 new LambdaQueryWrapper<SysConfigDO>().eq(SysConfigDO::getConfigKey, key)));
-    values.put(key, value);
-    if ("url.redirect-fallback".equals(key)) {
-      redis.opsForValue().set(REDIRECT_FALLBACK_REDIS_KEY, value);
-    }
+    refreshAfterCommit(key, value);
     writeAudit(definition, oldValue, value);
+  }
+
+  private void refreshAfterCommit(String key, String value) {
+    Runnable refresh =
+        () -> {
+          values.put(key, value);
+          if ("url.redirect-fallback".equals(key)) {
+            try {
+              redis.opsForValue().set(REDIRECT_FALLBACK_REDIS_KEY, value);
+            } catch (RuntimeException e) {
+              LOG.warn("Could not publish redirect fallback configuration to Redis", e);
+            }
+          }
+        };
+    afterCommit(refresh);
   }
 
   private void writeAudit(SystemConfigDefinition definition, String oldValue, String newValue) {
@@ -175,7 +189,21 @@ public class SystemConfigService implements SystemConfigApi {
     event.setCostMs(0L);
     event.setOperTime(Instant.now());
     event.setTenantId(null);
-    audit.write(event);
+    afterCommit(() -> audit.write(event));
+  }
+
+  private void afterCommit(Runnable action) {
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              action.run();
+            }
+          });
+    } else {
+      action.run();
+    }
   }
 
   private static String jsonEscape(String value) {

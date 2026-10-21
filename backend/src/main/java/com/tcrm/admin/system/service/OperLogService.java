@@ -3,6 +3,7 @@ package com.tcrm.admin.system.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysOperLogMapper;
 import com.tcrm.admin.system.mapper.SysUserMapper;
 import com.tcrm.admin.system.model.SysOperLogDO;
@@ -27,8 +28,22 @@ public class OperLogService {
     this.json = json;
   }
 
-  public PageResult<OperLogDTO> page(OperLogQuery query) {
+  public PageResult<OperLogDTO> page(OperLogQuery query, boolean platformAdmin) {
+    if (platformAdmin) {
+      return TenantScope.callSystem(
+          "read platform system configuration audit records", () -> pageInScope(query, true));
+    }
+    return pageInScope(query, false);
+  }
+
+  private PageResult<OperLogDTO> pageInScope(OperLogQuery query, boolean platformScope) {
     var wrapper = new LambdaQueryWrapper<SysOperLogDO>();
+    if (platformScope) {
+      wrapper
+          .isNull(SysOperLogDO::getTenantId)
+          .eq(SysOperLogDO::getModule, "Platform")
+          .likeRight(SysOperLogDO::getRequestUri, "/admin-api/platform/system-configs/");
+    }
     if (hasText(query.module())) {
       wrapper.eq(SysOperLogDO::getModule, query.module().strip());
     }

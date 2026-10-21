@@ -204,6 +204,9 @@ function requiredCodes(meta: RouteAccessMeta | undefined): readonly PermissionCo
  * the platform administrator may not. OWN hides `hideForOwn` routes.
  */
 export function canAccessRoute(meta: RouteAccessMeta | undefined, access: AccessProfile): boolean {
+  if (meta?.platformAdmin && meta?.superAdmin) {
+    return access.isPlatformAdmin || access.isSuperAdmin;
+  }
   if (meta?.platformAdmin) return access.isPlatformAdmin;
   if (access.isPlatformAdmin) {
     if (meta?.companyAccount) return false;

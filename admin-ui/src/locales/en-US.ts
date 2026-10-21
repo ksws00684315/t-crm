@@ -1202,6 +1202,7 @@ const enUS: MessageSchema = {
     time: "Time",
     operator: "Operator",
     module: "Module",
+    platformModule: "Platform",
     action: "Action",
     result: "Result",
     uri: "Request URL",
