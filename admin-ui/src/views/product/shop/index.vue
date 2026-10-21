@@ -95,7 +95,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
-    list.push({ key: "actions", label: t("common.actions"), width: 330 });
+    list.push({ key: "actions", label: t("common.actions"), minWidth: 520 });
   }
   return list;
 });
@@ -567,7 +567,7 @@ onMounted(() => {
         </el-tag>
       </template>
       <template #actions="{ row }">
-        <RowActions :actions="rowActions(asShop(row))" :max-visible="3" />
+        <RowActions :actions="rowActions(asShop(row))" />
       </template>
     </DataTable>
 

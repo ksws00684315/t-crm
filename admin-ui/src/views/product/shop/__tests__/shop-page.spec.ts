@@ -87,10 +87,9 @@ describe("shop list buttons", () => {
     const admin = await mountPage();
     expect(admin.find('[data-test="create"]').exists()).toBe(true);
     expect(admin.find('[data-test="authorize-1"]').exists()).toBe(true);
-    await admin.find('[data-test="more-actions"]').trigger("click");
-    await flushPromises();
-    expect(document.body.querySelector('[data-test="edit-1"]')).not.toBeNull();
-    expect(document.body.querySelector('[data-test="status-1"]')).not.toBeNull();
+    expect(admin.find('[data-test="edit-1"]').exists()).toBe(true);
+    expect(admin.find('[data-test="status-1"]').exists()).toBe(true);
+    expect(admin.find('[data-test="more-actions"]').exists()).toBe(false);
     admin.unmount();
   });
 
@@ -99,6 +98,9 @@ describe("shop list buttons", () => {
     const staff = await mountPage();
     expect(staff.find('[data-test="create"]').exists()).toBe(false);
     expect(staff.find('[data-test="sync-order-1"]').exists()).toBe(true);
+    expect(staff.find('[data-test="authorize-1"]').exists()).toBe(false);
+    expect(staff.find('[data-test="edit-1"]').exists()).toBe(false);
+    expect(staff.find('[data-test="status-1"]').exists()).toBe(false);
     expect(staff.find('[data-test="more-actions"]').exists()).toBe(false);
     staff.unmount();
   });
@@ -155,12 +157,9 @@ describe("shop list buttons", () => {
       attachTo: document.body
     });
     await flushPromises();
-    await wrapper.get('[data-test="more-actions"]').trigger("click");
-    await flushPromises();
-    const poolAction = document.body.querySelector<HTMLElement>('[data-test="copy-pool-1"]');
-    expect(poolAction).not.toBeNull();
-    expect(poolAction?.getAttribute("aria-disabled")).toBe("true");
-    expect(poolAction?.getAttribute("title")).toContain("源店铺");
+    const poolAction = wrapper.get('[data-test="copy-pool-1"]');
+    expect(poolAction.attributes("disabled")).toBeDefined();
+    expect(poolAction.classes()).toContain("is-disabled");
     wrapper.unmount();
   });
 

@@ -265,7 +265,7 @@ onMounted(() => {
 
 <template>
   <div v-if="!canManage" class="empty">{{ t("errors.AUTH_FORBIDDEN") }}</div>
-  <template v-else>
+  <div v-else class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #filters>
         <el-form-item :label="t('copyToken.hint')">
@@ -398,7 +398,7 @@ onMounted(() => {
     </DataTable>
 
     <CopyTokenCreateDialog v-model="createVisible" @created="load" />
-  </template>
+  </div>
 </template>
 
 <style scoped>
