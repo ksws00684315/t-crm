@@ -27,7 +27,9 @@ import KolItemDetailDrawer from "./KolItemDetailDrawer.vue";
 
 defineOptions({ name: "KolItemListPage" });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
+/** Action column: View + Commission + Links (norm 11 / ADR-029). */
+const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 const links = computed(() => linkAbilities(me.user));
@@ -87,7 +89,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("mapping.status"), width: 90 },
   { key: "cleanupStatus", label: t("mapping.cleanupStatus"), minWidth: 120 },
   { key: "createTime", label: t("mapping.createTime"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: 180 }
+  // View + Commission + Links: 6 CJK / 19 Latin glyphs + 2×8px gaps + 20px cell pad.
+  { key: "actions", label: t("common.actions"), width: px(168, 208) }
 ]);
 
 const applied = ref({
