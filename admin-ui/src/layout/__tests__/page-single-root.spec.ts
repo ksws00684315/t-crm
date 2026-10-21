@@ -39,10 +39,14 @@ function walk(list: readonly RouteRecordRaw[]): RouteRecordRaw[] {
   return list.flatMap(route => [route, ...(route.children ? walk(route.children) : [])]);
 }
 
-/** Pages that the layout mounts inside the page Transition (same population as component-names). */
-const pages = walk(routes).filter(
-  route => typeof route.meta?.componentName === "string" && typeof route.component === "function"
-);
+/**
+ * Every child route of the layout that carries a component is a page rendered inside the page
+ * Transition. Selecting by structure rather than by `meta.componentName` keeps a new page that
+ * forgets the meta (and still gets a fragment root) from slipping past this guard.
+ */
+const layoutRoute = routes.find(route => route.path === "/");
+if (!layoutRoute?.children) throw new Error("cannot find the layout route in routes.ts");
+const pages = walk(layoutRoute.children).filter(route => typeof route.component === "function");
 
 /**
  * Route component factories keep the module specifier; Vite only wraps the loader, e.g.
@@ -90,25 +94,31 @@ function rootBranches(nodes: AxNode[]): AxNode[][] {
   return branches;
 }
 
+/** Root tags that compile to a non-element vnode, so BaseTransition cannot animate them. */
+const NON_ELEMENT_ROOTS = new Set(["slot", "Teleport", "Suspense"]);
+
 /** Whether a root node compiles to exactly one element instead of a fragment. */
 function rendersSingleElement(node: AxNode): boolean {
   if (node.type !== ELEMENT) return false;
-  // `<slot>` and `<template>` roots forward their children, so they are only safe while they hold one.
-  if (node.tag === "slot") return false;
+  // `<template>` forwards its children, so it is only safe while it holds exactly one element.
   if (node.tag === "template") {
     const children = elementChildren(node.children ?? []);
     return children.length === 1 && rendersSingleElement(children[0]);
   }
-  return true;
+  return !NON_ELEMENT_ROOTS.has(String(node.tag));
 }
 
 describe("page components mounted in the layout Transition", () => {
-  it("covers every cacheable page", () => {
-    expect(pages.length).toBeGreaterThan(20);
+  it("covers every page of the layout route", () => {
+    expect(pages.length).toBeGreaterThanOrEqual(26);
+    // Every page declares the name the tab cache keys on, so nothing hides behind a missing meta.
+    expect(
+      pages.filter(route => typeof route.meta?.componentName === "string").map(r => r.path)
+    ).toEqual(pages.map(route => route.path));
   });
 
   for (const route of pages) {
-    const label = `${String(route.meta?.componentName)} (${String(route.path)})`;
+    const label = `${String(route.path)} (${String(route.meta?.componentName ?? "no componentName")})`;
 
     it(`${label} renders a single element root`, () => {
       const { descriptor } = parse(templateSource(route), { filename: modulePath(route) });
