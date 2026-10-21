@@ -27,6 +27,8 @@ const zhCN = {
     all: "全部",
     enabled: "启用",
     disabled: "停用",
+    enable: "启用",
+    disable: "停用",
     email: "邮箱",
     username: "用户名",
     nickname: "昵称",

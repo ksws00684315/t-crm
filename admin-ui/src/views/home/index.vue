@@ -16,13 +16,18 @@ const greeting = computed(() =>
 
 <template>
   <el-card class="home" shadow="never">
-    <template #header>{{ t("home.welcome") }}</template>
+    <template #header
+      ><h1 class="home__title">{{ t("home.welcome") }}</h1></template
+    >
     <p v-if="user.user" class="home__greeting">{{ greeting }}</p>
     <p class="home__body">{{ t("home.body") }}</p>
   </el-card>
 </template>
 
 <style scoped>
+.home__title {
+  margin: 0;
+}
 .home__greeting,
 .home__body {
   margin: 0;

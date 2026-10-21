@@ -416,6 +416,9 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
 }
+.layout__watermark :deep(> .home) {
+  height: auto;
+}
 @media (max-width: 991px) {
   .layout__label,
   .layout__kbd {

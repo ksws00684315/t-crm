@@ -215,7 +215,7 @@ onMounted(() => void load());
           data-test="status"
           @click="toggleStatus(asShop(row))"
         >
-          {{ asShop(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+          {{ asShop(row).status === 1 ? t("common.disable") : t("common.enable") }}
         </el-button>
       </template>
     </DataTable>

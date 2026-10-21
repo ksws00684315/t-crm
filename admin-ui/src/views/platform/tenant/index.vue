@@ -119,7 +119,7 @@ onMounted(load);
           :type="asTenant(row).status === 1 ? 'danger' : 'success'"
           @click="toggleStatus(asTenant(row))"
         >
-          {{ asTenant(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+          {{ asTenant(row).status === 1 ? t("common.disable") : t("common.enable") }}
         </el-button>
       </template>
     </DataTable>

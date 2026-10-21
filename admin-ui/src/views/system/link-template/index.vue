@@ -148,7 +148,7 @@ onMounted(() => void load());
           data-test="status"
           @click="toggleStatus(asTemplate(row))"
         >
-          {{ asTemplate(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+          {{ asTemplate(row).status === 1 ? t("common.disable") : t("common.enable") }}
         </el-button>
       </template>
     </DataTable>

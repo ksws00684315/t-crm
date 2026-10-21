@@ -296,7 +296,7 @@ onMounted(() => void load());
             data-test="status"
             @click="toggleStatus(asSource(row))"
           >
-            {{ asSource(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+            {{ asSource(row).status === 1 ? t("common.disable") : t("common.enable") }}
           </el-button>
           <el-button link type="danger" data-test="delete" @click="remove(asSource(row))">
             {{ t("common.delete") }}

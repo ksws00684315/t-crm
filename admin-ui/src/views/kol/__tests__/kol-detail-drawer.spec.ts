@@ -99,6 +99,8 @@ describe("KOL detail drawer", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain("+8613800000000");
     expect(text).toContain("ABC123");
+    expect(text).toContain("达人邀请码");
+    expect(text).not.toContain("kol.inviteCode");
     expect(text).toContain("AgentOne");
     expect(text).toContain("后台录入");
     expect(text).toContain("未激活");
@@ -108,6 +110,23 @@ describe("KOL detail drawer", () => {
     expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
     expect(document.body.querySelector('[data-test="primary-tag"]')?.textContent).toContain("主");
     expect(document.body.querySelector('[data-test="detail-invite"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("omits the empty legacy platform field while keeping configured platforms", async () => {
+    const wrapper = await open(
+      detail({
+        linkTemplateName: null,
+        platforms: [
+          { templateId: "7", templateName: "kakobuy", address: "https://example.com/u/a" }
+        ]
+      })
+    );
+    const platformLabels = [...document.body.querySelectorAll(".el-descriptions__label")].filter(
+      label => label.textContent?.trim() === "代购平台"
+    );
+    expect(platformLabels).toHaveLength(1);
+    expect(document.body.textContent).toContain("kakobuy");
     wrapper.unmount();
   });
 

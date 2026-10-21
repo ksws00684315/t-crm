@@ -481,7 +481,7 @@ onMounted(load);
             :disabled="asUser(row).id === me.user?.id"
             @click="toggleStatus(asUser(row))"
           >
-            {{ asUser(row).status === 1 ? t("common.disabled") : t("common.enabled") }}
+            {{ asUser(row).status === 1 ? t("common.disable") : t("common.enable") }}
           </el-button>
           <el-tooltip
             v-if="isMultiCompany(asUser(row))"

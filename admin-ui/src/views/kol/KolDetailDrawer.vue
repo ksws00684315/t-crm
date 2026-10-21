@@ -153,10 +153,10 @@ const historyColumns = computed<DataColumn[]>(() => [
             <CopyText v-if="detail.phone" :value="detail.phone" />
             <span v-else>-</span>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.agentPlatform')">
-            {{ detail.linkTemplateName || "-" }}
+          <el-descriptions-item v-if="detail.linkTemplateName" :label="t('kol.agentPlatform')">
+            {{ detail.linkTemplateName }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.inviteCode')">
+          <el-descriptions-item :label="t('promotion.creatorInviteCode')">
             <CopyText v-if="detail.inviteCode" :value="detail.inviteCode" />
             <span v-else>-</span>
           </el-descriptions-item>
