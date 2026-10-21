@@ -50,6 +50,22 @@ public interface ImportTaskApi {
       int maxRows);
 
   /**
+   * Same as {@link #submitImport(TaskType, List, List, ImportFileDTO, Supplier, int)} but stores
+   * the submitter's parameters with the task row (task 40: order/refund imports must pass {@code
+   * dataCutoffTime}). Values are simple strings; the caller serializes and validates them.
+   *
+   * @param params JSON object text, or null when there are no parameters
+   */
+  Long submitImport(
+      TaskType type,
+      List<String> headerKeys,
+      List<String> legacyHeaderKeys,
+      ImportFileDTO file,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows,
+      String params);
+
+  /**
    * Same as {@link #submitImport(TaskType, List, ImportFileDTO, Supplier, int)} for rows the system
    * produced instead of a user upload (ADR-021: rows read from a product source sheet). The rows
    * are written into a workbook under the template header in the request language and stored as the
