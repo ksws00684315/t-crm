@@ -34,23 +34,28 @@ const row: UserVO = {
 describe("user management page", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    // Teleported dropdown menus can outlive a wrapper in jsdom; start every test clean.
-    document.body.querySelectorAll(".el-popper").forEach(el => el.remove());
+    // Pages mount into the body; start every test clean.
+    document.body.innerHTML = "";
     // BD rows ask for their creator count; unknown by default (no assertion depends on it).
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "0", page: 1, size: 1 });
   });
 
   async function mountPage(items: UserVO[] = [row], total = "1") {
     vi.mocked(userApi.listUsers).mockResolvedValue({ items, total, page: 1, size: 20 });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(UserPage, {
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
     await flushPromises();
     return wrapper;
   }
 
-  /** Entries folded into the row "more" dropdown teleport to body as list items. */
+  /** A row action button; Element Plus also renders a hidden column-measuring copy outside rows. */
   function bodyItem(testId: string): HTMLElement {
-    const el = document.body.querySelector<HTMLElement>(`[data-test="${testId}"]`);
-    if (!el) throw new Error(`missing dropdown entry ${testId}`);
+    const el = [...document.body.querySelectorAll<HTMLElement>(`[data-test="${testId}"]`)].find(
+      item => item.closest("tr") !== null
+    );
+    if (!el) throw new Error(`missing row action ${testId}`);
     return el;
   }
 
@@ -66,7 +71,10 @@ describe("user management page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(UserPage, {
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
     await flushPromises();
     expect(userApi.listUsers).toHaveBeenCalledWith({
       page: 1,
@@ -96,7 +104,10 @@ describe("user management page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(UserPage, {
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
     await flushPromises();
     const pagination = wrapper.findComponent({ name: "ElPagination" });
     expect(pagination.exists()).toBe(true);
@@ -114,7 +125,10 @@ describe("user management page", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(UserPage, {
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
     await flushPromises();
     const text = wrapper.text();
     expect(text).toContain("Staff");
