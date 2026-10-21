@@ -481,4 +481,19 @@ class OrderQueryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.unmatchedReason").value("CONFLICT"));
   }
+
+  @Test
+  void shouldIgnoreSoftDeletedOrders_whenResolvingLatestOrderSource() throws Exception {
+    long apiOrder = save("1000", PAID, line("90", "1"));
+    assertThat(apiOrder).isPositive();
+    // Soft-delete the only API order, then plant a newer IMPORT row with a higher id.
+    jdbc.update("UPDATE crm_order SET is_deleted = TRUE WHERE id=?", apiOrder);
+    jdbc.update(
+        "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,order_status,raw_status,attribution_status,source,order_time,pay_amount,total_amount,freight,discount,last_sync_time,create_time,update_time,is_deleted) "
+            + "VALUES(?,1,10,'1001','PAID','pay','UNMATCHED',2,now(),10,10,0,0,now(),now(),now(),FALSE)",
+        apiOrder + 1);
+    mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].orders.source").value("IMPORT"));
+  }
 }

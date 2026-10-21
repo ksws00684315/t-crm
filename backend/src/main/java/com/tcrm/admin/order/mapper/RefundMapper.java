@@ -30,12 +30,14 @@ public interface RefundMapper extends BaseMapper<RefundDO> {
       """
       SELECT o.shop_id AS shopId, o.source AS latestSource
         FROM crm_refund r
-        JOIN crm_order o ON o.id = r.order_id
-       WHERE r.id IN (
-         SELECT MAX(r2.id) FROM crm_refund r2
-         JOIN crm_order o2 ON o2.id = r2.order_id
-         GROUP BY o2.shop_id
-       )
+        JOIN crm_order o ON o.id = r.order_id AND o.is_deleted = FALSE
+       WHERE r.is_deleted = FALSE
+         AND r.id IN (
+           SELECT MAX(r2.id) FROM crm_refund r2
+           JOIN crm_order o2 ON o2.id = r2.order_id AND o2.is_deleted = FALSE
+           WHERE r2.is_deleted = FALSE
+           GROUP BY o2.shop_id
+         )
       """)
   List<RefundSourceRow> latestRefundSourcePerShop();
 

@@ -24,13 +24,17 @@ import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.OrderSyncFailureDO;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.CopyJobLookupApi;
+import com.tcrm.admin.product.api.CopyJobLookupApi.CopyJobRefDTO;
 import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.product.api.KolItemRefDTO;
+import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
 import com.tcrm.admin.product.api.ProductAccessApi;
+import com.tcrm.admin.product.api.ProductAccessApi.ProductRefDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -88,7 +92,12 @@ class OrderServiceTest {
   @BeforeAll
   static void metadata() {
     for (var type :
-        List.of(OrderDO.class, OrderItemDO.class, RefundDO.class, OrderSyncStateDO.class)) {
+        List.of(
+            OrderDO.class,
+            OrderItemDO.class,
+            RefundDO.class,
+            OrderSyncStateDO.class,
+            OrderSyncFailureDO.class)) {
       TableInfoHelper.initTableInfo(
           new MapperBuilderAssistant(new MybatisConfiguration(), ""), type);
     }
@@ -477,5 +486,239 @@ class OrderServiceTest {
     assertThat(result.get(1).orders()).isEqualTo(emptyOrders);
     assertThat(result.get(1).refunds()).isEqualTo(emptyRefunds);
     assertThat(result.get(1).lastImport()).isNull();
+  }
+
+  @Test
+  void shouldReturnOrderDetailWithLinesAndImages_whenOrderExists() {
+    var o = order(10);
+    o.setKolId(100L);
+    o.setSource(1);
+    o.setOrderStatus("PAID");
+    o.setFreight(new BigDecimal("1.00"));
+    o.setLastSyncTime(PAID);
+    o.setOrderTime(PAID.minusSeconds(60));
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setProductId(200L);
+    i.setKolId(100L);
+    i.setQuantity(2);
+    i.setPayAmount(new BigDecimal("12.50"));
+    i.setItemName("Product");
+    i.setSkuName("Size");
+    i.setRefundAmount(BigDecimal.ZERO);
+    when(items.selectList(any())).thenReturn(List.of(i));
+    when(refunds.selectList(any())).thenReturn(List.of());
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(products.listProducts(any()))
+        .thenReturn(List.of(new ProductRefDTO(200L, "P200", "Original", "https://img/a.png", 1)));
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.orderNo()).isEqualTo("remote10");
+    assertThat(detail.channel()).isEqualTo("WEIDIAN");
+    assertThat(detail.merchantNo()).isEqualTo("wd-5");
+    assertThat(detail.source()).isEqualTo("API");
+    assertThat(detail.refundStatus()).isEqualTo("NONE");
+    assertThat(detail.itemAmount()).isEqualByComparingTo("12.50");
+    assertThat(detail.items()).hasSize(1);
+    assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
+    assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("6.25");
+    assertThat(detail.items().getFirst().status()).isEqualTo("PAID");
+  }
+
+  @Test
+  void shouldRejectDetail_whenOwnScopeMissesSnapshot() {
+    when(account.ownScope()).thenReturn(true);
+    var o = order(10);
+    o.setBdUserId(8L);
+    when(orders.selectById(10L)).thenReturn(o);
+    error(() -> service.detail(10L), ErrorCode.AUTH_FORBIDDEN);
+  }
+
+  @Test
+  void shouldBuildChainWithCopyJobLinkAndRefunds_whenLineHasMapping() {
+    var o = order(10);
+    o.setKolId(100L);
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setKolItemId(300L);
+    i.setKolId(100L);
+    i.setQuantity(1);
+    i.setPayAmount(new BigDecimal("12.50"));
+    i.setSubOrderId("sub-1");
+    when(items.selectList(any())).thenReturn(List.of(i));
+    var refund = new RefundDO();
+    refund.setId(9L);
+    refund.setOrderId(10L);
+    refund.setOrderItemId(20L);
+    refund.setWeidianRefundNo("R9");
+    refund.setRefundType("REFUND_ONLY");
+    refund.setRefundStatus("SUCCESS");
+    refund.setAmount(new BigDecimal("2.00"));
+    refund.setFinishTime(PAID.plusSeconds(10));
+    when(refunds.selectList(any())).thenReturn(List.of(refund));
+    when(kolItems.listMappingsByIds(any()))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L, 100L, 200L, "P200", "Original", 5L, "90", PAID.minusSeconds(100), null)));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(copyJobs.findByTargetItemId("90"))
+        .thenReturn(new CopyJobRefDTO("JOB-1", PAID.minusSeconds(200), "completed"));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.orderId()).isEqualTo(10L);
+    assertThat(chain.lines()).hasSize(1);
+    var line = chain.lines().getFirst();
+    assertThat(line.copyJob().jobCode()).isEqualTo("JOB-1");
+    assertThat(line.link().kolItemId()).isEqualTo(300L);
+    assertThat(line.link().targetItemId()).isEqualTo("90");
+    assertThat(line.link().linkCode()).isNull();
+    assertThat(line.refunds()).hasSize(1);
+    assertThat(line.refunds().getFirst().refundNo()).isEqualTo("R9");
+    assertThat(line.ledger()).isNull();
+    assertThat(line.withdrawals()).isNull();
+  }
+
+  @Test
+  void shouldExplainEvidenceReasons_forMappingCoverageAndConflict() {
+    var o = order(10);
+    o.setAttributionStatus("UNMATCHED");
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setWeidianItemId("90");
+    i.setItemName("Exclusive");
+    i.setAttributionType(0);
+    when(items.selectOne(any())).thenReturn(i);
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1));
+    // Mapping ended before pay time → MAPPING_EXPIRED.
+    when(kolItems.listMappingsByShopItem(5L, "90"))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L,
+                    100L,
+                    200L,
+                    "P200",
+                    "Original",
+                    5L,
+                    "90",
+                    PAID.minusSeconds(200),
+                    PAID.minusSeconds(1))));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(products.getProduct(200L))
+        .thenReturn(new ProductRefDTO(200L, "P200", "Original", null, 1));
+
+    var expired = service.evidence(20L);
+    assertThat(expired.unmatchedReason()).isEqualTo("MAPPING_EXPIRED");
+    assertThat(expired.mappings().getFirst().coversPayTime()).isFalse();
+    assertThat(expired.product().productCode()).isEqualTo("P200");
+
+    when(kolItems.listMappingsByShopItem(5L, "90")).thenReturn(List.of());
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("NO_MAPPING");
+
+    o.setAttributionStatus("CONFLICT");
+    when(kolItems.listMappingsByShopItem(5L, "90"))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L, 100L, 200L, "P200", "Original", 5L, "90", PAID.minusSeconds(200), null)));
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("CONFLICT");
+
+    o.setAttributionStatus("PENDING");
+    o.setPayTime(null);
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("PENDING");
+  }
+
+  @Test
+  void shouldReturnNotFound_whenEvidenceLineIsMissing() {
+    when(items.selectOne(any())).thenReturn(null);
+    error(() -> service.evidence(404L), ErrorCode.COMMON_NOT_FOUND);
+  }
+
+  @Test
+  void shouldAggregateMissingFieldsFailuresAndSources_whenListingSyncStates() {
+    var state = new OrderSyncStateDO();
+    state.setShopId(5L);
+    state.setLastSuccessAt(PAID);
+    state.setLastError("detail failed");
+    state.setLastImportKind("ORDER");
+    state.setLastImportCutoffAt(PAID);
+    state.setLastImportTaskId(33L);
+    when(syncStates.selectList(any())).thenReturn(List.of(state));
+    when(authorization.authorizedShopIds()).thenReturn(List.of(5L));
+
+    var orderQuality = new OrderMapper.ShopQualityRow();
+    orderQuality.setShopId(5L);
+    orderQuality.setMissingPayTime(2L);
+    orderQuality.setMissingOrderTime(1L);
+    orderQuality.setMissingPayAmount(0L);
+    orderQuality.setMissingTotalAmount(null);
+    when(orders.missingOrderFields()).thenReturn(List.of(orderQuality));
+
+    var itemQuality = new OrderItemMapper.ItemQualityRow();
+    itemQuality.setShopId(5L);
+    itemQuality.setMissingItemId(3L);
+    itemQuality.setMissingPayAmount(4L);
+    when(items.missingItemFields()).thenReturn(List.of(itemQuality));
+
+    var refundQuality = new RefundMapper.RefundQualityRow();
+    refundQuality.setShopId(5L);
+    refundQuality.setMissingOrderItemId(5L);
+    refundQuality.setMissingFinishTime(6L);
+    when(refunds.missingRefundFields()).thenReturn(List.of(refundQuality));
+
+    var orderSource = new OrderMapper.ShopSourceRow();
+    orderSource.setShopId(5L);
+    orderSource.setLatestSource(1);
+    when(orders.latestOrderSourcePerShop()).thenReturn(List.of(orderSource));
+    var refundSource = new RefundMapper.RefundSourceRow();
+    refundSource.setShopId(5L);
+    refundSource.setLatestSource(2);
+    when(refunds.latestRefundSourcePerShop()).thenReturn(List.of(refundSource));
+
+    var failure = new OrderSyncFailureDO();
+    failure.setShopId(5L);
+    failure.setKind("ORDER_SYNC");
+    failure.setCreateTime(PAID);
+    when(syncFailures.selectList(any())).thenReturn(List.of(failure, failure));
+
+    var result = service.listSyncStates();
+    assertThat(result.getFirst().orders().source()).isEqualTo("API");
+    assertThat(result.getFirst().orders().failures24h()).isEqualTo(2L);
+    assertThat(result.getFirst().orders().missingFields().get("payTime")).isEqualTo(2L);
+    assertThat(result.getFirst().orders().missingFields().get("itemItemId")).isEqualTo(3L);
+    assertThat(result.getFirst().refunds().source()).isEqualTo("IMPORT");
+    assertThat(result.getFirst().refunds().missingFields().get("finishTime")).isEqualTo(6L);
+  }
+
+  @Test
+  void shouldListRecentSyncFailures_withShopNames() {
+    var failure = new OrderSyncFailureDO();
+    failure.setId(1L);
+    failure.setShopId(5L);
+    failure.setKind("ORDER_IMPORT");
+    failure.setError("row failed");
+    failure.setTaskId(77L);
+    failure.setCreateTime(PAID);
+    var orphan = new OrderSyncFailureDO();
+    orphan.setId(2L);
+    orphan.setShopId(null);
+    orphan.setKind("REFUND_IMPORT");
+    orphan.setError("partial");
+    orphan.setTaskId(78L);
+    orphan.setCreateTime(PAID);
+    when(syncFailures.selectList(any())).thenReturn(List.of(failure, orphan));
+
+    var rows = service.listSyncFailures();
+    assertThat(rows).hasSize(2);
+    assertThat(rows.getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(rows.getFirst().taskId()).isEqualTo(77L);
+    assertThat(rows.get(1).shopName()).isNull();
   }
 }
