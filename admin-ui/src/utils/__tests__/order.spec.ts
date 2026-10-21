@@ -3,9 +3,17 @@ import {
   attributionStatusText,
   attributionTagType,
   attributionTypeText,
+  channelText,
   manualAttributionRequest,
+  orderRefundStatusText,
+  orderRefundTagType,
+  orderSourceText,
   orderStatusText,
-  payRangeToQuery
+  payRangeToQuery,
+  refundStatusText,
+  refundTagType,
+  refundTypeText,
+  syncSourceText
 } from "../order";
 
 describe("order display texts", () => {
@@ -94,5 +102,42 @@ describe("payRangeToQuery", () => {
     expect(
       payRangeToQuery([new Date("2026-10-15T16:00:00.000Z"), undefined as unknown as Date])
     ).toEqual({});
+  });
+});
+
+describe("refund status, type and channel texts (task 40)", () => {
+  it("reads the pack for the order-level refund statuses (08.02)", () => {
+    expect(orderRefundStatusText("NONE")).toBe("无退款");
+    expect(orderRefundStatusText("PROCESSING")).toBe("退款中");
+    expect(orderRefundStatusText("PARTIAL_SUCCESS")).toBe("部分退款成功");
+    expect(orderRefundStatusText("FULL_SUCCESS")).toBe("全额退款成功");
+    expect(orderRefundStatusText(null)).toBe("-");
+  });
+
+  it("reads the pack for refund types and single-refund statuses", () => {
+    expect(refundTypeText("REFUND_ONLY")).toBe("仅退款");
+    expect(refundTypeText("RETURN_REFUND")).toBe("退货退款");
+    expect(refundTypeText(null)).toBe("-");
+    expect(refundStatusText("PROCESSING")).toBe("退款中");
+    expect(refundStatusText("SUCCESS")).toBe("退款成功");
+    expect(refundStatusText("CLOSED")).toBe("已关闭");
+  });
+
+  it("never gives a refunding state the success colour (08.02)", () => {
+    expect(refundTagType("SUCCESS")).toBe("success");
+    expect(refundTagType("PROCESSING")).toBe("warning");
+    expect(refundTagType("CLOSED")).toBe("info");
+    expect(orderRefundTagType("NONE")).toBe("info");
+    expect(orderRefundTagType("PROCESSING")).toBe("warning");
+    expect(orderRefundTagType("PARTIAL_SUCCESS")).toBe("danger");
+    expect(orderRefundTagType("FULL_SUCCESS")).toBe("danger");
+  });
+
+  it("names the channel and the two data sources", () => {
+    expect(channelText("WEIDIAN")).toBe("微店");
+    expect(channelText(null)).toBe("-");
+    expect(orderSourceText("SYNC")).toBe("接口同步");
+    expect(orderSourceText("IMPORT")).toBe("导入");
+    expect(syncSourceText(null)).toBe("-");
   });
 });

@@ -168,6 +168,7 @@ const enUS: MessageSchema = {
     orderList: "Order List",
     orderUnmatched: "Matching Pool",
     refundQuery: "Refund Query",
+    orderChain: "Order Chain",
     kolManage: "Creators",
     kols: "Creator List",
     kolItems: "Creator Products",
@@ -1080,6 +1081,10 @@ const enUS: MessageSchema = {
   order: {
     shop: "Shop",
     orderId: "Order ID",
+    channel: "Channel",
+    channelOption: {
+      WEIDIAN: "Weidian"
+    },
     payTime: "Paid at",
     orderStatus: "Order Status",
     payAmount: "Paid",
@@ -1090,6 +1095,22 @@ const enUS: MessageSchema = {
     attributionStatus: "Attribution",
     payRange: "Payment time",
     kolCode: "Creator code",
+    freight: "Freight",
+    createTime: "Created at",
+    refundStatusColumn: "Refund status",
+    actionView: "View",
+    actionChain: "Chain",
+    chainNoKol: "The chain needs an attributed creator",
+    source: {
+      SYNC: "API sync",
+      IMPORT: "Import"
+    },
+    refundStatus: {
+      NONE: "No refund",
+      PROCESSING: "Refunding",
+      PARTIAL_SUCCESS: "Partially refunded",
+      FULL_SUCCESS: "Fully refunded"
+    },
     status: {
       UNPAID: "Unpaid",
       PAID: "Paid",
@@ -1134,6 +1155,72 @@ const enUS: MessageSchema = {
     syncFailed: "Sync failed",
     syncNow: "Sync now",
     syncStarted: "Synchronization started",
+    sync: {
+      statesTab: "Sync status",
+      failuresTab: "Failed jobs",
+      typeColumn: "Type",
+      type: {
+        ORDER: "Orders",
+        REFUND: "Refunds"
+      },
+      source: "Source",
+      failures24h: "Failures in 24h",
+      missingFields: "Missing fields",
+      importCutoff: "Last import cutoff",
+      time: "Time",
+      linkedTask: "Import task",
+      viewTask: "View"
+    },
+    refund: {
+      no: "Refund No.",
+      orderNo: "Order No.",
+      typeColumn: "Refund type",
+      statusColumn: "Refund status",
+      amount: "Refund amount",
+      applyTime: "Applied at",
+      finishTime: "Succeeded at",
+      detailTitle: "Refund Detail",
+      items: "Refunded items",
+      type: {
+        REFUND_ONLY: "Refund only",
+        RETURN_REFUND: "Return & refund",
+        UNKNOWN: "Unknown"
+      },
+      status: {
+        PROCESSING: "Refunding",
+        SUCCESS: "Refunded",
+        CLOSED: "Closed",
+        UNKNOWN: "Unknown"
+      }
+    },
+    detail: {
+      title: "Order Detail",
+      merchantNo: "Merchant No.",
+      itemAmount: "Item amount",
+      totalAmount: "Order total",
+      orderTime: "Ordered at",
+      source: "Source",
+      lastSyncTime: "Last sync",
+      items: "Items",
+      image: "Image",
+      itemName: "Item",
+      unitPrice: "Unit price",
+      lineRefund: "Refund"
+    },
+    chain: {
+      copyJob: "Product copy job",
+      copyJobTime: "Created at",
+      kolItem: "Creator item link",
+      linkCode: "Link code",
+      sourceItemId: "Source item ID",
+      targetItemId: "Target item ID",
+      orderLine: "Order line",
+      refunds: "Refunds",
+      noRefund: "No refund",
+      noLines: "No order lines",
+      ledger: "Ledger entries",
+      withdrawals: "Withdrawal holds"
+    },
     importOrders: "Import orders",
     importRefunds: "Import refunds",
     orderImportTitle: "Import Orders",
@@ -1157,7 +1244,23 @@ const enUS: MessageSchema = {
       reasonRequired: "Please fill in the reason",
       assigned: "Creator assigned",
       markedNonKol: "Marked as a non-creator order",
-      rematched: "Re-matching finished"
+      rematched: "Re-matching finished",
+      evidence: "Evidence",
+      evidenceTitle: "Evidence",
+      evidenceLine: "Order line",
+      mappings: "Creator item mappings",
+      effectiveRange: "Effective range",
+      coversPayTime: "Covers pay time",
+      coversYes: "Covers",
+      coversNo: "Not covering",
+      sourceProduct: "Source product",
+      unmatchedReason: "Unmatched reason",
+      reasonOption: {
+        UNMATCHED: "Unmatched",
+        MISSING_RULE: "No rule",
+        CONFLICT: "Conflicting evidence"
+      },
+      manualRecords: "Manual handling records"
     }
   },
   link: {
@@ -1201,7 +1304,11 @@ const enUS: MessageSchema = {
     closeRunning: "Keep running, close window",
     close: "Close",
     again: "Import another",
-    submit: "Upload and import"
+    submit: "Upload and import",
+    cutoffPlaceholder: "Data cutoff time",
+    cutoffHint: "Required: when the uploaded file's data ends; cannot be later than now",
+    cutoffRequired: "Pick the data cutoff time",
+    cutoffFuture: "The data cutoff time cannot be later than now"
   },
   audit: {
     time: "Time",
