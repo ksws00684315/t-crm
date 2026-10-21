@@ -19,14 +19,18 @@ import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.product.api.CopyJobLookupApi;
+import com.tcrm.admin.product.api.KolItemApi;
 import com.tcrm.admin.product.api.KolItemRefDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
+import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -39,6 +43,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +56,7 @@ class OrderServiceTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderSyncStateMapper syncStates = mock(OrderSyncStateMapper.class);
+  private final OrderSyncFailureMapper syncFailures = mock(OrderSyncFailureMapper.class);
   private final KolApi kols = mock(KolApi.class);
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
@@ -58,6 +64,9 @@ class OrderServiceTest {
   private final OrderMappingApi mappings = mock(OrderMappingApi.class);
   private final KolOwnershipApi ownership = mock(KolOwnershipApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
+  private final KolItemApi kolItems = mock(KolItemApi.class);
+  private final ProductAccessApi products = mock(ProductAccessApi.class);
+  private final CopyJobLookupApi copyJobs = mock(CopyJobLookupApi.class);
   private final AccountDTO account = mock(AccountDTO.class);
   private final OrderService service =
       new OrderService(
@@ -65,12 +74,16 @@ class OrderServiceTest {
           items,
           refunds,
           syncStates,
+          syncFailures,
           kols,
           shops,
           bdUsers,
           authorization,
           new OrderAttribution(mappings, ownership),
-          current);
+          current,
+          kolItems,
+          products,
+          copyJobs);
 
   @BeforeAll
   static void metadata() {
@@ -90,6 +103,12 @@ class OrderServiceTest {
             List.of(
                 new ShopAccessDTO(5L, "Main shop", "wd-5", 1),
                 new ShopAccessDTO(6L, "Backup shop", "wd-6", 0)));
+    when(orders.missingOrderFields()).thenReturn(List.of());
+    when(orders.latestOrderSourcePerShop()).thenReturn(List.of());
+    when(items.missingItemFields()).thenReturn(List.of());
+    when(refunds.missingRefundFields()).thenReturn(List.of());
+    when(refunds.latestRefundSourcePerShop()).thenReturn(List.of());
+    when(syncFailures.selectList(any())).thenReturn(List.of());
   }
 
   private static OrderDO order(long id) {
@@ -115,7 +134,7 @@ class OrderServiceTest {
 
   private static OrderFilterDTO filter(String code) {
     return new OrderFilterDTO(
-        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, 1, 20);
+        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, null, null, 1, 20);
   }
 
   private static void error(Runnable action, ErrorCode expected) {
@@ -171,9 +190,11 @@ class OrderServiceTest {
     var a = new RefundDO();
     a.setOrderId(10L);
     a.setAmount(new BigDecimal("1.25"));
+    a.setRefundStatus("SUCCESS");
     var b = new RefundDO();
     b.setOrderId(10L);
     b.setAmount(new BigDecimal("0.75"));
+    b.setRefundStatus("PROCESSING");
     when(refunds.selectList(any())).thenReturn(List.of(a, b));
     when(kols.listByIds(any()))
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
@@ -183,10 +204,12 @@ class OrderServiceTest {
     var result = service.page(filter("KOL0100"), true);
 
     assertThat(result.total()).isEqualTo(2);
-    assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("2.00");
+    assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("1.25");
+    assertThat(result.items().getFirst().refundStatus()).isEqualTo("PROCESSING");
     assertThat(result.items().getFirst().shopName()).isEqualTo("Main shop");
     assertThat(result.items().getFirst().bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).refundAmount()).isEqualByComparingTo("0");
+    assertThat(result.items().get(1).refundStatus()).isEqualTo("NONE");
     assertThat(result.items().get(1).bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).items()).isEmpty();
     assertThat(result.items().getFirst().items().getFirst())
@@ -220,8 +243,10 @@ class OrderServiceTest {
         .contains(7L, 100L, "CONFLICT", "UNMATCHED", PAID.minusSeconds(1), PAID.plusSeconds(1));
     ArgumentCaptor<LambdaQueryWrapper<RefundDO>> refundQuery = ArgumentCaptor.captor();
     verify(refunds).selectList(refundQuery.capture());
-    assertThat(refundQuery.getValue().getSqlSegment()).contains("raw_status");
-    assertThat(refundQuery.getValue().getParamNameValuePairs().values()).contains("10");
+    // All refund rows load once per page; SUCCESS totals and the order-level status derive in
+    // memory (OrderRefundStatuses), so no status predicate appears in SQL.
+    assertThat(refundQuery.getValue().getSqlSegment()).contains("order_id IN");
+    assertThat(refundQuery.getValue().getParamNameValuePairs().values()).contains(10L, 11L);
   }
 
   @Test
@@ -329,7 +354,7 @@ class OrderServiceTest {
   @Test
   void shouldApplyOnlyRequestedFilters_whenOptionalQueryFieldsAreAbsent() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, null, 1, 20), false);
+    service.page(new OrderFilterDTO(null, null, null, null, null, null, null, null, 1, 20), false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -340,11 +365,32 @@ class OrderServiceTest {
   @Test
   void shouldConstrainAttributionStatus_whenRequested() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", 1, 20), false);
+    service.page(
+        new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", null, null, 1, 20), false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("attribution_status");
     assertThat(query.getValue().getParamNameValuePairs().values()).contains("ATTRIBUTED");
+  }
+
+  @Test
+  void shouldMatchExactOrderNoAndIgnoreUnknownChannels_whenFiltering() {
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(
+        new OrderFilterDTO(null, null, null, null, null, null, "12345", "WEIDIAN", 1, 20), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("weidian_order_id");
+    assertThat(query.getValue().getParamNameValuePairs().values()).contains("12345");
+    // An unknown channel selects nothing instead of silently ignoring the filter.
+    assertThat(
+            service
+                .page(
+                    new OrderFilterDTO(null, null, null, null, null, null, null, "TMALL", 1, 20),
+                    false)
+                .items())
+        .isEmpty();
+    verify(orders, times(1)).selectPage(any(), any());
   }
 
   @Test
@@ -393,13 +439,43 @@ class OrderServiceTest {
     state.setShopId(5L);
     state.setLastSuccessAt(PAID);
     state.setLastError("order detail failed for order 1000");
+    state.setLastImportKind("ORDER");
+    state.setLastImportCutoffAt(PAID.plusSeconds(1));
+    state.setLastImportTaskId(33L);
     when(syncStates.selectList(any())).thenReturn(List.of(state));
     when(authorization.authorizedShopIds()).thenReturn(List.of(5L));
 
-    assertThat(service.listSyncStates())
-        .containsExactly(
-            new OrderSyncStateDTO(
-                5L, "Main shop", true, true, PAID, "order detail failed for order 1000"),
-            new OrderSyncStateDTO(6L, "Backup shop", false, false, null, null));
+    var result = service.listSyncStates();
+
+    var emptyOrders =
+        new OrderSyncStateDTO.KindSyncDTO(
+            null,
+            null,
+            null,
+            0L,
+            Map.of(
+                "payTime", 0L,
+                "orderTime", 0L,
+                "payAmount", 0L,
+                "totalAmount", 0L,
+                "itemItemId", 0L,
+                "itemPayAmount", 0L));
+    var emptyRefunds =
+        new OrderSyncStateDTO.KindSyncDTO(
+            null, null, null, 0L, Map.of("orderItemId", 0L, "finishTime", 0L));
+    assertThat(result.get(0).shopId()).isEqualTo(5L);
+    assertThat(result.get(0).enabled()).isTrue();
+    assertThat(result.get(0).authorized()).isTrue();
+    assertThat(result.get(0).lastSuccessAt()).isEqualTo(PAID);
+    assertThat(result.get(0).lastError()).isEqualTo("order detail failed for order 1000");
+    assertThat(result.get(0).lastImport())
+        .isEqualTo(new OrderSyncStateDTO.ImportCutoffDTO("ORDER", PAID.plusSeconds(1), 33L));
+    assertThat(result.get(0).orders().lastSuccessAt()).isEqualTo(PAID);
+    assertThat(result.get(1).shopId()).isEqualTo(6L);
+    assertThat(result.get(1).enabled()).isFalse();
+    assertThat(result.get(1).authorized()).isFalse();
+    assertThat(result.get(1).orders()).isEqualTo(emptyOrders);
+    assertThat(result.get(1).refunds()).isEqualTo(emptyRefunds);
+    assertThat(result.get(1).lastImport()).isNull();
   }
 }

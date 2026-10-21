@@ -24,6 +24,20 @@ public class OrderSyncStateDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String lastError;
 
+  /**
+   * Latest import kind written by an import processor: ORDER or REFUND; null when never imported.
+   */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String lastImportKind;
+
+  /** Data cutoff time the operator declared for the latest import (task 40). */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Instant lastImportCutoffAt;
+
+  /** Import task that produced the latest import; {@code crm_task.id}. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Long lastImportTaskId;
+
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long tenantId;
 
@@ -65,6 +79,30 @@ public class OrderSyncStateDO extends BaseEntity {
 
   public void setLastError(String value) {
     lastError = value;
+  }
+
+  public String getLastImportKind() {
+    return lastImportKind;
+  }
+
+  public void setLastImportKind(String value) {
+    lastImportKind = value;
+  }
+
+  public Instant getLastImportCutoffAt() {
+    return lastImportCutoffAt;
+  }
+
+  public void setLastImportCutoffAt(Instant value) {
+    lastImportCutoffAt = value;
+  }
+
+  public Long getLastImportTaskId() {
+    return lastImportTaskId;
+  }
+
+  public void setLastImportTaskId(Long value) {
+    lastImportTaskId = value;
   }
 
   public Long getTenantId() {

@@ -1,10 +1,14 @@
 package com.tcrm.admin.order.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.tcrm.admin.order.service.OrderChainDTO;
 import com.tcrm.admin.order.service.OrderDTO;
+import com.tcrm.admin.order.service.OrderDetailDTO;
 import com.tcrm.admin.order.service.OrderService;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
 import com.tcrm.admin.order.service.OrderSyncStateDTO;
+import com.tcrm.admin.order.service.SyncFailureDTO;
+import com.tcrm.admin.order.service.UnmatchedEvidenceDTO;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
@@ -41,6 +45,20 @@ public class OrderController {
     return R.ok(orders.page(query.filter(), false));
   }
 
+  /** order:view; one order with amounts, provenance and product lines (task 40). */
+  @GetMapping("/orders/{id}")
+  @SaCheckPermission("order:view")
+  public R<OrderDetailDTO> detail(@PathVariable @Positive Long id) {
+    return R.ok(orders.detail(id));
+  }
+
+  /** order:view; per-line chain of copy job, link, order line and refunds (task 40). */
+  @GetMapping("/orders/{id}/chain")
+  @SaCheckPermission("order:view")
+  public R<OrderChainDTO> chain(@PathVariable @Positive Long id) {
+    return R.ok(orders.chain(id));
+  }
+
   /**
    * order:manage; 202 once the background worker acquires the shop lock; 409 ORDER_SYNC_RUNNING.
    */
@@ -59,11 +77,25 @@ public class OrderController {
     return R.ok(orders.listSyncStates());
   }
 
+  /** order:view; recent order sync and import failures of the company (task 40). */
+  @GetMapping("/sync-failures")
+  @SaCheckPermission("order:view")
+  public R<List<SyncFailureDTO>> syncFailures() {
+    return R.ok(orders.listSyncFailures());
+  }
+
   /** order:manage; paginated CONFLICT / UNMATCHED orders and lines. */
   @GetMapping("/unmatched")
   @SaCheckPermission("order:manage")
   public R<PageResult<OrderDTO>> unmatched(@Valid @ModelAttribute OrderQuery query) {
     return R.ok(orders.page(query.filter(), true));
+  }
+
+  /** order:manage; read-only match evidence of one order line of the manual pool (task 40). */
+  @GetMapping("/unmatched/{orderItemId}/evidence")
+  @SaCheckPermission("order:manage")
+  public R<UnmatchedEvidenceDTO> evidence(@PathVariable @Positive Long orderItemId) {
+    return R.ok(orders.evidence(orderItemId));
   }
 
   /** order:manage; 400 invalid target/reason, 404 foreign order or KOL, 403 outside OWN scope. */

@@ -15,6 +15,8 @@ import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.task.api.ImportReason;
+import com.tcrm.admin.task.api.ImportTaskOutcome;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,11 +26,15 @@ import org.mockito.ArgumentCaptor;
 class RefundImportProcessorTest {
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final OrderWriter writer = mock(OrderWriter.class);
+  private final OrderImportStateWriter importStates = mock(OrderImportStateWriter.class);
+  private final OrderSyncFailureWriter syncFailures = mock(OrderSyncFailureWriter.class);
   private RefundImportProcessor processor;
 
   @BeforeEach
   void setup() {
-    processor = new RefundImportProcessor(shops, writer);
+    processor =
+        new RefundImportProcessor(
+            77L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     when(shops.findEnabledByWeidianShopId("100"))
         .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1));
     when(writer.find(10L, "5001")).thenReturn(new OrderDO());
@@ -103,5 +109,24 @@ class RefundImportProcessorTest {
     verify(writer).saveImportedRefund(eq(10L), eq("5001"), eq("sub-1"), cap.capture());
     assertThat(cap.getValue().getRefundTime()).isNotNull();
     assertThat(cap.getValue().getFinishTime()).isNotNull();
+  }
+
+  @Test
+  void shouldRecordImportCutoffOncePerShop_whenRowsResolveShops() {
+    assertThat(processor.process(valid())).isEmpty();
+    assertThat(processor.process(valid())).isEmpty();
+    verify(importStates, org.mockito.Mockito.times(1))
+        .record(10L, "REFUND", 77L, Instant.parse("2026-10-21T00:00:00Z"));
+  }
+
+  @Test
+  void shouldRecordFailure_whenImportFinishesWithFailures() {
+    processor.onFinish(new ImportTaskOutcome(4, 4, 4, ImportTaskOutcome.Status.FAILED));
+    verify(syncFailures)
+        .record(
+            org.mockito.ArgumentMatchers.isNull(),
+            eq(com.tcrm.admin.order.model.OrderSyncFailureKind.REFUND_IMPORT),
+            org.mockito.ArgumentMatchers.contains("4 of 4"),
+            eq(77L));
   }
 }
