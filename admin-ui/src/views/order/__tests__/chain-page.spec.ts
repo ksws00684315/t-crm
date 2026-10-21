@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
-import type { OrderChainVO, Role } from "@/api/types";
+import type { OrderChainVO, OrderDetailVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useUserStore } from "@/stores/user";
@@ -22,22 +22,15 @@ vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 const chain: OrderChainVO = {
   orderId: "101",
   orderNo: "2026102100001",
-  channel: "WEIDIAN",
-  shopName: "t40 Shop",
-  shopCode: "S001",
-  kolName: "Zoe",
-  kolCode: "KOL-ZS01",
   lines: [
     {
       orderItemId: "301",
-      itemName: "t40 Item",
-      skuName: "Blue / L",
-      weidianItemId: "9001",
-      copyJob: { jobId: "801", jobNo: "JOB-20261020-01", createTime: "2026-10-20T08:00:00Z" },
-      kolItem: {
+      subOrderId: null,
+      copyJob: { jobCode: "JOB-20261020-01", createTime: "2026-10-20T08:00:00Z", status: "done" },
+      link: {
         kolItemId: "701",
         linkCode: "LC001",
-        sourceItemId: "8001",
+        sourceProductId: "8001",
         targetItemId: "9001",
         kolId: "201",
         kolName: "Zoe",
@@ -47,6 +40,7 @@ const chain: OrderChainVO = {
       payAmount: "120.00",
       refunds: [
         {
+          id: "501",
           refundNo: "R20261021001",
           refundType: "RETURN_REFUND",
           refundStatus: "SUCCESS",
@@ -54,21 +48,76 @@ const chain: OrderChainVO = {
           finishTime: "2026-10-20T13:00:00Z"
         }
       ],
-      ledger: [],
-      withdrawals: []
+      ledger: null,
+      withdrawals: null
     },
     {
       orderItemId: "302",
-      itemName: "t40 Item 2",
-      skuName: null,
-      weidianItemId: "9002",
+      subOrderId: null,
       copyJob: null,
-      kolItem: null,
+      link: null,
       quantity: 1,
       payAmount: "60.00",
       refunds: [],
-      ledger: [],
-      withdrawals: []
+      ledger: null,
+      withdrawals: null
+    }
+  ]
+};
+
+const orderDetail: OrderDetailVO = {
+  id: "101",
+  orderNo: "2026102100001",
+  channel: "WEIDIAN",
+  shopId: "1",
+  shopName: "t40 Shop",
+  shopCode: "S001",
+  merchantNo: "wd-merchant-1",
+  kolId: "201",
+  kolName: "Zoe",
+  kolCode: "KOL-ZS01",
+  orderStatus: "PAID",
+  refundStatus: "PARTIAL_SUCCESS",
+  attributionStatus: "ATTRIBUTED",
+  source: "API",
+  orderTime: "2026-10-20T10:00:00Z",
+  payTime: "2026-10-20T10:01:00Z",
+  lastSyncTime: "2026-10-20T11:00:00Z",
+  createTime: "2026-10-20T10:00:05Z",
+  itemAmount: "180.00",
+  totalAmount: "185.00",
+  payAmount: "180.00",
+  freight: "5.00",
+  items: [
+    {
+      id: "301",
+      imageUrl: null,
+      itemName: "t40 Item",
+      weidianItemId: "9001",
+      skuName: "Blue / L",
+      kolId: "201",
+      kolName: "Zoe",
+      kolCode: "KOL-ZS01",
+      quantity: 2,
+      unitPrice: "60.00",
+      payAmount: "120.00",
+      refundAmount: "20.00",
+      status: "REFUNDED"
+    },
+    {
+      id: "302",
+      imageUrl: null,
+      itemName: "t40 Item 2",
+      weidianItemId: "9002",
+      skuName: null,
+      kolId: null,
+      kolName: null,
+      kolCode: null,
+      quantity: 1,
+      unitPrice: "60.00",
+      payAmount: "60.00",
+      refundAmount: null,
+      status: null
     }
   ]
 };
@@ -93,6 +142,7 @@ function signIn(role: Role, permissions: string[]) {
 
 async function mountPage() {
   vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
+  vi.mocked(orderApi.getOrder).mockResolvedValue(orderDetail);
   const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push("/order/orders/101/chain");
   const wrapper = mount(OrderChainPage, {
@@ -108,6 +158,7 @@ describe("order chain page (task 40)", () => {
     document.body.innerHTML = "";
     localStorage.clear();
     vi.mocked(orderApi.getOrderChain).mockReset();
+    vi.mocked(orderApi.getOrder).mockReset();
     vi.mocked(notifyError).mockClear();
     setActivePinia(createPinia());
   });

@@ -380,8 +380,8 @@ export type RefundType = "REFUND_ONLY" | "RETURN_REFUND" | "UNKNOWN";
 /** Single-refund status (task 40 §3.1). Only SUCCESS counts as a completed refund. */
 export type RefundStatus = "PROCESSING" | "SUCCESS" | "CLOSED" | "UNKNOWN";
 
-/** Where the order data came from (task 40 §3.2). */
-export type OrderSource = "SYNC" | "IMPORT";
+/** Where the order data came from (task 40 §3.2): the Weidian API or a manual import. */
+export type OrderSource = "API" | "IMPORT";
 
 /** Order attribution status (design §4.6). */
 export type AttributionStatus = "PENDING" | "ATTRIBUTED" | "NON_KOL" | "CONFLICT" | "UNMATCHED";
@@ -460,25 +460,29 @@ export interface OrderDetailItemVO {
 /** `GET /order/orders/{id}` (task 40 §3.2). */
 export interface OrderDetailVO {
   id: string;
-  weidianOrderId: string;
+  /** The Weidian order number. */
+  orderNo: string;
   channel: Channel;
+  shopId: string;
   shopName: string | null;
   shopCode: string | null;
   /** The shop's Weidian merchant identifier. */
   merchantNo: string | null;
-  itemAmount: string | null;
-  freight: string | null;
-  totalAmount: string;
-  payAmount: string;
-  orderStatus: OrderStatus;
-  refundStatus: OrderRefundStatus;
   kolId: string | null;
   kolName: string | null;
   kolCode: string | null;
+  orderStatus: OrderStatus;
+  refundStatus: OrderRefundStatus;
+  attributionStatus: AttributionStatus;
+  source: OrderSource | null;
   orderTime: string | null;
   payTime: string | null;
-  source: OrderSource | null;
   lastSyncTime: string | null;
+  createTime: string | null;
+  itemAmount: string | null;
+  totalAmount: string;
+  payAmount: string;
+  freight: string | null;
   items: OrderDetailItemVO[];
 }
 
@@ -500,13 +504,14 @@ export interface RefundVO {
   finishTime: string | null;
 }
 
-/** One refunded product row (task 40 §3.3). */
+/** One refunded product row, linked to its order line (task 40 §3.3). */
 export interface RefundItemVO {
-  id: string;
+  orderItemId: string;
   imageUrl: string | null;
   itemName: string | null;
   weidianItemId: string;
   skuName: string | null;
+  kolId: string | null;
   kolName: string | null;
   kolCode: string | null;
   quantity: number | null;
@@ -516,21 +521,22 @@ export interface RefundItemVO {
 /** `GET /order/refunds/{id}` (task 40 §3.3). */
 export interface RefundDetailVO extends RefundVO {
   merchantNo: string | null;
-  items: RefundItemVO[];
+  lines: RefundItemVO[];
 }
 
 /** Copy job block of a chain line (task 40 §3.4); null when the item has no copy job. */
 export interface ChainCopyJobVO {
-  jobId: string;
-  jobNo: string;
+  jobCode: string;
   createTime: string | null;
+  status: string | null;
 }
 
 /** KOL item link block of a chain line (task 40 §3.4); null when the line has no mapping. */
-export interface ChainKolItemVO {
+export interface ChainLinkVO {
   kolItemId: string;
   linkCode: string | null;
-  sourceItemId: string;
+  /** The source product the mapping points at (the chain's source item id). */
+  sourceProductId: string;
   targetItemId: string;
   kolId: string | null;
   kolName: string | null;
@@ -539,6 +545,7 @@ export interface ChainKolItemVO {
 
 /** One refund attached to a chain line (task 40 §3.4). */
 export interface ChainRefundVO {
+  id: string;
   refundNo: string;
   refundType: RefundType;
   refundStatus: RefundStatus;
@@ -548,53 +555,52 @@ export interface ChainRefundVO {
 
 /**
  * One product row of the order chain (task 40 §3.4): copy job → KOL item link → order line →
- * refunds. `ledger` and `withdrawals` stay null (developing) until the settlement scope lands.
+ * refunds. `ledger` and `withdrawals` stay null (developing) until the settlement scope lands;
+ * line names come from the order detail loaded alongside.
  */
 export interface ChainLineVO {
   orderItemId: string;
-  itemName: string | null;
-  skuName: string | null;
-  weidianItemId: string | null;
+  subOrderId: string | null;
   copyJob: ChainCopyJobVO | null;
-  kolItem: ChainKolItemVO | null;
+  link: ChainLinkVO | null;
   quantity: number | null;
   payAmount: string | null;
   refunds: ChainRefundVO[];
-  ledger: unknown[];
-  withdrawals: unknown[];
+  ledger: unknown;
+  withdrawals: unknown;
 }
 
 /** `GET /order/orders/{id}/chain` (task 40 §3.4). */
 export interface OrderChainVO {
   orderId: string;
   orderNo: string;
-  channel: Channel;
-  shopName: string | null;
-  shopCode: string | null;
-  kolName: string | null;
-  kolCode: string | null;
   lines: ChainLineVO[];
 }
 
 /** Which of the two sync streams a monitoring row describes. */
 export type SyncDataType = "ORDER" | "REFUND";
 
-/** Where the data of one monitoring row came from. */
-export type SyncSource = "SYNC" | "IMPORT";
+/** Where the data of one monitoring row came from: the Weidian API or a manual import. */
+export type SyncSource = "API" | "IMPORT";
 
-/** One shop × (order | refund) monitoring row (task 40 §3.5). */
-export interface SyncStateRowVO {
-  dataType: SyncDataType;
+/** One stream (orders or refunds) of a shop's monitoring block (task 40 §3.5). */
+export interface KindSyncVO {
   source: SyncSource | null;
   lastSuccessAt: string | null;
   lastError: string | null;
   failures24h: number;
-  missingFieldCount: number;
-  /** Data cutoff time of this shop's latest import; null when it never imported. */
-  lastImportCutoffTime: string | null;
+  /** Missing-field record counts by field name (dictionary in design §4.6a). */
+  missingFields: Record<string, number>;
 }
 
-/** `OrderSyncStateDTO` extended by task 40 §3.5: one shop with an order and a refund row. */
+/** The shop's latest import and its declared data cutoff (task 40 §3.5). */
+export interface ImportCutoffVO {
+  kind: SyncDataType;
+  dataCutoffTime: string;
+  taskId: string;
+}
+
+/** `OrderSyncStateDTO` extended by task 40 §3.5: one shop with per-stream monitoring. */
 export interface OrderSyncStateVO {
   shopId: string;
   shopName: string;
@@ -602,51 +608,64 @@ export interface OrderSyncStateVO {
   authorized: boolean;
   lastSuccessAt?: string | null;
   lastError?: string | null;
-  rows?: SyncStateRowVO[];
+  orders?: KindSyncVO | null;
+  refunds?: KindSyncVO | null;
+  lastImport?: ImportCutoffVO | null;
 }
+
+/** Which pipeline a failure belongs to (task 40 §3.5). */
+export type SyncFailureKind = "ORDER_SYNC" | "REFUND_SYNC" | "ORDER_IMPORT" | "REFUND_IMPORT";
 
 /** One recent sync / import failure (task 40 §3.5); `taskId` links an import task. */
 export interface SyncFailureVO {
   id: string;
+  shopId: string | null;
   shopName: string | null;
-  dataType: SyncDataType;
-  time: string;
+  kind: SyncFailureKind;
   error: string | null;
   taskId: string | null;
+  time: string;
 }
 
-/** Why an order item could not be attributed (task 40 §3.6, matching-pool evidence). */
-export type UnmatchedReason = "UNMATCHED" | "MISSING_RULE" | "CONFLICT";
+/** Why a line sits in the manual pool (task 40 §3.6, OrderService.unmatchedReason). */
+export type UnmatchedReason = "PENDING" | "CONFLICT" | "NO_MAPPING" | "MAPPING_EXPIRED" | "MATCHED";
 
-/** One KOL-item mapping that shares the evidence item's Weidian item id (task 40 §3.6). */
+/** One mapping candidate sharing the line's Weidian item id (task 40 §3.6). */
 export interface EvidenceMappingVO {
   kolItemId: string;
+  kolId: string | null;
   kolName: string | null;
   kolCode: string | null;
   linkCode: string | null;
-  effectiveFrom: string | null;
-  effectiveTo: string | null;
-  /** Whether the mapping's validity window covers the order's pay time. */
+  validFrom: string | null;
+  validTo: string | null;
+  /** Whether `validFrom <= payTime < validTo` (null end = current). */
   coversPayTime: boolean;
 }
 
-/** One earlier manual attribution decision recorded for the order (task 40 §3.6). */
-export interface EvidenceManualRecordVO {
-  operatorName: string | null;
-  action: string;
-  reason: string | null;
-  createTime: string;
+/** The recorded manual decision on this line, if any (task 40 §3.6). */
+export interface EvidenceManualVO {
+  attributionType: ItemAttributionType | null;
+  manualReason: string | null;
+  attributionTime: string | null;
 }
 
 /** `GET /order/unmatched/{orderItemId}/evidence` (task 40 §3.6). */
 export interface MatchEvidenceVO {
   orderItemId: string;
-  weidianItemId: string;
+  orderId: string;
+  orderNo: string;
+  shopId: string;
   shopName: string | null;
-  shopCode: string | null;
+  merchantNo: string | null;
+  weidianItemId: string;
+  itemName: string | null;
+  skuName: string | null;
   payTime: string | null;
-  mappings: EvidenceMappingVO[];
-  sourceProduct: { productId: string; productName: string | null } | null;
+  orderAttributionStatus: AttributionStatus;
+  lineAttributionType: string | null;
   unmatchedReason: UnmatchedReason;
-  manualRecords: EvidenceManualRecordVO[];
+  product: { productId: string; productCode: string | null; productName: string | null } | null;
+  mappings: EvidenceMappingVO[];
+  manual: EvidenceManualVO | null;
 }

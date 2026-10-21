@@ -2,20 +2,28 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { getOrderChain } from "@/api/order/order";
-import type { ChainLineVO, OrderChainVO } from "@/api/types";
+import { getOrder, getOrderChain } from "@/api/order/order";
+import type { ChainLineVO, OrderChainVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { channelText, refundStatusText, refundTagType, refundTypeText } from "@/utils/order";
+import {
+  channelText,
+  orderStatusText,
+  refundStatusText,
+  refundTagType,
+  refundTypeText
+} from "@/utils/order";
 
 defineOptions({ name: "OrderChainPage" });
 
 /**
  * Order chain (requirement 09.04, task 40 §4): opens in its own browser tab from the order
- * list. Every product line walks copy job → creator item link → order line → refunds; the
- * settlement blocks (ledger, withdrawals) are out of this task's scope and say "developing".
+ * list. The chain endpoint only carries the per-line wiring, so the page also loads the order
+ * detail for the header and the line names. Every product line walks copy job → creator item
+ * link → order line → refunds; the settlement blocks (ledger, withdrawals) are out of this
+ * task's scope and say "developing".
  */
 const { t } = useI18n();
 const route = useRoute();
@@ -23,13 +31,17 @@ const router = useRouter();
 
 const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
+/** Header context; degrades to the bare chain when the detail call fails. */
+const detail = ref<OrderDetailVO | null>(null);
 
-function kolText(line: ChainLineVO): string {
-  const item = line.kolItem;
-  if (!item || (!item.kolCode && !item.kolName)) return "-";
-  return item.kolCode
-    ? `${item.kolName ?? item.kolCode}（${item.kolCode}）`
-    : (item.kolName ?? "-");
+/** Line titles come from the detail items matched by order-item id. */
+function lineName(line: ChainLineVO): string {
+  const item = detail.value?.items.find(candidate => candidate.id === line.orderItemId);
+  return item?.itemName ?? t("order.detail.itemName");
+}
+
+function lineSku(line: ChainLineVO): string | null {
+  return detail.value?.items.find(candidate => candidate.id === line.orderItemId)?.skuName ?? null;
 }
 
 const refundColumns = computed<DataColumn[]>(() => [
@@ -40,9 +52,9 @@ const refundColumns = computed<DataColumn[]>(() => [
   { key: "finishTime", label: t("order.refund.finishTime"), width: 170 }
 ]);
 
-/** The product-task page owns the copy jobs; keep the job number as the filter (task 39). */
-function openCopyJob(jobNo: string): void {
-  void router.push({ path: "/product/tasks", query: { jobNo } });
+/** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */
+function openCopyJob(jobCode: string): void {
+  void router.push({ path: "/product/tasks", query: { jobNo: jobCode } });
 }
 
 onMounted(async () => {
@@ -50,9 +62,15 @@ onMounted(async () => {
   if (!id) return;
   loading.value = true;
   try {
-    chain.value = await getOrderChain(id);
-  } catch (error) {
-    notifyError(error);
+    const [chainResult, detailResult] = await Promise.allSettled([getOrderChain(id), getOrder(id)]);
+    if (chainResult.status === "fulfilled") {
+      chain.value = chainResult.value;
+    } else {
+      notifyError(chainResult.reason);
+    }
+    if (detailResult.status === "fulfilled") {
+      detail.value = detailResult.value;
+    }
   } finally {
     loading.value = false;
   }
@@ -60,7 +78,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="chain-page" v-loading="loading">
+  <div v-loading="loading" class="chain-page">
     <template v-if="chain">
       <div class="chain-page__card" data-test="chain-header">
         <h3 class="chain-page__title">{{ t("route.orderChain") }}</h3>
@@ -68,17 +86,20 @@ onMounted(async () => {
           <el-descriptions-item :label="t('order.orderId')">
             <CopyText :value="chain.orderNo" />
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.channel')">
-            {{ channelText(chain.channel) }}
+          <el-descriptions-item v-if="detail" :label="t('order.channel')">
+            {{ channelText(detail.channel) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.shop')">
-            {{ chain.shopName ?? "-" }}{{ chain.shopCode ? `（${chain.shopCode}）` : "" }}
+          <el-descriptions-item v-if="detail" :label="t('order.shop')">
+            {{ detail.shopName ?? "-" }}{{ detail.shopCode ? `（${detail.shopCode}）` : "" }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.kol')">
-            <span v-if="chain.kolCode"
-              >{{ chain.kolName ?? chain.kolCode }}（{{ chain.kolCode }}）</span
+          <el-descriptions-item v-if="detail" :label="t('order.kol')">
+            <span v-if="detail.kolCode"
+              >{{ detail.kolName ?? detail.kolCode }}（{{ detail.kolCode }}）</span
             >
             <span v-else>-</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
+            {{ orderStatusText(detail.orderStatus) }}
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -90,11 +111,8 @@ onMounted(async () => {
         data-test="chain-line"
       >
         <h4 class="chain-line__title">
-          {{ line.itemName ?? "-" }}
-          <span v-if="line.skuName" class="chain-line__sku">{{ line.skuName }}</span>
-          <span v-if="line.weidianItemId" class="chain-line__sku">
-            {{ t("order.line.itemId") }}: {{ line.weidianItemId }}
-          </span>
+          {{ lineName(line) }}
+          <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
         </h4>
 
         <div class="chain-line__blocks">
@@ -105,9 +123,9 @@ onMounted(async () => {
                 link
                 type="primary"
                 data-test="chain-copy-job-link"
-                @click="openCopyJob(line.copyJob.jobNo)"
+                @click="openCopyJob(line.copyJob.jobCode)"
               >
-                {{ line.copyJob.jobNo }}
+                {{ line.copyJob.jobCode }}
               </el-button>
               <div class="chain-block__text">
                 {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
@@ -118,17 +136,23 @@ onMounted(async () => {
 
           <div class="chain-block" data-test="chain-kol-item">
             <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
-            <template v-if="line.kolItem">
+            <template v-if="line.link">
               <div class="chain-block__text">
-                {{ t("order.chain.linkCode") }}: {{ line.kolItem.linkCode ?? "-" }}
+                {{ t("order.chain.linkCode") }}: {{ line.link.linkCode ?? "-" }}
               </div>
               <div class="chain-block__text">
-                {{ t("order.chain.sourceItemId") }}: {{ line.kolItem.sourceItemId ?? "-" }}
+                {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
               </div>
               <div class="chain-block__text">
-                {{ t("order.chain.targetItemId") }}: {{ line.kolItem.targetItemId ?? "-" }}
+                {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
               </div>
-              <div class="chain-block__text">{{ t("order.kol") }}: {{ kolText(line) }}</div>
+              <div class="chain-block__text">
+                {{ t("order.kol") }}:
+                <span v-if="line.link.kolCode"
+                  >{{ line.link.kolName ?? line.link.kolCode }}（{{ line.link.kolCode }}）</span
+                >
+                <span v-else>-</span>
+              </div>
             </template>
             <div v-else class="chain-block__text">-</div>
           </div>

@@ -57,40 +57,46 @@ const order: OrderVO = {
 
 const evidence: MatchEvidenceVO = {
   orderItemId: "301",
-  weidianItemId: "9001",
+  orderId: "101",
+  orderNo: "2026102100001",
+  shopId: "1",
   shopName: "t40 Shop",
-  shopCode: "S001",
+  merchantNo: "wd-merchant-1",
+  weidianItemId: "9001",
+  itemName: "t40 Item",
+  skuName: "Blue / L",
   payTime: "2026-10-20T10:01:00Z",
+  orderAttributionStatus: "UNMATCHED",
+  lineAttributionType: "0",
+  unmatchedReason: "CONFLICT",
+  product: { productId: "8001", productCode: "P8001", productName: "t40 Source" },
   mappings: [
     {
       kolItemId: "701",
+      kolId: "201",
       kolName: "Zoe",
       kolCode: "KOL-ZS01",
       linkCode: "LC001",
-      effectiveFrom: "2026-10-01T00:00:00Z",
-      effectiveTo: null,
+      validFrom: "2026-10-01T00:00:00Z",
+      validTo: null,
       coversPayTime: true
     },
     {
       kolItemId: "702",
+      kolId: "202",
       kolName: "Ada",
       kolCode: "KOL-AA02",
       linkCode: "LC002",
-      effectiveFrom: "2026-10-25T00:00:00Z",
-      effectiveTo: null,
+      validFrom: "2026-10-25T00:00:00Z",
+      validTo: null,
       coversPayTime: false
     }
   ],
-  sourceProduct: { productId: "8001", productName: "t40 Source" },
-  unmatchedReason: "CONFLICT",
-  manualRecords: [
-    {
-      operatorName: "ops",
-      action: "ASSIGN",
-      reason: "confirmed by chat",
-      createTime: "2026-10-20T09:00:00Z"
-    }
-  ]
+  manual: {
+    attributionType: 2,
+    manualReason: "confirmed by chat",
+    attributionTime: "2026-10-20T09:00:00Z"
+  }
 };
 
 async function mountDrawer() {
@@ -124,9 +130,13 @@ describe("match evidence drawer (task 40)", () => {
     expect(vi.mocked(orderApi.getMatchEvidence)).toHaveBeenCalledWith("301");
     const basic = document.body.querySelector('[data-test="evidence-basic"]');
     expect(basic?.textContent).toContain("9001");
-    expect(basic?.textContent).toContain("t40 Shop（S001）");
+    expect(basic?.textContent).toContain("t40 Shop");
+    expect(basic?.textContent).toContain("wd-merchant-1");
     expect(basic?.textContent).toContain("证据冲突");
     expect(basic?.textContent).toContain("t40 Source（8001）");
+    expect(document.body.querySelector('[data-test="evidence-manual"]')?.textContent).toContain(
+      "confirmed by chat"
+    );
     wrapper.unmount();
   });
 

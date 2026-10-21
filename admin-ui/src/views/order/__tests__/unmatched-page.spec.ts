@@ -58,14 +58,21 @@ const order: OrderVO = {
 
 const evidence: MatchEvidenceVO = {
   orderItemId: "301",
-  weidianItemId: "9001",
+  orderId: "101",
+  orderNo: "2026102100001",
+  shopId: "1",
   shopName: "t40 Shop",
-  shopCode: "S001",
+  merchantNo: "wd-merchant-1",
+  weidianItemId: "9001",
+  itemName: "t40 Item",
+  skuName: null,
   payTime: null,
+  orderAttributionStatus: "UNMATCHED",
+  lineAttributionType: "0",
+  unmatchedReason: "NO_MAPPING",
+  product: null,
   mappings: [],
-  sourceProduct: null,
-  unmatchedReason: "UNMATCHED",
-  manualRecords: []
+  manual: null
 };
 
 function signIn(role: Role, permissions: string[]) {

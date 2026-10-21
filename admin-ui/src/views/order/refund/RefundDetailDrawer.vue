@@ -109,9 +109,9 @@ const columns = computed<DataColumn[]>(() => [
         <DataTable
           plain
           table-id="refund-detail-items"
-          :rows="detail.items"
+          :rows="detail.lines"
           :columns="columns"
-          :total="detail.items.length"
+          :total="detail.lines.length"
           :paged="false"
         >
           <template #cell-image="{ row }">

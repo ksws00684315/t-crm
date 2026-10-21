@@ -93,6 +93,7 @@ export function orderSourceText(source: OrderSource | null | undefined): string 
   return source ? translate(`order.source.${source}`) : "-";
 }
 
+/** Sync-monitoring provenance: the API stream or a manual import (task 40 §3.5). */
 export function syncSourceText(source: SyncSource | null | undefined): string {
   return source ? translate(`order.source.${source}`) : "-";
 }

@@ -84,7 +84,7 @@ const columns = computed<DataColumn[]>(() => [
       <template v-if="detail">
         <el-descriptions :column="2" border data-test="order-detail">
           <el-descriptions-item :label="t('order.orderId')">
-            <CopyText :value="detail.weidianOrderId" />
+            <CopyText :value="detail.orderNo" />
           </el-descriptions-item>
           <el-descriptions-item :label="t('order.channel')">
             {{ channelText(detail.channel) }}

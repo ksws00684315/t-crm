@@ -2,16 +2,11 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getMatchEvidence } from "@/api/order/order";
-import type {
-  EvidenceManualRecordVO,
-  EvidenceMappingVO,
-  MatchEvidenceVO,
-  OrderItemVO,
-  OrderVO
-} from "@/api/types";
+import type { EvidenceMappingVO, MatchEvidenceVO, OrderItemVO, OrderVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { attributionTypeText } from "@/utils/order";
 
 defineOptions({ name: "MatchEvidenceDrawer" });
 
@@ -71,10 +66,6 @@ function asMapping(row: object): EvidenceMappingVO {
   return row as EvidenceMappingVO;
 }
 
-function asRecord(row: object): EvidenceManualRecordVO {
-  return row as EvidenceManualRecordVO;
-}
-
 function reasonText(reason: MatchEvidenceVO["unmatchedReason"] | undefined): string {
   return reason ? t(`order.pool.reasonOption.${reason}`) : "-";
 }
@@ -82,15 +73,8 @@ function reasonText(reason: MatchEvidenceVO["unmatchedReason"] | undefined): str
 const mappingColumns = computed<DataColumn[]>(() => [
   { key: "kol", label: t("order.kol"), minWidth: 150 },
   { key: "linkCode", label: t("order.chain.linkCode"), width: 120 },
-  { key: "effective", label: t("order.pool.effectiveRange"), width: 300 },
+  { key: "valid", label: t("order.pool.effectiveRange"), width: 300 },
   { key: "covers", label: t("order.pool.coversPayTime"), width: 130 }
-]);
-
-const recordColumns = computed<DataColumn[]>(() => [
-  { key: "operatorName", label: t("audit.operator"), width: 110 },
-  { key: "action", label: t("audit.action"), width: 110 },
-  { key: "reason", label: t("order.pool.reason"), minWidth: 160, tooltip: true },
-  { key: "createTime", label: t("audit.time"), width: 170 }
 ]);
 </script>
 
@@ -122,8 +106,13 @@ const recordColumns = computed<DataColumn[]>(() => [
               {{ evidence.weidianItemId }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('order.shop')">
-              {{ evidence.shopName ?? "-"
-              }}{{ evidence.shopCode ? `（${evidence.shopCode}）` : "" }}
+              {{ evidence.shopName ?? "-" }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('order.detail.merchantNo')">
+              {{ evidence.merchantNo ?? "-" }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('order.detail.itemName')">
+              {{ evidence.itemName ?? "-" }}{{ evidence.skuName ? ` · ${evidence.skuName}` : "" }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('order.payTime')">
               {{ formatInstant(evidence.payTime) }}
@@ -132,10 +121,8 @@ const recordColumns = computed<DataColumn[]>(() => [
               {{ reasonText(evidence.unmatchedReason) }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('order.pool.sourceProduct')" :span="2">
-              <span v-if="evidence.sourceProduct">
-                {{ evidence.sourceProduct.productName ?? "-" }}（{{
-                  evidence.sourceProduct.productId
-                }}）
+              <span v-if="evidence.product">
+                {{ evidence.product.productName ?? "-" }}（{{ evidence.product.productId }}）
               </span>
               <span v-else>-</span>
             </el-descriptions-item>
@@ -159,9 +146,9 @@ const recordColumns = computed<DataColumn[]>(() => [
               <span v-else>-</span>
             </template>
             <template #cell-linkCode="{ row }">{{ asMapping(row).linkCode ?? "-" }}</template>
-            <template #cell-effective="{ row }">
-              {{ formatInstant(asMapping(row).effectiveFrom) }} ~
-              {{ formatInstant(asMapping(row).effectiveTo) }}
+            <template #cell-valid="{ row }">
+              {{ formatInstant(asMapping(row).validFrom) }} ~
+              {{ formatInstant(asMapping(row).validTo) }}
             </template>
             <template #cell-covers="{ row }">
               <el-tag
@@ -179,23 +166,18 @@ const recordColumns = computed<DataColumn[]>(() => [
           </DataTable>
 
           <h4 class="title">{{ t("order.pool.manualRecords") }}</h4>
-          <DataTable
-            plain
-            table-id="evidence-records"
-            :rows="evidence.manualRecords"
-            :columns="recordColumns"
-            :total="evidence.manualRecords.length"
-            :paged="false"
-          >
-            <template #cell-operatorName="{ row }">{{
-              asRecord(row).operatorName ?? "-"
-            }}</template>
-            <template #cell-action="{ row }">{{ asRecord(row).action }}</template>
-            <template #cell-reason="{ row }">{{ asRecord(row).reason ?? "-" }}</template>
-            <template #cell-createTime="{ row }">{{
-              formatInstant(asRecord(row).createTime)
-            }}</template>
-          </DataTable>
+          <el-descriptions v-if="evidence.manual" :column="1" border data-test="evidence-manual">
+            <el-descriptions-item :label="t('order.line.attribution')">
+              {{ attributionTypeText(evidence.manual.attributionType) }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('order.pool.reason')">
+              {{ evidence.manual.manualReason ?? "-" }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('audit.time')">
+              {{ formatInstant(evidence.manual.attributionTime) }}
+            </el-descriptions-item>
+          </el-descriptions>
+          <div v-else class="empty">-</div>
         </template>
       </template>
     </div>
@@ -216,6 +198,9 @@ const recordColumns = computed<DataColumn[]>(() => [
 <style scoped>
 .title {
   margin: 20px 0 8px;
+}
+.empty {
+  color: var(--tcrm-color-text-secondary);
 }
 .evidence-mapping--covers {
   outline: 2px solid var(--el-color-warning-light-5);

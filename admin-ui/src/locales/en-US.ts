@@ -1102,7 +1102,7 @@ const enUS: MessageSchema = {
     actionChain: "Chain",
     chainNoKol: "The chain needs an attributed creator",
     source: {
-      SYNC: "API sync",
+      API: "API sync",
       IMPORT: "Import"
     },
     refundStatus: {
@@ -1159,9 +1159,15 @@ const enUS: MessageSchema = {
       statesTab: "Sync status",
       failuresTab: "Failed jobs",
       typeColumn: "Type",
-      type: {
+      typeOption: {
         ORDER: "Orders",
         REFUND: "Refunds"
+      },
+      kindOption: {
+        ORDER_SYNC: "Order sync",
+        REFUND_SYNC: "Refund sync",
+        ORDER_IMPORT: "Order import",
+        REFUND_IMPORT: "Refund import"
       },
       source: "Source",
       failures24h: "Failures in 24h",
@@ -1256,9 +1262,11 @@ const enUS: MessageSchema = {
       sourceProduct: "Source product",
       unmatchedReason: "Unmatched reason",
       reasonOption: {
-        UNMATCHED: "Unmatched",
-        MISSING_RULE: "No rule",
-        CONFLICT: "Conflicting evidence"
+        PENDING: "Awaiting payment",
+        CONFLICT: "Conflicting evidence",
+        NO_MAPPING: "No mapping",
+        MAPPING_EXPIRED: "Mapping expired at pay time",
+        MATCHED: "Matched"
       },
       manualRecords: "Manual handling records"
     }

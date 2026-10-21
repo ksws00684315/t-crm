@@ -47,13 +47,14 @@ const succeeded: RefundVO = {
 const refundDetail: RefundDetailVO = {
   ...succeeded,
   merchantNo: "wd-merchant-1",
-  items: [
+  lines: [
     {
-      id: "601",
+      orderItemId: "601",
       imageUrl: null,
       itemName: "t40 Item",
       weidianItemId: "9001",
       skuName: "Blue / L",
+      kolId: "201",
       kolName: "Zoe",
       kolCode: "KOL-ZS01",
       quantity: 1,
@@ -179,24 +180,27 @@ describe("refund query page (task 40)", () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     vi.mocked(orderApi.getOrder).mockResolvedValue({
       id: "101",
-      weidianOrderId: "2026102100001",
+      orderNo: "2026102100001",
       channel: "WEIDIAN",
+      shopId: "1",
       shopName: "t40 Shop",
       shopCode: "S001",
       merchantNo: "wd-merchant-1",
-      itemAmount: "115.00",
-      freight: "5.00",
-      totalAmount: "125.00",
-      payAmount: "120.00",
-      orderStatus: "PAID",
-      refundStatus: "PARTIAL_SUCCESS",
       kolId: "201",
       kolName: "Zoe",
       kolCode: "KOL-ZS01",
+      orderStatus: "PAID",
+      refundStatus: "PARTIAL_SUCCESS",
+      attributionStatus: "ATTRIBUTED",
+      source: "IMPORT",
       orderTime: null,
       payTime: "2026-10-20T10:01:00Z",
-      source: "IMPORT",
       lastSyncTime: null,
+      createTime: null,
+      itemAmount: "115.00",
+      totalAmount: "125.00",
+      payAmount: "120.00",
+      freight: "5.00",
       items: []
     });
     const wrapper = await mountPage();

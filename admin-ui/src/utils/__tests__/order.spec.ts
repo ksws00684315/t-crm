@@ -136,7 +136,7 @@ describe("refund status, type and channel texts (task 40)", () => {
   it("names the channel and the two data sources", () => {
     expect(channelText("WEIDIAN")).toBe("微店");
     expect(channelText(null)).toBe("-");
-    expect(orderSourceText("SYNC")).toBe("接口同步");
+    expect(orderSourceText("API")).toBe("接口同步");
     expect(orderSourceText("IMPORT")).toBe("导入");
     expect(syncSourceText(null)).toBe("-");
   });

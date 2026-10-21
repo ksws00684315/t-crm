@@ -1078,7 +1078,7 @@ const zhCN = {
     actionChain: "链路",
     chainNoKol: "未归属达人的订单暂无链路",
     source: {
-      SYNC: "接口同步",
+      API: "接口同步",
       IMPORT: "导入"
     },
     refundStatus: {
@@ -1135,9 +1135,15 @@ const zhCN = {
       statesTab: "同步状态",
       failuresTab: "失败任务",
       typeColumn: "类型",
-      type: {
+      typeOption: {
         ORDER: "订单",
         REFUND: "退款"
+      },
+      kindOption: {
+        ORDER_SYNC: "订单同步",
+        REFUND_SYNC: "退款同步",
+        ORDER_IMPORT: "订单导入",
+        REFUND_IMPORT: "退款导入"
       },
       source: "来源",
       failures24h: "24 小时失败次数",
@@ -1231,9 +1237,11 @@ const zhCN = {
       sourceProduct: "原商品",
       unmatchedReason: "未匹配原因",
       reasonOption: {
-        UNMATCHED: "未匹配",
-        MISSING_RULE: "缺规则",
-        CONFLICT: "证据冲突"
+        PENDING: "未支付",
+        CONFLICT: "证据冲突",
+        NO_MAPPING: "缺规则",
+        MAPPING_EXPIRED: "映射在支付时已失效",
+        MATCHED: "已匹配"
       },
       manualRecords: "人工处理记录"
     }

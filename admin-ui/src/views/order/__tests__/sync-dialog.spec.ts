@@ -23,44 +23,43 @@ const shop: OrderSyncStateVO = {
   shopName: "t40 Shop",
   enabled: true,
   authorized: true,
-  rows: [
-    {
-      dataType: "ORDER",
-      source: "SYNC",
-      lastSuccessAt: "2026-10-21T08:00:00Z",
-      lastError: null,
-      failures24h: 2,
-      missingFieldCount: 3,
-      lastImportCutoffTime: "2026-10-20T18:00:00Z"
-    },
-    {
-      dataType: "REFUND",
-      source: "IMPORT",
-      lastSuccessAt: "2026-10-21T07:30:00Z",
-      lastError: "weidian timeout",
-      failures24h: 0,
-      missingFieldCount: 0,
-      lastImportCutoffTime: null
-    }
-  ]
+  lastSuccessAt: "2026-10-21T08:00:00Z",
+  lastError: null,
+  orders: {
+    source: "API",
+    lastSuccessAt: "2026-10-21T08:00:00Z",
+    lastError: null,
+    failures24h: 2,
+    missingFields: { payTime: 2, itemItemId: 1 }
+  },
+  refunds: {
+    source: "IMPORT",
+    lastSuccessAt: "2026-10-21T07:30:00Z",
+    lastError: "weidian timeout",
+    failures24h: 0,
+    missingFields: {}
+  },
+  lastImport: { kind: "ORDER", dataCutoffTime: "2026-10-20T18:00:00Z", taskId: "9801" }
 };
 
 const failures: SyncFailureVO[] = [
   {
     id: "1",
+    shopId: "1",
     shopName: "t40 Shop",
-    dataType: "REFUND",
-    time: "2026-10-21T07:29:00Z",
+    kind: "REFUND_IMPORT",
     error: "weidian timeout",
-    taskId: "9901"
+    taskId: "9901",
+    time: "2026-10-21T07:29:00Z"
   },
   {
     id: "2",
+    shopId: "1",
     shopName: "t40 Shop",
-    dataType: "ORDER",
-    time: "2026-10-21T06:00:00Z",
+    kind: "ORDER_SYNC",
     error: "500",
-    taskId: null
+    taskId: null,
+    time: "2026-10-21T06:00:00Z"
   }
 ];
 
@@ -110,25 +109,21 @@ describe("sync states dialog (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("falls back to one order row before the backend sends per-stream rows", async () => {
+  it("still shows both streams with dashes when a shop never synced", async () => {
     vi.mocked(orderApi.listSyncStates).mockResolvedValue([
-      {
-        shopId: "1",
-        shopName: "t40 Shop",
-        enabled: true,
-        authorized: true,
-        lastSuccessAt: "2026-10-21T08:00:00Z",
-        lastError: null
-      }
+      { shopId: "1", shopName: "t40 Shop", enabled: false, authorized: false }
     ]);
     const router = createRouter({ history: createMemoryHistory(), routes });
+    await router.push("/order/orders");
     const wrapper = mount(SyncStatesDialog, {
       props: { modelValue: true },
       global: { plugins: [ElementPlus, i18n, router] },
       attachTo: document.body
     });
     await flushPromises();
-    expect(realRows('[data-test="sync-shop"]')).toHaveLength(1);
+    const shops = realRows('[data-test="sync-shop"]');
+    expect(shops).toHaveLength(2);
+    expect(shops[0].textContent).toContain("t40 Shop");
     wrapper.unmount();
   });
 

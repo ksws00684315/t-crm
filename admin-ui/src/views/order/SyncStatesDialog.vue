@@ -4,7 +4,13 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { listSyncFailures, listSyncStates, triggerOrderSync } from "@/api/order/order";
-import type { OrderSyncStateVO, SyncDataType, SyncFailureVO, SyncStateRowVO } from "@/api/types";
+import type {
+  KindSyncVO,
+  OrderSyncStateVO,
+  SyncDataType,
+  SyncFailureKind,
+  SyncFailureVO
+} from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -35,44 +41,38 @@ const failuresLoading = ref(false);
 const failures = ref<SyncFailureVO[] | null>(null);
 let startedAny = false;
 
-/** One table row: a shop with one of its two monitoring rows. */
+/** One table row: a shop with one of its two monitoring streams. */
 interface StateRow {
   shopId: string;
   shopName: string;
   enabled: boolean;
   authorized: boolean;
-  row: SyncStateRowVO;
+  dataType: SyncDataType;
+  kind: KindSyncVO | null;
+  /** The shop-level import cutoff, shown on the stream it belongs to. */
+  importCutoffTime: string | null;
+}
+
+/** The spec shows one count; the backend reports per-field counts (design §4.6a). */
+function missingFieldCount(kind: KindSyncVO | null): number {
+  return kind ? Object.values(kind.missingFields ?? {}).reduce((sum, count) => sum + count, 0) : 0;
 }
 
 const stateRows = computed<StateRow[]>(() => {
   const list: StateRow[] = [];
   for (const shop of shops.value) {
-    if (shop.rows?.length) {
-      for (const row of shop.rows) {
-        list.push({
-          shopId: shop.shopId,
-          shopName: shop.shopName,
-          enabled: shop.enabled,
-          authorized: shop.authorized,
-          row
-        });
-      }
-    } else {
-      // Before the backend branch lands there are no per-stream rows; keep the old single row.
+    for (const dataType of ["ORDER", "REFUND"] as const) {
       list.push({
         shopId: shop.shopId,
         shopName: shop.shopName,
         enabled: shop.enabled,
         authorized: shop.authorized,
-        row: {
-          dataType: "ORDER",
-          source: null,
-          lastSuccessAt: shop.lastSuccessAt ?? null,
-          lastError: shop.lastError ?? null,
-          failures24h: 0,
-          missingFieldCount: 0,
-          lastImportCutoffTime: null
-        }
+        dataType,
+        kind: (dataType === "ORDER" ? shop.orders : shop.refunds) ?? null,
+        importCutoffTime:
+          shop.lastImport && shop.lastImport.kind === dataType
+            ? shop.lastImport.dataCutoffTime
+            : null
       });
     }
   }
@@ -88,7 +88,11 @@ function asFailure(row: object): SyncFailureVO {
 }
 
 function dataTypeText(type: SyncDataType): string {
-  return t(`order.sync.type.${type}`);
+  return t(`order.sync.typeOption.${type}`);
+}
+
+function failureKindText(kind: SyncFailureKind): string {
+  return t(`order.sync.kindOption.${kind}`);
 }
 
 const stateColumns = computed<DataColumn[]>(() => [
@@ -105,7 +109,7 @@ const stateColumns = computed<DataColumn[]>(() => [
 
 const failureColumns = computed<DataColumn[]>(() => [
   { key: "shopName", label: t("order.syncShop"), minWidth: 150 },
-  { key: "dataType", label: t("order.sync.typeColumn"), width: 90 },
+  { key: "kind", label: t("order.sync.typeColumn"), width: 110 },
   { key: "time", label: t("order.sync.time"), width: 170 },
   { key: "error", label: t("order.syncLastError"), minWidth: 200, tooltip: true },
   { key: "task", label: t("order.sync.linkedTask"), width: 120 }
@@ -212,37 +216,35 @@ function close() {
             </el-tag>
           </template>
           <template #cell-dataType="{ row }">
-            {{ dataTypeText(asState(row).row.dataType) }}
+            {{ dataTypeText(asState(row).dataType) }}
           </template>
           <template #cell-source="{ row }">
-            {{ syncSourceText(asState(row).row.source) }}
+            {{ syncSourceText(asState(row).kind?.source) }}
           </template>
           <template #cell-lastSuccessAt="{ row }">
-            {{ formatInstant(asState(row).row.lastSuccessAt) }}
+            {{ formatInstant(asState(row).kind?.lastSuccessAt) }}
           </template>
           <template #cell-lastError="{ row }">
             <el-tooltip
-              v-if="asState(row).row.lastError"
-              :content="asState(row).row.lastError ?? ''"
+              v-if="asState(row).kind?.lastError"
+              :content="asState(row).kind?.lastError ?? ''"
               placement="top"
             >
               <el-tag type="danger" data-test="sync-error">{{ t("order.syncFailed") }}</el-tag>
             </el-tooltip>
             <span v-else>-</span>
           </template>
-          <template #cell-failures24h="{ row }">{{ asState(row).row.failures24h }}</template>
+          <template #cell-failures24h="{ row }">{{ asState(row).kind?.failures24h ?? 0 }}</template>
           <template #cell-missingFieldCount="{ row }">
-            {{ asState(row).row.missingFieldCount }}
+            {{ missingFieldCount(asState(row).kind) }}
           </template>
           <template #cell-lastImportCutoffTime="{ row }">
-            {{ formatInstant(asState(row).row.lastImportCutoffTime) }}
+            {{ formatInstant(asState(row).importCutoffTime) }}
           </template>
           <template #actions="{ row }">
             <el-button
               v-if="
-                asState(row).row.dataType === 'ORDER' &&
-                asState(row).enabled &&
-                asState(row).authorized
+                asState(row).dataType === 'ORDER' && asState(row).enabled && asState(row).authorized
               "
               link
               type="primary"
@@ -268,7 +270,7 @@ function close() {
           :loading="failuresLoading"
         >
           <template #cell-shopName="{ row }">{{ asFailure(row).shopName ?? "-" }}</template>
-          <template #cell-dataType="{ row }">{{ dataTypeText(asFailure(row).dataType) }}</template>
+          <template #cell-kind="{ row }">{{ failureKindText(asFailure(row).kind) }}</template>
           <template #cell-time="{ row }">{{ formatInstant(asFailure(row).time) }}</template>
           <template #cell-error="{ row }">{{ asFailure(row).error ?? "-" }}</template>
           <template #cell-task="{ row }">

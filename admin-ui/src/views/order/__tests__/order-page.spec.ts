@@ -58,24 +58,27 @@ const unattributed: OrderVO = {
 
 const detail: OrderDetailVO = {
   id: "101",
-  weidianOrderId: "2026102100001",
+  orderNo: "2026102100001",
   channel: "WEIDIAN",
+  shopId: "1",
   shopName: "t40 Shop",
   shopCode: "S001",
   merchantNo: "wd-merchant-1",
-  itemAmount: "115.00",
-  freight: "5.00",
-  totalAmount: "125.00",
-  payAmount: "120.00",
-  orderStatus: "PAID",
-  refundStatus: "PARTIAL_SUCCESS",
   kolId: "201",
   kolName: "Zoe",
   kolCode: "KOL-ZS01",
+  orderStatus: "PAID",
+  refundStatus: "PARTIAL_SUCCESS",
+  attributionStatus: "ATTRIBUTED",
+  source: "API",
   orderTime: "2026-10-20T10:00:00Z",
   payTime: "2026-10-20T10:01:00Z",
-  source: "SYNC",
   lastSyncTime: "2026-10-20T11:00:00Z",
+  createTime: "2026-10-20T10:00:05Z",
+  itemAmount: "115.00",
+  totalAmount: "125.00",
+  payAmount: "120.00",
+  freight: "5.00",
   items: [
     {
       id: "301",
@@ -161,7 +164,7 @@ describe("order list page (task 40)", () => {
       size: 20
     });
     vi.mocked(orderApi.listSyncStates).mockResolvedValue([
-      { shopId: "1", shopName: "t40 Shop", enabled: true, authorized: true, rows: [] }
+      { shopId: "1", shopName: "t40 Shop", enabled: true, authorized: true }
     ]);
   });
 
