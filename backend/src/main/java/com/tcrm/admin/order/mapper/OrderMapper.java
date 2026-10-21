@@ -77,7 +77,10 @@ public interface OrderMapper extends BaseMapper<OrderDO> {
       """
       SELECT shop_id AS shopId, source AS latestSource
         FROM crm_order
-       WHERE id IN (SELECT MAX(id) FROM crm_order GROUP BY shop_id)
+       WHERE is_deleted = FALSE
+         AND id IN (
+           SELECT MAX(id) FROM crm_order WHERE is_deleted = FALSE GROUP BY shop_id
+         )
       """)
   List<ShopSourceRow> latestOrderSourcePerShop();
 
