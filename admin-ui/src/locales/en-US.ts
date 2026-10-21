@@ -214,7 +214,7 @@ const enUS: MessageSchema = {
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
     DEPARTURE_NOT_BD_ACCOUNT:
       "Only a BD (a sub-account with the own-data scope) can leave this way.",
-    DEPARTURE_INVALID_TIME: "The time must be later than now and within one year.",
+    DEPARTURE_INVALID_TIME: "The time must be later than now.",
     DEPARTURE_PLAN_EXISTS:
       "This account already has a pending departure plan. Cancel or edit it first.",
     DEPARTURE_PLAN_NOT_SCHEDULED: "This account has no pending departure plan.",

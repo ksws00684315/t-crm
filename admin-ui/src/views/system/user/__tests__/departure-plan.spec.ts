@@ -138,6 +138,55 @@ describe("departure plan dialog (task 41)", () => {
     wrapper.unmount();
   });
 
+  it("switches a pending plan to immediate by sending now, not omitting the time", async () => {
+    const wrapper = await openDialog({ ...bd, departurePlan: pendingPlan });
+    // Flip from the pre-filled "at" mode to "立即".
+    await element("departure-mode").findAll("input")[0].trigger("click");
+    await element("departure-submit").trigger("click");
+    await flushPromises();
+    expect(departureApi.updateDeparturePlan).toHaveBeenCalled();
+    const body = vi.mocked(departureApi.updateDeparturePlan).mock.calls[0][1] as {
+      effectiveAt?: string;
+    };
+    expect(body.effectiveAt).toBeTruthy();
+    expect(Date.parse(body.effectiveAt!)).toBeLessThanOrEqual(Date.now());
+    wrapper.unmount();
+  });
+
+  it("keeps the type locked while editing a pending plan", async () => {
+    const wrapper = await openDialog({ ...bd, departurePlan: pendingPlan });
+    const group = element("departure-type");
+    // Element Plus puts disabled on each radio button, not always on the group root.
+    expect(group.findAll("input").every(input => input.attributes("disabled") !== undefined)).toBe(
+      true
+    );
+    // Clicking DISABLE must not change what gets submitted (type stays RESIGN from the plan).
+    await group.findAll("input")[1].trigger("click");
+    await element("departure-submit").trigger("click");
+    await flushPromises();
+    expect(departureApi.updateDeparturePlan).toHaveBeenCalledWith(
+      bd.id,
+      expect.objectContaining({ type: "RESIGN" })
+    );
+    wrapper.unmount();
+  });
+
+  it("allows saving an overdue plan so the administrator can still name an heir", async () => {
+    const overdue = {
+      ...pendingPlan,
+      effectiveAt: "2020-01-01T10:00:00.000Z"
+    };
+    const wrapper = await openDialog({ ...bd, departurePlan: overdue });
+    await element("departure-submit").trigger("click");
+    await flushPromises();
+    expect(departureApi.updateDeparturePlan).toHaveBeenCalledWith(
+      bd.id,
+      expect.objectContaining({ effectiveAt: overdue.effectiveAt })
+    );
+    expect(document.body.querySelector("[data-test=\"departure-error\"]")).toBeNull();
+    wrapper.unmount();
+  });
+
   it("spells out the consequence of not naming an heir", async () => {
     const wrapper = await openDialog(bd);
     expect(element("departure-hint").text()).toContain("转为未分配");
@@ -187,9 +236,21 @@ describe("user list departure column (task 41)", () => {
       page: 1,
       size: 20
     });
-    const wrapper = mount(UserPage, { global: { plugins: [ElementPlus, i18n] } });
+    const wrapper = mount(UserPage, {
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
     await flushPromises();
     return wrapper;
+  }
+
+  /** A row action button; Element Plus also renders a hidden column-measuring copy outside rows. */
+  function bodyItem(testId: string): HTMLElement {
+    const el = [...document.body.querySelectorAll<HTMLElement>(`[data-test="${testId}"]`)].find(
+      item => item.closest("tr") !== null
+    );
+    if (!el) throw new Error(`missing row action ${testId}`);
+    return el;
   }
 
   it("shows the pending plan with the heir still to be named", async () => {
@@ -197,8 +258,8 @@ describe("user list departure column (task 41)", () => {
     const text = wrapper.text();
     expect(text).toContain("离职计划");
     expect(text).toContain("待指定继承人");
-    // Row actions beyond the inline ones render in the row menu, which teleports to body.
-    expect(document.body.textContent).toContain("撤销离职计划");
+    // ADR-029: every row action is inline in the actions column (no "More" menu).
+    expect(bodyItem(`departure-cancel-${bd.id}`).textContent).toContain("撤销离职计划");
     wrapper.unmount();
   });
 
@@ -218,7 +279,7 @@ describe("user list departure column (task 41)", () => {
       }
     ]);
     expect(wrapper.text()).toContain("已离职");
-    expect(document.body.textContent).not.toContain("撤销离职计划");
+    expect(document.body.querySelector(`[data-test="departure-cancel-${bd.id}"]`)).toBeNull();
     wrapper.unmount();
   });
 
@@ -227,7 +288,7 @@ describe("user list departure column (task 41)", () => {
       { ...bd, departurePlan: { ...pendingPlan, status: "CANCELLED", awaitingHeir: false } }
     ]);
     expect(wrapper.text()).toContain("未设置");
-    expect(document.body.textContent).toContain("标记离职");
+    expect(bodyItem(`departure-${bd.id}`).textContent).toContain("标记离职");
     wrapper.unmount();
   });
 
@@ -235,11 +296,9 @@ describe("user list departure column (task 41)", () => {
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
     vi.mocked(departureApi.cancelDeparturePlan).mockResolvedValue(null);
     const wrapper = await mountPage([{ ...bd, departurePlan: pendingPlan }]);
-    const entry = document.body.querySelector<HTMLElement>(
-      '[data-test="departure-cancel-9007199254740993"]'
+    bodyItem(`departure-cancel-${bd.id}`).dispatchEvent(
+      new MouseEvent("click", { bubbles: true })
     );
-    expect(entry).not.toBeNull();
-    entry!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flushPromises();
     expect(confirm).toHaveBeenCalled();
     expect(departureApi.cancelDeparturePlan).toHaveBeenCalledWith(bd.id);

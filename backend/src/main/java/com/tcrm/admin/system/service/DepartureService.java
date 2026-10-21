@@ -222,8 +222,12 @@ public class DepartureService {
               if (plan == null) {
                 throw new BusinessException(ErrorCode.DEPARTURE_PLAN_NOT_SCHEDULED);
               }
+              // Same rule as create: a missing time keeps the current one; a past or present
+              // time means run in this request after the update (admin "立即").
               Instant effective =
-                  effectiveAt == null ? plan.getEffectiveAt() : requireTime(effectiveAt);
+                  effectiveAt == null
+                      ? plan.getEffectiveAt()
+                      : effectiveAt.truncatedTo(ChronoUnit.MILLIS);
               plan.setHeirUserId(heirUserId);
               plan.setEffectiveAt(effective);
               plan.setReason(normalizeReason(reason));

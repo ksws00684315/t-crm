@@ -83,7 +83,11 @@ function effectiveAtOrError(): { value?: string; error?: string } {
   if (!scheduled.value) return {};
   const picked = effectiveLocal.value;
   if (!picked) return { error: t("departure.pickTime") };
-  if (picked.getTime() <= Date.now()) return { error: t("departure.timeFuture") };
+  // Creating a "at" plan in the past is almost certainly a mistake. Editing may keep an overdue
+  // plan (or push it) and the backend runs it in the same request, same as create-with-past.
+  if (!editing.value && picked.getTime() <= Date.now()) {
+    return { error: t("departure.timeFuture") };
+  }
   return { value: picked.toISOString() };
 }
 
@@ -113,9 +117,15 @@ async function submit() {
   }
   error.value = "";
   saving.value = true;
+  // Create "立即": omit effectiveAt (backend treats missing as now).
+  // Edit "立即": send now explicitly — omitting would keep the old future time and never run.
   const request = {
     type: type.value,
-    ...(effective.value ? { effectiveAt: effective.value } : {}),
+    ...(effective.value
+      ? { effectiveAt: effective.value }
+      : editing.value
+        ? { effectiveAt: new Date().toISOString() }
+        : {}),
     heirUserId: heir.value === NO_HEIR ? null : heir.value,
     reason: reason.value.trim() ? reason.value.trim() : null
   };
@@ -146,7 +156,7 @@ async function submit() {
   >
     <el-form label-width="110px" label-position="left" @submit.prevent>
       <el-form-item :label="t('departure.type')">
-        <el-radio-group v-model="type" data-test="departure-type">
+        <el-radio-group v-model="type" :disabled="editing" data-test="departure-type">
           <el-radio-button value="RESIGN">{{ t("departure.typeResign") }}</el-radio-button>
           <el-radio-button value="DISABLE">{{ t("departure.typeDisable") }}</el-radio-button>
         </el-radio-group>

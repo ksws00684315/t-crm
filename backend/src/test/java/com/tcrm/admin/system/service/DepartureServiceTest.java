@@ -218,6 +218,24 @@ class DepartureServiceTest {
   }
 
   @Test
+  void shouldRunImmediately_whenAdministratorUpdatesToAPastTime() {
+    when(members.getMember(BD, TENANT)).thenReturn(member(BD));
+    when(bdUsers.getById(HEIR)).thenReturn(new BdUserDTO(HEIR, "heir", "Heir", true));
+    SysUserDeparturePlanDO pending = plan(BD, null, NOW.plusSeconds(3600));
+    // 1) validateHeir.scheduledPlan(heir)  2) update.lockScheduled
+    // 3) execute.lockScheduledById  4) execute.heirProblem.scheduledPlan(heir)
+    when(plans.selectOne(any())).thenReturn(null, pending, pending, null);
+    when(plans.update(any(), any())).thenReturn(1);
+
+    DepartureService.PlanDTO result = service.update(BD, NOW.minusSeconds(1), HEIR, "run now");
+
+    assertThat(result.status()).isEqualTo(DeparturePlanStatus.DONE);
+    assertThat(result.result()).isEqualTo(DepartureResult.TRANSFERRED);
+    verify(users).disableMembership(TENANT, BD, ACTOR);
+    assertThat(published()).hasAtLeastOneElementOfType(DepartureHandoverEvent.class);
+  }
+
+  @Test
   void shouldHandOverThenDisable_whenDuePlanHasHeir() {
     SysUserDeparturePlanDO due = plan(BD, HEIR, NOW.minusSeconds(60));
     // First read is the locked plan; the heir check then finds no plan of its own.

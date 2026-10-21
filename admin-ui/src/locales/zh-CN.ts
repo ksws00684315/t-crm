@@ -217,7 +217,7 @@ const zhCN = {
     USER_PERMISSION_INVALID: "权限无效，请重新勾选",
     USER_LAST_SUPER_ADMIN: "系统至少需要保留一个启用的超级管理员",
     DEPARTURE_NOT_BD_ACCOUNT: "只有商务（仅本人数据范围的子账号）才能离职",
-    DEPARTURE_INVALID_TIME: "生效时间必须晚于当前时间，且在一年以内",
+    DEPARTURE_INVALID_TIME: "生效时间必须晚于当前时间",
     DEPARTURE_PLAN_EXISTS: "该账号已有待生效的离职计划，请先撤销或修改",
     DEPARTURE_PLAN_NOT_SCHEDULED: "该账号没有待生效的离职计划",
     DEPARTURE_SELF_SUBMITTED_ONLY: "只能撤销本人提交的离职申请",
