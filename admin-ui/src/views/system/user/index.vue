@@ -345,7 +345,7 @@ function openPermissions(row: UserVO) {
   permissionsVisible.value = true;
 }
 
-/** Row actions in their original order; entries beyond the first two fold into the dropdown. */
+/** Row actions in their original order, all inline (ADR-029). */
 function rowActions(row: UserVO): RowAction[] {
   return [
     {

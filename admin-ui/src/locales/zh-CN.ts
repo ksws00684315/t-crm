@@ -17,7 +17,6 @@ const zhCN = {
     save: "保存",
     confirm: "确定",
     close: "关闭",
-    moreActions: "更多",
     edit: "编辑",
     create: "创建",
     delete: "删除",
