@@ -479,7 +479,7 @@ public class ProductLinkService {
   }
 
   private static String channelOf(String channel) {
-    return blank(channel) ? CHANNEL_WEIDIAN : channel.strip();
+    return blank(channel) ? CHANNEL_WEIDIAN : channel.strip().toUpperCase(Locale.ROOT);
   }
 
   private static String taskError(CopyTokenGrantDTO grant, BusinessException error) {
