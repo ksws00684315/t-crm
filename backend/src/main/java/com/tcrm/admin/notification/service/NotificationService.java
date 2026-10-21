@@ -19,6 +19,8 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
+import com.tcrm.admin.system.api.DeparturePlanSubmittedEvent;
 import com.tcrm.admin.system.api.EnabledSuperAdminApi;
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +43,7 @@ public class NotificationService {
   static final String BIZ_SHOP = "SHOP";
   static final String BIZ_BD_TRANSFER = "BD_TRANSFER";
   static final String BIZ_STAFF = "STAFF";
+  static final String BIZ_DEPARTURE = "DEPARTURE_PLAN";
 
   private final NotificationMapper notifications;
   private final KolApi kols;
@@ -131,6 +134,56 @@ public class NotificationService {
                             null, null, null, null, event.bdName(), event.count()),
                         BIZ_STAFF,
                         event.bdUserId())));
+  }
+
+  /** Reminds the super administrators to name the heir of a resignation just submitted. */
+  public void record(DeparturePlanSubmittedEvent event) {
+    tx.executeWithoutResult(
+        status ->
+            TenantScope.runCompany(
+                event.tenantId(),
+                () ->
+                    write(
+                        null,
+                        NotificationType.DEPARTURE_PLAN_SUBMITTED,
+                        new NotificationParamsDTO(
+                            null,
+                            null,
+                            null,
+                            null,
+                            event.bdName(),
+                            null,
+                            null,
+                            event.plannedLeaveAt().toString(),
+                            null,
+                            null),
+                        BIZ_DEPARTURE,
+                        event.userId())));
+  }
+
+  /** Announces what a plan did when it took effect. */
+  public void record(DeparturePlanExecutedEvent event) {
+    tx.executeWithoutResult(
+        status ->
+            TenantScope.runCompany(
+                event.tenantId(),
+                () ->
+                    write(
+                        null,
+                        NotificationType.DEPARTURE_PLAN_EXECUTED,
+                        new NotificationParamsDTO(
+                            null,
+                            null,
+                            null,
+                            null,
+                            event.bdName(),
+                            null,
+                            event.heirName(),
+                            event.effectiveAt().toString(),
+                            event.resultCode(),
+                            event.typeCode()),
+                        BIZ_DEPARTURE,
+                        event.userId())));
   }
 
   public PageResult<NotificationDTO> page(int page, int size, Boolean unread) {

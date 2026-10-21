@@ -191,7 +191,8 @@ const zhCN = {
     password: "修改密码",
     forbidden: "无权访问",
     notFound: "页面不存在",
-    notifications: "站内消息"
+    notifications: "站内消息",
+    resignation: "离职申请"
   },
   errors: {
     SYSTEM_CONFIG_INVALID: "系统配置无效，请检查后重试",
@@ -216,6 +217,12 @@ const zhCN = {
     USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于子账号",
     USER_PERMISSION_INVALID: "权限无效，请重新勾选",
     USER_LAST_SUPER_ADMIN: "系统至少需要保留一个启用的超级管理员",
+    DEPARTURE_NOT_BD_ACCOUNT: "只有商务（仅本人数据范围的子账号）才能离职",
+    DEPARTURE_INVALID_TIME: "生效时间必须晚于当前时间，且在一年以内",
+    DEPARTURE_PLAN_EXISTS: "该账号已有待生效的离职计划，请先撤销或修改",
+    DEPARTURE_PLAN_NOT_SCHEDULED: "该账号没有待生效的离职计划",
+    DEPARTURE_SELF_SUBMITTED_ONLY: "只能撤销本人提交的离职申请",
+    DEPARTURE_INVALID_HEIR: "继承人必须是其他在职商务",
     KOL_EMAIL_EXISTS: "该邮箱已被其他达人使用",
     KOL_CODE_EXISTS: "该达人编号已存在",
     KOL_ALREADY_ACTIVATED: "该达人已激活账号，无需再次邀请",
@@ -406,6 +413,7 @@ const zhCN = {
   },
   layout: {
     changePassword: "修改密码",
+    resignation: "离职申请",
     user: "{nickname}（{role}）",
     collapse: "折叠侧边栏",
     expand: "展开侧边栏",
@@ -622,6 +630,7 @@ const zhCN = {
     namePlaceholder: "达人名称",
     emailPlaceholder: "name{'@'}example.com",
     bd: "负责商务",
+    bdOption: "{nickname}（{username}）",
     defaultRate: "佣金比例",
     code: "达人ID",
     links: "链接",
@@ -819,6 +828,52 @@ const zhCN = {
     transferKols: "转移名下达人",
     noKols: "名下没有达人",
     recordsHint: "转移记录请到 系统管理 → 操作日志 查询"
+  },
+  departure: {
+    column: "离职计划",
+    none: "未设置",
+    doneResign: "已离职",
+    doneDisable: "已停用",
+    planText: "{type} · {time} · {heir}",
+    heirShort: "→ {name}",
+    awaitingHeir: "待指定继承人",
+    reasonTooltip: "原因：{reason}",
+    mark: "标记离职",
+    editPlan: "修改离职计划",
+    cancelPlan: "撤销离职计划",
+    cancelTitle: "撤销离职计划",
+    cancelConfirm: "确定撤销 {username} 的离职计划？",
+    cancelled: "离职计划已撤销",
+    created: "离职计划已创建",
+    updated: "离职计划已更新",
+    markTitle: "标记 {username} 离职",
+    editTitle: "修改 {username} 的离职计划",
+    type: "类型",
+    typeResign: "离职",
+    typeDisable: "停用",
+    effectiveTime: "生效时间",
+    now: "立即",
+    at: "指定时间",
+    pickTime: "请选择生效时间",
+    pickTimePlaceholder: "选择日期时间",
+    timeFuture: "生效时间必须晚于当前时间",
+    timezoneHint: "时区：{timezone}（UTC{offset}）",
+    heir: "继承人",
+    heirPlaceholder: "选择继承人",
+    noHeir: "不指定（转为未分配）",
+    noHeirHint: "未指定继承人：生效后该商务名下达人全部转为未分配。",
+    withHeirHint: "指定继承人：生效后该商务名下达人自动转交给继承人。",
+    reason: "原因",
+    reasonPlaceholder: "可选，最多 255 字",
+    bdOnly: "只有商务（仅本人数据范围的子账号）可以提交离职申请。",
+    submitted: "离职申请已提交",
+    submittedHint:
+      "到期后系统会自动把名下达人转交给继承人或转为未分配，并停用你的账号。在此之前可以随时撤销。",
+    status: "状态",
+    statusScheduled: "待生效",
+    plannedLeaveAt: "预计离职时间",
+    submit: "提交离职申请",
+    cancelOwnConfirm: "确定撤销你的离职申请？"
   },
   linkTemplate: {
     hint: "本公司全部代购平台，含已停用。",
@@ -1285,7 +1340,18 @@ const zhCN = {
       PAYOUT_ACCOUNT_SUBMITTED: "达人 {kolCode} 提交了 {accountType} 收款账户，待审核",
       ORDER_SYNC_FAILED: "店铺 {shopName} 的订单同步失败",
       BD_TRANSFER_CANCELLED: "达人 {kolCode} 的预约转移已取消：{reason}",
-      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配"
+      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配",
+      DEPARTURE_PLAN_SUBMITTED: "商务 {bdName} 提交了离职计划，{time} 生效",
+      DEPARTURE_PLAN_EXECUTED: "商务 {bdName} 的{kind}计划已生效：{result}"
+    },
+    planType: {
+      RESIGN: "离职",
+      DISABLE: "停用"
+    },
+    result: {
+      TRANSFERRED: "达人已转交给 {heir}",
+      UNASSIGNED: "名下达人已转为未分配",
+      HEIR_INVALID: "继承人不可用，名下达人已转为未分配"
     },
     reason: {
       OWNERSHIP_CHANGED: "执行时归属已变化",

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { TransferTarget } from "@/api/kol/bd-transfer";
 import { listKols } from "@/api/kol/kol";
+import { cancelDeparturePlan } from "@/api/system/departure-plan";
 import { listUsers, updateUserStatus } from "@/api/system/user";
-import type { CompanyRole, UserVO } from "@/api/types";
+import type { CompanyRole, DeparturePlanType, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
@@ -13,7 +14,7 @@ import { useBatchAction } from "@/composables/useBatchAction";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { isMultiCompany } from "@/utils/company";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   canExport,
@@ -29,6 +30,9 @@ import BdTransferDialog from "@/views/kol/BdTransferDialog.vue";
 import PermissionsDialog from "./PermissionsDialog.vue";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
+
+/** Loaded when the dialog is first opened: the plan form is not needed to render the list. */
+const DeparturePlanDialog = defineAsyncComponent(() => import("./DeparturePlanDialog.vue"));
 
 defineOptions({ name: "SystemUserPage" });
 
@@ -61,6 +65,9 @@ const columns = computed<DataColumn[]>(() => [
   { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
   { key: "role", label: t("user.role"), width: 120 },
   { key: "post", label: t("user.post"), width: 90 },
+  // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this
+  // wide placed next to the fixed actions column would sit under it until the user scrolls.
+  { key: "departure", label: t("departure.column"), width: px(210, 250) },
   { key: "permissions", label: t("user.permissionCount"), width: 92 },
   { key: "dataScope", label: t("user.dataScope"), width: 92 },
   { key: "status", label: t("common.status"), width: 80 },
@@ -105,6 +112,8 @@ const permissionsUser = ref<UserVO | null>(null);
 const kolCounts = ref<Record<string, number>>({});
 const transferVisible = ref(false);
 const transferTarget = ref<TransferTarget | null>(null);
+const departureVisible = ref(false);
+const departureUser = ref<UserVO | null>(null);
 
 function isBdRow(row: UserVO): boolean {
   return isStaff(row) && row.dataScope === "OWN";
@@ -136,6 +145,64 @@ function openTransfer(row: UserVO) {
     count: bdCount(row) ?? 0
   };
   transferVisible.value = true;
+}
+
+/** Type label of a plan: resignation or plain disable. */
+function planTypeLabel(type: DeparturePlanType): string {
+  return type === "RESIGN" ? t("departure.typeResign") : t("departure.typeDisable");
+}
+
+/**
+ * The list column: no plan, a pending plan with its time and heir (or the hint that the heir is
+ * still to be named), or the finished state. A withdrawn plan reads as "no plan".
+ */
+function planText(row: UserVO): string {
+  const plan = row.departurePlan;
+  if (!plan || plan.status === "CANCELLED") return t("departure.none");
+  if (plan.status === "DONE") {
+    return plan.type === "RESIGN" ? t("departure.doneResign") : t("departure.doneDisable");
+  }
+  return t("departure.planText", {
+    type: planTypeLabel(plan.type),
+    time: formatInstantToMinute(plan.effectiveAt),
+    heir: plan.heirName
+      ? t("departure.heirShort", { name: plan.heirName })
+      : t("departure.awaitingHeir")
+  });
+}
+
+/** Reason and execution result ride in the cell tooltip so the column stays one line. */
+function planTooltip(row: UserVO): string {
+  const plan = row.departurePlan;
+  if (!plan) return "";
+  const parts: string[] = [];
+  if (plan.reason) parts.push(t("departure.reasonTooltip", { reason: plan.reason }));
+  if (plan.resultMessage) parts.push(plan.resultMessage);
+  return parts.join(t("link.separator"));
+}
+
+function openDeparture(row: UserVO) {
+  departureUser.value = row;
+  departureVisible.value = true;
+}
+
+async function cancelPlan(row: UserVO) {
+  try {
+    await ElMessageBox.confirm(
+      t("departure.cancelConfirm", { username: row.username }),
+      t("departure.cancelTitle"),
+      { type: "warning" }
+    );
+  } catch {
+    return; // cancelled
+  }
+  try {
+    await cancelDeparturePlan(row.id);
+    ElMessage.success(t("departure.cancelled"));
+    await load();
+  } catch (error) {
+    notifyError(error);
+  }
 }
 
 function permissionEntries(row: UserVO): { code: string; name: string }[] {
@@ -312,6 +379,22 @@ function rowActions(row: UserVO): RowAction[] {
       onClick: () => toggleStatus(row)
     },
     {
+      key: "departure",
+      label:
+        row.departurePlan?.status === "SCHEDULED" ? t("departure.editPlan") : t("departure.mark"),
+      type: "warning",
+      testId: `departure-${row.id}`,
+      hidden: !isBdRow(row),
+      onClick: () => openDeparture(row)
+    },
+    {
+      key: "departure-cancel",
+      label: t("departure.cancelPlan"),
+      testId: `departure-cancel-${row.id}`,
+      hidden: !isBdRow(row) || row.departurePlan?.status !== "SCHEDULED",
+      onClick: () => void cancelPlan(row)
+    },
+    {
       key: "reset",
       label: t("user.resetPassword"),
       type: "warning",
@@ -485,6 +568,16 @@ onMounted(load);
           {{ asUser(row).status === 1 ? t("common.enabled") : t("common.disabled") }}
         </el-tag>
       </template>
+      <template #cell-departure="{ row }">
+        <el-tooltip
+          :disabled="!planTooltip(asUser(row))"
+          :content="planTooltip(asUser(row))"
+          placement="top"
+          popper-class="departure-tooltip"
+        >
+          <span data-test="departure-plan" class="departure-cell">{{ planText(asUser(row)) }}</span>
+        </el-tooltip>
+      </template>
       <template #cell-lastLogin="{ row }">{{ formatInstant(asUser(row).lastLoginTime) }}</template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asUser(row).createTime) }}</template>
       <template #actions="{ row }">
@@ -496,6 +589,7 @@ onMounted(load);
     <PermissionsDialog v-model="permissionsVisible" :user="permissionsUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
     <BdTransferDialog v-model="transferVisible" :target="transferTarget" @saved="load" />
+    <DeparturePlanDialog v-model="departureVisible" :user="departureUser" @saved="load" />
   </div>
 </template>
 
@@ -511,6 +605,26 @@ onMounted(load);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* One line in the cell; the full text (reason, result message) is in the tooltip below. */
+.departure-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Same row-action treatment as the creator list: tight gaps, no Element Plus button margins, so a
    BD row (five actions) keeps the same 49px height as the three-action super administrator row. */
+</style>
+
+<style>
+/* The tooltip teleports to body, so the limit has to be global: a 255-character reason must wrap
+   instead of stretching across the viewport and hiding the sidebar. */
+.departure-tooltip.el-popper {
+  max-width: 360px;
+  white-space: normal;
+  line-height: 1.5;
+  word-break: break-word;
+}
 </style>

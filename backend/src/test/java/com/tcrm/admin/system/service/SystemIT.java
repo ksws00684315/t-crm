@@ -204,6 +204,7 @@ class SystemIT {
             "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
             "sys_post_template:NO",
+            "sys_user_departure_plan:NO",
             "sys_user_permission:NO",
             "sys_user_tenant:NO");
     var without =

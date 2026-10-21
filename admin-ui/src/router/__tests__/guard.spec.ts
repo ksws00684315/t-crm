@@ -1,5 +1,5 @@
 import { createMemoryHistory, createRouter } from "vue-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { accessOf, buildMenu, type AbilitySubject } from "@/utils/permission";
 import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
@@ -129,6 +129,11 @@ describe("resolveAccess", () => {
 });
 
 describe("installGuard with the real route table", () => {
+  // Every case builds a router over the whole real route table, so the first navigation compiles
+  // the target view and its dialogs. Task 41 grew the user page; its slowest case takes ~1.8s in
+  // isolation, which leaves too little of the default 5s budget on a loaded CI machine.
+  vi.setConfig({ testTimeout: 20_000 });
+
   async function navigate(user: AbilitySubject | null, path: string) {
     const router = createRouter({ history: createMemoryHistory(), routes });
     installGuard(router, () => session(user));
@@ -199,6 +204,7 @@ describe("installGuard with the real route table", () => {
       ["fund", null, false, false, false],
       ["system", null, false, false, false],
       ["notifications", null, false, false, false],
+      ["account/resignation", null, false, false, false],
       ["account/password", null, false, false, false],
       ["403", null, false, false, false],
       // Merged and removed pages survive as plain redirects (task 32 §2.1).

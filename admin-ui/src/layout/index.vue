@@ -105,6 +105,8 @@ function toggleSidebar(): void {
 async function onCommand(command: string) {
   if (command === "password") {
     await router.push("/account/password");
+  } else if (command === "resignation") {
+    await router.push("/account/resignation");
   } else if (command === "logout") {
     reauth.close();
     tabs.reset();
@@ -262,6 +264,13 @@ onBeforeUnmount(() => {
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <!-- Only a BD may resign (task 41 §2.2); the backend rejects anyone else too. -->
+                <el-dropdown-item
+                  v-if="access.isOwnScope"
+                  command="resignation"
+                  data-test="menu-resignation"
+                  >{{ t("layout.resignation") }}</el-dropdown-item
+                >
                 <el-dropdown-item command="password">{{
                   t("layout.changePassword")
                 }}</el-dropdown-item>
