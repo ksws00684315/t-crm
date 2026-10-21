@@ -39,7 +39,7 @@ describe("login page", () => {
     const wrapper = await mountPage();
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(wrapper.find("h1").text()).toBe("SparkTrack Creator Portal");
+    expect(wrapper.find("h1").text()).toBe("SparkTrack 达人端");
     expect(wrapper.text()).toContain("邮箱");
     expect(wrapper.text()).toContain("密码");
     expect(wrapper.text()).toContain("登录");

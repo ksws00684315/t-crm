@@ -35,7 +35,7 @@ class RedirectIT {
     r.add("spring.data.redis.host", REDIS::getHost);
     r.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     r.add("spring.data.redis.password", () -> "");
-    r.add("crm.redirect.fallback-url", () -> "https://example.com/unavailable");
+    r.add("crm.redirect.fallback-url", () -> "https://example.com");
     r.add("crm.redirect.ip-hash-salt", () -> "integration-test-salt0123456789a");
   }
 
@@ -157,7 +157,7 @@ class RedirectIT {
   private void itemFallback(String path) throws Exception {
     mvc.perform(get(path))
         .andExpect(status().isFound())
-        .andExpect(header().string("Location", "https://example.com/unavailable"))
+        .andExpect(header().string("Location", "https://example.com"))
         .andExpect(header().string("Cache-Control", "no-store"));
     assertThat(Boolean.TRUE.equals(redis.hasKey("stream:click"))).isFalse();
   }
@@ -183,7 +183,7 @@ class RedirectIT {
   private void fallback() throws Exception {
     mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
-        .andExpect(header().string("Location", "https://example.com/unavailable"));
+        .andExpect(header().string("Location", "https://example.com"));
   }
 
   private void acl(String rule) {

@@ -8,9 +8,9 @@ import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,15 +25,13 @@ public class KolPortalItemService {
 
   private final KolItemMapper items;
   private final CurrentKolContext current;
-  private final String linkBaseUrl;
+  private final SystemConfigApi configs;
 
   public KolPortalItemService(
-      KolItemMapper items,
-      CurrentKolContext current,
-      @Value("${crm.link.base-url}") String linkBaseUrl) {
+      KolItemMapper items, CurrentKolContext current, SystemConfigApi configs) {
     this.items = items;
     this.current = current;
-    this.linkBaseUrl = linkBaseUrl;
+    this.configs = configs;
   }
 
   /** Page of the creator's current mappings, keyword-filtered by display name. */
@@ -62,7 +60,7 @@ public class KolPortalItemService {
         row.getWeidianItemId(),
         name,
         row.getImageUrl(),
-        linkBaseUrl + "/i/" + row.getWeidianItemId(),
+        configs.getValue("url.link") + "/i/" + row.getWeidianItemId(),
         row.getCreateTime());
   }
 

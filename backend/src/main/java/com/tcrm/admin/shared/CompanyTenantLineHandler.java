@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class CompanyTenantLineHandler implements TenantLineHandler {
   private static final Set<String> ALWAYS_IGNORED =
-      Set.of("sys_tenant", "crm_link_index_outbox", "crm_fx_rate", "sys_user");
+      Set.of("sys_tenant", "crm_link_index_outbox", "crm_fx_rate", "sys_user", "sys_config");
   private final CurrentTenantResolver login;
 
   public CompanyTenantLineHandler(CurrentTenantResolver login) {

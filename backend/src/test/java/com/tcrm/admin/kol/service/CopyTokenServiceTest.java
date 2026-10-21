@@ -70,13 +70,39 @@ class CopyTokenServiceTest {
           1440,
           plaintexts,
           Clock.fixed(NOW, ZoneOffset.UTC));
-
   private TenantScope.Scope companyScope;
 
   @BeforeEach
   void setUp() {
     when(current.user()).thenReturn(admin());
     companyScope = TenantScope.openCompany(1L);
+  }
+
+  @Test
+  void shouldUseCurrentConfiguredDefaultsForNewToken() {
+    var configs = mock(com.tcrm.admin.shared.api.SystemConfigApi.class);
+    when(configs.getInt("copy-token.default-quota")).thenReturn(17);
+    when(configs.getInt("copy-token.default-valid-minutes")).thenReturn(240);
+    when(configs.getInt("copy-token.max-quota")).thenReturn(100000);
+    when(configs.getInt("copy-token.max-valid-minutes")).thenReturn(10080);
+    var configuredService = new CopyTokenService(tokens, kols, shops, cipher, current, configs);
+    when(kols.listByIds(List.of(10L))).thenReturn(List.of(kol(10L, true, 99L)));
+    when(tokens.insert(any(KolCopyTokenDO.class)))
+        .thenAnswer(
+            invocation -> {
+              KolCopyTokenDO row = invocation.getArgument(0);
+              row.setId(100L);
+              row.setCreateTime(NOW);
+              return 1;
+            });
+
+    CreatedCopyTokenDTO created =
+        configuredService.create(new CreateCopyTokenCommand(10L, null, null, null));
+
+    assertThat(created.row().quota()).isEqualTo(17);
+    assertThat(created.row().validMinutes()).isEqualTo(240);
+    verify(configs).getInt("copy-token.default-quota");
+    verify(configs).getInt("copy-token.default-valid-minutes");
   }
 
   @AfterEach

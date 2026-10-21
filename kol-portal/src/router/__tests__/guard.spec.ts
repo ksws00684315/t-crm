@@ -101,7 +101,7 @@ describe("document title", () => {
   it("translates the route title key into Chinese", async () => {
     useLocaleStore().setLocale("zh-CN");
     await navigate(true, "/");
-    expect(document.title).toBe("首页 | SparkTrack Creator Portal");
+    expect(document.title).toBe("首页 | SparkTrack 达人端");
   });
 
   it("uses the app name alone when a route has no title key", () => {

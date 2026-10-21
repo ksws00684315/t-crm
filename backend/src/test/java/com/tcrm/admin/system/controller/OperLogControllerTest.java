@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tcrm.admin.security.api.AccountDTO;
+import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.GlobalExceptionHandler;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.system.service.OperLogQuery;
@@ -21,10 +25,31 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class OperLogControllerTest {
   private final OperLogService logs = mock(OperLogService.class);
+  private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final MockMvc mvc =
-      MockMvcBuilders.standaloneSetup(new OperLogController(logs))
+      MockMvcBuilders.standaloneSetup(new OperLogController(logs, current))
           .setControllerAdvice(new GlobalExceptionHandler())
           .build();
+
+  OperLogControllerTest() {
+    when(current.user())
+        .thenReturn(
+            new AccountDTO(
+                1L,
+                "admin",
+                null,
+                null,
+                null,
+                Role.SUPER_ADMIN,
+                null,
+                1,
+                null,
+                null,
+                1,
+                1L,
+                null,
+                true));
+  }
 
   @Test
   void shouldRejectPageBeyondLimit_whenListingOperLogs() throws Exception {
@@ -36,14 +61,15 @@ class OperLogControllerTest {
 
   @Test
   void shouldAcceptLastAllowedPage_whenListingOperLogs() throws Exception {
-    when(logs.page(any(OperLogQuery.class))).thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
+    when(logs.page(any(OperLogQuery.class), anyBoolean()))
+        .thenReturn(new PageResult<>(List.of(), 0, 10000, 20));
     mvc.perform(get("/admin-api/system/oper-logs?page=10000")).andExpect(status().isOk());
-    verify(logs).page(new OperLogQuery(null, null, null, null, null, 10000, 20));
+    verify(logs).page(new OperLogQuery(null, null, null, null, null, 10000, 20), false);
   }
 
   @Test
   void shouldRejectOversizedPage_whenSizeExceedsHundred() throws Exception {
     mvc.perform(get("/admin-api/system/oper-logs?size=101")).andExpect(status().isBadRequest());
-    verify(logs, never()).page(any(OperLogQuery.class));
+    verify(logs, never()).page(any(OperLogQuery.class), anyBoolean());
   }
 }

@@ -7,7 +7,8 @@ import type { MessageSchema } from "./en-US";
  */
 const zhCN: MessageSchema = {
   app: {
-    title: "SparkTrack Creator Portal"
+    title: "SparkTrack Creator Portal",
+    titleSuffix: " 达人端"
   },
   common: {
     language: "语言",
@@ -140,7 +141,7 @@ const zhCN: MessageSchema = {
     createTitle: "添加收款账户",
     editTitle: "修改收款账户",
     empty: "添加 PayPal 或 USDT 账户，审核通过后用于收款。",
-    limitReached: "收款账户最多保留 5 个（不含已停用）。",
+    limitReached: "已达到系统配置的收款账户数量上限。",
     submitted: "已提交，等待商务审核。",
     account: "账号 / 地址",
     holder: "收款人",
@@ -240,7 +241,7 @@ const zhCN: MessageSchema = {
     KOL_AUTH_TOKEN_INVALID: "链接已失效，请联系您的商务重新发送。",
     AUTH_OLD_PASSWORD_INCORRECT: "当前密码错误。",
     KOL_LOGIN_SELECTION_INVALID: "公司选择凭据已失效，请重新登录。",
-    PAYOUT_ACCOUNT_LIMIT: "收款账户最多保留 5 个（不含已停用）。",
+    PAYOUT_ACCOUNT_LIMIT: "已达到系统配置的收款账户数量上限。",
     PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个。",
     PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认。",
     FILE_INVALID: "文件必须是 PNG 或 JPEG 图片。",

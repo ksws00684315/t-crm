@@ -49,7 +49,7 @@ class RedirectServiceTest {
   @Test
   void shouldRejectOldKolCodeFormat_whenPathUsesPreAdr023Pattern() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://fallback.example/", SALT);
+    var service = new RedirectService(redis, IPS, "https://fallback.example", SALT);
     var response = service.redirect("KOL0001", "product", new MockHttpServletRequest());
     assertThat(response.getStatusCode().value()).isEqualTo(404);
     verifyNoInteractions(redis);
@@ -60,15 +60,42 @@ class RedirectServiceTest {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString()))
         .thenThrow(new IllegalStateException("unit-failure"));
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     assertThat(
             service
                 .redirect("KOL-AAA001", "product", new MockHttpServletRequest())
                 .getHeaders()
                 .getLocation()
                 .toString())
-        .isEqualTo("https://example.com/fallback");
+        .isEqualTo("https://example.com");
     verify(redis, never()).append(anyMap());
+  }
+
+  @Test
+  void shouldUseRedisConfiguredFallback_whenKeyExists() {
+    var redis = mock(ClickRedis.class);
+    when(redis.getValue("crm:config:redirect-fallback-url"))
+        .thenReturn("https://configured.example");
+    var service = new RedirectService(redis, IPS, "https://environment.example", SALT);
+
+    var response = service.redirectItem("invalid", new MockHttpServletRequest());
+
+    assertThat(response.getHeaders().getLocation().toString())
+        .isEqualTo("https://configured.example");
+    verify(redis).getValue("crm:config:redirect-fallback-url");
+  }
+
+  @Test
+  void shouldUseEnvironmentFallback_whenRedisConfigurationIsMissing() {
+    var redis = mock(ClickRedis.class);
+    when(redis.getValue("crm:config:redirect-fallback-url")).thenReturn(null);
+    var service = new RedirectService(redis, IPS, "https://environment.example", SALT);
+
+    var response = service.redirectItem("invalid", new MockHttpServletRequest());
+
+    assertThat(response.getHeaders().getLocation().toString())
+        .isEqualTo("https://environment.example");
+    verify(redis).getValue("crm:config:redirect-fallback-url");
   }
 
   private static String sha256(String value) throws Exception {
@@ -80,7 +107,7 @@ class RedirectServiceTest {
   private Map<?, ?> clickFor(MockHttpServletRequest request) {
     var redis = mock(ClickRedis.class);
     when(redis.lookup(anyString(), anyString())).thenReturn(ITEM);
-    new RedirectService(redis, IPS, "https://example.com/fallback", SALT)
+    new RedirectService(redis, IPS, "https://example.com", SALT)
         .redirect("KOL-AAA001", "product", request);
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);
     verify(redis).append(events.capture());
@@ -117,7 +144,7 @@ class RedirectServiceTest {
   @Test
   void shouldRejectUnsafeIndexTargets_whenUriHasNoHostOrContainsUserInfo() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     for (String target :
         new String[] {
           "https:///missing-host", "https://user:credential@example.com", "https://[invalid"
@@ -130,14 +157,13 @@ class RedirectServiceTest {
                   .getHeaders()
                   .getLocation()
                   .toString())
-          .isEqualTo("https://example.com/fallback");
+          .isEqualTo("https://example.com");
     }
   }
 
   @Test
   void shouldReturnUnavailable_whenRedisHealthIsFalse() {
-    var service =
-        new RedirectService(mock(ClickRedis.class), IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(mock(ClickRedis.class), IPS, "https://example.com", SALT);
     assertThat(service.health().getStatusCode().value()).isEqualTo(503);
   }
 
@@ -147,7 +173,7 @@ class RedirectServiceTest {
     when(redis.lookup(anyString(), anyString()))
         .thenReturn(
             "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p?a=1%7C2\",\"status\":1}");
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     var response = service.redirect("KOL-AAA001", "product", new MockHttpServletRequest());
     assertThat(response.getHeaders().getLocation().toString())
         .isEqualTo("https://example.com/p?a=1%7C2");
@@ -159,7 +185,7 @@ class RedirectServiceTest {
   @Test
   void shouldUseFallbackWithoutRecording_whenIndexValueIsInactiveOrMalformed() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     for (String value :
         new String[] {
           "{\"kolItemId\":\"77\",\"targetUrl\":\"https://example.com/p\",\"status\":0}", "{broken"
@@ -172,7 +198,7 @@ class RedirectServiceTest {
                   .getLocation()
                   .toString())
           .as(value)
-          .isEqualTo("https://example.com/fallback");
+          .isEqualTo("https://example.com");
     }
     verify(redis, never()).append(anyMap());
   }
@@ -180,7 +206,7 @@ class RedirectServiceTest {
   @Test
   void shouldUseFallbackWithoutLookup_whenItemIdIsNotOneToTwentyAsciiDigits() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     for (String id :
         new String[] {
           "", "1".repeat(21), "12a", "-1", "+1", "1.0", " 1", "\u0661\u0662", "\uFF11\uFF12"
@@ -189,16 +215,17 @@ class RedirectServiceTest {
       assertThat(response.getStatusCode().value()).as(id).isEqualTo(302);
       assertThat(response.getHeaders().getLocation().toString())
           .as(id)
-          .isEqualTo("https://example.com/fallback");
+          .isEqualTo("https://example.com");
       assertThat(response.getHeaders().getCacheControl()).as(id).isEqualTo("no-store");
     }
-    verifyNoInteractions(redis);
+    verify(redis).getValue("crm:config:redirect-fallback-url");
+    verify(redis, never()).lookupItem(anyString());
   }
 
   @Test
   void shouldLookUpIdAsGiven_whenItemIdHasOneToTwentyDigits() {
     var redis = mock(ClickRedis.class);
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     for (String id : new String[] {"0", "7", "007", "7849640325", "9".repeat(20)}) {
       service.redirectItem(id, new MockHttpServletRequest());
       verify(redis).lookupItem(id);
@@ -209,14 +236,14 @@ class RedirectServiceTest {
   void shouldUseFallback_whenItemLookupFails() {
     var redis = mock(ClickRedis.class);
     when(redis.lookupItem(anyString())).thenThrow(new IllegalStateException("unit-failure"));
-    var service = new RedirectService(redis, IPS, "https://example.com/fallback", SALT);
+    var service = new RedirectService(redis, IPS, "https://example.com", SALT);
     assertThat(
             service
                 .redirectItem("7849640325", new MockHttpServletRequest())
                 .getHeaders()
                 .getLocation()
                 .toString())
-        .isEqualTo("https://example.com/fallback");
+        .isEqualTo("https://example.com");
     verify(redis, never()).append(anyMap());
   }
 
@@ -233,7 +260,7 @@ class RedirectServiceTest {
     request.addHeader("CF-IPCountry", "X".repeat(20));
     long before = System.currentTimeMillis();
     var response =
-        new RedirectService(redis, IPS, "https://example.com/fallback", SALT)
+        new RedirectService(redis, IPS, "https://example.com", SALT)
             .redirectItem("7849640325", request);
     assertThat(response.getHeaders().getLocation().toString()).isEqualTo("https://example.com/p");
     var events = org.mockito.ArgumentCaptor.forClass(Map.class);

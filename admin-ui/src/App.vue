@@ -8,6 +8,7 @@ import VersionNotice from "@/components/VersionNotice.vue";
 import { applyDocumentTitle } from "@/router/title";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
+import { siteName } from "@/stores/site-config";
 
 defineOptions({ name: "AppRoot" });
 
@@ -22,7 +23,7 @@ const elementLocale = computed(() => elementLocales[localeStore.locale]);
 // The router sets the title on navigation; a language switch updates it without navigating again.
 const route = useRoute();
 watch(
-  () => localeStore.locale,
+  () => [localeStore.locale, siteName.value],
   () => applyDocumentTitle(route.meta)
 );
 </script>

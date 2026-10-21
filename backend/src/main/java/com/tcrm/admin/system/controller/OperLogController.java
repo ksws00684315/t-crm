@@ -1,6 +1,9 @@
 package com.tcrm.admin.system.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import com.tcrm.admin.system.service.OperLogQuery;
@@ -13,15 +16,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** SUPER_ADMIN audit log list; validation 400, authorization AUTH_UNAUTHORIZED/AUTH_FORBIDDEN. */
+/** Company and platform-scoped audit log list. */
 @RestController
 @RequestMapping("/admin-api/system/oper-logs")
-@SaCheckRole("SUPER_ADMIN")
+@SaCheckRole(
+    value = {"SUPER_ADMIN", "PLATFORM_ADMIN"},
+    mode = SaMode.OR)
 public class OperLogController {
   private final OperLogService logs;
+  private final CurrentUserContext current;
 
-  public OperLogController(OperLogService logs) {
+  public OperLogController(OperLogService logs, CurrentUserContext current) {
     this.logs = logs;
+    this.current = current;
   }
 
   @GetMapping
@@ -34,7 +41,9 @@ public class OperLogController {
       @RequestParam(defaultValue = "1") @Min(1) @Max(PageResult.MAX_PAGE) int page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
     return R.ok(
-        logs.page(new OperLogQuery(module, keyword, operator, from, to, page, size))
+        logs.page(
+                new OperLogQuery(module, keyword, operator, from, to, page, size),
+                current.user().role() == Role.PLATFORM_ADMIN)
             .map(OperLogVO::from));
   }
 }

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { login, selectCompany, type CompanySelection, type AuthSession } from "@/api/auth";
 import AuthShell from "@/components/AuthShell.vue";
 import { useSessionStore } from "@/stores/session";
+import { siteName } from "@/stores/site-config";
 import { safeRedirect, validEmail, validPassword } from "@/utils/auth";
 import { ApiError } from "@/utils/http/error";
 import { useSubmission } from "@/utils/useSubmission";
@@ -67,7 +68,7 @@ function chooseCompany() {
 </script>
 
 <template>
-  <AuthShell :title="t('login.title')">
+  <AuthShell :title="`${siteName}${t('app.titleSuffix')}`">
     <el-alert
       v-if="route.query.reset === 'success'"
       type="success"

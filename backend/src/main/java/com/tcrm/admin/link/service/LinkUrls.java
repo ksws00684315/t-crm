@@ -1,10 +1,10 @@
 package com.tcrm.admin.link.service;
 
 import com.tcrm.admin.kol.api.KolRefDTO;
-import java.net.URI;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,15 +23,32 @@ public class LinkUrls {
   static final String PRODUCT_VARIABLE = "{PRODUCT_ID}";
   static final String INVITE_VARIABLE = "{INVITE_CODE}";
   static final String VARIABLE = "TCRM_LINK_BASE_URL";
-  private final String baseUrl;
+  private final SystemConfigApi configs;
 
-  public LinkUrls(@Value("${crm.link.base-url}") String baseUrl) {
-    this.baseUrl = validate(baseUrl);
+  @Autowired
+  public LinkUrls(SystemConfigApi configs) {
+    this.configs = configs;
+  }
+
+  LinkUrls(String baseUrl) {
+    validate(baseUrl);
+    this.configs =
+        new SystemConfigApi() {
+          @Override
+          public String getValue(String key) {
+            return baseUrl;
+          }
+
+          @Override
+          public int getInt(String key) {
+            return 0;
+          }
+        };
   }
 
   /** {@code {base}/t/{kolCode}/{productCode}}; stable for a KOL and original product. */
   public String linkUrl(String kolCode, String productCode) {
-    return baseUrl + "/t/" + kolCode + "/" + productCode;
+    return configs.getValue("url.link") + "/t/" + kolCode + "/" + productCode;
   }
 
   /** Target of a link: the Weidian page of the exclusive item. */
@@ -86,12 +103,18 @@ public class LinkUrls {
       return false;
     }
     try {
-      URI uri = URI.create(value);
+      java.net.URI uri = java.net.URI.create(value);
+      if (uri.getHost() == null
+          || uri.getRawUserInfo() != null
+          || uri.getRawQuery() != null
+          || uri.getRawFragment() != null
+          || (uri.getRawPath() != null && !uri.getRawPath().isEmpty())) {
+        return false;
+      }
       return "https".equals(uri.getScheme())
-          && uri.getHost() != null
-          && uri.getRawUserInfo() == null
-          && uri.getRawQuery() == null
-          && uri.getRawFragment() == null;
+          || ("http".equals(uri.getScheme())
+              && ("localhost".equalsIgnoreCase(uri.getHost())
+                  || "127.0.0.1".equals(uri.getHost())));
     } catch (IllegalArgumentException e) {
       return false;
     }

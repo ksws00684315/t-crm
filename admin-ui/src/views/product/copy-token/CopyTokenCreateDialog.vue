@@ -37,8 +37,8 @@ const form = reactive<{
   targetShopId: string | null;
 }>({
   kolId: null,
-  quota: 1,
-  validMinutes: 1440,
+  quota: null,
+  validMinutes: null,
   targetShopId: null
 });
 
@@ -53,8 +53,8 @@ watch(
     if (!openNow) return;
     result.value = null;
     form.kolId = props.presetKolId ?? null;
-    form.quota = 1;
-    form.validMinutes = 1440;
+    form.quota = null;
+    form.validMinutes = null;
     form.targetShopId = null;
     kolOptions.value = [];
     if (props.presetKolId && props.presetKolLabel) {
@@ -189,7 +189,6 @@ function close() {
           <el-input-number
             v-model="form.quota"
             :min="1"
-            :max="100000"
             data-test="create-quota"
             style="width: 100%"
           />
@@ -198,7 +197,6 @@ function close() {
           <el-input-number
             v-model="form.validMinutes"
             :min="5"
-            :max="10080"
             data-test="create-minutes"
             style="width: 100%"
           />

@@ -20,6 +20,7 @@ class KolApiInterceptor implements HandlerInterceptor {
     "/kol-api/auth/activate",
     "/kol-api/auth/forgot",
     "/kol-api/auth/reset",
+    "/kol-api/public/site-config",
     "/kol-api/register",
     "/kol-api/register/**"
   };

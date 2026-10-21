@@ -10,6 +10,7 @@ import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.security.service.LoginFailures;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -74,8 +75,8 @@ public class SecurityConfiguration implements WebMvcConfigurer {
    * KOL login failures count on their own keys ({@code kol:auth:fail:*}); thresholds as ADR-008.
    */
   @Bean(name = "kolLoginFailures")
-  public LoginFailures kolLoginFailures(StringRedisTemplate redis) {
-    return new LoginFailures(redis, "kol:auth");
+  public LoginFailures kolLoginFailures(StringRedisTemplate redis, SystemConfigApi configs) {
+    return new LoginFailures(redis, "kol:auth", configs);
   }
 
   @Bean
@@ -119,6 +120,7 @@ public class SecurityConfiguration implements WebMvcConfigurer {
         .excludePathPatterns(
             "/admin-api/auth/login",
             "/admin-api/auth/captchas",
+            "/admin-api/public/site-config",
             "/admin-api/integration/weidian/oauth/callback",
             "/admin-api/external/**");
     // The displayed-company check runs after the status check (so it sees a valid login) and
@@ -150,6 +152,7 @@ public class SecurityConfiguration implements WebMvcConfigurer {
         .excludePathPatterns(
             "/admin-api/auth/login",
             "/admin-api/auth/captchas",
+            "/admin-api/public/site-config",
             "/admin-api/integration/weidian/oauth/callback",
             "/admin-api/external/**");
     // KOL mirror of the two interceptors above: status checks first, annotations second. The

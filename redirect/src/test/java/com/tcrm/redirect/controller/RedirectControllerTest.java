@@ -39,7 +39,7 @@ class RedirectControllerTest {
                     new RedirectService(
                         redis,
                         new ClientIpResolver("127.0.0.1", "CF-Connecting-IP,X-Forwarded-For"),
-                        "https://example.com/unavailable",
+                        "https://example.com",
                         "unit-test-salt0123456789abcdef01")))
             .build();
   }
@@ -202,7 +202,8 @@ class RedirectControllerTest {
         new String[] {"/i/abc", "/i/12a", "/i/" + "1".repeat(21), "/i/1.0", "/i/%D9%A1"}) {
       itemFallback(path);
     }
-    verifyNoInteractions(redis);
+    verify(redis).getValue("crm:config:redirect-fallback-url");
+    verify(redis, never()).lookupItem(anyString());
   }
 
   @Test
@@ -217,13 +218,13 @@ class RedirectControllerTest {
   private void itemFallback(String path) throws Exception {
     mvc.perform(get(path))
         .andExpect(status().isFound())
-        .andExpect(header().string("Location", "https://example.com/unavailable"))
+        .andExpect(header().string("Location", "https://example.com"))
         .andExpect(header().string("Cache-Control", "no-store"));
   }
 
   private void fallback() throws Exception {
     mvc.perform(get("/t/KOL-AAA001/P000001"))
         .andExpect(status().isFound())
-        .andExpect(header().string("Location", "https://example.com/unavailable"));
+        .andExpect(header().string("Location", "https://example.com"));
   }
 }

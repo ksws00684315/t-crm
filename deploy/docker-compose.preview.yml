@@ -55,6 +55,7 @@ services:
       TCRM_CORS_ALLOWED_ORIGINS: ${TCRM_CORS_ALLOWED_ORIGINS:-}
       # Placeholder https URLs. The backend rejects http; generated links are not browsable.
       TCRM_LINK_BASE_URL: ${TCRM_LINK_BASE_URL}
+      TCRM_UPLOAD_BASE_URL: ${TCRM_UPLOAD_BASE_URL:-}
       TCRM_KOL_PORTAL_BASE_URL: ${TCRM_KOL_PORTAL_BASE_URL}
       TCRM_ADMIN_BASE_URL: ${TCRM_ADMIN_BASE_URL}
       TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}

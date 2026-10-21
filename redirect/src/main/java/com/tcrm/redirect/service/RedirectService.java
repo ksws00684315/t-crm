@@ -21,8 +21,10 @@ public class RedirectService {
   private static final Logger LOG = LoggerFactory.getLogger(RedirectService.class);
   private final ClickRedis redis;
   private final ClientIpResolver clientIps;
-  private final URI fallback;
+  private final URI environmentFallback;
   private final String salt;
+  private volatile URI cachedFallback;
+  private volatile long fallbackExpiresAt;
 
   public RedirectService(
       ClickRedis redis,
@@ -31,10 +33,11 @@ public class RedirectService {
       @Value("${crm.redirect.ip-hash-salt}") String salt) {
     this.redis = redis;
     this.clientIps = clientIps;
-    this.fallback = httpUri(fallback);
+    this.environmentFallback = baseUri(fallback);
+    this.cachedFallback = this.environmentFallback;
     this.salt = salt;
-    if (this.fallback == null) {
-      throw new IllegalArgumentException("An HTTP(S) fallback URL is required");
+    if (this.environmentFallback == null) {
+      throw new IllegalArgumentException("A valid fallback URL is required");
     }
     if (salt == null || salt.length() < 32) {
       throw new IllegalArgumentException(
@@ -57,7 +60,7 @@ public class RedirectService {
   /** Redirects by copied Weidian item ID ({@code /i/{weidianItemId}}, ADR-019). */
   public ResponseEntity<Void> redirectItem(String weidianItemId, HttpServletRequest request) {
     if (!weidianItemId.matches("^[0-9]{1,20}$")) {
-      return redirectTo(fallback);
+      return redirectTo(fallback());
     }
     return resolve(() -> redis.lookupItem(weidianItemId), Map.of(), request);
   }
@@ -73,17 +76,17 @@ public class RedirectService {
       value = lookup.get();
     } catch (RuntimeException e) {
       LOG.error("Link lookup failed", e);
-      return redirectTo(fallback);
+      return redirectTo(fallback());
     }
     // A miss means the link does not exist: the index is kept complete by crm-admin (incremental
     // updates plus a daily rebuild), so there is no fallback to the backend (ADR-012).
     if (value == null) {
-      return redirectTo(fallback);
+      return redirectTo(fallback());
     }
     var entry = LinkEntry.parse(value);
     URI target = entry.map(link -> httpUri(link.targetUrl())).orElse(null);
     if (target == null) {
-      return redirectTo(fallback);
+      return redirectTo(fallback());
     }
     var event = new HashMap<>(linkFields);
     event.put("kolItemId", entry.get().kolItemId());
@@ -105,6 +108,28 @@ public class RedirectService {
       return ResponseEntity.status(redis.healthy() ? 200 : 503).build();
     } catch (RuntimeException e) {
       return ResponseEntity.status(503).build();
+    }
+  }
+
+  private URI fallback() {
+    long now = System.nanoTime();
+    if (now < fallbackExpiresAt) {
+      return cachedFallback;
+    }
+    synchronized (this) {
+      now = System.nanoTime();
+      if (now >= fallbackExpiresAt) {
+        String configured = null;
+        try {
+          configured = redis.getValue("crm:config:redirect-fallback-url");
+        } catch (RuntimeException e) {
+          LOG.warn("Could not read configured redirect fallback; using environment default");
+        }
+        URI parsed = configured == null ? null : baseUri(configured);
+        cachedFallback = parsed == null ? environmentFallback : parsed;
+        fallbackExpiresAt = now + java.time.Duration.ofSeconds(30).toNanos();
+      }
+      return cachedFallback;
     }
   }
 
@@ -131,7 +156,10 @@ public class RedirectService {
   private static URI httpUri(String value) {
     try {
       URI uri = URI.create(value);
-      return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+      boolean localHttp =
+          "http".equalsIgnoreCase(uri.getScheme())
+              && ("localhost".equalsIgnoreCase(uri.getHost()) || "127.0.0.1".equals(uri.getHost()));
+      return ("https".equalsIgnoreCase(uri.getScheme()) || localHttp)
               && uri.getHost() != null
               && uri.getUserInfo() == null
           ? uri
@@ -139,5 +167,16 @@ public class RedirectService {
     } catch (IllegalArgumentException e) {
       return null;
     }
+  }
+
+  private static URI baseUri(String value) {
+    URI uri = httpUri(value);
+    return uri != null
+            && (uri.getRawPath() == null || uri.getRawPath().isEmpty())
+            && uri.getRawQuery() == null
+            && uri.getRawFragment() == null
+            && !value.endsWith("/")
+        ? uri
+        : null;
   }
 }

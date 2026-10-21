@@ -2,6 +2,7 @@ package com.tcrm.admin.security.service;
 
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -13,6 +14,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -49,26 +51,41 @@ public class CaptchaService {
   private final StringRedisTemplate redis;
   private final CaptchaImageGenerator generator;
   private final boolean enabled;
-  private final int issueLimit;
+  private final SystemConfigApi configs;
+  private final int testIssueLimit;
 
+  @Autowired
   public CaptchaService(
       StringRedisTemplate redis,
       CaptchaImageGenerator generator,
       @Value("${crm.auth.captcha.enabled:true}") boolean enabled,
-      @Value("${crm.auth.captcha.issue-per-minute:" + DEFAULT_ISSUE_LIMIT + "}") int issueLimit) {
-    if (issueLimit < 1) {
-      throw new IllegalArgumentException("crm.auth.captcha.issue-per-minute must be at least 1");
-    }
+      SystemConfigApi configs) {
     this.redis = redis;
     this.generator = generator;
     this.enabled = enabled;
-    this.issueLimit = issueLimit;
+    this.configs = configs;
+    this.testIssueLimit = -1;
     if (!enabled) {
       // Spec 06 / ADR-017: production must keep captchas on. A WARN at startup makes a mis-set
       // env var visible in the first log lines instead of only when someone tries to log in.
       LOG.warn(
           "crm.auth.captcha.enabled is false: administrator login captchas are DISABLED. "
               + "Do not use this setting in production (security spec 06, ADR-017).");
+    }
+  }
+
+  public CaptchaService(
+      StringRedisTemplate redis, CaptchaImageGenerator generator, boolean enabled, int issueLimit) {
+    if (issueLimit < 1) {
+      throw new IllegalArgumentException("crm.auth.captcha.issue-per-minute must be positive");
+    }
+    this.redis = redis;
+    this.generator = generator;
+    this.enabled = enabled;
+    this.configs = null;
+    this.testIssueLimit = issueLimit;
+    if (!enabled) {
+      LOG.warn("Administrator login captchas are disabled (local development only)");
     }
   }
 
@@ -88,6 +105,7 @@ public class CaptchaService {
             COUNT,
             List.of(KEY_PREFIX + "rate:" + digest(clientIp)),
             Long.toString(ISSUE_WINDOW_MS));
+    int issueLimit = configs == null ? testIssueLimit : configs.getInt("captcha.issue-per-minute");
     if (issued != null && issued > issueLimit) {
       throw new BusinessException(ErrorCode.AUTH_CAPTCHA_RATE_LIMITED);
     }

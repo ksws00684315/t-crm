@@ -10,6 +10,7 @@ import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -36,10 +38,6 @@ import tools.jackson.databind.ObjectMapper;
 public class KolAuthService {
   static final Duration SELECTION_TTL = Duration.ofMinutes(5);
   static final Duration RESET_TTL = Duration.ofMinutes(30);
-  private static final int FORGOT_EMAIL_LIMIT = 3;
-  private static final Duration FORGOT_EMAIL_WINDOW = Duration.ofMinutes(10);
-  private static final int FORGOT_IP_LIMIT = 20;
-  private static final Duration FORGOT_IP_WINDOW = Duration.ofHours(1);
   private static final String SELECTION_PREFIX = "kol:auth:selection:";
   private static final String FORGOT_EMAIL_PREFIX = "kol:auth:forgot:email:";
   private static final String FORGOT_IP_PREFIX = "kol:auth:forgot:ip:";
@@ -54,9 +52,11 @@ public class KolAuthService {
   private final StringRedisTemplate redis;
   private final ObjectMapper json;
   private final TransactionTemplate tx;
+  private final SystemConfigApi configs;
   // Verified for unknown or unactivated accounts so every attempt pays one BCrypt comparison.
   private final String timingHash;
 
+  @Autowired
   public KolAuthService(
       KolAccountStore accounts,
       KolAuthTokens tokens,
@@ -67,7 +67,8 @@ public class KolAuthService {
       ExternalAuditApi audit,
       StringRedisTemplate redis,
       ObjectMapper json,
-      TransactionTemplate tx) {
+      TransactionTemplate tx,
+      SystemConfigApi configs) {
     this.accounts = accounts;
     this.tokens = tokens;
     this.mails = mails;
@@ -78,7 +79,22 @@ public class KolAuthService {
     this.redis = redis;
     this.json = json;
     this.tx = tx;
+    this.configs = configs;
     this.timingHash = passwords.encode(UUID.randomUUID().toString());
+  }
+
+  KolAuthService(
+      KolAccountStore accounts,
+      KolAuthTokens tokens,
+      KolMails mails,
+      BCryptPasswordEncoder passwords,
+      LoginFailureCounter failures,
+      CurrentKolContext current,
+      ExternalAuditApi audit,
+      StringRedisTemplate redis,
+      ObjectMapper json,
+      TransactionTemplate tx) {
+    this(accounts, tokens, mails, passwords, failures, current, audit, redis, json, tx, null);
   }
 
   /** Successful login answer for the KOL portal; {@code kol} mirrors {@code GET /kol-api/me}. */
@@ -339,13 +355,19 @@ public class KolAuthService {
   }
 
   private boolean withinIpBudget(String clientIp) {
-    return increment(FORGOT_IP_PREFIX + SecureTokens.hash(clientIp), FORGOT_IP_WINDOW)
-        <= FORGOT_IP_LIMIT;
+    Duration window = Duration.ofMinutes(configInt("kol.forgot.ip-window-minutes", 60));
+    return increment(FORGOT_IP_PREFIX + SecureTokens.hash(clientIp), window)
+        <= configInt("kol.forgot.ip-limit", 20);
   }
 
   private boolean tryConsumeEmailBudget(String email) {
-    return increment(FORGOT_EMAIL_PREFIX + SecureTokens.hash(email), FORGOT_EMAIL_WINDOW)
-        <= FORGOT_EMAIL_LIMIT;
+    Duration window = Duration.ofMinutes(configInt("kol.forgot.email-window-minutes", 10));
+    return increment(FORGOT_EMAIL_PREFIX + SecureTokens.hash(email), window)
+        <= configInt("kol.forgot.email-limit", 3);
+  }
+
+  private int configInt(String key, int fallback) {
+    return configs == null ? fallback : configs.getInt(key);
   }
 
   private long increment(String key, Duration window) {
