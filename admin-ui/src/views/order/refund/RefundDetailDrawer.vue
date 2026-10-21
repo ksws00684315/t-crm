@@ -150,6 +150,6 @@ const columns = computed<DataColumn[]>(() => [
 .item-image {
   width: 40px;
   height: 40px;
-  border-radius: 4px;
+  border-radius: var(--tcrm-radius-tag);
 }
 </style>
