@@ -30,6 +30,7 @@ import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.CopyJobLookupApi;
 import com.tcrm.admin.product.api.CopyJobLookupApi.CopyJobRefDTO;
 import com.tcrm.admin.product.api.KolItemApi;
+import com.tcrm.admin.product.api.KolItemLinkCodeDTO;
 import com.tcrm.admin.product.api.KolItemRefDTO;
 import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
@@ -122,8 +123,8 @@ class OrderServiceTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(5L, "Main shop", "wd-5", 1),
-                new ShopAccessDTO(6L, "Backup shop", "wd-6", 0)));
+                new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"),
+                new ShopAccessDTO(6L, "Backup shop", "wd-6", 0, "S006")));
     when(orders.missingOrderFields()).thenReturn(List.of());
     when(orders.latestOrderSourcePerShop()).thenReturn(List.of());
     when(items.missingItemFields()).thenReturn(List.of());
@@ -228,6 +229,7 @@ class OrderServiceTest {
     assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("1.25");
     assertThat(result.items().getFirst().refundStatus()).isEqualTo("PROCESSING");
     assertThat(result.items().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(result.items().getFirst().shopCode()).isEqualTo("S005");
     assertThat(result.items().getFirst().bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).refundAmount()).isEqualByComparingTo("0");
     assertThat(result.items().get(1).refundStatus()).isEqualTo("NONE");
@@ -443,6 +445,7 @@ class OrderServiceTest {
 
     var first = result.items().getFirst();
     assertThat(first.shopName()).isEqualTo("Main shop");
+    assertThat(first.shopCode()).isEqualTo("S005");
     assertThat(first.kolCode()).isEqualTo("KOL0100");
     assertThat(first.kolName()).isEqualTo("Creator");
     assertThat(first.bdUserName()).isEqualTo("Test BD");
@@ -520,7 +523,7 @@ class OrderServiceTest {
     i.setRefundAmount(BigDecimal.ZERO);
     when(items.selectList(any())).thenReturn(List.of(i));
     when(refunds.selectList(any())).thenReturn(List.of());
-    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1));
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
     when(kols.listByIds(any()))
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
     when(products.listProducts(any()))
@@ -530,6 +533,7 @@ class OrderServiceTest {
 
     assertThat(detail.orderNo()).isEqualTo("remote10");
     assertThat(detail.channel()).isEqualTo("WEIDIAN");
+    assertThat(detail.shopCode()).isEqualTo("S005");
     assertThat(detail.merchantNo()).isEqualTo("wd-5");
     assertThat(detail.source()).isEqualTo("API");
     assertThat(detail.refundStatus()).isEqualTo("NONE");
@@ -576,6 +580,8 @@ class OrderServiceTest {
             List.of(
                 new KolMappingEvidenceDTO(
                     300L, 100L, 200L, "P200", "Original", 5L, "90", PAID.minusSeconds(100), null)));
+    when(kolItems.listLinkCodesByIds(any()))
+        .thenReturn(List.of(new KolItemLinkCodeDTO(300L, "KPL-AAAAAAAAAAAA")));
     when(kols.listByIds(any()))
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
     when(copyJobs.findByTargetItemId("90"))
@@ -589,7 +595,7 @@ class OrderServiceTest {
     assertThat(line.copyJob().jobCode()).isEqualTo("JOB-1");
     assertThat(line.link().kolItemId()).isEqualTo(300L);
     assertThat(line.link().targetItemId()).isEqualTo("90");
-    assertThat(line.link().linkCode()).isNull();
+    assertThat(line.link().linkCode()).isEqualTo("KPL-AAAAAAAAAAAA");
     assertThat(line.refunds()).hasSize(1);
     assertThat(line.refunds().getFirst().refundNo()).isEqualTo("R9");
     assertThat(line.ledger()).isNull();
@@ -606,7 +612,7 @@ class OrderServiceTest {
     i.setItemName("Exclusive");
     i.setAttributionType(0);
     when(items.selectOne(any())).thenReturn(i);
-    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1));
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
     // Mapping ended before pay time → MAPPING_EXPIRED.
     when(kolItems.listMappingsByShopItem(5L, "90"))
         .thenReturn(
@@ -621,6 +627,8 @@ class OrderServiceTest {
                     "90",
                     PAID.minusSeconds(200),
                     PAID.minusSeconds(1))));
+    when(kolItems.listLinkCodesByIds(any()))
+        .thenReturn(List.of(new KolItemLinkCodeDTO(300L, "KPL-BBBBBBBBBBBB")));
     when(kols.listByIds(any()))
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
     when(products.getProduct(200L))
@@ -629,6 +637,7 @@ class OrderServiceTest {
     var expired = service.evidence(20L);
     assertThat(expired.unmatchedReason()).isEqualTo("MAPPING_EXPIRED");
     assertThat(expired.mappings().getFirst().coversPayTime()).isFalse();
+    assertThat(expired.mappings().getFirst().linkCode()).isEqualTo("KPL-BBBBBBBBBBBB");
     assertThat(expired.product().productCode()).isEqualTo("P200");
 
     when(kolItems.listMappingsByShopItem(5L, "90")).thenReturn(List.of());

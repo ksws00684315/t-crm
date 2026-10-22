@@ -193,7 +193,7 @@ class WeidianTokenCenterTest {
 
     private CenterFixture() {
       when(shops.findShop(SHOP_ID))
-          .thenReturn(new ShopAccessDTO(SHOP_ID, "Test shop", "weidian-12", 1));
+          .thenReturn(new ShopAccessDTO(SHOP_ID, "Test shop", "weidian-12", 1, null));
       when(redis.opsForValue()).thenReturn(values);
     }
 

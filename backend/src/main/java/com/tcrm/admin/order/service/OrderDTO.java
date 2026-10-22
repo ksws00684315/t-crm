@@ -12,7 +12,7 @@ import java.util.List;
  * @param orderNo Weidian order number, same value as {@code weidianOrderId} (contract, task 40)
  * @param channel sales channel, WEIDIAN today
  * @param refundStatus order-level status from {@link OrderRefundStatuses}
- * @param shopCode shop code; null until the shop module's column lands (task 37 merge)
+ * @param shopCode shop code from {@code crm_shop.shop_code}
  */
 public record OrderDTO(
     Long id,

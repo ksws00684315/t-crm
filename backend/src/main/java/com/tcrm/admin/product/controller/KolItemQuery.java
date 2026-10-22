@@ -7,23 +7,24 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 public record KolItemQuery(
-    @Size(max = 16) String kolCode,
-    @Size(max = 16) String productCode,
+    @Size(max = 16) String linkCode,
+    @Size(max = 128) String kolKeyword,
     @Min(1) Long shopId,
-    @Size(max = 32) String weidianItemId,
-    @Size(max = 16) String source,
-    Boolean current,
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size) {
   KolItemFilterDTO toFilter() {
     return new KolItemFilterDTO(
-        kolCode,
-        productCode,
+        blankToNull(linkCode),
+        blankToNull(kolKeyword),
         shopId,
-        weidianItemId,
-        source,
-        current == null || current,
         page == null ? 1 : page,
         size == null ? 20 : size);
+  }
+
+  private static String blankToNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.strip();
   }
 }

@@ -139,4 +139,12 @@ public interface KolItemApi {
    * @param weidianItemId exclusive item Weidian ID
    */
   List<KolMappingEvidenceDTO> listMappingsByShopItem(Long shopId, String weidianItemId);
+
+  /**
+   * Link codes of these mappings, current or closed (task 39, for the order trace page). Unknown
+   * ids are skipped. An empty collection returns an empty list without querying.
+   *
+   * @param kolItemIds {@code crm_kol_item.id} values
+   */
+  List<KolItemLinkCodeDTO> listLinkCodesByIds(Collection<Long> kolItemIds);
 }

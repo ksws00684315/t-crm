@@ -140,7 +140,7 @@ public class RefundQueryService {
         OrderChannels.WEIDIAN,
         order.getShopId(),
         shop == null ? null : shop.name(),
-        null,
+        shop == null ? null : shop.shopCode(),
         shop == null ? null : shop.weidianShopId(),
         kolId,
         kol == null ? null : kol.kolCode(),
@@ -164,9 +164,9 @@ public class RefundQueryService {
             ? Map.of()
             : items.selectByIds(lineIds).stream()
                 .collect(Collectors.toMap(OrderItemDO::getId, Function.identity()));
-    Map<Long, String> shopNames =
+    Map<Long, ShopAccessDTO> shopById =
         shops.listShops().stream()
-            .collect(Collectors.toMap(ShopAccessDTO::id, ShopAccessDTO::name, (a, b) -> a));
+            .collect(Collectors.toMap(ShopAccessDTO::id, Function.identity(), (a, b) -> a));
     Set<Long> kolIds = new HashSet<>();
     for (var refund : records) {
       var order = orderById.get(refund.getOrderId());
@@ -192,6 +192,10 @@ public class RefundQueryService {
                       ? line.getKolId()
                       : order == null ? null : order.getKolId();
               var kol = kolId == null ? null : kolById.get(kolId);
+              var shop =
+                  order == null || order.getShopId() == null
+                      ? null
+                      : shopById.get(order.getShopId());
               return new RefundDTO(
                   refund.getId(),
                   refund.getWeidianRefundNo(),
@@ -199,10 +203,8 @@ public class RefundQueryService {
                   order == null ? null : order.getWeidianOrderId(),
                   OrderChannels.WEIDIAN,
                   order == null ? null : order.getShopId(),
-                  order == null || order.getShopId() == null
-                      ? null
-                      : shopNames.get(order.getShopId()),
-                  null,
+                  shop == null ? null : shop.name(),
+                  shop == null ? null : shop.shopCode(),
                   kolId,
                   kol == null ? null : kol.kolCode(),
                   kol == null ? null : kol.name(),

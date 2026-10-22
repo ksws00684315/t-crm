@@ -30,7 +30,7 @@ public record OrderChainDTO(Long orderId, String orderNo, List<ChainLineDTO> lin
    * The kol item link of the line; null when the line is unattributed.
    *
    * @param kolItemId {@code crm_kol_item.id}
-   * @param linkCode link code; null until the link module's column lands (task 39 merge)
+   * @param linkCode link code from {@code crm_kol_item.link_code}
    * @param sourceProductId original product id
    * @param targetItemId exclusive (copied) Weidian item id
    */

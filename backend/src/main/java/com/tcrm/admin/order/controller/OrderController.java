@@ -70,7 +70,7 @@ public class OrderController {
   @SaCheckPermission("order:manage")
   @AuditLog(module = "ORDER", action = "Synchronize shop orders")
   public ResponseEntity<R<Void>> sync(@Valid @RequestBody OrderSyncRequest request) {
-    syncs.trigger(request.shopId());
+    syncs.trigger(request.shopId(), request.type());
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.ok(null));
   }
 

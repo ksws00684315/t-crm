@@ -6,6 +6,7 @@ import { createBdTransfer, type BdTransferResultVO } from "@/api/kol/bd-transfer
 import { listKols } from "@/api/kol/kol";
 import { listBdUsers } from "@/api/system/bd-user";
 import type { BdUserVO, KolVO } from "@/api/types";
+import { formatNameWithCode } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 
@@ -94,7 +95,7 @@ async function searchKols(keyword: string): Promise<void> {
 }
 
 function kolLabel(kol: KolVO): string {
-  return `${kol.name} (${kol.kolCode})`;
+  return formatNameWithCode(kol.name, kol.kolCode);
 }
 
 function effectiveAtOrNull(): { value?: string; error?: string } {

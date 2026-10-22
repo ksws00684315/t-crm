@@ -10,7 +10,7 @@ import {
   uploadProductImport
 } from "@/api/product/product";
 import { listShops } from "@/api/product/shop";
-import type { ProductVO, ShopVO } from "@/api/types";
+import type { ProductVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -37,7 +37,7 @@ const showActions = computed(
 const loading = ref(false);
 const rows = ref<ProductVO[]>([]);
 const total = ref(0);
-const shops = ref<ShopVO[]>([]);
+const shops = ref<ShopOptionVO[]>([]);
 const query = reactive<{
   page: number;
   size: number;

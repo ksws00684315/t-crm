@@ -90,7 +90,7 @@ class OrderSyncNotificationTest {
     var state = new OrderSyncStateDO();
     state.setShopId(3L);
     when(states.selectOne(any())).thenReturn(state);
-    when(shops.findShop(3L)).thenReturn(new ShopAccessDTO(3L, "Shop A", "wd-3", 1));
+    when(shops.findShop(3L)).thenReturn(new ShopAccessDTO(3L, "Shop A", "wd-3", 1, null));
     var sync =
         new OrderSync(
             api,

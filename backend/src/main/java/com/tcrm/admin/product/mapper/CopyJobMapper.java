@@ -28,7 +28,11 @@ public interface CopyJobMapper extends BaseMapper<CopyJobDO> {
       SET success_count = #{successCount},
           fail_count = #{failCount},
           status = #{status},
-          update_time = #{updateTime}
+          update_time = #{updateTime},
+          finish_time = CASE
+            WHEN #{status} = 'processing' THEN finish_time
+            ELSE COALESCE(finish_time, #{updateTime})
+          END
       WHERE id = #{id}
       """)
   int updateProgress(

@@ -36,7 +36,7 @@ class RefundImportProcessorTest {
         new RefundImportProcessor(
             77L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     when(shops.findEnabledByWeidianShopId("100"))
-        .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1));
+        .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1, null));
     when(writer.find(10L, "5001")).thenReturn(new OrderDO());
     when(writer.saveImportedRefund(anyLong(), anyString(), anyString(), any(RefundDO.class)))
         .thenReturn(true);
