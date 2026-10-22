@@ -165,6 +165,8 @@ public class ProductLinkService {
         progress,
         copies,
         jdbc,
+        null,
+        null,
         linkBaseUrl,
         random);
   }
@@ -484,7 +486,6 @@ public class ProductLinkService {
     return shopId;
   }
 
-
   /** One live original product for this item id. Several shops, or none, stay empty. */
   private Long uniqueSourceShop(String weidianItemId) {
     List<ProductDO> found =
@@ -505,11 +506,9 @@ public class ProductLinkService {
     return shopIds.iterator().next();
   }
 
-
   private static String channelOf(String channel) {
     return blank(channel) ? CHANNEL_WEIDIAN : channel.strip().toUpperCase(Locale.ROOT);
   }
-
 
   private CopyJobDO requireJob(String jobCode) {
     if (blank(jobCode)) {
