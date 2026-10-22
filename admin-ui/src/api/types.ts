@@ -33,7 +33,7 @@ export type DataScope = "ALL" | "OWN";
  * Post chosen when a sub-account is created. It only pre-fills permissions (ADR-018);
  * it is not itself a role.
  */
-export type PostTemplate = "OPERATOR" | "BD";
+export type PostTemplate = "OPERATOR" | "BD" | "FINANCE";
 
 /** The 18 permission codes in design §3.1. The API may also return codes this build does not know. */
 export type PermissionCode =

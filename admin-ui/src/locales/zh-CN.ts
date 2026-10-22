@@ -62,6 +62,7 @@ const zhCN = {
   post: {
     OPERATOR: "运营",
     BD: "商务",
+    FINANCE: "财务",
     none: "—"
   },
   permissionGroup: {
