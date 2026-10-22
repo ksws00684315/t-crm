@@ -1,4 +1,23 @@
 export default {
+  noRecords: "No activity yet",
+  actorRole: {
+    BUSINESS: "Business",
+    OPERATIONS_REVIEW: "Operations review",
+    FINANCE_REVIEW: "Finance review",
+    PAYMENT: "Payment registration",
+    HISTORICAL: "Historical handler",
+    SYSTEM: "System"
+  },
+  lockedInfo:
+    "Application details are locked after submission. Reject incorrect applications so the business owner can reapply.",
+  retryRecipient: "Unable to load recipient information. Retry",
+  recipientHint:
+    "Enter payment method, recipient, full account and currency/network required for payment (up to 1,000 characters).",
+  systemPerson: "System",
+  historicalPerson: "Historical user",
+  paymentInfo: "Payment",
+  flowRecords: "Activity",
+  applicationInfo: "Application",
   tooLong: "Enter no more than {max} characters",
   chooseDeduction: "Choose whether to deduct from commission",
   applicationStatus: "Application status",
@@ -30,7 +49,7 @@ export default {
   statusLabel: "Status",
   reason: "Application reason",
   expectedDate: "Expected payment date",
-  account: "Recipient snapshot at application",
+  account: "Recipient information",
   deduct: "Deduct from future commission",
   attachments: "Application attachments",
   fileHint: "Optional: up to 5 PNG/JPEG/PDF files, at most 10 MB each.",
@@ -48,7 +67,7 @@ export default {
   close: "Close",
   submit: "Submit application",
   saved: "Saved successfully",
-  detail: "Details",
+  detail: "View",
   refresh: "Refresh",
   approve: "Approve",
   reject: "Reject",
@@ -75,7 +94,7 @@ export default {
   payMethod: "Payment method (free text)",
   payRemark: "Finance remarks (optional offline currency and quantity)",
   voucher: "Payment voucher",
-  registerPayment: "Register payment",
+  registerPayment: "Record payment",
   differenceRemark: "A remark is required when the amount differs from the application",
   confirmDifference:
     "The registered amount differs. Confirm the CNY amount and explanation before continuing.",

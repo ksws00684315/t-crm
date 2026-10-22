@@ -11,7 +11,7 @@ export type PrepayStatus =
   | "CANCELLED";
 export interface PrepayAccount {
   id: string;
-  type: "PAYPAL" | "USDT";
+  type: "PAYPAL" | "USDT" | "MANUAL";
   currency?: string | null;
   network?: string | null;
   maskedAccount: string;
@@ -42,6 +42,8 @@ export interface PrepayDetail extends PrepayRow {
   approval?: {
     decision: "APPROVE" | "REJECT";
     operatorId: string;
+    operatorName?: string | null;
+    operatorRole?: string | null;
     time: string;
     reason?: string;
   } | null;
@@ -53,8 +55,17 @@ export interface PrepayDetail extends PrepayRow {
     payRemark?: string;
     voucherFileId: string;
     operatorId: string;
+    operatorName?: string | null;
+    operatorRole?: string | null;
   } | null;
-  timeline: { action: string; operatorId: string; time: string; reason?: string }[];
+  timeline: {
+    action: string;
+    operatorId: string;
+    operatorName?: string | null;
+    operatorRole?: string | null;
+    time: string;
+    reason?: string;
+  }[];
   deduction?: {
     postedAmountCny: string;
     recoveredAmountCny: string;
@@ -85,7 +96,7 @@ export interface PrepayApplicationDetails {
   deductFromCommission: boolean;
   reason: string;
   expectedPayDate: string;
-  payoutAccountId: string;
+  recipientText: string;
 }
 export function savePrepayApplicationDetails(
   id: string,
@@ -120,7 +131,7 @@ export const prepayAccounts = (kolId: string) =>
     method: "get",
     params: { kolId }
   });
-/** Deliberately requested on demand only; never persisted in a store. */
+/** Loaded only for an open application dialog; never persisted in a store. */
 export const prepayRecipient = (id: string) =>
   http.request<Omit<PrepayAccount, "id"> & { account: string }>({
     url: `${root}/${id}/recipient`,

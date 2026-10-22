@@ -63,6 +63,12 @@ beforeEach(() => {
   };
   vi.mocked(api.getPrepay).mockResolvedValue(detail);
   vi.mocked(api.getActivePrepay).mockResolvedValue(null);
+  vi.mocked(api.prepayRecipient).mockResolvedValue({
+    type: "MANUAL",
+    account: "Bank\nTest recipient\n123456",
+    maskedAccount: "***",
+    holderName: null
+  });
   vi.mocked(api.prepayAccounts).mockResolvedValue([
     { id: "2", type: "PAYPAL", maskedAccount: "t***", holderName: "Test" }
   ]);
@@ -109,6 +115,41 @@ async function voucher(wrapper: VueWrapper) {
   await input.trigger("change");
 }
 describe("prepay safe submission", () => {
+  it("ignores recipient responses from a previously opened application", async () => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof api.prepayRecipient>>) => void;
+    vi.mocked(api.prepayRecipient)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveOld = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        type: "MANUAL",
+        account: "New recipient",
+        maskedAccount: "***",
+        holderName: null
+      });
+    vi.mocked(api.getPrepay).mockImplementation(async id => ({
+      ...detail,
+      id,
+      amountCny: id === "10" ? "200.00" : "100.00"
+    }));
+    const wrapper = await open(DetailDrawer);
+    await wrapper.setProps({ id: "10" });
+    await flushPromises();
+    resolveOld({
+      type: "MANUAL",
+      account: "Old recipient",
+      maskedAccount: "***",
+      holderName: null
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="prepay-recipient-value"]').text()).toBe("New recipient");
+    expect((wrapper.get('[data-test="prepay-pay-amount"]').element as HTMLInputElement).value).toBe(
+      "200.00"
+    );
+  });
   it.each([1000, 1001])("validates the finance reason boundary at %i characters", async length => {
     useUserStore().user!.permissions = ["prepay:apply"];
     vi.mocked(api.getPrepay).mockResolvedValue({
@@ -180,7 +221,7 @@ describe("prepay safe submission", () => {
       .mockResolvedValueOnce({ ...detail, status: "PAID" });
     const wrapper = await open(DetailDrawer);
     expect(wrapper.find('[data-test="prepay-pay-submit"]').exists()).toBe(true);
-    expect(api.prepayRecipient).not.toHaveBeenCalled();
+    expect(api.prepayRecipient).toHaveBeenCalledWith("9");
     await set(wrapper, "prepay-pay-amount", "90.00");
     await set(wrapper, "prepay-pay-method", "PayPal");
     await set(wrapper, "prepay-pay-remark", "difference explained");
@@ -296,7 +337,7 @@ describe("prepay safe submission", () => {
     expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
     const supplement = wrapper.get('[data-test="prepay-application-details"]');
     expect(supplement.find('[data-test="finance-prepay-deduct"]').exists()).toBe(true);
-    await supplement.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
     await flushPromises();
     expect(api.savePrepayApplicationDetails).not.toHaveBeenCalled();
     expect(api.approvePrepay).not.toHaveBeenCalled();
@@ -320,7 +361,7 @@ describe("prepay safe submission", () => {
     const wrapper = await open(DetailDrawer);
     await set(wrapper, "finance-prepay-reason", "finance details");
     wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
-    wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", "2");
+    await set(wrapper, "finance-prepay-recipient", "Bank\nTest recipient\n123456");
     wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", false);
     await flushPromises();
     await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
@@ -330,11 +371,67 @@ describe("prepay safe submission", () => {
       {
         reason: "finance details",
         expectedPayDate: "2026-10-23",
-        payoutAccountId: "2",
+        recipientText: "Bank\nTest recipient\n123456",
         deductFromCommission: false
       },
       []
     );
     expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
+    expect(wrapper.props("modelValue")).toBe(true);
+    expect(wrapper.find('[data-test="finance-prepay-recipient"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="prepay-recipient-value"]').text()).toBe(
+      "Bank\nTest recipient\n123456"
+    );
+    expect(wrapper.find('[data-test="finance-prepay-details-save"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="prepay-application-details"]')).toHaveLength(1);
+    expect(api.prepayAccounts).not.toHaveBeenCalled();
+  });
+  it.each([0, 1000, 1001])(
+    "validates manual recipient boundary %i before submission",
+    async length => {
+      useUserStore().user!.permissions = ["prepay:apply"];
+      vi.mocked(api.getPrepay).mockResolvedValue({
+        ...detail,
+        status: "WAITING_DETAILS",
+        payoutAccountSnapshot: null
+      });
+      vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
+        ...detail,
+        status: "PENDING_OPERATIONS_REVIEW"
+      });
+      const wrapper = await open(DetailDrawer);
+      await set(wrapper, "finance-prepay-recipient", "收".repeat(length));
+      await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+      await flushPromises();
+      expect(api.savePrepayApplicationDetails).toHaveBeenCalledTimes(length === 1000 ? 1 : 0);
+    }
+  );
+  it("uses one activity tab and names with handling roles without internal ID fallback", async () => {
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      applicantName: null,
+      applicantId: "2111789912836734977",
+      financeTaskId: "2111789912836734978",
+      timeline: [
+        {
+          action: "OPERATIONS_APPROVED",
+          operatorId: "2111789912836734979",
+          operatorName: "张三",
+          operatorRole: "OPERATIONS_REVIEW",
+          time: detail.createdAt
+        },
+        { action: "REJECTED", operatorId: "2111789912836734980", time: detail.createdAt },
+        { action: "REJECTED", operatorId: "0", operatorRole: "SYSTEM", time: detail.createdAt }
+      ]
+    });
+    const wrapper = await open(DetailDrawer);
+    expect(wrapper.getComponent({ name: "ElDialog" }).props("alignCenter")).toBe(true);
+    expect(wrapper.findComponent({ name: "ElDrawer" }).exists()).toBe(false);
+    expect(wrapper.text()).toContain("张三 · 运营审核");
+    expect(wrapper.text()).toContain("历史人员");
+    expect(wrapper.text()).toContain("系统");
+    expect(wrapper.text()).not.toMatch(/21117899128367349/);
+    expect(wrapper.text()).not.toContain("操作轨迹");
+    expect(wrapper.text()).not.toContain("审核记录");
   });
 });

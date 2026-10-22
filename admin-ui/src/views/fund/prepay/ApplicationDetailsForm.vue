@@ -2,33 +2,43 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
-import {
-  prepayAccounts,
-  savePrepayApplicationDetails,
-  type PrepayAccount,
-  type PrepayDetail
-} from "@/api/commission/prepay";
+import { savePrepayApplicationDetails, type PrepayDetail } from "@/api/commission/prepay";
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
 import { validPrepayFiles } from "@/utils/prepay";
-
-const props = defineProps<{ detail: PrepayDetail; disabled?: boolean }>();
-const emit = defineEmits<{ saved: [detail: PrepayDetail]; busy: [value: boolean] }>();
+const props = defineProps<{
+  detail: PrepayDetail;
+  editable: boolean;
+  recipientText: string | null;
+  recipientFailed?: boolean;
+  disabled?: boolean;
+}>();
+const emit = defineEmits<{
+  saved: [detail: PrepayDetail, recipientText: string];
+  busy: [value: boolean];
+  download: [id: string, name: string];
+  retryRecipient: [];
+}>();
 const { t } = useI18n();
 const formRef = ref<FormInstance>();
 const form = reactive<{
   reason: string;
   expectedPayDate: string;
-  payoutAccountId: string;
+  recipientText: string;
   deductFromCommission: boolean | null;
-}>({ reason: "", expectedPayDate: "", payoutAccountId: "", deductFromCommission: null });
-const accounts = ref<PrepayAccount[]>([]);
-const loading = ref(false);
+}>({ reason: "", expectedPayDate: "", recipientText: "", deductFromCommission: null });
 const saving = ref(false);
 const files = ref<File[]>([]);
 const fileError = ref(false);
 const errors = ref<Record<string, string>>({});
-let sequence = 0;
+const textRules = () => [
+  { required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" },
+  {
+    validator: (_rule: unknown, value: string, done: (error?: Error) => void) =>
+      done(value.length <= 1000 ? undefined : new Error(t("prepay.tooLong", { max: 1000 }))),
+    trigger: "blur"
+  }
+];
 const rules = computed<FormRules>(() => ({
   deductFromCommission: [
     {
@@ -38,56 +48,39 @@ const rules = computed<FormRules>(() => ({
       trigger: "change"
     }
   ],
-  reason: [
-    { required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" },
-    {
-      validator: (_rule, value: string, done) =>
-        done(
-          value.trim().length <= 1000 ? undefined : new Error(t("prepay.tooLong", { max: 1000 }))
-        ),
-      trigger: "blur"
-    }
-  ],
-  expectedPayDate: [{ required: true, message: t("prepay.required"), trigger: "change" }],
-  payoutAccountId: [{ required: true, message: t("prepay.required"), trigger: "change" }]
+  reason: textRules(),
+  recipientText: textRules(),
+  expectedPayDate: [{ required: true, message: t("prepay.required"), trigger: "change" }]
 }));
 watch(
   () => props.detail,
-  async detail => {
+  detail => {
     Object.assign(form, {
       reason: detail.reason ?? "",
       expectedPayDate: detail.expectedPayDate ?? "",
-      payoutAccountId: detail.payoutAccountId ?? "",
+      recipientText: props.recipientText ?? "",
       deductFromCommission: detail.deductFromCommission ?? null
     });
     files.value = [];
     fileError.value = false;
     errors.value = {};
-    accounts.value = [];
-    await loadAccounts();
   },
   { immediate: true }
 );
-async function loadAccounts() {
-  const request = ++sequence;
-  const kolId = props.detail.kolId;
-  loading.value = true;
-  try {
-    const data = await prepayAccounts(kolId);
-    if (request === sequence && props.detail.kolId === kolId) accounts.value = data;
-  } catch (error) {
-    if (request === sequence) notifyError(error);
-  } finally {
-    if (request === sequence) loading.value = false;
+watch(
+  () => props.recipientText,
+  text => {
+    if (text != null) form.recipientText = text;
   }
-}
+);
 function chooseFiles(event: Event) {
   const selected = Array.from((event.target as HTMLInputElement).files ?? []);
   fileError.value = !validPrepayFiles(selected, Math.max(0, 5 - props.detail.attachments.length));
   files.value = fileError.value ? [] : selected;
 }
 async function save() {
-  if (saving.value || loading.value || props.disabled || fileError.value) return;
+  if (saving.value || props.disabled || !props.editable || fileError.value || props.recipientFailed)
+    return;
   saving.value = true;
   emit("busy", true);
   try {
@@ -102,7 +95,8 @@ async function save() {
       files.value
     );
     ElMessage.success(t("prepay.saved"));
-    emit("saved", detail);
+    emit("saved", detail, form.recipientText);
+    window.dispatchEvent(new Event("prepay-updated"));
   } catch (error) {
     errors.value = serverFieldErrors(error, Object.keys(form));
     notifyError(error);
@@ -111,103 +105,146 @@ async function save() {
     emit("busy", false);
   }
 }
+defineExpose({ save });
 </script>
 <template>
-  <section v-loading="loading" data-test="prepay-application-details">
-    <h3>{{ t("prepay.completeDetails") }}</h3>
+  <section data-test="prepay-application-details">
     <el-form
       ref="formRef"
       :model="form"
-      :rules="rules"
+      :rules="editable ? rules : {}"
       label-position="top"
       :disabled="saving || disabled"
+      class="application-grid"
     >
+      <el-form-item :label="t('prepay.amount')"
+        ><div class="read-value amount">{{ detail.amountCny }} CNY</div></el-form-item
+      >
+      <el-form-item
+        prop="expectedPayDate"
+        :label="t('prepay.expectedDate')"
+        :error="errors.expectedPayDate"
+      >
+        <el-date-picker
+          v-if="editable"
+          v-model="form.expectedPayDate"
+          type="date"
+          value-format="YYYY-MM-DD"
+          data-test="finance-prepay-date"
+        />
+        <div v-else class="read-value">{{ detail.expectedPayDate || "—" }}</div>
+      </el-form-item>
+      <el-form-item prop="reason" :label="t('prepay.reason')" :error="errors.reason">
+        <el-input
+          v-if="editable"
+          v-model="form.reason"
+          type="textarea"
+          :rows="3"
+          maxlength="1000"
+          show-word-limit
+          data-test="finance-prepay-reason"
+        />
+        <div v-else class="read-value">{{ detail.reason || "—" }}</div>
+      </el-form-item>
+      <el-form-item prop="recipientText" :label="t('prepay.account')" :error="errors.recipientText">
+        <el-input
+          v-if="editable"
+          v-model="form.recipientText"
+          type="textarea"
+          :rows="3"
+          maxlength="1000"
+          show-word-limit
+          :placeholder="t('prepay.recipientHint')"
+          data-test="finance-prepay-recipient"
+        />
+        <div v-else class="read-value" data-test="prepay-recipient-value">
+          {{ recipientText ?? "—" }}
+        </div>
+        <el-button v-if="recipientFailed" link type="primary" @click="emit('retryRecipient')">{{
+          t("prepay.retryRecipient")
+        }}</el-button>
+      </el-form-item>
       <el-form-item
         prop="deductFromCommission"
         :label="t('prepay.deduct')"
         :error="errors.deductFromCommission"
       >
-        <el-radio-group v-model="form.deductFromCommission" data-test="finance-prepay-deduct"
-          ><el-radio :value="true">{{ t("prepay.yes") }}</el-radio
-          ><el-radio :value="false">{{ t("prepay.no") }}</el-radio></el-radio-group
+        <el-radio-group
+          v-if="editable"
+          v-model="form.deductFromCommission"
+          data-test="finance-prepay-deduct"
         >
+          <el-radio :value="true">{{ t("prepay.yes") }}</el-radio
+          ><el-radio :value="false">{{ t("prepay.no") }}</el-radio>
+        </el-radio-group>
+        <div v-else class="read-value">
+          {{
+            detail.deductFromCommission == null
+              ? "—"
+              : t(detail.deductFromCommission ? "prepay.yes" : "prepay.no")
+          }}
+        </div>
       </el-form-item>
-      <el-form-item prop="reason" :label="t('prepay.reason')" :error="errors.reason"
-        ><el-input
-          v-model="form.reason"
-          type="textarea"
-          maxlength="1000"
-          data-test="finance-prepay-reason"
-      /></el-form-item>
-      <el-form-item
-        prop="expectedPayDate"
-        :label="t('prepay.expectedDate')"
-        :error="errors.expectedPayDate"
-        ><el-date-picker
-          v-model="form.expectedPayDate"
-          type="date"
-          value-format="YYYY-MM-DD"
-          data-test="finance-prepay-date"
-      /></el-form-item>
-      <el-form-item
-        prop="payoutAccountId"
-        :label="t('prepay.account')"
-        :error="errors.payoutAccountId"
-        ><el-select v-model="form.payoutAccountId" data-test="finance-prepay-account"
-          ><el-option
-            v-for="account in accounts"
-            :key="account.id"
-            :value="account.id"
-            :label="
-              [
-                account.type,
-                account.currency,
-                account.network,
-                account.maskedAccount,
-                account.holderName
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            " /></el-select
-      ></el-form-item>
-      <el-alert
-        v-if="!loading && !accounts.length"
-        :title="t('prepay.noAccounts')"
-        type="warning"
-        :closable="false"
-      />
-      <el-button
-        :disabled="saving"
-        data-test="finance-prepay-reload-accounts"
-        @click="loadAccounts"
-        >{{ t("prepay.reloadAccounts") }}</el-button
-      >
       <el-form-item
         :label="t('prepay.attachments')"
         :error="fileError ? t('prepay.invalidFiles') : ''"
-        ><input
-          type="file"
-          multiple
-          accept="image/png,image/jpeg,application/pdf"
-          :disabled="saving || disabled"
-          data-test="finance-prepay-attachments"
-          @change="chooseFiles"
-      /></el-form-item>
-      <p>{{ t("prepay.fileHint") }}</p>
+      >
+        <div>
+          <el-button
+            v-for="file in detail.attachments"
+            :key="file.id"
+            link
+            data-test="prepay-download-attachment"
+            @click="emit('download', file.id, file.name)"
+            >{{ file.name }}</el-button
+          >
+          <template v-if="editable">
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,application/pdf"
+              :disabled="saving || disabled"
+              data-test="finance-prepay-attachments"
+              @change="chooseFiles"
+            />
+            <p class="file-hint">{{ t("prepay.fileHint") }}</p>
+          </template>
+          <span v-else-if="!detail.attachments.length">—</span>
+        </div>
+      </el-form-item>
     </el-form>
-    <el-button
-      :loading="saving"
-      :disabled="disabled || loading || !accounts.length || fileError"
-      type="primary"
-      data-test="finance-prepay-details-save"
-      @click="save"
-      >{{ t("prepay.saveDetails") }}</el-button
-    >
   </section>
 </template>
 <style scoped>
-h3 {
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
+.application-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 24px;
+}
+.application-grid :deep(.el-form-item__content) {
+  align-items: flex-start;
+}
+.application-grid :deep(.el-date-editor) {
+  width: 100%;
+}
+.read-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 32px;
+  color: var(--el-text-color-primary);
+}
+.amount {
+  font-size: var(--tcrm-font-size-title);
+  font-weight: 600;
+}
+.file-hint {
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: 1.5;
+}
+@media (max-width: 640px) {
+  .application-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

@@ -8,6 +8,7 @@ import {
   type ApplyPrepay,
   type PrepayDetail
 } from "@/api/commission/prepay";
+import PrepayStatusTag from "./PrepayStatusTag.vue";
 import CopyText from "@/components/CopyText.vue";
 import { useUserStore } from "@/stores/user";
 import { notifyError } from "@/utils/notify";
@@ -160,11 +161,14 @@ async function save() {
       <template v-if="application">
         <div class="prepay-status" data-test="prepay-application-status">
           <span>{{ t("prepay.applicationStatus") }}</span>
-          <span>{{
-            application.status === "WAITING_DETAILS"
-              ? t("prepay.applicationInProgress")
-              : t(`prepay.status.${application.status}`)
-          }}</span>
+          <PrepayStatusTag
+            :status="application.status"
+            :label="
+              application.status === 'WAITING_DETAILS'
+                ? t('prepay.applicationInProgress')
+                : undefined
+            "
+          />
         </div>
         <div class="prepay-status">
           <span>{{ t("prepay.number") }}</span

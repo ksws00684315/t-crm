@@ -19,6 +19,7 @@ import { saveBlob } from "@/utils/download";
 import { PREPAY_STATUSES, prepayAbilities } from "@/utils/prepay";
 import { readPageSize } from "@/utils/table-prefs";
 import DetailDrawer from "./DetailDrawer.vue";
+import PrepayStatusTag from "./PrepayStatusTag.vue";
 
 defineOptions({ name: "PrepayTasksPage" });
 const { t, locale } = useI18n();
@@ -46,7 +47,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "currency", label: t("prepay.currency"), prop: "currency", width: 100 },
   { key: "status", label: t("common.status"), minWidth: 150 },
   { key: "createdAt", label: t("prepay.createdAt"), minWidth: 180 },
-  { key: "actions", label: t("common.actions"), width: locale.value === "zh-CN" ? 200 : 320 }
+  { key: "actions", label: t("common.actions"), width: locale.value === "zh-CN" ? 130 : 210 }
 ]);
 const chips = computed<SearchChip[]>(() =>
   Object.entries(applied.value)
@@ -110,19 +111,15 @@ function asRow(row: object) {
   return row as PrepayRow;
 }
 function actions(row: PrepayRow): RowAction[] {
+  // Element Plus invokes column slots with an empty row while registering columns.
+  if (!row.id) return [];
+  const mode = processMode(row);
   return [
     {
-      key: "detail",
-      label: t("prepay.detail"),
-      testId: "prepay-row-detail",
-      onClick: () => open(row)
-    },
-    {
-      key: "process",
-      label: processLabel(row),
-      testId: "prepay-row-process",
-      hidden: !processLabel(row),
-      onClick: () => open(row, processMode(row))
+      key: "entry",
+      label: processLabel(row) || t("prepay.detail"),
+      testId: mode ? "prepay-row-process" : "prepay-row-detail",
+      onClick: () => open(row, mode)
     }
   ];
 }
@@ -228,8 +225,13 @@ onMounted(load);
       "
     >
       <template #cell-prepayNo="{ row }"><CopyText :value="asRow(row).prepayNo" /></template>
-      <template #cell-type>{{ t("prepay.type") }}</template>
-      <template #cell-status="{ row }">{{ t(`prepay.status.${asRow(row).status}`) }}</template>
+      <template #cell-applicantName="{ row }"
+        >{{ asRow(row).applicantName || t("prepay.historicalPerson") }} ·
+        {{ t("prepay.actorRole.BUSINESS") }}</template
+      >
+      <template #cell-status="{ row }"
+        ><PrepayStatusTag v-if="asRow(row).status" :status="asRow(row).status"
+      /></template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asRow(row).createdAt) }}</template>
       <template #actions="{ row }"><RowActions :actions="actions(asRow(row))" /></template>
     </DataTable>
