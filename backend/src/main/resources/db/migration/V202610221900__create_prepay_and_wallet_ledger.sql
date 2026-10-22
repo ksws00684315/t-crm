@@ -260,7 +260,8 @@ COMMENT ON COLUMN crm_file.content_type IS '按文件头识别的实际类型：
 ALTER TABLE crm_notification DROP CONSTRAINT ck_crm_notification_type;
 ALTER TABLE crm_notification ADD CONSTRAINT ck_crm_notification_type CHECK (
   type IN ('PAYOUT_ACCOUNT_SUBMITTED', 'ORDER_SYNC_FAILED', 'BD_TRANSFER_CANCELLED', 'KOLS_UNASSIGNED',
-           'PREPAY_SUBMITTED', 'PREPAY_APPROVED', 'PREPAY_REJECTED', 'PREPAY_PAID')
+           'PREPAY_SUBMITTED', 'PREPAY_APPROVED', 'PREPAY_REJECTED', 'PREPAY_PAID',
+           'DEPARTURE_PLAN_SUBMITTED', 'DEPARTURE_PLAN_EXECUTED')
 );
 COMMENT ON COLUMN crm_notification.type IS '消息类型：收款账户提交、订单同步失败、预约转移取消、达人转为未分配、预付提交、通过、驳回、支付完成';
 CREATE UNIQUE INDEX uk_crm_notification_prepay_event

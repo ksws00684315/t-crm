@@ -44,7 +44,13 @@ class PrepayMigrationIT {
               + "(2,2,4701,'prepay:review',now()),"
               + "(3,2,4701,'prepay:pay',now())");
 
+      flyway(postgres, "202610221500").migrate();
+      jdbc.update(
+          "INSERT INTO crm_notification(id,tenant_id,user_id,type,params,create_time) VALUES(4701,1,4701,'DEPARTURE_PLAN_SUBMITTED','{}'::jsonb,now())");
       flyway(postgres, "202610221900").migrate();
+      assertThat(
+              jdbc.queryForObject("SELECT type FROM crm_notification WHERE id=4701", String.class))
+          .isEqualTo("DEPARTURE_PLAN_SUBMITTED");
 
       assertThat(
               jdbc.queryForList(
@@ -100,7 +106,7 @@ class PrepayMigrationIT {
                   String.class))
           .contains("tenant_id, kol_id")
           .contains("WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
-      flyway(postgres, "202610231000").migrate();
+      flyway(postgres, "202610231100").migrate();
       assertThat(jdbc.queryForList("SELECT status FROM crm_prepay ORDER BY id", String.class))
           .containsExactly("REJECTED", "APPROVED", "WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
       assertThat(

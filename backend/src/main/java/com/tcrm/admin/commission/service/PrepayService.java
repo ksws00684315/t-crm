@@ -400,7 +400,9 @@ public class PrepayService {
   public List<KolSummary> summaries(AccountDTO user, List<Long> kolIds) {
     requirePermission(user, "kol:view");
     long tenantId = requireTenant(user);
-    if (kolIds == null || kolIds.isEmpty()) return List.of();
+    if (kolIds == null || kolIds.isEmpty()) {
+      return List.of();
+    }
     if (kolIds.size() > 100) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -642,9 +644,13 @@ public class PrepayService {
     long tenantId = requireTenant(user);
     requireDetailPermission(user);
     PrepayRow row = findRow(tenantId, id);
-    if (row == null) throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    if (row == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
     KolRefDTO kol = requireKol(row.kolId());
-    if (!hasFinanceAccess(user)) requireKolScope(user, kol);
+    if (!hasFinanceAccess(user)) {
+      requireKolScope(user, kol);
+    }
     try {
       jdbc.queryForObject(
           "SELECT id FROM crm_prepay WHERE tenant_id = ? AND id = ? FOR UPDATE",
@@ -1252,12 +1258,16 @@ public class PrepayService {
   }
 
   private static String actorName(ResultSet rs) throws SQLException {
-    if (rs.getLong("operator_id") == 0) return null;
+    if (rs.getLong("operator_id") == 0) {
+      return null;
+    }
     return rs.getString("operator_name");
   }
 
   private static String actorRole(ResultSet rs) throws SQLException {
-    if (rs.getLong("operator_id") == 0) return "SYSTEM";
+    if (rs.getLong("operator_id") == 0) {
+      return "SYSTEM";
+    }
     String role = rs.getString("operator_role");
     return role == null ? "HISTORICAL" : role;
   }

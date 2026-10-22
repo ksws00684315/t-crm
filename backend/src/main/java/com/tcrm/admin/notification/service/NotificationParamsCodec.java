@@ -78,6 +78,7 @@ final class NotificationParamsCodec {
   private record UnassignedParams(String bdName, Integer count) {}
 
   private record PrepayParams(String prepayNo) {}
+
   private record DepartureParams(String bdName, String effectiveAt) {}
 
   private record DepartureExecutedParams(
