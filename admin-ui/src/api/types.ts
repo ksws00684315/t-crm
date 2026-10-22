@@ -351,23 +351,40 @@ export interface GoogleCredentialVO {
   updateTime: string | null;
 }
 
-/** `KolItemVO`. `validTo` null means currently effective. */
+/** Creator-item list row (task 39). Amounts and ids are strings. Counts are strings too. */
 export interface KolItemVO {
   id: string;
+  linkCode: string;
+  itemName: string | null;
+  imageUrl: string | null;
   kolId: string;
   kolCode: string | null;
   kolName: string | null;
-  productId: string | null;
-  productCode: string | null;
-  productName: string | null;
-  shopId: string;
-  shopName: string | null;
-  weidianShopId: string | null;
-  weidianItemId: string;
-  itemName: string | null;
-  source: string | null;
-  validFrom: string;
-  validTo: string | null;
+  targetShopId: string;
+  targetShopName: string | null;
+  targetShopCode: string | null;
+  targetChannel: string;
+  targetItemId: string;
+  targetItemUrl: string | null;
+  sourceItemId: string | null;
+  sourceChannel: string | null;
+  currentRate: string | null;
+  salesQuantity: string;
+  payAmount: string;
+  status: "ENABLED" | "DISABLED";
+  cleanupStatus: "NONE" | "PENDING" | "DONE" | "FAILED";
+  createTime: string;
+}
+
+/** Creator-item detail. `totalPayAmount` uses the same paid-order rule as `payAmount`. */
+export interface KolItemDetailVO extends KolItemVO {
+  sourceItemUrl: string | null;
+  visitCount: string;
+  totalPayAmount: string;
+  refundAmount: string;
+  cleanupTime: string | null;
+  cleanupReason: string | null;
+  cleanupFailReason: string | null;
 }
 
 /** Why a tracking link is unusable (task 06 §4.3). */

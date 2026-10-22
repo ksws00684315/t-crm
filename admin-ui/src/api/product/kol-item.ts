@@ -1,18 +1,16 @@
 import { http } from "../http";
 import type { DownloadedFile } from "@/utils/http";
-import type { KolItemVO, PageResult } from "../types";
+import type { KolItemDetailVO, KolItemVO, PageResult } from "../types";
 
 export interface KolItemQuery {
   page?: number;
   size?: number;
-  kolCode?: string;
-  productCode?: string;
+  /** Exact link code. */
+  linkCode?: string;
+  /** Creator name (fuzzy) or code / email (exact). The page sends the selected creator's code. */
+  kolKeyword?: string;
+  /** Target shop id. */
   shopId?: string;
-  weidianItemId?: string;
-  /** Mapping source filter (task 26/17b): IMPORT, SHEET_UPLOAD, or COPY. */
-  source?: string;
-  /** Default true on the backend; false includes historical mappings. */
-  current?: boolean;
 }
 
 export interface KolItemImportVO {
@@ -24,6 +22,13 @@ export function listKolItems(query: KolItemQuery): Promise<PageResult<KolItemVO>
     method: "get",
     url: "/product/kol-items",
     params: query
+  });
+}
+
+export function getKolItem(id: string): Promise<KolItemDetailVO> {
+  return http.request<KolItemDetailVO>({
+    method: "get",
+    url: `/product/kol-items/${id}`
   });
 }
 

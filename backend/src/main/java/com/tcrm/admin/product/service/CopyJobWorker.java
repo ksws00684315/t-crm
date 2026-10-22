@@ -249,7 +249,7 @@ public class CopyJobWorker implements ApplicationRunner {
       neu.setCreateTime(now);
       neu.setUpdateTime(now);
       neu.setTenantId(job.getTenantId());
-      kolItems.insert(neu);
+      KolItemCodes.insertNew(kolItems, neu);
       if (shops.incrementCurrentItems(job.getTargetShopId(), now) != 1) {
         throw new IllegalStateException("Target shop capacity was exhausted during copy");
       }

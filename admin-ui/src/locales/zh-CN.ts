@@ -1117,7 +1117,46 @@ const zhCN = {
       SHEET_UPLOAD: "上传推广表",
       COPY: "复制"
     },
-    noProduct: "未关联原商品"
+    noProduct: "未关联原商品",
+    linkCode: "链接编码",
+    kol: "达人",
+    kolPlaceholder: "名称 / 编号 / 邮箱",
+    targetShop: "目标店铺",
+    targetChannel: "目标渠道",
+    targetItemId: "新商品 ID",
+    targetItemUrl: "新商品链接",
+    sourceItemId: "来源商品 ID",
+    sourceChannel: "来源渠道",
+    currentRate: "当前佣金比例",
+    salesQuantity: "销量",
+    payAmount: "支付金额",
+    status: "状态",
+    cleanupStatus: "清理状态",
+    createTime: "创建时间",
+    view: "查看",
+    open: "打开",
+    product: "商品",
+    detailTitle: "商品链接详情",
+    sourceItemUrl: "来源链接",
+    visitCount: "访问次数",
+    totalPayAmount: "累计支付金额",
+    refundAmount: "累计退款",
+    cleanupTime: "清理时间",
+    cleanupReason: "清理原因",
+    cleanupFailReason: "清理失败原因",
+    statuses: {
+      ENABLED: "启用",
+      DISABLED: "停用"
+    },
+    cleanups: {
+      NONE: "未清理",
+      PENDING: "清理中",
+      DONE: "已清理",
+      FAILED: "清理失败"
+    },
+    channels: {
+      WEIDIAN: "微店"
+    }
   },
   promoSheet: {
     title: "上传推广表",
