@@ -478,7 +478,7 @@ class CopyTokenIT {
                   status -> {
                     long shopId = shopService.allocateCopyTarget("WEIDIAN", 1);
                     jdbc.update(
-                        "INSERT INTO crm_copy_job(id,tenant_id,kol_id,token_id,job_code,caller_platform,target_shop_id,status,total_count,success_count,fail_count,create_time,update_time) VALUES(?,1,1,1,?,'test',?,'processing',1,0,0,now(),now())",
+                        "INSERT INTO crm_copy_job(id,tenant_id,kol_id,token_id,job_code,caller_platform,target_shop_id,target_channel,status,total_count,success_count,fail_count,create_time,update_time) VALUES(?,1,1,1,?,'test',?,'WEIDIAN','processing',1,0,0,now(),now())",
                         id,
                         "t37_capacity_" + id,
                         shopId);

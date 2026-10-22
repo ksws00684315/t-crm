@@ -5,7 +5,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n";
 import {
   PAGE_SIZES,
+  applyDefaultHidden,
   defaultPrefs,
+  hasSavedTablePrefs,
   loadTablePrefs,
   moveColumn,
   saveTablePrefs,
@@ -25,6 +27,8 @@ export interface DataColumn {
   amount?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
+  /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
+  defaultHidden?: boolean;
 }
 
 const props = withDefaults(
@@ -232,15 +236,29 @@ function normalize(columns: PrefColumn[]): PrefColumn[] {
   return withLockedVisible(columns, locked.value);
 }
 
+function hiddenKeys(): ReadonlySet<string> {
+  return new Set(props.columns.filter(column => column.defaultHidden).map(column => column.key));
+}
+
+function withDefaultHidden(loaded: ReturnType<typeof loadTablePrefs>) {
+  return hasSavedTablePrefs(props.tableId) ? loaded : applyDefaultHidden(loaded, hiddenKeys());
+}
+
 const prefs = ref(
   (() => {
-    const loaded = loadTablePrefs(props.tableId, columnKeys.value, props.size);
+    const loaded = withDefaultHidden(loadTablePrefs(props.tableId, columnKeys.value, props.size));
     return { ...loaded, columns: withLockedVisible(loaded.columns, locked.value) };
   })()
 );
 
 watch(columnKeys, keys => {
-  const merged = loadTablePrefs(props.tableId, keys, prefs.value.pageSize);
+  // Labels change with the locale, which rebuilds this array. Reloading then would
+  // replace the in-memory default-hidden columns before the user has saved anything.
+  const current = prefs.value.columns.map(column => column.key);
+  if (current.length === keys.length && current.every((key, index) => key === keys[index])) {
+    return;
+  }
+  const merged = withDefaultHidden(loadTablePrefs(props.tableId, keys, prefs.value.pageSize));
   prefs.value = { ...merged, columns: normalize(merged.columns) };
 });
 
@@ -315,9 +333,13 @@ function move(index: number, delta: -1 | 1): void {
 }
 
 function resetColumns(): void {
+  const defaults = applyDefaultHidden(
+    defaultPrefs(columnKeys.value, prefs.value.pageSize),
+    hiddenKeys()
+  );
   prefs.value = {
     ...prefs.value,
-    columns: normalize(defaultPrefs(columnKeys.value, prefs.value.pageSize).columns)
+    columns: normalize(defaults.columns)
   };
 }
 

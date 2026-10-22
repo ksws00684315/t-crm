@@ -976,6 +976,51 @@ const enUS: MessageSchema = {
     invalidSheet: "Enter the sheet address or ID",
     requiredFields: "Enter the name and the tab name"
   },
+  copyJob: {
+    jobCode: "Job code",
+    targetChannel: "Target channel",
+    status: "Status",
+    result: "Result",
+    error: "Error",
+    createTime: "Created",
+    finishTime: "Finished",
+    viewItems: "View items",
+    total: "Total {n}",
+    success: "Success {n}",
+    fail: "Failed {n}",
+    completedHasFailures: "This completed job still has failed items. Open the details.",
+    detailTitle: "Job items: {jobCode}",
+    seq: "No.",
+    sourceChannel: "Source channel",
+    sourceProductId: "Old item ID",
+    sourceShop: "Source shop",
+    sourceMerchantNo: "Source merchant no.",
+    targetShop: "Target shop",
+    targetItemId: "New item ID",
+    targetItemUrl: "New item link",
+    failReason: "Failure reason",
+    open: "Open",
+    none: "-",
+    kolId: "Creator ID",
+    kolCode: "Creator code",
+    kolName: "Creator name",
+    targetShopCode: "Target shop code",
+    targetShopName: "Target shop name",
+    channel: {
+      WEIDIAN: "Weidian"
+    },
+    jobStatus: {
+      processing: "Processing",
+      completed: "Completed",
+      partial_failed: "Partial failure",
+      failed: "Failed"
+    },
+    itemStatus: {
+      pending: "Pending",
+      success: "Success",
+      failed: "Failed"
+    }
+  },
   shop: {
     code: "Shop Code",
     channel: "Channel",
