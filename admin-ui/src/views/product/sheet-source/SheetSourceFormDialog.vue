@@ -7,7 +7,7 @@ import {
   editSheetSource,
   type SheetSourceRequest
 } from "@/api/product/sheet-source";
-import type { SheetSourceVO, ShopVO } from "@/api/types";
+import type { SheetSourceVO, ShopOptionVO } from "@/api/types";
 import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "SheetSourceFormDialog" });
@@ -19,7 +19,7 @@ const CURRENCIES = ["USD", "CNY", "EUR", "GBP"];
 const props = defineProps<{
   modelValue: boolean;
   source: SheetSourceVO | null;
-  shops: ShopVO[];
+  shops: ShopOptionVO[];
 }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;

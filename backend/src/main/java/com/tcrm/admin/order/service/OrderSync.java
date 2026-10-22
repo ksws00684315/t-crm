@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
+import com.tcrm.admin.order.model.OrderSyncFailureKind;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
@@ -41,6 +42,7 @@ public class OrderSync {
   private final ShopAccessApi shops;
   private final ApplicationEventPublisher events;
   private final TransactionTemplate tx;
+  private final OrderSyncFailureWriter failures;
 
   @Autowired
   public OrderSync(
@@ -50,8 +52,9 @@ public class OrderSync {
       OrderNormalizer normalizer,
       ShopAccessApi shops,
       ApplicationEventPublisher events,
-      TransactionTemplate tx) {
-    this(api, states, writer, normalizer, Clock.systemUTC(), shops, events, tx);
+      TransactionTemplate tx,
+      OrderSyncFailureWriter failures) {
+    this(api, states, writer, normalizer, Clock.systemUTC(), shops, events, tx, failures);
   }
 
   public OrderSync(
@@ -59,7 +62,7 @@ public class OrderSync {
       OrderSyncStateMapper states,
       OrderWriter writer,
       OrderNormalizer normalizer) {
-    this(api, states, writer, normalizer, Clock.systemUTC(), null, null, null);
+    this(api, states, writer, normalizer, Clock.systemUTC(), null, null, null, null);
   }
 
   OrderSync(
@@ -68,7 +71,7 @@ public class OrderSync {
       OrderWriter writer,
       OrderNormalizer normalizer,
       Clock clock) {
-    this(api, states, writer, normalizer, clock, null, null, null);
+    this(api, states, writer, normalizer, clock, null, null, null, null);
   }
 
   OrderSync(
@@ -80,6 +83,19 @@ public class OrderSync {
       ShopAccessApi shops,
       ApplicationEventPublisher events,
       TransactionTemplate tx) {
+    this(api, states, writer, normalizer, clock, shops, events, tx, null);
+  }
+
+  OrderSync(
+      WeidianBusinessApi api,
+      OrderSyncStateMapper states,
+      OrderWriter writer,
+      OrderNormalizer normalizer,
+      Clock clock,
+      ShopAccessApi shops,
+      ApplicationEventPublisher events,
+      TransactionTemplate tx,
+      OrderSyncFailureWriter failures) {
     this.api = api;
     this.states = states;
     this.writer = writer;
@@ -88,9 +104,16 @@ public class OrderSync {
     this.shops = shops;
     this.events = events;
     this.tx = tx;
+    this.failures = failures;
   }
 
   public boolean synchronize(long shopId) {
+    return synchronize(shopId, null);
+  }
+
+  public boolean synchronize(long shopId, String type) {
+    boolean syncOrders = type == null || "ORDER".equals(type);
+    boolean syncRefunds = type == null || "REFUND".equals(type);
     var state =
         states.selectOne(
             new LambdaQueryWrapper<OrderSyncStateDO>().eq(OrderSyncStateDO::getShopId, shopId));
@@ -104,11 +127,21 @@ public class OrderSync {
     Instant previousRefundCursor = state.getRefundCursor();
     Instant previousSuccess = state.getLastSuccessAt();
     boolean notify = state.getLastError() == null && previousSuccess != null;
+    String phase = OrderSyncFailureKind.ORDER_SYNC.name();
     try {
-      orders(shopId, start(state.getOrderCursor(), end), end);
-      refunds(shopId, start(state.getRefundCursor(), end), end);
-      state.setOrderCursor(end);
-      state.setRefundCursor(end);
+      if (syncOrders) {
+        orders(shopId, start(state.getOrderCursor(), end), end);
+      }
+      if (syncRefunds) {
+        phase = OrderSyncFailureKind.REFUND_SYNC.name();
+        refunds(shopId, start(state.getRefundCursor(), end), end);
+      }
+      if (syncOrders) {
+        state.setOrderCursor(end);
+      }
+      if (syncRefunds) {
+        state.setRefundCursor(end);
+      }
       state.setLastSuccessAt(clock.instant());
       state.setLastError(null);
       states.updateById(state);
@@ -124,14 +157,15 @@ public class OrderSync {
               ? business.getErrorCode().name()
               : "inspect API status logs";
       state.setLastError("Order synchronization failed" + context + ": " + category);
-      saveFailure(state, notify, shopId);
+      saveFailure(state, notify, shopId, phase, category);
       LOG.warn("Order synchronization failed for shop {}", shopId);
       return false;
     }
   }
 
   /** Persists the failure. A success-to-failure transition notifies super admins once. */
-  private void saveFailure(OrderSyncStateDO state, boolean notify, long shopId) {
+  private void saveFailure(
+      OrderSyncStateDO state, boolean notify, long shopId, String phase, String category) {
     String shopName = notify ? shopName(shopId) : "";
     if (tx == null) {
       states.updateById(state);
@@ -140,6 +174,13 @@ public class OrderSync {
     tx.executeWithoutResult(
         status -> {
           states.updateById(state);
+          if (failures != null) {
+            failures.record(
+                shopId,
+                OrderSyncFailureKind.valueOf(phase),
+                "Order synchronization failed: " + category,
+                null);
+          }
           if (notify) {
             publishFailure(shopId, shopName);
           }

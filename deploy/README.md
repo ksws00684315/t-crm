@@ -31,7 +31,7 @@ set +a
 cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Vite 开发服务器仍按 `admin-ui/`、`kol-portal/` 各自原有命令启动。Flyway 本地配置允许忽略其他分支产生但当前代码没有的迁移，并按顺序补跑较早版本迁移。这只能缓解版本先后和缺失问题；删除的列或改掉的约束不会自动恢复，需要用 `backup` / `restore` 处理。
+Vite 开发服务器仍按 `admin-ui/`、`kol-portal/` 各自原有命令启动。Flyway 本地配置（`SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing,*:future`、`SPRING_FLYWAY_OUT_OF_ORDER=true`）允许忽略其他分支产生但当前代码没有的迁移，并按顺序补跑较早版本迁移。库中这类迁移的版本低于当前代码最新迁移时，Flyway 视为 `missing`，高于时视为 `future`，两种都要忽略，否则其他分支先跑了更新的迁移后，当前代码的后台会校验失败、无法启动。这只能缓解版本先后和缺失问题；删除的列或改掉的约束不会自动恢复，需要用 `backup` / `restore` 处理。
 
 ### 代理联调规则
 
@@ -114,7 +114,7 @@ deploy/scripts/local-infra.sh psql
 |---|---|---|
 | 站点 | `site.name`、`mail.from` | `SparkTrack`；`TCRM_MAIL_FROM` |
 | 地址 | `url.kol-portal`、`url.link`、`url.admin`、`url.upload`、`url.redirect-fallback` | 分别为 `TCRM_KOL_PORTAL_BASE_URL`、`TCRM_LINK_BASE_URL`、`TCRM_ADMIN_BASE_URL`、`TCRM_UPLOAD_BASE_URL`、`TCRM_REDIRECT_FALLBACK_URL`；上传地址默认空值 |
-| 业务默认值与上限 | `copy-token.default-quota`（1）、`copy-token.default-valid-minutes`（1440）、`copy-token.max-quota`（100000）、`copy-token.max-valid-minutes`（10080）、`shop.max-per-company`（3）、`payout-account.max-per-kol`（5）、`kol.invite-ttl-hours`（72，最大 72）、`oper-log.retention-days`（180） | 代码默认值；操作日志保留期按安全规范至少 180 天 |
+| 业务默认值与上限 | `copy-token.default-quota`（1）、`copy-token.default-valid-minutes`（1440）、`copy-token.max-quota`（100000）、`copy-token.max-valid-minutes`（10080）、`shop.max-per-company`（3）、`payout-account.max-per-kol`（5）、`kol.invite-ttl-hours`（72，最大 72）、`oper-log.retention-days`（180）、`order.sync-failure.retention-days`（0，不自动清理） | 代码默认值；操作日志保留期按安全规范至少 180 天 |
 | 限流与安全 | `login.fail.pair-limit`（5）、`login.fail.ip-limit`（20）、`login.fail.account-limit`（50）、`login.fail.window-minutes`（15）、`captcha.issue-per-minute`（120）、`kol.register.ip-per-hour`（20）、`kol.register-preview.ip-per-hour`（20）、`kol.forgot.email-limit`（3）、`kol.forgot.email-window-minutes`（10）、`kol.forgot.ip-limit`（20）、`kol.forgot.ip-window-minutes`（60）、`product-links.ip-per-minute`（120）、`product-links.convert-token-per-minute`（10）、`product-links.resolve-token-per-minute`（120）、`weidian.qps`（5） | 代码默认值；`captcha.issue-per-minute` 可由 `crm.auth.captcha.issue-per-minute` 覆盖默认值 |
 
 地址默认值与覆盖值必须为 HTTPS host-only URL（不带路径、查询、片段或尾斜杠）；本地允许 `http://localhost[:端口]` 与 `http://127.0.0.1[:端口]`。修改管理端地址后，须同步更新微店开放平台登记的回调域名。上传子域名应设置为 Cloudflare「仅 DNS」，并确认 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端来源。

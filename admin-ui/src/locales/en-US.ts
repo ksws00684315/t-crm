@@ -42,7 +42,9 @@ const enUS: MessageSchema = {
     platformScope: "Platform",
     unassigned: "Unassigned",
     comingSoon: "This feature is under development",
-    developing: "Under development"
+    developing: "Under development",
+    nameWithCode: "{name} ({code})",
+    codeWithName: "{code} ({name})"
   },
   locale: {
     "en-US": "English",
@@ -168,6 +170,7 @@ const enUS: MessageSchema = {
     orderList: "Order List",
     orderUnmatched: "Matching Pool",
     refundQuery: "Refund Query",
+    orderChain: "Order Chain",
     kolManage: "Creators",
     kols: "Creator List",
     kolItems: "Creator Products",
@@ -186,7 +189,8 @@ const enUS: MessageSchema = {
     password: "Change Password",
     forbidden: "Access denied",
     notFound: "Page not found",
-    notifications: "Notifications"
+    notifications: "Notifications",
+    resignation: "Resignation"
   },
   errors: {
     SYSTEM_CONFIG_INVALID: "This system configuration value is invalid.",
@@ -211,6 +215,14 @@ const enUS: MessageSchema = {
     USER_INVALID_DATA_SCOPE: "Own Data Only applies only to a staff account.",
     USER_PERMISSION_INVALID: "Those permissions are not valid. Choose them again.",
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
+    DEPARTURE_NOT_BD_ACCOUNT:
+      "Only a BD (a sub-account with the own-data scope) can leave this way.",
+    DEPARTURE_INVALID_TIME: "The time must be later than now.",
+    DEPARTURE_PLAN_EXISTS:
+      "This account already has a pending departure plan. Cancel or edit it first.",
+    DEPARTURE_PLAN_NOT_SCHEDULED: "This account has no pending departure plan.",
+    DEPARTURE_SELF_SUBMITTED_ONLY: "You can only cancel the resignation you filed yourself.",
+    DEPARTURE_INVALID_HEIR: "The heir must be another active BD.",
     KOL_EMAIL_EXISTS: "This email is already used by another creator.",
     KOL_CODE_EXISTS: "This creator code already exists.",
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
@@ -271,6 +283,9 @@ const enUS: MessageSchema = {
     KOL_PROMO_UPLOAD_EXPIRED: "The upload preview has expired (30 minutes); upload it again.",
     SHOP_DISABLED: "The shop is disabled and this action cannot be done.",
     SHOP_NOT_FOUND: "Shop not found.",
+    SHOP_SOURCE_CANNOT_JOIN_POOL: "Source shops cannot join the copy pool.",
+    SHOP_COPY_CAPACITY_EXCEEDED: "Requested quantity exceeds available shop capacity.",
+    COPY_SHOP_CAPACITY_INSUFFICIENT: "No eligible copy shop has enough remaining capacity.",
     PRODUCT_NOT_FOUND: "Product not found.",
     PRODUCT_CODE_EXISTS: "This product code already exists.",
     PRODUCT_WEIDIAN_ID_EXISTS: "This Weidian item ID already exists in the shop.",
@@ -388,6 +403,7 @@ const enUS: MessageSchema = {
       payout_account_max_per_kol: "Maximum payout accounts per creator",
       kol_invite_ttl_hours: "Creator invitation validity (hours)",
       oper_log_retention_days: "Operation log retention (days)",
+      order_sync_failure_retention_days: "Order sync failure retention days (0 = no auto cleanup)",
       login_fail_pair_limit: "Login failures per account and IP",
       login_fail_ip_limit: "Login failures per IP",
       login_fail_account_limit: "Login failures per account",
@@ -420,6 +436,7 @@ const enUS: MessageSchema = {
   },
   layout: {
     changePassword: "Change Password",
+    resignation: "Resignation",
     user: "{nickname} ({role})",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",
@@ -641,6 +658,7 @@ const enUS: MessageSchema = {
     namePlaceholder: "Creator name",
     emailPlaceholder: "name{'@'}example.com",
     bd: "BD",
+    bdOption: "{nickname} ({username})",
     defaultRate: "Commission",
     code: "Creator ID",
     links: "Links",
@@ -841,6 +859,54 @@ const enUS: MessageSchema = {
     noKols: "No creators",
     recordsHint: "Transfer records are in System → Audit Log"
   },
+  departure: {
+    column: "Departure",
+    none: "Not set",
+    doneResign: "Has left",
+    doneDisable: "Disabled",
+    planText: "{type} · {time} · {heir}",
+    heirShort: "→ {name}",
+    awaitingHeir: "Heir not chosen yet",
+    reasonTooltip: "Reason: {reason}",
+    mark: "Mark departure",
+    editPlan: "Edit departure plan",
+    cancelPlan: "Cancel departure plan",
+    cancelTitle: "Cancel departure plan",
+    cancelConfirm: "Cancel the departure plan of {username}?",
+    cancelled: "Departure plan cancelled.",
+    created: "Departure plan created.",
+    updated: "Departure plan saved.",
+    markTitle: "Mark {username} as leaving",
+    editTitle: "Edit the departure plan of {username}",
+    type: "Type",
+    typeResign: "Resignation",
+    typeDisable: "Disable",
+    effectiveTime: "Takes effect",
+    now: "Now",
+    at: "At a set time",
+    pickTime: "Choose when it takes effect.",
+    pickTimePlaceholder: "Pick date and time",
+    timeFuture: "The time must be later than now.",
+    timezoneHint: "Time zone: {timezone} (UTC{offset})",
+    heir: "Heir",
+    heirPlaceholder: "Choose an heir",
+    noHeir: "No heir (leave creators unassigned)",
+    noHeirHint:
+      "Without an heir, every creator of this BD becomes unassigned when the plan takes effect.",
+    withHeirHint:
+      "With an heir, every creator of this BD is handed over automatically when the plan takes effect.",
+    reason: "Reason",
+    reasonPlaceholder: "Optional, up to 255 characters",
+    bdOnly: "Only a BD (a sub-account with the own-data scope) can file a resignation.",
+    submitted: "Resignation filed.",
+    submittedHint:
+      "When the time comes, the system hands your creators over to the heir or leaves them unassigned, then disables your account. You can cancel until then.",
+    status: "Status",
+    statusScheduled: "Pending",
+    plannedLeaveAt: "Planned leave date",
+    submit: "File resignation",
+    cancelOwnConfirm: "Cancel your resignation?"
+  },
   linkTemplate: {
     hint: "Every purchasing platform of this company, including disabled ones.",
     code: "Platform name",
@@ -875,12 +941,19 @@ const enUS: MessageSchema = {
     hint: "Token",
     hintPlaceholder: "Search by masked value",
     kol: "Creator",
-    kolPlaceholder: "Search by code or name",
+    kolPlaceholder: "Search by name, code, or email",
     channel: "Target channel",
     shop: "Target shop",
-    shopAuto: "Default copy shop",
-    shopAutoMissing: "No default copy shop yet — set one in Shop management first",
-    shopAutoNamed: "Default copy shop ({name})",
+    shopAuto: "A shop from this channel's automatic copy pool will be assigned",
+    shopAutoMissing: "No automatic copy pool capacity is available for this channel",
+    channelCapacity: "Weidian (automatic pool: {capacity} remaining)",
+    channelNoCapacity: "Weidian (no automatic pool capacity)",
+    shopRemaining: "{name} ({code}, {capacity} remaining)",
+    targetChannelRequired: "Select a target channel",
+    quotaRequired: "Enter a product quantity",
+    validMinutesRequired: "Enter the validity in minutes",
+    capacityExceeded: "The quantity exceeds available capacity ({capacity})",
+    capacityError: "The quantity exceeds the target capacity. Reduce it or choose another shop.",
     usage: "Usage",
     validMinutes: "Valid minutes",
     expiresAt: "Expires at",
@@ -899,8 +972,8 @@ const enUS: MessageSchema = {
     statusExhausted: "Exhausted",
     statusExpired: "Expired",
     statusRevoked: "Revoked",
-    quota: "Quota",
-    defaultsNote: "Empty quota and valid minutes use system defaults"
+    quota: "Product quantity",
+    defaultsNote: "Default quantity and validity are provided by system configuration"
   },
   sheetSource: {
     hint: "Original products are read from online Google Sheets; Excel import is the fallback. Products removed from a sheet are not taken off sale automatically.",
@@ -964,12 +1037,101 @@ const enUS: MessageSchema = {
     invalidSheet: "Enter the sheet address or ID",
     requiredFields: "Enter the name and the tab name"
   },
+  copyJob: {
+    jobCode: "Job code",
+    targetChannel: "Target channel",
+    status: "Status",
+    result: "Result",
+    error: "Error",
+    createTime: "Created",
+    finishTime: "Finished",
+    viewItems: "View items",
+    total: "Total {n}",
+    success: "Success {n}",
+    fail: "Failed {n}",
+    completedHasFailures: "This completed job still has failed items. Open the details.",
+    detailTitle: "Job items: {jobCode}",
+    seq: "No.",
+    sourceChannel: "Source channel",
+    sourceProductId: "Old item ID",
+    sourceShop: "Source shop",
+    sourceMerchantNo: "Source merchant no.",
+    targetShop: "Target shop",
+    targetItemId: "New item ID",
+    targetItemUrl: "New item link",
+    failReason: "Failure reason",
+    open: "Open",
+    none: "-",
+    kolId: "Creator ID",
+    kolCode: "Creator code",
+    kolName: "Creator name",
+    targetShopCode: "Target shop code",
+    targetShopName: "Target shop name",
+    channel: {
+      WEIDIAN: "Weidian"
+    },
+    jobStatus: {
+      processing: "Processing",
+      completed: "Completed",
+      partial_failed: "Partial failure",
+      failed: "Failed"
+    },
+    itemStatus: {
+      pending: "Pending",
+      success: "Success",
+      failed: "Failed"
+    }
+  },
   shop: {
-    copyTarget: "Default copy",
-    setCopyTarget: "Set as default copy shop",
-    setCopyTargetDone: "Set as default copy shop",
-    clearCopyTarget: "Clear default copy shop",
-    clearCopyTargetDone: "Cleared default copy shop",
+    code: "Shop Code",
+    channel: "Channel",
+    channelWeidian: "Weidian",
+    source: "Source shop",
+    copyPool: "Automatic copy pool",
+    poolJoinedLabel: "Joined",
+    poolExitedLabel: "Exited",
+    poolNotApplicable: "Not applicable (source shop)",
+    authStatus: "Authorization",
+    authExpiresAt: "Authorization expires",
+    authAuthorized: "Authorized",
+    authExpired: "Expired",
+    authUnauthorized: "Not authorized",
+    apiStatus: "API status",
+    apiProduct: "Products",
+    apiOrder: "Orders",
+    apiRefund: "Refunds",
+    apiOk: "Normal",
+    apiFailed: "Failed",
+    apiUnchecked: "Not checked",
+    capacity: "Product capacity",
+    maxItems: "Maximum products",
+    refreshCapacity: "Refresh capacity",
+    authorize: "Authorize",
+    pullOrders: "Pull orders",
+    pullRefunds: "Pull refunds",
+    setSource: "Set as source shop",
+    clearSource: "Clear source shop",
+    sourceSet: "Source shop updated",
+    sourceCleared: "Source shop cleared",
+    joinPool: "Join copy pool",
+    exitPool: "Exit copy pool",
+    poolJoined: "Joined the automatic copy pool",
+    poolExited: "Exited the automatic copy pool",
+    sourceCannotJoinPool: "A source shop cannot join the automatic copy pool",
+    checkApis: "Check APIs",
+    syncStarted: "Synchronization started. Check its status on the Orders page.",
+    authSuccess: "Weidian authorization succeeded. The shop list was refreshed.",
+    authFailed: "Weidian authorization failed. Check the authorization and try again.",
+    nameRequired: "Enter a shop name",
+    channelRequired: "Select a shop channel",
+    maxItemsRequired: "Enter the maximum product count",
+    maxItemsRange: "Maximum products must be between 1 and 1,000,000",
+    reasonDisabled: "The shop is disabled",
+    reasonUnauthorized: "The shop is not authorized",
+    reasonAuthExpired: "The shop authorization has expired",
+    reasonSource: "A source shop cannot be a copy target",
+    reasonPoolExited: "The shop has exited the automatic copy pool",
+    reasonCapacityFull: "The shop has no product capacity left",
     hint: "The shop limit is managed in system configuration. A disabled shop cannot receive product or mapping imports.",
     confirmDisable: 'Disable shop "{name}"?',
     confirmEnable: 'Enable shop "{name}"?',
@@ -983,8 +1145,8 @@ const enUS: MessageSchema = {
     editTitle: "Edit Shop",
     createTitle: "Create Shop",
     name: "Shop Name",
-    weidianId: "Weidian Shop ID",
-    weidianPlaceholder: "Digits. Cannot be changed after creation."
+    weidianId: "Weidian Shop Identifier",
+    weidianPlaceholder: "Weidian shop identifier"
   },
   product: {
     onSale: "On sale",
@@ -1040,7 +1202,46 @@ const enUS: MessageSchema = {
       SHEET_UPLOAD: "Sheet upload",
       COPY: "Copy"
     },
-    noProduct: "No original product"
+    noProduct: "No original product",
+    linkCode: "Link Code",
+    kol: "Creator",
+    kolPlaceholder: "Name / code / email",
+    targetShop: "Target Shop",
+    targetChannel: "Target Channel",
+    targetItemId: "New Item ID",
+    targetItemUrl: "New Item Link",
+    sourceItemId: "Source Item ID",
+    sourceChannel: "Source Channel",
+    currentRate: "Current Commission Rate",
+    salesQuantity: "Sales",
+    payAmount: "Pay Amount",
+    status: "Status",
+    cleanupStatus: "Cleanup Status",
+    createTime: "Created",
+    view: "View",
+    open: "Open",
+    product: "Product",
+    detailTitle: "Item Link Detail",
+    sourceItemUrl: "Source Link",
+    visitCount: "Visits",
+    totalPayAmount: "Cumulative Pay Amount",
+    refundAmount: "Cumulative Refund",
+    cleanupTime: "Cleanup Time",
+    cleanupReason: "Cleanup Reason",
+    cleanupFailReason: "Cleanup Failure Reason",
+    statuses: {
+      ENABLED: "Enabled",
+      DISABLED: "Disabled"
+    },
+    cleanups: {
+      NONE: "Not cleaned",
+      PENDING: "Cleaning",
+      DONE: "Cleaned",
+      FAILED: "Cleanup failed"
+    },
+    channels: {
+      WEIDIAN: "Weidian"
+    }
   },
   promoSheet: {
     title: "Upload Promo Sheet",
@@ -1080,9 +1281,13 @@ const enUS: MessageSchema = {
   order: {
     shop: "Shop",
     orderId: "Order ID",
+    channel: "Channel",
+    channelOption: {
+      WEIDIAN: "Weidian"
+    },
     payTime: "Paid at",
     orderStatus: "Order Status",
-    payAmount: "Paid",
+    payAmount: "Paid amount",
     refundTotal: "Refunds",
     kol: "Creator",
     bd: "Owner BD",
@@ -1090,6 +1295,22 @@ const enUS: MessageSchema = {
     attributionStatus: "Attribution",
     payRange: "Payment time",
     kolCode: "Creator code",
+    freight: "Freight",
+    createTime: "Created at",
+    refundStatusColumn: "Refund status",
+    actionView: "View",
+    actionChain: "Chain",
+    chainNoKol: "The chain needs an attributed creator",
+    source: {
+      API: "API sync",
+      IMPORT: "Import"
+    },
+    refundStatus: {
+      NONE: "No refund",
+      PROCESSING: "Refunding",
+      PARTIAL_SUCCESS: "Partially refunded",
+      FULL_SUCCESS: "Fully refunded"
+    },
     status: {
       UNPAID: "Unpaid",
       PAID: "Paid",
@@ -1134,6 +1355,85 @@ const enUS: MessageSchema = {
     syncFailed: "Sync failed",
     syncNow: "Sync now",
     syncStarted: "Synchronization started",
+    sync: {
+      statesTab: "Sync status",
+      failuresTab: "Failed jobs",
+      typeColumn: "Type",
+      typeOption: {
+        ORDER: "Orders",
+        REFUND: "Refunds"
+      },
+      kindOption: {
+        ORDER_SYNC: "Order sync",
+        REFUND_SYNC: "Refund sync",
+        ORDER_IMPORT: "Order import",
+        REFUND_IMPORT: "Refund import"
+      },
+      source: "Source",
+      failures24h: "Failures in 24h",
+      missingFields: "Missing fields",
+      importCutoff: "Last import cutoff",
+      time: "Time",
+      linkedTask: "Import task",
+      viewTask: "View",
+      cleanFailures: "Clean up",
+      cleanFailuresTitle: "Clean sync failures",
+      cleanFailuresPrompt:
+        "Deletes failure records older than N days. This cannot be undone. Enter days (1–3650):",
+      cleanFailuresConfirm: "Delete failure records older than {days} days? This cannot be undone.",
+      cleanFailuresDaysInvalid: "Enter an integer from 1 to 3650",
+      cleanFailuresDone: "Deleted {count} failure record(s)"
+    },
+    refund: {
+      no: "Refund No.",
+      orderNo: "Order No.",
+      typeColumn: "Refund type",
+      statusColumn: "Refund status",
+      amount: "Refund amount",
+      applyTime: "Applied at",
+      finishTime: "Succeeded at",
+      detailTitle: "Refund Detail",
+      items: "Refunded items",
+      type: {
+        REFUND_ONLY: "Refund only",
+        RETURN_REFUND: "Return & refund",
+        UNKNOWN: "Unknown"
+      },
+      status: {
+        PROCESSING: "Refunding",
+        SUCCESS: "Refunded",
+        CLOSED: "Closed",
+        UNKNOWN: "Unknown"
+      }
+    },
+    detail: {
+      title: "Order Detail",
+      merchantNo: "Merchant No.",
+      itemAmount: "Item amount",
+      totalAmount: "Order total",
+      orderTime: "Ordered at",
+      source: "Source",
+      lastSyncTime: "Last sync",
+      items: "Items",
+      image: "Image",
+      itemName: "Item",
+      unitPrice: "Unit price",
+      lineRefund: "Refund"
+    },
+    chain: {
+      copyJob: "Product copy job",
+      copyJobTime: "Created at",
+      kolItem: "Creator item link",
+      linkCode: "Link code",
+      sourceItemId: "Source item ID",
+      targetItemId: "Target item ID",
+      orderLine: "Order line",
+      refunds: "Refunds",
+      noRefund: "No refund",
+      noLines: "No order lines",
+      ledger: "Ledger entries",
+      withdrawals: "Withdrawal holds"
+    },
     importOrders: "Import orders",
     importRefunds: "Import refunds",
     orderImportTitle: "Import Orders",
@@ -1157,7 +1457,25 @@ const enUS: MessageSchema = {
       reasonRequired: "Please fill in the reason",
       assigned: "Creator assigned",
       markedNonKol: "Marked as a non-creator order",
-      rematched: "Re-matching finished"
+      rematched: "Re-matching finished",
+      evidence: "Evidence",
+      evidenceTitle: "Evidence",
+      evidenceLine: "Order line",
+      mappings: "Creator item mappings",
+      effectiveRange: "Effective range",
+      coversPayTime: "Covers pay time",
+      coversYes: "Covers",
+      coversNo: "Not covering",
+      sourceProduct: "Source product",
+      unmatchedReason: "Unmatched reason",
+      reasonOption: {
+        PENDING: "Awaiting payment",
+        CONFLICT: "Conflicting evidence",
+        NO_MAPPING: "No mapping",
+        MAPPING_EXPIRED: "Mapping expired at pay time",
+        MATCHED: "Matched"
+      },
+      manualRecords: "Manual handling records"
     }
   },
   link: {
@@ -1201,7 +1519,11 @@ const enUS: MessageSchema = {
     closeRunning: "Keep running, close window",
     close: "Close",
     again: "Import another",
-    submit: "Upload and import"
+    submit: "Upload and import",
+    cutoffPlaceholder: "Data cutoff time",
+    cutoffHint: "Required: when the uploaded file's data ends; cannot be later than now",
+    cutoffRequired: "Pick the data cutoff time",
+    cutoffFuture: "The data cutoff time cannot be later than now"
   },
   audit: {
     time: "Time",
@@ -1316,7 +1638,18 @@ const enUS: MessageSchema = {
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
       BD_TRANSFER_CANCELLED: "Scheduled transfer for creator {kolCode} was cancelled: {reason}",
-      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned"
+      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned",
+      DEPARTURE_PLAN_SUBMITTED: "BD {bdName} filed a departure plan effective {time}",
+      DEPARTURE_PLAN_EXECUTED: "The {kind} plan of BD {bdName} took effect: {result}"
+    },
+    planType: {
+      RESIGN: "resignation",
+      DISABLE: "deactivation"
+    },
+    result: {
+      TRANSFERRED: "creators were handed over to {heir}",
+      UNASSIGNED: "creators are now unassigned",
+      HEIR_INVALID: "the heir was unavailable, so creators are now unassigned"
     },
     reason: {
       OWNERSHIP_CHANGED: "Ownership changed at execution",

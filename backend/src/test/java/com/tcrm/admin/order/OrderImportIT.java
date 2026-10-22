@@ -100,6 +100,7 @@ class OrderImportIT {
   void prepare() throws Exception {
     for (String table :
         List.of(
+            "crm_order_sync_failure",
             "crm_refund",
             "crm_order_item",
             "crm_order",
@@ -117,11 +118,11 @@ class OrderImportIT {
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time)"
-            + " VALUES(10,1,'Shop A','100',1,now(),now())");
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
+            + " VALUES(10,1,'SHOP-900010','Shop A','100',1,now(),now())");
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time)"
-            + " VALUES(20,2,'Other','200',1,now(),now())");
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
+            + " VALUES(20,2,'SHOP-900020','Other','200',1,now(),now())");
     jdbc.update(
         "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,create_time,update_time)"
             + " VALUES(100,1,'KOL-AAA100','Creator','kol0100@example.test','US',now(),now())");
@@ -515,6 +516,94 @@ class OrderImportIT {
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM crm_order", Long.class)).isZero();
   }
 
+  @Test
+  void shouldPersistDataCutoffAndSyncState_whenImportFinishes() throws Exception {
+    List<List<String>> rows =
+        List.of(
+            List.of(
+                "100",
+                "7100",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "10.00",
+                "0",
+                "9001",
+                "s1",
+                "Item A",
+                "Red",
+                "1",
+                "10.00"));
+    String taskId = submit("/admin-api/order/order-imports", orderWorkbook(rows), "c.xlsx");
+    assertThat(awaitTask(taskId).path("status").asText()).isEqualTo("SUCCESS");
+
+    Map<String, Object> task =
+        jdbc.queryForMap("SELECT params FROM crm_task WHERE id=" + Long.parseLong(taskId));
+    assertThat(task.get("params").toString())
+        .contains("\"dataCutoffTime\": \"2026-10-21T00:00:00Z\"");
+    Map<String, Object> state =
+        jdbc.queryForMap(
+            "SELECT last_import_kind, last_import_cutoff_at, last_import_task_id FROM crm_order_sync_state WHERE shop_id=10");
+    assertThat(state.get("last_import_kind")).isEqualTo("ORDER");
+    assertThat(((java.sql.Timestamp) state.get("last_import_cutoff_at")).toInstant())
+        .isEqualTo(Instant.parse("2026-10-21T00:00:00Z"));
+    assertThat(((Number) state.get("last_import_task_id")).longValue())
+        .isEqualTo(Long.parseLong(taskId));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM crm_order_sync_failure", Long.class))
+        .isZero();
+  }
+
+  @Test
+  void shouldRecordImportFailure_whenSomeRowsFail() throws Exception {
+    List<List<String>> rows =
+        List.of(
+            List.of(
+                "999",
+                "7200",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "10.00",
+                "0",
+                "9001",
+                "s1",
+                "Item A",
+                "Red",
+                "1",
+                "10.00"),
+            List.of(
+                "100",
+                "7201",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "10.00",
+                "0",
+                "9001",
+                "s1",
+                "Item A",
+                "Red",
+                "1",
+                "10.00"));
+    String taskId = submit("/admin-api/order/order-imports", orderWorkbook(rows), "f.xlsx");
+    JsonNode task = awaitTask(taskId);
+    assertThat(task.path("status").asText()).isEqualTo("PARTIAL");
+    assertThat(task.path("failed").asInt()).isEqualTo(1);
+    Map<String, Object> failure =
+        jdbc.queryForMap(
+            "SELECT kind, task_id FROM crm_order_sync_failure ORDER BY id DESC LIMIT 1");
+    assertThat(failure.get("kind")).isEqualTo("ORDER_IMPORT");
+    assertThat(((Number) failure.get("task_id")).longValue()).isEqualTo(Long.parseLong(taskId));
+    // The failing shop (999) never resolves, so the cutoff is recorded only for the valid shop.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_sync_state WHERE shop_id=10", Long.class))
+        .isEqualTo(1L);
+  }
+
   private String submit(String path, byte[] workbook, String name) throws Exception {
     MvcResult result =
         mvc.perform(
@@ -522,6 +611,7 @@ class OrderImportIT {
                     .file(
                         new MockMultipartFile(
                             "file", name, ImportTaskApi.XLSX_CONTENT_TYPE, workbook))
+                    .param("dataCutoffTime", "2026-10-21T00:00:00Z")
                     .header(TOKEN, admin)
                     .contentType(MediaType.MULTIPART_FORM_DATA))
             .andExpect(status().isAccepted())

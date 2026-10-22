@@ -37,9 +37,9 @@ class WeidianTokenRenewalJobTest {
                 switch (TenantScope.companyId().intValue()) {
                   case 1 ->
                       List.of(
-                          new ShopAccessDTO(11L, "enabled", "weidian-11", 1),
-                          new ShopAccessDTO(12L, "disabled", "weidian-12", 0));
-                  case 3 -> List.of(new ShopAccessDTO(31L, "other company", "weidian-31", 1));
+                          new ShopAccessDTO(11L, "enabled", "weidian-11", 1, null),
+                          new ShopAccessDTO(12L, "disabled", "weidian-12", 0, null));
+                  case 3 -> List.of(new ShopAccessDTO(31L, "other company", "weidian-31", 1, null));
                   default -> throw new AssertionError("unexpected company scope");
                 });
     when(auths.selectList(any(Wrapper.class)))
