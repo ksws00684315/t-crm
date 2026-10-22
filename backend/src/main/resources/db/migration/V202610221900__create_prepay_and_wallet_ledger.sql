@@ -269,8 +269,11 @@ CREATE UNIQUE INDEX uk_crm_notification_prepay_event
 
 -- Grant only the review right to existing operator-template staff. Existing finance accounts must
 -- be explicitly configured by the company super administrator; never bulk-grant payment rights.
+-- Serialize with permission writers before reserving IDs above all legacy and snowflake values.
+LOCK TABLE sys_user_permission IN SHARE ROW EXCLUSIVE MODE;
 INSERT INTO sys_user_permission (id, tenant_id, user_id, permission_code, create_by, create_time)
-SELECT row_number() OVER (ORDER BY ut.tenant_id, u.id),
+SELECT (SELECT COALESCE(MAX(id), 0) FROM sys_user_permission)
+         + row_number() OVER (ORDER BY ut.tenant_id, u.id),
        ut.tenant_id,
        u.id,
        'prepay:review',

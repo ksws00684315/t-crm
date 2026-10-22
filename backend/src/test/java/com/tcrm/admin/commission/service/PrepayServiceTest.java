@@ -329,6 +329,27 @@ class PrepayServiceTest {
   }
 
   @ParameterizedTest
+  @ValueSource(ints = {5, 6})
+  void shouldEnforceFiveNewAttachments_whenCompletingDetails(int count) {
+    when(accounts.selectById(33L)).thenReturn(account());
+    var attachments =
+        java.util.Collections.nCopies(
+            count, new PrepayService.UploadedFile("proof.pdf", new byte[] {1}));
+    if (count == 6) {
+      fails(
+          () -> service.saveApplicationDetails(user("prepay:pay"), ID, details(false), attachments),
+          ErrorCode.COMMON_VALIDATION_FAILED);
+      assertThat(writes).isEmpty();
+    } else {
+      doReturn(detail("PENDING_APPROVAL", false)).when(service).detail(any(), anyLong());
+      service.saveApplicationDetails(user("prepay:pay"), ID, details(false), attachments);
+      verify(files, org.mockito.Mockito.times(5))
+          .uploadPrepayAdmin(
+              COMPANY, 5L, ID, FileBizType.PREPAY_ATTACHMENT, "proof.pdf", new byte[] {1});
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"missing", "tenant", "nullTenant", "kol", "pending"})
   void shouldRejectUnreviewedOrForeignAccount_whenCompletingDetails(String condition) {
     var account = account();

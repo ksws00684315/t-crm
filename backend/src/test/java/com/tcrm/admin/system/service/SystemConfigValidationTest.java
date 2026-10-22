@@ -11,14 +11,18 @@ import org.junit.jupiter.api.Test;
 class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
-    assertThat(SystemConfigDefinition.values()).hasSize(31);
+    assertThat(SystemConfigDefinition.values()).hasSize(32);
+    assertThat(SystemConfigDefinition.find("commission.minimum-withdrawal-cny"))
+        .isEqualTo(SystemConfigDefinition.MINIMUM_WITHDRAWAL_CNY);
+    assertThat(SystemConfigDefinition.list())
+        .contains(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS);
     assertThat(SystemConfigDefinition.KOL_INVITE_TTL_HOURS.min()).isEqualTo(1);
     assertThat(SystemConfigDefinition.KOL_INVITE_TTL_HOURS.max()).isEqualTo(72);
     assertThat(
             java.util.Arrays.stream(SystemConfigDefinition.values())
                 .map(SystemConfigDefinition::key)
                 .collect(Collectors.toSet()))
-        .hasSize(31);
+        .hasSize(32);
   }
 
   @Test
