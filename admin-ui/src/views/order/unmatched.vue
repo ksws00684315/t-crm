@@ -14,6 +14,8 @@ import type { KolVO, OrderSyncStateVO, OrderVO, PageResult } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -26,6 +28,7 @@ import {
   payRangeToQuery
 } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
+import MatchEvidenceDrawer from "./MatchEvidenceDrawer.vue";
 import OrderLines from "./OrderLines.vue";
 
 defineOptions({ name: "OrderUnmatchedPage" });
@@ -49,6 +52,9 @@ function asOrder(row: object): OrderVO {
   return row as OrderVO;
 }
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
   { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
   { key: "shopName", label: t("order.shop"), prop: "shopName", minWidth: 120 },
@@ -59,7 +65,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "kol", label: t("order.kol"), minWidth: 160 },
   { key: "bdUserName", label: t("order.bd"), minWidth: 110 },
   { key: "attributionStatus", label: t("order.attributionStatus"), width: 100 },
-  { key: "actions", label: t("common.actions"), width: 210 }
+  { key: "actions", label: t("common.actions"), width: px(290, 330) }
 ]);
 
 const applied = ref(snapshot());
@@ -110,6 +116,14 @@ const nonKolReason = ref("");
 const nonKolSaving = ref(false);
 
 const acting = ref<string | null>(null);
+
+const evidenceVisible = ref(false);
+const evidenceOrder = ref<OrderVO | null>(null);
+
+function openEvidence(order: OrderVO) {
+  evidenceOrder.value = order;
+  evidenceVisible.value = true;
+}
 
 async function load() {
   loading.value = true;
@@ -256,6 +270,36 @@ async function rematch(order: OrderVO) {
   }
 }
 
+function rowActions(order: OrderVO): RowAction[] {
+  return [
+    {
+      key: "evidence",
+      label: t("order.pool.evidence"),
+      testId: "action-evidence",
+      onClick: () => openEvidence(order)
+    },
+    {
+      key: "assign",
+      label: t("order.pool.assign"),
+      testId: "assign-kol",
+      hidden: !abilities.value.canViewKol,
+      onClick: () => openAssign(order)
+    },
+    {
+      key: "nonKol",
+      label: t("order.pool.markNonKol"),
+      testId: "mark-non-kol",
+      onClick: () => openNonKol(order)
+    },
+    {
+      key: "rematch",
+      label: t("order.pool.rematch"),
+      testId: "rematch",
+      onClick: () => void rematch(order)
+    }
+  ];
+}
+
 onMounted(() => {
   void load();
   void loadShops();
@@ -326,27 +370,7 @@ onMounted(() => {
         </el-tag>
       </template>
       <template #actions="{ row }">
-        <el-button
-          v-if="abilities.canViewKol"
-          link
-          type="primary"
-          data-test="assign-kol"
-          @click="openAssign(asOrder(row))"
-        >
-          {{ t("order.pool.assign") }}
-        </el-button>
-        <el-button link type="primary" data-test="mark-non-kol" @click="openNonKol(asOrder(row))">
-          {{ t("order.pool.markNonKol") }}
-        </el-button>
-        <el-button
-          link
-          type="warning"
-          data-test="rematch"
-          :loading="acting === asOrder(row).id"
-          @click="rematch(asOrder(row))"
-        >
-          {{ t("order.pool.rematch") }}
-        </el-button>
+        <RowActions :actions="rowActions(asOrder(row))" />
       </template>
       <template #expand="{ row }">
         <OrderLines :order="asOrder(row)" />
@@ -439,5 +463,6 @@ onMounted(() => {
         </el-button>
       </template>
     </el-dialog>
+    <MatchEvidenceDrawer v-model="evidenceVisible" :order="evidenceOrder" @assign="openAssign" />
   </div>
 </template>

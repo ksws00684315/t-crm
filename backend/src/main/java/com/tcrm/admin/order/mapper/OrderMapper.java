@@ -53,4 +53,105 @@ public interface OrderMapper extends BaseMapper<OrderDO> {
       this.payTime = payTime;
     }
   }
+
+  /**
+   * Per-shop missing-field counts for the monitoring view (task 40 §3.5). CASE sums instead of
+   * FILTER clauses: the tenant interceptor re-parses every statement with JSqlParser. The tenant
+   * predicate comes from the interceptor.
+   */
+  @Select(
+      """
+      SELECT shop_id AS shopId,
+             SUM(CASE WHEN pay_time IS NULL THEN 1 ELSE 0 END) AS missingPayTime,
+             SUM(CASE WHEN order_time IS NULL THEN 1 ELSE 0 END) AS missingOrderTime,
+             SUM(CASE WHEN pay_amount IS NULL THEN 1 ELSE 0 END) AS missingPayAmount,
+             SUM(CASE WHEN total_amount IS NULL THEN 1 ELSE 0 END) AS missingTotalAmount
+        FROM crm_order
+       WHERE is_deleted = FALSE
+       GROUP BY shop_id
+      """)
+  List<ShopQualityRow> missingOrderFields();
+
+  /** Data provenance per shop: the source of the newest order (task 40 §3.5). */
+  @Select(
+      """
+      SELECT shop_id AS shopId, source AS latestSource
+        FROM crm_order
+       WHERE is_deleted = FALSE
+         AND id IN (
+           SELECT MAX(id) FROM crm_order WHERE is_deleted = FALSE GROUP BY shop_id
+         )
+      """)
+  List<ShopSourceRow> latestOrderSourcePerShop();
+
+  /** Mapper row for {@link #missingOrderFields()}. */
+  class ShopQualityRow {
+    private Long shopId;
+    private Long missingPayTime;
+    private Long missingOrderTime;
+    private Long missingPayAmount;
+    private Long missingTotalAmount;
+
+    public Long getShopId() {
+      return shopId;
+    }
+
+    public void setShopId(Long shopId) {
+      this.shopId = shopId;
+    }
+
+    public Long getMissingPayTime() {
+      return missingPayTime;
+    }
+
+    public void setMissingPayTime(Long value) {
+      missingPayTime = value;
+    }
+
+    public Long getMissingOrderTime() {
+      return missingOrderTime;
+    }
+
+    public void setMissingOrderTime(Long value) {
+      missingOrderTime = value;
+    }
+
+    public Long getMissingPayAmount() {
+      return missingPayAmount;
+    }
+
+    public void setMissingPayAmount(Long value) {
+      missingPayAmount = value;
+    }
+
+    public Long getMissingTotalAmount() {
+      return missingTotalAmount;
+    }
+
+    public void setMissingTotalAmount(Long value) {
+      missingTotalAmount = value;
+    }
+  }
+
+  /** Mapper row for {@link #latestOrderSourcePerShop()}. */
+  class ShopSourceRow {
+    private Long shopId;
+    private Integer latestSource;
+
+    public Long getShopId() {
+      return shopId;
+    }
+
+    public void setShopId(Long shopId) {
+      this.shopId = shopId;
+    }
+
+    public Integer getLatestSource() {
+      return latestSource;
+    }
+
+    public void setLatestSource(Integer value) {
+      latestSource = value;
+    }
+  }
 }

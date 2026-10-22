@@ -16,6 +16,30 @@ public interface CopyTargetShopApi {
    */
   void requireEnabled(long shopId);
 
+  /** Validates channel, current eligibility, and requested quantity without reserving capacity. */
+  void validateCopyTarget(long shopId, String channel, int quantity);
+
+  /** Revalidates shop eligibility before each external copy operation. */
+  void requireCopyEligible(long shopId, String channel);
+
+  /** Locks and chooses the eligible shop with the greatest unreserved capacity. */
+  long allocateCopyTarget(String channel, int quantity);
+
+  /** Lists target channels and their unreserved capacity for token creation. */
+  java.util.List<CopyChannelDTO> copyChannels();
+
   /** Names of non-deleted shops visible in the caller's company; missing ids are omitted. */
   Map<Long, String> namesByIds(Collection<Long> shopIds);
+
+  /** Company-scoped immutable shop codes. */
+  Map<Long, String> codesByIds(Collection<Long> shopIds);
+
+  record CopyChannelDTO(
+      String channel,
+      int remainingCapacity,
+      java.util.List<CopyShopDTO> shops,
+      int defaultQuota,
+      int defaultValidMinutes) {}
+
+  record CopyShopDTO(Long id, String shopCode, String shopName, int remainingCapacity) {}
 }

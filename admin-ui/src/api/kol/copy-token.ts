@@ -1,5 +1,5 @@
 import { http } from "../http";
-import type { CopyTokenVO, CreatedCopyTokenVO, PageResult } from "../types";
+import type { CopyTokenVO, CreatedCopyTokenVO, PageResult, ShopChannel } from "../types";
 
 export type CopyTokenDisplayStatus = "ACTIVE" | "EXHAUSTED" | "EXPIRED" | "REVOKED";
 
@@ -14,8 +14,9 @@ export interface CopyTokenQuery {
 
 export interface CreateCopyTokenRequest {
   kolId: string;
-  quota?: number;
-  validMinutes?: number;
+  targetChannel: ShopChannel;
+  quota: number;
+  validMinutes: number;
   targetShopId?: string | null;
 }
 
