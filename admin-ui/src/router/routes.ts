@@ -350,6 +350,17 @@ export const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "account/resignation",
+        name: "AccountResignation",
+        component: () => import("@/views/account/resignation.vue"),
+        meta: {
+          title: "route.resignation",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "AccountResignationPage"
+        }
+      },
+      {
         path: "account/password",
         name: "AccountPassword",
         component: () => import("@/views/account/password.vue"),

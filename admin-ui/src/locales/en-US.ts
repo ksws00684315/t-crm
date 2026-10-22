@@ -190,7 +190,8 @@ const enUS: MessageSchema = {
     password: "Change Password",
     forbidden: "Access denied",
     notFound: "Page not found",
-    notifications: "Notifications"
+    notifications: "Notifications",
+    resignation: "Resignation"
   },
   errors: {
     SYSTEM_CONFIG_INVALID: "This system configuration value is invalid.",
@@ -215,6 +216,14 @@ const enUS: MessageSchema = {
     USER_INVALID_DATA_SCOPE: "Own Data Only applies only to a staff account.",
     USER_PERMISSION_INVALID: "Those permissions are not valid. Choose them again.",
     USER_LAST_SUPER_ADMIN: "At least one enabled Super Admin must remain.",
+    DEPARTURE_NOT_BD_ACCOUNT:
+      "Only a BD (a sub-account with the own-data scope) can leave this way.",
+    DEPARTURE_INVALID_TIME: "The time must be later than now.",
+    DEPARTURE_PLAN_EXISTS:
+      "This account already has a pending departure plan. Cancel or edit it first.",
+    DEPARTURE_PLAN_NOT_SCHEDULED: "This account has no pending departure plan.",
+    DEPARTURE_SELF_SUBMITTED_ONLY: "You can only cancel the resignation you filed yourself.",
+    DEPARTURE_INVALID_HEIR: "The heir must be another active BD.",
     KOL_EMAIL_EXISTS: "This email is already used by another creator.",
     KOL_CODE_EXISTS: "This creator code already exists.",
     KOL_ALREADY_ACTIVATED: "This creator has already activated the account.",
@@ -428,6 +437,7 @@ const enUS: MessageSchema = {
   },
   layout: {
     changePassword: "Change Password",
+    resignation: "Resignation",
     user: "{nickname} ({role})",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",
@@ -649,6 +659,7 @@ const enUS: MessageSchema = {
     namePlaceholder: "Creator name",
     emailPlaceholder: "name{'@'}example.com",
     bd: "BD",
+    bdOption: "{nickname} ({username})",
     defaultRate: "Commission",
     code: "Creator ID",
     links: "Links",
@@ -848,6 +859,54 @@ const enUS: MessageSchema = {
     transferKols: "Transfer creators",
     noKols: "No creators",
     recordsHint: "Transfer records are in System → Audit Log"
+  },
+  departure: {
+    column: "Departure",
+    none: "Not set",
+    doneResign: "Has left",
+    doneDisable: "Disabled",
+    planText: "{type} · {time} · {heir}",
+    heirShort: "→ {name}",
+    awaitingHeir: "Heir not chosen yet",
+    reasonTooltip: "Reason: {reason}",
+    mark: "Mark departure",
+    editPlan: "Edit departure plan",
+    cancelPlan: "Cancel departure plan",
+    cancelTitle: "Cancel departure plan",
+    cancelConfirm: "Cancel the departure plan of {username}?",
+    cancelled: "Departure plan cancelled.",
+    created: "Departure plan created.",
+    updated: "Departure plan saved.",
+    markTitle: "Mark {username} as leaving",
+    editTitle: "Edit the departure plan of {username}",
+    type: "Type",
+    typeResign: "Resignation",
+    typeDisable: "Disable",
+    effectiveTime: "Takes effect",
+    now: "Now",
+    at: "At a set time",
+    pickTime: "Choose when it takes effect.",
+    pickTimePlaceholder: "Pick date and time",
+    timeFuture: "The time must be later than now.",
+    timezoneHint: "Time zone: {timezone} (UTC{offset})",
+    heir: "Heir",
+    heirPlaceholder: "Choose an heir",
+    noHeir: "No heir (leave creators unassigned)",
+    noHeirHint:
+      "Without an heir, every creator of this BD becomes unassigned when the plan takes effect.",
+    withHeirHint:
+      "With an heir, every creator of this BD is handed over automatically when the plan takes effect.",
+    reason: "Reason",
+    reasonPlaceholder: "Optional, up to 255 characters",
+    bdOnly: "Only a BD (a sub-account with the own-data scope) can file a resignation.",
+    submitted: "Resignation filed.",
+    submittedHint:
+      "When the time comes, the system hands your creators over to the heir or leaves them unassigned, then disables your account. You can cancel until then.",
+    status: "Status",
+    statusScheduled: "Pending",
+    plannedLeaveAt: "Planned leave date",
+    submit: "File resignation",
+    cancelOwnConfirm: "Cancel your resignation?"
   },
   linkTemplate: {
     hint: "Every purchasing platform of this company, including disabled ones.",
@@ -1580,7 +1639,18 @@ const enUS: MessageSchema = {
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
       BD_TRANSFER_CANCELLED: "Scheduled transfer for creator {kolCode} was cancelled: {reason}",
-      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned"
+      KOLS_UNASSIGNED: "{count} creators under {bdName} are now unassigned",
+      DEPARTURE_PLAN_SUBMITTED: "BD {bdName} filed a departure plan effective {time}",
+      DEPARTURE_PLAN_EXECUTED: "The {kind} plan of BD {bdName} took effect: {result}"
+    },
+    planType: {
+      RESIGN: "resignation",
+      DISABLE: "deactivation"
+    },
+    result: {
+      TRANSFERRED: "creators were handed over to {heir}",
+      UNASSIGNED: "creators are now unassigned",
+      HEIR_INVALID: "the heir was unavailable, so creators are now unassigned"
     },
     reason: {
       OWNERSHIP_CHANGED: "Ownership changed at execution",

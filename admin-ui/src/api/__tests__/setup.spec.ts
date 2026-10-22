@@ -40,6 +40,11 @@ function appWithSession() {
 }
 
 describe("401 handling", () => {
+  // These cases push the real /system/users route, so they compile that page and its dialogs on
+  // first use. Task 41 made the page bigger; under a full-suite run the default 5s budget is too
+  // tight (it still passes in isolation in ~3s).
+  vi.setConfig({ testTimeout: 20_000 });
+
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
