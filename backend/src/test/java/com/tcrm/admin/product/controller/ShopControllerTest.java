@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.product.service.ShopDTO;
+import com.tcrm.admin.product.service.ShopOptionDTO;
 import com.tcrm.admin.product.service.ShopService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
@@ -65,6 +66,25 @@ class ShopControllerTest {
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].weidianShopId").value("100"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
+  void shouldListOptions_whenAnyRoleReads(Role role, DataScope scope) throws Exception {
+    when(shops.listOptions())
+        .thenReturn(
+            List.of(
+                new ShopOptionDTO(2L, "S002", "乙店", "WEIDIAN", 1),
+                new ShopOptionDTO(1L, "S001", "甲店", "WEIDIAN", 0)));
+    mvc.perform(get(BASE + "/options").header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].shopCode").value("S002"))
+        .andExpect(jsonPath("$.data[0].shopName").value("乙店"))
+        .andExpect(jsonPath("$.data[0].channel").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data[0].status").value(1))
+        .andExpect(jsonPath("$.data[1].id").value(1));
+    verify(shops).listOptions();
   }
 
   @Test

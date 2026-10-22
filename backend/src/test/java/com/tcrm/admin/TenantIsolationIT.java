@@ -189,6 +189,9 @@ class TenantIsolationIT {
     mvc.perform(get("/admin-api/product/shops").header(TOKEN, tokenA))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items.length()").value(0));
+    mvc.perform(get("/admin-api/product/shops/options").header(TOKEN, tokenA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(0));
     mvc.perform(
             get("/admin-api/product/kol-items")
                 .param("weidianItemId", "81001")

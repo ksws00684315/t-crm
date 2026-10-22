@@ -84,6 +84,22 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
     return new PageResult<>(items, result.getTotal(), page, size);
   }
 
+  /** All shops of the current company for selector dropdowns, ordered by shopCode. */
+  public List<ShopOptionDTO> listOptions() {
+    return shops
+        .selectList(new LambdaQueryWrapper<ShopDO>().orderByAsc(ShopDO::getShopCode))
+        .stream()
+        .map(
+            shop ->
+                new ShopOptionDTO(
+                    shop.getId(),
+                    shop.getShopCode(),
+                    shop.getShopName(),
+                    shop.getChannel(),
+                    shop.getStatus()))
+        .toList();
+  }
+
   /**
    * Creates a shop. The count check and the insert run in one transaction behind a
    * transaction-level advisory lock, so concurrent requests cannot exceed the current configured

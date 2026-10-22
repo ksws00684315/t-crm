@@ -49,6 +49,12 @@ public class ShopController {
             result.items().stream().map(ShopVO::from).toList(), result.total(), page, size));
   }
 
+  @GetMapping("/options")
+  @SaCheckPermission("product:view")
+  public R<List<ShopOptionVO>> options() {
+    return R.ok(shops.listOptions().stream().map(ShopOptionVO::from).toList());
+  }
+
   @PostMapping
   @SaCheckRole("SUPER_ADMIN")
   @AuditLog(module = "PRODUCT", action = "Create shop")

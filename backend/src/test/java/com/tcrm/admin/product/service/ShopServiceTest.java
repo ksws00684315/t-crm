@@ -14,6 +14,7 @@ import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationEventPublisher;
@@ -66,5 +67,26 @@ class ShopServiceTest {
     assertThat(row.copyIneligibleReason()).isEqualTo(reason);
     assertThat(service.copyChannels().getFirst().shops()).isEmpty();
     assertThat(service.copyChannels().getFirst().remainingCapacity()).isZero();
+  }
+
+  @Test
+  void shouldListOptionsOrderedByShopCode() {
+    ShopDO later = new ShopDO();
+    later.setId(2L);
+    later.setShopCode("S002");
+    later.setShopName("乙");
+    later.setChannel("WEIDIAN");
+    later.setStatus(1);
+    ShopDO earlier = new ShopDO();
+    earlier.setId(1L);
+    earlier.setShopCode("S001");
+    earlier.setShopName("甲");
+    earlier.setChannel("WEIDIAN");
+    earlier.setStatus(0);
+    when(shops.selectList(any())).thenReturn(List.of(earlier, later));
+
+    assertThat(service.listOptions())
+        .extracting(ShopOptionDTO::shopCode)
+        .containsExactly("S001", "S002");
   }
 }
