@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n";
 import { getKolItem } from "@/api/product/kol-item";
 import type { KolItemDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { formatRate } from "@/utils/rate";
 
@@ -48,15 +48,17 @@ function text(value: string | null | undefined): string {
 }
 
 function shopText(row: KolItemDetailVO): string {
-  if (row.targetShopName && row.targetShopCode) {
-    return `${row.targetShopName}（${row.targetShopCode}）`;
+  if (row.targetShopName || row.targetShopCode) {
+    return formatNameWithCode(row.targetShopName, row.targetShopCode);
   }
-  return row.targetShopName || "-";
+  return "-";
 }
 
 function kolText(row: KolItemDetailVO): string {
-  if (row.kolName && row.kolCode) return `${row.kolName}（${row.kolCode}）`;
-  return row.kolName || row.kolCode || "-";
+  if (row.kolName || row.kolCode) {
+    return formatNameWithCode(row.kolName, row.kolCode);
+  }
+  return "-";
 }
 
 function label(group: "channels" | "statuses" | "cleanups", value: string | null): string {

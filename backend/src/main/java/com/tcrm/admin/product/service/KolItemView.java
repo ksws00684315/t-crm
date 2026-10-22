@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * One row of the creator-item list (task 39). {@code targetShopCode} stays null until task 37 adds
- * the shop code.
+ * One row of the creator-item list (task 39). {@code targetShopCode} comes from the target shop row
+ * when present.
  */
 public record KolItemView(
     Long id,

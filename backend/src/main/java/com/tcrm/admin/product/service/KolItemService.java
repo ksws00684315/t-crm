@@ -243,7 +243,7 @@ public class KolItemService {
         kol == null ? null : kol.name(),
         row.getShopId(),
         shop == null ? null : shop.getShopName(),
-        null,
+        shop == null ? null : shop.getShopCode(),
         KolItemStatus.CHANNEL,
         row.getWeidianItemId(),
         WeidianItemUrls.of(row.getWeidianItemId()),

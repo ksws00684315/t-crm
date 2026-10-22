@@ -173,6 +173,7 @@ class KolItemServiceTest {
     ShopDO shop = new ShopDO();
     shop.setId(31L);
     shop.setShopName("Shop A");
+    shop.setShopCode("SHOP-100031");
     when(shops.selectList(any())).thenReturn(List.of(shop));
     when(sales.sumByKolItemIds(anyCollection()))
         .thenReturn(
@@ -198,7 +199,7 @@ class KolItemServiceTest {
     assertThat(first.payAmount()).isEqualByComparingTo("14.00");
     assertThat(first.status()).isEqualTo("ENABLED");
     assertThat(first.cleanupStatus()).isEqualTo("DONE");
-    assertThat(first.targetShopCode()).isNull();
+    assertThat(first.targetShopCode()).isEqualTo("SHOP-100031");
     assertThat(first.targetShopName()).isEqualTo("Shop A");
     KolItemView second = result.items().get(1);
     assertThat(second.itemName()).isEqualTo("Snapshot");

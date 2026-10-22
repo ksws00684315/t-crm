@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.update.Update;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
@@ -82,6 +83,8 @@ class CopyJobWorkerTest {
             events,
             TestTransactions.template(),
             new DirectExecutor());
+    // Happy-path inserts bump target-shop capacity (task 37); mock default int is 0.
+    when(shops.incrementCurrentItems(anyLong(), any())).thenReturn(1);
   }
 
   @Test
@@ -137,6 +140,9 @@ class CopyJobWorkerTest {
 
     verify(copies, never()).copy(anyLong(), any(), anyLong());
     verify(tokens, never()).consume(anyLong(), anyInt());
+    ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
+    verify(items).update(eq(null), cap.capture());
+    assertThat(((Update<?, ?>) cap.getValue()).getSqlSet()).contains("source_shop_id");
   }
 
   @Test
@@ -169,6 +175,9 @@ class CopyJobWorkerTest {
     worker.processJob(1L);
 
     verifyFailedMessage(ProductLinkMessages.SOURCE_NOT_IN_SHOPS);
+    ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
+    verify(items).update(eq(null), cap.capture());
+    assertThat(((Update<?, ?>) cap.getValue()).getSqlSet()).doesNotContain("source_shop_id");
   }
 
   @Test

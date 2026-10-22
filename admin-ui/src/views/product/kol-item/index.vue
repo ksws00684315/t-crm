@@ -7,7 +7,7 @@ import { getKol, listKols } from "@/api/kol/kol";
 import { rebuildLinkIndex } from "@/api/link/link";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
-import type { KolItemVO, KolVO, ShopVO } from "@/api/types";
+import type { KolItemVO, KolVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -15,7 +15,7 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { canExport, kolAbilities, linkAbilities, productAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
@@ -40,7 +40,7 @@ const rebuilding = ref(false);
 const loading = ref(false);
 const rows = ref<KolItemVO[]>([]);
 const total = ref(0);
-const shops = ref<ShopVO[]>([]);
+const shops = ref<ShopOptionVO[]>([]);
 const query = reactive<{
   page: number;
   size: number;
@@ -58,15 +58,21 @@ function asItem(row: object): KolItemVO {
 }
 
 function kolText(row: KolItemVO): string {
-  if (row.kolName && row.kolCode) return `${row.kolName}（${row.kolCode}）`;
-  return row.kolName || row.kolCode || "-";
+  if (row.kolName || row.kolCode) {
+    return formatNameWithCode(row.kolName, row.kolCode);
+  }
+  return "-";
 }
 
 function shopText(row: KolItemVO): string {
-  if (row.targetShopName && row.targetShopCode) {
-    return `${row.targetShopName}（${row.targetShopCode}）`;
+  if (row.targetShopName || row.targetShopCode) {
+    return formatNameWithCode(row.targetShopName, row.targetShopCode);
   }
-  return row.targetShopName || "-";
+  return "-";
+}
+
+function shopOptionLabel(shop: ShopOptionVO): string {
+  return formatNameWithCode(shop.shopName, shop.shopCode);
 }
 
 function named(group: "channels" | "statuses" | "cleanups", value: string | null): string {
@@ -422,7 +428,7 @@ onMounted(() => {
             <el-option
               v-for="shop in shops"
               :key="shop.id"
-              :label="shop.shopName"
+              :label="shopOptionLabel(shop)"
               :value="shop.id"
             />
           </el-select>

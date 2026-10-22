@@ -1,6 +1,5 @@
 package com.tcrm.admin.product.controller;
 
-import static org.hamcrest.CoreMatchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -59,7 +58,7 @@ class KolItemControllerTest {
         .andExpect(jsonPath("$.data.items[0].linkCode").value("KPL-ABCDEF123456"))
         .andExpect(jsonPath("$.data.items[0].salesQuantity").value("3"))
         .andExpect(jsonPath("$.data.items[0].payAmount").value("14.00"))
-        .andExpect(jsonPath("$.data.items[0].targetShopCode").value(nullValue()));
+        .andExpect(jsonPath("$.data.items[0].targetShopCode").value("SHOP-100003"));
     verify(items).page(any());
   }
 
@@ -122,7 +121,7 @@ class KolItemControllerTest {
         "Alice",
         3L,
         "Shop",
-        null,
+        "SHOP-100003",
         "WEIDIAN",
         "9001",
         "https://weidian.com/item.html?itemID=9001",

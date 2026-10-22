@@ -141,7 +141,7 @@ class KolItemQueryIT {
     assertThat(sold.get("imageUrl").asText()).isEqualTo("https://example.com/t39.png");
     assertThat(sold.get("kolCode").asText()).isEqualTo("KOL-TAA001");
     assertThat(sold.get("targetShopName").asText()).isEqualTo("t39 Shop A");
-    assertThat(sold.get("targetShopCode").isNull()).isTrue();
+    assertThat(sold.get("targetShopCode").asText()).isEqualTo("SHOP-009101");
     assertThat(sold.get("targetChannel").asText()).isEqualTo("WEIDIAN");
     assertThat(sold.get("targetItemId").asText()).isEqualTo("90010001");
     assertThat(sold.get("targetItemUrl").asText())
@@ -347,13 +347,16 @@ class KolItemQueryIT {
   }
 
   private void shop(long id, long tenantId, String name, String weidianId) {
+    String shopCode = "SHOP-" + String.format("%06d", id % 1_000_000);
     jdbc.update(
         """
-        INSERT INTO crm_shop(id, tenant_id, shop_name, weidian_shop_id, status, create_time, update_time)
-        VALUES (?, ?, ?, ?, 1, now(), now())
+        INSERT INTO crm_shop(id, tenant_id, shop_code, channel, shop_name, weidian_shop_id, status,
+          is_source, copy_pool_status, max_items, current_items, create_time, update_time)
+        VALUES (?, ?, ?, 'WEIDIAN', ?, ?, 1, FALSE, 'EXITED', 20000, 0, now(), now())
         """,
         id,
         tenantId,
+        shopCode,
         name,
         weidianId);
   }
