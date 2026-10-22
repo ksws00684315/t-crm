@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -97,6 +98,17 @@ class KolItemControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+  }
+
+
+  @Test
+  void shouldReturn400_whenDetailIdIsNotPositive() throws Exception {
+    mvc.perform(
+            get("/admin-api/product/kol-items/0")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.STAFF, DataScope.ALL)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+    verifyNoInteractions(items);
   }
 
   private static KolItemView sample() {
