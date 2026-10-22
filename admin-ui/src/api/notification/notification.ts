@@ -2,7 +2,12 @@ import { http } from "../http";
 import type { PageResult } from "../types";
 
 export type NotificationType =
-  "PAYOUT_ACCOUNT_SUBMITTED" | "ORDER_SYNC_FAILED" | "BD_TRANSFER_CANCELLED" | "KOLS_UNASSIGNED";
+  | "PAYOUT_ACCOUNT_SUBMITTED"
+  | "ORDER_SYNC_FAILED"
+  | "BD_TRANSFER_CANCELLED"
+  | "KOLS_UNASSIGNED"
+  | "DEPARTURE_PLAN_SUBMITTED"
+  | "DEPARTURE_PLAN_EXECUTED";
 
 /** Render parameters. Only the fields for the message type are present. */
 export interface NotificationParams {
@@ -12,6 +17,11 @@ export interface NotificationParams {
   reason: string | null;
   bdName: string | null;
   count: number | null;
+  /** Departure messages: heir display name, ISO instant, result and plan type of the plan. */
+  heirName: string | null;
+  effectiveAt: string | null;
+  result: string | null;
+  planType: string | null;
 }
 
 export interface NotificationVO {

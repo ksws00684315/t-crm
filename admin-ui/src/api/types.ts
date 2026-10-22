@@ -63,6 +63,33 @@ export interface CompanyVO {
   role: CompanyRole;
 }
 
+/** How a departure plan ends the account (task 41). */
+export type DeparturePlanType = "RESIGN" | "DISABLE";
+/** A plan is pending until it runs (DONE) or is withdrawn (CANCELLED). */
+export type DeparturePlanStatus = "SCHEDULED" | "DONE" | "CANCELLED";
+/** Who asked for the plan. */
+export type DepartureInitiator = "SELF" | "ADMIN";
+/** What happened to the account's creators when the plan ran. */
+export type DepartureResult = "TRANSFERRED" | "UNASSIGNED" | "HEIR_INVALID";
+
+/** `DeparturePlanVO`: the resignation or disable plan of one BD account. */
+export interface DeparturePlanVO {
+  id: string;
+  userId: string;
+  type: DeparturePlanType;
+  effectiveAt: string;
+  heirUserId: string | null;
+  heirName: string | null;
+  initiator: DepartureInitiator;
+  reason: string | null;
+  status: DeparturePlanStatus;
+  executedAt: string | null;
+  result: DepartureResult | null;
+  resultMessage: string | null;
+  /** Pending plan without an heir: the list shows "heir still to be named". */
+  awaitingHeir: boolean;
+}
+
 /** `UserVO`. Ids are strings (backend Long), time stamps are ISO 8601 instants. */
 export interface UserVO {
   id: string;
@@ -93,6 +120,8 @@ export interface UserVO {
   companies?: CompanyVO[];
   /** `/system/users` rows only: how many companies this person belongs to. */
   companyCount?: number;
+  /** `/system/users` rows only: the newest departure plan, null when the account has none. */
+  departurePlan?: DeparturePlanVO | null;
 }
 
 /** `SocialAccountVO`; `followers` is a string (backend Long). `primary` is the main platform. */

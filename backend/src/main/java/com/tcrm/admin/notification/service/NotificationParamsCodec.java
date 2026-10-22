@@ -18,6 +18,15 @@ final class NotificationParamsCodec {
           case ORDER_SYNC_FAILED -> new ShopParams(params.shopName());
           case BD_TRANSFER_CANCELLED -> new TransferParams(params.kolCode(), params.reason());
           case KOLS_UNASSIGNED -> new UnassignedParams(params.bdName(), params.count());
+          case DEPARTURE_PLAN_SUBMITTED ->
+              new DepartureParams(params.bdName(), params.effectiveAt());
+          case DEPARTURE_PLAN_EXECUTED ->
+              new DepartureExecutedParams(
+                  params.bdName(),
+                  params.effectiveAt(),
+                  params.heirName(),
+                  params.result(),
+                  params.planType());
         };
     return JSON.writeValueAsString(body);
   }
@@ -35,7 +44,11 @@ final class NotificationParamsCodec {
           text(node, "shopName"),
           text(node, "reason"),
           text(node, "bdName"),
-          count);
+          count,
+          text(node, "heirName"),
+          text(node, "effectiveAt"),
+          text(node, "result"),
+          text(node, "planType"));
     } catch (JacksonException ex) {
       return empty();
     }
@@ -60,4 +73,9 @@ final class NotificationParamsCodec {
   private record TransferParams(String kolCode, String reason) {}
 
   private record UnassignedParams(String bdName, Integer count) {}
+
+  private record DepartureParams(String bdName, String effectiveAt) {}
+
+  private record DepartureExecutedParams(
+      String bdName, String effectiveAt, String heirName, String result, String planType) {}
 }
