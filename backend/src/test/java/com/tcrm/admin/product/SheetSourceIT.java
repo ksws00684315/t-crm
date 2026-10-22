@@ -305,7 +305,13 @@ class SheetSourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         json.writeValueAsString(
-                            Map.of("shopName", "Main shop", "weidianShopId", weidianShopId))))
+                            Map.of(
+                                "shopName",
+                                "Main shop",
+                                "channel",
+                                "WEIDIAN",
+                                "weidianShopId",
+                                weidianShopId))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
