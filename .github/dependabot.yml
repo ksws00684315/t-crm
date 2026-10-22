@@ -1,4 +1,6 @@
 version: 2
+# After merging npm/maven bumps, run ./scripts/refresh-notices.sh and commit
+# updated */THIRD-PARTY-NOTICES (spec 07 §4). Dependabot does not regenerate them.
 # Policy (spec 07): dependencies managed by the Spring Boot parent declare no
 # <version> and are upgraded only together with Spring Boot. Major upgrades
 # require an ADR and are done manually, so Dependabot ignores them.
