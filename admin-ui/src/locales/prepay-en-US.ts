@@ -1,4 +1,5 @@
 export default {
+  tooLong: "Enter no more than {max} characters",
   chooseDeduction: "Choose whether to deduct from commission",
   applicationStatus: "Application status",
   toComplete: "Not yet completed",

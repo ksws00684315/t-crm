@@ -38,7 +38,16 @@ const rules = computed<FormRules>(() => ({
       trigger: "change"
     }
   ],
-  reason: [{ required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" }],
+  reason: [
+    { required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" },
+    {
+      validator: (_rule, value: string, done) =>
+        done(
+          value.trim().length <= 1000 ? undefined : new Error(t("prepay.tooLong", { max: 1000 }))
+        ),
+      trigger: "blur"
+    }
+  ],
   expectedPayDate: [{ required: true, message: t("prepay.required"), trigger: "change" }],
   payoutAccountId: [{ required: true, message: t("prepay.required"), trigger: "change" }]
 }));
@@ -127,7 +136,7 @@ async function save() {
         ><el-input
           v-model="form.reason"
           type="textarea"
-          maxlength="2000"
+          maxlength="1000"
           data-test="finance-prepay-reason"
       /></el-form-item>
       <el-form-item

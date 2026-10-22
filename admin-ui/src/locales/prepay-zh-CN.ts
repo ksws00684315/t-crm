@@ -1,4 +1,5 @@
 export default {
+  tooLong: "最多填写 {max} 个字符",
   title: "达人预付",
   type: "达人预付",
   number: "申请编号",

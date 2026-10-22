@@ -205,6 +205,12 @@ const zhCN = {
     notifications: "站内消息"
   },
   errors: {
+    PREPAY_REQUEST_CONFLICT: "该申请编号已用于其他内容，请核对申请列表后重试。",
+    PREPAY_STATE_CONFLICT: "预付任务状态已变化，请刷新后再操作。",
+    PREPAY_DETAILS_REQUIRED: "请先在财务待审核任务中补齐申请资料，再审核通过。",
+    PREPAY_PAYMENT_CONFLICT: "该付款已登记或付款编号内容不一致，请核对付款结果。",
+    PREPAY_FILE_INVALID: "预付附件及凭证仅支持有效的 PNG、JPEG 或 PDF 文件。",
+    PREPAY_FILE_TOO_LARGE: "预付附件或凭证不能超过 10 MB。",
     SYSTEM_CONFIG_INVALID: "系统配置无效，请检查后重试",
     COMMON_VALIDATION_FAILED: "提交的内容不符合要求，请检查后重试",
     COMMON_NOT_FOUND: "请求的内容不存在",

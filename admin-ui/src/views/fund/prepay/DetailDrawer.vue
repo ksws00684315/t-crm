@@ -73,8 +73,22 @@ const rules = computed<FormRules>(() => ({
     }
   ],
   payTime: [{ required: true, message: t("prepay.required"), trigger: "change" }],
-  payMethod: [{ required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" }],
+  payMethod: [
+    { required: true, whitespace: true, message: t("prepay.required"), trigger: "blur" },
+    {
+      validator: (_rule, value: string, done) =>
+        done(value.trim().length <= 100 ? undefined : new Error(t("prepay.tooLong", { max: 100 }))),
+      trigger: "blur"
+    }
+  ],
   payRemark: [
+    {
+      validator: (_rule, value: string, done) =>
+        done(
+          value.trim().length <= 1000 ? undefined : new Error(t("prepay.tooLong", { max: 1000 }))
+        ),
+      trigger: "blur"
+    },
     {
       validator: (_rule, value: string, done) =>
         done(
@@ -475,7 +489,7 @@ async function submitPayment() {
                 data-test="prepay-pay-time"
             /></el-form-item>
             <el-form-item prop="payMethod" :label="t('prepay.payMethod')" :error="errors.payMethod"
-              ><el-input v-model="form.payMethod" maxlength="200" data-test="prepay-pay-method"
+              ><el-input v-model="form.payMethod" maxlength="100" data-test="prepay-pay-method"
             /></el-form-item>
             <el-form-item
               prop="payRemark"
@@ -485,7 +499,7 @@ async function submitPayment() {
               ><el-input
                 v-model="form.payRemark"
                 type="textarea"
-                maxlength="2000"
+                maxlength="1000"
                 data-test="prepay-pay-remark"
             /></el-form-item>
             <el-form-item

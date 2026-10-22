@@ -106,6 +106,54 @@ async function voucher(wrapper: VueWrapper) {
   await input.trigger("change");
 }
 describe("prepay safe submission", () => {
+  it.each([1000, 1001])("validates the finance reason boundary at %i characters", async length => {
+    useUserStore().user!.permissions = ["prepay:review"];
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      status: "PENDING_APPROVAL",
+      payoutAccountId: "2"
+    });
+    vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
+      ...detail,
+      status: "PENDING_APPROVAL"
+    });
+    const wrapper = await open(DetailDrawer);
+    await set(wrapper, "finance-prepay-reason", "原".repeat(length));
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await flushPromises();
+    expect(api.savePrepayApplicationDetails).toHaveBeenCalledTimes(length === 1000 ? 1 : 0);
+    if (length > 1000)
+      await vi.waitFor(() =>
+        expect(wrapper.text()).toContain(i18n.global.t("prepay.tooLong", { max: 1000 }))
+      );
+  });
+  it.each([
+    [100, 1000, true],
+    [101, 1000, false],
+    [100, 1001, false]
+  ])(
+    "validates payment method %i and remark %i before submitting",
+    async (methodLength, remarkLength, accepted) => {
+      vi.mocked(api.payPrepay).mockResolvedValue({ ...detail, status: "PAID" });
+      const wrapper = await open(DetailDrawer);
+      await set(wrapper, "prepay-pay-amount", "100.00");
+      await set(wrapper, "prepay-pay-method", "M".repeat(methodLength as number));
+      await set(wrapper, "prepay-pay-remark", "注".repeat(remarkLength as number));
+      wrapper
+        .getComponent({ name: "ElDatePicker" })
+        .vm.$emit("update:modelValue", "2026-10-22T10:00:00+08:00");
+      await voucher(wrapper);
+      await wrapper.get('[data-test="prepay-pay-submit"]').trigger("click");
+      await flushPromises();
+      expect(api.payPrepay).toHaveBeenCalledTimes(accepted ? 1 : 0);
+      if (!accepted)
+        await vi.waitFor(() =>
+          expect(wrapper.text()).toContain(
+            i18n.global.t("prepay.tooLong", { max: methodLength === 101 ? 100 : 1000 })
+          )
+        );
+    }
+  );
   it("retains the application UUID and immutable payload after an ambiguous failure", async () => {
     vi.mocked(api.applyPrepay).mockRejectedValue(new Error("network"));
     const wrapper = await open(ApplyDialog);
@@ -124,7 +172,7 @@ describe("prepay safe submission", () => {
   it("allows pay-only users, confirms a difference, refreshes conflict and retries the same UUID", async () => {
     vi.mocked(api.payPrepay)
       .mockRejectedValueOnce(
-        new ApiError({ status: 409, errorCode: "PREPAY_STATUS_CONFLICT", traceId: "test" })
+        new ApiError({ status: 409, errorCode: "PREPAY_STATE_CONFLICT", traceId: "test" })
       )
       .mockResolvedValueOnce({ ...detail, status: "PAID" });
     const wrapper = await open(DetailDrawer);
@@ -182,7 +230,7 @@ describe("prepay safe submission", () => {
     useUserStore().user!.permissions = ["prepay:review"];
     vi.mocked(api.getPrepay).mockResolvedValue({ ...detail, status: "PENDING_APPROVAL" });
     vi.mocked(api.approvePrepay).mockRejectedValue(
-      new ApiError({ status: 409, errorCode: "PREPAY_STATUS_CONFLICT", traceId: "test" })
+      new ApiError({ status: 409, errorCode: "PREPAY_STATE_CONFLICT", traceId: "test" })
     );
     const wrapper = await open(DetailDrawer);
     expect(wrapper.find('[data-test="prepay-pay-submit"]').exists()).toBe(false);

@@ -10,6 +10,20 @@ import {
 } from "../error-codes";
 
 describe("error-code text", () => {
+  it.each([
+    "PREPAY_REQUEST_CONFLICT",
+    "PREPAY_STATE_CONFLICT",
+    "PREPAY_DETAILS_REQUIRED",
+    "PREPAY_PAYMENT_CONFLICT",
+    "PREPAY_FILE_INVALID",
+    "PREPAY_FILE_TOO_LARGE"
+  ])("provides both languages for %s", code => {
+    expect(isKnownErrorCode(code)).toBe(true);
+    expect(messageForErrorCode(code)).not.toBe(genericErrorMessage());
+    useLocaleStore().setLocale("zh-CN");
+    expect(messageForErrorCode(code)).not.toBe(genericErrorMessage());
+    expect(messageForErrorCode(code)).toMatch(/[\u4e00-\u9fa5]/);
+  });
   beforeEach(() => {
     localStorage.clear();
     setActivePinia(createPinia());
