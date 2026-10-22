@@ -154,7 +154,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },
-  { key: "actions", label: t("common.actions"), width: px(168, 208) }
+  { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 
 function asKol(row: object): KolVO {
@@ -221,7 +221,7 @@ function cleanupLabel(row: KolVO): string {
   return t("kol.cleanupRemaining", { days: remaining });
 }
 
-/** Edit and commission stay inline; the rest folds into the "more" dropdown (visual spec §3). */
+/** All five actions stay inline in the 04.01 order (owner decision 2026-10-21, ADR-029). */
 function rowActions(row: KolVO): RowAction[] {
   return [
     {

@@ -125,7 +125,7 @@ async function unmarkCopyTarget(row: ShopVO) {
   }
 }
 
-/** Edit and the copy-target switch stay inline; the status toggle folds into the dropdown. */
+/** Row actions, all inline (ADR-029). */
 function rowActions(row: ShopVO): RowAction[] {
   return [
     {
