@@ -22,12 +22,13 @@ import org.springframework.context.ApplicationEventPublisher;
 class ShopServiceTest {
   private final ShopMapper shops = mock(ShopMapper.class);
   private final ShopIntegrationApi integration = mock(ShopIntegrationApi.class);
+  private final SystemConfigApi configs = mock(SystemConfigApi.class);
   private final ShopService service =
       new ShopService(
           shops,
           mock(CurrentUserContext.class),
           mock(ApplicationEventPublisher.class),
-          mock(SystemConfigApi.class),
+          configs,
           integration);
 
   @ParameterizedTest
@@ -88,5 +89,24 @@ class ShopServiceTest {
     assertThat(service.listOptions())
         .extracting(ShopOptionDTO::shopCode)
         .containsExactly("S001", "S002");
+  }
+
+
+  @Test
+  void shouldReturnCopyChannelDefaultsFromSystemConfig() {
+    when(shops.selectList(any())).thenReturn(List.of());
+    when(configs.getInt("copy-token.default-quota")).thenReturn(1);
+    when(configs.getInt("copy-token.default-valid-minutes")).thenReturn(1440);
+
+    var channel = service.copyChannels().getFirst();
+    assertThat(channel.channel()).isEqualTo("WEIDIAN");
+    assertThat(channel.defaultQuota()).isEqualTo(1);
+    assertThat(channel.defaultValidMinutes()).isEqualTo(1440);
+
+    when(configs.getInt("copy-token.default-quota")).thenReturn(17);
+    when(configs.getInt("copy-token.default-valid-minutes")).thenReturn(240);
+    var updated = service.copyChannels().getFirst();
+    assertThat(updated.defaultQuota()).isEqualTo(17);
+    assertThat(updated.defaultValidMinutes()).isEqualTo(240);
   }
 }

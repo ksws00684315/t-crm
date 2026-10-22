@@ -56,7 +56,7 @@ generate_env() {
     printf 'TCRM_REDIRECT_FALLBACK_URL=https://fallback.local.invalid\n'
     printf 'TCRM_IP_HASH_SALT=%s\n' "$salt"
     printf 'SPRING_FLYWAY_OUT_OF_ORDER=true\n'
-    printf 'SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing\n'
+    printf 'SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing,*:future\n'
   } >"$tmp"
   mv "$tmp" "$ENV_FILE"
   chmod 600 "$ENV_FILE"
@@ -302,7 +302,7 @@ TCRM_LOCAL_INFRA_NETWORK=${NETWORK_OVERRIDE:-tcrm-local}
 TCRM_DB_PORT=${DB_PORT_OVERRIDE:-55432}
 TCRM_REDIS_PORT=${REDIS_PORT_OVERRIDE:-46391}
 SPRING_FLYWAY_OUT_OF_ORDER=true
-SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing
+SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing,*:future
 EOF
   chmod 600 "$ENV_FILE"
 
