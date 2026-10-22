@@ -22,15 +22,18 @@ import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,6 +67,8 @@ public class OrderService {
   private final KolItemApi kolItems;
   private final ProductAccessApi products;
   private final CopyJobLookupApi copyJobs;
+  private final ExternalAuditApi audit;
+  private final AuditSanitizer sanitizer;
 
   public OrderService(
       OrderMapper orders,
@@ -79,7 +84,9 @@ public class OrderService {
       CurrentUserContext current,
       KolItemApi kolItems,
       ProductAccessApi products,
-      CopyJobLookupApi copyJobs) {
+      CopyJobLookupApi copyJobs,
+      ExternalAuditApi audit,
+      AuditSanitizer sanitizer) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
@@ -94,6 +101,8 @@ public class OrderService {
     this.kolItems = kolItems;
     this.products = products;
     this.copyJobs = copyJobs;
+    this.audit = audit;
+    this.sanitizer = sanitizer;
   }
 
   public PageResult<OrderDTO> page(OrderFilterDTO filter, boolean unmatched) {
@@ -590,6 +599,34 @@ public class OrderService {
         .collect(
             Collectors.groupingBy(
                 row -> row.getShopId() + ":" + row.getKind(), Collectors.counting()));
+  }
+
+  /**
+   * Deletes this company's sync failures with create_time strictly before now − olderThanDays.
+   * Returns the number of deleted rows (task 40 cleanup).
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public int deleteSyncFailures(int olderThanDays) {
+    if (olderThanDays < 1 || olderThanDays > 3650) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    Instant cutoff = Instant.now().minus(olderThanDays, ChronoUnit.DAYS);
+    int total = 0;
+    int deleted;
+    do {
+      deleted = syncFailures.deleteOlderThan(cutoff, 10_000);
+      total += deleted;
+    } while (deleted >= 10_000);
+    var user = current.user();
+    audit.recordTenantWriteOperation(
+        user.tenantId(),
+        user.id(),
+        "ORDER",
+        "Clean order sync failures olderThanDays=" + olderThanDays + " deleted=" + total,
+        "DELETE",
+        "/admin-api/order/sync-failures",
+        sanitizer.sanitize(Map.of("olderThanDays", olderThanDays, "deleted", total)));
+    return total;
   }
 
   /** Recent sync and import failures of the company, newest first (task 40 §3.5). */

@@ -13,10 +13,13 @@ import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Orders and manual matching, scoped by company and payment-time BD snapshot. */
@@ -82,6 +86,13 @@ public class OrderController {
   @SaCheckPermission("order:view")
   public R<List<SyncFailureDTO>> syncFailures() {
     return R.ok(orders.listSyncFailures());
+  }
+
+  /** order:manage; delete company sync failures older than the given days (task 40). */
+  @DeleteMapping("/sync-failures")
+  @SaCheckPermission("order:manage")
+  public R<Integer> deleteSyncFailures(@RequestParam @Min(1) @Max(3650) int olderThanDays) {
+    return R.ok(orders.deleteSyncFailures(olderThanDays));
   }
 
   /** order:manage; paginated CONFLICT / UNMATCHED orders and lines. */

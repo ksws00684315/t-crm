@@ -1,6 +1,8 @@
 package com.tcrm.admin.order.service;
 
 import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
@@ -42,6 +44,9 @@ public class OrderImportService {
    * declares up to which moment the downloaded file's data reaches.
    */
   public Long submit(ImportFileDTO file, Instant dataCutoffTime) {
+    if (dataCutoffTime == null || dataCutoffTime.isAfter(Instant.now())) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     AtomicReference<Long> taskId = new AtomicReference<>();
     CountDownLatch ready = new CountDownLatch(1);
     Long id =
