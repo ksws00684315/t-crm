@@ -32,10 +32,13 @@ public enum SystemConfigDefinition {
   COPY_TOKEN_MAX_QUOTA("copy-token.max-quota", "business", "integer", null, "100000", 1, 100000),
   COPY_TOKEN_MAX_VALID_MINUTES(
       "copy-token.max-valid-minutes", "business", "minutes", null, "10080", 5, 10080),
-  SHOP_MAX_PER_COMPANY("shop.max-per-company", "business", "integer", null, "3", 1, 1000),
+  SHOP_MAX_PER_COMPANY("shop.max-per-company", "business", "integer", null, "20", 1, 1000),
   PAYOUT_ACCOUNT_MAX_PER_KOL("payout-account.max-per-kol", "business", "integer", null, "5", 1, 20),
   KOL_INVITE_TTL_HOURS("kol.invite-ttl-hours", "business", "hours", null, "72", 1, 72),
   OPER_LOG_RETENTION_DAYS("oper-log.retention-days", "business", "days", null, "180", 180, 3650),
+  /** 0 = automatic cleanup off (task 40 owner decision 2026-10-22). */
+  ORDER_SYNC_FAILURE_RETENTION_DAYS(
+      "order.sync-failure.retention-days", "business", "days", null, "0", 0, 3650),
   LOGIN_PAIR_LIMIT("login.fail.pair-limit", "security", "integer", null, "5", 3, 1000),
   LOGIN_IP_LIMIT("login.fail.ip-limit", "security", "integer", null, "20", 3, 10000),
   LOGIN_ACCOUNT_LIMIT("login.fail.account-limit", "security", "integer", null, "50", 3, 10000),

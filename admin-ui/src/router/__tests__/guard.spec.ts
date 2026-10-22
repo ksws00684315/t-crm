@@ -235,7 +235,9 @@ describe("installGuard with the real route table", () => {
       ])
     ).toEqual([
       ["orders", "order:view", false],
-      ["refunds", "order:view", false]
+      ["refunds", "order:view", false],
+      // The chain page opens in its own tab from the order list (task 40 §4).
+      ["orders/:id/chain", "order:view", false]
     ]);
     // The payout-account review accepts either of its two codes (task 15b §4.2.1).
     const fund = layout?.children?.find(route => route.path === "fund");

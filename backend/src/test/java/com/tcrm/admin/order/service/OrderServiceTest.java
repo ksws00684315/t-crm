@@ -19,26 +19,38 @@ import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.OrderSyncFailureDO;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.product.api.CopyJobLookupApi;
+import com.tcrm.admin.product.api.CopyJobLookupApi.CopyJobRefDTO;
+import com.tcrm.admin.product.api.KolItemApi;
+import com.tcrm.admin.product.api.KolItemLinkCodeDTO;
 import com.tcrm.admin.product.api.KolItemRefDTO;
+import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.api.OrderMappingApi;
+import com.tcrm.admin.product.api.ProductAccessApi;
+import com.tcrm.admin.product.api.ProductAccessApi.ProductRefDTO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +63,7 @@ class OrderServiceTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderSyncStateMapper syncStates = mock(OrderSyncStateMapper.class);
+  private final OrderSyncFailureMapper syncFailures = mock(OrderSyncFailureMapper.class);
   private final KolApi kols = mock(KolApi.class);
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
   private final BdUserApi bdUsers = mock(BdUserApi.class);
@@ -58,6 +71,17 @@ class OrderServiceTest {
   private final OrderMappingApi mappings = mock(OrderMappingApi.class);
   private final KolOwnershipApi ownership = mock(KolOwnershipApi.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
+  private final KolItemApi kolItems = mock(KolItemApi.class);
+  private final ProductAccessApi products = mock(ProductAccessApi.class);
+  private final CopyJobLookupApi copyJobs = mock(CopyJobLookupApi.class);
+  private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final AuditSanitizer sanitizer = mock(AuditSanitizer.class);
+
+  {
+    org.mockito.Mockito.when(sanitizer.sanitize(org.mockito.ArgumentMatchers.any()))
+        .thenReturn("{}");
+  }
+
   private final AccountDTO account = mock(AccountDTO.class);
   private final OrderService service =
       new OrderService(
@@ -65,17 +89,28 @@ class OrderServiceTest {
           items,
           refunds,
           syncStates,
+          syncFailures,
           kols,
           shops,
           bdUsers,
           authorization,
           new OrderAttribution(mappings, ownership),
-          current);
+          current,
+          kolItems,
+          products,
+          copyJobs,
+          audit,
+          sanitizer);
 
   @BeforeAll
   static void metadata() {
     for (var type :
-        List.of(OrderDO.class, OrderItemDO.class, RefundDO.class, OrderSyncStateDO.class)) {
+        List.of(
+            OrderDO.class,
+            OrderItemDO.class,
+            RefundDO.class,
+            OrderSyncStateDO.class,
+            OrderSyncFailureDO.class)) {
       TableInfoHelper.initTableInfo(
           new MapperBuilderAssistant(new MybatisConfiguration(), ""), type);
     }
@@ -88,8 +123,14 @@ class OrderServiceTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(5L, "Main shop", "wd-5", 1),
-                new ShopAccessDTO(6L, "Backup shop", "wd-6", 0)));
+                new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"),
+                new ShopAccessDTO(6L, "Backup shop", "wd-6", 0, "S006")));
+    when(orders.missingOrderFields()).thenReturn(List.of());
+    when(orders.latestOrderSourcePerShop()).thenReturn(List.of());
+    when(items.missingItemFields()).thenReturn(List.of());
+    when(refunds.missingRefundFields()).thenReturn(List.of());
+    when(refunds.latestRefundSourcePerShop()).thenReturn(List.of());
+    when(syncFailures.selectList(any())).thenReturn(List.of());
   }
 
   private static OrderDO order(long id) {
@@ -115,7 +156,7 @@ class OrderServiceTest {
 
   private static OrderFilterDTO filter(String code) {
     return new OrderFilterDTO(
-        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, 1, 20);
+        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, null, null, 1, 20);
   }
 
   private static void error(Runnable action, ErrorCode expected) {
@@ -171,9 +212,11 @@ class OrderServiceTest {
     var a = new RefundDO();
     a.setOrderId(10L);
     a.setAmount(new BigDecimal("1.25"));
+    a.setRefundStatus("SUCCESS");
     var b = new RefundDO();
     b.setOrderId(10L);
     b.setAmount(new BigDecimal("0.75"));
+    b.setRefundStatus("PROCESSING");
     when(refunds.selectList(any())).thenReturn(List.of(a, b));
     when(kols.listByIds(any()))
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
@@ -183,10 +226,13 @@ class OrderServiceTest {
     var result = service.page(filter("KOL0100"), true);
 
     assertThat(result.total()).isEqualTo(2);
-    assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("2.00");
+    assertThat(result.items().getFirst().refundAmount()).isEqualByComparingTo("1.25");
+    assertThat(result.items().getFirst().refundStatus()).isEqualTo("PROCESSING");
     assertThat(result.items().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(result.items().getFirst().shopCode()).isEqualTo("S005");
     assertThat(result.items().getFirst().bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).refundAmount()).isEqualByComparingTo("0");
+    assertThat(result.items().get(1).refundStatus()).isEqualTo("NONE");
     assertThat(result.items().get(1).bdUserName()).isEqualTo("Test BD");
     assertThat(result.items().get(1).items()).isEmpty();
     assertThat(result.items().getFirst().items().getFirst())
@@ -220,8 +266,10 @@ class OrderServiceTest {
         .contains(7L, 100L, "CONFLICT", "UNMATCHED", PAID.minusSeconds(1), PAID.plusSeconds(1));
     ArgumentCaptor<LambdaQueryWrapper<RefundDO>> refundQuery = ArgumentCaptor.captor();
     verify(refunds).selectList(refundQuery.capture());
-    assertThat(refundQuery.getValue().getSqlSegment()).contains("raw_status");
-    assertThat(refundQuery.getValue().getParamNameValuePairs().values()).contains("10");
+    // All refund rows load once per page; SUCCESS totals and the order-level status derive in
+    // memory (OrderRefundStatuses), so no status predicate appears in SQL.
+    assertThat(refundQuery.getValue().getSqlSegment()).contains("order_id IN");
+    assertThat(refundQuery.getValue().getParamNameValuePairs().values()).contains(10L, 11L);
   }
 
   @Test
@@ -329,7 +377,7 @@ class OrderServiceTest {
   @Test
   void shouldApplyOnlyRequestedFilters_whenOptionalQueryFieldsAreAbsent() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, null, 1, 20), false);
+    service.page(new OrderFilterDTO(null, null, null, null, null, null, null, null, 1, 20), false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -340,11 +388,32 @@ class OrderServiceTest {
   @Test
   void shouldConstrainAttributionStatus_whenRequested() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", 1, 20), false);
+    service.page(
+        new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", null, null, 1, 20), false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("attribution_status");
     assertThat(query.getValue().getParamNameValuePairs().values()).contains("ATTRIBUTED");
+  }
+
+  @Test
+  void shouldMatchExactOrderNoAndIgnoreUnknownChannels_whenFiltering() {
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(
+        new OrderFilterDTO(null, null, null, null, null, null, "12345", "WEIDIAN", 1, 20), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("weidian_order_id");
+    assertThat(query.getValue().getParamNameValuePairs().values()).contains("12345");
+    // An unknown channel selects nothing instead of silently ignoring the filter.
+    assertThat(
+            service
+                .page(
+                    new OrderFilterDTO(null, null, null, null, null, null, null, "TMALL", 1, 20),
+                    false)
+                .items())
+        .isEmpty();
+    verify(orders, times(1)).selectPage(any(), any());
   }
 
   @Test
@@ -376,6 +445,7 @@ class OrderServiceTest {
 
     var first = result.items().getFirst();
     assertThat(first.shopName()).isEqualTo("Main shop");
+    assertThat(first.shopCode()).isEqualTo("S005");
     assertThat(first.kolCode()).isEqualTo("KOL0100");
     assertThat(first.kolName()).isEqualTo("Creator");
     assertThat(first.bdUserName()).isEqualTo("Test BD");
@@ -393,13 +463,283 @@ class OrderServiceTest {
     state.setShopId(5L);
     state.setLastSuccessAt(PAID);
     state.setLastError("order detail failed for order 1000");
+    state.setLastImportKind("ORDER");
+    state.setLastImportCutoffAt(PAID.plusSeconds(1));
+    state.setLastImportTaskId(33L);
     when(syncStates.selectList(any())).thenReturn(List.of(state));
     when(authorization.authorizedShopIds()).thenReturn(List.of(5L));
 
-    assertThat(service.listSyncStates())
-        .containsExactly(
-            new OrderSyncStateDTO(
-                5L, "Main shop", true, true, PAID, "order detail failed for order 1000"),
-            new OrderSyncStateDTO(6L, "Backup shop", false, false, null, null));
+    var result = service.listSyncStates();
+
+    var emptyOrders =
+        new OrderSyncStateDTO.KindSyncDTO(
+            null,
+            null,
+            null,
+            0L,
+            Map.of(
+                "payTime", 0L,
+                "orderTime", 0L,
+                "payAmount", 0L,
+                "totalAmount", 0L,
+                "itemItemId", 0L,
+                "itemPayAmount", 0L));
+    var emptyRefunds =
+        new OrderSyncStateDTO.KindSyncDTO(
+            null, null, null, 0L, Map.of("orderItemId", 0L, "finishTime", 0L));
+    assertThat(result.get(0).shopId()).isEqualTo(5L);
+    assertThat(result.get(0).enabled()).isTrue();
+    assertThat(result.get(0).authorized()).isTrue();
+    assertThat(result.get(0).lastSuccessAt()).isEqualTo(PAID);
+    assertThat(result.get(0).lastError()).isEqualTo("order detail failed for order 1000");
+    assertThat(result.get(0).lastImport())
+        .isEqualTo(new OrderSyncStateDTO.ImportCutoffDTO("ORDER", PAID.plusSeconds(1), 33L));
+    assertThat(result.get(0).orders().lastSuccessAt()).isEqualTo(PAID);
+    assertThat(result.get(1).shopId()).isEqualTo(6L);
+    assertThat(result.get(1).enabled()).isFalse();
+    assertThat(result.get(1).authorized()).isFalse();
+    assertThat(result.get(1).orders()).isEqualTo(emptyOrders);
+    assertThat(result.get(1).refunds()).isEqualTo(emptyRefunds);
+    assertThat(result.get(1).lastImport()).isNull();
+  }
+
+  @Test
+  void shouldReturnOrderDetailWithLinesAndImages_whenOrderExists() {
+    var o = order(10);
+    o.setKolId(100L);
+    o.setSource(1);
+    o.setOrderStatus("PAID");
+    o.setFreight(new BigDecimal("1.00"));
+    o.setLastSyncTime(PAID);
+    o.setOrderTime(PAID.minusSeconds(60));
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setProductId(200L);
+    i.setKolId(100L);
+    i.setQuantity(2);
+    i.setPayAmount(new BigDecimal("12.50"));
+    i.setItemName("Product");
+    i.setSkuName("Size");
+    i.setRefundAmount(BigDecimal.ZERO);
+    when(items.selectList(any())).thenReturn(List.of(i));
+    when(refunds.selectList(any())).thenReturn(List.of());
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(products.listProducts(any()))
+        .thenReturn(List.of(new ProductRefDTO(200L, "P200", "Original", "https://img/a.png", 1)));
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.orderNo()).isEqualTo("remote10");
+    assertThat(detail.channel()).isEqualTo("WEIDIAN");
+    assertThat(detail.shopCode()).isEqualTo("S005");
+    assertThat(detail.merchantNo()).isEqualTo("wd-5");
+    assertThat(detail.source()).isEqualTo("API");
+    assertThat(detail.refundStatus()).isEqualTo("NONE");
+    assertThat(detail.itemAmount()).isEqualByComparingTo("12.50");
+    assertThat(detail.items()).hasSize(1);
+    assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
+    assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("6.25");
+    assertThat(detail.items().getFirst().status()).isEqualTo("PAID");
+  }
+
+  @Test
+  void shouldRejectDetail_whenOwnScopeMissesSnapshot() {
+    when(account.ownScope()).thenReturn(true);
+    var o = order(10);
+    o.setBdUserId(8L);
+    when(orders.selectById(10L)).thenReturn(o);
+    error(() -> service.detail(10L), ErrorCode.AUTH_FORBIDDEN);
+  }
+
+  @Test
+  void shouldBuildChainWithCopyJobLinkAndRefunds_whenLineHasMapping() {
+    var o = order(10);
+    o.setKolId(100L);
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setKolItemId(300L);
+    i.setKolId(100L);
+    i.setQuantity(1);
+    i.setPayAmount(new BigDecimal("12.50"));
+    i.setSubOrderId("sub-1");
+    when(items.selectList(any())).thenReturn(List.of(i));
+    var refund = new RefundDO();
+    refund.setId(9L);
+    refund.setOrderId(10L);
+    refund.setOrderItemId(20L);
+    refund.setWeidianRefundNo("R9");
+    refund.setRefundType("REFUND_ONLY");
+    refund.setRefundStatus("SUCCESS");
+    refund.setAmount(new BigDecimal("2.00"));
+    refund.setFinishTime(PAID.plusSeconds(10));
+    when(refunds.selectList(any())).thenReturn(List.of(refund));
+    when(kolItems.listMappingsByIds(any()))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L, 100L, 200L, "P200", "Original", 5L, "90", PAID.minusSeconds(100), null)));
+    when(kolItems.listLinkCodesByIds(any()))
+        .thenReturn(List.of(new KolItemLinkCodeDTO(300L, "KPL-AAAAAAAAAAAA")));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(copyJobs.findByTargetItemId("90"))
+        .thenReturn(new CopyJobRefDTO("JOB-1", PAID.minusSeconds(200), "completed"));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.orderId()).isEqualTo(10L);
+    assertThat(chain.lines()).hasSize(1);
+    var line = chain.lines().getFirst();
+    assertThat(line.copyJob().jobCode()).isEqualTo("JOB-1");
+    assertThat(line.link().kolItemId()).isEqualTo(300L);
+    assertThat(line.link().targetItemId()).isEqualTo("90");
+    assertThat(line.link().linkCode()).isEqualTo("KPL-AAAAAAAAAAAA");
+    assertThat(line.refunds()).hasSize(1);
+    assertThat(line.refunds().getFirst().refundNo()).isEqualTo("R9");
+    assertThat(line.ledger()).isNull();
+    assertThat(line.withdrawals()).isNull();
+  }
+
+  @Test
+  void shouldExplainEvidenceReasons_forMappingCoverageAndConflict() {
+    var o = order(10);
+    o.setAttributionStatus("UNMATCHED");
+    when(orders.selectById(10L)).thenReturn(o);
+    var i = item();
+    i.setWeidianItemId("90");
+    i.setItemName("Exclusive");
+    i.setAttributionType(0);
+    when(items.selectOne(any())).thenReturn(i);
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
+    // Mapping ended before pay time → MAPPING_EXPIRED.
+    when(kolItems.listMappingsByShopItem(5L, "90"))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L,
+                    100L,
+                    200L,
+                    "P200",
+                    "Original",
+                    5L,
+                    "90",
+                    PAID.minusSeconds(200),
+                    PAID.minusSeconds(1))));
+    when(kolItems.listLinkCodesByIds(any()))
+        .thenReturn(List.of(new KolItemLinkCodeDTO(300L, "KPL-BBBBBBBBBBBB")));
+    when(kols.listByIds(any()))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
+    when(products.getProduct(200L))
+        .thenReturn(new ProductRefDTO(200L, "P200", "Original", null, 1));
+
+    var expired = service.evidence(20L);
+    assertThat(expired.unmatchedReason()).isEqualTo("MAPPING_EXPIRED");
+    assertThat(expired.mappings().getFirst().coversPayTime()).isFalse();
+    assertThat(expired.mappings().getFirst().linkCode()).isEqualTo("KPL-BBBBBBBBBBBB");
+    assertThat(expired.product().productCode()).isEqualTo("P200");
+
+    when(kolItems.listMappingsByShopItem(5L, "90")).thenReturn(List.of());
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("NO_MAPPING");
+
+    o.setAttributionStatus("CONFLICT");
+    when(kolItems.listMappingsByShopItem(5L, "90"))
+        .thenReturn(
+            List.of(
+                new KolMappingEvidenceDTO(
+                    300L, 100L, 200L, "P200", "Original", 5L, "90", PAID.minusSeconds(200), null)));
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("CONFLICT");
+
+    o.setAttributionStatus("PENDING");
+    o.setPayTime(null);
+    assertThat(service.evidence(20L).unmatchedReason()).isEqualTo("PENDING");
+  }
+
+  @Test
+  void shouldReturnNotFound_whenEvidenceLineIsMissing() {
+    when(items.selectOne(any())).thenReturn(null);
+    error(() -> service.evidence(404L), ErrorCode.COMMON_NOT_FOUND);
+  }
+
+  @Test
+  void shouldAggregateMissingFieldsFailuresAndSources_whenListingSyncStates() {
+    var state = new OrderSyncStateDO();
+    state.setShopId(5L);
+    state.setLastSuccessAt(PAID);
+    state.setLastError("detail failed");
+    state.setLastImportKind("ORDER");
+    state.setLastImportCutoffAt(PAID);
+    state.setLastImportTaskId(33L);
+    when(syncStates.selectList(any())).thenReturn(List.of(state));
+    when(authorization.authorizedShopIds()).thenReturn(List.of(5L));
+
+    var orderQuality = new OrderMapper.ShopQualityRow();
+    orderQuality.setShopId(5L);
+    orderQuality.setMissingPayTime(2L);
+    orderQuality.setMissingOrderTime(1L);
+    orderQuality.setMissingPayAmount(0L);
+    orderQuality.setMissingTotalAmount(null);
+    when(orders.missingOrderFields()).thenReturn(List.of(orderQuality));
+
+    var itemQuality = new OrderItemMapper.ItemQualityRow();
+    itemQuality.setShopId(5L);
+    itemQuality.setMissingItemId(3L);
+    itemQuality.setMissingPayAmount(4L);
+    when(items.missingItemFields()).thenReturn(List.of(itemQuality));
+
+    var refundQuality = new RefundMapper.RefundQualityRow();
+    refundQuality.setShopId(5L);
+    refundQuality.setMissingOrderItemId(5L);
+    refundQuality.setMissingFinishTime(6L);
+    when(refunds.missingRefundFields()).thenReturn(List.of(refundQuality));
+
+    var orderSource = new OrderMapper.ShopSourceRow();
+    orderSource.setShopId(5L);
+    orderSource.setLatestSource(1);
+    when(orders.latestOrderSourcePerShop()).thenReturn(List.of(orderSource));
+    var refundSource = new RefundMapper.RefundSourceRow();
+    refundSource.setShopId(5L);
+    refundSource.setLatestSource(2);
+    when(refunds.latestRefundSourcePerShop()).thenReturn(List.of(refundSource));
+
+    var failure = new OrderSyncFailureDO();
+    failure.setShopId(5L);
+    failure.setKind("ORDER_SYNC");
+    failure.setCreateTime(PAID);
+    when(syncFailures.selectList(any())).thenReturn(List.of(failure, failure));
+
+    var result = service.listSyncStates();
+    assertThat(result.getFirst().orders().source()).isEqualTo("API");
+    assertThat(result.getFirst().orders().failures24h()).isEqualTo(2L);
+    assertThat(result.getFirst().orders().missingFields().get("payTime")).isEqualTo(2L);
+    assertThat(result.getFirst().orders().missingFields().get("itemItemId")).isEqualTo(3L);
+    assertThat(result.getFirst().refunds().source()).isEqualTo("IMPORT");
+    assertThat(result.getFirst().refunds().missingFields().get("finishTime")).isEqualTo(6L);
+  }
+
+  @Test
+  void shouldListRecentSyncFailures_withShopNames() {
+    var failure = new OrderSyncFailureDO();
+    failure.setId(1L);
+    failure.setShopId(5L);
+    failure.setKind("ORDER_IMPORT");
+    failure.setError("row failed");
+    failure.setTaskId(77L);
+    failure.setCreateTime(PAID);
+    var orphan = new OrderSyncFailureDO();
+    orphan.setId(2L);
+    orphan.setShopId(null);
+    orphan.setKind("REFUND_IMPORT");
+    orphan.setError("partial");
+    orphan.setTaskId(78L);
+    orphan.setCreateTime(PAID);
+    when(syncFailures.selectList(any())).thenReturn(List.of(failure, orphan));
+
+    var rows = service.listSyncFailures();
+    assertThat(rows).hasSize(2);
+    assertThat(rows.getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(rows.getFirst().taskId()).isEqualTo(77L);
+    assertThat(rows.get(1).shopName()).isNull();
   }
 }

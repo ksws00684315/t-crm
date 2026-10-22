@@ -13,6 +13,7 @@
 ## 新增依赖说明
 
 <!-- 每项说明用途、为何不使用已有能力、固定稳定版本、许可证、最近发布时间，以及兼容依据。没有新增时注明无。 -->
+<!-- 若本 PR 由 Dependabot 发起或改动了 package.json / pnpm-lock.yaml / pom.xml：合并前须本地执行 ./scripts/refresh-notices.sh，并把各工程 THIRD-PARTY-NOTICES 的变更一并提交（规范 07 §4）。 -->
 
 ## 数据库变更说明
 
@@ -34,6 +35,7 @@
 
 - [ ] 功能符合需求原文（规范 12 第 1 节）、设计说明书与任务要求，未超出范围；执行报告含逐条复核表
 - [ ] 符合工程规范；自动检查全部通过
+- [ ] 若改动了依赖锁文件 / pom，已运行 `./scripts/refresh-notices.sh` 并提交各工程 `THIRD-PARTY-NOTICES`
 - [ ] 必测清单中相关项已有测试，覆盖率达标
 - [ ] 数据库变更有迁移脚本，接口变更有 OpenAPI 描述，前端错误码映射已更新
 - [ ] 设计说明书、README、`.env.example` 等受影响文档已同步

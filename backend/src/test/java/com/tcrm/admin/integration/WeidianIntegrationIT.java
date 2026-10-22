@@ -72,6 +72,7 @@ class WeidianIntegrationIT {
   private static final AtomicReference<String> REFRESH_RESPONSE =
       new AtomicReference<>(serviceToken("1001", "service-access-two", "service-refresh-two"));
   private static final Map<String, AtomicInteger> OAUTH_CALLS = new ConcurrentHashMap<>();
+  private static final Map<String, String> API_RESPONSES = new ConcurrentHashMap<>();
   private static final AtomicReference<CountDownLatch> REFRESH_ENTERED = new AtomicReference<>();
   private static final AtomicReference<CountDownLatch> REFRESH_RELEASE = new AtomicReference<>();
   private static final HttpServer WEIDIAN = startServer();
@@ -143,6 +144,7 @@ class WeidianIntegrationIT {
       redis.delete(stateKeys);
     }
     OAUTH_CALLS.clear();
+    API_RESPONSES.clear();
     REFRESH_ENTERED.set(null);
     REFRESH_RELEASE.set(null);
     TOKEN_RESPONSE.set(serviceToken("1001", "service-access-one", "service-refresh-one"));
@@ -455,13 +457,83 @@ class WeidianIntegrationIT {
     assertThat(authRow(shopId).get("status")).isEqualTo("EXPIRED");
   }
 
+  @Test
+  void shouldRefreshCapacityAndPreserveTheLastSuccessfulSnapshotOnApiFailure() throws Exception {
+    long shopId = createShop(adminToken, "1001", "t37_capacity");
+    saveServiceApp(adminToken);
+    callback(startAuthorization(adminToken, shopId), "code");
+    API_RESPONSES.put(
+        "vdian.item.list.get",
+        "{\"status\":{\"status_code\":0},\"result\":{\"total_num\":37,\"items\":[]}}");
+
+    mvc.perform(
+            post("/admin-api/product/shops/{id}/capacity-refreshes", shopId)
+                .header(TOKEN_HEADER, adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.currentItems").value(37))
+        .andExpect(jsonPath("$.data.itemsRefreshedAt").isNotEmpty());
+    Map<String, Object> snapshot =
+        jdbc.queryForMap(
+            "SELECT current_items,items_refreshed_at FROM crm_shop WHERE id=?", shopId);
+    API_RESPONSES.put("vdian.item.list.get", "{\"status\":{\"status_code\":10001}}");
+
+    mvc.perform(
+            post("/admin-api/product/shops/{id}/capacity-refreshes", shopId)
+                .header(TOKEN_HEADER, adminToken))
+        .andExpect(status().is5xxServerError());
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT current_items,items_refreshed_at FROM crm_shop WHERE id=?", shopId))
+        .isEqualTo(snapshot);
+  }
+
+  @Test
+  void shouldPersistEachApiCheckIndependentlyWhenAnyOneApiFails() throws Exception {
+    long shopId = createShop(adminToken, "1001", "t37_api_checks");
+    saveServiceApp(adminToken);
+    callback(startAuthorization(adminToken, shopId), "code");
+    List<String> methods =
+        List.of("vdian.item.list.get", "vdian.order.list.get", "open.SellerQueryRefundList");
+    List<String> names = List.of("product", "order", "refund");
+    for (int failed = 0; failed < methods.size(); failed++) {
+      API_RESPONSES.clear();
+      API_RESPONSES.put(methods.get(failed), "{\"status\":{\"status_code\":10001}}");
+      MvcResult checked =
+          mvc.perform(
+                  post("/admin-api/product/shops/{id}/api-checks", shopId)
+                      .header(TOKEN_HEADER, adminToken))
+              .andExpect(status().isOk())
+              .andReturn();
+      var apiStatus =
+          json.readTree(checked.getResponse().getContentAsString()).at("/data/apiStatus");
+      for (int api = 0; api < names.size(); api++) {
+        var check = apiStatus.path(names.get(api));
+        assertThat(check.path("ok").asBoolean()).isEqualTo(api != failed);
+        assertThat(check.path("checkedAt").asText()).isNotBlank();
+        if (api == failed) {
+          assertThat(check.path("error").asText()).isEqualTo("WEIDIAN_API_FAILED");
+        } else {
+          assertThat(check.path("error").isNull()).isTrue();
+        }
+        String column = names.get(api) + "_api_ok";
+        assertThat(
+                jdbc.queryForObject(
+                    "SELECT " + column + " FROM crm_shop WHERE id=?", Boolean.class, shopId))
+            .isEqualTo(api != failed);
+      }
+    }
+  }
+
   private MvcResult createShopResult(String token, String weidianId, String name) throws Exception {
     return mvc.perform(
             post("/admin-api/product/shops")
                 .header(TOKEN_HEADER, token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    json.writeValueAsString(Map.of("shopName", name, "weidianShopId", weidianId))))
+                    json.writeValueAsString(
+                        Map.of(
+                            "shopName", name, "channel", "WEIDIAN", "weidianShopId", weidianId))))
         .andExpect(status().isOk())
         .andReturn();
   }
@@ -555,7 +627,13 @@ class WeidianIntegrationIT {
     String path = exchange.getRequestURI().getPath();
     String body;
     if ("/api".equals(path)) {
-      body = "{\"status\":{\"status_code\":0},\"result\":{\"items\":[{\"seller_id\":\"1001\"}]}}";
+      String form = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+      String method =
+          new ObjectMapper().readTree(query("?" + form).get("public")).path("method").asText();
+      body =
+          API_RESPONSES.getOrDefault(
+              method,
+              "{\"status\":{\"status_code\":0},\"result\":{\"items\":[{\"seller_id\":\"1001\"}]}}");
     } else if ("/oauth2/refresh_token".equals(path)) {
       OAUTH_CALLS.computeIfAbsent(path, ignored -> new AtomicInteger()).incrementAndGet();
       CountDownLatch entered = REFRESH_ENTERED.get();
