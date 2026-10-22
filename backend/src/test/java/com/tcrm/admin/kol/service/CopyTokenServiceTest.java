@@ -14,6 +14,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.kol.api.CopyTargetShopApi;
+import com.tcrm.admin.kol.api.CopyTargetShopApi.CopyChannelDTO;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
@@ -75,6 +76,8 @@ class CopyTokenServiceTest {
   @BeforeEach
   void setUp() {
     when(current.user()).thenReturn(admin());
+    when(shops.copyChannels())
+        .thenReturn(List.of(new CopyChannelDTO("WEIDIAN", 100000, List.of())));
     companyScope = TenantScope.openCompany(1L);
   }
 
@@ -149,14 +152,14 @@ class CopyTokenServiceTest {
     when(kols.listByIds(List.of(10L))).thenReturn(List.of(kol(10L, true, 99L)));
     org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.SHOP_NOT_FOUND))
         .when(shops)
-        .requireEnabled(5L);
+        .validateCopyTarget(5L, "WEIDIAN", 10);
     assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(10L, 10, 60, 5L)))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.SHOP_NOT_FOUND.message());
 
     org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.SHOP_DISABLED))
         .when(shops)
-        .requireEnabled(5L);
+        .validateCopyTarget(5L, "WEIDIAN", 10);
     assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(10L, 10, 60, 5L)))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.SHOP_DISABLED.message());
@@ -171,6 +174,7 @@ class CopyTokenServiceTest {
     KolRefDTO kol = kol(10L, true, 99L);
     when(kols.listByIds(List.of(10L))).thenReturn(List.of(kol));
     when(shops.namesByIds(List.of(5L))).thenReturn(Map.of(5L, "Shop A"));
+    when(shops.codesByIds(List.of(5L))).thenReturn(Map.of(5L, "SHOP-100005"));
     when(tokens.insert(any(KolCopyTokenDO.class)))
         .thenAnswer(
             inv -> {
@@ -184,7 +188,8 @@ class CopyTokenServiceTest {
 
     assertThat(created.row().targetShopId()).isEqualTo(5L);
     assertThat(created.row().targetShopName()).isEqualTo("Shop A");
-    verify(shops).requireEnabled(5L);
+    assertThat(created.row().targetShopCode()).isEqualTo("SHOP-100005");
+    verify(shops).validateCopyTarget(5L, "WEIDIAN", 1);
   }
 
   @Test

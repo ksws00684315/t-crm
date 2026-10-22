@@ -12,6 +12,7 @@ public record CopyTokenRowDTO(
     String kolName,
     String targetChannel,
     Long targetShopId,
+    String targetShopCode,
     String targetShopName,
     int used,
     int quota,

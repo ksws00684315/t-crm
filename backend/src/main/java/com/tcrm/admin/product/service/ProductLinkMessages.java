@@ -12,7 +12,9 @@ final class ProductLinkMessages {
   static final String TOKEN_EXPIRED = "复制令牌已过期";
   static final String TOKEN_QUOTA = "复制令牌额度已用尽";
   static final String KOL_DISABLED = "达人账号已停用";
-  static final String TARGET_MISSING = "未配置默认复制店铺，且令牌未指定目标店铺";
+  static final String TARGET_MISSING = "没有可用的目标店铺";
+  static final String COPY_CAPACITY_EXCEEDED = "复制数量超过可用店铺容量";
+  static final String COPY_CAPACITY_INSUFFICIENT = "自动复制池没有足够容量的可用店铺";
   static final String TARGET_DISABLED = "目标店铺已停用";
   static final String TARGET_UNAUTHORIZED = "目标店铺未完成微店授权";
   static final String JOB_NOT_FOUND = "任务编号不存在";
@@ -42,6 +44,8 @@ final class ProductLinkMessages {
       case COPY_TOKEN_QUOTA_EXCEEDED -> TOKEN_QUOTA;
       case KOL_DISABLED -> KOL_DISABLED;
       case COPY_TARGET_SHOP_MISSING -> TARGET_MISSING;
+      case SHOP_COPY_CAPACITY_EXCEEDED -> COPY_CAPACITY_EXCEEDED;
+      case COPY_SHOP_CAPACITY_INSUFFICIENT -> COPY_CAPACITY_INSUFFICIENT;
       case SHOP_DISABLED -> TARGET_DISABLED;
       case WEIDIAN_SHOP_NOT_AUTHORIZED -> TARGET_UNAUTHORIZED;
       case COMMON_NOT_FOUND -> JOB_NOT_FOUND;
