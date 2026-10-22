@@ -173,6 +173,7 @@ describe("order chain page (task 40)", () => {
     expect(text).toContain("8001");
     expect(text).toContain("9001");
     expect(text).toContain("Zoe（KOL-ZS01）");
+    expect(text).toContain("t40 Shop（S001）");
     wrapper.unmount();
   });
 

@@ -133,6 +133,8 @@ describe("refund query page (task 40)", () => {
     expect(tags[1].textContent).toBe("退款成功");
     expect(wrapper.text()).toContain("退货退款");
     expect(wrapper.text()).toContain("仅退款");
+    expect(wrapper.text()).toContain("t40 Shop（S001）");
+    expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
     wrapper.unmount();
   });
 
