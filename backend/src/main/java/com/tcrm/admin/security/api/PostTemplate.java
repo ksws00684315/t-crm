@@ -12,6 +12,9 @@ public enum PostTemplate {
   OPERATOR(
       DataScope.ALL,
       Permission.KOL_VIEW,
+      // Creator editing also carries promotion configuration (commission rate) and link cleanup,
+      // which the permission table grants to this post; the code does not split them yet.
+      Permission.KOL_EDIT,
       Permission.PRODUCT_VIEW,
       Permission.PRODUCT_EDIT,
       Permission.PRODUCT_STATUS,
@@ -32,6 +35,22 @@ public enum PostTemplate {
       Permission.PAYOUT_ACCOUNT_REVIEW,
       Permission.WITHDRAWAL_REVIEW,
       Permission.PREPAY_APPLY,
+      Permission.DASHBOARD_TEAM,
+      Permission.DASHBOARD_KOL,
+      Permission.DATA_EXPORT),
+  /**
+   * Finance reads creators, products, orders and income; it reviews payout accounts and withdrawals
+   * and exports both business and finance data, without any product or order action.
+   */
+  FINANCE(
+      DataScope.ALL,
+      Permission.KOL_VIEW,
+      Permission.PRODUCT_VIEW,
+      Permission.ORDER_VIEW,
+      Permission.COMMISSION_VIEW,
+      Permission.PAYOUT_ACCOUNT_REVIEW,
+      Permission.WITHDRAWAL_REVIEW,
+      Permission.DASHBOARD_SHOP,
       Permission.DASHBOARD_TEAM,
       Permission.DASHBOARD_KOL,
       Permission.DATA_EXPORT);

@@ -11,7 +11,7 @@ vi.mock("@/api/system/post-template");
 vi.mock("@/api/system/user");
 
 /**
- * 权限设置 (task 32 §2.3, contract 33 §3.4): the two post-template cards, the "only future
+ * 权限设置 (task 32 §2.3, contract 33 §3.4): the post-template cards, the "only future
  * accounts" hint, save and reset.
  */
 const catalog: userApi.PermissionCatalogVO = {
@@ -22,7 +22,12 @@ const catalog: userApi.PermissionCatalogVO = {
   ],
   templates: [
     { code: "BD", permissions: ["kol:view", "kol:edit"], dataScope: "OWN" },
-    { code: "OPERATOR", permissions: ["product:view"], dataScope: "ALL" }
+    { code: "OPERATOR", permissions: ["product:view"], dataScope: "ALL" },
+    {
+      code: "FINANCE",
+      permissions: ["kol:view", "product:view", "order:view"],
+      dataScope: "ALL"
+    }
   ]
 };
 
@@ -34,7 +39,13 @@ function templates(overrides: Partial<postTemplateApi.PostTemplateVO> = {}) {
       permissions: ["kol:view", "kol:edit"],
       isDefault: true
     },
-    { postTemplate: "OPERATOR", dataScope: "ALL", permissions: ["product:view"], isDefault: false }
+    { postTemplate: "OPERATOR", dataScope: "ALL", permissions: ["product:view"], isDefault: false },
+    {
+      postTemplate: "FINANCE",
+      dataScope: "ALL",
+      permissions: ["kol:view", "product:view", "order:view"],
+      isDefault: true
+    }
   ].map(item => ({ ...item, ...overrides })) as postTemplateApi.PostTemplateVO[];
 }
 
@@ -63,6 +74,7 @@ describe("post template page (task 32 §2.3)", () => {
     expect(text).toContain("只影响之后新建的账号，不会修改已有账号的权限");
     expect(text).toContain("商务岗位模板");
     expect(text).toContain("运营岗位模板");
+    expect(text).toContain("财务岗位模板");
     expect(text).toContain("默认");
     expect(text).toContain("已自定义");
     wrapper.unmount();

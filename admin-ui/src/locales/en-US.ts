@@ -58,6 +58,7 @@ const enUS: MessageSchema = {
   post: {
     OPERATOR: "Operator",
     BD: "BD",
+    FINANCE: "Finance",
     none: "—"
   },
   permissionGroup: {
