@@ -11,7 +11,9 @@ import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import org.springframework.context.MessageSource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -55,7 +57,10 @@ public class OrderImportController {
 
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @AuditLog(module = "ORDER", action = "Import orders")
-  public ResponseEntity<R<OrderImportVO>> submit(@RequestParam("file") MultipartFile file) {
+  public ResponseEntity<R<OrderImportVO>> submit(
+      @RequestParam("file") MultipartFile file,
+      @RequestParam("dataCutoffTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant dataCutoffTime) {
     byte[] content;
     try {
       content = file.getBytes();
@@ -64,7 +69,8 @@ public class OrderImportController {
     }
     Long taskId =
         imports.submit(
-            new ImportFileDTO(file.getOriginalFilename(), file.getContentType(), content));
+            new ImportFileDTO(file.getOriginalFilename(), file.getContentType(), content),
+            dataCutoffTime);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(R.ok(new OrderImportVO(taskId)));
   }
 }

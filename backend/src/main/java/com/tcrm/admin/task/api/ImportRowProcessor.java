@@ -18,4 +18,14 @@ public interface ImportRowProcessor {
    *     row and gets the generic system-error reason.
    */
   List<ImportReason> process(List<String> cells);
+
+  /**
+   * Called once after the last row with the final outcome, still inside the task's company scope
+   * and on the worker thread (task 40: modules record import failures for monitoring). Runs after
+   * the task row is finished, so a listener may query the final status. Never thrown to; a listener
+   * exception is logged and swallowed.
+   *
+   * @param outcome final counts and status of the task
+   */
+  default void onFinish(ImportTaskOutcome outcome) {}
 }

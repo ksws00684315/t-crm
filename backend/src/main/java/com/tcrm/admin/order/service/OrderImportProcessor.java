@@ -18,16 +18,20 @@ import static com.tcrm.admin.order.service.OrderImportColumn.SUB_ORDER_NO;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.OrderStatus;
+import com.tcrm.admin.order.model.OrderSyncFailureKind;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
+import com.tcrm.admin.task.api.ImportTaskOutcome;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Imports one order line per Excel row (task 18 §4.2). Same order across rows is written as one
@@ -66,6 +70,9 @@ class OrderImportProcessor implements ImportRowProcessor {
   private final long taskId;
   private final ShopAccessApi shops;
   private final OrderWriter writer;
+  private final OrderImportStateWriter importStates;
+  private final OrderSyncFailureWriter syncFailures;
+  private final Instant dataCutoffAt;
 
   /**
    * Per-file occurrence count of the same shop+order+item+SKU. Incremented as soon as those ids
@@ -73,10 +80,22 @@ class OrderImportProcessor implements ImportRowProcessor {
    */
   private final Map<String, Integer> lineIndexes = new HashMap<>();
 
-  OrderImportProcessor(long taskId, ShopAccessApi shops, OrderWriter writer) {
+  /** Shops whose import state was already written by this file; each shop is written once. */
+  private final Set<Long> importShops = new HashSet<>();
+
+  OrderImportProcessor(
+      long taskId,
+      ShopAccessApi shops,
+      OrderWriter writer,
+      OrderImportStateWriter importStates,
+      OrderSyncFailureWriter syncFailures,
+      Instant dataCutoffAt) {
     this.taskId = taskId;
     this.shops = shops;
     this.writer = writer;
+    this.importStates = importStates;
+    this.syncFailures = syncFailures;
+    this.dataCutoffAt = dataCutoffAt;
   }
 
   @Override
@@ -92,6 +111,8 @@ class OrderImportProcessor implements ImportRowProcessor {
       shop = shops.findEnabledByWeidianShopId(shopWeidian);
       if (shop == null) {
         errors.add(ImportReason.of(SHOP_MISSING));
+      } else {
+        recordImport(shop);
       }
     }
     String orderNo = ORDER_NO.of(row);
@@ -247,5 +268,29 @@ class OrderImportProcessor implements ImportRowProcessor {
     item.setAttributionType(0);
     writer.save(new OrderPayloadDTO(order, List.of(item)));
     return List.of();
+  }
+
+  /** One row per shop is enough: every row of the file declares the same cutoff time. */
+  private void recordImport(ShopAccessDTO shop) {
+    if (importShops.add(shop.id())) {
+      importStates.record(shop.id(), "ORDER", taskId, dataCutoffAt);
+    }
+  }
+
+  @Override
+  public void onFinish(ImportTaskOutcome outcome) {
+    if (outcome.status() != ImportTaskOutcome.Status.SUCCESS) {
+      syncFailures.record(
+          null,
+          OrderSyncFailureKind.ORDER_IMPORT,
+          "Order import finished "
+              + outcome.status()
+              + ": "
+              + outcome.failed()
+              + " of "
+              + outcome.total()
+              + " rows failed",
+          taskId);
+    }
   }
 }

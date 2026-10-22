@@ -24,7 +24,7 @@ class WeidianConnectivityCheckerTest {
                 .readTree(
                     "{\"status\":{\"status_code\":0},\"result\":{\"items\":[{\"seller_id\":\"shop-4\"}]}}"));
 
-    var result = checker.check(new ShopAccessDTO(4L, "shop", "shop-4", 1), "app", "token");
+    var result = checker.check(new ShopAccessDTO(4L, "shop", "shop-4", 1, null), "app", "token");
 
     assertThat(result.sellerId()).isEqualTo("shop-4");
     assertThat(result.sellerMatches()).isTrue();
@@ -40,7 +40,7 @@ class WeidianConnectivityCheckerTest {
                 .readTree(
                     "{\"status\":{\"status_code\":0},\"result\":{\"items\":[{\"seller_id\":\"different\"}]}}"));
 
-    var result = checker.check(new ShopAccessDTO(4L, "shop", "shop-4", 1), "app", "token");
+    var result = checker.check(new ShopAccessDTO(4L, "shop", "shop-4", 1, null), "app", "token");
 
     assertThat(result.sellerMatches()).isFalse();
   }

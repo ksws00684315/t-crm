@@ -77,8 +77,8 @@ class PromoSheetMappingServiceTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(11L, "Main Shop", "111", 1),
-                new ShopAccessDTO(12L, "Closed Shop", "222", 0)));
+                new ShopAccessDTO(11L, "Main Shop", "111", 1, null),
+                new ShopAccessDTO(12L, "Closed Shop", "222", 0, null)));
     // No current owners or products unless a test says otherwise.
     when(items.listCurrentOwners(anyLong(), anyCollection())).thenReturn(List.of());
     when(products.listByShopItems(anyLong(), anyCollection())).thenReturn(List.of());

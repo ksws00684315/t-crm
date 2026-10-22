@@ -148,6 +148,14 @@ public class OrderWriter {
     row.setFinishTime(detail.finishedAt());
     var basic = detail.raw() == null ? null : detail.raw().get("refundBasicInfo");
     row.setRawStatus(OrderNormalizer.required(OrderNormalizer.text(basic, "status"), 32));
+    // Task 40: normalized dictionaries come from the single mapping place (RefundDictionary).
+    row.setRefundStatus(RefundDictionary.statusOf(row.getRawStatus()).name());
+    row.setRefundType(
+        RefundDictionary.typeOf(
+                OrderNormalizer.first(
+                    OrderNormalizer.text(basic, "refund_type"),
+                    OrderNormalizer.text(basic, "refundType")))
+            .name());
     var all = listItems(order.getId());
     Long itemId = null;
     var remoteItems = basic == null ? null : basic.get("itemList");
@@ -214,17 +222,21 @@ public class OrderWriter {
     row.setOrderId(locked.getId());
     row.setOrderItemId(itemId);
     row.setRawStatus("10");
+    // Imported refunds are completed ones by template; their type is not in the template.
+    row.setRefundStatus(RefundDictionary.statusOf("10").name());
+    row.setRefundType(RefundDictionary.typeOf(null).name());
     refunds.insert(row);
     refreshCompletedRefundTotals(locked, listItems(locked.getId()));
     return true;
   }
 
   private void refreshCompletedRefundTotals(OrderDO order, List<OrderItemDO> all) {
+    // Only SUCCESS refunds count (task 40 §3.1); same rows as the previous raw_status = '10'.
     var completed =
         refunds.selectList(
             new LambdaQueryWrapper<RefundDO>()
                 .eq(RefundDO::getOrderId, order.getId())
-                .eq(RefundDO::getRawStatus, "10"));
+                .eq(RefundDO::getRefundStatus, "SUCCESS"));
     for (var item : all) {
       item.setRefundAmount(
           completed.stream()

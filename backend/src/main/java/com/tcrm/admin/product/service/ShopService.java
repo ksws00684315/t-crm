@@ -230,7 +230,11 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
     return shop == null
         ? null
         : new ShopAccessDTO(
-            shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus());
+            shop.getId(),
+            shop.getShopName(),
+            shop.getWeidianShopId(),
+            shop.getStatus(),
+            shop.getShopCode());
   }
 
   @Override
@@ -239,7 +243,11 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
     return shop == null
         ? null
         : new ShopAccessDTO(
-            shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus());
+            shop.getId(),
+            shop.getShopName(),
+            shop.getWeidianShopId(),
+            shop.getStatus(),
+            shop.getShopCode());
   }
 
   @Override
@@ -248,7 +256,11 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
         .map(
             shop ->
                 new ShopAccessDTO(
-                    shop.getId(), shop.getShopName(), shop.getWeidianShopId(), shop.getStatus()))
+                    shop.getId(),
+                    shop.getShopName(),
+                    shop.getWeidianShopId(),
+                    shop.getStatus(),
+                    shop.getShopCode()))
         .toList();
   }
 

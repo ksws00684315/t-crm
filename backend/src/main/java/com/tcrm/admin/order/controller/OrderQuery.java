@@ -11,7 +11,10 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
 
-/** Payment interval is inclusive from, exclusive to; IDs never select another company. */
+/**
+ * Payment interval is inclusive from, exclusive to; IDs never select another company. Task 40 adds
+ * the exact Weidian order number and the sales channel (row 09.04).
+ */
 public record OrderQuery(
     @Positive Long shopId,
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant payFrom,
@@ -19,11 +22,15 @@ public record OrderQuery(
     @Size(max = 16) String kolCode,
     @Pattern(regexp = "UNPAID|PAID|SHIPPED|RECEIVED|COMPLETED|CLOSED|UNKNOWN") String orderStatus,
     @Pattern(regexp = "PENDING|ATTRIBUTED|NON_KOL|CONFLICT|UNMATCHED") String attributionStatus,
+    @Size(max = 32) String orderNo,
+    @Size(max = 16) String channel,
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size) {
   public OrderQuery {
     page = page == null ? 1 : page;
     size = size == null ? 20 : size;
+    orderNo = normalize(orderNo);
+    channel = normalize(channel);
   }
 
   @AssertTrue
@@ -33,6 +40,23 @@ public record OrderQuery(
 
   OrderFilterDTO filter() {
     return new OrderFilterDTO(
-        shopId, payFrom, payTo, kolCode, orderStatus, attributionStatus, page, size);
+        shopId,
+        payFrom,
+        payTo,
+        kolCode,
+        orderStatus,
+        attributionStatus,
+        orderNo,
+        channel,
+        page,
+        size);
+  }
+
+  private static String normalize(String value) {
+    if (value == null) {
+      return null;
+    }
+    var stripped = value.strip();
+    return stripped.isEmpty() ? null : stripped;
   }
 }
