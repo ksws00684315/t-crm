@@ -315,6 +315,13 @@ onMounted(() => {
       </template>
       <template #cell-createTime="{ row }">{{ formatInstant(asJob(row).createTime) }}</template>
       <template #cell-finishTime="{ row }">{{ formatInstant(asJob(row).finishTime) }}</template>
+      <template #cell-targetShopName="{ row }">
+        <span data-test="target-shop-name">{{
+          asJob(row).targetShopName || asJob(row).targetShopCode
+            ? formatNameWithCode(asJob(row).targetShopName, asJob(row).targetShopCode)
+            : t("copyJob.none")
+        }}</span>
+      </template>
       <template #actions="{ row }">
         <RowActions :actions="rowActions(asJob(row))" />
       </template>
