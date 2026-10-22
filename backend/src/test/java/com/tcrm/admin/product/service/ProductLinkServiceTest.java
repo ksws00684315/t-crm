@@ -115,7 +115,7 @@ class ProductLinkServiceTest {
             e -> {
               BusinessException be = (BusinessException) e;
               assertThat(be.getErrorCode()).isEqualTo(ErrorCode.COPY_TARGET_SHOP_MISSING);
-              assertThat(be.getMessage()).contains("默认复制店铺");
+              assertThat(be.getMessage()).contains("没有可用的目标店铺");
             });
     verify(jobs, never()).insert(any(CopyJobDO.class));
     verify(worker, never()).submit(anyLong());

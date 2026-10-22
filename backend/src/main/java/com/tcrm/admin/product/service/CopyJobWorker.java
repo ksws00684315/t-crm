@@ -51,6 +51,7 @@ public class CopyJobWorker implements ApplicationRunner {
   private final CopyJobMapper jobs;
   private final CopyJobItemMapper items;
   private final ShopMapper shops;
+  private final ShopService shopService;
   private final ProductMapper products;
   private final KolItemMapper kolItems;
   private final ProductCodeGenerator codes;
@@ -66,6 +67,7 @@ public class CopyJobWorker implements ApplicationRunner {
       CopyJobMapper jobs,
       CopyJobItemMapper items,
       ShopMapper shops,
+      ShopService shopService,
       ProductMapper products,
       KolItemMapper kolItems,
       ProductCodeGenerator codes,
@@ -79,6 +81,7 @@ public class CopyJobWorker implements ApplicationRunner {
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
+    this.shopService = shopService;
     this.products = products;
     this.kolItems = kolItems;
     this.codes = codes;
@@ -115,6 +118,7 @@ public class CopyJobWorker implements ApplicationRunner {
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
+    this.shopService = null;
     this.products = products;
     this.kolItems = kolItems;
     this.codes = codes;
@@ -187,6 +191,9 @@ public class CopyJobWorker implements ApplicationRunner {
       markFailed(fresh.getId(), ProductLinkMessages.UNSUPPORTED_CHANNEL, null);
       return;
     }
+    if (shopService != null) {
+      shopService.requireCopyEligible(job.getTargetShopId(), ProductLinkService.CHANNEL_WEIDIAN);
+    }
 
     // ADR-019 rule 2: exclusive (copied) item IDs must not be treated as source for another copy.
     KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
@@ -243,6 +250,9 @@ public class CopyJobWorker implements ApplicationRunner {
       neu.setUpdateTime(now);
       neu.setTenantId(job.getTenantId());
       kolItems.insert(neu);
+      if (shops.incrementCurrentItems(job.getTargetShopId(), now) != 1) {
+        throw new IllegalStateException("Target shop capacity was exhausted during copy");
+      }
       TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
       markSuccess(fresh.getId(), newItemId, copied.detailWarning(), product.getShopId());
     } catch (RuntimeException e) {

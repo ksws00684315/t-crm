@@ -1,6 +1,7 @@
 package com.tcrm.admin.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.tcrm.admin.kol.api.CopyTargetShopApi;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
@@ -47,6 +48,7 @@ public class ProductLinkService {
   static final int MAX_RESOLVE_ITEMS = 50;
 
   private final CopyTokenApi tokens;
+  private final CopyTargetShopApi targetShops;
   private final CopyJobMapper jobs;
   private final CopyJobItemMapper items;
   private final ShopMapper shops;
@@ -64,6 +66,7 @@ public class ProductLinkService {
   @Autowired
   public ProductLinkService(
       CopyTokenApi tokens,
+      CopyTargetShopApi targetShops,
       CopyJobMapper jobs,
       CopyJobItemMapper items,
       ShopMapper shops,
@@ -77,6 +80,7 @@ public class ProductLinkService {
       CopyJobFailureRecorder failures,
       SystemConfigApi configs) {
     this.tokens = tokens;
+    this.targetShops = targetShops;
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
@@ -94,6 +98,7 @@ public class ProductLinkService {
 
   ProductLinkService(
       CopyTokenApi tokens,
+      CopyTargetShopApi targetShops,
       CopyJobMapper jobs,
       CopyJobItemMapper items,
       ShopMapper shops,
@@ -108,6 +113,7 @@ public class ProductLinkService {
       String linkBaseUrl,
       SecureRandom random) {
     this.tokens = tokens;
+    this.targetShops = targetShops;
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
@@ -132,6 +138,35 @@ public class ProductLinkService {
           }
         };
     this.random = random;
+  }
+
+  ProductLinkService(
+      CopyTokenApi tokens,
+      CopyJobMapper jobs,
+      CopyJobItemMapper items,
+      ShopMapper shops,
+      KolItemMapper kolItems,
+      ProductLinkRateLimiter rates,
+      CopyJobWorker worker,
+      CopyJobProgress progress,
+      WeidianItemCopyApi copies,
+      JdbcTemplate jdbc,
+      String linkBaseUrl,
+      SecureRandom random) {
+    this(
+        tokens,
+        null,
+        jobs,
+        items,
+        shops,
+        kolItems,
+        rates,
+        worker,
+        progress,
+        copies,
+        jdbc,
+        linkBaseUrl,
+        random);
   }
 
   public List<LinkTemplateView> templates(String channelCode) {
@@ -195,9 +230,6 @@ public class ProductLinkService {
     return TenantScope.callCompany(
         grant.tenantId(),
         () -> {
-          long targetShopId = resolveTargetShop(grant, command);
-          Instant now = Instant.now();
-          String jobCode = newJobCode();
           // Deduplicate by sourceProductId within the job (first wins).
           Map<String, ConvertItem> unique = new LinkedHashMap<>();
           for (ConvertItem item : command.items()) {
@@ -213,6 +245,9 @@ public class ProductLinkService {
           if (unique.isEmpty()) {
             throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
           }
+          long targetShopId = resolveTargetShop(grant, unique.size());
+          Instant now = Instant.now();
+          String jobCode = newJobCode();
           CopyJobDO job = new CopyJobDO();
           job.setTenantId(grant.tenantId());
           job.setKolId(grant.kolId());
@@ -399,30 +434,43 @@ public class ProductLinkService {
     }
   }
 
-  private long resolveTargetShop(CopyTokenGrantDTO grant, ConvertCommand command) {
+  private long resolveTargetShop(CopyTokenGrantDTO grant, int quantity) {
     Long shopId = grant.targetShopId();
-    if (shopId == null) {
-      ShopDO defaults =
-          shops.selectOne(
-              new LambdaQueryWrapper<ShopDO>()
-                  .eq(ShopDO::getCopyTarget, true)
-                  .eq(ShopDO::getStatus, 1)
-                  .last("LIMIT 1"));
-      if (defaults == null) {
+    if (targetShops == null) {
+      if (shopId == null) {
         throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
       }
-      shopId = defaults.getId();
+      ShopDO legacy = shops.selectById(shopId);
+      if (legacy == null) {
+        throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
+      }
+      if (!Integer.valueOf(1).equals(legacy.getStatus())) {
+        throw ProductLinkMessages.chinese(ErrorCode.SHOP_DISABLED);
+      }
+      if (!copies.isShopAuthorized(shopId)) {
+        throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
+      }
+      return shopId;
     }
-    try {
-      assertShopReady(shopId);
-    } catch (BusinessException ex) {
-      failures.record(failedJob(grant, command, shopId, ex));
-      throw ex;
+    if (shopId == null) {
+      try {
+        shopId =
+            TenantScope.callCompany(
+                grant.tenantId(),
+                () -> targetShops.allocateCopyTarget(grant.targetChannel(), quantity));
+      } catch (BusinessException e) {
+        throw ProductLinkMessages.wrap(e);
+      }
+    } else {
+      Long selectedShopId = shopId;
+      try {
+        TenantScope.runCompany(
+            grant.tenantId(),
+            () -> targetShops.validateCopyTarget(selectedShopId, grant.targetChannel(), quantity));
+      } catch (BusinessException e) {
+        throw ProductLinkMessages.wrap(e);
+      }
     }
-    return shopId;
-  }
-
-  private void assertShopReady(long shopId) {
     ShopDO shop = shops.selectById(shopId);
     if (shop == null) {
       throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
@@ -433,7 +481,9 @@ public class ProductLinkService {
     if (!copies.isShopAuthorized(shopId)) {
       throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
     }
+    return shopId;
   }
+
 
   /** One live original product for this item id. Several shops, or none, stay empty. */
   private Long uniqueSourceShop(String weidianItemId) {
@@ -455,47 +505,11 @@ public class ProductLinkService {
     return shopIds.iterator().next();
   }
 
-  private CopyJobDO failedJob(
-      CopyTokenGrantDTO grant, ConvertCommand command, long shopId, BusinessException error) {
-    Instant now = Instant.now();
-    CopyJobDO job = new CopyJobDO();
-    job.setTenantId(grant.tenantId());
-    job.setKolId(grant.kolId());
-    job.setTokenId(grant.tokenId());
-    job.setJobCode(newJobCode());
-    job.setCallerPlatform(
-        blank(command.callerPlatform()) ? "unknown" : command.callerPlatform().strip());
-    job.setTargetShopId(shopId);
-    job.setTargetChannel(channelOf(grant.targetChannel()));
-    job.setStatus(CopyJobDO.STATUS_FAILED);
-    job.setTotalCount(0);
-    job.setSuccessCount(0);
-    job.setFailCount(0);
-    job.setErrorMessage(taskError(grant, error));
-    job.setCreateTime(now);
-    job.setUpdateTime(now);
-    job.setFinishTime(now);
-    return job;
-  }
 
   private static String channelOf(String channel) {
     return blank(channel) ? CHANNEL_WEIDIAN : channel.strip().toUpperCase(Locale.ROOT);
   }
 
-  private static String taskError(CopyTokenGrantDTO grant, BusinessException error) {
-    // The script still receives the original exception. A named shop that is not in the
-    // database shares that exception with "no default shop", which would misstate this row.
-    if (error.getErrorCode() == ErrorCode.COPY_TARGET_SHOP_MISSING
-        && grant.targetShopId() != null) {
-      return ProductLinkMessages.TARGET_NOT_FOUND;
-    }
-    String message = error.getMessage();
-    if (blank(message)) {
-      message = ProductLinkMessages.zh(error.getErrorCode());
-    }
-    String trimmed = message.strip();
-    return trimmed.length() > 500 ? trimmed.substring(0, 500) : trimmed;
-  }
 
   private CopyJobDO requireJob(String jobCode) {
     if (blank(jobCode)) {

@@ -98,7 +98,7 @@ class OrderControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shopId\":\"5\"}"))
         .andExpect(status().isAccepted());
-    verify(sync).trigger(5L);
+    verify(sync).trigger(5L, null);
   }
 
   @Test
@@ -136,6 +136,18 @@ class OrderControllerTest {
                 .content(body))
         .andExpect(status().isBadRequest());
     verifyNoInteractions(orders);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ORDER", "REFUND"})
+  void shouldForwardTheRequestedSyncType(String type) throws Exception {
+    mvc.perform(
+            post("/admin-api/order/syncs")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shopId\":5,\"type\":\"" + type + "\"}"))
+        .andExpect(status().isAccepted());
+    verify(sync).trigger(5L, type);
   }
 
   @Test

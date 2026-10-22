@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
   listCopyJobItems,
@@ -11,7 +12,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import RowActions from "@/components/RowActions.vue";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { readPageSize } from "@/utils/table-prefs";
 
@@ -21,6 +22,7 @@ const CHANNELS = ["WEIDIAN"] as const;
 const JOB_STATUSES = ["processing", "completed", "partial_failed", "failed"] as const;
 
 const { t } = useI18n();
+const route = useRoute();
 const loading = ref(false);
 const rows = ref<CopyJobVO[]>([]);
 const total = ref(0);
@@ -208,7 +210,13 @@ function rowActions(row: CopyJobVO) {
   ];
 }
 
-onMounted(() => void load());
+onMounted(() => {
+  const fromRoute = route.query.jobCode;
+  if (typeof fromRoute === "string" && fromRoute.trim()) {
+    query.jobCode = fromRoute.trim();
+  }
+  void load();
+});
 </script>
 
 <template>

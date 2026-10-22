@@ -1,6 +1,7 @@
 package com.tcrm.admin.product.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -13,10 +14,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.product.service.ShopDTO;
+import com.tcrm.admin.product.service.ShopOptionDTO;
 import com.tcrm.admin.product.service.ShopService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.shared.PageResult;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,21 +47,44 @@ class ShopControllerTest {
   @ParameterizedTest
   @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
   void shouldList_whenAnyRoleReads(Role role, DataScope scope) throws Exception {
-    when(shops.list())
+    when(shops.page(any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(
-            List.of(
-                new ShopDTO(
-                    1L,
-                    "店",
-                    "100",
-                    1,
-                    false,
-                    null,
-                    Instant.parse("2026-01-01T00:00:00Z"),
-                    Instant.parse("2026-01-01T00:00:00Z"))));
+            new PageResult<>(
+                List.of(
+                    new ShopDTO(
+                        1L,
+                        "店",
+                        "100",
+                        1,
+                        false,
+                        null,
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        Instant.parse("2026-01-01T00:00:00Z"))),
+                1,
+                1,
+                20));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[0].weidianShopId").value("100"));
+        .andExpect(jsonPath("$.data.items[0].weidianShopId").value("100"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"SUPER_ADMIN, ALL", "STAFF, ALL", "STAFF, OWN"})
+  void shouldListOptions_whenAnyRoleReads(Role role, DataScope scope) throws Exception {
+    when(shops.listOptions())
+        .thenReturn(
+            List.of(
+                new ShopOptionDTO(2L, "S002", "乙店", "WEIDIAN", 1),
+                new ShopOptionDTO(1L, "S001", "甲店", "WEIDIAN", 0)));
+    mvc.perform(get(BASE + "/options").header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].shopCode").value("S002"))
+        .andExpect(jsonPath("$.data[0].shopName").value("乙店"))
+        .andExpect(jsonPath("$.data[0].channel").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data[0].status").value(1))
+        .andExpect(jsonPath("$.data[1].id").value(1));
+    verify(shops).listOptions();
   }
 
   @Test
@@ -78,7 +104,8 @@ class ShopControllerTest {
             post(BASE)
                 .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"shopName\":\"店\",\"weidianShopId\":\"100\"}"))
+                .content(
+                    "{\"shopName\":\"店\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"100\",\"maxItems\":20000}"))
         .andExpect(status().isOk());
     verify(shops).create(any());
   }
@@ -91,13 +118,14 @@ class ShopControllerTest {
             post(BASE)
                 .header(AdminMvcSupport.TOKEN_HEADER, token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"shopName\":\"店\",\"weidianShopId\":\"100\"}"))
+                .content(
+                    "{\"shopName\":\"店\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"100\",\"maxItems\":20000}"))
         .andExpect(status().isForbidden());
     mvc.perform(
             put(BASE + "/1")
                 .header(AdminMvcSupport.TOKEN_HEADER, token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"shopName\":\"店\"}"))
+                .content("{\"shopName\":\"店\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"100\"}"))
         .andExpect(status().isForbidden());
     mvc.perform(
             put(BASE + "/1/status")

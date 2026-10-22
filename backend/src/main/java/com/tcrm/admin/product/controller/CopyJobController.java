@@ -6,7 +6,6 @@ import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Product-task list and line detail (task 38). Retries are a later task. */
-@Validated
 @RestController
 @RequestMapping("/admin-api/product/copy-jobs")
 public class CopyJobController {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,11 +12,14 @@ import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.kol.api.CopyTokenApi;
 import com.tcrm.admin.kol.api.CopyTokenGrantDTO;
+import com.tcrm.admin.product.service.ShopService;
+import com.tcrm.admin.shared.TenantScope;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,6 +37,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -84,6 +90,8 @@ class CopyTokenIT {
   private final ObjectMapper json;
   private final StringRedisTemplate redis;
   private final CopyTokenApi copyTokens;
+  private final ShopService shopService;
+  private final TransactionTemplate transactions;
 
   private String admin;
 
@@ -93,19 +101,27 @@ class CopyTokenIT {
       JdbcTemplate jdbc,
       ObjectMapper json,
       StringRedisTemplate redis,
-      CopyTokenApi copyTokens) {
+      CopyTokenApi copyTokens,
+      ShopService shopService,
+      PlatformTransactionManager transactionManager) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.redis = redis;
     this.copyTokens = copyTokens;
+    this.shopService = shopService;
+    this.transactions = new TransactionTemplate(transactionManager);
   }
 
   @BeforeEach
   void prepareIndependentData() throws Exception {
+    jdbc.update("DELETE FROM crm_copy_job_item");
+    jdbc.update("DELETE FROM crm_copy_job");
     jdbc.update("DELETE FROM crm_kol_copy_token");
     jdbc.update("DELETE FROM crm_kol_bd_history");
     jdbc.update("DELETE FROM crm_kol");
+    jdbc.update("DELETE FROM crm_weidian_shop_auth");
+    jdbc.update("DELETE FROM crm_shop");
     for (String table :
         List.of("sys_user_permission", "sys_user_tenant", "sys_user", "sys_oper_log")) {
       jdbc.update(
@@ -117,6 +133,10 @@ class CopyTokenIT {
       connection.serverCommands().flushAll();
     }
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,channel,shop_name,weidian_shop_id,status,is_source,copy_pool_status,max_items,current_items,create_time,update_time) "
+            + "VALUES(900001,1,'SHOP-900001','WEIDIAN','t37_Copy Shop','390001',1,FALSE,'JOINED',20000,0,now(),now())");
+    authorizeShop(900001L);
   }
 
   @Test
@@ -128,7 +148,10 @@ class CopyTokenIT {
                 post("/admin-api/kol/copy-tokens")
                     .header(ADMIN_TOKEN, admin)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"kolId\":\"" + kolId + "\",\"quota\":5,\"validMinutes\":60}"))
+                    .content(
+                        "{\"kolId\":\""
+                            + kolId
+                            + "\",\"quota\":5,\"validMinutes\":60,\"targetChannel\":\"WEIDIAN\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data.token").isString())
@@ -206,7 +229,7 @@ class CopyTokenIT {
             post("/admin-api/kol/copy-tokens")
                 .header(ADMIN_TOKEN, admin)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"kolId\":\"" + other + "\"}"))
+                .content("{\"kolId\":\"" + other + "\",\"targetChannel\":\"WEIDIAN\"}"))
         .andExpect(status().isOk());
 
     MvcResult mineCreated =
@@ -214,7 +237,7 @@ class CopyTokenIT {
                 post("/admin-api/kol/copy-tokens")
                     .header(ADMIN_TOKEN, bdToken)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"kolId\":\"" + mine + "\"}"))
+                    .content("{\"kolId\":\"" + mine + "\",\"targetChannel\":\"WEIDIAN\"}"))
             .andExpect(status().isOk())
             .andReturn();
     long mineTokenId =
@@ -248,7 +271,10 @@ class CopyTokenIT {
                 post("/admin-api/kol/copy-tokens")
                     .header(ADMIN_TOKEN, admin)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"kolId\":\"" + kolId + "\",\"quota\":1,\"validMinutes\":60}"))
+                    .content(
+                        "{\"kolId\":\""
+                            + kolId
+                            + "\",\"quota\":1,\"validMinutes\":60,\"targetChannel\":\"WEIDIAN\"}"))
             .andExpect(status().isOk())
             .andReturn();
     long id =
@@ -287,13 +313,15 @@ class CopyTokenIT {
                                 .header(ADMIN_TOKEN, admin)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                    "{\"shopName\":\"Copy Shop\",\"weidianShopId\":\"28001\"}"))
+                                    "{\"shopName\":\"Copy Shop\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"28001\",\"maxItems\":20000}"))
                         .andExpect(status().isOk())
                         .andReturn()
                         .getResponse()
                         .getContentAsString())
                 .at("/data/id")
                 .asText());
+    jdbc.update("UPDATE crm_shop SET copy_pool_status = 'JOINED' WHERE id = ?", shopId);
+    authorizeShop(shopId);
 
     mvc.perform(
             post("/admin-api/kol/copy-tokens")
@@ -304,7 +332,7 @@ class CopyTokenIT {
                         + kolId
                         + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\""
                         + shopId
-                        + "\"}"))
+                        + "\",\"targetChannel\":\"WEIDIAN\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.targetShopId").value(String.valueOf(shopId)));
 
@@ -318,7 +346,7 @@ class CopyTokenIT {
                         + kolId
                         + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\""
                         + shopId
-                        + "\"}"))
+                        + "\",\"targetChannel\":\"WEIDIAN\"}"))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errorCode").value("SHOP_DISABLED"));
 
@@ -329,9 +357,144 @@ class CopyTokenIT {
                 .content(
                     "{\"kolId\":\""
                         + kolId
-                        + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\"999999\"}"))
+                        + "\",\"quota\":1,\"validMinutes\":60,\"targetShopId\":\"999999\",\"targetChannel\":\"WEIDIAN\"}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.errorCode").value("SHOP_NOT_FOUND"));
+  }
+
+  @Test
+  void shouldRejectTokenQuotaAboveExplicitShopOrChannelCapacity() throws Exception {
+    long kolId = createKol("t37_capacity_kol", "t37_capacity@example.com", null);
+    jdbc.update("UPDATE crm_shop SET max_items=5,current_items=2 WHERE id=900001");
+    for (String target : List.of("", ",\"targetShopId\":\"900001\"")) {
+      mvc.perform(
+              post("/admin-api/kol/copy-tokens")
+                  .header(ADMIN_TOKEN, admin)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"kolId\":\""
+                          + kolId
+                          + "\",\"targetChannel\":\"WEIDIAN\",\"quota\":4"
+                          + target
+                          + "}"))
+          .andExpect(status().isUnprocessableEntity())
+          .andExpect(jsonPath("$.errorCode").value("SHOP_COPY_CAPACITY_EXCEEDED"));
+    }
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_kol_copy_token", Integer.class))
+        .isZero();
+  }
+
+  @Test
+  void shouldExcludeSourceShopAndRequireExplicitlyRejoiningThePoolAfterUnmarking()
+      throws Exception {
+    mvc.perform(put("/admin-api/product/shops/900001/source").header(ADMIN_TOKEN, admin))
+        .andExpect(status().isOk());
+    mvc.perform(get("/admin-api/product/shops").header(ADMIN_TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].isSource").value(true))
+        .andExpect(jsonPath("$.data.items[0].copyPoolStatus").value("NOT_APPLICABLE"))
+        .andExpect(jsonPath("$.data.items[0].copyIneligibleReason").value("SOURCE_SHOP"));
+    mvc.perform(put("/admin-api/product/shops/900001/copy-pool").header(ADMIN_TOKEN, admin))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errorCode").value("SHOP_SOURCE_CANNOT_JOIN_POOL"));
+    assertThat(
+            TenantScope.callCompany(1L, shopService::copyChannels).getFirst().remainingCapacity())
+        .isZero();
+    mvc.perform(delete("/admin-api/product/shops/900001/source").header(ADMIN_TOKEN, admin))
+        .andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT copy_pool_status FROM crm_shop WHERE id=900001", String.class))
+        .isEqualTo("EXITED");
+    mvc.perform(put("/admin-api/product/shops/900001/copy-pool").header(ADMIN_TOKEN, admin))
+        .andExpect(status().isOk());
+    assertThat(
+            TenantScope.callCompany(1L, shopService::copyChannels).getFirst().remainingCapacity())
+        .isEqualTo(20000);
+  }
+
+  @Test
+  void shouldChooseLargestRemainingShopAndNeverSplitAnOversizedJob() {
+    jdbc.update("UPDATE crm_shop SET max_items=10,current_items=8 WHERE id=900001");
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,channel,shop_name,weidian_shop_id,status,is_source,copy_pool_status,max_items,current_items,create_time,update_time) "
+            + "VALUES(900002,1,'SHOP-900002','WEIDIAN','t37_larger','390002',1,FALSE,'JOINED',10,1,now(),now())");
+    authorizeShop(900002L);
+
+    assertThat(
+            TenantScope.callCompany(1L, shopService::copyChannels).getFirst().remainingCapacity())
+        .isEqualTo(11);
+    assertThat(TenantScope.callCompany(1L, () -> shopService.allocateCopyTarget("WEIDIAN", 8)))
+        .isEqualTo(900002L);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> TenantScope.callCompany(1L, () -> shopService.allocateCopyTarget("WEIDIAN", 10)))
+        .isInstanceOf(com.tcrm.admin.shared.BusinessException.class)
+        .satisfies(
+            error ->
+                assertThat(((com.tcrm.admin.shared.BusinessException) error).getErrorCode())
+                    .isEqualTo(com.tcrm.admin.shared.ErrorCode.COPY_SHOP_CAPACITY_INSUFFICIENT));
+  }
+
+  @Test
+  void shouldNotReserveSameRemainingCapacityForConcurrentJobs() throws Exception {
+    var channels = TenantScope.callCompany(1L, shopService::copyChannels);
+    assertThat(channels).hasSize(1);
+    assertThat(channels.getFirst().shops()).hasSize(1);
+    jdbc.update("UPDATE crm_shop SET max_items = 1, current_items = 0 WHERE id = 900001");
+    var limitedChannels = TenantScope.callCompany(1L, shopService::copyChannels);
+    assertThat(limitedChannels.getFirst().remainingCapacity()).isEqualTo(1);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<Boolean>> results =
+          List.of(
+              executor.submit(() -> reserveOne(ready, start, 990001L)),
+              executor.submit(() -> reserveOne(ready, start, 990002L)));
+      ready.await();
+      start.countDown();
+      boolean firstAllocated = results.get(0).get();
+      boolean secondAllocated = results.get(1).get();
+      assertThat(firstAllocated ^ secondAllocated)
+          .withFailMessage(
+              "Expected exactly one allocation to succeed; first=%s, second=%s",
+              firstAllocated, secondAllocated)
+          .isTrue();
+      assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_copy_job_item", Integer.class))
+          .isEqualTo(1);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private boolean reserveOne(CountDownLatch ready, CountDownLatch start, long id) throws Exception {
+    ready.countDown();
+    start.await();
+    try {
+      TenantScope.runCompany(
+          1L,
+          () ->
+              transactions.execute(
+                  status -> {
+                    long shopId = shopService.allocateCopyTarget("WEIDIAN", 1);
+                    jdbc.update(
+                        "INSERT INTO crm_copy_job(id,tenant_id,kol_id,token_id,job_code,caller_platform,target_shop_id,status,total_count,success_count,fail_count,create_time,update_time) VALUES(?,1,1,1,?,'test',?,'processing',1,0,0,now(),now())",
+                        id,
+                        "t37_capacity_" + id,
+                        shopId);
+                    jdbc.update(
+                        "INSERT INTO crm_copy_job_item(id,job_id,tenant_id,source_channel,source_product_id,status,update_time) VALUES(?,?,1,'WEIDIAN',?,'pending',now())",
+                        id + 100,
+                        id,
+                        Long.toString(id));
+                    return true;
+                  }));
+      return true;
+    } catch (com.tcrm.admin.shared.BusinessException error) {
+      assertThat(error.getErrorCode())
+          .isEqualTo(com.tcrm.admin.shared.ErrorCode.COPY_SHOP_CAPACITY_INSUFFICIENT);
+      return false;
+    }
   }
 
   private long staff(String username, String scope, String... permissions) throws Exception {
@@ -383,5 +546,13 @@ class CopyTokenIT {
             .getResponse()
             .getContentAsString();
     return Long.parseLong(json.readTree(body).at("/data/id").asText());
+  }
+
+  private void authorizeShop(long shopId) {
+    jdbc.update(
+        "INSERT INTO crm_weidian_shop_auth(id,tenant_id,shop_id,auth_mode,status,access_expires_at,create_time,update_time) "
+            + "VALUES(?,1,?,'SERVICE','AUTHORIZED','2099-01-01T00:00:00Z',now(),now())",
+        shopId,
+        shopId);
   }
 }

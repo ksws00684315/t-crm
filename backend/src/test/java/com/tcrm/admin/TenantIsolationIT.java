@@ -188,6 +188,9 @@ class TenantIsolationIT {
         .andExpect(jsonPath("$.data.total").value("0"));
     mvc.perform(get("/admin-api/product/shops").header(TOKEN, tokenA))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items.length()").value(0));
+    mvc.perform(get("/admin-api/product/shops/options").header(TOKEN, tokenA))
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.length()").value(0));
     mvc.perform(
             get("/admin-api/product/kol-items")
@@ -219,7 +222,18 @@ class TenantIsolationIT {
     expectNotFound(putJson("/admin-api/product/products/" + productIdB, productEdit()));
     expectNotFound(
         putJson("/admin-api/product/products/" + productIdB + "/status", Map.of("status", 0)));
-    expectNotFound(putJson("/admin-api/product/shops/" + shopB, Map.of("shopName", "Nope")));
+    expectNotFound(
+        putJson(
+            "/admin-api/product/shops/" + shopB,
+            Map.of(
+                "shopName",
+                "Nope",
+                "channel",
+                "WEIDIAN",
+                "weidianShopId",
+                "61002",
+                "maxItems",
+                20000)));
     expectNotFound(putJson("/admin-api/product/shops/" + shopB + "/status", Map.of("status", 0)));
     expectNotFound(putJson("/admin-api/system/users/" + userB, userEdit()));
     expectNotFound(putJson("/admin-api/system/users/" + userB + "/status", Map.of("status", 0)));
@@ -279,6 +293,9 @@ class TenantIsolationIT {
 
     createShop(tokenA, "Two", "62003");
     createShop(tokenA, "Three", "62004");
+    for (int number = 4; number <= 20; number++) {
+      createShop(tokenA, "Shop" + number, "62" + (100 + number));
+    }
     mvc.perform(
             post("/admin-api/product/shops")
                 .header(TOKEN, tokenA)
@@ -588,7 +605,8 @@ class TenantIsolationIT {
   }
 
   private String shopBody(String name, String weidianId) throws Exception {
-    return json.writeValueAsString(Map.of("shopName", name, "weidianShopId", weidianId));
+    return json.writeValueAsString(
+        Map.of("shopName", name, "channel", "WEIDIAN", "weidianShopId", weidianId));
   }
 
   private String userBody(String username) throws Exception {

@@ -47,6 +47,10 @@ public class OrderSyncCoordinator {
   }
 
   public void trigger(Long shopId) {
+    trigger(shopId, null);
+  }
+
+  public void trigger(Long shopId, String type) {
     var shop = shops.findShop(shopId);
     if (shop == null) {
       throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
@@ -72,7 +76,7 @@ public class OrderSyncCoordinator {
                     -1,
                     () -> {
                       acquired.complete(true);
-                      TenantScope.runCompany(tenantId, () -> sync.synchronize(shopId));
+                      TenantScope.runCompany(tenantId, () -> sync.synchronize(shopId, type));
                     });
             if (!ran) {
               acquired.complete(false);

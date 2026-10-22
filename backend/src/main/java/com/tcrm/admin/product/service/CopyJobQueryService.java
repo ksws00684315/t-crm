@@ -231,7 +231,7 @@ public class CopyJobQueryService {
         row.getKolId(),
         kol == null ? null : kol.kolCode(),
         kol == null ? null : kol.name(),
-        null,
+        shop == null ? null : shop.getShopCode(),
         shop == null ? null : shop.getShopName());
   }
 

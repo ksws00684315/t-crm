@@ -164,7 +164,7 @@ class CopyJobQueryServiceTest {
   }
 
   @Test
-  void shouldLeaveShopCodeEmpty_andKeepTaskError() {
+  void shouldReturnShopCode_andKeepTaskError() {
     when(current.user()).thenReturn(admin());
     CopyJobDO job = job(3L, 20L);
     job.setJobCode("abc");
@@ -184,13 +184,14 @@ class CopyJobQueryServiceTest {
         .thenReturn(List.of(new KolRefDTO(20L, "K1", "Ada", true, 7L)));
     ShopDO shop = new ShopDO();
     shop.setId(5L);
+    shop.setShopCode("SHOP-000005");
     shop.setShopName("Main");
     when(shops.selectList(any())).thenReturn(List.of(shop));
 
     var result = service.page(new CopyJobQueryDTO(null, "WEIDIAN", "failed", 1, 20));
 
     assertThat(result.items()).hasSize(1);
-    assertThat(result.items().getFirst().targetShopCode()).isNull();
+    assertThat(result.items().getFirst().targetShopCode()).isEqualTo("SHOP-000005");
     assertThat(result.items().getFirst().targetShopName()).isEqualTo("Main");
     assertThat(result.items().getFirst().errorMessage()).isEqualTo("目标店铺未完成微店授权");
     assertThat(result.items().getFirst().kolCode()).isEqualTo("K1");

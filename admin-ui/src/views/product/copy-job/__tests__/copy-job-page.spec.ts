@@ -10,6 +10,11 @@ import { notifyError } from "@/utils/notify";
 import CopyJobPage from "../index.vue";
 
 vi.mock("@/api/product/copy-job");
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: routeQuery })
+}));
+const routeQuery: Record<string, string | undefined> = {};
+
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 vi.mock("@/utils/copy", () => ({
   copyText: vi.fn(async () => true),
@@ -78,6 +83,7 @@ describe("Copy job page", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     localStorage.clear();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     i18n.global.locale.value = "zh-CN";
     vi.mocked(copyUtil.copyText).mockResolvedValue(true);
     vi.spyOn(ElMessage, "success").mockImplementation(() => undefined as never);
@@ -209,6 +215,18 @@ describe("Copy job page", () => {
     await flushPromises();
     expect(notifyError).toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "DataTable" }).props("loading")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("prefills jobCode from the jobCode query and loads", async () => {
+    routeQuery.jobCode = " from-route ";
+    const wrapper = await open();
+    expect((wrapper.get('[data-test="job-code"]').element as HTMLInputElement).value).toBe(
+      "from-route"
+    );
+    expect(copyJobApi.listCopyJobs).toHaveBeenCalledWith(
+      expect.objectContaining({ jobCode: "from-route" })
+    );
     wrapper.unmount();
   });
 });
