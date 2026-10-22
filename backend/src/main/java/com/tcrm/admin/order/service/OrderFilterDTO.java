@@ -10,5 +10,7 @@ public record OrderFilterDTO(
     String kolCode,
     String status,
     String attribution,
+    String orderNo,
+    String channel,
     int page,
     int size) {}

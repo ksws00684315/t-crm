@@ -36,6 +36,18 @@ class SystemConfigValidationTest {
   void shouldValidateIntegerRangesAndOptionalUploadAddress() {
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1");
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1000");
+    SystemConfigService.validate(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "0");
+    SystemConfigService.validate(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "3650");
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "-1"))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "3651"))
+        .isInstanceOf(BusinessException.class);
     SystemConfigService.validate(SystemConfigDefinition.UPLOAD_URL, "");
     assertThatThrownBy(
             () -> SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "0"))

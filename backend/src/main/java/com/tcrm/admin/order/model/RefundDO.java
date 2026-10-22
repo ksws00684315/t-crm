@@ -26,6 +26,12 @@ public class RefundDO extends BaseEntity {
   private String rawStatus;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String refundType;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String refundStatus;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Instant refundTime;
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
@@ -72,6 +78,22 @@ public class RefundDO extends BaseEntity {
 
   public void setRawStatus(String value) {
     rawStatus = value;
+  }
+
+  public String getRefundType() {
+    return refundType;
+  }
+
+  public void setRefundType(String value) {
+    refundType = value;
+  }
+
+  public String getRefundStatus() {
+    return refundStatus;
+  }
+
+  public void setRefundStatus(String value) {
+    refundStatus = value;
   }
 
   public Instant getRefundTime() {

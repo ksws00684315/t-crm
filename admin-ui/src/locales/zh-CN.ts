@@ -378,6 +378,7 @@ const zhCN = {
       payout_account_max_per_kol: "每位达人收款账户上限",
       kol_invite_ttl_hours: "达人邀请有效期（小时）",
       oper_log_retention_days: "操作日志保留天数",
+      order_sync_failure_retention_days: "订单同步失败记录保留天数（0=不自动清理）",
       login_fail_pair_limit: "账号与 IP 失败次数上限",
       login_fail_ip_limit: "IP 失败次数上限",
       login_fail_account_limit: "账号失败次数上限",
