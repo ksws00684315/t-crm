@@ -1,7 +1,6 @@
 package com.tcrm.admin.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
@@ -509,8 +508,9 @@ class ProductLinkIT {
   @Test
   void shouldKeepFailedJob_whenTargetShopIsNotAuthorized() throws Exception {
     long shopId = createShop("1001", "Main");
-    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
         .andExpect(status().isOk());
+    authorizeShop(shopId);
     long kolId = createKol("FailKol", "fail38@example.com");
     String token = createToken(kolId, 10);
     when(copies.isShopAuthorized(anyLong())).thenReturn(false);
@@ -581,7 +581,7 @@ class ProductLinkIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].jobCode").value("t38ownjob"))
         .andExpect(jsonPath("$.data.items[0].failCount").value(1))
-        .andExpect(jsonPath("$.data.items[0].targetShopCode").value(nullValue()));
+        .andExpect(jsonPath("$.data.items[0].targetShopCode").value("SHOP-100000"));
     mvc.perform(get("/admin-api/product/copy-jobs").header(ADMIN, admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].jobCode").value("t38otherjob"));
@@ -638,6 +638,9 @@ class ProductLinkIT {
   @Test
   void shouldBackfillFinishTimeSourceShopAndChannel() throws Exception {
     long shopId = createShop("1001", "Main");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
     long kolId = createKol("Backfill", "back38@example.com");
     String token = createToken(kolId, 1);
     Long tokenId =

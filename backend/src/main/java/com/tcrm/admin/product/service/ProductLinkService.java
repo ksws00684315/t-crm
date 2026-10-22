@@ -247,7 +247,7 @@ public class ProductLinkService {
           if (unique.isEmpty()) {
             throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
           }
-          long targetShopId = resolveTargetShop(grant, unique.size());
+          long targetShopId = resolveTargetShop(grant, command, unique.size());
           Instant now = Instant.now();
           String jobCode = newJobCode();
           CopyJobDO job = new CopyJobDO();
@@ -436,23 +436,13 @@ public class ProductLinkService {
     }
   }
 
-  private long resolveTargetShop(CopyTokenGrantDTO grant, int quantity) {
+  private long resolveTargetShop(CopyTokenGrantDTO grant, ConvertCommand command, int quantity) {
     Long shopId = grant.targetShopId();
     if (targetShops == null) {
       if (shopId == null) {
         throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
       }
-      ShopDO legacy = shops.selectById(shopId);
-      if (legacy == null) {
-        throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
-      }
-      if (!Integer.valueOf(1).equals(legacy.getStatus())) {
-        throw ProductLinkMessages.chinese(ErrorCode.SHOP_DISABLED);
-      }
-      if (!copies.isShopAuthorized(shopId)) {
-        throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
-      }
-      return shopId;
+      return assertReadyOrRecord(grant, command, shopId);
     }
     if (shopId == null) {
       try {
@@ -461,6 +451,7 @@ public class ProductLinkService {
                 grant.tenantId(),
                 () -> targetShops.allocateCopyTarget(grant.targetChannel(), quantity));
       } catch (BusinessException e) {
+        // Capacity / pool miss happens before a target shop is fixed — do not create a job.
         throw ProductLinkMessages.wrap(e);
       }
     } else {
@@ -470,20 +461,33 @@ public class ProductLinkService {
             grant.tenantId(),
             () -> targetShops.validateCopyTarget(selectedShopId, grant.targetChannel(), quantity));
       } catch (BusinessException e) {
+        // Named-shop capacity / eligibility failures stay without a task row (task 37).
         throw ProductLinkMessages.wrap(e);
       }
     }
-    ShopDO shop = shops.selectById(shopId);
-    if (shop == null) {
-      throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
+    return assertReadyOrRecord(grant, command, shopId);
+  }
+
+  /** Shop is chosen; unauthorized / disabled / missing still leave a failed task for admins. */
+  private long assertReadyOrRecord(CopyTokenGrantDTO grant, ConvertCommand command, long shopId) {
+    try {
+      ShopDO shop = shops.selectById(shopId);
+      if (shop == null) {
+        throw ProductLinkMessages.chinese(ErrorCode.COPY_TARGET_SHOP_MISSING);
+      }
+      if (shop.getStatus() == null || shop.getStatus() != 1) {
+        throw ProductLinkMessages.chinese(ErrorCode.SHOP_DISABLED);
+      }
+      if (!copies.isShopAuthorized(shopId)) {
+        throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
+      }
+      return shopId;
+    } catch (BusinessException ex) {
+      if (failures != null) {
+        failures.record(failedJob(grant, command, shopId, ex));
+      }
+      throw ex;
     }
-    if (shop.getStatus() == null || shop.getStatus() != 1) {
-      throw ProductLinkMessages.chinese(ErrorCode.SHOP_DISABLED);
-    }
-    if (!copies.isShopAuthorized(shopId)) {
-      throw ProductLinkMessages.chinese(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
-    }
-    return shopId;
   }
 
   /** One live original product for this item id. Several shops, or none, stay empty. */
@@ -506,8 +510,46 @@ public class ProductLinkService {
     return shopIds.iterator().next();
   }
 
+  private CopyJobDO failedJob(
+      CopyTokenGrantDTO grant, ConvertCommand command, long shopId, BusinessException error) {
+    Instant now = Instant.now();
+    CopyJobDO job = new CopyJobDO();
+    job.setTenantId(grant.tenantId());
+    job.setKolId(grant.kolId());
+    job.setTokenId(grant.tokenId());
+    job.setJobCode(newJobCode());
+    job.setCallerPlatform(
+        blank(command.callerPlatform()) ? "unknown" : command.callerPlatform().strip());
+    job.setTargetShopId(shopId);
+    job.setTargetChannel(channelOf(grant.targetChannel()));
+    job.setStatus(CopyJobDO.STATUS_FAILED);
+    job.setTotalCount(0);
+    job.setSuccessCount(0);
+    job.setFailCount(0);
+    job.setErrorMessage(taskError(grant, error));
+    job.setCreateTime(now);
+    job.setUpdateTime(now);
+    job.setFinishTime(now);
+    return job;
+  }
+
   private static String channelOf(String channel) {
     return blank(channel) ? CHANNEL_WEIDIAN : channel.strip().toUpperCase(Locale.ROOT);
+  }
+
+  private static String taskError(CopyTokenGrantDTO grant, BusinessException error) {
+    // The script still receives the original exception. A named shop that is not in the
+    // database shares that exception with "no default shop", which would misstate this row.
+    if (error.getErrorCode() == ErrorCode.COPY_TARGET_SHOP_MISSING
+        && grant.targetShopId() != null) {
+      return ProductLinkMessages.TARGET_NOT_FOUND;
+    }
+    String message = error.getMessage();
+    if (blank(message)) {
+      message = ProductLinkMessages.zh(error.getErrorCode());
+    }
+    String trimmed = message.strip();
+    return trimmed.length() > 500 ? trimmed.substring(0, 500) : trimmed;
   }
 
   private CopyJobDO requireJob(String jobCode) {

@@ -91,7 +91,6 @@ class ShopServiceTest {
         .containsExactly("S001", "S002");
   }
 
-
   @Test
   void shouldReturnCopyChannelDefaultsFromSystemConfig() {
     when(shops.selectList(any())).thenReturn(List.of());

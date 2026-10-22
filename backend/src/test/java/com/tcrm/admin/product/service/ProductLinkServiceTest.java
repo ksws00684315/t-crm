@@ -255,7 +255,13 @@ class ProductLinkServiceTest {
               assertThat(be.getErrorCode()).isEqualTo(ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED);
               assertThat(be.getMessage()).contains("未完成微店授权");
             });
-    verify(jobs, never()).insert(any(CopyJobDO.class));
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getErrorMessage()).contains("未完成微店授权");
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
+    assertThat(failed.getValue().getTargetChannel()).isEqualTo("WEIDIAN");
+    assertThat(failed.getValue().getTotalCount()).isZero();
     verify(items, never()).insert(any(CopyJobItemDO.class));
     verify(worker, never()).submit(anyLong());
   }
@@ -279,12 +285,16 @@ class ProductLinkServiceTest {
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
         .isEqualTo(ErrorCode.SHOP_DISABLED);
-    verify(jobs, never()).insert(any(CopyJobDO.class));
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getErrorMessage()).contains("已停用");
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
     verify(worker, never()).submit(anyLong());
   }
 
   @Test
-  void shouldRejectMissingNamedShop_withoutCreatingATask() {
+  void shouldRecordMissingNamedShop_withoutChangingTheScriptMessage() {
     when(tokens.authenticate("tok"))
         .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
     when(shops.selectById(5L)).thenReturn(null);
@@ -303,7 +313,11 @@ class ProductLinkServiceTest {
               assertThat(be.getErrorCode()).isEqualTo(ErrorCode.COPY_TARGET_SHOP_MISSING);
               assertThat(be.getMessage()).isEqualTo("没有可用的目标店铺");
             });
-    verify(jobs, never()).insert(any(CopyJobDO.class));
+    ArgumentCaptor<CopyJobDO> failed = ArgumentCaptor.forClass(CopyJobDO.class);
+    verify(jobs).insert(failed.capture());
+    assertThat(failed.getValue().getErrorMessage()).isEqualTo("指定的目标店铺不存在");
+    assertThat(failed.getValue().getStatus()).isEqualTo(CopyJobDO.STATUS_FAILED);
+    assertThat(failed.getValue().getFinishTime()).isNotNull();
     verify(items, never()).insert(any(CopyJobItemDO.class));
   }
 

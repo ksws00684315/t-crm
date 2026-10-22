@@ -2,9 +2,7 @@ package com.tcrm.admin.product.service;
 
 import java.time.Instant;
 
-/**
- * One product-task row. {@code targetShopCode} comes from the target shop row when present.
- */
+/** One product-task row. {@code targetShopCode} comes from the target shop row when present. */
 public record CopyJobDTO(
     Long id,
     String jobCode,
