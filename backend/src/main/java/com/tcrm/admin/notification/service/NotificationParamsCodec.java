@@ -18,6 +18,8 @@ final class NotificationParamsCodec {
           case ORDER_SYNC_FAILED -> new ShopParams(params.shopName());
           case BD_TRANSFER_CANCELLED -> new TransferParams(params.kolCode(), params.reason());
           case KOLS_UNASSIGNED -> new UnassignedParams(params.bdName(), params.count());
+          case PREPAY_SUBMITTED, PREPAY_APPROVED, PREPAY_REJECTED, PREPAY_PAID ->
+              new PrepayParams(params.prepayNo());
         };
     return JSON.writeValueAsString(body);
   }
@@ -35,14 +37,15 @@ final class NotificationParamsCodec {
           text(node, "shopName"),
           text(node, "reason"),
           text(node, "bdName"),
-          count);
+          count,
+          text(node, "prepayNo"));
     } catch (JacksonException ex) {
       return empty();
     }
   }
 
   private static NotificationParamsDTO empty() {
-    return new NotificationParamsDTO(null, null, null, null, null, null);
+    return new NotificationParamsDTO(null, null, null, null, null, null, null);
   }
 
   private static String text(JsonNode node, String field) {
@@ -60,4 +63,6 @@ final class NotificationParamsCodec {
   private record TransferParams(String kolCode, String reason) {}
 
   private record UnassignedParams(String bdName, Integer count) {}
+
+  private record PrepayParams(String prepayNo) {}
 }

@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.commission.service.BizFileService;
 import com.tcrm.admin.commission.service.PayoutAccountService;
+import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
@@ -32,10 +33,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPayoutAccountController {
   private final PayoutAccountService accounts;
   private final CurrentUserContext current;
+  private final PrepayService prepays;
 
-  public AdminPayoutAccountController(PayoutAccountService accounts, CurrentUserContext current) {
+  public AdminPayoutAccountController(
+      PayoutAccountService accounts, CurrentUserContext current, PrepayService prepays) {
     this.accounts = accounts;
     this.current = current;
+    this.prepays = prepays;
   }
 
   /** Review queue by default (PENDING); {@code status=ALL} lists everything. */
@@ -78,10 +82,17 @@ public class AdminPayoutAccountController {
    * could review. The file name never carries account data; the content streams as attachment.
    */
   @GetMapping("/admin-api/files/{id}")
-  @SaCheckPermission("payout-account:review")
+  @SaCheckPermission(
+      value = {"payout-account:review", "prepay:review", "prepay:pay", "commission:view"},
+      mode = SaMode.OR)
   @AuditLog(module = "PayoutAccount", action = "Download file")
   public ResponseEntity<byte[]> file(@PathVariable @Min(1) Long id) {
-    BizFileService.FileDTO file = accounts.fileForAdmin(current.user(), id);
+    var user = current.user();
+    BizFileService.AttachedFile attached = accounts.attachedFile(id);
+    BizFileService.FileDTO file =
+        attached.bizType() == com.tcrm.admin.commission.model.FileBizType.PAYOUT_QR
+            ? payoutQrFile(user, id)
+            : prepays.adminFile(user, id);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
@@ -94,4 +105,14 @@ public class AdminPayoutAccountController {
   }
 
   record PendingCountVO(Long count) {}
+
+  private BizFileService.FileDTO payoutQrFile(
+      com.tcrm.admin.security.api.AccountDTO user, long fileId) {
+    if (user.role() != com.tcrm.admin.security.api.Role.SUPER_ADMIN
+        && !user.permissions().contains("payout-account:review")) {
+      throw new com.tcrm.admin.shared.BusinessException(
+          com.tcrm.admin.shared.ErrorCode.AUTH_FORBIDDEN);
+    }
+    return accounts.fileForAdmin(user, fileId);
+  }
 }

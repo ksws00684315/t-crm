@@ -2,12 +2,15 @@ package com.tcrm.admin.notification.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
+import com.tcrm.admin.notification.api.PrepayNotification;
+import com.tcrm.admin.notification.api.PrepayNotificationApi;
 import com.tcrm.admin.notification.mapper.NotificationMapper;
 import com.tcrm.admin.notification.model.NotificationDO;
 import com.tcrm.admin.notification.model.NotificationType;
@@ -19,6 +22,7 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.system.api.EnabledPrepayReviewerApi;
 import com.tcrm.admin.system.api.EnabledSuperAdminApi;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * user's own messages. Recipients are resolved here, not by the publisher.
  */
 @Service
-public class NotificationService {
+public class NotificationService implements PrepayNotificationApi {
   static final String BIZ_PAYOUT_ACCOUNT = "PAYOUT_ACCOUNT";
   static final String BIZ_SHOP = "SHOP";
   static final String BIZ_BD_TRANSFER = "BD_TRANSFER";
@@ -46,6 +50,7 @@ public class NotificationService {
   private final KolApi kols;
   private final EnabledSuperAdminApi superAdmins;
   private final CurrentUserContext current;
+  private final EnabledPrepayReviewerApi prepayReviewers;
   private final TransactionTemplate tx;
   private final Clock clock;
 
@@ -55,8 +60,25 @@ public class NotificationService {
       KolApi kols,
       EnabledSuperAdminApi superAdmins,
       CurrentUserContext current,
+      TransactionTemplate tx,
+      EnabledPrepayReviewerApi prepayReviewers) {
+    this(
+        notifications,
+        kols,
+        superAdmins,
+        current,
+        requiresNew(tx),
+        prepayReviewers,
+        Clock.systemUTC());
+  }
+
+  public NotificationService(
+      NotificationMapper notifications,
+      KolApi kols,
+      EnabledSuperAdminApi superAdmins,
+      CurrentUserContext current,
       TransactionTemplate tx) {
-    this(notifications, kols, superAdmins, current, requiresNew(tx), Clock.systemUTC());
+    this(notifications, kols, superAdmins, current, requiresNew(tx), null, Clock.systemUTC());
   }
 
   public NotificationService(
@@ -66,12 +88,66 @@ public class NotificationService {
       CurrentUserContext current,
       TransactionTemplate tx,
       Clock clock) {
+    this(notifications, kols, superAdmins, current, tx, null, clock);
+  }
+
+  private NotificationService(
+      NotificationMapper notifications,
+      KolApi kols,
+      EnabledSuperAdminApi superAdmins,
+      CurrentUserContext current,
+      TransactionTemplate tx,
+      EnabledPrepayReviewerApi prepayReviewers,
+      Clock clock) {
     this.notifications = notifications;
     this.kols = kols;
     this.superAdmins = superAdmins;
     this.current = current;
+    this.prepayReviewers = prepayReviewers;
     this.tx = tx;
     this.clock = clock;
+  }
+
+  @Override
+  public void deliver(PrepayNotification event) {
+    if (prepayReviewers == null) {
+      throw new IllegalStateException("prepay notification recipient service is required");
+    }
+    tx.executeWithoutResult(
+        status ->
+            TenantScope.runCompany(
+                event.tenantId(),
+                () -> {
+                  NotificationType type = NotificationType.valueOf("PREPAY_" + event.eventType());
+                  LinkedHashSet<Long> recipients = new LinkedHashSet<>();
+                  if ("SUBMITTED".equals(event.eventType())) {
+                    recipients.addAll(prepayReviewers.listEnabledIds());
+                    recipients.addAll(superAdmins.listEnabledIds());
+                  } else {
+                    Long currentBd = currentBd(event.kolId());
+                    if (currentBd != null) {
+                      recipients.add(currentBd);
+                    }
+                  }
+                  String params =
+                      NotificationParamsCodec.write(
+                          type,
+                          new NotificationParamsDTO(
+                              null, null, null, null, null, null, event.prepayNo()));
+                  Instant created = now();
+                  for (Long userId : recipients) {
+                    NotificationDO row = new NotificationDO();
+                    row.setId(IdWorker.getId());
+                    row.setTenantId(event.tenantId());
+                    row.setUserId(userId);
+                    row.setType(type);
+                    row.setParams(params);
+                    row.setBizType("PREPAY");
+                    row.setBizId(event.prepayId());
+                    row.setCreateTime(created);
+                    notifications.insertPrepayEvent(row);
+                  }
+                }));
   }
 
   public void record(PayoutAccountSubmittedEvent event) {
@@ -84,7 +160,7 @@ public class NotificationService {
                         currentBd(event.kolId()),
                         NotificationType.PAYOUT_ACCOUNT_SUBMITTED,
                         new NotificationParamsDTO(
-                            event.kolCode(), event.accountType(), null, null, null, null),
+                            event.kolCode(), event.accountType(), null, null, null, null, null),
                         BIZ_PAYOUT_ACCOUNT,
                         event.accountId())));
   }
@@ -98,7 +174,8 @@ public class NotificationService {
                     write(
                         null,
                         NotificationType.ORDER_SYNC_FAILED,
-                        new NotificationParamsDTO(null, null, event.shopName(), null, null, null),
+                        new NotificationParamsDTO(
+                            null, null, event.shopName(), null, null, null, null),
                         BIZ_SHOP,
                         event.shopId())));
   }
@@ -113,7 +190,7 @@ public class NotificationService {
                         null,
                         NotificationType.BD_TRANSFER_CANCELLED,
                         new NotificationParamsDTO(
-                            event.kolCode(), null, null, event.reasonCode(), null, null),
+                            event.kolCode(), null, null, event.reasonCode(), null, null, null),
                         BIZ_BD_TRANSFER,
                         event.transferId())));
   }
@@ -128,7 +205,7 @@ public class NotificationService {
                         null,
                         NotificationType.KOLS_UNASSIGNED,
                         new NotificationParamsDTO(
-                            null, null, null, null, event.bdName(), event.count()),
+                            null, null, null, null, event.bdName(), event.count(), null),
                         BIZ_STAFF,
                         event.bdUserId())));
   }

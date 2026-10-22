@@ -7,4 +7,5 @@ public record NotificationParamsDTO(
     String shopName,
     String reason,
     String bdName,
-    Integer count) {}
+    Integer count,
+    String prepayNo) {}

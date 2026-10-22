@@ -458,6 +458,10 @@ public class PayoutAccountService {
     return file.download();
   }
 
+  public BizFileService.AttachedFile attachedFile(long fileId) {
+    return files.attachedFile(fileId);
+  }
+
   // -------------------------------------------------------------------- helpers
 
   /** Applies the type-specific fields with encryption and masking to a new row. */

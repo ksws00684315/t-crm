@@ -16,6 +16,7 @@ import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.commission.model.PayoutAccountStatus;
 import com.tcrm.admin.commission.model.PayoutAccountType;
 import com.tcrm.admin.commission.service.PayoutAccountService;
+import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Permission;
@@ -35,8 +36,9 @@ class AdminPayoutAccountControllerTest {
 
   private final PayoutAccountService accounts = mock(PayoutAccountService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
+  private final PrepayService prepays = mock(PrepayService.class);
   private final MockMvc mvc =
-      AdminMvcSupport.build(current, new AdminPayoutAccountController(accounts, current));
+      AdminMvcSupport.build(current, new AdminPayoutAccountController(accounts, current, prepays));
 
   private String reviewer() {
     return AdminMvcSupport.actAs(
@@ -227,6 +229,10 @@ class AdminPayoutAccountControllerTest {
 
   @Test
   void shouldDownloadFileOnlyWithReviewPermission() throws Exception {
+    when(accounts.attachedFile(66L))
+        .thenReturn(
+            new com.tcrm.admin.commission.service.BizFileService.AttachedFile(
+                com.tcrm.admin.commission.model.FileBizType.PAYOUT_QR, 77L, null));
     when(accounts.fileForAdmin(any(), eq(66L)))
         .thenReturn(
             new com.tcrm.admin.commission.service.BizFileService.FileDTO(

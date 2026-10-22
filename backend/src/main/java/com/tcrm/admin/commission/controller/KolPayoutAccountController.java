@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.service.BizFileService;
 import com.tcrm.admin.commission.service.PayoutAccountService;
+import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.security.api.StpKolUtil;
@@ -41,16 +42,19 @@ public class KolPayoutAccountController {
   private final BizFileService files;
   private final CurrentKolContext current;
   private final ClientIpResolver clientIps;
+  private final PrepayService prepays;
 
   public KolPayoutAccountController(
       PayoutAccountService accounts,
       BizFileService files,
       CurrentKolContext current,
-      ClientIpResolver clientIps) {
+      ClientIpResolver clientIps,
+      PrepayService prepays) {
     this.accounts = accounts;
     this.files = files;
     this.current = current;
     this.clientIps = clientIps;
+    this.prepays = prepays;
   }
 
   /** The KOL's own accounts without the disabled ones; the owner sees full accounts. */
@@ -124,7 +128,11 @@ public class KolPayoutAccountController {
   @GetMapping("/kol-api/files/{id}")
   public ResponseEntity<byte[]> download(@PathVariable @Min(1) Long id) {
     KolAccountDTO kol = current.kol();
-    var file = files.kolFile(kol.id(), id);
+    var attached = files.attachedFile(id);
+    var file =
+        attached.bizType() == FileBizType.PAYOUT_QR
+            ? files.kolFile(kol.id(), id)
+            : prepays.kolFile(kol.id(), id);
     return attachment(file);
   }
 

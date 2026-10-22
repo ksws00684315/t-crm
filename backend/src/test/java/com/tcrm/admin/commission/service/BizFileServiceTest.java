@@ -35,6 +35,41 @@ class BizFileServiceTest {
   private final BizFileMapper files = mock(BizFileMapper.class);
   private final BizFileService service = new BizFileService(files);
 
+  @Test
+  void shouldBindPrepayUploadToCompanyAdminAndTaskBeforeSaving() {
+    when(files.insert(any(BizFileDO.class)))
+        .thenAnswer(
+            invocation -> {
+              invocation.getArgument(0, BizFileDO.class).setId(66L);
+              return 1;
+            });
+    assertThat(
+            service.uploadPrepayAdmin(
+                11L, 5L, 77L, FileBizType.PREPAY_VOUCHER, " receipt.png ", PNG))
+        .isEqualTo(66L);
+    var saved = ArgumentCaptor.forClass(BizFileDO.class);
+    verify(files).insert(saved.capture());
+    assertThat(saved.getValue().getTenantId()).isEqualTo(11L);
+    assertThat(saved.getValue().getBizId()).isEqualTo(77L);
+    assertThat(saved.getValue().getCreateBy()).isEqualTo(5L);
+    assertThat(saved.getValue().getCreateByType()).isEqualTo("ADMIN");
+    assertThat(saved.getValue().getFileName()).isEqualTo("receipt.png");
+    assertThat(saved.getValue().getContentType()).isEqualTo("image/png");
+  }
+
+  @Test
+  void shouldSupportPrepayAttachmentsButRejectUnrelatedUploadTypes() {
+    service.uploadPrepayAdmin(11L, 5L, 77L, FileBizType.PREPAY_ATTACHMENT, "attachment.png", PNG);
+    assertThatThrownBy(
+            () -> service.uploadPrepayAdmin(11L, 5L, 77L, FileBizType.PAYOUT_QR, "qr.png", PNG))
+        .hasMessage(ErrorCode.COMMON_VALIDATION_FAILED.message());
+    BizFileDO attachment = file(77L, "ADMIN", 5L);
+    attachment.setBizType(FileBizType.PREPAY_ATTACHMENT);
+    when(files.selectList(any())).thenReturn(java.util.List.of(attachment));
+    assertThat(service.prepayAttachments(77L))
+        .containsExactly(new BizFileService.FileMeta(55L, "qr.png", "image/png", 8L));
+  }
+
   private static BizFileDO file(Long bizId, String uploaderType, Long uploader) {
     BizFileDO file = new BizFileDO();
     file.setId(55L);
