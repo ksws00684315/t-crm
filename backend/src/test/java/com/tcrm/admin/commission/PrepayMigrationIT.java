@@ -69,11 +69,16 @@ class PrepayMigrationIT {
       jdbc.update(
           "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,bd_user_id,status,create_time,update_time) "
               + "VALUES(4710,1,'KOL-ABC4710','t47_complete','complete@example.test','US',4701,1,now(),now()),"
-              + "(4711,1,'KOL-ABC4711','t47_incomplete','incomplete@example.test','US',4701,1,now(),now())");
+              + "(4711,1,'KOL-ABC4711','t47_incomplete','incomplete@example.test','US',4701,1,now(),now()),"
+              + "(4712,1,'KOL-ABC4712','t47_single','single@example.test','US',4701,1,now(),now())");
       jdbc.update(
-          "INSERT INTO crm_prepay(id,tenant_id,kol_id,prepay_no,request_id,applicant_id,amount_cny,reason,expected_pay_date,deduct_from_commission,payout_account_id,status,create_time,update_time) "
-              + "VALUES(4710,1,4710,'PP0470001',?::uuid,4701,100,'reason',CURRENT_DATE,TRUE,44,'PENDING_APPROVAL',now(),now()),"
-              + "(4711,1,4711,'PP0470002',?::uuid,4701,100,NULL,NULL,NULL,NULL,'PENDING_APPROVAL',now(),now())",
+          "INSERT INTO crm_prepay(id,tenant_id,kol_id,prepay_no,request_id,applicant_id,amount_cny,reason,expected_pay_date,deduct_from_commission,payout_account_id,status,approved_by,approved_time,create_time,update_time) "
+              + "VALUES(4710,1,4710,'PP0470001',?::uuid,4701,100,'reason',CURRENT_DATE,TRUE,44,'PENDING_APPROVAL',NULL,NULL,now()-interval '1 day',now()),"
+              + "(4711,1,4710,'PP0470002',?::uuid,4701,100,'reason',CURRENT_DATE,TRUE,44,'APPROVED',4701,now(),now(),now()),"
+              + "(4712,1,4711,'PP0470003',?::uuid,4701,100,NULL,NULL,NULL,NULL,'PENDING_APPROVAL',NULL,NULL,now(),now()),"
+              + "(4713,1,4712,'PP0470004',?::uuid,4701,100,'reason',CURRENT_DATE,TRUE,44,'PENDING_APPROVAL',NULL,NULL,now(),now())",
+          UUID.randomUUID().toString(),
+          UUID.randomUUID().toString(),
           UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       flyway(postgres, "202610222000").migrate();
@@ -83,7 +88,12 @@ class PrepayMigrationIT {
                   Integer.class))
           .isEqualTo(1);
       assertThat(jdbc.queryForList("SELECT status FROM crm_prepay ORDER BY id", String.class))
-          .containsExactly("PENDING_OPERATIONS_REVIEW", "WAITING_DETAILS");
+          .containsExactly("REJECTED", "APPROVED", "WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM crm_prepay_history WHERE prepay_id=4710 AND action='REJECTED' AND operator_id=0 AND reason LIKE '系统迁移关闭重复申请%'",
+                  Integer.class))
+          .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
                   "SELECT indexdef FROM pg_indexes WHERE indexname='uk_crm_prepay_one_active_per_kol'",

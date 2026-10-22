@@ -18,6 +18,43 @@ ALTER TABLE crm_prepay_history ADD CONSTRAINT ck_crm_prepay_history_action
   CHECK (action IN ('SUBMITTED', 'DETAILS_COMPLETED', 'OPERATIONS_APPROVED', 'FINANCE_APPROVED', 'APPROVED', 'REJECTED', 'CANCELLED', 'PAID'));
 COMMENT ON COLUMN crm_prepay_history.action IS '动作：提交、补录完成、运营审核通过、财务审核通过、驳回、撤销、付款完成';
 
+-- Legacy rows could contain multiple active applications for one creator. Keep the oldest task
+-- active and explicitly close later duplicates before enforcing the new one-active-task rule.
+LOCK TABLE crm_prepay, crm_prepay_history IN SHARE ROW EXCLUSIVE MODE;
+WITH ranked AS (
+  SELECT id,
+         row_number() OVER (
+           PARTITION BY tenant_id, kol_id
+           ORDER BY CASE status
+             WHEN 'APPROVED' THEN 0
+             WHEN 'PENDING_FINANCE_REVIEW' THEN 1
+             WHEN 'PENDING_OPERATIONS_REVIEW' THEN 2
+             ELSE 3
+           END, create_time, id
+         ) AS position
+    FROM crm_prepay
+   WHERE status IN ('WAITING_DETAILS', 'PENDING_OPERATIONS_REVIEW', 'PENDING_FINANCE_REVIEW', 'APPROVED')
+), closed AS (
+  UPDATE crm_prepay p
+     SET status = 'REJECTED',
+         approval_reason = '系统迁移关闭重复申请：仅保留该达人最早创建的进行中申请。',
+         update_by = NULL,
+         update_time = CURRENT_TIMESTAMP(3)
+    FROM ranked r
+   WHERE p.id = r.id AND r.position > 1
+  RETURNING p.id, p.tenant_id
+)
+INSERT INTO crm_prepay_history (id, tenant_id, prepay_id, action, operator_id, reason, create_time)
+SELECT (SELECT COALESCE(MAX(id), 0) FROM crm_prepay_history)
+         + row_number() OVER (ORDER BY closed.id),
+       closed.tenant_id,
+       closed.id,
+       'REJECTED',
+       0,
+       '系统迁移关闭重复申请；保留同一达人最早创建的进行中申请继续处理。',
+       CURRENT_TIMESTAMP(3)
+  FROM closed;
+
 -- Keep existing finance staff able to review while separating review from payment at runtime.
 LOCK TABLE sys_user_permission IN SHARE ROW EXCLUSIVE MODE;
 INSERT INTO sys_user_permission (id, tenant_id, user_id, permission_code, create_by, create_time)
