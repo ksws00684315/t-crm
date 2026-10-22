@@ -119,9 +119,12 @@ public class CopyTokenService implements CopyTokenApi {
     var result = tokens.selectPage(new Page<>(filter.page(), filter.size()), query);
     Map<Long, KolRefDTO> kolRefs = kolRefs(result.getRecords());
     Map<Long, String> shopNames = shopNames(result.getRecords());
+    Map<Long, String> shopCodes = shopCodes(result.getRecords());
     Instant now = now();
     return new PageResult<>(
-        result.getRecords().stream().map(row -> toRow(row, kolRefs, shopNames, now)).toList(),
+        result.getRecords().stream()
+            .map(row -> toRow(row, kolRefs, shopNames, shopCodes, now))
+            .toList(),
         result.getTotal(),
         filter.page(),
         filter.size());
@@ -150,13 +153,25 @@ public class CopyTokenService implements CopyTokenApi {
         || command.kolId() <= 0) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
+    if (!"WEIDIAN".equals(command.targetChannel())) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
     KolRefDTO kol = requireVisibleKol(user, command.kolId());
     if (!kol.enabled()) {
       throw new BusinessException(ErrorCode.KOL_DISABLED);
     }
     Long shopId = command.targetShopId();
     if (shopId != null) {
-      requireEnabledShop(shopId);
+      shops.validateCopyTarget(shopId, command.targetChannel(), quota);
+    } else {
+      int remaining =
+          shops.copyChannels().stream()
+              .filter(channel -> command.targetChannel().equals(channel.channel()))
+              .mapToInt(CopyTargetShopApi.CopyChannelDTO::remainingCapacity)
+              .sum();
+      if (quota > remaining) {
+        throw new BusinessException(ErrorCode.SHOP_COPY_CAPACITY_EXCEEDED);
+      }
     }
     Instant now = now();
     Instant expiresAt = now.plus(minutes, ChronoUnit.MINUTES);
@@ -168,7 +183,7 @@ public class CopyTokenService implements CopyTokenApi {
       row.setTokenHash(CopyTokenPlaintexts.sha256Hex(plaintext));
       row.setTokenCipher(cipher.encrypt(plaintext));
       row.setTokenHint(CopyTokenPlaintexts.hint(plaintext));
-      row.setTargetChannel(KolCopyTokenDO.CHANNEL_WEIDIAN);
+      row.setTargetChannel(command.targetChannel());
       row.setTargetShopId(shopId);
       row.setQuota(quota);
       row.setUsed(0);
@@ -183,7 +198,8 @@ public class CopyTokenService implements CopyTokenApi {
       }
       Map<Long, KolRefDTO> kolMap = Map.of(kol.id(), kol);
       Map<Long, String> shopMap = shopId == null ? Map.of() : shopNames(List.of(row));
-      return new CreatedCopyTokenDTO(plaintext, toRow(row, kolMap, shopMap, now));
+      Map<Long, String> codeMap = shopId == null ? Map.of() : shopCodes(List.of(row));
+      return new CreatedCopyTokenDTO(plaintext, toRow(row, kolMap, shopMap, codeMap, now));
     }
     throw new IllegalStateException("Unable to allocate a unique copy token");
   }
@@ -376,8 +392,22 @@ public class CopyTokenService implements CopyTokenApi {
     return shops.namesByIds(ids);
   }
 
+  private Map<Long, String> shopCodes(List<KolCopyTokenDO> rows) {
+    List<Long> ids =
+        rows.stream()
+            .map(KolCopyTokenDO::getTargetShopId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+    return ids.isEmpty() ? Map.of() : shops.codesByIds(ids);
+  }
+
   private CopyTokenRowDTO toRow(
-      KolCopyTokenDO row, Map<Long, KolRefDTO> kolRefs, Map<Long, String> shopNames, Instant now) {
+      KolCopyTokenDO row,
+      Map<Long, KolRefDTO> kolRefs,
+      Map<Long, String> shopNames,
+      Map<Long, String> shopCodes,
+      Instant now) {
     KolRefDTO kol = kolRefs.get(row.getKolId());
     String shopName = row.getTargetShopId() == null ? null : shopNames.get(row.getTargetShopId());
     return new CopyTokenRowDTO(
@@ -388,6 +418,7 @@ public class CopyTokenService implements CopyTokenApi {
         kol == null ? null : kol.name(),
         row.getTargetChannel(),
         row.getTargetShopId(),
+        row.getTargetShopId() == null ? null : shopCodes.get(row.getTargetShopId()),
         shopName,
         row.getUsed(),
         row.getQuota(),

@@ -20,6 +20,11 @@ public class KolItemDO {
   private String weidianItemId;
   private String itemName;
   private String source;
+
+  /** Company-unique link code. Inserts set it; updates never write it. */
+  @TableField(updateStrategy = FieldStrategy.NEVER)
+  private String linkCode;
+
   private Instant validFrom;
   private Instant validTo;
 
@@ -93,6 +98,14 @@ public class KolItemDO {
 
   public void setSource(String value) {
     this.source = value;
+  }
+
+  public String getLinkCode() {
+    return linkCode;
+  }
+
+  public void setLinkCode(String value) {
+    this.linkCode = value;
   }
 
   public Instant getValidFrom() {

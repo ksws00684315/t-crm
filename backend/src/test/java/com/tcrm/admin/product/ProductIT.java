@@ -133,7 +133,7 @@ class ProductIT {
   }
 
   @Test
-  void shouldCreateAtMostThreeShops_whenCreatedConcurrently() throws Exception {
+  void shouldCreateWithinTwentyShopLimit_whenCreatedConcurrently() throws Exception {
     int attempts = 12;
     ExecutorService pool = Executors.newFixedThreadPool(attempts);
     try {
@@ -147,7 +147,9 @@ class ProductIT {
                             .header(TOKEN, adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(
-                                "{\"shopName\":\"并发\",\"weidianShopId\":\"" + weidianId + "\"}"))
+                                "{\"shopName\":\"并发\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\""
+                                    + weidianId
+                                    + "\"}"))
                     .andReturn()
                     .getResponse()
                     .getStatus();
@@ -159,11 +161,54 @@ class ProductIT {
         assertThat(code).isIn(200, 422);
         created += code == 200 ? 1 : 0;
       }
-      assertThat(created).isEqualTo(3);
-      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM crm_shop", Integer.class)).isEqualTo(3);
+      assertThat(created).isEqualTo(attempts);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM crm_shop", Integer.class))
+          .isEqualTo(attempts);
+      assertThat(
+              jdbc.queryForObject("SELECT COUNT(DISTINCT shop_code) FROM crm_shop", Integer.class))
+          .isEqualTo(attempts);
     } finally {
       pool.shutdownNow();
     }
+  }
+
+  @Test
+  void shouldGenerateSequentialCompanyShopCodesAndDefaultCapacity() throws Exception {
+    long first = createShop("店A", "6001");
+    long second = createShop("店B", "6002");
+
+    assertThat(
+            jdbc.queryForObject("SELECT shop_code FROM crm_shop WHERE id = ?", String.class, first))
+        .isEqualTo("SHOP-100000");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT shop_code FROM crm_shop WHERE id = ?", String.class, second))
+        .isEqualTo("SHOP-100001");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT max_items FROM crm_shop WHERE id = ?", Integer.class, first))
+        .isEqualTo(20000);
+  }
+
+  @Test
+  void shouldStartShopCodesIndependentlyForEachCompany() throws Exception {
+    createShop("t37_first_company", "370001");
+    String unique = UUID.randomUUID().toString().substring(0, 8);
+    var company =
+        CompanySessions.openCompany(mvc, json, PASSWORD, "t37-" + unique, "t37_" + unique);
+    mvc.perform(
+            post("/admin-api/product/shops")
+                .header(TOKEN, company.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"shopName\":\"t37_second_company\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"370002\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.shopCode").value("SHOP-100000"));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT shop_code FROM crm_shop WHERE weidian_shop_id IN ('370001','370002')",
+                String.class))
+        .containsExactly("SHOP-100000", "SHOP-100000");
   }
 
   @Test
@@ -331,7 +376,11 @@ class ProductIT {
                     .header(TOKEN, adminToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        "{\"shopName\":\"" + name + "\",\"weidianShopId\":\"" + weidianId + "\"}"))
+                        "{\"shopName\":\""
+                            + name
+                            + "\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\""
+                            + weidianId
+                            + "\"}"))
             .andExpect(status().isOk())
             .andReturn();
     return Long.parseLong(

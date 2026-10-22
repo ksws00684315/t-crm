@@ -32,7 +32,7 @@ public enum SystemConfigDefinition {
   COPY_TOKEN_MAX_QUOTA("copy-token.max-quota", "business", "integer", null, "100000", 1, 100000),
   COPY_TOKEN_MAX_VALID_MINUTES(
       "copy-token.max-valid-minutes", "business", "minutes", null, "10080", 5, 10080),
-  SHOP_MAX_PER_COMPANY("shop.max-per-company", "business", "integer", null, "3", 1, 1000),
+  SHOP_MAX_PER_COMPANY("shop.max-per-company", "business", "integer", null, "20", 1, 1000),
   MINIMUM_WITHDRAWAL_CNY(
       "commission.minimum-withdrawal-cny", "business", "integer", null, "200", 0, 1000000),
   PAYOUT_ACCOUNT_MAX_PER_KOL("payout-account.max-per-kol", "business", "integer", null, "5", 1, 20),

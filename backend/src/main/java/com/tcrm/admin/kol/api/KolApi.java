@@ -53,4 +53,19 @@ public interface KolApi {
    * @param kolId crm_kol.id
    */
   boolean lockKol(long kolId);
+
+  /**
+   * Ids of undeleted KOLs whose name contains {@code keyword} (case-insensitive), or whose code or
+   * email equals it (case-insensitive). Blank returns an empty list without querying.
+   *
+   * @param keyword text typed in the creator-item filter
+   */
+  List<Long> findIdsByKeyword(String keyword);
+
+  /**
+   * Current promotion rate text of these KOLs (task 39). Unknown ids are skipped. An empty
+   * collection returns an empty list without querying. A KOL with no rate has a null {@code
+   * rateText}.
+   */
+  List<KolRateDTO> listRatesByIds(Collection<Long> ids);
 }

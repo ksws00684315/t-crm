@@ -3,6 +3,7 @@ package com.tcrm.admin.product.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.api.KolItemApi;
+import com.tcrm.admin.product.api.KolItemLinkCodeDTO;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
 import com.tcrm.admin.product.api.KolItemRefDTO;
 import com.tcrm.admin.product.mapper.KolItemMapper;
@@ -147,6 +148,21 @@ public class KolItemLookupService implements KolItemApi {
         row.getWeidianItemId(),
         productOnSale,
         Integer.valueOf(1).equals(row.getShopStatus()));
+  }
+
+  @Override
+  public List<KolItemLinkCodeDTO> listLinkCodesByIds(Collection<Long> kolItemIds) {
+    if (kolItemIds == null || kolItemIds.isEmpty()) {
+      return List.of();
+    }
+    return items
+        .selectList(
+            new LambdaQueryWrapper<KolItemDO>()
+                .select(KolItemDO::getId, KolItemDO::getLinkCode)
+                .in(KolItemDO::getId, kolItemIds))
+        .stream()
+        .map(row -> new KolItemLinkCodeDTO(row.getId(), row.getLinkCode()))
+        .toList();
   }
 
   @Override

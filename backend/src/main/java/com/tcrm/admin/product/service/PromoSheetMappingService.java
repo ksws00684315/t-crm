@@ -194,7 +194,7 @@ public class PromoSheetMappingService implements PromoSheetItemApi {
             mapping.setValidFrom(now);
             mapping.setCreateBy(actorId);
             mapping.setUpdateBy(actorId);
-            items.insert(mapping);
+            KolItemCodes.insertNew(items, mapping);
           }
           if (!additions.isEmpty()) {
             // Registered in this transaction and applied to the link index afterwards (ADR-013);
