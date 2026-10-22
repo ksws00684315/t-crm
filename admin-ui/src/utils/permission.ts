@@ -79,7 +79,7 @@ export const SELECTABLE_ROLES: readonly Exclude<Role, "PLATFORM_ADMIN">[] = [
   "STAFF"
 ];
 
-export const POST_TEMPLATES: readonly PostTemplate[] = ["OPERATOR", "BD"];
+export const POST_TEMPLATES: readonly PostTemplate[] = ["OPERATOR", "BD", "FINANCE"];
 
 /** Groups from `GET /system/permissions`, in the order the permission picker renders them. */
 export const PERMISSION_GROUP_ORDER = [

@@ -170,11 +170,23 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "refunds",
             name: "OrderRefunds",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/order/refund/index.vue"),
             meta: {
               title: "route.refundQuery",
               permission: "order:view",
-              componentName: "ComingSoonPage"
+              componentName: "OrderRefundPage"
+            }
+          },
+          {
+            // Order chain (09.04): opened in its own browser tab from the order list.
+            path: "orders/:id/chain",
+            name: "OrderChain",
+            component: () => import("@/views/order/chain/index.vue"),
+            meta: {
+              title: "route.orderChain",
+              permission: "order:view",
+              hideInMenu: true,
+              componentName: "OrderChainPage"
             }
           }
         ]
@@ -351,6 +363,17 @@ export const routes: RouteRecordRaw[] = [
           hideInMenu: true,
           companyAccount: true,
           componentName: "NotificationPage"
+        }
+      },
+      {
+        path: "account/resignation",
+        name: "AccountResignation",
+        component: () => import("@/views/account/resignation.vue"),
+        meta: {
+          title: "route.resignation",
+          hideInMenu: true,
+          companyAccount: true,
+          componentName: "AccountResignationPage"
         }
       },
       {

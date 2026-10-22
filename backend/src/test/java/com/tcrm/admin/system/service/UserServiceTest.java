@@ -350,7 +350,7 @@ class UserServiceTest {
       stp.verify(() -> StpUtil.getTokenValueListByLoginId(7L));
       stp.verify(() -> StpUtil.kickout(any()), never());
       stp.verify(() -> StpUtil.logout(any()), never());
-      verify(events).publishEvent(new StaffDisabledEvent(TENANT, 7L));
+      verify(events).publishEvent(new StaffDisabledEvent(TENANT, 7L, 8L));
     }
   }
 

@@ -1,7 +1,7 @@
 import type { NotificationParams, NotificationType } from "@/api/notification/notification";
 import { translate } from "@/locales";
 import type { AccessProfile } from "@/utils/permission";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatInstantToMinute } from "@/utils/format";
 
 export const NOTIFICATION_POLL_MS = 60_000;
 
@@ -38,13 +38,22 @@ export function relativeNotificationTime(iso: string, now = Date.now()): string 
 export function notificationText(item: NotificationView): string {
   const params = item.params ?? {};
   const reason = params.reason ? translate(`notification.reason.${params.reason}`) : "";
+  // Departure messages carry codes for the plan type and its outcome; both become words here so
+  // the sentence switches language as a whole.
+  const kind = params.planType ? translate(`notification.planType.${params.planType}`) : "";
+  const result = params.result
+    ? translate(`notification.result.${params.result}`, { heir: params.heirName ?? "" })
+    : "";
   return translate(`notification.type.${item.type}`, {
     kolCode: params.kolCode ?? "",
     accountType: params.accountType ?? "",
     shopName: params.shopName ?? "",
     reason,
     bdName: params.bdName ?? "",
-    count: params.count ?? 0
+    count: params.count ?? 0,
+    time: params.effectiveAt ? formatInstantToMinute(params.effectiveAt) : "",
+    kind,
+    result
   });
 }
 
@@ -66,6 +75,10 @@ export function notificationHref(item: NotificationView): string {
       return `/system/oper-logs?module=KOL&keyword=${encodeURIComponent(item.params?.kolCode ?? "")}`;
     case "KOLS_UNASSIGNED":
       return "/kol/kols";
+    case "DEPARTURE_PLAN_SUBMITTED":
+    case "DEPARTURE_PLAN_EXECUTED":
+      // The plan and its outcome live in the account list (task 41 §2.4).
+      return "/system/users";
     default:
       return "/notifications";
   }
@@ -90,6 +103,9 @@ export function canOpenNotification(type: string, access: AccessProfile): boolea
       return access.isSuperAdmin;
     case "KOLS_UNASSIGNED":
       return access.can("kol:view");
+    case "DEPARTURE_PLAN_SUBMITTED":
+    case "DEPARTURE_PLAN_EXECUTED":
+      return access.isSuperAdmin;
     default:
       return false;
   }

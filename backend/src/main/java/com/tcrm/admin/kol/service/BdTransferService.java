@@ -22,6 +22,7 @@ import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.system.api.DepartureHandoverEvent;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import com.tcrm.admin.system.api.StaffDisabledEvent;
 import java.time.Clock;
@@ -365,14 +366,86 @@ public class BdTransferService {
     }
   }
 
+  /**
+   * Departure plan with an heir (task 41): the creators move before {@code StaffDisabledEvent} of
+   * the same transaction would unassign them. Same ownership rules as an immediate transfer, but no
+   * request credentials are read. A retry after a rolled-back attempt finds nothing left under the
+   * departing BD, so nothing is written twice.
+   */
+  @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+  public void onDepartureHandover(DepartureHandoverEvent event) {
+    // Explicit company scope: the event may be published by another module in its transaction.
+    TenantScope.runCompany(event.tenantId(), () -> handoverAll(event));
+  }
+
   @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
   public void onStaffDisabled(StaffDisabledEvent event) {
     // Explicit company scope: the event may be published by another module in its transaction.
     TenantScope.runCompany(event.tenantId(), () -> unassignDisabled(event));
   }
 
+  private void handoverAll(DepartureHandoverEvent event) {
+    if (event.toBdUserId() == null) {
+      return;
+    }
+    List<KolDO> rows =
+        kols.selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(KolDO::getId)
+                .eq(KolDO::getBdUserId, event.fromBdUserId())
+                .orderByAsc(KolDO::getId));
+    Instant effective = event.effectiveAt().truncatedTo(ChronoUnit.MILLIS);
+    Instant executed = now();
+    List<KolDO> moved = new ArrayList<>();
+    for (KolDO row : rows) {
+      KolDO kol = lockKol(row.getId());
+      if (!Objects.equals(kol.getBdUserId(), event.fromBdUserId())) {
+        continue;
+      }
+      changeOwnership(kol, event.toBdUserId(), effective, event.actorId());
+      cancelForKol(kol.getId(), "被离职交接取代", event.actorId());
+      KolBdTransferDO done = new KolBdTransferDO();
+      done.setKolId(kol.getId());
+      done.setFromBdUserId(event.fromBdUserId());
+      done.setToBdUserId(event.toBdUserId());
+      done.setEffectiveAt(effective);
+      done.setStatus(BdTransferStatus.DONE);
+      done.setExecutedAt(executed);
+      done.setReason(event.reason());
+      done.setDeleted(false);
+      transfers.insert(done);
+      moved.add(kol);
+    }
+    if (!moved.isEmpty()) {
+      record(
+          "Hand over departing BD KOLs",
+          "SYSTEM",
+          new HandoverAuditDTO(
+              event.fromBdUserId(), event.toBdUserId(), moved.size(), effective, event.reason()),
+          event.tenantId(),
+          event.actorId());
+    }
+  }
+
+  /**
+   * Audit actor of a disable: the event names who to credit (task 41); an event without one uses
+   * the signed-in administrator, and a scheduled execution without either credits the account
+   * itself.
+   */
+  private Long actorOf(StaffDisabledEvent event) {
+    if (event.actorId() != null) {
+      return event.actorId();
+    }
+    try {
+      return current.user().id();
+    } catch (RuntimeException e) {
+      return event.userId();
+    }
+  }
+
   private void unassignDisabled(StaffDisabledEvent event) {
     long userId = event.userId();
+    Long actor = actorOf(event);
     List<KolDO> rows =
         kols.selectList(
             new LambdaQueryWrapper<KolDO>()
@@ -383,13 +456,13 @@ public class BdTransferService {
     for (KolDO row : rows) {
       KolDO kol = lockKol(row.getId());
       if (Objects.equals(kol.getBdUserId(), userId)) {
-        changeOwnership(kol, null, now(), current.user().id());
+        changeOwnership(kol, null, now(), actor);
         count++;
       }
     }
     transfers.update(
         null,
-        scheduledUpdate(current.user().id())
+        scheduledUpdate(actor)
             .eq(KolBdTransferDO::getFromBdUserId, userId)
             .set(KolBdTransferDO::getFromBdUserId, null));
     List<KolBdTransferDO> toDisabled =
@@ -401,7 +474,7 @@ public class BdTransferService {
       int cancelled =
           transfers.update(
               null,
-              scheduledUpdate(current.user().id())
+              scheduledUpdate(actor)
                   .eq(KolBdTransferDO::getId, row.getId())
                   .set(KolBdTransferDO::getStatus, BdTransferStatus.CANCELLED)
                   .set(KolBdTransferDO::getCancelReason, "目标商务已停用"));
@@ -411,10 +484,15 @@ public class BdTransferService {
             "SYSTEM",
             new CancelAuditDTO(row.getId(), transferSummary(row, "预约转移已取消", "目标商务已停用")),
             event.tenantId(),
-            current.user().id());
+            actor);
       }
     }
-    record("Unassign disabled staff KOLs", "SYSTEM", new DisabledAuditDTO(userId, count));
+    record(
+        "Unassign disabled staff KOLs",
+        "SYSTEM",
+        new DisabledAuditDTO(userId, count),
+        event.tenantId(),
+        actor);
     if (count > 0) {
       publishUnassigned(event, count);
     }
@@ -665,7 +743,7 @@ public class BdTransferService {
   private void record(String action, String method, Object params, long tenantId, Long actorId) {
     audit.recordTenantWriteOperation(
         tenantId,
-        actorId,
+        actorId == null ? 0L : actorId,
         "KOL",
         action,
         method,
@@ -689,4 +767,7 @@ public class BdTransferService {
   private record DisabledAuditDTO(long disabledUserId, int kolCount) {}
 
   private record CancelAuditDTO(Long transferId, String summary) {}
+
+  private record HandoverAuditDTO(
+      Long fromBdUserId, Long toBdUserId, int kolCount, Instant effectiveAt, String reason) {}
 }

@@ -31,6 +31,23 @@ class ConfigurablePermissionsMigrationIT {
           .withUsername("tcrm")
           .withPassword(UUID.randomUUID().toString());
 
+  /**
+   * Codes that {@code V202610171000} wrote for legacy OPERATOR/ALL rows. Kept as a fixed list so
+   * later changes to {@link PostTemplate#OPERATOR} (for example adding {@code kol:edit}) do not
+   * rewrite history.
+   */
+  private static final List<String> OPERATOR_ALL =
+      List.of(
+          "kol:view",
+          "product:view",
+          "product:edit",
+          "product:status",
+          "order:view",
+          "order:manage",
+          "dashboard:shop",
+          "dashboard:kol",
+          "data:export");
+
   private static final List<String> FINANCE =
       List.of(
           "kol:view",
@@ -84,8 +101,7 @@ class ConfigurablePermissionsMigrationIT {
     assertUser(db, 9106, "STAFF", "BD", "OWN");
     assertThat(flag(db, 9106)).isTrue();
 
-    assertThat(codes(db, 9101))
-        .containsExactlyInAnyOrderElementsOf(PostTemplate.OPERATOR.permissionCodes());
+    assertThat(codes(db, 9101)).containsExactlyInAnyOrderElementsOf(OPERATOR_ALL);
     assertThat(codes(db, 9102))
         .containsExactlyInAnyOrderElementsOf(PostTemplate.BD.permissionCodes());
     assertThat(codes(db, 9103)).containsExactlyInAnyOrderElementsOf(FINANCE);

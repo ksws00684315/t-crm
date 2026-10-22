@@ -17,10 +17,13 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.system.service.DepartureService;
 import com.tcrm.admin.system.service.UserDTO;
 import com.tcrm.admin.system.service.UserPermissionService;
 import com.tcrm.admin.system.service.UserService;
 import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,9 +31,15 @@ import org.springframework.test.web.servlet.MockMvc;
 class UserControllerTest {
   private final UserService users = mock(UserService.class);
   private final UserPermissionService permissions = mock(UserPermissionService.class);
+  private final DepartureService departures = mock(DepartureService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final MockMvc mvc =
-      AdminMvcSupport.build(current, new UserController(users, permissions));
+      AdminMvcSupport.build(current, new UserController(users, permissions, departures));
+
+  @BeforeEach
+  void noPlans() {
+    when(departures.latestPlans(any())).thenReturn(Map.of());
+  }
 
   private String admin() {
     return AdminMvcSupport.actAs(current, 1L, Role.SUPER_ADMIN, DataScope.ALL);
