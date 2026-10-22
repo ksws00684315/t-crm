@@ -51,6 +51,7 @@ export function notificationText(item: NotificationView): string {
     reason,
     bdName: params.bdName ?? "",
     count: params.count ?? 0,
+    prepayNo: params.prepayNo ?? "",
     time: params.effectiveAt ? formatInstantToMinute(params.effectiveAt) : "",
     kind,
     result

@@ -21,6 +21,7 @@ export interface NotificationParams {
   reason: string | null;
   bdName: string | null;
   count: number | null;
+  prepayNo?: string | null;
   /** Departure messages: heir display name, ISO instant, result and plan type of the plan. */
   heirName: string | null;
   effectiveAt: string | null;

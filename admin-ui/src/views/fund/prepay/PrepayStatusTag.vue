@@ -26,7 +26,7 @@ const { t } = useI18n();
   background: #f3ebff;
 }
 .prepay-status-APPROVED {
-  color: #007b87;
+  color: #007782;
   background: #def7f7;
 }
 .prepay-status-PAID {
