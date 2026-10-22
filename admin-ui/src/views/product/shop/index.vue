@@ -97,7 +97,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
-    list.push({ key: "actions", label: t("common.actions"), width: px(472, 664) });
+    list.push({ key: "actions", label: t("common.actions"), width: px(500, 780) });
   }
   return list;
 });
