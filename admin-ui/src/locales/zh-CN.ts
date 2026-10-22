@@ -45,7 +45,9 @@ const zhCN = {
     platformScope: "平台管理",
     unassigned: "未分配",
     comingSoon: "该功能正在开发中",
-    developing: "开发中"
+    developing: "开发中",
+    nameWithCode: "{name}（{code}）",
+    codeWithName: "{code}（{name}）"
   },
   /** Each language is named in itself and shows the same label in both languages. */
   locale: {
