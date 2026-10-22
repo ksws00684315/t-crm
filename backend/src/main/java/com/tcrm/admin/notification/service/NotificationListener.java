@@ -5,6 +5,8 @@ import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
 import com.tcrm.admin.notification.model.NotificationType;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
+import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
+import com.tcrm.admin.system.api.DeparturePlanSubmittedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -48,6 +50,22 @@ public class NotificationListener {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onKolsUnassigned(KolsUnassignedEvent event) {
     safely(event.tenantId(), NotificationType.KOLS_UNASSIGNED, () -> notifications.record(event));
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onDeparturePlanSubmitted(DeparturePlanSubmittedEvent event) {
+    safely(
+        event.tenantId(),
+        NotificationType.DEPARTURE_PLAN_SUBMITTED,
+        () -> notifications.record(event));
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onDeparturePlanExecuted(DeparturePlanExecutedEvent event) {
+    safely(
+        event.tenantId(),
+        NotificationType.DEPARTURE_PLAN_EXECUTED,
+        () -> notifications.record(event));
   }
 
   private void safely(long tenantId, NotificationType type, Runnable action) {

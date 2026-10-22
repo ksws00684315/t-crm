@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -42,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class UserService {
+  private static final Logger LOG = LoggerFactory.getLogger(UserService.class);
+
   private final SysUserMapper users;
   private final SysUserTenantMapper members;
   private final BCryptPasswordEncoder passwords;
@@ -207,9 +211,43 @@ public class UserService {
         new LambdaUpdateWrapper<SysUserTenantDO>().set(SysUserTenantDO::getStatus, status));
     if (status == 0) {
       if (target.getRole() == Role.STAFF) {
-        TransactionalEvents.publish(events, new StaffDisabledEvent(tenantId, id));
+        TransactionalEvents.publish(events, new StaffDisabledEvent(tenantId, id, current.id()));
       }
       CurrentUserContext.logoutCompany(id, tenantId);
+    }
+  }
+
+  /**
+   * Disables one membership in an explicit company on behalf of the system, used when a departure
+   * plan takes effect (task 41). Same effect as the administrator's disable: the staff member's
+   * creators are unassigned through {@link StaffDisabledEvent} and the tokens working in this
+   * company end. Idempotent. Requires an active transaction.
+   */
+  public void disableMembership(long tenantId, long userId, Long actorId) {
+    if (members.lockMember(userId, tenantId) == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    int changed =
+        members.update(
+            null,
+            new LambdaUpdateWrapper<SysUserTenantDO>()
+                .eq(SysUserTenantDO::getUserId, userId)
+                .eq(SysUserTenantDO::getTenantId, tenantId)
+                .eq(SysUserTenantDO::getStatus, 1)
+                .set(SysUserTenantDO::getStatus, 0)
+                .set(SysUserTenantDO::getUpdateBy, actorId)
+                .set(SysUserTenantDO::getUpdateTime, Instant.now()));
+    if (changed != 1) {
+      return;
+    }
+    TransactionalEvents.publish(
+        events, new StaffDisabledEvent(tenantId, userId, actorId == null ? userId : actorId));
+    try {
+      CurrentUserContext.logoutCompany(userId, tenantId);
+    } catch (RuntimeException e) {
+      // Scheduled execution has no web context; such a token is refused by CurrentUserContext on
+      // its next request because the membership is disabled.
+      LOG.debug("Token logout skipped for user {} in company {}", userId, tenantId, e);
     }
   }
 

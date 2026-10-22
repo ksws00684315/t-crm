@@ -20,6 +20,15 @@ final class NotificationParamsCodec {
           case KOLS_UNASSIGNED -> new UnassignedParams(params.bdName(), params.count());
           case PREPAY_SUBMITTED, PREPAY_APPROVED, PREPAY_REJECTED, PREPAY_PAID ->
               new PrepayParams(params.prepayNo());
+          case DEPARTURE_PLAN_SUBMITTED ->
+              new DepartureParams(params.bdName(), params.effectiveAt());
+          case DEPARTURE_PLAN_EXECUTED ->
+              new DepartureExecutedParams(
+                  params.bdName(),
+                  params.effectiveAt(),
+                  params.heirName(),
+                  params.result(),
+                  params.planType());
         };
     return JSON.writeValueAsString(body);
   }
@@ -38,7 +47,11 @@ final class NotificationParamsCodec {
           text(node, "reason"),
           text(node, "bdName"),
           count,
-          text(node, "prepayNo"));
+          text(node, "prepayNo"),
+          text(node, "heirName"),
+          text(node, "effectiveAt"),
+          text(node, "result"),
+          text(node, "planType"));
     } catch (JacksonException ex) {
       return empty();
     }
@@ -65,4 +78,8 @@ final class NotificationParamsCodec {
   private record UnassignedParams(String bdName, Integer count) {}
 
   private record PrepayParams(String prepayNo) {}
+  private record DepartureParams(String bdName, String effectiveAt) {}
+
+  private record DepartureExecutedParams(
+      String bdName, String effectiveAt, String heirName, String result, String planType) {}
 }

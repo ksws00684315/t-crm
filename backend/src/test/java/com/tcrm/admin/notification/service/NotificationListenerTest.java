@@ -9,7 +9,10 @@ import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
+import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
+import com.tcrm.admin.system.api.DeparturePlanSubmittedEvent;
 import java.lang.reflect.Method;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -37,6 +40,24 @@ class NotificationListenerTest {
         .doesNotThrowAnyException();
     assertThatCode(() -> listener.onKolsUnassigned(new KolsUnassignedEvent(1L, 5L, "Blake", 1)))
         .doesNotThrowAnyException();
+    assertThatCode(
+            () ->
+                listener.onDeparturePlanSubmitted(
+                    new DeparturePlanSubmittedEvent(
+                        1L, 5L, "Blake", Instant.parse("2026-10-30T10:00:00Z"))))
+        .doesNotThrowAnyException();
+    assertThatCode(
+            () ->
+                listener.onDeparturePlanExecuted(
+                    new DeparturePlanExecutedEvent(
+                        1L,
+                        5L,
+                        "Blake",
+                        "RESIGN",
+                        Instant.parse("2026-10-30T10:00:00Z"),
+                        "Carol",
+                        "TRANSFERRED")))
+        .doesNotThrowAnyException();
   }
 
   @Test
@@ -51,6 +72,6 @@ class NotificationListenerTest {
       listeners++;
       assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
-    assertThat(listeners).isEqualTo(4);
+    assertThat(listeners).isEqualTo(6);
   }
 }

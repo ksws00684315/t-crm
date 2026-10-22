@@ -87,7 +87,7 @@ describe("labels", () => {
 
   it("keeps platform administrator out of the company account types", () => {
     expect(SELECTABLE_ROLES).toEqual(["SUPER_ADMIN", "STAFF"]);
-    expect(POST_TEMPLATES).toEqual(["OPERATOR", "BD"]);
+    expect(POST_TEMPLATES).toEqual(["OPERATOR", "BD", "FINANCE"]);
     expect(isStaff(staff("ALL", []))).toBe(true);
     expect(isStaff(superAdmin)).toBe(false);
     expect(isSuperAdminAccount(superAdmin)).toBe(true);

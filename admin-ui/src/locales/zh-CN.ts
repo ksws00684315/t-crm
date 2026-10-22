@@ -62,6 +62,7 @@ const zhCN = {
   post: {
     OPERATOR: "运营",
     BD: "商务",
+    FINANCE: "财务",
     none: "—"
   },
   permissionGroup: {
@@ -174,6 +175,7 @@ const zhCN = {
     orderList: "订单列表",
     orderUnmatched: "人工匹配池",
     refundQuery: "退款查询",
+    orderChain: "订单链路",
     kolManage: "达人管理",
     kols: "达人列表",
     kolItems: "达人商品",
@@ -192,7 +194,8 @@ const zhCN = {
     password: "修改密码",
     forbidden: "无权访问",
     notFound: "页面不存在",
-    notifications: "站内消息"
+    notifications: "站内消息",
+    resignation: "离职申请"
   },
   errors: {
     SYSTEM_CONFIG_INVALID: "系统配置无效，请检查后重试",
@@ -217,6 +220,12 @@ const zhCN = {
     USER_INVALID_DATA_SCOPE: "“仅本人数据”范围只适用于子账号",
     USER_PERMISSION_INVALID: "权限无效，请重新勾选",
     USER_LAST_SUPER_ADMIN: "系统至少需要保留一个启用的超级管理员",
+    DEPARTURE_NOT_BD_ACCOUNT: "只有商务（仅本人数据范围的子账号）才能离职",
+    DEPARTURE_INVALID_TIME: "生效时间必须晚于当前时间",
+    DEPARTURE_PLAN_EXISTS: "该账号已有待生效的离职计划，请先撤销或修改",
+    DEPARTURE_PLAN_NOT_SCHEDULED: "该账号没有待生效的离职计划",
+    DEPARTURE_SELF_SUBMITTED_ONLY: "只能撤销本人提交的离职申请",
+    DEPARTURE_INVALID_HEIR: "继承人必须是其他在职商务",
     KOL_EMAIL_EXISTS: "该邮箱已被其他达人使用",
     KOL_CODE_EXISTS: "该达人编号已存在",
     KOL_ALREADY_ACTIVATED: "该达人已激活账号，无需再次邀请",
@@ -411,6 +420,7 @@ const zhCN = {
   },
   layout: {
     changePassword: "修改密码",
+    resignation: "离职申请",
     user: "{nickname}（{role}）",
     collapse: "折叠侧边栏",
     expand: "展开侧边栏",
@@ -627,6 +637,7 @@ const zhCN = {
     namePlaceholder: "达人名称",
     emailPlaceholder: "name{'@'}example.com",
     bd: "负责商务",
+    bdOption: "{nickname}（{username}）",
     defaultRate: "佣金比例",
     code: "达人ID",
     links: "链接",
@@ -824,6 +835,52 @@ const zhCN = {
     transferKols: "转移名下达人",
     noKols: "名下没有达人",
     recordsHint: "转移记录请到 系统管理 → 操作日志 查询"
+  },
+  departure: {
+    column: "离职计划",
+    none: "未设置",
+    doneResign: "已离职",
+    doneDisable: "已停用",
+    planText: "{type} · {time} · {heir}",
+    heirShort: "→ {name}",
+    awaitingHeir: "待指定继承人",
+    reasonTooltip: "原因：{reason}",
+    mark: "标记离职",
+    editPlan: "修改离职计划",
+    cancelPlan: "撤销离职计划",
+    cancelTitle: "撤销离职计划",
+    cancelConfirm: "确定撤销 {username} 的离职计划？",
+    cancelled: "离职计划已撤销",
+    created: "离职计划已创建",
+    updated: "离职计划已更新",
+    markTitle: "标记 {username} 离职",
+    editTitle: "修改 {username} 的离职计划",
+    type: "类型",
+    typeResign: "离职",
+    typeDisable: "停用",
+    effectiveTime: "生效时间",
+    now: "立即",
+    at: "指定时间",
+    pickTime: "请选择生效时间",
+    pickTimePlaceholder: "选择日期时间",
+    timeFuture: "生效时间必须晚于当前时间",
+    timezoneHint: "时区：{timezone}（UTC{offset}）",
+    heir: "继承人",
+    heirPlaceholder: "选择继承人",
+    noHeir: "不指定（转为未分配）",
+    noHeirHint: "未指定继承人：生效后该商务名下达人全部转为未分配。",
+    withHeirHint: "指定继承人：生效后该商务名下达人自动转交给继承人。",
+    reason: "原因",
+    reasonPlaceholder: "可选，最多 255 字",
+    bdOnly: "只有商务（仅本人数据范围的子账号）可以提交离职申请。",
+    submitted: "离职申请已提交",
+    submittedHint:
+      "到期后系统会自动把名下达人转交给继承人或转为未分配，并停用你的账号。在此之前可以随时撤销。",
+    status: "状态",
+    statusScheduled: "待生效",
+    plannedLeaveAt: "预计离职时间",
+    submit: "提交离职申请",
+    cancelOwnConfirm: "确定撤销你的离职申请？"
   },
   linkTemplate: {
     hint: "本公司全部代购平台，含已停用。",
@@ -1197,9 +1254,13 @@ const zhCN = {
   order: {
     shop: "店铺",
     orderId: "订单号",
+    channel: "渠道",
+    channelOption: {
+      WEIDIAN: "微店"
+    },
     payTime: "支付时间",
     orderStatus: "订单状态",
-    payAmount: "实付",
+    payAmount: "支付金额",
     refundTotal: "退款合计",
     kol: "达人",
     bd: "所属商务",
@@ -1207,6 +1268,22 @@ const zhCN = {
     attributionStatus: "归因状态",
     payRange: "支付时间",
     kolCode: "达人编号",
+    freight: "运费",
+    createTime: "创建时间",
+    refundStatusColumn: "退款状态",
+    actionView: "查看",
+    actionChain: "链路",
+    chainNoKol: "未归属达人的订单暂无链路",
+    source: {
+      API: "接口同步",
+      IMPORT: "导入"
+    },
+    refundStatus: {
+      NONE: "无退款",
+      PROCESSING: "退款中",
+      PARTIAL_SUCCESS: "部分退款成功",
+      FULL_SUCCESS: "全额退款成功"
+    },
     status: {
       UNPAID: "待支付",
       PAID: "已支付",
@@ -1251,6 +1328,84 @@ const zhCN = {
     syncFailed: "同步失败",
     syncNow: "立即同步",
     syncStarted: "已开始同步",
+    sync: {
+      statesTab: "同步状态",
+      failuresTab: "失败任务",
+      typeColumn: "类型",
+      typeOption: {
+        ORDER: "订单",
+        REFUND: "退款"
+      },
+      kindOption: {
+        ORDER_SYNC: "订单同步",
+        REFUND_SYNC: "退款同步",
+        ORDER_IMPORT: "订单导入",
+        REFUND_IMPORT: "退款导入"
+      },
+      source: "来源",
+      failures24h: "24 小时失败次数",
+      missingFields: "缺字段记录数",
+      importCutoff: "最近导入数据截止时间",
+      time: "时间",
+      linkedTask: "关联导入任务",
+      viewTask: "查看",
+      cleanFailures: "清理",
+      cleanFailuresTitle: "清理失败记录",
+      cleanFailuresPrompt: "将删除 N 天前的失败记录，删除后不可恢复。请输入天数（1～3650）：",
+      cleanFailuresConfirm: "确定删除 {days} 天前的失败记录？删除后不可恢复。",
+      cleanFailuresDaysInvalid: "请输入 1～3650 的整数",
+      cleanFailuresDone: "已删除 {count} 条失败记录"
+    },
+    refund: {
+      no: "退款单号",
+      orderNo: "原订单号",
+      typeColumn: "退款类型",
+      statusColumn: "退款状态",
+      amount: "退款金额",
+      applyTime: "申请时间",
+      finishTime: "成功时间",
+      detailTitle: "退款详情",
+      items: "退款商品",
+      type: {
+        REFUND_ONLY: "仅退款",
+        RETURN_REFUND: "退货退款",
+        UNKNOWN: "未知"
+      },
+      status: {
+        PROCESSING: "退款中",
+        SUCCESS: "退款成功",
+        CLOSED: "已关闭",
+        UNKNOWN: "未知"
+      }
+    },
+    detail: {
+      title: "订单详情",
+      merchantNo: "商户号",
+      itemAmount: "商品金额",
+      totalAmount: "订单总额",
+      orderTime: "下单时间",
+      source: "来源",
+      lastSyncTime: "最后同步时间",
+      items: "商品行",
+      image: "图片",
+      itemName: "商品名称",
+      unitPrice: "单价",
+      lineRefund: "退款金额"
+    },
+    chain: {
+      copyJob: "商品创建任务",
+      copyJobTime: "创建时间",
+      kolItem: "达人商品链接",
+      linkCode: "链接编码",
+      sourceItemId: "来源商品 ID",
+      targetItemId: "目标商品 ID",
+      orderLine: "订单商品行",
+      refunds: "退款",
+      noRefund: "无退款",
+      noLines: "无商品行",
+      ledger: "账务流水",
+      withdrawals: "提现占用"
+    },
     importOrders: "导入订单",
     importRefunds: "导入退款",
     orderImportTitle: "导入订单",
@@ -1273,7 +1428,25 @@ const zhCN = {
       reasonRequired: "请填写原因",
       assigned: "已指定达人",
       markedNonKol: "已标为非达人订单",
-      rematched: "已完成重新匹配"
+      rematched: "已完成重新匹配",
+      evidence: "查看依据",
+      evidenceTitle: "查看依据",
+      evidenceLine: "商品行",
+      mappings: "达人商品对应关系",
+      effectiveRange: "生效起止",
+      coversPayTime: "覆盖支付时间",
+      coversYes: "覆盖",
+      coversNo: "不覆盖",
+      sourceProduct: "原商品",
+      unmatchedReason: "未匹配原因",
+      reasonOption: {
+        PENDING: "未支付",
+        CONFLICT: "证据冲突",
+        NO_MAPPING: "缺规则",
+        MAPPING_EXPIRED: "映射在支付时已失效",
+        MATCHED: "已匹配"
+      },
+      manualRecords: "人工处理记录"
     }
   },
   link: {
@@ -1313,7 +1486,11 @@ const zhCN = {
     closeRunning: "后台继续，关闭窗口",
     close: "关闭",
     again: "继续导入",
-    submit: "上传并导入"
+    submit: "上传并导入",
+    cutoffPlaceholder: "数据截止时间",
+    cutoffHint: "必填：导入文件中数据的截至时间，不能晚于当前时间",
+    cutoffRequired: "请选择数据截止时间",
+    cutoffFuture: "数据截止时间不能晚于当前时间"
   },
   audit: {
     time: "操作时间",
@@ -1425,7 +1602,18 @@ const zhCN = {
       PAYOUT_ACCOUNT_SUBMITTED: "达人 {kolCode} 提交了 {accountType} 收款账户，待审核",
       ORDER_SYNC_FAILED: "店铺 {shopName} 的订单同步失败",
       BD_TRANSFER_CANCELLED: "达人 {kolCode} 的预约转移已取消：{reason}",
-      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配"
+      KOLS_UNASSIGNED: "商务 {bdName} 已停用，{count} 位达人转为未分配",
+      DEPARTURE_PLAN_SUBMITTED: "商务 {bdName} 提交了离职计划，{time} 生效",
+      DEPARTURE_PLAN_EXECUTED: "商务 {bdName} 的{kind}计划已生效：{result}"
+    },
+    planType: {
+      RESIGN: "离职",
+      DISABLE: "停用"
+    },
+    result: {
+      TRANSFERRED: "达人已转交给 {heir}",
+      UNASSIGNED: "名下达人已转为未分配",
+      HEIR_INVALID: "继承人不可用，名下达人已转为未分配"
     },
     reason: {
       OWNERSHIP_CHANGED: "执行时归属已变化",

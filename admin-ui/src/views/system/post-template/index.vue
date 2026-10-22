@@ -11,12 +11,12 @@ import PermissionPicker from "@/views/system/user/PermissionPicker.vue";
 defineOptions({ name: "SystemPostTemplatePage" });
 
 /**
- * Permissions (task 32 §2.3, contract 33 §3.4): the two post templates of this company. Saving
+ * Permissions (task 32 §2.3, contract 33 §3.4): the post templates of this company. Saving
  * only changes what newly created accounts start with; existing accounts keep their grants.
  */
 const { t } = useI18n();
 
-const TEMPLATES: PostTemplate[] = ["BD", "OPERATOR"];
+const TEMPLATES: PostTemplate[] = ["BD", "OPERATOR", "FINANCE"];
 
 const loading = ref(false);
 const catalog = ref<PermissionItemVO[]>([]);

@@ -37,7 +37,7 @@ export interface PermissionItemVO {
   group: string;
 }
 
-/** One post template. `code` is `OPERATOR` or `BD` in this build. */
+/** One post template. `code` is `OPERATOR`, `BD` or `FINANCE` in this build. */
 export interface PermissionTemplateVO {
   code: string;
   permissions: string[];

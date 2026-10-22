@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { UserVO } from "./types";
+import type { DeparturePlanVO, UserVO } from "./types";
 
 export interface LoginRequest {
   username: string;
@@ -58,6 +58,29 @@ export function fetchCurrentUser(): Promise<UserVO> {
 /** Moves the session to another company of this account; answers like `/auth/me`. */
 export function switchCompany(tenantId: string): Promise<UserVO> {
   return http.request<UserVO>({ method: "post", url: "/auth/company", data: { tenantId } });
+}
+
+/** `ResignationRequest`: a BD resigning about itself; it may not name an heir. */
+export interface ResignationRequest {
+  plannedLeaveAt: string;
+  reason?: string | null;
+}
+
+/** The caller's own pending resignation; null when there is none (task 41). */
+export function getOwnResignation(): Promise<DeparturePlanVO | null> {
+  return http.request<DeparturePlanVO | null>({ method: "get", url: "/auth/resignation" });
+}
+
+export function submitResignation(request: ResignationRequest): Promise<DeparturePlanVO> {
+  return http.request<DeparturePlanVO>({
+    method: "post",
+    url: "/auth/resignation",
+    data: request
+  });
+}
+
+export function cancelResignation(): Promise<null> {
+  return http.request<null>({ method: "delete", url: "/auth/resignation" });
 }
 
 export function changePassword(request: PasswordRequest): Promise<null> {

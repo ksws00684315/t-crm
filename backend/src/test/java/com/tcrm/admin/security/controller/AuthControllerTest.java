@@ -101,7 +101,9 @@ class AuthControllerTest {
     mvc =
         MockMvcBuilders.standaloneSetup(
                 new UserController(
-                    users, mock(com.tcrm.admin.system.service.UserPermissionService.class)),
+                    users,
+                    mock(com.tcrm.admin.system.service.UserPermissionService.class),
+                    mock(com.tcrm.admin.system.service.DepartureService.class)),
                 new AuthController(
                     auth, current, new ClientIpResolver("10.0.0.0/8", "X-Forwarded-For"), captchas),
                 new ErrorController())
