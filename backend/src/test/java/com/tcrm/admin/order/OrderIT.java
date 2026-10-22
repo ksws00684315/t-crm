@@ -169,9 +169,10 @@ class OrderIT {
 
   private void shop(long id, long tenant) {
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,create_time,update_time) VALUES(?,?,?,?,now(),now())",
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,create_time,update_time) VALUES(?,?,?,?,?,now(),now())",
         id,
         tenant,
+        "SHOP-%06d".formatted(id + 900000),
         "Test shop",
         String.valueOf(id));
   }
@@ -669,14 +670,14 @@ class OrderIT {
   @Test
   void shouldListEveryCompanyShopWithSyncStatus_whenReadingSyncStates() throws Exception {
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time) VALUES(30,1,'Disabled shop','30',0,now(),now())");
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time) VALUES(30,1,'SHOP-900030','Disabled shop','30',0,now(),now())");
     jdbc.update(
         "INSERT INTO crm_order_sync_state(id,tenant_id,shop_id,last_success_at,last_error,create_time,update_time) VALUES(10,1,10,?,'order detail failed for order 1000',now(),now())",
         Timestamp.from(PAID));
     var other =
         CompanySessions.openCompany(mvc, json, PASSWORD, "order-states-co", "order-states-admin");
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,create_time,update_time) VALUES(40,?,'Other company shop','40',now(),now())",
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,create_time,update_time) VALUES(40,?,'SHOP-900040','Other company shop','40',now(),now())",
         other.tenantId());
     mvc.perform(get("/admin-api/order/sync-states").header("X-Admin-Token", admin))
         .andExpect(status().isOk())

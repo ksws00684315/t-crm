@@ -74,7 +74,7 @@ class OrderSyncCoordinatorTest {
   void shouldAcquireLockBeforeAccepting_whenTriggeredManually() throws Exception {
     ready();
     service.trigger(10L);
-    verify(sync, timeout(2000)).synchronize(10);
+    verify(sync, timeout(2000)).synchronize(10, null);
     verify(locks)
         .run(
             org.mockito.ArgumentMatchers.eq("order:sync:10"),

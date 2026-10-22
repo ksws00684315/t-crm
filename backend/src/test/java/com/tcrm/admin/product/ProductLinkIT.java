@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -139,7 +140,7 @@ class ProductLinkIT {
   @Test
   void shouldConvertProcessAndResolve_endToEnd() throws Exception {
     long shopId = createShop("1001", "Main");
-    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
         .andExpect(status().isOk());
     authorizeShop(shopId);
     long productId = insertProduct(shopId, "10001", "Source item");
@@ -222,16 +223,16 @@ class ProductLinkIT {
             kolId,
             productId);
     assertThat(mappingSource).isEqualTo("COPY");
-    Integer outbox =
-        jdbc.queryForObject(
-            """
-            SELECT COUNT(*) FROM crm_link_index_outbox
-            WHERE scope = 'MAPPING' AND scope_id = ? AND product_id = ?
-            """,
-            Integer.class,
-            kolId,
-            productId);
-    assertThat(outbox).isGreaterThanOrEqualTo(1);
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM crm_link_index_outbox WHERE scope = 'MAPPING' AND scope_id = ? AND product_id = ?",
+                    Integer.class,
+                    kolId,
+                    productId)
+                >= 1,
+        "copy mapping should register a link-index refresh");
 
     TestWait.until(
         Duration.ofSeconds(10),
@@ -291,7 +292,13 @@ class ProductLinkIT {
         .andExpect(jsonPath("$.msg").value("复制令牌无效或已作废"));
 
     long kolId = createKol("NoShop", "noshop17b@example.com");
+    long shopId = createShop("1001", "Temporary pool member");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
     String token = createToken(kolId, 5);
+    mvc.perform(delete("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
     mvc.perform(
             post(BASE + "/convert")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -302,8 +309,32 @@ class ProductLinkIT {
                     """
                         .formatted(token)))
         .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.errorCode").value("COPY_TARGET_SHOP_MISSING"))
-        .andExpect(jsonPath("$.msg").value("未配置默认复制店铺，且令牌未指定目标店铺"));
+        .andExpect(jsonPath("$.errorCode").value("COPY_SHOP_CAPACITY_INSUFFICIENT"))
+        .andExpect(jsonPath("$.msg").value("自动复制池没有足够容量的可用店铺"));
+  }
+
+  @Test
+  void shouldRejectSpecifiedTargetShopCapacity_withChineseMsg() throws Exception {
+    long kolId = createKol("CapShop", "capshop17b@example.com");
+    long shopId = createShop("371002", "Capacity limited pool member");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    jdbc.update("UPDATE crm_shop SET max_items = 1, current_items = 0 WHERE id = ?", shopId);
+    String token = createTokenForShop(kolId, 1, shopId);
+    jdbc.update("UPDATE crm_shop SET current_items = 1 WHERE id = ?", shopId);
+    mvc.perform(
+            post(BASE + "/convert")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","callerPlatform":"google_sheet_plugin",
+                     "items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"1"}]}
+                    """
+                        .formatted(token)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errorCode").value("SHOP_COPY_CAPACITY_EXCEEDED"))
+        .andExpect(jsonPath("$.msg").value("复制数量超过可用店铺容量"));
   }
 
   @Test
@@ -325,7 +356,7 @@ class ProductLinkIT {
   @Test
   void shouldResolveAlreadyApplied_forOwnExclusiveItem() throws Exception {
     long shopId = createShop("1001", "Main");
-    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
         .andExpect(status().isOk());
     authorizeShop(shopId);
     long productId = insertProduct(shopId, "10001", "Source item");
@@ -414,7 +445,7 @@ class ProductLinkIT {
   @Test
   void shouldRejectResolve_withOtherKolToken() throws Exception {
     long shopId = createShop("1002", "Other");
-    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-target").header(ADMIN, admin))
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
         .andExpect(status().isOk());
     authorizeShop(shopId);
     long kolA = createKol("KolA", "kola17b@example.com");
@@ -458,7 +489,11 @@ class ProductLinkIT {
                     .header(ADMIN, admin)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        "{\"shopName\":\"" + name + "\",\"weidianShopId\":\"" + weidianId + "\"}"))
+                        "{\"shopName\":\""
+                            + name
+                            + "\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\""
+                            + weidianId
+                            + "\",\"maxItems\":20000}"))
             .andExpect(status().isOk())
             .andReturn();
     return Long.parseLong(
@@ -516,6 +551,28 @@ class ProductLinkIT {
         json.readTree(result.getResponse().getContentAsString()).path("data").path("id").asText());
   }
 
+  private String createTokenForShop(long kolId, int quota, long shopId) throws Exception {
+    MvcResult result =
+        mvc.perform(
+                post("/admin-api/kol/copy-tokens")
+                    .header(ADMIN, admin)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"kolId\":\""
+                            + kolId
+                            + "\",\"quota\":"
+                            + quota
+                            + ",\"validMinutes\":60,\"targetChannel\":\"WEIDIAN\",\"targetShopId\":\""
+                            + shopId
+                            + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString())
+        .path("data")
+        .path("token")
+        .asString();
+  }
+
   private String createToken(long kolId, int quota) throws Exception {
     MvcResult result =
         mvc.perform(
@@ -527,7 +584,7 @@ class ProductLinkIT {
                             + kolId
                             + "\",\"quota\":"
                             + quota
-                            + ",\"validMinutes\":60}"))
+                            + ",\"validMinutes\":60,\"targetChannel\":\"WEIDIAN\"}"))
             .andExpect(status().isOk())
             .andReturn();
     return json.readTree(result.getResponse().getContentAsString())
