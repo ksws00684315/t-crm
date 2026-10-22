@@ -177,6 +177,52 @@ class OrderWriterTest {
   }
 
   @Test
+  void shouldMapRefundDictionaries_whenSavingWeidianRefund() {
+    when(orders.selectOne(any())).thenReturn(order());
+    when(items.selectList(any())).thenReturn(List.of(item(20, "sub", "s")));
+    when(refunds.selectList(any())).thenReturn(List.of());
+
+    writer.saveRefund(
+        5,
+        refund(
+            "{\"refundBasicInfo\":{\"status\":10,\"refund_type\":\"2\","
+                + "\"itemList\":[{\"orderDescId\":\"sub\"}]}}"));
+
+    var saved = ArgumentCaptor.forClass(RefundDO.class);
+    verify(refunds).insert(saved.capture());
+    assertThat(saved.getValue().getRefundStatus()).isEqualTo("SUCCESS");
+    assertThat(saved.getValue().getRefundType()).isEqualTo("RETURN_REFUND");
+  }
+
+  @Test
+  void shouldMarkUnrecognizedRefundFieldsAsUnknown_whenSavingWeidianRefund() {
+    when(orders.selectOne(any())).thenReturn(order());
+    when(items.selectList(any())).thenReturn(List.of());
+    when(refunds.selectList(any())).thenReturn(List.of());
+
+    writer.saveRefund(5, refund("{\"refundBasicInfo\":{\"status\":\"weird\"}}"));
+
+    var saved = ArgumentCaptor.forClass(RefundDO.class);
+    verify(refunds).insert(saved.capture());
+    assertThat(saved.getValue().getRefundStatus()).isEqualTo("UNKNOWN");
+    assertThat(saved.getValue().getRefundType()).isEqualTo("UNKNOWN");
+    assertThat(saved.getValue().getRawStatus()).isEqualTo("weird");
+  }
+
+  @Test
+  void shouldFixImportedRefundToSuccess_whenSavingExcelRefund() {
+    when(orders.selectOne(any())).thenReturn(order());
+    when(items.selectList(any())).thenReturn(List.of(), List.of());
+    when(refunds.selectList(any())).thenReturn(List.of());
+    var row = new RefundDO();
+
+    assertThat(writer.saveImportedRefund(5, "100", "sub", row)).isTrue();
+
+    assertThat(row.getRefundStatus()).isEqualTo("SUCCESS");
+    assertThat(row.getRefundType()).isEqualTo("UNKNOWN");
+  }
+
+  @Test
   void shouldUseUniqueCurrentShopSku_whenRefundHasNoMatchingSubOrder() {
     when(orders.selectOne(any())).thenReturn(order());
     var first = item(20, "first", "a");

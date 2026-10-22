@@ -23,6 +23,7 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 class RefundImportControllerTest {
   private static final String BASE = "/admin-api/order/refund-imports";
+  private static final String CUTOFF = "2026-10-21T00:00:00Z";
   private final RefundImportService imports = mock(RefundImportService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
@@ -53,13 +55,19 @@ class RefundImportControllerTest {
 
   @Test
   void shouldAcceptUploadWith202AndTaskId_whenManagerSubmits() throws Exception {
-    when(imports.submit(any())).thenReturn(9007199254740993L);
-    mvc.perform(multipart(BASE).file(file).header(AdminMvcSupport.TOKEN_HEADER, manager()))
+    when(imports.submit(any(), any())).thenReturn(9007199254740993L);
+    mvc.perform(
+            multipart(BASE)
+                .file(file)
+                .param("dataCutoffTime", CUTOFF)
+                .header(AdminMvcSupport.TOKEN_HEADER, manager()))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.data.taskId").value("9007199254740993"));
     var dto = ArgumentCaptor.forClass(ImportFileDTO.class);
-    verify(imports).submit(dto.capture());
+    var cutoff = ArgumentCaptor.forClass(Instant.class);
+    verify(imports).submit(dto.capture(), cutoff.capture());
     assertThat(dto.getValue().fileName()).isEqualTo("imp.xlsx");
+    assertThat(cutoff.getValue()).isEqualTo(Instant.parse(CUTOFF));
   }
 
   @Test
@@ -70,6 +78,13 @@ class RefundImportControllerTest {
         .andExpect(status().isForbidden());
     mvc.perform(get(BASE + "/template").header(AdminMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isForbidden());
+    verifyNoInteractions(imports);
+  }
+
+  @Test
+  void shouldReturn400_whenDataCutoffTimeIsMissing() throws Exception {
+    mvc.perform(multipart(BASE).file(file).header(AdminMvcSupport.TOKEN_HEADER, manager()))
+        .andExpect(status().isBadRequest());
     verifyNoInteractions(imports);
   }
 
@@ -86,13 +101,21 @@ class RefundImportControllerTest {
 
   @Test
   void shouldMapFileErrors_whenServiceRejectsFile() throws Exception {
-    when(imports.submit(any()))
+    when(imports.submit(any(), any()))
         .thenThrow(new BusinessException(ErrorCode.TASK_FILE_HEADER_MISMATCH))
         .thenThrow(new BusinessException(ErrorCode.TASK_QUEUE_FULL));
-    mvc.perform(multipart(BASE).file(file).header(AdminMvcSupport.TOKEN_HEADER, manager()))
+    mvc.perform(
+            multipart(BASE)
+                .file(file)
+                .param("dataCutoffTime", CUTOFF)
+                .header(AdminMvcSupport.TOKEN_HEADER, manager()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("TASK_FILE_HEADER_MISMATCH"));
-    mvc.perform(multipart(BASE).file(file).header(AdminMvcSupport.TOKEN_HEADER, manager()))
+    mvc.perform(
+            multipart(BASE)
+                .file(file)
+                .param("dataCutoffTime", CUTOFF)
+                .header(AdminMvcSupport.TOKEN_HEADER, manager()))
         .andExpect(status().isTooManyRequests())
         .andExpect(jsonPath("$.errorCode").value("TASK_QUEUE_FULL"));
   }
@@ -106,7 +129,11 @@ class RefundImportControllerTest {
             throw new IOException("unit");
           }
         };
-    mvc.perform(multipart(BASE).file(broken).header(AdminMvcSupport.TOKEN_HEADER, manager()))
+    mvc.perform(
+            multipart(BASE)
+                .file(broken)
+                .param("dataCutoffTime", CUTOFF)
+                .header(AdminMvcSupport.TOKEN_HEADER, manager()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("TASK_FILE_INVALID"));
     verifyNoInteractions(imports);

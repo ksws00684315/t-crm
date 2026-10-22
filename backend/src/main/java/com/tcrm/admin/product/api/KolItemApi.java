@@ -123,6 +123,24 @@ public interface KolItemApi {
   int closeCurrentMappingsForKol(Long kolId, Instant at, Long actorId);
 
   /**
+   * Returns the mappings (current and closed) with these IDs, with validity windows and original
+   * product fields (task 40: order chain). Unknown IDs are skipped; an empty collection returns an
+   * empty list without querying.
+   *
+   * @param kolItemIds {@code crm_kol_item.id} values
+   */
+  List<KolMappingEvidenceDTO> listMappingsByIds(Collection<Long> kolItemIds);
+
+  /**
+   * Returns every mapping (current and closed) whose exclusive item is this shop's Weidian item
+   * (task 40: manual-match evidence). Mappings of other companies are never returned.
+   *
+   * @param shopId shop of the exclusive item ({@code crm_kol_item.shop_id})
+   * @param weidianItemId exclusive item Weidian ID
+   */
+  List<KolMappingEvidenceDTO> listMappingsByShopItem(Long shopId, String weidianItemId);
+
+  /**
    * Link codes of these mappings, current or closed (task 39, for the order trace page). Unknown
    * ids are skipped. An empty collection returns an empty list without querying.
    *

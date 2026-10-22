@@ -43,7 +43,7 @@ class OrderSyncCoordinatorTest {
   }
 
   private void ready() throws Exception {
-    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 1));
+    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 1, null));
     when(auth.authorizedShopIds()).thenReturn(List.of(10L));
     when(current.user())
         .thenReturn(
@@ -96,9 +96,9 @@ class OrderSyncCoordinatorTest {
   @Test
   void shouldRejectDisabledMissingOrUnauthorizedShop_whenTriggered() {
     assertThatThrownBy(() -> service.trigger(10L)).hasMessageContaining("not found");
-    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 0));
+    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 0, null));
     assertThatThrownBy(() -> service.trigger(10L)).hasMessageContaining("disabled");
-    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 1));
+    when(shops.findShop(10L)).thenReturn(new ShopAccessDTO(10L, "Test", "10", 1, null));
     assertThatThrownBy(() -> service.trigger(10L)).hasMessageContaining("not connected");
   }
 
@@ -109,9 +109,9 @@ class OrderSyncCoordinatorTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(10L, "Test", "10", 1),
-                new ShopAccessDTO(20L, "Disabled", "20", 0),
-                new ShopAccessDTO(30L, "Unauthorized", "30", 1)));
+                new ShopAccessDTO(10L, "Test", "10", 1, null),
+                new ShopAccessDTO(20L, "Disabled", "20", 0, null),
+                new ShopAccessDTO(30L, "Unauthorized", "30", 1, null)));
     service.scheduled();
     verify(sync).synchronize(10);
     verify(sync, never()).synchronize(20);
@@ -126,7 +126,7 @@ class OrderSyncCoordinatorTest {
     when(auth.authorizedShopIds())
         .thenThrow(new IllegalStateException("test"))
         .thenReturn(List.of(10L));
-    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(10L, "Test", "10", 1)));
+    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(10L, "Test", "10", 1, null)));
     service.scheduled();
     verify(sync).synchronize(10);
   }
@@ -155,7 +155,8 @@ class OrderSyncCoordinatorTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(10L, "Test", "10", 1), new ShopAccessDTO(20L, "Test", "20", 1)));
+                new ShopAccessDTO(10L, "Test", "10", 1, null),
+                new ShopAccessDTO(20L, "Test", "20", 1, null)));
     org.mockito.Mockito.doThrow(new IllegalStateException("test"))
         .doAnswer(
             call -> {

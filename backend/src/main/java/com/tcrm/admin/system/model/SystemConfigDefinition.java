@@ -36,6 +36,9 @@ public enum SystemConfigDefinition {
   PAYOUT_ACCOUNT_MAX_PER_KOL("payout-account.max-per-kol", "business", "integer", null, "5", 1, 20),
   KOL_INVITE_TTL_HOURS("kol.invite-ttl-hours", "business", "hours", null, "72", 1, 72),
   OPER_LOG_RETENTION_DAYS("oper-log.retention-days", "business", "days", null, "180", 180, 3650),
+  /** 0 = automatic cleanup off (task 40 owner decision 2026-10-22). */
+  ORDER_SYNC_FAILURE_RETENTION_DAYS(
+      "order.sync-failure.retention-days", "business", "days", null, "0", 0, 3650),
   LOGIN_PAIR_LIMIT("login.fail.pair-limit", "security", "integer", null, "5", 3, 1000),
   LOGIN_IP_LIMIT("login.fail.ip-limit", "security", "integer", null, "20", 3, 10000),
   LOGIN_ACCOUNT_LIMIT("login.fail.account-limit", "security", "integer", null, "50", 3, 10000),

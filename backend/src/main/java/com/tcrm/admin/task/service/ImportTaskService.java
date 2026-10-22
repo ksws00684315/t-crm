@@ -8,6 +8,7 @@ import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportReason;
 import com.tcrm.admin.task.api.ImportRowProcessor;
 import com.tcrm.admin.task.api.ImportTaskApi;
+import com.tcrm.admin.task.api.ImportTaskOutcome;
 import com.tcrm.admin.task.api.TaskType;
 import com.tcrm.admin.task.mapper.TaskFileMapper;
 import com.tcrm.admin.task.mapper.TaskMapper;
@@ -89,6 +90,18 @@ public class ImportTaskService implements ImportTaskApi {
       ImportFileDTO file,
       Supplier<ImportRowProcessor> processor,
       int maxRows) {
+    return submitImport(type, headerKeys, legacyHeaderKeys, file, processor, maxRows, null);
+  }
+
+  @Override
+  public Long submitImport(
+      TaskType type,
+      List<String> headerKeys,
+      List<String> legacyHeaderKeys,
+      ImportFileDTO file,
+      Supplier<ImportRowProcessor> processor,
+      int maxRows,
+      String params) {
     boolean allowCsv = type == TaskType.ORDER_IMPORT || type == TaskType.REFUND_IMPORT;
     excel.check(file, allowCsv);
     boolean asCsv =
@@ -111,6 +124,9 @@ public class ImportTaskService implements ImportTaskApi {
     task.setFailed(0);
     task.setDeleted(false);
     task.setLocale(AppLocale.current().tag());
+    if (params != null) {
+      task.setParams(params);
+    }
     TaskFileDO input = new TaskFileDO();
     input.setKind(TaskFileKind.INPUT);
     input.setFileName(fileName(file.fileName()));
@@ -248,7 +264,20 @@ public class ImportTaskService implements ImportTaskApi {
       errorFile.setContent(excel.write(errorHeaders, errors));
     }
     finish(id, errorFile, status, status == TaskStatus.FAILED ? MESSAGE_ALL_FAILED : null, result);
+    notifyFinished(processor, rows.size(), done, failed, status);
     LOG.info("Batch task {} finished {}: {} rows, {} failed", id, status, done, failed);
+  }
+
+  private static void notifyFinished(
+      ImportRowProcessor processor, int total, int done, int failed, TaskStatus status) {
+    var outcome =
+        new ImportTaskOutcome(total, done, failed, ImportTaskOutcome.Status.valueOf(status.name()));
+    try {
+      processor.onFinish(outcome);
+    } catch (RuntimeException e) {
+      // The task itself already finished; listener problems must not flip its status.
+      LOG.error("Batch task finish listener failed: {}", e.getClass().getName());
+    }
   }
 
   private List<ImportReason> processRow(Long id, ImportRowProcessor processor, List<String> row) {
