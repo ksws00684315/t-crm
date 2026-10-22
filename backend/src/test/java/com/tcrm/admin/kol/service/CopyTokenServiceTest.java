@@ -77,7 +77,7 @@ class CopyTokenServiceTest {
   void setUp() {
     when(current.user()).thenReturn(admin());
     when(shops.copyChannels())
-        .thenReturn(List.of(new CopyChannelDTO("WEIDIAN", 100000, List.of())));
+        .thenReturn(List.of(new CopyChannelDTO("WEIDIAN", 100000, List.of(), 1, 1440)));
     companyScope = TenantScope.openCompany(1L);
   }
 

@@ -34,7 +34,12 @@ public interface CopyTargetShopApi {
   /** Company-scoped immutable shop codes. */
   Map<Long, String> codesByIds(Collection<Long> shopIds);
 
-  record CopyChannelDTO(String channel, int remainingCapacity, java.util.List<CopyShopDTO> shops) {}
+  record CopyChannelDTO(
+      String channel,
+      int remainingCapacity,
+      java.util.List<CopyShopDTO> shops,
+      int defaultQuota,
+      int defaultValidMinutes) {}
 
   record CopyShopDTO(Long id, String shopCode, String shopName, int remainingCapacity) {}
 }

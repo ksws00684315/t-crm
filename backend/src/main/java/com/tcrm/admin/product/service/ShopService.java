@@ -471,9 +471,15 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
                         availableCapacity(row.id(), row.maxItems(), row.currentItems())))
             .filter(row -> row.remainingCapacity() > 0)
             .toList();
+    int defaultQuota = configs.getInt("copy-token.default-quota");
+    int defaultValidMinutes = configs.getInt("copy-token.default-valid-minutes");
     return List.of(
         new CopyChannelDTO(
-            "WEIDIAN", shopRows.stream().mapToInt(CopyShopDTO::remainingCapacity).sum(), shopRows));
+            "WEIDIAN",
+            shopRows.stream().mapToInt(CopyShopDTO::remainingCapacity).sum(),
+            shopRows,
+            defaultQuota,
+            defaultValidMinutes));
   }
 
   private int availableCapacity(long shopId, int maxItems, int currentItems) {
