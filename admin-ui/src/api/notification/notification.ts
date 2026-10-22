@@ -2,7 +2,14 @@ import { http } from "../http";
 import type { PageResult } from "../types";
 
 export type NotificationType =
-  "PAYOUT_ACCOUNT_SUBMITTED" | "ORDER_SYNC_FAILED" | "BD_TRANSFER_CANCELLED" | "KOLS_UNASSIGNED";
+  | "PREPAY_SUBMITTED"
+  | "PREPAY_APPROVED"
+  | "PREPAY_REJECTED"
+  | "PREPAY_PAID"
+  | "PAYOUT_ACCOUNT_SUBMITTED"
+  | "ORDER_SYNC_FAILED"
+  | "BD_TRANSFER_CANCELLED"
+  | "KOLS_UNASSIGNED";
 
 /** Render parameters. Only the fields for the message type are present. */
 export interface NotificationParams {

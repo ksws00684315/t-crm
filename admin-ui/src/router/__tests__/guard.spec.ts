@@ -235,6 +235,7 @@ describe("installGuard with the real route table", () => {
     const fund = layout?.children?.find(route => route.path === "fund");
     expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
       ["payout-account:review", "commission:view"],
+      ["commission:view", "prepay:review", "prepay:pay"],
       "commission:view",
       "commission:view"
     ]);

@@ -12,6 +12,7 @@ import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
+vi.mock("@/api/commission/prepay", () => ({ prepayAccounts: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/kol/promotion");
 vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");
@@ -215,7 +216,7 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("moves review into its status and keeps prepay disabled", async () => {
+  it("moves review into its status and opens authorized prepay applications", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
       { ...row, reviewStatus: "PENDING", id: "1" },
@@ -230,15 +231,12 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    // Prepay is under development: shown inline but disabled on every row, with the hint as its
-    // tooltip.
     const prepay = ["1", "2", "3"].map(id => rowButtons(`action-prepay-${id}`)[0]);
-    expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
-    expect(
-      wrapper
-        .findAllComponents({ name: "ElTooltip" })
-        .filter(tip => tip.props("content") === "开发中").length
-    ).toBeGreaterThanOrEqual(3);
+    expect(prepay.every(item => !item?.classList.contains("is-disabled"))).toBe(true);
+    await element("action-prepay-2").trigger("click");
+    await flushPromises();
+    expect(document.querySelector('[data-test="prepay-apply"]')).not.toBeNull();
+    expect(wrapper.getComponent({ name: "ApplyDialog" }).props("kol")).toMatchObject({ id: "2" });
     wrapper.unmount();
   });
 

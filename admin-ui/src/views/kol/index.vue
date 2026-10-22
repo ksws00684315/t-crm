@@ -21,6 +21,8 @@ import CommissionDialog from "./CommissionDialog.vue";
 import InviteKolDialog from "./InviteKolDialog.vue";
 import KolManageTab from "./KolManageTab.vue";
 import KolProfileDialog from "./KolProfileDialog.vue";
+import PrepayApplyDialog from "@/views/fund/prepay/ApplyDialog.vue";
+import { prepayAbilities } from "@/utils/prepay";
 
 defineOptions({ name: "KolListPage" });
 
@@ -192,6 +194,13 @@ const commissionKol = ref<KolVO | null>(null);
 const cleanupVisible = ref(false);
 const cleanupKol = ref<KolVO | null>(null);
 const inviteVisible = ref(false);
+const prepayVisible = ref(false);
+const prepayKol = ref<KolVO | null>(null);
+
+function openPrepay(row: KolVO) {
+  prepayKol.value = row;
+  prepayVisible.value = true;
+}
 
 function openEdit(row: KolVO) {
   profileKol.value = row;
@@ -242,8 +251,8 @@ function rowActions(row: KolVO): RowAction[] {
       key: "prepay",
       label: t("kol.actionPrepay"),
       testId: `action-prepay-${row.id}`,
-      disabled: true,
-      tooltip: t("common.developing")
+      disabled: !prepayAbilities(me.user).apply || !rowOwned(row),
+      onClick: () => openPrepay(row)
     },
     {
       key: "cleanup",
@@ -432,6 +441,7 @@ onMounted(() => {
       @saved="load"
     />
     <CommissionDialog v-model="commissionVisible" :kol="commissionKol" @saved="load" />
+    <PrepayApplyDialog v-model="prepayVisible" :kol="prepayKol" @saved="load" />
     <CleanupConfigDialog v-model="cleanupVisible" :kol="cleanupKol" @changed="load" />
     <InviteKolDialog v-model="inviteVisible" />
   </div>

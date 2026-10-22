@@ -12,5 +12,6 @@ export const NAV_ITEMS: NavItem[] = [
   { name: "Home", path: "/", title: "nav.home" },
   { name: "PayoutAccounts", path: "/payout-accounts", title: "nav.payoutAccounts" }, // 15b
   { name: "Orders", path: "/orders", title: "nav.orders" }, // 19b
-  { name: "Items", path: "/items", title: "nav.items" } // 26
+  { name: "Items", path: "/items", title: "nav.items" }, // 26
+  { name: "PrepayResults", path: "/income/prepays", title: "prepay.title" }
 ];

@@ -51,6 +51,8 @@ export type PermissionCode =
   | "payout-account:review"
   | "withdrawal:review"
   | "prepay:apply"
+  | "prepay:review"
+  | "prepay:pay"
   | "dashboard:shop"
   | "dashboard:team"
   | "dashboard:kol"

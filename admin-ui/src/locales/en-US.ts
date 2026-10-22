@@ -1,7 +1,9 @@
 import type { MessageSchema } from "./zh-CN";
 
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
+import prepay from "./prepay-en-US";
 const enUS: MessageSchema = {
+  prepay,
   app: {
     title: "SparkTrack Admin",
     titleSuffix: " Admin"
@@ -67,6 +69,14 @@ const enUS: MessageSchema = {
     OTHER: "Other"
   },
   permission: {
+    "prepay:review": {
+      name: "Review prepays",
+      desc: "View all company prepay tasks and approve or reject applications; payment registration is separate"
+    },
+    "prepay:pay": {
+      name: "Register prepay payments",
+      desc: "View all company prepay tasks, reveal audited recipient snapshots and register offline payments"
+    },
     "kol:view": {
       name: "View creators",
       desc: "View the creator list, details, and BD history"
@@ -545,7 +555,7 @@ const enUS: MessageSchema = {
     resetTemplate: "Reset from template",
     exclusiveTitle: "Super Admin only. These cannot be granted.",
     exclusiveItems:
-      "Users and permissions, system settings, the audit log, prepay approval, marking a withdrawal as paid, and transferring creators.",
+      "Users and permissions, system settings, the audit log, marking a withdrawal as paid, and transferring creators. Prepay review and payment permissions may be granted separately.",
     permissionDependencies:
       "Checking an action permission also checks the view permission it needs; clearing a view permission also clears the action permissions that need it.",
     templateRequired: "Choose a post template",
@@ -1312,6 +1322,10 @@ const enUS: MessageSchema = {
     hours: "{n} hours ago",
     days: "{n} days ago",
     type: {
+      PREPAY_SUBMITTED: "Creator prepay application awaits review",
+      PREPAY_APPROVED: "Creator prepay approved, awaiting payment registration",
+      PREPAY_REJECTED: "Creator prepay application rejected",
+      PREPAY_PAID: "Creator prepay payment registered",
       PAYOUT_ACCOUNT_SUBMITTED:
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",

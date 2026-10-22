@@ -32,7 +32,7 @@ describe("hard-coded UI copy", () => {
     const root = join(process.cwd(), "src");
     const offenders: string[] = [];
     for (const file of sourceFiles(root)) {
-      const rel = relative(root, file);
+      const rel = relative(root, file).replaceAll("\\", "/");
       if (rel in ALLOWLIST) continue;
       const lines = readFileSync(file, "utf8").split("\n");
       lines.forEach((line, index) => {

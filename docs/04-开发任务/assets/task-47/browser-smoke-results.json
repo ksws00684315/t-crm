@@ -1,0 +1,156 @@
+[
+  {
+    "app": "admin",
+    "width": 1440,
+    "height": 900,
+    "language": "zh-CN",
+    "file": "admin-unauth-prepays-1440-zh.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "登录 | SparkTrack 管理端",
+    "text": "SparkTrack 管理端\n用户名\n密码\n验证码\n加载失败，点击重试\n登录\n中文",
+    "overflow": false
+  },
+  {
+    "app": "admin",
+    "width": 1280,
+    "height": 800,
+    "language": "zh-CN",
+    "file": "admin-unauth-prepays-1280-zh.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "登录 | SparkTrack 管理端",
+    "text": "SparkTrack 管理端\n用户名\n密码\n验证码\n加载失败，点击重试\n登录\n中文",
+    "overflow": false
+  },
+  {
+    "app": "admin",
+    "width": 2560,
+    "height": 1440,
+    "language": "zh-CN",
+    "file": "admin-unauth-prepays-2560-zh.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "登录 | SparkTrack 管理端",
+    "text": "SparkTrack 管理端\n用户名\n密码\n验证码\n加载失败，点击重试\n登录\n中文",
+    "overflow": false
+  },
+  {
+    "app": "admin",
+    "width": 1440,
+    "height": 900,
+    "language": "en-US",
+    "file": "admin-unauth-prepays-1440-en.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "Sign in | SparkTrack Admin",
+    "text": "SparkTrack Admin\nUsername\nPassword\nCaptcha\nFailed to load. Click to retry.\nSign in\nEnglish",
+    "overflow": false
+  },
+  {
+    "app": "admin",
+    "width": 1280,
+    "height": 800,
+    "language": "en-US",
+    "file": "admin-unauth-prepays-1280-en.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "Sign in | SparkTrack Admin",
+    "text": "SparkTrack Admin\nUsername\nPassword\nCaptcha\nFailed to load. Click to retry.\nSign in\nEnglish",
+    "overflow": false
+  },
+  {
+    "app": "admin",
+    "width": 2560,
+    "height": 1440,
+    "language": "en-US",
+    "file": "admin-unauth-prepays-2560-en.png",
+    "url": "http://127.0.0.1:8897/login?redirect=/fund/prepays",
+    "title": "Sign in | SparkTrack Admin",
+    "text": "SparkTrack Admin\nUsername\nPassword\nCaptcha\nFailed to load. Click to retry.\nSign in\nEnglish",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 1440,
+    "height": 900,
+    "language": "zh-CN",
+    "file": "portal-unauth-prepays-1440-zh.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "登录 | SparkTrack 达人端",
+    "text": "中文\nSparkTrack\nSparkTrack 达人端\n邮箱\n密码\n登录\n注册账号\n忘记密码？",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 1280,
+    "height": 800,
+    "language": "zh-CN",
+    "file": "portal-unauth-prepays-1280-zh.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "登录 | SparkTrack 达人端",
+    "text": "中文\nSparkTrack\nSparkTrack 达人端\n邮箱\n密码\n登录\n注册账号\n忘记密码？",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 390,
+    "height": 844,
+    "language": "zh-CN",
+    "file": "portal-unauth-prepays-390-zh.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "登录 | SparkTrack 达人端",
+    "text": "中文\nSparkTrack\nSparkTrack 达人端\n邮箱\n密码\n登录\n注册账号\n忘记密码？",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 375,
+    "height": 812,
+    "language": "zh-CN",
+    "file": "portal-unauth-prepays-375-zh.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "登录 | SparkTrack 达人端",
+    "text": "中文\nSparkTrack\nSparkTrack 达人端\n邮箱\n密码\n登录\n注册账号\n忘记密码？",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 1440,
+    "height": 900,
+    "language": "en-US",
+    "file": "portal-unauth-prepays-1440-en.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "Sign in | SparkTrack Creator Portal",
+    "text": "English\nSparkTrack\nSparkTrack Creator Portal\nEmail\nPassword\nSign in\nSign up\nForgot password?",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 1280,
+    "height": 800,
+    "language": "en-US",
+    "file": "portal-unauth-prepays-1280-en.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "Sign in | SparkTrack Creator Portal",
+    "text": "English\nSparkTrack\nSparkTrack Creator Portal\nEmail\nPassword\nSign in\nSign up\nForgot password?",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 390,
+    "height": 844,
+    "language": "en-US",
+    "file": "portal-unauth-prepays-390-en.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "Sign in | SparkTrack Creator Portal",
+    "text": "English\nSparkTrack\nSparkTrack Creator Portal\nEmail\nPassword\nSign in\nSign up\nForgot password?",
+    "overflow": false
+  },
+  {
+    "app": "portal",
+    "width": 375,
+    "height": 812,
+    "language": "en-US",
+    "file": "portal-unauth-prepays-375-en.png",
+    "url": "http://127.0.0.1:8898/login?redirect=/income/prepays",
+    "title": "Sign in | SparkTrack Creator Portal",
+    "text": "English\nSparkTrack\nSparkTrack Creator Portal\nEmail\nPassword\nSign in\nSign up\nForgot password?",
+    "overflow": false
+  }
+]

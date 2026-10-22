@@ -51,6 +51,11 @@ export function notificationText(item: NotificationView): string {
 /** Target route. Missing pages render the existing 404. */
 export function notificationHref(item: NotificationView): string {
   switch (item.type) {
+    case "PREPAY_SUBMITTED":
+    case "PREPAY_APPROVED":
+    case "PREPAY_REJECTED":
+    case "PREPAY_PAID":
+      return `/fund/prepays?id=${encodeURIComponent(item.bizId ?? "")}`;
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return `/fund/payouts?id=${encodeURIComponent(item.bizId ?? "")}`;
     case "ORDER_SYNC_FAILED":
@@ -69,6 +74,14 @@ export function notificationHref(item: NotificationView): string {
 /** Whether the signed-in account may open the message's target page. */
 export function canOpenNotification(type: string, access: AccessProfile): boolean {
   switch (type) {
+    case "PREPAY_SUBMITTED":
+    case "PREPAY_APPROVED":
+    case "PREPAY_REJECTED":
+    case "PREPAY_PAID":
+      return (
+        !access.isPlatformAdmin &&
+        (access.can("commission:view") || access.can("prepay:review") || access.can("prepay:pay"))
+      );
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return access.can("payout-account:review") || access.can("commission:view");
     case "ORDER_SYNC_FAILED":

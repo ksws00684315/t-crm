@@ -4,7 +4,9 @@
  * same keys: its type is `MessageSchema` below, so a missing or extra key fails `pnpm typecheck`,
  * and messages.spec.ts checks the same at runtime.
  */
+import prepay from "./prepay-en-US";
 const enUS = {
+  prepay,
   app: {
     title: "SparkTrack Creator Portal",
     titleSuffix: " Creator Portal"

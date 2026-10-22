@@ -4,7 +4,9 @@
  * same keys: its type is `MessageSchema` below, so a missing or extra key fails `pnpm typecheck`,
  * and messages.spec.ts checks the same at runtime.
  */
+import prepay from "./prepay-zh-CN";
 const zhCN = {
+  prepay,
   app: {
     title: "SparkTrack 管理端",
     titleSuffix: " 管理端"
@@ -71,6 +73,14 @@ const zhCN = {
     OTHER: "其他"
   },
   permission: {
+    "prepay:review": {
+      name: "审核预付",
+      desc: "查看本公司全部预付任务并通过或驳回申请；不包含登记支付权限"
+    },
+    "prepay:pay": {
+      name: "登记预付支付",
+      desc: "查看本公司全部预付任务、受审计地查看完整收款快照并登记线下付款"
+    },
     "kol:view": {
       name: "查看达人",
       desc: "查看达人列表、详情和商务归属历史"
@@ -529,7 +539,8 @@ const zhCN = {
     selectAll: "全选",
     resetTemplate: "按模板重置",
     exclusiveTitle: "超管专属，不可授予。",
-    exclusiveItems: "用户与权限、系统配置、操作日志、审批预付、标记打款、转移达人。",
+    exclusiveItems:
+      "用户与权限、系统配置、操作日志、提现标记打款、转移达人。预付审核与支付可分别授权给子账号。",
     permissionDependencies:
       "勾选操作类权限会自动勾上它依赖的查看权限；取消查看权限会一并取消依赖它的操作类权限。",
     templateRequired: "请选择岗位模板",
@@ -1281,6 +1292,10 @@ const zhCN = {
     hours: "{n} 小时前",
     days: "{n} 天前",
     type: {
+      PREPAY_SUBMITTED: "达人预付申请待审核",
+      PREPAY_APPROVED: "达人预付已通过，等待支付登记",
+      PREPAY_REJECTED: "达人预付申请已驳回",
+      PREPAY_PAID: "达人预付已登记支付",
       PAYOUT_ACCOUNT_SUBMITTED: "达人 {kolCode} 提交了 {accountType} 收款账户，待审核",
       ORDER_SYNC_FAILED: "店铺 {shopName} 的订单同步失败",
       BD_TRANSFER_CANCELLED: "达人 {kolCode} 的预约转移已取消：{reason}",

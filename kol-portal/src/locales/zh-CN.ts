@@ -5,7 +5,9 @@ import type { MessageSchema } from "./en-US";
  * "Sign in" is 登录, "Sign out" is 退出登录 (terminology from task 06d). The type forces the keys
  * to match en-US exactly; values are the translations.
  */
+import prepay from "./prepay-zh-CN";
 const zhCN: MessageSchema = {
+  prepay,
   app: {
     title: "SparkTrack Creator Portal",
     titleSuffix: " 达人端"
