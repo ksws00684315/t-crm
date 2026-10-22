@@ -117,8 +117,8 @@ async function submit() {
   }
   error.value = "";
   saving.value = true;
-  // Create "立即": omit effectiveAt (backend treats missing as now).
-  // Edit "立即": send now explicitly — omitting would keep the old future time and never run.
+  // Create "immediate": omit effectiveAt (backend treats missing as now).
+  // Edit "immediate": send now explicitly — omitting would keep the old future time and never run.
   const request = {
     type: type.value,
     ...(effective.value
