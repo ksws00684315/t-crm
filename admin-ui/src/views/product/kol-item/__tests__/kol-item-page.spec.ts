@@ -89,13 +89,10 @@ async function mountPage(items: KolItemVO[] = [row]) {
   vi.mocked(shopApi.listShops).mockResolvedValue([
     {
       id: "1",
+      shopCode: "SHOP-100001",
       shopName: "旗舰店",
-      weidianShopId: "100",
-      status: 1,
-      copyTarget: false,
-      remark: null,
-      createTime: "2026-10-01T00:00:00Z",
-      updateTime: "2026-10-01T00:00:00Z"
+      channel: "WEIDIAN",
+      status: 1
     }
   ]);
   vi.mocked(kolItemApi.listKolItems).mockResolvedValue({

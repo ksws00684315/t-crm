@@ -91,6 +91,12 @@ public class OrderSync {
   }
 
   public boolean synchronize(long shopId) {
+    return synchronize(shopId, null);
+  }
+
+  public boolean synchronize(long shopId, String type) {
+    boolean syncOrders = type == null || "ORDER".equals(type);
+    boolean syncRefunds = type == null || "REFUND".equals(type);
     var state =
         states.selectOne(
             new LambdaQueryWrapper<OrderSyncStateDO>().eq(OrderSyncStateDO::getShopId, shopId));
@@ -105,10 +111,18 @@ public class OrderSync {
     Instant previousSuccess = state.getLastSuccessAt();
     boolean notify = state.getLastError() == null && previousSuccess != null;
     try {
-      orders(shopId, start(state.getOrderCursor(), end), end);
-      refunds(shopId, start(state.getRefundCursor(), end), end);
-      state.setOrderCursor(end);
-      state.setRefundCursor(end);
+      if (syncOrders) {
+        orders(shopId, start(state.getOrderCursor(), end), end);
+      }
+      if (syncRefunds) {
+        refunds(shopId, start(state.getRefundCursor(), end), end);
+      }
+      if (syncOrders) {
+        state.setOrderCursor(end);
+      }
+      if (syncRefunds) {
+        state.setRefundCursor(end);
+      }
       state.setLastSuccessAt(clock.instant());
       state.setLastError(null);
       states.updateById(state);

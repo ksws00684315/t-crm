@@ -268,7 +268,7 @@ class PermissionIT {
             .content("{\"bdUserId\":null}"),
         post("/admin-api/product/shops")
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"shopName\":\"Nope\",\"weidianShopId\":\"1\"}"),
+            .content("{\"shopName\":\"Nope\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"1\"}"),
         put("/admin-api/product/shops/1")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"shopName\":\"Nope\"}"),
@@ -296,7 +296,8 @@ class PermissionIT {
                 post("/admin-api/product/shops")
                     .header(TOKEN, admin)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"shopName\":\"Perm\",\"weidianShopId\":\"910001\"}"))
+                    .content(
+                        "{\"shopName\":\"Perm\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\"910001\"}"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

@@ -18,6 +18,60 @@ import org.mockito.ArgumentCaptor;
 
 class OrderSyncTest {
   @Test
+  void shouldSyncOnlyOrders_whenOrderTypeIsSelected() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var state = new OrderSyncStateDO();
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null));
+    var now = Instant.parse("2026-10-16T00:00:00Z");
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    mock(OrderWriter.class),
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1, "ORDER"))
+        .isTrue();
+
+    verify(api).orderList(org.mockito.ArgumentMatchers.eq(1L), any());
+    verify(api, org.mockito.Mockito.never())
+        .refundList(org.mockito.ArgumentMatchers.anyLong(), any());
+    assertThat(state.getOrderCursor()).isEqualTo(now);
+    assertThat(state.getRefundCursor()).isNull();
+  }
+
+  @Test
+  void shouldSyncOnlyRefunds_whenRefundTypeIsSelected() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var state = new OrderSyncStateDO();
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+    var now = Instant.parse("2026-10-16T00:00:00Z");
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    mock(OrderWriter.class),
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1, "REFUND"))
+        .isTrue();
+
+    verify(api, org.mockito.Mockito.never())
+        .orderList(org.mockito.ArgumentMatchers.anyLong(), any());
+    verify(api).refundList(org.mockito.ArgumentMatchers.eq(1L), any());
+    assertThat(state.getOrderCursor()).isNull();
+    assertThat(state.getRefundCursor()).isEqualTo(now);
+  }
+
+  @Test
   void shouldKeepCursors_whenExternalCallFails() {
     var api = mock(WeidianBusinessApi.class);
     var states = mock(OrderSyncStateMapper.class);

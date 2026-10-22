@@ -51,6 +51,7 @@ public class CopyJobWorker implements ApplicationRunner {
   private final CopyJobMapper jobs;
   private final CopyJobItemMapper items;
   private final ShopMapper shops;
+  private final ShopService shopService;
   private final ProductMapper products;
   private final KolItemMapper kolItems;
   private final ProductCodeGenerator codes;
@@ -66,6 +67,7 @@ public class CopyJobWorker implements ApplicationRunner {
       CopyJobMapper jobs,
       CopyJobItemMapper items,
       ShopMapper shops,
+      ShopService shopService,
       ProductMapper products,
       KolItemMapper kolItems,
       ProductCodeGenerator codes,
@@ -79,6 +81,7 @@ public class CopyJobWorker implements ApplicationRunner {
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
+    this.shopService = shopService;
     this.products = products;
     this.kolItems = kolItems;
     this.codes = codes;
@@ -115,6 +118,7 @@ public class CopyJobWorker implements ApplicationRunner {
     this.jobs = jobs;
     this.items = items;
     this.shops = shops;
+    this.shopService = null;
     this.products = products;
     this.kolItems = kolItems;
     this.codes = codes;
@@ -165,13 +169,13 @@ public class CopyJobWorker implements ApplicationRunner {
             "Weidian item {} created for copy job item {} but CRM mapping failed",
             e.weidianItemId(),
             row.getId());
-        markFailed(row.getId(), ProductLinkMessages.mappingPersistFailed(e.weidianItemId()));
+        markFailed(row.getId(), ProductLinkMessages.mappingPersistFailed(e.weidianItemId()), null);
       } catch (RuntimeException e) {
         LOG.warn(
             "Copy job item {} failed: {}",
             row.getId(),
             e instanceof BusinessException be ? be.getErrorCode() : e.getClass().getSimpleName());
-        markFailed(row.getId(), failMessage(e));
+        markFailed(row.getId(), failMessage(e), null);
       }
       progress.recountAndMaybeFinish(job.getId());
     }
@@ -184,49 +188,52 @@ public class CopyJobWorker implements ApplicationRunner {
       return;
     }
     if (!ProductLinkService.CHANNEL_WEIDIAN.equals(fresh.getSourceChannel())) {
-      markFailed(fresh.getId(), ProductLinkMessages.UNSUPPORTED_CHANNEL);
+      markFailed(fresh.getId(), ProductLinkMessages.UNSUPPORTED_CHANNEL, null);
       return;
+    }
+    if (shopService != null) {
+      shopService.requireCopyEligible(job.getTargetShopId(), ProductLinkService.CHANNEL_WEIDIAN);
     }
 
     // ADR-019 rule 2: exclusive (copied) item IDs must not be treated as source for another copy.
     KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
     if (exclusive != null) {
       if (exclusive.getKolId() != null && exclusive.getKolId().equals(job.getKolId())) {
-        markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null);
+        markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null, null);
         return;
       }
-      markFailed(fresh.getId(), ProductLinkMessages.OTHER_KOL_EXCLUSIVE);
+      markFailed(fresh.getId(), ProductLinkMessages.OTHER_KOL_EXCLUSIVE, null);
       return;
     }
 
     SourceLookup source = findSource(fresh.getSourceProductId());
     if (source.conflict()) {
-      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_CONFLICT);
+      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_CONFLICT, null);
       return;
     }
     if (source.incomplete()) {
-      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_INCOMPLETE);
+      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_INCOMPLETE, null);
       return;
     }
     if (source.product() == null) {
-      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS);
+      markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS, null);
       return;
     }
     ProductDO product = source.product();
     KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), product.getId());
     if (existing != null) {
-      markSuccess(fresh.getId(), existing.getWeidianItemId(), null);
+      markSuccess(fresh.getId(), existing.getWeidianItemId(), null, product.getShopId());
       return;
     }
     if (!tokens.consume(job.getTokenId(), 1)) {
-      markFailed(fresh.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT);
+      markFailed(fresh.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT, product.getShopId());
       return;
     }
     CopyResult copied;
     try {
       copied = copies.copy(product.getShopId(), product.getWeidianItemId(), job.getTargetShopId());
     } catch (RuntimeException e) {
-      markFailed(fresh.getId(), failMessage(e));
+      markFailed(fresh.getId(), failMessage(e), product.getShopId());
       return;
     }
     String newItemId = copied.newItemId();
@@ -243,8 +250,11 @@ public class CopyJobWorker implements ApplicationRunner {
       neu.setUpdateTime(now);
       neu.setTenantId(job.getTenantId());
       KolItemCodes.insertNew(kolItems, neu);
+      if (shops.incrementCurrentItems(job.getTargetShopId(), now) != 1) {
+        throw new IllegalStateException("Target shop capacity was exhausted during copy");
+      }
       TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
-      markSuccess(fresh.getId(), newItemId, copied.detailWarning());
+      markSuccess(fresh.getId(), newItemId, copied.detailWarning(), product.getShopId());
     } catch (RuntimeException e) {
       throw new MappingPersistException(newItemId, e);
     }
@@ -331,25 +341,27 @@ public class CopyJobWorker implements ApplicationRunner {
     return products.selectById(product.getId());
   }
 
-  private void markSuccess(long itemId, String targetItemId, String warning) {
-    items.update(
-        null,
+  private void markSuccess(long itemId, String targetItemId, String warning, Long sourceShopId) {
+    LambdaUpdateWrapper<CopyJobItemDO> update =
         new LambdaUpdateWrapper<CopyJobItemDO>()
             .eq(CopyJobItemDO::getId, itemId)
             .eq(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_PENDING)
             .set(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_SUCCESS)
             .set(CopyJobItemDO::getTargetItemId, targetItemId)
             .set(CopyJobItemDO::getErrorMessage, warning)
-            .set(CopyJobItemDO::getUpdateTime, Instant.now()));
+            .set(CopyJobItemDO::getUpdateTime, Instant.now());
+    if (sourceShopId != null) {
+      update.set(CopyJobItemDO::getSourceShopId, sourceShopId);
+    }
+    items.update(null, update);
   }
 
-  private void markFailed(long itemId, String message) {
+  private void markFailed(long itemId, String message, Long sourceShopId) {
     String safe =
         message == null
             ? ProductLinkMessages.WEIDIAN_FAILED
             : message.length() > 500 ? message.substring(0, 500) : message;
-    items.update(
-        null,
+    LambdaUpdateWrapper<CopyJobItemDO> update =
         new LambdaUpdateWrapper<CopyJobItemDO>()
             .eq(CopyJobItemDO::getId, itemId)
             .in(
@@ -357,7 +369,11 @@ public class CopyJobWorker implements ApplicationRunner {
                 List.of(CopyJobItemDO.STATUS_PENDING, CopyJobItemDO.STATUS_FAILED))
             .set(CopyJobItemDO::getStatus, CopyJobItemDO.STATUS_FAILED)
             .set(CopyJobItemDO::getErrorMessage, safe)
-            .set(CopyJobItemDO::getUpdateTime, Instant.now()));
+            .set(CopyJobItemDO::getUpdateTime, Instant.now());
+    if (sourceShopId != null) {
+      update.set(CopyJobItemDO::getSourceShopId, sourceShopId);
+    }
+    items.update(null, update);
   }
 
   private static String failMessage(RuntimeException e) {
