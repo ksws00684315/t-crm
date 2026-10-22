@@ -62,7 +62,8 @@ class RefundQueryServiceTest {
   void setup() {
     when(current.user()).thenReturn(account);
     when(account.ownScope()).thenReturn(false);
-    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005")));
+    when(shops.listShops())
+        .thenReturn(List.of(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005")));
     when(kols.listByIds(any())).thenReturn(List.of());
   }
 

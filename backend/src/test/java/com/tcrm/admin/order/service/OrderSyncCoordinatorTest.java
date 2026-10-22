@@ -155,7 +155,8 @@ class OrderSyncCoordinatorTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(10L, "Test", "10", 1, null), new ShopAccessDTO(20L, "Test", "20", 1, null)));
+                new ShopAccessDTO(10L, "Test", "10", 1, null),
+                new ShopAccessDTO(20L, "Test", "20", 1, null)));
     org.mockito.Mockito.doThrow(new IllegalStateException("test"))
         .doAnswer(
             call -> {

@@ -345,9 +345,7 @@ public class OrderService {
         kolItems.listLinkCodesByIds(kolItemIds).stream()
             .collect(
                 Collectors.toMap(
-                    KolItemLinkCodeDTO::kolItemId,
-                    KolItemLinkCodeDTO::linkCode,
-                    (a, b) -> a));
+                    KolItemLinkCodeDTO::kolItemId, KolItemLinkCodeDTO::linkCode, (a, b) -> a));
     Set<Long> kolIds = new HashSet<>();
     if (order.getKolId() != null) {
       kolIds.add(order.getKolId());
@@ -435,9 +433,7 @@ public class OrderService {
             .stream()
             .collect(
                 Collectors.toMap(
-                    KolItemLinkCodeDTO::kolItemId,
-                    KolItemLinkCodeDTO::linkCode,
-                    (a, b) -> a));
+                    KolItemLinkCodeDTO::kolItemId, KolItemLinkCodeDTO::linkCode, (a, b) -> a));
     for (var mapping : candidates) {
       var kol = mapping.kolId() == null ? null : kolById.get(mapping.kolId());
       mappings.add(
