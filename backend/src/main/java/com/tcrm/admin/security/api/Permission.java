@@ -27,6 +27,7 @@ public enum Permission {
   WITHDRAWAL_REVIEW("withdrawal:review", Group.FUNDS),
   PREPAY_APPLY("prepay:apply", Group.FUNDS),
   PREPAY_REVIEW("prepay:review", Group.FUNDS),
+  PREPAY_FINANCE_REVIEW("prepay:finance-review", Group.FUNDS),
   PREPAY_PAY("prepay:pay", Group.FUNDS),
   DASHBOARD_SHOP("dashboard:shop", Group.DASHBOARD),
   DASHBOARD_TEAM("dashboard:team", Group.DASHBOARD),

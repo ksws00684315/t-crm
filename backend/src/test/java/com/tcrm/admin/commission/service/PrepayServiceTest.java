@@ -105,7 +105,7 @@ class PrepayServiceTest {
                 return new BigDecimal("100.00");
               }
               if (type == String.class) {
-                return "PENDING_APPROVAL";
+                return "WAITING_DETAILS";
               }
             }
             List<Map<String, Object>> data =
@@ -154,13 +154,12 @@ class PrepayServiceTest {
     when(wallet.currentBalance(COMPANY, KOL)).thenReturn(new BigDecimal("-200.00"));
     when(files.prepayAttachments(ID)).thenReturn(List.of());
     rows(
-        sql -> sql.contains("JOIN crm_kol") && !sql.contains("request_id"),
-        row("PENDING_APPROVAL"));
+        sql -> sql.contains("JOIN crm_kol") && !sql.contains("request_id"), row("WAITING_DETAILS"));
   }
 
   @Test
   void shouldCreateOnePendingTaskAndOutbox_whenOnlyAmountIsSubmitted() {
-    var expected = detail("PENDING_APPROVAL", null);
+    var expected = detail("WAITING_DETAILS", null);
     doReturn(expected).when(service).detail(any(), anyLong());
     var result = service.apply(user("prepay:apply"), application("300"));
     assertThat(result).isEqualTo(expected);
@@ -170,13 +169,13 @@ class PrepayServiceTest {
     assertThat(insert.args()).contains("PP20261022000001");
     assertThat(insert.sql()).doesNotContain("deduct_from_commission", "payout_account_id");
     assertThat(write("INSERT INTO crm_prepay_history").args()).contains("SUBMITTED");
-    assertThat(write("INSERT INTO crm_prepay_outbox").args()).contains("SUBMITTED");
+    assertThat(writes).noneMatch(write -> write.sql().contains("outbox"));
   }
 
   @Test
   void shouldReturnExistingTaskWithoutWriting_whenApplicationIsRetried() {
-    rows(sql -> sql.contains("request_id = ?"), row("PENDING_APPROVAL"));
-    doReturn(detail("PENDING_APPROVAL", null)).when(service).detail(any(), anyLong());
+    rows(sql -> sql.contains("request_id = ?"), row("WAITING_DETAILS"));
+    doReturn(detail("WAITING_DETAILS", null)).when(service).detail(any(), anyLong());
     assertThat(service.apply(user("prepay:apply"), application("300.00")).id()).isEqualTo(ID);
     assertThat(writes).isEmpty();
     verify(kols, never()).lockKol(anyLong());
@@ -185,7 +184,7 @@ class PrepayServiceTest {
   @ParameterizedTest
   @ValueSource(strings = {"301", "299.99"})
   void shouldRejectChangedAmount_whenRequestIdIsReused(String amount) {
-    rows(sql -> sql.contains("request_id = ?"), row("PENDING_APPROVAL"));
+    rows(sql -> sql.contains("request_id = ?"), row("WAITING_DETAILS"));
     fails(
         () -> service.apply(user("prepay:apply"), application(amount)),
         ErrorCode.PREPAY_REQUEST_CONFLICT);
@@ -194,7 +193,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectChangedKol_whenRequestIdIsReused() {
-    rows(sql -> sql.contains("request_id = ?"), row("PENDING_APPROVAL"));
+    rows(sql -> sql.contains("request_id = ?"), row("WAITING_DETAILS"));
     fails(
         () ->
             service.apply(
@@ -269,9 +268,9 @@ class PrepayServiceTest {
   @Test
   void shouldSaveExplicitFalseAndFreezeApprovedAccount_whenFinanceCompletesDetails() {
     when(accounts.selectById(33L)).thenReturn(account());
-    doReturn(detail("PENDING_APPROVAL", false)).when(service).detail(any(), anyLong());
+    doReturn(detail("WAITING_DETAILS", false)).when(service).detail(any(), anyLong());
     service.saveApplicationDetails(
-        user("prepay:pay"),
+        user("prepay:apply"),
         ID,
         details(false),
         List.of(new PrepayService.UploadedFile("proof.pdf", new byte[] {1})));
@@ -282,13 +281,14 @@ class PrepayServiceTest {
         .uploadPrepayAdmin(
             COMPANY, 5L, ID, FileBizType.PREPAY_ATTACHMENT, "proof.pdf", new byte[] {1});
     assertThat(write("INSERT INTO crm_prepay_history").args()).contains("DETAILS_COMPLETED");
+    assertThat(write("INSERT INTO crm_prepay_outbox").args()).contains("SUBMITTED");
   }
 
   @ParameterizedTest
   @MethodSource("incompleteDetails")
   void shouldRejectIncompleteFinanceDetails_whenSaving(PrepayService.ApplicationDetails details) {
     fails(
-        () -> service.saveApplicationDetails(user("prepay:review"), ID, details, List.of()),
+        () -> service.saveApplicationDetails(user("prepay:apply"), ID, details, List.of()),
         ErrorCode.COMMON_VALIDATION_FAILED);
     assertThat(writes).isEmpty();
   }
@@ -309,9 +309,9 @@ class PrepayServiceTest {
   void shouldRejectNonPendingTaskOrTooManyAttachments_whenCompletingDetails() {
     scalars.put("SELECT status", "APPROVED");
     fails(
-        () -> service.saveApplicationDetails(user("prepay:review"), ID, details(true), null),
+        () -> service.saveApplicationDetails(user("prepay:apply"), ID, details(true), null),
         ErrorCode.PREPAY_STATE_CONFLICT);
-    scalars.put("SELECT status", "PENDING_APPROVAL");
+    scalars.put("SELECT status", "WAITING_DETAILS");
     when(accounts.selectById(33L)).thenReturn(account());
     when(files.prepayAttachments(ID))
         .thenReturn(
@@ -320,7 +320,7 @@ class PrepayServiceTest {
     fails(
         () ->
             service.saveApplicationDetails(
-                user("prepay:review"),
+                user("prepay:apply"),
                 ID,
                 details(true),
                 List.of(new PrepayService.UploadedFile("extra.png", new byte[] {1}))),
@@ -337,12 +337,13 @@ class PrepayServiceTest {
             count, new PrepayService.UploadedFile("proof.pdf", new byte[] {1}));
     if (count == 6) {
       fails(
-          () -> service.saveApplicationDetails(user("prepay:pay"), ID, details(false), attachments),
+          () ->
+              service.saveApplicationDetails(user("prepay:apply"), ID, details(false), attachments),
           ErrorCode.COMMON_VALIDATION_FAILED);
       assertThat(writes).isEmpty();
     } else {
-      doReturn(detail("PENDING_APPROVAL", false)).when(service).detail(any(), anyLong());
-      service.saveApplicationDetails(user("prepay:pay"), ID, details(false), attachments);
+      doReturn(detail("WAITING_DETAILS", false)).when(service).detail(any(), anyLong());
+      service.saveApplicationDetails(user("prepay:apply"), ID, details(false), attachments);
       verify(files, org.mockito.Mockito.times(5))
           .uploadPrepayAdmin(
               COMPANY, 5L, ID, FileBizType.PREPAY_ATTACHMENT, "proof.pdf", new byte[] {1});
@@ -367,22 +368,43 @@ class PrepayServiceTest {
     }
     when(accounts.selectById(33L)).thenReturn(condition.equals("missing") ? null : account);
     fails(
-        () -> service.saveApplicationDetails(user("prepay:review"), ID, details(true), null),
+        () -> service.saveApplicationDetails(user("prepay:apply"), ID, details(true), null),
         ErrorCode.COMMON_NOT_FOUND);
     assertThat(writes).isEmpty();
   }
 
   @Test
   void shouldApproveOnlyCompleteDetails_whenReviewerApproves() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     service.approval(user("prepay:review"), ID, "APPROVE", null);
-    assertThat(write("UPDATE crm_prepay SET status").args()).contains("APPROVED", 5L);
+    assertThat(write("UPDATE crm_prepay SET status").args()).contains("PENDING_FINANCE_REVIEW");
+    assertThat(writes).noneMatch(write -> write.sql().contains("outbox"));
+  }
+
+  @Test
+  void shouldRequireFinanceReviewPermissionForSecondStage() {
+    doReturn(detail("PENDING_FINANCE_REVIEW", true)).when(service).detail(any(), anyLong());
+    service.approval(user("prepay:finance-review"), ID, "APPROVE", null);
+    assertThat(write("UPDATE crm_prepay SET status").args()).contains("APPROVED");
     assertThat(write("INSERT INTO crm_prepay_outbox").args()).contains("APPROVED");
+    doReturn(detail("PENDING_FINANCE_REVIEW", true)).when(service).detail(any(), anyLong());
+    fails(
+        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        ErrorCode.AUTH_FORBIDDEN);
+  }
+
+  @Test
+  void shouldRejectAnotherActiveApplicationForTheSameKol() {
+    rows(sql -> sql.contains("status IN ('WAITING_DETAILS'"), row("WAITING_DETAILS"));
+    fails(
+        () -> service.apply(user("prepay:apply"), application("300")),
+        ErrorCode.PREPAY_STATE_CONFLICT);
+    assertThat(writes).isEmpty();
   }
 
   @Test
   void shouldRequireFinanceDetailsBeforeApproval_whenApplicationHasOnlyAmount() {
-    doReturn(detail("PENDING_APPROVAL", null)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", null)).when(service).detail(any(), anyLong());
     fails(
         () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
         ErrorCode.PREPAY_DETAILS_REQUIRED);
@@ -391,7 +413,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectWithTrimmedReasonWithoutRequiringDetails_whenReviewerRejects() {
-    doReturn(detail("PENDING_APPROVAL", null)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", null)).when(service).detail(any(), anyLong());
     service.approval(user("prepay:review"), ID, "REJECT", "  Needs correction  ");
     assertThat(write("UPDATE crm_prepay SET status").args())
         .contains("REJECTED", "Needs correction");
@@ -400,7 +422,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectInvalidDecisionsOrMissingReasons_whenReviewing() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
         () -> service.approval(user("prepay:review"), ID, "OTHER", null),
         ErrorCode.COMMON_VALIDATION_FAILED);
@@ -418,7 +440,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectStateCompareAndSetFailure_whenApproving() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     changed = 0;
     fails(
         () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
@@ -430,7 +452,7 @@ class PrepayServiceTest {
   @NullAndEmptySource
   @ValueSource(strings = {" ", "  No longer needed  "})
   void shouldCancelOwnPendingApplication_whenApplicantStillOwnsKol(String reason) {
-    doReturn(detail("PENDING_APPROVAL", null)).when(service).detail(any(), anyLong());
+    doReturn(detail("WAITING_DETAILS", null)).when(service).detail(any(), anyLong());
     service.cancel(user("prepay:apply"), ID, reason);
     assertThat(write("UPDATE crm_prepay SET status").sql()).contains("status = 'CANCELLED'");
     assertThat(write("INSERT INTO crm_prepay_history").args()).contains("CANCELLED");
@@ -441,7 +463,7 @@ class PrepayServiceTest {
   void shouldRejectCancellationByDifferentApplicantOrAfterApproval() {
     doReturn(detail("APPROVED", true)).when(service).detail(any(), anyLong());
     fails(() -> service.cancel(user("prepay:apply"), ID, null), ErrorCode.PREPAY_STATE_CONFLICT);
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
         () ->
             service.cancel(
@@ -494,7 +516,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectUnapprovedOrIncompletePayment() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("WAITING_DETAILS", true)).when(service).detail(any(), anyLong());
     fails(
         () -> service.pay(user("prepay:pay"), ID, payment("300", null), voucher()),
         ErrorCode.PREPAY_STATE_CONFLICT);
@@ -595,7 +617,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectOverlongRejectionReasonBeforeDatabaseWrite() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
         () -> service.approval(user("prepay:review"), ID, "REJECT", "x".repeat(1001)),
         ErrorCode.COMMON_VALIDATION_FAILED);
@@ -604,7 +626,7 @@ class PrepayServiceTest {
 
   @Test
   void shouldRejectOverlongCancellationReasonBeforeDatabaseWrite() {
-    doReturn(detail("PENDING_APPROVAL", true)).when(service).detail(any(), anyLong());
+    doReturn(detail("WAITING_DETAILS", true)).when(service).detail(any(), anyLong());
     fails(
         () -> service.cancel(user("prepay:apply"), ID, "x".repeat(1001)),
         ErrorCode.COMMON_VALIDATION_FAILED);
@@ -723,7 +745,7 @@ class PrepayServiceTest {
     fixtures.clear();
     fails(() -> service.detail(user("commission:view"), ID), ErrorCode.COMMON_NOT_FOUND);
     fails(() -> service.cancel(user("prepay:apply"), ID, null), ErrorCode.COMMON_NOT_FOUND);
-    rows(sql -> sql.contains("JOIN crm_kol"), row("PENDING_APPROVAL"));
+    rows(sql -> sql.contains("JOIN crm_kol"), row("WAITING_DETAILS"));
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
     fails(() -> service.detail(user("commission:view"), ID), ErrorCode.COMMON_NOT_FOUND);
   }
@@ -786,6 +808,7 @@ class PrepayServiceTest {
             "KOL-test",
             " =SUM(1,2)\"",
             5L,
+            "Business operator",
             "300.00",
             "CNY",
             "PAID",
@@ -831,14 +854,14 @@ class PrepayServiceTest {
     fails(
         () -> service.export(user("data:export", "commission:view"), filter),
         ErrorCode.COMMON_VALIDATION_FAILED);
-    doReturn(new PageResult<>(List.of(prepayRow("PENDING_APPROVAL")), 1, 1, 100))
+    doReturn(new PageResult<>(List.of(prepayRow("WAITING_DETAILS")), 1, 1, 100))
         .when(service)
         .page(any(), any());
     assertThat(
             new String(
                 service.export(user("data:export", "commission:view"), filter),
                 StandardCharsets.UTF_8))
-        .contains("PENDING_APPROVAL", "\"\",\"\",\"\",\"\"");
+        .contains("WAITING_DETAILS", "\"\",\"\",\"\",\"\"");
   }
 
   @Test
@@ -1016,6 +1039,7 @@ class PrepayServiceTest {
         "KOL-test",
         "Test creator",
         5L,
+        "Business operator",
         "300.00",
         "CNY",
         status,
@@ -1032,6 +1056,7 @@ class PrepayServiceTest {
         "KOL-test",
         "Test creator",
         5L,
+        "Business operator",
         "300.00",
         "CNY",
         status,

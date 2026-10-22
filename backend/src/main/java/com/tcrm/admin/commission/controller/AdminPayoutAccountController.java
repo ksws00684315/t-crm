@@ -83,7 +83,13 @@ public class AdminPayoutAccountController {
    */
   @GetMapping("/admin-api/files/{id}")
   @SaCheckPermission(
-      value = {"payout-account:review", "prepay:review", "prepay:pay", "commission:view"},
+      value = {
+        "payout-account:review",
+        "prepay:review",
+        "prepay:finance-review",
+        "prepay:pay",
+        "commission:view"
+      },
       mode = SaMode.OR)
   @AuditLog(module = "PayoutAccount", action = "Download file")
   public ResponseEntity<byte[]> file(@PathVariable @Min(1) Long id) {

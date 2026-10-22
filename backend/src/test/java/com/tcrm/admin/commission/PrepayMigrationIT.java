@@ -41,7 +41,8 @@ class PrepayMigrationIT {
           "INSERT INTO sys_user_permission(id,tenant_id,user_id,permission_code,create_time) "
               + "VALUES(1,1,4701,'kol:view',now()),"
               + "(900000000000000000,1,4701,'data:export',now()),"
-              + "(2,2,4701,'prepay:review',now())");
+              + "(2,2,4701,'prepay:review',now()),"
+              + "(3,2,4701,'prepay:pay',now())");
 
       flyway(postgres, "202610221900").migrate();
 
@@ -64,10 +65,34 @@ class PrepayMigrationIT {
               jdbc.queryForObject(
                   "SELECT count(*) FROM sys_user_permission WHERE permission_code='prepay:pay'",
                   Integer.class))
-          .isZero();
-      flyway(postgres, "202610221900").migrate();
+          .isEqualTo(1);
+      jdbc.update(
+          "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,bd_user_id,status,create_time,update_time) "
+              + "VALUES(4710,1,'KOL-ABC4710','t47_complete','complete@example.test','US',4701,1,now(),now()),"
+              + "(4711,1,'KOL-ABC4711','t47_incomplete','incomplete@example.test','US',4701,1,now(),now())");
+      jdbc.update(
+          "INSERT INTO crm_prepay(id,tenant_id,kol_id,prepay_no,request_id,applicant_id,amount_cny,reason,expected_pay_date,deduct_from_commission,payout_account_id,status,create_time,update_time) "
+              + "VALUES(4710,1,4710,'PP0470001',?::uuid,4701,100,'reason',CURRENT_DATE,TRUE,44,'PENDING_APPROVAL',now(),now()),"
+              + "(4711,1,4711,'PP0470002',?::uuid,4701,100,NULL,NULL,NULL,NULL,'PENDING_APPROVAL',now(),now())",
+          UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
+      flyway(postgres, "202610222000").migrate();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM sys_user_permission WHERE tenant_id=2 AND user_id=4701 AND permission_code='prepay:finance-review'",
+                  Integer.class))
+          .isEqualTo(1);
+      assertThat(jdbc.queryForList("SELECT status FROM crm_prepay ORDER BY id", String.class))
+          .containsExactly("PENDING_OPERATIONS_REVIEW", "WAITING_DETAILS");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT indexdef FROM pg_indexes WHERE indexname='uk_crm_prepay_one_active_per_kol'",
+                  String.class))
+          .contains("tenant_id, kol_id")
+          .contains("WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
+      flyway(postgres, "202610222000").migrate();
       assertThat(jdbc.queryForObject("SELECT count(*) FROM sys_user_permission", Integer.class))
-          .isEqualTo(4);
+          .isEqualTo(6);
     }
   }
 

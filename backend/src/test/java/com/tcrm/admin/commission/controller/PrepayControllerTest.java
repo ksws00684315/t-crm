@@ -56,9 +56,10 @@ class PrepayControllerTest {
                         "KOL-test",
                         "Test",
                         5L,
+                        "Business operator",
                         "300.00",
                         "CNY",
-                        "PENDING_APPROVAL",
+                        "WAITING_DETAILS",
                         Instant.parse("2026-10-22T04:00:00Z"))),
                 1,
                 1,
@@ -125,7 +126,7 @@ class PrepayControllerTest {
                 .file(
                     new MockMultipartFile(
                         "attachments", "reason.pdf", "application/pdf", new byte[] {1, 2}))
-                .header(AdminMvcSupport.TOKEN_HEADER, token("prepay:review")))
+                .header(AdminMvcSupport.TOKEN_HEADER, token("prepay:apply")))
         .andExpect(status().isOk());
     var details = ArgumentCaptor.forClass(PrepayService.ApplicationDetails.class);
     @SuppressWarnings("unchecked")
@@ -145,7 +146,7 @@ class PrepayControllerTest {
   void shouldAllowFinanceCompletionWithoutAttachmentsAndRequireDeductionChoice() throws Exception {
     String body =
         "{\"reason\":\"Business advance\",\"expectedPayDate\":\"2026-10-23\",\"payoutAccountId\":\"33\",\"deductFromCommission\":true}";
-    String token = token("prepay:pay");
+    String token = token("prepay:apply");
     mvc.perform(
             multipart(HttpMethod.PUT, BASE + "/77/application-details")
                 .file(payload(body))

@@ -43,7 +43,7 @@ public class PrepayController {
 
   @GetMapping("/admin-api/commission/prepays")
   @SaCheckPermission(
-      value = {"prepay:review", "prepay:pay", "commission:view"},
+      value = {"prepay:review", "prepay:finance-review", "prepay:pay", "commission:view"},
       mode = SaMode.OR)
   public R<com.tcrm.admin.shared.PageResult<PrepayService.PrepayRow>> list(
       @Valid @ModelAttribute Query request) {
@@ -56,6 +56,18 @@ public class PrepayController {
                 request.status(),
                 request.pageNumber(),
                 request.pageSize())));
+  }
+
+  @GetMapping("/admin-api/commission/prepays/active")
+  @SaCheckPermission("prepay:apply")
+  public R<PrepayService.PrepayDetail> active(@RequestParam @Positive Long kolId) {
+    return R.ok(prepays.activeApplication(current.user(), kolId));
+  }
+
+  @GetMapping("/admin-api/commission/prepays/kol-summaries")
+  @SaCheckPermission("kol:view")
+  public R<List<PrepayService.KolSummary>> summaries(@RequestParam List<@Positive Long> kolId) {
+    return R.ok(prepays.summaries(current.user(), kolId));
   }
 
   @GetMapping("/admin-api/commission/prepays/export")
@@ -92,9 +104,7 @@ public class PrepayController {
   @PutMapping(
       value = "/admin-api/commission/prepays/{id}/application-details",
       consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
-  @SaCheckPermission(
-      value = {"prepay:review", "prepay:pay"},
-      mode = SaMode.OR)
+  @SaCheckPermission("prepay:apply")
   public R<PrepayService.PrepayDetail> saveApplicationDetails(
       @PathVariable @Positive Long id,
       @Valid @RequestPart("payload") DetailsRequest request,
@@ -127,7 +137,7 @@ public class PrepayController {
 
   @GetMapping("/admin-api/commission/prepays/payout-accounts")
   @SaCheckPermission(
-      value = {"prepay:apply", "prepay:review", "prepay:pay"},
+      value = {"prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay"},
       mode = SaMode.OR)
   public R<List<PrepayService.PayoutOption>> payoutAccounts(@RequestParam @Positive Long kolId) {
     return R.ok(prepays.payoutOptions(current.user(), kolId));
@@ -135,14 +145,16 @@ public class PrepayController {
 
   @GetMapping("/admin-api/commission/prepays/{id}")
   @SaCheckPermission(
-      value = {"prepay:review", "prepay:pay", "commission:view"},
+      value = {"prepay:review", "prepay:finance-review", "prepay:pay", "commission:view"},
       mode = SaMode.OR)
   public R<PrepayService.PrepayDetail> detail(@PathVariable @Positive Long id) {
     return R.ok(prepays.detail(current.user(), id));
   }
 
   @PutMapping("/admin-api/commission/prepays/{id}/approval")
-  @SaCheckPermission("prepay:review")
+  @SaCheckPermission(
+      value = {"prepay:review", "prepay:finance-review"},
+      mode = SaMode.OR)
   public R<PrepayService.PrepayDetail> approval(
       @PathVariable @Positive Long id, @Valid @RequestBody ApprovalRequest request) {
     return R.ok(prepays.approval(current.user(), id, request.decision(), request.reason()));
