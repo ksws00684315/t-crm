@@ -3,6 +3,7 @@ package com.tcrm.admin.product.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.AdminMvcSupport;
+import com.tcrm.admin.kol.api.CopyTargetShopApi.CopyChannelDTO;
+import com.tcrm.admin.kol.api.CopyTargetShopApi.CopyShopDTO;
 import com.tcrm.admin.product.service.ShopDTO;
 import com.tcrm.admin.product.service.ShopOptionDTO;
 import com.tcrm.admin.product.service.ShopService;
@@ -134,5 +137,33 @@ class ShopControllerTest {
                 .content("{\"status\":0}"))
         .andExpect(status().isForbidden());
     verifyNoInteractions(shops);
+  }
+
+  @Test
+  void shouldListCopyChannelsWithDefaults() throws Exception {
+    when(shops.copyChannels())
+        .thenReturn(
+            List.of(
+                new CopyChannelDTO(
+                    "WEIDIAN", 12, List.of(new CopyShopDTO(9L, "S009", "池店", 12)), 1, 1440)));
+    mvc.perform(
+            get(BASE + "/copy-channels")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].channel").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data[0].remainingCapacity").value(12))
+        .andExpect(jsonPath("$.data[0].defaultQuota").value(1))
+        .andExpect(jsonPath("$.data[0].defaultValidMinutes").value(1440))
+        .andExpect(jsonPath("$.data[0].shops[0].shopCode").value("S009"));
+
+    when(shops.copyChannels())
+        .thenReturn(List.of(new CopyChannelDTO("WEIDIAN", 0, List.of(), 17, 240)));
+    mvc.perform(
+            get(BASE + "/copy-channels")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].defaultQuota").value(17))
+        .andExpect(jsonPath("$.data[0].defaultValidMinutes").value(240));
+    verify(shops, times(2)).copyChannels();
   }
 }
