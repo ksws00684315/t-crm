@@ -6,7 +6,7 @@ import { rebuildLinkIndex } from "@/api/link/link";
 import { getKol, listKols } from "@/api/kol/kol";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
-import type { KolItemVO, KolVO, ShopVO } from "@/api/types";
+import type { KolItemVO, KolVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -37,7 +37,7 @@ const loading = ref(false);
 const hasQueried = ref(false);
 const rows = ref<KolItemVO[]>([]);
 const total = ref(0);
-const shops = ref<ShopVO[]>([]);
+const shops = ref<ShopOptionVO[]>([]);
 const query = reactive<{
   page: number;
   size: number;

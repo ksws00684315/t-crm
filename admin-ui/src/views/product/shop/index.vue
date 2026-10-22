@@ -22,6 +22,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
@@ -34,6 +35,8 @@ const { t } = useI18n();
 const userStore = useUserStore();
 const access = computed(() => accessOf(userStore.user));
 const canManage = computed(() => access.value.isSuperAdmin);
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const canSyncOrders = computed(() => access.value.can("order:manage"));
 const loading = ref(false);
 const rows = ref<ShopVO[]>([]);
@@ -63,7 +66,6 @@ const form = reactive({
 });
 const saving = ref(false);
 const refreshingId = ref<string | null>(null);
-const checkId = ref<string | null>(null);
 
 const rules = computed<FormRules>(() => ({
   shopName: [{ required: true, message: t("shop.nameRequired"), trigger: "blur" }],
@@ -95,7 +97,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
-    list.push({ key: "actions", label: t("common.actions"), minWidth: 520 });
+    list.push({ key: "actions", label: t("common.actions"), width: px(472, 664) });
   }
   return list;
 });
@@ -295,14 +297,11 @@ async function refreshCapacity(row: ShopVO) {
 }
 
 async function checkApis(row: ShopVO) {
-  checkId.value = row.id;
   try {
     await checkShopApis(row.id);
     await load();
   } catch (error) {
     notifyError(error);
-  } finally {
-    checkId.value = null;
   }
 }
 

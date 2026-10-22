@@ -1,5 +1,5 @@
 import { http } from "../http";
-import type { CopyChannelVO, PageResult, ShopChannel, ShopVO } from "../types";
+import type { CopyChannelVO, PageResult, ShopChannel, ShopOptionVO, ShopVO } from "../types";
 
 export interface ShopQuery {
   shopCode?: string;
@@ -33,9 +33,9 @@ export function pageShops(query: ShopQuery): Promise<PageResult<ShopVO>> {
   });
 }
 
-/** Returns the company's shops for selectors used outside the shop list. */
-export function listShops(): Promise<ShopVO[]> {
-  return pageShops({ page: 1, size: 100 }).then(result => result.items);
+/** Full company shop list for selectors (not the paginated shop table). */
+export function listShops(): Promise<ShopOptionVO[]> {
+  return http.request<ShopOptionVO[]>({ method: "get", url: "/product/shops/options" });
 }
 
 export function listCopyChannels(): Promise<CopyChannelVO[]> {

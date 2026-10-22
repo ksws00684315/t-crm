@@ -221,6 +221,14 @@ export interface ShopApiCheckVO {
 }
 
 /** `ShopVO`; mirrors `GET /admin-api/product/shops`. */
+export interface ShopOptionVO {
+  id: string;
+  shopCode: string;
+  shopName: string;
+  channel: ShopChannel;
+  status: 0 | 1;
+}
+
 export interface ShopVO {
   id: string;
   shopCode: string;
