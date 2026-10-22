@@ -31,7 +31,7 @@ set +a
 cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Vite 开发服务器仍按 `admin-ui/`、`kol-portal/` 各自原有命令启动。Flyway 本地配置允许忽略其他分支产生但当前代码没有的迁移，并按顺序补跑较早版本迁移。这只能缓解版本先后和缺失问题；删除的列或改掉的约束不会自动恢复，需要用 `backup` / `restore` 处理。
+Vite 开发服务器仍按 `admin-ui/`、`kol-portal/` 各自原有命令启动。Flyway 本地配置（`SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS=*:missing,*:future`、`SPRING_FLYWAY_OUT_OF_ORDER=true`）允许忽略其他分支产生但当前代码没有的迁移，并按顺序补跑较早版本迁移。库中这类迁移的版本低于当前代码最新迁移时，Flyway 视为 `missing`，高于时视为 `future`，两种都要忽略，否则其他分支先跑了更新的迁移后，当前代码的后台会校验失败、无法启动。这只能缓解版本先后和缺失问题；删除的列或改掉的约束不会自动恢复，需要用 `backup` / `restore` 处理。
 
 ### 代理联调规则
 

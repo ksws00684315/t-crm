@@ -118,11 +118,11 @@ class OrderImportIT {
     jdbc.update("DELETE FROM sys_user WHERE username <> 'bootstrap'");
     admin = CompanySessions.companyAdmin(mvc, json, PASSWORD);
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time)"
-            + " VALUES(10,1,'Shop A','100',1,now(),now())");
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
+            + " VALUES(10,1,'SHOP-900010','Shop A','100',1,now(),now())");
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,status,create_time,update_time)"
-            + " VALUES(20,2,'Other','200',1,now(),now())");
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
+            + " VALUES(20,2,'SHOP-900020','Other','200',1,now(),now())");
     jdbc.update(
         "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,create_time,update_time)"
             + " VALUES(100,1,'KOL-AAA100','Creator','kol0100@example.test','US',now(),now())");

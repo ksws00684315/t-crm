@@ -62,7 +62,8 @@ class RefundQueryServiceTest {
   void setup() {
     when(current.user()).thenReturn(account);
     when(account.ownScope()).thenReturn(false);
-    when(shops.listShops()).thenReturn(List.of(new ShopAccessDTO(5L, "Main shop", "wd-5", 1)));
+    when(shops.listShops())
+        .thenReturn(List.of(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005")));
     when(kols.listByIds(any())).thenReturn(List.of());
   }
 
@@ -156,6 +157,7 @@ class RefundQueryServiceTest {
     var row = result.items().getFirst();
     assertThat(row.orderNo()).isEqualTo("10010");
     assertThat(row.shopName()).isEqualTo("Main shop");
+    assertThat(row.shopCode()).isEqualTo("S005");
     // The line's KOL wins over the order's KOL.
     assertThat(row.kolCode()).isEqualTo("KOL0200");
     assertThat(row.refundType()).isEqualTo("RETURN_REFUND");
@@ -167,7 +169,7 @@ class RefundQueryServiceTest {
   void shouldReturnDetailWithLinkedLine_whenRefundExists() {
     when(refunds.selectById(1L)).thenReturn(refund(1, 10, 20L));
     when(orders.selectById(10L)).thenReturn(order(10, 100L, null));
-    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1));
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
     var line = new OrderItemDO();
     line.setId(20L);
     line.setOrderId(10L);
@@ -187,6 +189,7 @@ class RefundQueryServiceTest {
     var detail = service.detail(1L);
 
     assertThat(detail.merchantNo()).isEqualTo("wd-5");
+    assertThat(detail.shopCode()).isEqualTo("S005");
     assertThat(detail.refundStatus()).isEqualTo("SUCCESS");
     assertThat(detail.lines()).hasSize(1);
     var first = detail.lines().getFirst();

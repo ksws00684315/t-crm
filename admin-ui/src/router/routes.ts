@@ -138,11 +138,11 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "tasks",
             name: "ProductTasks",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/product/copy-job/index.vue"),
             meta: {
               title: "route.productTasks",
               permission: "product:view",
-              componentName: "ComingSoonPage"
+              componentName: "CopyJobPage"
             }
           }
         ]

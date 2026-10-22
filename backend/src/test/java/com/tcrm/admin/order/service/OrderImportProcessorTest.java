@@ -46,7 +46,7 @@ class OrderImportProcessorTest {
         new OrderImportProcessor(
             99L, shops, writer, importStates, syncFailures, Instant.parse("2026-10-21T00:00:00Z"));
     when(shops.findEnabledByWeidianShopId("100"))
-        .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1));
+        .thenReturn(new ShopAccessDTO(10L, "Shop", "100", 1, null));
   }
 
   private static List<String> row(String... cells) {

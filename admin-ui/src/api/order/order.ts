@@ -120,8 +120,12 @@ export function getMatchEvidence(orderItemId: string): Promise<MatchEvidenceVO> 
 }
 
 /** 202 once the background worker starts; 409 ORDER_SYNC_RUNNING while the shop lock is held. */
-export function triggerOrderSync(shopId: string): Promise<null> {
-  return http.request<null>({ method: "post", url: "/order/syncs", data: { shopId } });
+export function triggerOrderSync(shopId: string, type?: "ORDER" | "REFUND"): Promise<null> {
+  return http.request<null>({
+    method: "post",
+    url: "/order/syncs",
+    data: { shopId, ...(type ? { type } : {}) }
+  });
 }
 
 export function assignOrderAttribution(

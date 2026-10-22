@@ -17,6 +17,7 @@ import com.tcrm.admin.order.model.OrderSyncStateDO;
 import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.CopyJobLookupApi;
 import com.tcrm.admin.product.api.KolItemApi;
+import com.tcrm.admin.product.api.KolItemLinkCodeDTO;
 import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
@@ -174,9 +175,9 @@ public class OrderService {
       Map<Long, List<OrderItemDO>> lines,
       Map<Long, List<RefundDO>> refundRows,
       Map<Long, BigDecimal> totals) {
-    Map<Long, String> shopNames =
+    Map<Long, ShopAccessDTO> shopById =
         shops.listShops().stream()
-            .collect(Collectors.toMap(ShopAccessDTO::id, ShopAccessDTO::name, (a, b) -> a));
+            .collect(Collectors.toMap(ShopAccessDTO::id, Function.identity(), (a, b) -> a));
     Set<Long> kolIds = new HashSet<>();
     for (var order : records) {
       if (order.getKolId() != null) {
@@ -204,11 +205,12 @@ public class OrderService {
         .map(
             o -> {
               var kol = o.getKolId() == null ? null : kolById.get(o.getKolId());
+              var shop = o.getShopId() == null ? null : shopById.get(o.getShopId());
               return new OrderDTO(
                   o.getId(),
                   o.getShopId(),
-                  o.getShopId() == null ? null : shopNames.get(o.getShopId()),
-                  null,
+                  shop == null ? null : shop.name(),
+                  shop == null ? null : shop.shopCode(),
                   OrderChannels.WEIDIAN,
                   o.getWeidianOrderId(),
                   o.getWeidianOrderId(),
@@ -265,7 +267,7 @@ public class OrderService {
         OrderChannels.WEIDIAN,
         order.getShopId(),
         shop == null ? null : shop.name(),
-        null,
+        shop == null ? null : shop.shopCode(),
         shop == null ? null : shop.weidianShopId(),
         order.getKolId(),
         orderKol == null ? null : orderKol.kolCode(),
@@ -331,15 +333,19 @@ public class OrderService {
     var order = readable(id);
     var lines = lines(id);
     var refunds = refundRows(id);
+    Set<Long> kolItemIds =
+        lines.stream()
+            .map(OrderItemDO::getKolItemId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
     Map<Long, KolMappingEvidenceDTO> mappingById =
-        kolItems
-            .listMappingsByIds(
-                lines.stream()
-                    .map(OrderItemDO::getKolItemId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet()))
-            .stream()
+        kolItems.listMappingsByIds(kolItemIds).stream()
             .collect(Collectors.toMap(KolMappingEvidenceDTO::kolItemId, Function.identity()));
+    Map<Long, String> linkCodeById =
+        kolItems.listLinkCodesByIds(kolItemIds).stream()
+            .collect(
+                Collectors.toMap(
+                    KolItemLinkCodeDTO::kolItemId, KolItemLinkCodeDTO::linkCode, (a, b) -> a));
     Set<Long> kolIds = new HashSet<>();
     if (order.getKolId() != null) {
       kolIds.add(order.getKolId());
@@ -357,11 +363,10 @@ public class OrderService {
       OrderChainDTO.ChainCopyJobDTO job = null;
       if (mapping != null) {
         var kol = mapping.kolId() == null ? null : kolById.get(mapping.kolId());
-        // linkCode stays null until the link module's code column lands (task 39 merge).
         link =
             new OrderChainDTO.ChainLinkDTO(
                 mapping.kolItemId(),
-                null,
+                linkCodeById.get(mapping.kolItemId()),
                 mapping.productId(),
                 mapping.weidianItemId(),
                 mapping.kolId(),
@@ -418,6 +423,17 @@ public class OrderService {
     Map<Long, KolRefDTO> kolById = kolById(kolIds);
     var productRef = productRef(candidates);
     var mappings = new ArrayList<UnmatchedEvidenceDTO.MappingDTO>();
+    Map<Long, String> evidenceLinkCodes =
+        kolItems
+            .listLinkCodesByIds(
+                candidates.stream()
+                    .map(KolMappingEvidenceDTO::kolItemId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet()))
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    KolItemLinkCodeDTO::kolItemId, KolItemLinkCodeDTO::linkCode, (a, b) -> a));
     for (var mapping : candidates) {
       var kol = mapping.kolId() == null ? null : kolById.get(mapping.kolId());
       mappings.add(
@@ -426,7 +442,7 @@ public class OrderService {
               mapping.kolId(),
               kol == null ? null : kol.kolCode(),
               kol == null ? null : kol.name(),
-              null,
+              evidenceLinkCodes.get(mapping.kolItemId()),
               mapping.validFrom(),
               mapping.validTo(),
               covers(mapping, order.getPayTime())));

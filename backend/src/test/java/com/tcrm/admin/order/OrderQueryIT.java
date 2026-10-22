@@ -149,8 +149,9 @@ class OrderQueryIT {
 
   private void shop(long id) {
     jdbc.update(
-        "INSERT INTO crm_shop(id,tenant_id,shop_name,weidian_shop_id,create_time,update_time) VALUES(?,1,?,?,now(),now())",
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,create_time,update_time) VALUES(?,1,?,?,?,now(),now())",
         id,
+        "SHOP-" + String.format("%06d", id),
         "Main shop",
         String.valueOf(id));
   }
@@ -173,11 +174,12 @@ class OrderQueryIT {
         "8" + id,
         image);
     jdbc.update(
-        "INSERT INTO crm_kol_item(id,tenant_id,kol_id,product_id,shop_id,weidian_item_id,valid_from,valid_to,create_time,update_time) VALUES(?,1,?,?,10,?,?,?,now(),now())",
+        "INSERT INTO crm_kol_item(id,tenant_id,kol_id,product_id,shop_id,weidian_item_id,link_code,valid_from,valid_to,create_time,update_time) VALUES(?,1,?,?,10,?,?,?,?,now(),now())",
         id,
         kol,
         id,
         item,
+        "KPL-" + String.format("%012X", id),
         Timestamp.from(from),
         to == null ? null : Timestamp.from(to));
     return id;
@@ -241,6 +243,7 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"))
         .andExpect(jsonPath("$.data.items[0].channel").value("WEIDIAN"))
         .andExpect(jsonPath("$.data.items[0].shopName").value("Main shop"))
+        .andExpect(jsonPath("$.data.items[0].shopCode").value("SHOP-000010"))
         .andExpect(jsonPath("$.data.items[0].refundStatus").value("NONE"))
         .andExpect(jsonPath("$.data.items[0].freight").value("0.00"));
     mvc.perform(
@@ -277,6 +280,7 @@ class OrderQueryIT {
     mvc.perform(get("/admin-api/order/orders/" + orderId).header("X-Admin-Token", admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.orderNo").value("1000"))
+        .andExpect(jsonPath("$.data.shopCode").value("SHOP-000010"))
         .andExpect(jsonPath("$.data.merchantNo").value("10"))
         .andExpect(jsonPath("$.data.source").value("API"))
         .andExpect(jsonPath("$.data.itemAmount").value("10.00"))
@@ -294,8 +298,8 @@ class OrderQueryIT {
     long orderId = save("1000", PAID, line("90", "1"));
     long itemId = jdbc.queryForObject("SELECT id FROM crm_order_item", Long.class);
     jdbc.update(
-        "INSERT INTO crm_copy_job(id,tenant_id,kol_id,token_id,job_code,caller_platform,target_shop_id,status,total_count,success_count,fail_count,create_time,update_time) "
-            + "VALUES(50,1,100,60,'job-abc','google_sheet_plugin',10,'completed',1,1,0,now(),now())");
+        "INSERT INTO crm_copy_job(id,tenant_id,kol_id,token_id,job_code,caller_platform,target_shop_id,target_channel,status,total_count,success_count,fail_count,create_time,update_time) "
+            + "VALUES(50,1,100,60,'job-abc','google_sheet_plugin',10,'WEIDIAN','completed',1,1,0,now(),now())");
     jdbc.update(
         "INSERT INTO crm_copy_job_item(id,job_id,tenant_id,source_channel,source_product_id,status,target_item_id,update_time) "
             + "VALUES(51,50,1,'WEIDIAN','8','success','90',now())");
@@ -305,6 +309,7 @@ class OrderQueryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.lines[0].copyJob.jobCode").value("job-abc"))
         .andExpect(jsonPath("$.data.lines[0].link.kolItemId").value("1"))
+        .andExpect(jsonPath("$.data.lines[0].link.linkCode").value("KPL-000000000001"))
         .andExpect(jsonPath("$.data.lines[0].link.sourceProductId").value("1"))
         .andExpect(jsonPath("$.data.lines[0].link.targetItemId").value("90"))
         .andExpect(jsonPath("$.data.lines[0].link.kolCode").value("KOL-AAA100"))
@@ -345,6 +350,7 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.items[0].refundType").value("RETURN_REFUND"))
         .andExpect(jsonPath("$.data.items[0].refundStatus").value("SUCCESS"))
         .andExpect(jsonPath("$.data.items[0].applyTime").value(PAID.plusSeconds(60).toString()))
+        .andExpect(jsonPath("$.data.items[0].shopCode").value("SHOP-000010"))
         .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL-AAA100"));
     mvc.perform(
             get("/admin-api/order/refunds")
@@ -355,6 +361,7 @@ class OrderQueryIT {
     mvc.perform(get("/admin-api/order/refunds/" + refundId).header("X-Admin-Token", admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.merchantNo").value("10"))
+        .andExpect(jsonPath("$.data.shopCode").value("SHOP-000010"))
         .andExpect(jsonPath("$.data.lines[0].imageUrl").value("https://img.example/p1.png"))
         .andExpect(jsonPath("$.data.lines[0].refundAmount").value("5.00"));
 
@@ -462,6 +469,7 @@ class OrderQueryIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.unmatchedReason").value("MAPPING_EXPIRED"))
         .andExpect(jsonPath("$.data.mappings[0].kolCode").value("KOL-AAA100"))
+        .andExpect(jsonPath("$.data.mappings[0].linkCode").value("KPL-000000000001"))
         .andExpect(jsonPath("$.data.mappings[0].coversPayTime").value(false))
         .andExpect(jsonPath("$.data.product.productId").value("1"))
         .andExpect(jsonPath("$.data.product.productCode").value("P1"));
