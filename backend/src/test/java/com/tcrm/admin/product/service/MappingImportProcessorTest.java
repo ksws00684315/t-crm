@@ -88,6 +88,7 @@ class MappingImportProcessorTest {
     assertThat(cap.getValue().getProductId()).isEqualTo(20L);
     assertThat(cap.getValue().getWeidianItemId()).isEqualTo("9001");
     assertThat(cap.getValue().getValidTo()).isNull();
+    assertThat(cap.getValue().getLinkCode()).matches("KPL-[0-9A-F]{12}");
   }
 
   @Test

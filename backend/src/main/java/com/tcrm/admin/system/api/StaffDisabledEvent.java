@@ -6,5 +6,12 @@ package com.tcrm.admin.system.api;
  *
  * @param tenantId owning company ID, positive
  * @param userId disabled staff account ID, positive
+ * @param actorId account to credit in the audit rows; null means the disabled account itself (a
+ *     system execution has no request credentials, task 41)
  */
-public record StaffDisabledEvent(long tenantId, long userId) {}
+public record StaffDisabledEvent(long tenantId, long userId, Long actorId) {
+  /** Event of an administrator action; the audit actor is the disabled account unless given. */
+  public StaffDisabledEvent(long tenantId, long userId) {
+    this(tenantId, userId, null);
+  }
+}

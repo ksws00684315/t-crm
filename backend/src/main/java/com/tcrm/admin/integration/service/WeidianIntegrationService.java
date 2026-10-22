@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianAppRequest;
 import com.tcrm.admin.integration.api.WeidianAppView;
 import com.tcrm.admin.integration.api.WeidianAuthorizeView;
+import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianSelfUseRequest;
 import com.tcrm.admin.integration.api.WeidianShopView;
 import com.tcrm.admin.integration.mapper.WeidianAppMapper;
@@ -12,6 +13,7 @@ import com.tcrm.admin.integration.model.WeidianAppDO;
 import com.tcrm.admin.integration.model.WeidianShopAuthDO;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.product.api.ShopIntegrationApi;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +37,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
-public class WeidianIntegrationService {
+public class WeidianIntegrationService implements ShopIntegrationApi {
   private static final Logger LOG = LoggerFactory.getLogger(WeidianIntegrationService.class);
   private static final String STATE_PREFIX = "weidian:oauth:state:";
   private static final Duration STATE_TTL = Duration.ofMinutes(10);
@@ -50,6 +53,7 @@ public class WeidianIntegrationService {
   private final SecretCipher cipher;
   private final WeidianTokenCenter tokens;
   private final WeidianConnectivityChecker connectivity;
+  private final WeidianBusinessApi business;
   private final WeidianAdminBaseUrl adminBaseUrl;
   private final StringRedisTemplate redis;
   private final ObjectMapper json;
@@ -65,6 +69,7 @@ public class WeidianIntegrationService {
       SecretCipher cipher,
       WeidianTokenCenter tokens,
       WeidianConnectivityChecker connectivity,
+      WeidianBusinessApi business,
       WeidianAdminBaseUrl adminBaseUrl,
       StringRedisTemplate redis,
       ObjectMapper json,
@@ -77,6 +82,7 @@ public class WeidianIntegrationService {
     this.cipher = cipher;
     this.tokens = tokens;
     this.connectivity = connectivity;
+    this.business = business;
     this.adminBaseUrl = adminBaseUrl;
     this.redis = redis;
     this.json = json;
@@ -124,6 +130,90 @@ public class WeidianIntegrationService {
         .selectList(new LambdaQueryWrapper<WeidianShopAuthDO>())
         .forEach(row -> rows.put(row.getShopId(), row));
     return shops.listShops().stream().map(shop -> shopView(shop, rows.get(shop.id()))).toList();
+  }
+
+  @Override
+  public Map<Long, ShopAuthorizationDTO> statuses(java.util.Collection<Long> shopIds) {
+    if (shopIds == null || shopIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, ShopAuthorizationDTO> result = new HashMap<>();
+    for (WeidianShopAuthDO auth :
+        auths.selectList(
+            new LambdaQueryWrapper<WeidianShopAuthDO>()
+                .in(WeidianShopAuthDO::getShopId, shopIds))) {
+      String status = auth.getStatus();
+      if (auth.getAccessExpiresAt() != null && !auth.getAccessExpiresAt().isAfter(Instant.now())) {
+        status = WeidianAuthStatus.EXPIRED.name();
+      }
+      result.put(auth.getShopId(), new ShopAuthorizationDTO(status, auth.getAccessExpiresAt()));
+    }
+    return result;
+  }
+
+  @Override
+  public ShopApiChecksDTO checkApis(long shopId) {
+    return new ShopApiChecksDTO(
+        probe(
+            () -> {
+              tokens.accessToken(shopId);
+              return business.itemList(
+                  shopId, new WeidianBusinessApi.ItemListRequest(null, "1", null, 1, null, "1"));
+            }),
+        probe(
+            () -> {
+              tokens.accessToken(shopId);
+              return business.orderList(
+                  shopId,
+                  new WeidianBusinessApi.OrderListRequest(
+                      1, false, null, "all", 1, null, null, null, null, "0", null));
+            }),
+        probe(
+            () -> {
+              tokens.accessToken(shopId);
+              return business.refundList(
+                  shopId,
+                  new WeidianBusinessApi.RefundListRequest(
+                      null, null, null, null, null, 0, 1, null, null, null));
+            }));
+  }
+
+  @Override
+  public int countOnSaleItems(long shopId) {
+    tokens.accessToken(shopId);
+    int count = 0;
+    int page = 1;
+    while (page <= 1000) {
+      WeidianBusinessApi.ItemListResponse response =
+          business.itemList(
+              shopId,
+              new WeidianBusinessApi.ItemListRequest(
+                  null, Integer.toString(page), null, 1, null, "100"));
+      if (response.totalNum() != null) {
+        return Math.max(0, response.totalNum());
+      }
+      int current = response.items() == null ? 0 : response.items().size();
+      count += current;
+      if (current < 100) {
+        return count;
+      }
+      page++;
+    }
+    throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
+  }
+
+  private ShopApiCheckDTO probe(Supplier<?> request) {
+    Instant checkedAt = Instant.now();
+    try {
+      request.get();
+      return new ShopApiCheckDTO(true, checkedAt, null);
+    } catch (RuntimeException error) {
+      String code =
+          error instanceof BusinessException businessError
+              ? businessError.getErrorCode().name()
+              : "WEIDIAN_API_FAILED";
+      return new ShopApiCheckDTO(false, checkedAt, code);
+    }
   }
 
   public WeidianShopView configureSelfUse(long shopId, WeidianSelfUseRequest request) {

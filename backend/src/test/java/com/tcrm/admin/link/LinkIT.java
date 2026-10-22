@@ -889,7 +889,11 @@ class LinkIT {
                     .header(TOKEN, adminToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        "{\"shopName\":\"" + name + "\",\"weidianShopId\":\"" + weidianId + "\"}"))
+                        "{\"shopName\":\""
+                            + name
+                            + "\",\"channel\":\"WEIDIAN\",\"weidianShopId\":\""
+                            + weidianId
+                            + "\"}"))
             .andExpect(status().isOk())
             .andReturn();
     return Long.parseLong(

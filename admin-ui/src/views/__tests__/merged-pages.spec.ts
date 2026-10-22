@@ -18,7 +18,15 @@ vi.mock("@/api/product/product", () => ({
 vi.mock("@/api/product/sheet-source", () => ({ listSheetSources: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/order/order", () => ({
   listOrders: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
+  listUnmatchedOrders: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
   listSyncStates: vi.fn().mockResolvedValue([]),
+  listSyncFailures: vi.fn().mockResolvedValue([]),
+  getOrder: vi.fn(),
+  getOrderChain: vi.fn(),
+  listRefunds: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
+  getRefund: vi.fn(),
+  getMatchEvidence: vi.fn(),
+  triggerOrderSync: vi.fn(),
   downloadOrderImportTemplate: vi.fn(),
   uploadOrderImport: vi.fn(),
   downloadRefundImportTemplate: vi.fn(),

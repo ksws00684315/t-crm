@@ -26,6 +26,7 @@ describe("cacheable route component names", () => {
     expect(cacheable.map(route => route.meta?.componentName).sort()).toEqual(
       [
         "AccountPasswordPage",
+        "AccountResignationPage",
         // One shared stateless placeholder backs every coming-soon route (task 32 §2.1).
         "ComingSoonPage",
         "ComingSoonPage",
@@ -34,15 +35,16 @@ describe("cacheable route component names", () => {
         "ComingSoonPage",
         "ComingSoonPage",
         "ComingSoonPage",
-        "ComingSoonPage",
-        "ComingSoonPage",
+        "CopyJobPage",
         "CopyTokenPage",
         "FundPayoutPage",
         "HomePage",
         "KolItemListPage",
         "KolListPage",
         "NotificationPage",
+        "OrderChainPage",
         "OrderQueryPage",
+        "OrderRefundPage",
         "PlatformTenantPage",
         "PlatformSystemConfigPage",
         "ShopManagementPage",

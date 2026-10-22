@@ -6,10 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as copyTokenApi from "@/api/kol/copy-token";
 import * as kolApi from "@/api/kol/kol";
 import * as shopApi from "@/api/product/shop";
-import type { CopyTokenVO, Role } from "@/api/types";
+import type { CopyChannelVO, CopyTokenVO, CreatedCopyTokenVO, Role } from "@/api/types";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import * as copyUtil from "@/utils/copy";
+import CopyTokenCreateDialog from "../CopyTokenCreateDialog.vue";
 import CopyTokenPage from "../index.vue";
 
 vi.mock("@/api/kol/copy-token");
@@ -27,6 +28,7 @@ function row(overrides: Partial<CopyTokenVO> = {}): CopyTokenVO {
     targetChannel: "WEIDIAN",
     targetShopId: null,
     targetShopName: null,
+    targetShopCode: null,
     used: 0,
     quota: 1,
     validMinutes: 1440,
@@ -139,11 +141,101 @@ describe("Copy token page", () => {
 
   it("opens the create dialog", async () => {
     vi.mocked(shopApi.listShops).mockResolvedValue([]);
+    vi.mocked(shopApi.listCopyChannels).mockResolvedValue([
+      {
+        channel: "WEIDIAN",
+        remainingCapacity: 10,
+        defaultQuota: 1,
+        defaultValidMinutes: 1440,
+        shops: [{ id: "20", shopCode: "SHOP-100020", shopName: "可用店铺", remainingCapacity: 10 }]
+      }
+    ]);
     vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "0", page: 1, size: 20 });
     const wrapper = await open();
     await wrapper.get('[data-test="create-token"]').trigger("click");
     await flushPromises();
     expect(document.body.querySelector('[data-test="copy-token-create-dialog"]')).toBeTruthy();
+    wrapper.unmount();
+  });
+
+  it("loads configured defaults and omits an automatic target shop from the request", async () => {
+    const channel: CopyChannelVO = {
+      channel: "WEIDIAN",
+      remainingCapacity: 3,
+      defaultQuota: 1,
+      defaultValidMinutes: 1440,
+      shops: [{ id: "20", shopCode: "SHOP-100020", shopName: "可用店铺", remainingCapacity: 2 }]
+    };
+    vi.mocked(shopApi.listCopyChannels).mockResolvedValue([channel]);
+    const token: CreatedCopyTokenVO = {
+      ...row(),
+      token: "TKN-SECRET"
+    };
+    vi.mocked(copyTokenApi.createCopyToken).mockResolvedValue(token);
+    const wrapper = mount(CopyTokenCreateDialog, {
+      props: { modelValue: false, presetKolId: "10", presetKolLabel: "KOL0001" },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    expect(
+      (wrapper.get('[data-test="create-quota"] input').element as HTMLInputElement).value
+    ).toBe("1");
+    expect(
+      (wrapper.get('[data-test="create-minutes"] input').element as HTMLInputElement).value
+    ).toBe("1440");
+    await wrapper.get('[data-test="create-submit"]').trigger("click");
+    await flushPromises();
+    expect(copyTokenApi.createCopyToken).toHaveBeenCalledWith({
+      kolId: "10",
+      targetChannel: "WEIDIAN",
+      quota: 1,
+      validMinutes: 1440
+    });
+    wrapper.unmount();
+  });
+
+  it("checks selected shop capacity before creation and passes a chosen shop", async () => {
+    vi.mocked(shopApi.listCopyChannels).mockResolvedValue([
+      {
+        channel: "WEIDIAN",
+        remainingCapacity: 3,
+        defaultQuota: 1,
+        defaultValidMinutes: 1440,
+        shops: [{ id: "20", shopCode: "SHOP-100020", shopName: "可用店铺", remainingCapacity: 2 }]
+      }
+    ]);
+    vi.mocked(copyTokenApi.createCopyToken).mockResolvedValue({
+      ...row({ targetShopId: "20", targetShopName: "可用店铺", targetShopCode: "SHOP-100020" }),
+      token: "TKN-SECRET"
+    });
+    const wrapper = mount(CopyTokenCreateDialog, {
+      props: { modelValue: false, presetKolId: "10", presetKolLabel: "KOL0001" },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    const selects = wrapper.findAllComponents({ name: "ElSelect" });
+    await selects[2]?.setValue("20");
+    await wrapper.get('[data-test="create-quota"] input').setValue("3");
+    await flushPromises();
+    expect(wrapper.find('[data-test="capacity-error"]').exists()).toBe(true);
+    await wrapper.get('[data-test="create-submit"]').trigger("click");
+    await flushPromises();
+    expect(copyTokenApi.createCopyToken).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-test="create-quota"] input').setValue("2");
+    await wrapper.get('[data-test="create-submit"]').trigger("click");
+    await flushPromises();
+    expect(copyTokenApi.createCopyToken).toHaveBeenCalledWith({
+      kolId: "10",
+      targetChannel: "WEIDIAN",
+      targetShopId: "20",
+      quota: 2,
+      validMinutes: 1440
+    });
     wrapper.unmount();
   });
 });

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyDefaultHidden,
   defaultPrefs,
   loadTablePrefs,
   mergePrefs,
@@ -34,6 +35,18 @@ describe("table prefs", () => {
       "actions"
     ]);
     expect(defaultPrefs(keys, 20).columns.every(column => column.visible)).toBe(true);
+  });
+
+  it("hides only the columns that opt in", () => {
+    const applied = applyDefaultHidden(
+      defaultPrefs(["jobCode", "kolId", "actions"], 20),
+      new Set(["kolId"])
+    );
+    expect(applied.columns.find(column => column.key === "kolId")?.visible).toBe(false);
+    expect(applied.columns.find(column => column.key === "jobCode")?.visible).toBe(true);
+    expect(
+      applyDefaultHidden(defaultPrefs(keys, 20), new Set()).columns.every(column => column.visible)
+    ).toBe(true);
   });
 
   it("forces locked columns to stay visible", () => {
