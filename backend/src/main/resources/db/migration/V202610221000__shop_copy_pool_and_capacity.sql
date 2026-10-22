@@ -58,4 +58,4 @@ COMMENT ON COLUMN crm_shop.refund_api_error IS '最近一次退款接口检查�
 COMMENT ON TABLE crm_shop IS '公司店铺及自动复制容量；每家公司默认最多 20 个，雪花 ID、逻辑删除';
 
 UPDATE sys_config SET config_value = '20', update_time = NOW()
-WHERE config_key = 'shop.max-per-company';
+WHERE config_key = 'shop.max-per-company' AND config_value = '3';

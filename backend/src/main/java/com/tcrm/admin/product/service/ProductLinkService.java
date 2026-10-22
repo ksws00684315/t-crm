@@ -447,9 +447,13 @@ public class ProductLinkService {
       }
     } else {
       Long selectedShopId = shopId;
-      TenantScope.runCompany(
-          grant.tenantId(),
-          () -> targetShops.validateCopyTarget(selectedShopId, grant.targetChannel(), quantity));
+      try {
+        TenantScope.runCompany(
+            grant.tenantId(),
+            () -> targetShops.validateCopyTarget(selectedShopId, grant.targetChannel(), quantity));
+      } catch (BusinessException e) {
+        throw ProductLinkMessages.wrap(e);
+      }
     }
     ShopDO shop = shops.selectById(shopId);
     if (shop == null) {

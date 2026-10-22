@@ -439,7 +439,11 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
   public List<CopyChannelDTO> copyChannels() {
     List<ShopDO> rows =
         shops.selectList(new LambdaQueryWrapper<ShopDO>().orderByAsc(ShopDO::getId));
-    List<ShopDTO> eligible = buildViews(rows).stream().filter(ShopDTO::copyEligible).toList();
+    List<ShopDTO> eligible =
+        buildViews(rows).stream()
+            .filter(ShopDTO::copyEligible)
+            .filter(row -> "WEIDIAN".equals(row.channel()))
+            .toList();
     List<CopyShopDTO> shopRows =
         eligible.stream()
             .map(
@@ -465,7 +469,7 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
     shops.lockShop(shopId);
     ShopDO shop = require(shopId);
     ShopDTO row = buildViews(List.of(shop)).getFirst();
-    if (!"WEIDIAN".equals(channel) || !row.copyEligible()) {
+    if (!Objects.equals(channel, shop.getChannel()) || !row.copyEligible()) {
       throw ineligibleError(row.copyIneligibleReason());
     }
     if (quantity > availableCapacity(shopId, shop.getMaxItems(), shop.getCurrentItems())) {
@@ -477,7 +481,7 @@ public class ShopService implements ShopAccessApi, CopyTargetShopApi {
   public void requireCopyEligible(long shopId, String channel) {
     ShopDO shop = require(shopId);
     ShopDTO row = buildViews(List.of(shop)).getFirst();
-    if (!"WEIDIAN".equals(channel) || !row.copyEligible()) {
+    if (!Objects.equals(channel, shop.getChannel()) || !row.copyEligible()) {
       throw ineligibleError(row.copyIneligibleReason());
     }
   }

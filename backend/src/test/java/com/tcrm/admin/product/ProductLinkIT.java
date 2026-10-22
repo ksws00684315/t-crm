@@ -314,6 +314,30 @@ class ProductLinkIT {
   }
 
   @Test
+  void shouldRejectSpecifiedTargetShopCapacity_withChineseMsg() throws Exception {
+    long kolId = createKol("CapShop", "capshop17b@example.com");
+    long shopId = createShop("371002", "Capacity limited pool member");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    jdbc.update("UPDATE crm_shop SET max_items = 1, current_items = 0 WHERE id = ?", shopId);
+    String token = createTokenForShop(kolId, 1, shopId);
+    jdbc.update("UPDATE crm_shop SET current_items = 1 WHERE id = ?", shopId);
+    mvc.perform(
+            post(BASE + "/convert")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","callerPlatform":"google_sheet_plugin",
+                     "items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"1"}]}
+                    """
+                        .formatted(token)))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(jsonPath("$.errorCode").value("SHOP_COPY_CAPACITY_EXCEEDED"))
+        .andExpect(jsonPath("$.msg").value("复制数量超过可用店铺容量"));
+  }
+
+  @Test
   void shouldReturnTemplates_withRelayFirst() throws Exception {
     mvc.perform(get(BASE + "/templates").param("channelCode", "WEIDIAN"))
         .andExpect(status().isOk())
@@ -525,6 +549,28 @@ class ProductLinkIT {
             .andReturn();
     return Long.parseLong(
         json.readTree(result.getResponse().getContentAsString()).path("data").path("id").asText());
+  }
+
+  private String createTokenForShop(long kolId, int quota, long shopId) throws Exception {
+    MvcResult result =
+        mvc.perform(
+                post("/admin-api/kol/copy-tokens")
+                    .header(ADMIN, admin)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"kolId\":\""
+                            + kolId
+                            + "\",\"quota\":"
+                            + quota
+                            + ",\"validMinutes\":60,\"targetChannel\":\"WEIDIAN\",\"targetShopId\":\""
+                            + shopId
+                            + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString())
+        .path("data")
+        .path("token")
+        .asString();
   }
 
   private String createToken(long kolId, int quota) throws Exception {
