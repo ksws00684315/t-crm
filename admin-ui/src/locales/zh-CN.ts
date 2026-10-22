@@ -174,6 +174,7 @@ const zhCN = {
     orderList: "订单列表",
     orderUnmatched: "人工匹配池",
     refundQuery: "退款查询",
+    orderChain: "订单链路",
     kolManage: "达人管理",
     kols: "达人列表",
     kolItems: "达人商品",
@@ -1197,9 +1198,13 @@ const zhCN = {
   order: {
     shop: "店铺",
     orderId: "订单号",
+    channel: "渠道",
+    channelOption: {
+      WEIDIAN: "微店"
+    },
     payTime: "支付时间",
     orderStatus: "订单状态",
-    payAmount: "实付",
+    payAmount: "支付金额",
     refundTotal: "退款合计",
     kol: "达人",
     bd: "所属商务",
@@ -1207,6 +1212,22 @@ const zhCN = {
     attributionStatus: "归因状态",
     payRange: "支付时间",
     kolCode: "达人编号",
+    freight: "运费",
+    createTime: "创建时间",
+    refundStatusColumn: "退款状态",
+    actionView: "查看",
+    actionChain: "链路",
+    chainNoKol: "未归属达人的订单暂无链路",
+    source: {
+      API: "接口同步",
+      IMPORT: "导入"
+    },
+    refundStatus: {
+      NONE: "无退款",
+      PROCESSING: "退款中",
+      PARTIAL_SUCCESS: "部分退款成功",
+      FULL_SUCCESS: "全额退款成功"
+    },
     status: {
       UNPAID: "待支付",
       PAID: "已支付",
@@ -1251,6 +1272,84 @@ const zhCN = {
     syncFailed: "同步失败",
     syncNow: "立即同步",
     syncStarted: "已开始同步",
+    sync: {
+      statesTab: "同步状态",
+      failuresTab: "失败任务",
+      typeColumn: "类型",
+      typeOption: {
+        ORDER: "订单",
+        REFUND: "退款"
+      },
+      kindOption: {
+        ORDER_SYNC: "订单同步",
+        REFUND_SYNC: "退款同步",
+        ORDER_IMPORT: "订单导入",
+        REFUND_IMPORT: "退款导入"
+      },
+      source: "来源",
+      failures24h: "24 小时失败次数",
+      missingFields: "缺字段记录数",
+      importCutoff: "最近导入数据截止时间",
+      time: "时间",
+      linkedTask: "关联导入任务",
+      viewTask: "查看",
+      cleanFailures: "清理",
+      cleanFailuresTitle: "清理失败记录",
+      cleanFailuresPrompt: "将删除 N 天前的失败记录，删除后不可恢复。请输入天数（1～3650）：",
+      cleanFailuresConfirm: "确定删除 {days} 天前的失败记录？删除后不可恢复。",
+      cleanFailuresDaysInvalid: "请输入 1～3650 的整数",
+      cleanFailuresDone: "已删除 {count} 条失败记录"
+    },
+    refund: {
+      no: "退款单号",
+      orderNo: "原订单号",
+      typeColumn: "退款类型",
+      statusColumn: "退款状态",
+      amount: "退款金额",
+      applyTime: "申请时间",
+      finishTime: "成功时间",
+      detailTitle: "退款详情",
+      items: "退款商品",
+      type: {
+        REFUND_ONLY: "仅退款",
+        RETURN_REFUND: "退货退款",
+        UNKNOWN: "未知"
+      },
+      status: {
+        PROCESSING: "退款中",
+        SUCCESS: "退款成功",
+        CLOSED: "已关闭",
+        UNKNOWN: "未知"
+      }
+    },
+    detail: {
+      title: "订单详情",
+      merchantNo: "商户号",
+      itemAmount: "商品金额",
+      totalAmount: "订单总额",
+      orderTime: "下单时间",
+      source: "来源",
+      lastSyncTime: "最后同步时间",
+      items: "商品行",
+      image: "图片",
+      itemName: "商品名称",
+      unitPrice: "单价",
+      lineRefund: "退款金额"
+    },
+    chain: {
+      copyJob: "商品创建任务",
+      copyJobTime: "创建时间",
+      kolItem: "达人商品链接",
+      linkCode: "链接编码",
+      sourceItemId: "来源商品 ID",
+      targetItemId: "目标商品 ID",
+      orderLine: "订单商品行",
+      refunds: "退款",
+      noRefund: "无退款",
+      noLines: "无商品行",
+      ledger: "账务流水",
+      withdrawals: "提现占用"
+    },
     importOrders: "导入订单",
     importRefunds: "导入退款",
     orderImportTitle: "导入订单",
@@ -1273,7 +1372,25 @@ const zhCN = {
       reasonRequired: "请填写原因",
       assigned: "已指定达人",
       markedNonKol: "已标为非达人订单",
-      rematched: "已完成重新匹配"
+      rematched: "已完成重新匹配",
+      evidence: "查看依据",
+      evidenceTitle: "查看依据",
+      evidenceLine: "商品行",
+      mappings: "达人商品对应关系",
+      effectiveRange: "生效起止",
+      coversPayTime: "覆盖支付时间",
+      coversYes: "覆盖",
+      coversNo: "不覆盖",
+      sourceProduct: "原商品",
+      unmatchedReason: "未匹配原因",
+      reasonOption: {
+        PENDING: "未支付",
+        CONFLICT: "证据冲突",
+        NO_MAPPING: "缺规则",
+        MAPPING_EXPIRED: "映射在支付时已失效",
+        MATCHED: "已匹配"
+      },
+      manualRecords: "人工处理记录"
     }
   },
   link: {
@@ -1313,7 +1430,11 @@ const zhCN = {
     closeRunning: "后台继续，关闭窗口",
     close: "关闭",
     again: "继续导入",
-    submit: "上传并导入"
+    submit: "上传并导入",
+    cutoffPlaceholder: "数据截止时间",
+    cutoffHint: "必填：导入文件中数据的截至时间，不能晚于当前时间",
+    cutoffRequired: "请选择数据截止时间",
+    cutoffFuture: "数据截止时间不能晚于当前时间"
   },
   audit: {
     time: "操作时间",
