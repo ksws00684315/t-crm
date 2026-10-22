@@ -94,3 +94,7 @@
 ## 6. 不做
 
 管理端页面（任务 40 前端）；账务流水、提现占用、佣金相关；微店真实状态取值核实（M0）。
+
+## 补充（负责人 2026-10-22）：同步失败记录的清理
+
+同步失败记录目前人工清理；「保留 N 天、每天自动清理」先预留，默认不打开。具体要求见 #97 的审查补充意见：人工清理接口 `DELETE /admin-api/order/sync-failures?olderThanDays=`（`order:manage`，1～3650 天，写审计）；系统配置 `order.sync-failure.retention-days`（默认 0 = 不自动清理，0～3650）与每日清理任务（参照 `OperLogRetentionJob`）。
