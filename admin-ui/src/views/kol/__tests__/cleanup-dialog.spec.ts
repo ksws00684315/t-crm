@@ -73,6 +73,17 @@ describe("per-creator cleanup config dialog (task 32 §2.2)", () => {
     vi.restoreAllMocks();
   });
 
+  it("shows code and name with locale-aware brackets", async () => {
+    i18n.global.locale.value = "zh-CN";
+    await openDialog();
+    expect(element("cleanup-kol-label").text()).toBe("KOL-ASD001（Alice）");
+    document.body.innerHTML = "";
+    i18n.global.locale.value = "en-US";
+    await openDialog();
+    expect(element("cleanup-kol-label").text()).toBe("KOL-ASD001 (Alice)");
+    i18n.global.locale.value = "zh-CN";
+  });
+
   it("seeds the form from the creator's stored auto-cleanup days", async () => {
     const wrapper = await openDialog();
     const text = document.body.textContent ?? "";

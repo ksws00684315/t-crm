@@ -12,7 +12,6 @@ import jakarta.validation.constraints.Min;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,8 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Product source sheets (ADR-021): configuration is super-administrator only, reading and the "no
  * longer in the sheet" list need product:edit, the list needs product:view.
+ *
+ * <p>Parameter constraints ({@code @Min}/{@code @Max}) rely on Spring MVC built-in method
+ * validation (Framework 6.1+); do not put class-level {@code @Validated} on controllers.
  */
-@Validated
 @RestController
 @RequestMapping("/admin-api/product/sheet-sources")
 public class SheetSourceController {

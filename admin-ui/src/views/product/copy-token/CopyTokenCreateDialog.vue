@@ -7,6 +7,7 @@ import { listKols } from "@/api/kol/kol";
 import { listShops } from "@/api/product/shop";
 import type { CreatedCopyTokenVO, KolVO, ShopVO } from "@/api/types";
 import { copyText, truncateCopy } from "@/utils/copy";
+import { formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "CopyTokenCreateDialog" });
@@ -118,7 +119,7 @@ async function searchKols(keyword: string) {
 }
 
 function kolLabel(kol: KolVO): string {
-  return `${kol.name} (${kol.kolCode})`;
+  return formatNameWithCode(kol.name, kol.kolCode);
 }
 
 async function submit() {
