@@ -35,7 +35,7 @@ describe("cacheable route component names", () => {
         "ComingSoonPage",
         "ComingSoonPage",
         "ComingSoonPage",
-        "ComingSoonPage",
+        "CopyJobPage",
         "CopyTokenPage",
         "FundPayoutPage",
         "PrepayTasksPage",

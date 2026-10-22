@@ -29,6 +29,29 @@ export function defaultPrefs(keys: readonly string[], pageSize: number): TablePr
   };
 }
 
+/** Hides columns that opt in. Callers apply this only when the user has no saved prefs, and on reset. */
+export function applyDefaultHidden(prefs: TablePrefs, hidden: ReadonlySet<string>): TablePrefs {
+  if (hidden.size === 0) return prefs;
+  return {
+    ...prefs,
+    columns: prefs.columns.map(column =>
+      hidden.has(column.key) ? { ...column, visible: false } : column
+    )
+  };
+}
+
+/** True when localStorage holds a payload this table can merge. A bad payload counts as unsaved. */
+export function hasSavedTablePrefs(tableId: string): boolean {
+  try {
+    const raw = localStorage.getItem(tablePrefsKey(tableId));
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Partial<TablePrefs>;
+    return parsed?.v === 1 && Array.isArray(parsed.columns);
+  } catch {
+    return false;
+  }
+}
+
 function isPageSize(value: unknown): value is PageSize {
   return typeof value === "number" && (PAGE_SIZES as readonly number[]).includes(value);
 }

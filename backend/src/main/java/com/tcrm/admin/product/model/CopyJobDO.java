@@ -19,12 +19,15 @@ public class CopyJobDO {
   private String jobCode;
   private String callerPlatform;
   private Long targetShopId;
+  private String targetChannel;
   private String status;
   private Integer totalCount;
   private Integer successCount;
   private Integer failCount;
+  private String errorMessage;
   private Instant createTime;
   private Instant updateTime;
+  private Instant finishTime;
 
   public Long getId() {
     return id;
@@ -82,6 +85,14 @@ public class CopyJobDO {
     this.targetShopId = value;
   }
 
+  public String getTargetChannel() {
+    return targetChannel;
+  }
+
+  public void setTargetChannel(String value) {
+    this.targetChannel = value;
+  }
+
   public String getStatus() {
     return status;
   }
@@ -114,6 +125,14 @@ public class CopyJobDO {
     this.failCount = value;
   }
 
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String value) {
+    this.errorMessage = value;
+  }
+
   public Instant getCreateTime() {
     return createTime;
   }
@@ -128,5 +147,13 @@ public class CopyJobDO {
 
   public void setUpdateTime(Instant value) {
     this.updateTime = value;
+  }
+
+  public Instant getFinishTime() {
+    return finishTime;
+  }
+
+  public void setFinishTime(Instant value) {
+    this.finishTime = value;
   }
 }

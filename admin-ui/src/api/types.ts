@@ -210,16 +210,67 @@ export interface TaskVO {
   finishedAt: string | null;
 }
 
-/** `ShopVO`. */
+export type ShopChannel = "WEIDIAN";
+export type ShopAuthStatus = "UNAUTHORIZED" | "AUTHORIZED" | "EXPIRED";
+export type CopyPoolStatus = "JOINED" | "EXITED" | "NOT_APPLICABLE";
+export type CopyIneligibleReason =
+  "DISABLED" | "UNAUTHORIZED" | "AUTH_EXPIRED" | "SOURCE_SHOP" | "POOL_EXITED" | "CAPACITY_FULL";
+
+export interface ShopApiCheckVO {
+  ok: boolean | null;
+  checkedAt: string | null;
+  error: string | null;
+}
+
+/** `ShopVO`; mirrors `GET /admin-api/product/shops`. */
+export interface ShopOptionVO {
+  id: string;
+  shopCode: string;
+  shopName: string;
+  channel: ShopChannel;
+  status: 0 | 1;
+}
+
 export interface ShopVO {
   id: string;
+  shopCode: string;
   shopName: string;
-  weidianShopId: string;
+  channel: ShopChannel;
+  weidianShopId: string | null;
   status: 0 | 1;
-  copyTarget: boolean;
+  isSource: boolean;
+  copyPoolStatus: CopyPoolStatus;
+  maxItems: number;
+  currentItems: number;
+  itemsRefreshedAt: string | null;
+  authStatus: ShopAuthStatus;
+  authExpiresAt: string | null;
+  apiStatus: {
+    product: ShopApiCheckVO;
+    order: ShopApiCheckVO;
+    refund: ShopApiCheckVO;
+  };
+  copyEligible: boolean;
+  copyIneligibleReason: CopyIneligibleReason | null;
   remark: string | null;
   createTime: string;
   updateTime: string;
+}
+
+export interface CopyChannelShopVO {
+  id: string;
+  shopCode: string;
+  shopName: string;
+  remainingCapacity: number;
+}
+
+/** Optional defaults are supplied by the backend when available. */
+export interface CopyChannelVO {
+  channel: ShopChannel;
+  remainingCapacity: number;
+  shops: CopyChannelShopVO[];
+  defaultQuota?: number;
+  defaultValidMinutes?: number;
 }
 
 /** `ProductVO`. `price` 2 decimals; `rate` fraction 4 decimals or null. */
@@ -302,23 +353,40 @@ export interface GoogleCredentialVO {
   updateTime: string | null;
 }
 
-/** `KolItemVO`. `validTo` null means currently effective. */
+/** Creator-item list row (task 39). Amounts and ids are strings. Counts are strings too. */
 export interface KolItemVO {
   id: string;
+  linkCode: string;
+  itemName: string | null;
+  imageUrl: string | null;
   kolId: string;
   kolCode: string | null;
   kolName: string | null;
-  productId: string | null;
-  productCode: string | null;
-  productName: string | null;
-  shopId: string;
-  shopName: string | null;
-  weidianShopId: string | null;
-  weidianItemId: string;
-  itemName: string | null;
-  source: string | null;
-  validFrom: string;
-  validTo: string | null;
+  targetShopId: string;
+  targetShopName: string | null;
+  targetShopCode: string | null;
+  targetChannel: string;
+  targetItemId: string;
+  targetItemUrl: string | null;
+  sourceItemId: string | null;
+  sourceChannel: string | null;
+  currentRate: string | null;
+  salesQuantity: string;
+  payAmount: string;
+  status: "ENABLED" | "DISABLED";
+  cleanupStatus: "NONE" | "PENDING" | "DONE" | "FAILED";
+  createTime: string;
+}
+
+/** Creator-item detail. `totalPayAmount` uses the same paid-order rule as `payAmount`. */
+export interface KolItemDetailVO extends KolItemVO {
+  sourceItemUrl: string | null;
+  visitCount: string;
+  totalPayAmount: string;
+  refundAmount: string;
+  cleanupTime: string | null;
+  cleanupReason: string | null;
+  cleanupFailReason: string | null;
 }
 
 /** Why a tracking link is unusable (task 06 §4.3). */
@@ -334,6 +402,7 @@ export interface CopyTokenVO {
   targetChannel: string;
   targetShopId: string | null;
   targetShopName: string | null;
+  targetShopCode: string | null;
   used: number;
   quota: number;
   validMinutes: number;

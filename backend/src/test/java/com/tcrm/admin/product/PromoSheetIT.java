@@ -201,9 +201,9 @@ class PromoSheetIT {
   /** Shop 111 with one original product; KOL A owns 555…, KOL B owns 222…. */
   private long[] seed() {
     jdbc.update(
-        "INSERT INTO crm_shop (id, tenant_id, shop_name, weidian_shop_id, status, is_deleted,"
+        "INSERT INTO crm_shop (id, tenant_id, shop_code, shop_name, weidian_shop_id, status, is_deleted,"
             + " create_time, update_time)"
-            + " VALUES (11, 1, 'Main Shop', '111', 1, false, now(), now())");
+            + " VALUES (11, 1, 'SHOP-900011', 'Main Shop', '111', 1, false, now(), now())");
     jdbc.update(
         "INSERT INTO crm_product (id, tenant_id, product_code, shop_id, weidian_item_id, name,"
             + " image_url, price, status, is_deleted, create_time, update_time)"
