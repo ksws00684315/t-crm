@@ -183,7 +183,7 @@ describe("departure plan dialog (task 41)", () => {
       bd.id,
       expect.objectContaining({ effectiveAt: overdue.effectiveAt })
     );
-    expect(document.body.querySelector("[data-test=\"departure-error\"]")).toBeNull();
+    expect(document.body.querySelector('[data-test="departure-error"]')).toBeNull();
     wrapper.unmount();
   });
 
@@ -296,9 +296,7 @@ describe("user list departure column (task 41)", () => {
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
     vi.mocked(departureApi.cancelDeparturePlan).mockResolvedValue(null);
     const wrapper = await mountPage([{ ...bd, departurePlan: pendingPlan }]);
-    bodyItem(`departure-cancel-${bd.id}`).dispatchEvent(
-      new MouseEvent("click", { bubbles: true })
-    );
+    bodyItem(`departure-cancel-${bd.id}`).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flushPromises();
     expect(confirm).toHaveBeenCalled();
     expect(departureApi.cancelDeparturePlan).toHaveBeenCalledWith(bd.id);
