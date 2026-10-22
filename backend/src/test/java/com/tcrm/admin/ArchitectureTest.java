@@ -25,6 +25,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -151,6 +152,24 @@ class ArchitectureTest {
         .tryGetAnnotationOfType(SaCheckLogin.class)
         .map(annotation -> StpKolUtil.TYPE.equals(annotation.type()))
         .orElse(false);
+  }
+
+  /**
+   * Spring Framework 6.1+ validates {@code @Min}/{@code @Max} on controller parameters through
+   * built-in MVC method validation ({@code HandlerMethodValidationException}). Class-level
+   * {@code @Validated} switches to AOP method validation and can turn a 400 into a 500 in tests or
+   * miss the shared field-error envelope — keep it off controllers.
+   */
+  @Test
+  void shouldNotPutValidatedOnControllers() {
+    noClasses()
+        .that()
+        .areAnnotatedWith(RestController.class)
+        .should()
+        .beAnnotatedWith(Validated.class)
+        .because(
+            "use Spring MVC built-in method validation; class-level @Validated is for @Service beans")
+        .check(classes);
   }
 
   @Test

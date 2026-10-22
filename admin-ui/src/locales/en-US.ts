@@ -42,7 +42,9 @@ const enUS: MessageSchema = {
     platformScope: "Platform",
     unassigned: "Unassigned",
     comingSoon: "This feature is under development",
-    developing: "Under development"
+    developing: "Under development",
+    nameWithCode: "{name} ({code})",
+    codeWithName: "{code} ({name})"
   },
   locale: {
     "en-US": "English",
