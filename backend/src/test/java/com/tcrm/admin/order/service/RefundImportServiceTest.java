@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -10,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
@@ -57,5 +60,19 @@ class RefundImportServiceTest {
   void shouldDelegateTemplateBytes() {
     when(imports.template(anyList(), any())).thenReturn(new byte[] {8});
     assertThat(service.template()).containsExactly(8);
+  }
+
+  @Test
+  void shouldRejectFutureCutoff() {
+    Instant future = Instant.now().plusSeconds(3600);
+    assertThatThrownBy(
+            () ->
+                service.submit(
+                    new ImportFileDTO(
+                        "refunds.xlsx", ImportTaskApi.XLSX_CONTENT_TYPE, new byte[] {1}),
+                    future))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
   }
 }

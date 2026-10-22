@@ -388,6 +388,7 @@ const enUS: MessageSchema = {
       payout_account_max_per_kol: "Maximum payout accounts per creator",
       kol_invite_ttl_hours: "Creator invitation validity (hours)",
       oper_log_retention_days: "Operation log retention (days)",
+      order_sync_failure_retention_days: "Order sync failure retention days (0 = no auto cleanup)",
       login_fail_pair_limit: "Login failures per account and IP",
       login_fail_ip_limit: "Login failures per IP",
       login_fail_account_limit: "Login failures per account",

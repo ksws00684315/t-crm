@@ -39,10 +39,12 @@ import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
+import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
@@ -71,6 +73,14 @@ class OrderServiceTest {
   private final KolItemApi kolItems = mock(KolItemApi.class);
   private final ProductAccessApi products = mock(ProductAccessApi.class);
   private final CopyJobLookupApi copyJobs = mock(CopyJobLookupApi.class);
+  private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final AuditSanitizer sanitizer = mock(AuditSanitizer.class);
+
+  {
+    org.mockito.Mockito.when(sanitizer.sanitize(org.mockito.ArgumentMatchers.any()))
+        .thenReturn("{}");
+  }
+
   private final AccountDTO account = mock(AccountDTO.class);
   private final OrderService service =
       new OrderService(
@@ -87,7 +97,9 @@ class OrderServiceTest {
           current,
           kolItems,
           products,
-          copyJobs);
+          copyJobs,
+          audit,
+          sanitizer);
 
   @BeforeAll
   static void metadata() {

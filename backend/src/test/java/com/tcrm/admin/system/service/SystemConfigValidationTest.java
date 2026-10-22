@@ -11,14 +11,14 @@ import org.junit.jupiter.api.Test;
 class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
-    assertThat(SystemConfigDefinition.values()).hasSize(30);
+    assertThat(SystemConfigDefinition.values()).hasSize(31);
     assertThat(SystemConfigDefinition.KOL_INVITE_TTL_HOURS.min()).isEqualTo(1);
     assertThat(SystemConfigDefinition.KOL_INVITE_TTL_HOURS.max()).isEqualTo(72);
     assertThat(
             java.util.Arrays.stream(SystemConfigDefinition.values())
                 .map(SystemConfigDefinition::key)
                 .collect(Collectors.toSet()))
-        .hasSize(30);
+        .hasSize(31);
   }
 
   @Test
@@ -36,6 +36,18 @@ class SystemConfigValidationTest {
   void shouldValidateIntegerRangesAndOptionalUploadAddress() {
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1");
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1000");
+    SystemConfigService.validate(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "0");
+    SystemConfigService.validate(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "3650");
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "-1"))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "3651"))
+        .isInstanceOf(BusinessException.class);
     SystemConfigService.validate(SystemConfigDefinition.UPLOAD_URL, "");
     assertThatThrownBy(
             () -> SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "0"))
