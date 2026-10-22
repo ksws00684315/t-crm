@@ -99,7 +99,6 @@ class KolItemControllerTest {
         .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
   }
 
-
   @Test
   void shouldReturn400_whenDetailIdIsNotPositive() throws Exception {
     mvc.perform(
