@@ -13,6 +13,7 @@ import {
   type PrepayDetail
 } from "@/api/commission/prepay";
 import CopyText from "@/components/CopyText.vue";
+import ApplicationDetailsForm from "./ApplicationDetailsForm.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { saveBlob } from "@/utils/download";
@@ -47,8 +48,20 @@ const fileError = ref(false);
 const errors = ref<Record<string, string>>({});
 const locked = ref(false);
 const uncertain = ref(false);
+const detailsBusy = ref(false);
+const detailsComplete = computed(
+  () =>
+    typeof detail.value?.deductFromCommission === "boolean" &&
+    !!detail.value?.reason?.trim() &&
+    !!detail.value.expectedPayDate &&
+    !!detail.value.payoutAccountSnapshot
+);
+function detailsSaved(value: PrepayDetail) {
+  detail.value = value;
+  emit("saved");
+}
 function beforeClose(done: () => void) {
-  if (!saving.value && !preparing.value) done();
+  if (!saving.value && !preparing.value && !detailsBusy.value) done();
 }
 let attempt: { payload: PayPrepay; voucher: File } | null = null;
 const rules = computed<FormRules>(() => ({
@@ -140,7 +153,11 @@ async function revealRecipient() {
   }
 }
 async function changeState(action: "APPROVE" | "REJECT" | "CANCEL") {
-  if (preparing.value || saving.value) return;
+  if (preparing.value || saving.value || detailsBusy.value) return;
+  if (action === "APPROVE" && !detailsComplete.value) {
+    ElMessage.warning(t("prepay.detailsRequired"));
+    return;
+  }
   preparing.value = true;
   try {
     await submitState(action);
@@ -297,17 +314,23 @@ async function submitPayment() {
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('prepay.account')">{{
             [
-              detail.payoutAccountSnapshot.type,
-              detail.payoutAccountSnapshot.holderName,
-              detail.payoutAccountSnapshot.currency,
-              detail.payoutAccountSnapshot.network,
-              detail.payoutAccountSnapshot.maskedAccount
+              detail.payoutAccountSnapshot?.type,
+              detail.payoutAccountSnapshot?.holderName,
+              detail.payoutAccountSnapshot?.currency,
+              detail.payoutAccountSnapshot?.network,
+              detail.payoutAccountSnapshot?.maskedAccount
             ]
               .filter(Boolean)
               .join(" · ")
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('prepay.deduct')">{{
-            t(detail.deductFromCommission ? "prepay.yes" : "prepay.no")
+            t(
+              detail.deductFromCommission == null
+                ? "prepay.toComplete"
+                : detail.deductFromCommission
+                  ? "prepay.yes"
+                  : "prepay.no"
+            )
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('prepay.attachments')"
             ><el-button
@@ -360,10 +383,23 @@ async function submitPayment() {
             </li>
           </ol>
         </section>
+        <ApplicationDetailsForm
+          v-if="detail.status === 'PENDING_APPROVAL' && (abilities.review || abilities.pay)"
+          :detail="detail"
+          :disabled="saving || preparing"
+          @busy="detailsBusy = $event"
+          @saved="detailsSaved"
+        />
+        <el-alert
+          v-if="detail.status === 'PENDING_APPROVAL' && !detailsComplete"
+          :title="t('prepay.detailsRequired')"
+          type="warning"
+          :closable="false"
+        />
         <div v-if="detail.status === 'PENDING_APPROVAL'" class="prepay-actions">
           <el-button
             v-if="abilities.review"
-            :disabled="saving"
+            :disabled="saving || detailsBusy || !detailsComplete"
             data-test="prepay-approve"
             @click="changeState('APPROVE')"
             >{{ t("prepay.approve") }}</el-button

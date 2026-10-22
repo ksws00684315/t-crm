@@ -16,7 +16,8 @@ vi.mock("@/api/commission/prepay", () => ({
   prepayRecipient: vi.fn(),
   approvePrepay: vi.fn(),
   cancelPrepay: vi.fn(),
-  downloadPrepayFile: vi.fn()
+  downloadPrepayFile: vi.fn(),
+  savePrepayApplicationDetails: vi.fn()
 }));
 const detail: api.PrepayDetail = {
   id: "9",
@@ -109,9 +110,6 @@ describe("prepay safe submission", () => {
     vi.mocked(api.applyPrepay).mockRejectedValue(new Error("network"));
     const wrapper = await open(ApplyDialog);
     await set(wrapper, "prepay-amount", "100.00");
-    await set(wrapper, "prepay-reason", "test");
-    wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
-    wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", "2");
     await flushPromises();
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
@@ -193,24 +191,95 @@ describe("prepay safe submission", () => {
     expect(api.approvePrepay).toHaveBeenCalledWith("9", "APPROVE", undefined);
     expect(api.getPrepay).toHaveBeenCalledTimes(2);
   });
-  it("ignores a previous creator account request after switching creators", async () => {
-    let finish!: (value: api.PrepayAccount[]) => void;
-    vi.mocked(api.prepayAccounts)
-      .mockImplementationOnce(
-        () =>
-          new Promise(resolve => {
-            finish = resolve;
-          })
-      )
-      .mockResolvedValueOnce([
-        { id: "new", type: "PAYPAL", maskedAccount: "new***", holderName: "New" }
-      ]);
+  it("shows only identity amount and readonly state and submits a minimal application", async () => {
+    vi.mocked(api.applyPrepay).mockResolvedValue(detail);
+    useUserStore().user!.nickname = "Business operator";
     const wrapper = await open(ApplyDialog);
-    await wrapper.setProps({ kol: { id: "4", kolCode: "KOL-new", name: "New" } });
+    expect(wrapper.get('[data-test="prepay-creator-name"]').text()).toBe("Test");
+    expect(wrapper.get('[data-test="prepay-creator-code"]').text()).toBe("KOL-test");
+    expect(wrapper.get('[data-test="prepay-application-status"]').text()).toContain("待申请");
+    expect(wrapper.text()).not.toContain("Business operator");
+    expect(api.prepayAccounts).not.toHaveBeenCalled();
+    for (const field of [
+      "prepay-reason",
+      "prepay-date",
+      "prepay-account",
+      "prepay-attachments",
+      "prepay-deduct"
+    ]) {
+      expect(wrapper.find('[data-test="' + field + '"]').exists()).toBe(false);
+    }
+    await set(wrapper, "prepay-amount", "100.00");
+    await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
-    finish([{ id: "old", type: "PAYPAL", maskedAccount: "old***", holderName: "Old" }]);
+    expect(api.applyPrepay).toHaveBeenCalledExactlyOnceWith({
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      kolId: "3",
+      amountCny: "100.00"
+    });
+  });
+  it("requires a positive CNY amount", async () => {
+    const wrapper = await open(ApplyDialog);
+    for (const value of ["", "0", "-1", "1.001"]) {
+      await set(wrapper, "prepay-amount", value);
+      await wrapper.get('[data-test="prepay-submit"]').trigger("click");
+      await flushPromises();
+      expect(api.applyPrepay).not.toHaveBeenCalled();
+    }
+  });
+  it("requires finance details and an explicit deduction choice before approval", async () => {
+    useUserStore().user!.permissions = ["prepay:review"];
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      status: "PENDING_APPROVAL",
+      deductFromCommission: null,
+      payoutAccountSnapshot: null,
+      reason: null,
+      expectedPayDate: null
+    });
+    const wrapper = await open(DetailDrawer);
+    expect(wrapper.get('[data-test="prepay-approve"]').attributes("disabled")).toBeDefined();
+    const supplement = wrapper.get('[data-test="prepay-application-details"]');
+    expect(supplement.find('[data-test="finance-prepay-deduct"]').exists()).toBe(true);
+    await supplement.get('[data-test="finance-prepay-details-save"]').trigger("click");
     await flushPromises();
-    const options = wrapper.findAllComponents({ name: "ElOption" });
-    expect(options.map(option => option.attributes("value"))).toEqual(["new"]);
+    expect(api.savePrepayApplicationDetails).not.toHaveBeenCalled();
+    expect(api.approvePrepay).not.toHaveBeenCalled();
+  });
+  it("saves the deduction and account from finance before allowing approval", async () => {
+    useUserStore().user!.permissions = ["prepay:review"];
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      status: "PENDING_APPROVAL",
+      deductFromCommission: null,
+      payoutAccountSnapshot: null,
+      reason: null,
+      expectedPayDate: null
+    });
+    vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
+      ...detail,
+      status: "PENDING_APPROVAL",
+      deductFromCommission: false,
+      payoutAccountId: "2"
+    });
+    const wrapper = await open(DetailDrawer);
+    await set(wrapper, "finance-prepay-reason", "finance details");
+    wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
+    wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", "2");
+    wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", false);
+    await flushPromises();
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await flushPromises();
+    expect(api.savePrepayApplicationDetails).toHaveBeenCalledExactlyOnceWith(
+      "9",
+      {
+        reason: "finance details",
+        expectedPayDate: "2026-10-23",
+        payoutAccountId: "2",
+        deductFromCommission: false
+      },
+      []
+    );
+    expect(wrapper.get('[data-test="prepay-approve"]').attributes("disabled")).toBeUndefined();
   });
 });

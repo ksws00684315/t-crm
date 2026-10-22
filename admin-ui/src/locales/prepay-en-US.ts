@@ -1,4 +1,14 @@
 export default {
+  chooseDeduction: "Choose whether to deduct from commission",
+  applicationStatus: "Application status",
+  toComplete: "Not yet completed",
+  notSubmitted: "Not submitted",
+  cancelAction: "Cancel",
+  submitAction: "Submit",
+  completeDetails: "Complete prepay details",
+  saveDetails: "Save application details",
+  detailsRequired:
+    "Complete the deduction choice, reason, expected payment date and payout account in Finance before approval.",
   title: "Creator prepays",
   type: "Creator prepay",
   number: "Application number",

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { http } from "../http";
-import { applyPrepay, payPrepay } from "../commission/prepay";
+import { applyPrepay, payPrepay, savePrepayApplicationDetails } from "../commission/prepay";
 vi.mock("../http", () => ({ http: { request: vi.fn() } }));
 const read = (blob: Blob) =>
   new Promise<string>(resolve => {
@@ -9,26 +9,38 @@ const read = (blob: Blob) =>
     reader.readAsText(blob);
   });
 describe("prepay multipart contract", () => {
-  it("preserves JSON UUID IDs money and files on retry", async () => {
+  it("saves finance details separately and preserves a false deduction choice", async () => {
+    vi.mocked(http.request).mockClear();
+    const payload = {
+      reason: "finance",
+      expectedPayDate: "2026-10-23",
+      payoutAccountId: "9007199254740993",
+      deductFromCommission: false
+    };
+    const attachment = new File(["proof"], "proof.pdf", { type: "application/pdf" });
+    savePrepayApplicationDetails("9", payload, [attachment]);
+    const config = vi.mocked(http.request).mock.calls[0][0];
+    expect(config.url).toBe("/commission/prepays/9/application-details");
+    expect(config.method).toBe("put");
+    const data = config.data as FormData;
+    expect(JSON.parse(await read(data.get("payload") as Blob))).toEqual(payload);
+    expect(data.getAll("attachments")).toHaveLength(1);
+  });
+  it("preserves the minimal JSON payload UUID IDs and money on retry", async () => {
     const payload = {
       requestId: "6fbcbe78-9853-4b7b-8652-a96de00af0b4",
       kolId: "9007199254740993",
-      amountCny: "999999999999.99",
-      reason: "test",
-      expectedPayDate: "2026-10-23",
-      payoutAccountId: "9007199254740995",
-      deductFromCommission: true
+      amountCny: "999999999999.99"
     };
-    const file = new File(["test"], "proof.pdf", { type: "application/pdf" });
     vi.mocked(http.request).mockClear();
-    applyPrepay(payload, [file]);
-    applyPrepay(payload, [file]);
+    applyPrepay(payload);
+    applyPrepay(payload);
     for (const [config] of vi.mocked(http.request).mock.calls) {
       expect(config.url).toBe("/commission/prepays");
       const data = config.data as FormData;
       expect((data.get("payload") as Blob).type).toBe("application/json");
       expect(JSON.parse(await read(data.get("payload") as Blob))).toEqual(payload);
-      expect((data.get("attachments") as File).name).toBe("proof.pdf");
+      expect(data.getAll("attachments")).toEqual([]);
     }
   });
   it("registers payment as multipart with a single voucher", async () => {

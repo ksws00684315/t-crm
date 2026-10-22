@@ -25,10 +25,11 @@ export interface PrepayRow {
   createdAt: string;
 }
 export interface PrepayDetail extends PrepayRow {
-  reason: string;
-  expectedPayDate: string;
-  deductFromCommission: boolean;
-  payoutAccountSnapshot: Omit<PrepayAccount, "id">;
+  reason: string | null;
+  expectedPayDate: string | null;
+  deductFromCommission: boolean | null;
+  payoutAccountId?: string | null;
+  payoutAccountSnapshot: Omit<PrepayAccount, "id"> | null;
   attachments: { id: string; name: string; mimeType: string; size: string }[];
   approval?: {
     decision: "APPROVE" | "REJECT";
@@ -64,10 +65,6 @@ export interface ApplyPrepay {
   requestId: string;
   kolId: string;
   amountCny: string;
-  reason: string;
-  expectedPayDate: string;
-  payoutAccountId: string;
-  deductFromCommission: boolean;
 }
 export interface PayPrepay {
   requestId: string;
@@ -75,6 +72,26 @@ export interface PayPrepay {
   payTime: string;
   payMethod: string;
   payRemark?: string;
+}
+export interface PrepayApplicationDetails {
+  deductFromCommission: boolean;
+  reason: string;
+  expectedPayDate: string;
+  payoutAccountId: string;
+}
+export function savePrepayApplicationDetails(
+  id: string,
+  payload: PrepayApplicationDetails,
+  attachments: readonly File[]
+) {
+  const data = new FormData();
+  data.append("payload", new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  attachments.forEach(file => data.append("attachments", file));
+  return http.request<PrepayDetail>({
+    url: `/commission/prepays/${id}/application-details`,
+    method: "put",
+    data
+  });
 }
 const root = "/commission/prepays";
 export const listPrepays = (params: PrepayQuery) =>
@@ -93,10 +110,9 @@ export const prepayRecipient = (id: string) =>
     url: `${root}/${id}/recipient`,
     method: "get"
   });
-export function applyPrepay(payload: ApplyPrepay, attachments: readonly File[]) {
+export function applyPrepay(payload: ApplyPrepay) {
   const data = new FormData();
   data.append("payload", new Blob([JSON.stringify(payload)], { type: "application/json" }));
-  attachments.forEach(file => data.append("attachments", file));
   return http.request<PrepayDetail>({ url: root, method: "post", data });
 }
 export const cancelPrepay = (id: string, reason?: string) =>
