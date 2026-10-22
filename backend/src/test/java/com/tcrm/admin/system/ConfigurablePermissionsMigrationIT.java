@@ -101,8 +101,7 @@ class ConfigurablePermissionsMigrationIT {
     assertUser(db, 9106, "STAFF", "BD", "OWN");
     assertThat(flag(db, 9106)).isTrue();
 
-    assertThat(codes(db, 9101))
-        .containsExactlyInAnyOrderElementsOf(OPERATOR_ALL);
+    assertThat(codes(db, 9101)).containsExactlyInAnyOrderElementsOf(OPERATOR_ALL);
     assertThat(codes(db, 9102))
         .containsExactlyInAnyOrderElementsOf(PostTemplate.BD.permissionCodes());
     assertThat(codes(db, 9103)).containsExactlyInAnyOrderElementsOf(FINANCE);

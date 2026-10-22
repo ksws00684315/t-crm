@@ -39,8 +39,8 @@ public enum PostTemplate {
       Permission.DASHBOARD_KOL,
       Permission.DATA_EXPORT),
   /**
-   * Finance reads creators, products, orders and income; it reviews payout accounts and
-   * withdrawals and exports both business and finance data, without any product or order action.
+   * Finance reads creators, products, orders and income; it reviews payout accounts and withdrawals
+   * and exports both business and finance data, without any product or order action.
    */
   FINANCE(
       DataScope.ALL,
