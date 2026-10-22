@@ -16,6 +16,8 @@ describe("prepay business boundaries", () => {
       view: true,
       apply: false,
       review: false,
+      operationsReview: false,
+      financeReview: false,
       pay: true,
       export: false
     });
@@ -24,11 +26,19 @@ describe("prepay business boundaries", () => {
     expect(prepayAbilities(null).view).toBe(false);
   });
   it("restricts cancellation to the pending applicant", () => {
-    const row = { applicantId: "7", status: "PENDING_APPROVAL" } as PrepayRow;
+    const row = { applicantId: "7", status: "WAITING_DETAILS" } as unknown as PrepayRow;
     expect(canCancelPrepay(staff(["prepay:apply"]), row)).toBe(true);
     expect(canCancelPrepay(staff(["prepay:pay"]), row)).toBe(false);
     expect(canCancelPrepay({ ...staff(["prepay:apply"]), id: "8" }, row)).toBe(false);
     expect(canCancelPrepay(staff(["prepay:apply"]), { ...row, status: "APPROVED" })).toBe(false);
+  });
+  it("keeps finance review separate from operations review and payment", () => {
+    expect(prepayAbilities(staff(["prepay:finance-review"]))).toMatchObject({
+      view: true,
+      operationsReview: false,
+      financeReview: true,
+      pay: false
+    });
   });
   it("validates decimal strings without rounding", () => {
     for (const value of ["0.01", "999999999999.99", "1"]) expect(validCny(value)).toBe(true);

@@ -73,7 +73,11 @@ const enUS: MessageSchema = {
   permission: {
     "prepay:review": {
       name: "Review prepays",
-      desc: "View all company prepay tasks and approve or reject applications; payment registration is separate"
+      desc: "Perform the operations review stage for prepay applications; finance review and payment registration are separate"
+    },
+    "prepay:finance-review": {
+      name: "Review prepays (finance)",
+      desc: "Review applications approved by operations; payment registration is separate"
     },
     "prepay:pay": {
       name: "Register prepay payments",

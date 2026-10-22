@@ -77,7 +77,11 @@ const zhCN = {
   permission: {
     "prepay:review": {
       name: "审核预付",
-      desc: "查看本公司全部预付任务并通过或驳回申请；不包含登记支付权限"
+      desc: "执行预付申请的运营阶段审核；不包含财务复核或登记支付权限"
+    },
+    "prepay:finance-review": {
+      name: "财务审核预付",
+      desc: "审核运营已通过的预付申请；付款登记权限单独配置"
     },
     "prepay:pay": {
       name: "登记预付支付",

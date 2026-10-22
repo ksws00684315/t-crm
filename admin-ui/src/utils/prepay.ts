@@ -2,7 +2,9 @@ import type { PrepayRow } from "@/api/commission/prepay";
 import { accessOf, type AbilitySubject } from "./permission";
 
 export const PREPAY_STATUSES = [
-  "PENDING_APPROVAL",
+  "WAITING_DETAILS",
+  "PENDING_OPERATIONS_REVIEW",
+  "PENDING_FINANCE_REVIEW",
   "APPROVED",
   "PAID",
   "REJECTED",
@@ -34,13 +36,17 @@ export function prepayAbilities(user: AbilitySubject | null | undefined) {
   const company = !!user && !access.isPlatformAdmin;
   const view =
     company &&
-    ["commission:view", "prepay:review", "prepay:pay"].some(code =>
-      access.can(code as "commission:view" | "prepay:review" | "prepay:pay")
+    ["commission:view", "prepay:review", "prepay:finance-review", "prepay:pay"].some(code =>
+      access.can(
+        code as "commission:view" | "prepay:review" | "prepay:finance-review" | "prepay:pay"
+      )
     );
   return {
     view,
     apply: company && access.can("prepay:apply"),
     review: company && access.can("prepay:review"),
+    operationsReview: company && access.can("prepay:review"),
+    financeReview: company && access.can("prepay:finance-review"),
     pay: company && access.can("prepay:pay"),
     export: view && access.can("data:export")
   };
@@ -50,6 +56,6 @@ export function canCancelPrepay(
   row: PrepayRow
 ): boolean {
   return (
-    prepayAbilities(user).apply && user?.id === row.applicantId && row.status === "PENDING_APPROVAL"
+    prepayAbilities(user).apply && user?.id === row.applicantId && row.status === "WAITING_DETAILS"
   );
 }

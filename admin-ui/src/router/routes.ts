@@ -248,7 +248,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/fund/prepay/index.vue"),
             meta: {
               title: "prepay.title",
-              permission: ["commission:view", "prepay:review", "prepay:pay"],
+              permission: [
+                "commission:view",
+                "prepay:review",
+                "prepay:finance-review",
+                "prepay:pay"
+              ],
               companyAccount: true,
               componentName: "PrepayTasksPage"
             }

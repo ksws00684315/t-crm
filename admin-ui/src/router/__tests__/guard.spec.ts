@@ -231,11 +231,11 @@ describe("installGuard with the real route table", () => {
       ["orders", "order:view", false],
       ["refunds", "order:view", false]
     ]);
-    // The payout-account review accepts either of its two codes (task 15b §4.2.1).
+    // The fund pages accept either a review role or general commission visibility.
     const fund = layout?.children?.find(route => route.path === "fund");
     expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
       ["payout-account:review", "commission:view"],
-      ["commission:view", "prepay:review", "prepay:pay"],
+      ["commission:view", "prepay:review", "prepay:finance-review", "prepay:pay"],
       "commission:view",
       "commission:view"
     ]);

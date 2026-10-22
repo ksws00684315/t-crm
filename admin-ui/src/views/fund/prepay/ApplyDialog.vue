@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
-import { applyPrepay, type ApplyPrepay } from "@/api/commission/prepay";
+import {
+  applyPrepay,
+  getActivePrepay,
+  type ApplyPrepay,
+  type PrepayDetail
+} from "@/api/commission/prepay";
+import CopyText from "@/components/CopyText.vue";
 import { useUserStore } from "@/stores/user";
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
@@ -22,6 +28,8 @@ const preparing = ref(false);
 const locked = ref(false);
 const errors = ref<Record<string, string>>({});
 const form = reactive({ amountCny: "" });
+const application = ref<PrepayDetail | null>(null);
+let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let attempt: ApplyPrepay | null = null;
 function beforeClose(done: () => void) {
   if (!saving.value && !preparing.value) done();
@@ -39,15 +47,41 @@ const rules = computed<FormRules>(() => ({
 watch(
   () => [props.modelValue, props.kol?.id] as const,
   ([open]) => {
+    clearInterval(refreshTimer);
     if (!open) return;
+    application.value = null;
     Object.assign(form, { amountCny: "" });
     attempt = null;
     locked.value = false;
     errors.value = {};
     formRef.value?.clearValidate();
+    void refreshApplication();
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => void refreshApplication(true), 10_000);
   },
   { immediate: true }
 );
+onBeforeUnmount(() => clearInterval(refreshTimer));
+async function refreshApplication(quiet = false) {
+  const kolId = props.kol?.id;
+  if (!kolId || !props.modelValue) return;
+  try {
+    const data = await getActivePrepay(kolId);
+    if (!props.modelValue || props.kol?.id !== kolId) return;
+    application.value = data;
+    if (data) {
+      form.amountCny = data.amountCny;
+      attempt = null;
+      locked.value = true;
+    } else {
+      Object.assign(form, { amountCny: "" });
+      attempt = null;
+      locked.value = false;
+    }
+  } catch (error) {
+    if (!quiet) notifyError(error);
+  }
+}
 async function save() {
   if (preparing.value || saving.value || !props.kol || !prepayAbilities(me.user).apply) return;
   preparing.value = true;
@@ -62,14 +96,16 @@ async function save() {
     saving.value = true;
     locked.value = true;
     try {
-      await applyPrepay(attempt);
+      application.value = await applyPrepay(attempt);
+      form.amountCny = application.value.amountCny;
+      locked.value = true;
       window.dispatchEvent(new Event("prepay-updated"));
       ElMessage.success(t("prepay.saved"));
       emit("saved");
-      emit("update:modelValue", false);
     } catch (error) {
       errors.value = serverFieldErrors(error, Object.keys(form));
       notifyError(error);
+      if (error instanceof ApiError && error.status === 409) await refreshApplication(true);
       if (error instanceof ApiError && error.status === 400) {
         attempt = null;
         locked.value = false;
@@ -98,7 +134,12 @@ async function save() {
       </div>
     </template>
     <div data-test="prepay-apply">
-      <el-alert v-if="locked" :title="t('prepay.retrySame')" :closable="false" type="warning" />
+      <el-alert
+        v-if="locked && !application"
+        :title="t('prepay.retrySame')"
+        :closable="false"
+        type="warning"
+      />
       <el-form
         ref="formRef"
         :model="form"
@@ -106,16 +147,31 @@ async function save() {
         :label-width="locale === 'zh-CN' ? '156px' : '220px'"
         label-position="left"
         class="prepay-form"
-        :disabled="saving || preparing || locked"
+        :disabled="saving || preparing || !!application || locked"
       >
         <el-form-item prop="amountCny" :label="t('prepay.amount')" :error="errors.amountCny"
           ><el-input v-model="form.amountCny" inputmode="decimal" data-test="prepay-amount"
         /></el-form-item>
       </el-form>
-      <div class="prepay-status" data-test="prepay-application-status">
+      <div v-if="!application" class="prepay-status" data-test="prepay-application-status">
         <span>{{ t("prepay.applicationStatus") }}</span>
         <span>{{ t("prepay.notSubmitted") }}</span>
       </div>
+      <template v-if="application">
+        <div class="prepay-status" data-test="prepay-application-status">
+          <span>{{ t("prepay.applicationStatus") }}</span>
+          <span>{{
+            application.status === "WAITING_DETAILS"
+              ? t("prepay.applicationInProgress")
+              : t(`prepay.status.${application.status}`)
+          }}</span>
+        </div>
+        <div class="prepay-status">
+          <span>{{ t("prepay.number") }}</span
+          ><CopyText :value="application.prepayNo" />
+        </div>
+        <el-alert :title="t('prepay.completeInFinance')" :closable="false" type="info" />
+      </template>
     </div>
     <template #footer
       ><div class="prepay-footer">
@@ -125,6 +181,7 @@ async function save() {
           @click="emit('update:modelValue', false)"
           >{{ t("prepay.cancelAction") }}</el-button
         ><el-button
+          v-if="!application"
           type="primary"
           :loading="saving || preparing"
           :disabled="!prepayAbilities(me.user).apply"

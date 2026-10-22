@@ -33,6 +33,11 @@ const emit = defineEmits<{ "update:modelValue": [value: boolean]; saved: [] }>()
 const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => prepayAbilities(me.user));
+const canApprove = computed(() =>
+  detail.value?.status === "PENDING_OPERATIONS_REVIEW"
+    ? abilities.value.operationsReview
+    : detail.value?.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview
+);
 const detail = ref<PrepayDetail | null>(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -181,8 +186,8 @@ async function changeState(action: "APPROVE" | "REJECT" | "CANCEL") {
 }
 async function submitState(action: "APPROVE" | "REJECT" | "CANCEL") {
   const row = detail.value;
-  if (!row || saving.value || row.status !== "PENDING_APPROVAL") return;
-  if (action === "CANCEL" ? !canCancelPrepay(me.user, row) : !abilities.value.review) return;
+  if (!row || saving.value) return;
+  if (action === "CANCEL" ? !canCancelPrepay(me.user, row) : !canApprove.value) return;
   if (action === "REJECT" && !rejectReason.value.trim()) {
     ElMessage.warning(t("prepay.required"));
     return;
@@ -309,7 +314,7 @@ async function submitPayment() {
             >{{ detail.kolCode }} · {{ detail.kolName }}</el-descriptions-item
           >
           <el-descriptions-item :label="t('prepay.applicant')">{{
-            detail.applicantId
+            detail.applicantName ?? detail.applicantId
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('prepay.createdAt')">{{
             formatInstant(detail.createdAt)
@@ -398,28 +403,32 @@ async function submitPayment() {
           </ol>
         </section>
         <ApplicationDetailsForm
-          v-if="detail.status === 'PENDING_APPROVAL' && (abilities.review || abilities.pay)"
+          v-if="
+            detail.status === 'WAITING_DETAILS' &&
+            detail.applicantId === me.user?.id &&
+            abilities.apply
+          "
           :detail="detail"
           :disabled="saving || preparing"
           @busy="detailsBusy = $event"
           @saved="detailsSaved"
         />
         <el-alert
-          v-if="detail.status === 'PENDING_APPROVAL' && !detailsComplete"
+          v-if="detail.status === 'WAITING_DETAILS' && !detailsComplete"
           :title="t('prepay.detailsRequired')"
           type="warning"
           :closable="false"
         />
-        <div v-if="detail.status === 'PENDING_APPROVAL'" class="prepay-actions">
+        <div v-if="canApprove" class="prepay-actions">
           <el-button
-            v-if="abilities.review"
+            v-if="canApprove"
             :disabled="saving || detailsBusy || !detailsComplete"
             data-test="prepay-approve"
             @click="changeState('APPROVE')"
             >{{ t("prepay.approve") }}</el-button
           >
           <el-button
-            v-if="abilities.review"
+            v-if="canApprove"
             :disabled="saving"
             data-test="prepay-reject"
             @click="mode = 'reject'"
@@ -433,9 +442,7 @@ async function submitPayment() {
             >{{ t("prepay.cancel") }}</el-button
           >
         </div>
-        <section
-          v-if="mode === 'reject' && detail.status === 'PENDING_APPROVAL' && abilities.review"
-        >
+        <section v-if="mode === 'reject' && canApprove">
           <el-input
             v-model="rejectReason"
             type="textarea"

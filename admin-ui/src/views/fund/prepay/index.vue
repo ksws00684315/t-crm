@@ -39,10 +39,10 @@ const visible = ref(false);
 const initialAction = ref("");
 const columns = computed<DataColumn[]>(() => [
   { key: "prepayNo", label: t("prepay.number"), minWidth: 220 },
-  { key: "kolCode", label: t("prepay.kolCode"), prop: "kolCode", minWidth: 160 },
+  { key: "kolCode", label: t("prepay.kolId"), prop: "kolCode", minWidth: 160 },
   { key: "kolName", label: t("prepay.kol"), prop: "kolName", minWidth: 160, tooltip: true },
-  { key: "type", label: t("prepay.task"), minWidth: 160 },
   { key: "amountCny", label: t("prepay.amount"), prop: "amountCny", minWidth: 160, amount: true },
+  { key: "applicantName", label: t("prepay.applicant"), prop: "applicantName", minWidth: 140 },
   { key: "currency", label: t("prepay.currency"), prop: "currency", width: 100 },
   { key: "status", label: t("common.status"), minWidth: 150 },
   { key: "createdAt", label: t("prepay.createdAt"), minWidth: 180 },
@@ -118,27 +118,32 @@ function actions(row: PrepayRow): RowAction[] {
       onClick: () => open(row)
     },
     {
-      key: "approve",
-      label: t("prepay.approve"),
-      testId: "prepay-row-approve",
-      hidden: !abilities.value.review || row.status !== "PENDING_APPROVAL",
-      onClick: () => open(row, "approve")
-    },
-    {
-      key: "reject",
-      label: t("prepay.reject"),
-      testId: "prepay-row-reject",
-      hidden: !abilities.value.review || row.status !== "PENDING_APPROVAL",
-      onClick: () => open(row, "reject")
-    },
-    {
-      key: "paid",
-      label: t("prepay.registerPayment"),
-      testId: "prepay-row-pay",
-      hidden: !abilities.value.pay || row.status !== "APPROVED",
-      onClick: () => open(row, "pay")
+      key: "process",
+      label: processLabel(row),
+      testId: "prepay-row-process",
+      hidden: !processLabel(row),
+      onClick: () => open(row, processMode(row))
     }
   ];
+}
+function processMode(row: PrepayRow) {
+  if (row.status === "WAITING_DETAILS" && abilities.value.apply && row.applicantId === me.user?.id)
+    return "complete";
+  if (row.status === "PENDING_OPERATIONS_REVIEW" && abilities.value.operationsReview)
+    return "approve";
+  if (row.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview) return "approve";
+  if (row.status === "APPROVED" && abilities.value.pay) return "pay";
+  return "";
+}
+function processLabel(row: PrepayRow) {
+  const mode = processMode(row);
+  return mode === "complete"
+    ? t("prepay.completeApplication")
+    : mode === "approve"
+      ? t("prepay.reviewAction")
+      : mode === "pay"
+        ? t("prepay.registerPayment")
+        : "";
 }
 async function exportRows() {
   if (!abilities.value.export || exporting.value) return;

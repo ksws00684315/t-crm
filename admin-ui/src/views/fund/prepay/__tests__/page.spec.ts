@@ -37,6 +37,7 @@ describe("finance prepay tasks", () => {
           kolCode: "KOL-test",
           kolName: "Test",
           applicantId: "7",
+          applicantName: "Test",
           amountCny: "100.00",
           currency: "CNY",
           status: "APPROVED",
@@ -67,7 +68,7 @@ describe("finance prepay tasks", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="prepay-row-approve"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="prepay-row-reject"]').exists()).toBe(false);
-    await wrapper.get('[data-test="prepay-row-pay"]').trigger("click");
+    await wrapper.get('[data-test="prepay-row-process"]').trigger("click");
     expect(wrapper.getComponent({ name: "DetailDrawer" }).props()).toMatchObject({
       modelValue: true,
       id: "9007199254740993",

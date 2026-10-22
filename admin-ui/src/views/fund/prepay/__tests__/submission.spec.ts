@@ -10,6 +10,7 @@ import ApplyDialog from "../ApplyDialog.vue";
 import DetailDrawer from "../DetailDrawer.vue";
 vi.mock("@/api/commission/prepay", () => ({
   applyPrepay: vi.fn(),
+  getActivePrepay: vi.fn(),
   prepayAccounts: vi.fn(),
   getPrepay: vi.fn(),
   payPrepay: vi.fn(),
@@ -28,6 +29,7 @@ const detail: api.PrepayDetail = {
   kolCode: "KOL-test",
   kolName: "Test",
   applicantId: "7",
+  applicantName: "Business operator",
   amountCny: "100.00",
   currency: "CNY",
   status: "APPROVED",
@@ -60,6 +62,7 @@ beforeEach(() => {
     createTime: detail.createdAt
   };
   vi.mocked(api.getPrepay).mockResolvedValue(detail);
+  vi.mocked(api.getActivePrepay).mockResolvedValue(null);
   vi.mocked(api.prepayAccounts).mockResolvedValue([
     { id: "2", type: "PAYPAL", maskedAccount: "t***", holderName: "Test" }
   ]);
@@ -107,15 +110,15 @@ async function voucher(wrapper: VueWrapper) {
 }
 describe("prepay safe submission", () => {
   it.each([1000, 1001])("validates the finance reason boundary at %i characters", async length => {
-    useUserStore().user!.permissions = ["prepay:review"];
+    useUserStore().user!.permissions = ["prepay:apply"];
     vi.mocked(api.getPrepay).mockResolvedValue({
       ...detail,
-      status: "PENDING_APPROVAL",
+      status: "WAITING_DETAILS",
       payoutAccountId: "2"
     });
     vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
       ...detail,
-      status: "PENDING_APPROVAL"
+      status: "WAITING_DETAILS"
     });
     const wrapper = await open(DetailDrawer);
     await set(wrapper, "finance-prepay-reason", "原".repeat(length));
@@ -228,7 +231,7 @@ describe("prepay safe submission", () => {
   });
   it("shows review actions only to reviewers and refreshes after approval conflict", async () => {
     useUserStore().user!.permissions = ["prepay:review"];
-    vi.mocked(api.getPrepay).mockResolvedValue({ ...detail, status: "PENDING_APPROVAL" });
+    vi.mocked(api.getPrepay).mockResolvedValue({ ...detail, status: "PENDING_OPERATIONS_REVIEW" });
     vi.mocked(api.approvePrepay).mockRejectedValue(
       new ApiError({ status: 409, errorCode: "PREPAY_STATE_CONFLICT", traceId: "test" })
     );
@@ -240,7 +243,7 @@ describe("prepay safe submission", () => {
     expect(api.getPrepay).toHaveBeenCalledTimes(2);
   });
   it("shows only identity amount and readonly state and submits a minimal application", async () => {
-    vi.mocked(api.applyPrepay).mockResolvedValue(detail);
+    vi.mocked(api.applyPrepay).mockResolvedValue({ ...detail, status: "WAITING_DETAILS" });
     useUserStore().user!.nickname = "Business operator";
     const wrapper = await open(ApplyDialog);
     expect(wrapper.get('[data-test="prepay-creator-name"]').text()).toBe("Test");
@@ -260,6 +263,10 @@ describe("prepay safe submission", () => {
     await set(wrapper, "prepay-amount", "100.00");
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
+    expect(wrapper.props("modelValue")).toBe(true);
+    expect(wrapper.getComponent({ name: "ElForm" }).props("disabled")).toBe(true);
+    expect(wrapper.text()).toContain("PP-test");
+    expect(wrapper.text()).toContain(i18n.global.t("prepay.completeInFinance"));
     expect(api.applyPrepay).toHaveBeenCalledExactlyOnceWith({
       requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
       kolId: "3",
@@ -276,17 +283,17 @@ describe("prepay safe submission", () => {
     }
   });
   it("requires finance details and an explicit deduction choice before approval", async () => {
-    useUserStore().user!.permissions = ["prepay:review"];
+    useUserStore().user!.permissions = ["prepay:apply"];
     vi.mocked(api.getPrepay).mockResolvedValue({
       ...detail,
-      status: "PENDING_APPROVAL",
+      status: "WAITING_DETAILS",
       deductFromCommission: null,
       payoutAccountSnapshot: null,
       reason: null,
       expectedPayDate: null
     });
     const wrapper = await open(DetailDrawer);
-    expect(wrapper.get('[data-test="prepay-approve"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
     const supplement = wrapper.get('[data-test="prepay-application-details"]');
     expect(supplement.find('[data-test="finance-prepay-deduct"]').exists()).toBe(true);
     await supplement.get('[data-test="finance-prepay-details-save"]').trigger("click");
@@ -295,10 +302,10 @@ describe("prepay safe submission", () => {
     expect(api.approvePrepay).not.toHaveBeenCalled();
   });
   it("saves the deduction and account from finance before allowing approval", async () => {
-    useUserStore().user!.permissions = ["prepay:review"];
+    useUserStore().user!.permissions = ["prepay:apply"];
     vi.mocked(api.getPrepay).mockResolvedValue({
       ...detail,
-      status: "PENDING_APPROVAL",
+      status: "WAITING_DETAILS",
       deductFromCommission: null,
       payoutAccountSnapshot: null,
       reason: null,
@@ -306,7 +313,7 @@ describe("prepay safe submission", () => {
     });
     vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
       ...detail,
-      status: "PENDING_APPROVAL",
+      status: "PENDING_OPERATIONS_REVIEW",
       deductFromCommission: false,
       payoutAccountId: "2"
     });
@@ -328,6 +335,6 @@ describe("prepay safe submission", () => {
       },
       []
     );
-    expect(wrapper.get('[data-test="prepay-approve"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
   });
 });

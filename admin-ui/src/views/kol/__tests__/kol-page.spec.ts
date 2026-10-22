@@ -12,7 +12,10 @@ import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
-vi.mock("@/api/commission/prepay", () => ({ prepayAccounts: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/api/commission/prepay", () => ({
+  prepayAccounts: vi.fn().mockResolvedValue([]),
+  getPrepayKolSummaries: vi.fn().mockResolvedValue([])
+}));
 vi.mock("@/api/kol/promotion");
 vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");
@@ -159,7 +162,7 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("renders the 04.01 columns in order with the 05.01 placeholder", async () => {
+  it("renders the creator columns in order and the paid prepay total", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage();
     const headers = wrapper
@@ -181,7 +184,7 @@ describe("creator list page (task 32 §2.2)", () => {
       "关系状态",
       "操作"
     ]);
-    expect(wrapper.text()).toContain("开发中");
+    expect(element("kol-prepay-total").text()).toBe("0.00");
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
