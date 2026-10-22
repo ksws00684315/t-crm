@@ -8,7 +8,7 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   CHANNELS,
@@ -52,14 +52,14 @@ function asRefund(row: object): RefundVO {
 function shopText(refund: RefundVO): string {
   if (!refund.shopName && !refund.shopCode) return "-";
   return refund.shopCode
-    ? `${refund.shopName ?? "-"}（${refund.shopCode}）`
+    ? formatNameWithCode(refund.shopName ?? "-", refund.shopCode)
     : (refund.shopName ?? "-");
 }
 
 function kolText(refund: RefundVO): string {
   if (!refund.kolCode && !refund.kolName) return "-";
   return refund.kolCode
-    ? `${refund.kolName ?? refund.kolCode}（${refund.kolCode}）`
+    ? formatNameWithCode(refund.kolName ?? refund.kolCode, refund.kolCode)
     : (refund.kolName ?? "-");
 }
 

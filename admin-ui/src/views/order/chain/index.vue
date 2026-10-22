@@ -6,7 +6,7 @@ import { getOrder, getOrderChain } from "@/api/order/order";
 import type { ChainLineVO, OrderChainVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
@@ -26,6 +26,16 @@ defineOptions({ name: "OrderChainPage" });
  * task's scope and say "developing".
  */
 const { t } = useI18n();
+
+function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
+  if (!name && !code) return "-";
+  return code ? formatNameWithCode(name ?? "-", code) : (name ?? "-");
+}
+
+function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
+  if (!name && !code) return "-";
+  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
+}
 const route = useRoute();
 const router = useRouter();
 
@@ -54,7 +64,7 @@ const refundColumns = computed<DataColumn[]>(() => [
 
 /** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */
 function openCopyJob(jobCode: string): void {
-  void router.push({ path: "/product/tasks", query: { jobNo: jobCode } });
+  void router.push({ path: "/product/tasks", query: { jobCode } });
 }
 
 onMounted(async () => {
@@ -90,12 +100,10 @@ onMounted(async () => {
             {{ channelText(detail.channel) }}
           </el-descriptions-item>
           <el-descriptions-item v-if="detail" :label="t('order.shop')">
-            {{ detail.shopName ?? "-" }}{{ detail.shopCode ? `（${detail.shopCode}）` : "" }}
+            {{ shopLabel(detail.shopName, detail.shopCode) }}
           </el-descriptions-item>
           <el-descriptions-item v-if="detail" :label="t('order.kol')">
-            <span v-if="detail.kolCode"
-              >{{ detail.kolName ?? detail.kolCode }}（{{ detail.kolCode }}）</span
-            >
+            <span v-if="detail.kolCode">{{ kolLabel(detail.kolName, detail.kolCode) }}</span>
             <span v-else>-</span>
           </el-descriptions-item>
           <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
@@ -148,9 +156,9 @@ onMounted(async () => {
               </div>
               <div class="chain-block__text">
                 {{ t("order.kol") }}:
-                <span v-if="line.link.kolCode"
-                  >{{ line.link.kolName ?? line.link.kolCode }}（{{ line.link.kolCode }}）</span
-                >
+                <span v-if="line.link.kolCode">{{
+                  kolLabel(line.link.kolName, line.link.kolCode)
+                }}</span>
                 <span v-else>-</span>
               </div>
             </template>

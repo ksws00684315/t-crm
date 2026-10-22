@@ -1,10 +1,11 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
-import type { OrderSyncStateVO, SyncFailureVO } from "@/api/types";
+import type { OrderSyncStateVO, Role, SyncFailureVO } from "@/api/types";
+import { useUserStore } from "@/stores/user";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { notifyError } from "@/utils/notify";
@@ -63,6 +64,24 @@ const failures: SyncFailureVO[] = [
   }
 ];
 
+function signIn(role: Role, permissions: string[]) {
+  useUserStore().user = {
+    id: "1",
+    username: "me",
+    nickname: "Me",
+    email: null,
+    role,
+    postTemplate: null,
+    permissions,
+    dataScope: "ALL",
+    tenantId: "1",
+    tenantName: "默认公司",
+    status: 1,
+    lastLoginTime: null,
+    createTime: "2026-10-01T00:00:00Z"
+  };
+}
+
 async function mountDialog() {
   const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push("/order/orders");
@@ -87,10 +106,13 @@ describe("sync states dialog (task 40)", () => {
     localStorage.clear();
     vi.mocked(orderApi.listSyncStates).mockReset();
     vi.mocked(orderApi.listSyncFailures).mockReset();
+    vi.mocked(orderApi.deleteSyncFailures).mockReset();
     vi.mocked(notifyError).mockClear();
     setActivePinia(createPinia());
+    signIn("SUPER_ADMIN", ["order:view", "order:manage"]);
     vi.mocked(orderApi.listSyncStates).mockResolvedValue([shop]);
     vi.mocked(orderApi.listSyncFailures).mockResolvedValue(failures);
+    vi.mocked(orderApi.deleteSyncFailures).mockResolvedValue(3);
   });
 
   it("shows an order and a refund row per shop with the monitoring fields", async () => {
@@ -155,5 +177,45 @@ describe("sync states dialog (task 40)", () => {
     await flushPromises();
     expect(vi.mocked(notifyError)).toHaveBeenCalledTimes(1);
     wrapper.unmount();
+  });
+
+  it("shows the cleanup button only with order:manage", async () => {
+    signIn("STAFF", ["order:view"]);
+    const { wrapper } = await mountDialog();
+    const tabs = [...document.body.querySelectorAll<HTMLElement>(".el-tabs__item")];
+    tabs.find(tab => tab.textContent?.includes("失败任务"))?.click();
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="clean-failures"]')).toBeNull();
+    wrapper.unmount();
+
+    signIn("SUPER_ADMIN", ["order:view", "order:manage"]);
+    const again = await mountDialog();
+    const tabs2 = [...document.body.querySelectorAll<HTMLElement>(".el-tabs__item")];
+    tabs2.find(tab => tab.textContent?.includes("失败任务"))?.click();
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="clean-failures"]')).not.toBeNull();
+    again.wrapper.unmount();
+  });
+
+  it("prompts for days, confirms, calls deleteSyncFailures and refreshes", async () => {
+    const prompt = vi.spyOn(ElMessageBox, "prompt").mockResolvedValue({ value: "30" } as never);
+    const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
+    const success = vi.spyOn(ElMessage, "success").mockImplementation(() => undefined as never);
+    const { wrapper } = await mountDialog();
+    const tabs = [...document.body.querySelectorAll<HTMLElement>(".el-tabs__item")];
+    tabs.find(tab => tab.textContent?.includes("失败任务"))?.click();
+    await flushPromises();
+    document.body.querySelector<HTMLButtonElement>('[data-test="clean-failures"]')?.click();
+    await flushPromises();
+    expect(prompt).toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalled();
+    expect(vi.mocked(orderApi.deleteSyncFailures)).toHaveBeenCalledWith(30);
+    expect(success).toHaveBeenCalled();
+    // reload after clear
+    expect(vi.mocked(orderApi.listSyncFailures).mock.calls.length).toBeGreaterThanOrEqual(2);
+    wrapper.unmount();
+    prompt.mockRestore();
+    confirm.mockRestore();
+    success.mockRestore();
   });
 });

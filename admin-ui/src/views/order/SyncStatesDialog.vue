@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { listSyncFailures, listSyncStates, triggerOrderSync } from "@/api/order/order";
+import {
+  deleteSyncFailures,
+  listSyncFailures,
+  listSyncStates,
+  triggerOrderSync
+} from "@/api/order/order";
 import type {
   KindSyncVO,
   OrderSyncStateVO,
@@ -12,7 +17,9 @@ import type {
   SyncFailureVO
 } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
+import { orderAbilities } from "@/utils/permission";
 import { notifyError } from "@/utils/notify";
 import { syncSourceText } from "@/utils/order";
 
@@ -27,6 +34,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const router = useRouter();
+const abilities = computed(() => orderAbilities(useUserStore().user));
 
 /**
  * Task 40 §3.5: the sync monitor shows one row per shop and stream (order, refund) with its
@@ -39,6 +47,7 @@ const shops = ref<OrderSyncStateVO[]>([]);
 const syncing = ref<string | null>(null);
 const failuresLoading = ref(false);
 const failures = ref<SyncFailureVO[] | null>(null);
+const cleaning = ref(false);
 let startedAny = false;
 
 /** One table row: a shop with one of its two monitoring streams. */
@@ -173,6 +182,50 @@ async function syncNow(state: StateRow) {
   }
 }
 
+async function cleanFailures() {
+  let days: number;
+  try {
+    const { value } = await ElMessageBox.prompt(
+      t("order.sync.cleanFailuresPrompt"),
+      t("order.sync.cleanFailuresTitle"),
+      {
+        inputValue: "30",
+        inputPattern: /^[1-9]\d*$/,
+        inputErrorMessage: t("order.sync.cleanFailuresDaysInvalid"),
+        confirmButtonText: t("common.confirm"),
+        cancelButtonText: t("common.cancel")
+      }
+    );
+    days = Number(value);
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      ElMessage.error(t("order.sync.cleanFailuresDaysInvalid"));
+      return;
+    }
+  } catch {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      t("order.sync.cleanFailuresConfirm", { days }),
+      t("order.sync.cleanFailuresTitle"),
+      { type: "warning" }
+    );
+  } catch {
+    return;
+  }
+  cleaning.value = true;
+  try {
+    const count = await deleteSyncFailures(days);
+    ElMessage.success(t("order.sync.cleanFailuresDone", { count }));
+    failures.value = null;
+    await loadFailures();
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    cleaning.value = false;
+  }
+}
+
 function openTask(failure: SyncFailureVO) {
   if (!failure.taskId) return;
   void router.push({ path: "/system/tasks", query: { taskId: failure.taskId } });
@@ -262,6 +315,17 @@ function close() {
         </DataTable>
       </el-tab-pane>
       <el-tab-pane :label="t('order.sync.failuresTab')" name="failures" lazy>
+        <div v-if="abilities.canManage" class="failures-toolbar">
+          <el-button
+            type="danger"
+            plain
+            data-test="clean-failures"
+            :loading="cleaning"
+            @click="cleanFailures"
+          >
+            {{ t("order.sync.cleanFailures") }}
+          </el-button>
+        </div>
         <DataTable
           plain
           table-id="order-sync-failures"
@@ -299,5 +363,8 @@ function close() {
 <style scoped>
 .shop-tag {
   margin-left: 4px;
+}
+.failures-toolbar {
+  margin-bottom: 12px;
 }
 </style>

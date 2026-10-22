@@ -1154,7 +1154,13 @@ const zhCN = {
       importCutoff: "最近导入数据截止时间",
       time: "时间",
       linkedTask: "关联导入任务",
-      viewTask: "查看"
+      viewTask: "查看",
+      cleanFailures: "清理",
+      cleanFailuresTitle: "清理失败记录",
+      cleanFailuresPrompt: "将删除 N 天前的失败记录，删除后不可恢复。请输入天数（1～3650）：",
+      cleanFailuresConfirm: "确定删除 {days} 天前的失败记录？删除后不可恢复。",
+      cleanFailuresDaysInvalid: "请输入 1～3650 的整数",
+      cleanFailuresDone: "已删除 {count} 条失败记录"
     },
     refund: {
       no: "退款单号",

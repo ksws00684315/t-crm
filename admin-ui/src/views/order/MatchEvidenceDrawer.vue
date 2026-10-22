@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { getMatchEvidence } from "@/api/order/order";
 import type { EvidenceMappingVO, MatchEvidenceVO, OrderItemVO, OrderVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { attributionTypeText } from "@/utils/order";
 
@@ -18,6 +18,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
+  if (!name && !code) return "-";
+  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
+}
 
 /**
  * Matching-pool evidence (requirement 10.01, task 40 §6). Orders can carry several unmatched
@@ -122,7 +127,12 @@ const mappingColumns = computed<DataColumn[]>(() => [
             </el-descriptions-item>
             <el-descriptions-item :label="t('order.pool.sourceProduct')" :span="2">
               <span v-if="evidence.product">
-                {{ evidence.product.productName ?? "-" }}（{{ evidence.product.productId }}）
+                {{
+                  formatNameWithCode(
+                    evidence.product.productName ?? "-",
+                    evidence.product.productId
+                  )
+                }}
               </span>
               <span v-else>-</span>
             </el-descriptions-item>
@@ -138,11 +148,9 @@ const mappingColumns = computed<DataColumn[]>(() => [
             :paged="false"
           >
             <template #cell-kol="{ row }">
-              <span v-if="asMapping(row).kolCode"
-                >{{ asMapping(row).kolName ?? asMapping(row).kolCode }}（{{
-                  asMapping(row).kolCode
-                }}）</span
-              >
+              <span v-if="asMapping(row).kolCode">{{
+                kolLabel(asMapping(row).kolName, asMapping(row).kolCode)
+              }}</span>
               <span v-else>-</span>
             </template>
             <template #cell-linkCode="{ row }">{{ asMapping(row).linkCode ?? "-" }}</template>

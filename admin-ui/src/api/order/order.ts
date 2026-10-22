@@ -102,6 +102,15 @@ export function listSyncFailures(): Promise<SyncFailureVO[]> {
   return http.request<SyncFailureVO[]>({ method: "get", url: "/order/sync-failures" });
 }
 
+/** order:manage; delete company sync failures older than the given days. Returns deleted count. */
+export function deleteSyncFailures(olderThanDays: number): Promise<number> {
+  return http.request<number>({
+    method: "delete",
+    url: "/order/sync-failures",
+    params: { olderThanDays }
+  });
+}
+
 /** Matching-pool evidence for one order item (task 40 §3.6). */
 export function getMatchEvidence(orderItemId: string): Promise<MatchEvidenceVO> {
   return http.request<MatchEvidenceVO>({

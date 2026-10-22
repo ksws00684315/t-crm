@@ -176,7 +176,7 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("jumps to the product task page with the job number filter", async () => {
+  it("jumps to the product task page with the jobCode filter", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const { wrapper, router } = await mountPage();
     const link = document.body.querySelector<HTMLButtonElement>(
@@ -186,7 +186,7 @@ describe("order chain page (task 40)", () => {
     link?.click();
     // The task route lazy-loads its page; poll instead of guessing flush counts.
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/product/tasks"));
-    expect(router.currentRoute.value.query.jobNo).toBe("JOB-20261020-01");
+    expect(router.currentRoute.value.query.jobCode).toBe("JOB-20261020-01");
     wrapper.unmount();
   });
 

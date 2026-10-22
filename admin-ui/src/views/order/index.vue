@@ -26,7 +26,7 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { orderAbilities } from "@/utils/permission";
 import {
@@ -82,14 +82,16 @@ function asOrder(row: object): OrderVO {
 /** Shop cell per 09.04: "name (code)"; the code comes with task 37's backend and may be null. */
 function shopText(order: OrderVO): string {
   if (!order.shopName && !order.shopCode) return "-";
-  return order.shopCode ? `${order.shopName ?? "-"}（${order.shopCode}）` : (order.shopName ?? "-");
+  return order.shopCode
+    ? formatNameWithCode(order.shopName ?? "-", order.shopCode)
+    : (order.shopName ?? "-");
 }
 
 /** Creator cell per 09.04: "name (code)"; "-" while the order is not attributed to a creator. */
 function kolText(order: OrderVO): string {
   if (!order.kolId && !order.kolCode) return "-";
   return order.kolCode
-    ? `${order.kolName ?? order.kolCode}（${order.kolCode}）`
+    ? formatNameWithCode(order.kolName ?? order.kolCode, order.kolCode)
     : (order.kolName ?? "-");
 }
 

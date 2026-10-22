@@ -1178,7 +1178,14 @@ const enUS: MessageSchema = {
       importCutoff: "Last import cutoff",
       time: "Time",
       linkedTask: "Import task",
-      viewTask: "View"
+      viewTask: "View",
+      cleanFailures: "Clean up",
+      cleanFailuresTitle: "Clean sync failures",
+      cleanFailuresPrompt:
+        "Deletes failure records older than N days. This cannot be undone. Enter days (1–3650):",
+      cleanFailuresConfirm: "Delete failure records older than {days} days? This cannot be undone.",
+      cleanFailuresDaysInvalid: "Enter an integer from 1 to 3650",
+      cleanFailuresDone: "Deleted {count} failure record(s)"
     },
     refund: {
       no: "Refund No.",
