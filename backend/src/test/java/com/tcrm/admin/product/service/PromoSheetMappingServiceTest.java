@@ -77,8 +77,8 @@ class PromoSheetMappingServiceTest {
     when(shops.listShops())
         .thenReturn(
             List.of(
-                new ShopAccessDTO(11L, "Main Shop", "111", 1),
-                new ShopAccessDTO(12L, "Closed Shop", "222", 0)));
+                new ShopAccessDTO(11L, "Main Shop", "111", 1, null),
+                new ShopAccessDTO(12L, "Closed Shop", "222", 0, null)));
     // No current owners or products unless a test says otherwise.
     when(items.listCurrentOwners(anyLong(), anyCollection())).thenReturn(List.of());
     when(products.listByShopItems(anyLong(), anyCollection())).thenReturn(List.of());
@@ -238,6 +238,7 @@ class PromoSheetMappingServiceTest {
     // A shop item without a registered original product keeps product_id empty.
     assertThat(mappings.get(1).getProductId()).isNull();
     assertThat(mappings.get(1).getItemName()).isEqualTo("No Product");
+    assertThat(mappings).allMatch(row -> row.getLinkCode().matches("KPL-[0-9A-F]{12}"));
     verify(products).lockShopItem(ProductRules.shopItemLockKey(11L, "1111111111"));
     verify(products).lockShopItem(ProductRules.shopItemLockKey(11L, "3333333333"));
     verify(events).publishEvent(any(com.tcrm.admin.product.api.KolMappingsChangedEvent.class));

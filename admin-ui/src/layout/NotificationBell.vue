@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Avatar, Bell, Switch, Wallet, Warning } from "@element-plus/icons-vue";
+import { Avatar, Bell, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -39,7 +39,9 @@ const icons: Record<NotificationType, typeof Wallet> = {
   PAYOUT_ACCOUNT_SUBMITTED: Wallet,
   ORDER_SYNC_FAILED: Warning,
   BD_TRANSFER_CANCELLED: Switch,
-  KOLS_UNASSIGNED: Avatar
+  KOLS_UNASSIGNED: Avatar,
+  DEPARTURE_PLAN_SUBMITTED: Clock,
+  DEPARTURE_PLAN_EXECUTED: CircleCheck
 };
 
 async function refreshCount() {

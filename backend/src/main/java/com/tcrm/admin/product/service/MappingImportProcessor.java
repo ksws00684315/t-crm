@@ -185,7 +185,7 @@ class MappingImportProcessor implements ImportRowProcessor {
             neu.setValidFrom(now);
             neu.setCreateBy(actorId);
             neu.setUpdateBy(actorId);
-            items.insert(neu);
+            KolItemCodes.insertNew(items, neu);
             // Registered in this transaction and applied to the link index afterwards (task 06b).
             TransactionalEvents.publish(events, new KolItemChangedEvent(kol.id(), product.getId()));
           });

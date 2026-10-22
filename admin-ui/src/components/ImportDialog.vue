@@ -26,11 +26,13 @@ const props = withDefaults(
     templateFileName: string;
     taskType: TaskType;
     downloadTemplate: () => Promise<DownloadedFile>;
-    upload: (file: File) => Promise<{ taskId: string }>;
+    upload: (file: File, dataCutoffTime?: string) => Promise<{ taskId: string }>;
     /** Order / refund imports also accept .csv (task 28 §3.6). */
     acceptCsv?: boolean;
+    /** Requires the "data cutoff time" field (task 40 §3.5): when the file's data ends. */
+    requireDataCutoff?: boolean;
   }>(),
-  { acceptCsv: false }
+  { acceptCsv: false, requireDataCutoff: false }
 );
 
 const emit = defineEmits<{
@@ -40,6 +42,8 @@ const emit = defineEmits<{
 
 const file = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement>();
+/** When the uploaded file's data ends; defaults to "now" and may not be in the future. */
+const dataCutoffTime = ref<Date | null>(null);
 const uploading = ref(false);
 const task = ref<TaskVO | null>(null);
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -81,6 +85,21 @@ function reset() {
   file.value = null;
   task.value = null;
   if (fileInput.value) fileInput.value.value = "";
+  dataCutoffTime.value = props.requireDataCutoff ? new Date() : null;
+}
+
+/** Days after today stay unpickable; a future time on today is caught at submit. */
+function futureDateDisabled(date: Date): boolean {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return date.getTime() > today.getTime();
+}
+
+function cutoffProblem(): string | null {
+  if (!props.requireDataCutoff) return null;
+  if (!dataCutoffTime.value) return t("import.cutoffRequired");
+  if (dataCutoffTime.value.getTime() > Date.now()) return t("import.cutoffFuture");
+  return null;
 }
 
 watch(
@@ -93,7 +112,8 @@ watch(
       stopPolling();
       if (finishedAny) emit("finished");
     }
-  }
+  },
+  { immediate: true }
 );
 
 onBeforeUnmount(stopPolling);
@@ -144,14 +164,19 @@ async function submitUpload() {
     ElMessage.warning(t("import.chooseFile"));
     return;
   }
-  const problem = checkFile(file.value);
+  const problem = checkFile(file.value) ?? cutoffProblem();
   if (problem) {
     ElMessage.error(problem);
     return;
   }
   uploading.value = true;
   try {
-    const { taskId } = await props.upload(file.value);
+    const { taskId } = await props.upload(
+      file.value,
+      props.requireDataCutoff && dataCutoffTime.value
+        ? dataCutoffTime.value.toISOString()
+        : undefined
+    );
     task.value = {
       id: taskId,
       taskType: props.taskType,
@@ -220,6 +245,19 @@ function close() {
     </ol>
 
     <div v-if="!task" class="picker">
+      <!-- el-date-picker renders a fragment root, so the test hook lives on this wrapper. -->
+      <div v-if="props.requireDataCutoff" data-test="data-cutoff">
+        <el-date-picker
+          v-model="dataCutoffTime"
+          type="datetime"
+          :placeholder="t('import.cutoffPlaceholder')"
+          :disabled-date="futureDateDisabled"
+          style="width: 100%; margin-bottom: 12px"
+        />
+      </div>
+      <div v-if="props.requireDataCutoff" class="cutoff-hint" data-test="data-cutoff-hint">
+        {{ t("import.cutoffHint") }}
+      </div>
       <input
         ref="fileInput"
         type="file"
@@ -283,6 +321,12 @@ function close() {
 }
 .picker {
   padding: 12px 0;
+}
+.cutoff-hint {
+  margin-bottom: 8px;
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 .result p {
   margin: 12px 0;

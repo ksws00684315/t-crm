@@ -7,7 +7,7 @@ import com.tcrm.admin.shared.BaseEntity;
 import com.tcrm.admin.task.api.TaskType;
 import java.time.Instant;
 
-@TableName("crm_task")
+@TableName(value = "crm_task", autoResultMap = true)
 public class TaskDO extends BaseEntity {
   private TaskType taskType;
   private TaskStatus status;
@@ -21,6 +21,10 @@ public class TaskDO extends BaseEntity {
 
   private Instant startedAt;
   private Instant finishedAt;
+
+  /** Submitter parameters as a JSON object (task 40: import dataCutoffTime); null when none. */
+  @TableField(typeHandler = JsonbStringTypeHandler.class)
+  private String params;
 
   /** Owning company. Updates never write this column. */
   @TableField(updateStrategy = FieldStrategy.NEVER)
@@ -95,7 +99,15 @@ public class TaskDO extends BaseEntity {
   }
 
   public void setFinishedAt(Instant value) {
-    this.finishedAt = value;
+    finishedAt = value;
+  }
+
+  public String getParams() {
+    return params;
+  }
+
+  public void setParams(String value) {
+    params = value;
   }
 
   public Long getTenantId() {

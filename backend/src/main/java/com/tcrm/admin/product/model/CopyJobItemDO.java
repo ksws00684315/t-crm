@@ -16,6 +16,7 @@ public class CopyJobItemDO {
   private Long tenantId;
   private String sourceChannel;
   private String sourceProductId;
+  private Long sourceShopId;
   private String ruleId;
   private String status;
   private String targetItemId;
@@ -60,6 +61,14 @@ public class CopyJobItemDO {
 
   public void setSourceProductId(String value) {
     this.sourceProductId = value;
+  }
+
+  public Long getSourceShopId() {
+    return sourceShopId;
+  }
+
+  public void setSourceShopId(Long value) {
+    this.sourceShopId = value;
   }
 
   public String getRuleId() {

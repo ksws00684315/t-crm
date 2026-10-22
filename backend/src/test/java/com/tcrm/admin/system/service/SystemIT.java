@@ -191,6 +191,7 @@ class SystemIT {
             "crm_notification:NO",
             "crm_order:NO",
             "crm_order_item:NO",
+            "crm_order_sync_failure:NO",
             "crm_order_sync_state:NO",
             "crm_payout_account:NO",
             "crm_product:NO",
@@ -204,6 +205,7 @@ class SystemIT {
             "crm_weidian_shop_auth:NO",
             "sys_oper_log:YES",
             "sys_post_template:NO",
+            "sys_user_departure_plan:NO",
             "sys_user_permission:NO",
             "sys_user_tenant:NO");
     var without =

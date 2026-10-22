@@ -3,8 +3,10 @@ package com.tcrm.admin.product.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.product.api.KolItemApi;
+import com.tcrm.admin.product.api.KolItemLinkCodeDTO;
 import com.tcrm.admin.product.api.KolItemLinkDTO;
 import com.tcrm.admin.product.api.KolItemRefDTO;
+import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.mapper.KolItemMapper;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.KolItemDO;
@@ -16,7 +18,10 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /** Kol item mapping facade for other modules (task 06 link index, link list, click attribution). */
@@ -150,10 +155,85 @@ public class KolItemLookupService implements KolItemApi {
   }
 
   @Override
+  public List<KolItemLinkCodeDTO> listLinkCodesByIds(Collection<Long> kolItemIds) {
+    if (kolItemIds == null || kolItemIds.isEmpty()) {
+      return List.of();
+    }
+    return items
+        .selectList(
+            new LambdaQueryWrapper<KolItemDO>()
+                .select(KolItemDO::getId, KolItemDO::getLinkCode)
+                .in(KolItemDO::getId, kolItemIds))
+        .stream()
+        .map(row -> new KolItemLinkCodeDTO(row.getId(), row.getLinkCode()))
+        .toList();
+  }
+
+  @Override
   public int closeCurrentMappingsForKol(Long kolId, Instant at, Long actorId) {
     if (kolId == null || at == null) {
       return 0;
     }
     return items.closeCurrentByKol(kolId, at, actorId);
+  }
+
+  @Override
+  public List<KolMappingEvidenceDTO> listMappingsByIds(Collection<Long> kolItemIds) {
+    if (kolItemIds == null || kolItemIds.isEmpty()) {
+      return List.of();
+    }
+    return withProducts(
+        items
+            .selectList(new LambdaQueryWrapper<KolItemDO>().in(KolItemDO::getId, kolItemIds))
+            .stream()
+            .toList());
+  }
+
+  @Override
+  public List<KolMappingEvidenceDTO> listMappingsByShopItem(Long shopId, String weidianItemId) {
+    if (shopId == null || weidianItemId == null || weidianItemId.isBlank()) {
+      return List.of();
+    }
+    return withProducts(
+        items
+            .selectList(
+                new LambdaQueryWrapper<KolItemDO>()
+                    .eq(KolItemDO::getShopId, shopId)
+                    .eq(KolItemDO::getWeidianItemId, weidianItemId))
+            .stream()
+            .toList());
+  }
+
+  /** Attaches original-product code and name; a deleted product leaves them null. */
+  private List<KolMappingEvidenceDTO> withProducts(List<KolItemDO> rows) {
+    Set<Long> productIds = new HashSet<>();
+    for (var row : rows) {
+      if (row.getProductId() != null) {
+        productIds.add(row.getProductId());
+      }
+    }
+    Map<Long, ProductDO> byId =
+        productIds.isEmpty()
+            ? Map.of()
+            : products
+                .selectList(new LambdaQueryWrapper<ProductDO>().in(ProductDO::getId, productIds))
+                .stream()
+                .collect(Collectors.toMap(ProductDO::getId, Function.identity()));
+    return rows.stream()
+        .map(
+            row -> {
+              ProductDO product = row.getProductId() == null ? null : byId.get(row.getProductId());
+              return new KolMappingEvidenceDTO(
+                  row.getId(),
+                  row.getKolId(),
+                  row.getProductId(),
+                  product == null ? null : product.getProductCode(),
+                  product == null ? null : product.getName(),
+                  row.getShopId(),
+                  row.getWeidianItemId(),
+                  row.getValidFrom(),
+                  row.getValidTo());
+            })
+        .toList();
   }
 }

@@ -18,6 +18,60 @@ import org.mockito.ArgumentCaptor;
 
 class OrderSyncTest {
   @Test
+  void shouldSyncOnlyOrders_whenOrderTypeIsSelected() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var state = new OrderSyncStateDO();
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null));
+    var now = Instant.parse("2026-10-16T00:00:00Z");
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    mock(OrderWriter.class),
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1, "ORDER"))
+        .isTrue();
+
+    verify(api).orderList(org.mockito.ArgumentMatchers.eq(1L), any());
+    verify(api, org.mockito.Mockito.never())
+        .refundList(org.mockito.ArgumentMatchers.anyLong(), any());
+    assertThat(state.getOrderCursor()).isEqualTo(now);
+    assertThat(state.getRefundCursor()).isNull();
+  }
+
+  @Test
+  void shouldSyncOnlyRefunds_whenRefundTypeIsSelected() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var state = new OrderSyncStateDO();
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+    var now = Instant.parse("2026-10-16T00:00:00Z");
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    mock(OrderWriter.class),
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1, "REFUND"))
+        .isTrue();
+
+    verify(api, org.mockito.Mockito.never())
+        .orderList(org.mockito.ArgumentMatchers.anyLong(), any());
+    verify(api).refundList(org.mockito.ArgumentMatchers.eq(1L), any());
+    assertThat(state.getOrderCursor()).isNull();
+    assertThat(state.getRefundCursor()).isEqualTo(now);
+  }
+
+  @Test
   void shouldKeepCursors_whenExternalCallFails() {
     var api = mock(WeidianBusinessApi.class);
     var states = mock(OrderSyncStateMapper.class);
@@ -405,5 +459,74 @@ class OrderSyncTest {
         .isFalse();
     assertThat(state.getLastError())
         .isEqualTo("Order synchronization failed for order 100: WEIDIAN_RATE_LIMITED");
+  }
+
+  @Test
+  void shouldRecordPhaseKind_whenSynchronizationFails() {
+    for (var failure :
+        List.of(
+            new PhaseCase("ORDER_SYNC") {
+              @Override
+              void stub(WeidianBusinessApi api) {
+                when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenThrow(new IllegalStateException("boom"));
+              }
+            },
+            new PhaseCase("REFUND_SYNC") {
+              @Override
+              void stub(WeidianBusinessApi api) {
+                when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenReturn(
+                        new WeidianBusinessApi.OrderListResponse(
+                            0, 0, List.of(), false, null, null));
+                when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+                    .thenThrow(new IllegalStateException("boom"));
+              }
+            })) {
+      var api = mock(WeidianBusinessApi.class);
+      var states = mock(OrderSyncStateMapper.class);
+      var state = new OrderSyncStateDO();
+      state.setLastSuccessAt(Instant.parse("2026-10-15T00:00:00Z"));
+      state.setLastError(null);
+      when(states.selectOne(any())).thenReturn(state);
+      failure.stub(api);
+      var failuresWriter = mock(OrderSyncFailureWriter.class);
+      var tx = mock(org.springframework.transaction.support.TransactionTemplate.class);
+      org.mockito.Mockito.doAnswer(
+              call -> {
+                call.getArgument(0, java.util.function.Consumer.class).accept(null);
+                return null;
+              })
+          .when(tx)
+          .executeWithoutResult(any());
+      var sync =
+          new OrderSync(
+              api,
+              states,
+              mock(OrderWriter.class),
+              new OrderNormalizer("test"),
+              Clock.fixed(Instant.parse("2026-10-16T00:00:00Z"), ZoneOffset.UTC),
+              null,
+              null,
+              tx,
+              failuresWriter);
+      assertThat(sync.synchronize(1L)).isFalse();
+      verify(failuresWriter)
+          .record(
+              1L,
+              com.tcrm.admin.order.model.OrderSyncFailureKind.valueOf(failure.kind),
+              "Order synchronization failed: inspect API status logs",
+              null);
+    }
+  }
+
+  private abstract static class PhaseCase {
+    final String kind;
+
+    PhaseCase(String kind) {
+      this.kind = kind;
+    }
+
+    abstract void stub(WeidianBusinessApi api);
   }
 }

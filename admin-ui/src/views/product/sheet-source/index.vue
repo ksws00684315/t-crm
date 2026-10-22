@@ -9,7 +9,7 @@ import {
   updateSheetSourceStatus
 } from "@/api/product/sheet-source";
 import { listShops } from "@/api/product/shop";
-import type { GoogleCredentialVO, SheetSourceVO, ShopVO } from "@/api/types";
+import type { GoogleCredentialVO, SheetSourceVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
@@ -37,7 +37,7 @@ const KEY_FILE_MAX_BYTES = 8 * 1024;
 
 const loading = ref(false);
 const rows = ref<SheetSourceVO[]>([]);
-const shops = ref<ShopVO[]>([]);
+const shops = ref<ShopOptionVO[]>([]);
 const credential = ref<GoogleCredentialVO | null>(null);
 const keyInput = ref<HTMLInputElement>();
 const savingKey = ref(false);
