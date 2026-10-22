@@ -163,8 +163,6 @@ class PrepayControllerTest {
   @Test
   void shouldKeepApprovalAndPaymentPermissionsSeparate() throws Exception {
     String reviewer = token("prepay:review");
-    mvc.perform(get(BASE + "/77/recipient").header(AdminMvcSupport.TOKEN_HEADER, reviewer))
-        .andExpect(status().isForbidden());
     mvc.perform(
             multipart(HttpMethod.PUT, BASE + "/77/paid")
                 .file(payload(paymentJson()))
@@ -179,6 +177,32 @@ class PrepayControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, payer))
         .andExpect(status().isForbidden());
     verifyNoInteractions(service);
+  }
+
+  @Test
+  void shouldAllowDetailViewersToReadRecipientAndAcceptManualDetails() throws Exception {
+    for (String permission :
+        List.of(
+            "prepay:apply",
+            "commission:view",
+            "prepay:review",
+            "prepay:finance-review",
+            "prepay:pay")) {
+      mvc.perform(
+              get(BASE + "/77/recipient").header(AdminMvcSupport.TOKEN_HEADER, token(permission)))
+          .andExpect(status().isOk());
+    }
+    mvc.perform(
+            multipart(HttpMethod.PUT, BASE + "/77/application-details")
+                .file(
+                    payload(
+                        "{\"reason\":\"Manual\",\"expectedPayDate\":\"2026-10-23\",\"recipientText\":\"Bank\\nAccount123\",\"deductFromCommission\":false}"))
+                .header(AdminMvcSupport.TOKEN_HEADER, token("prepay:apply")))
+        .andExpect(status().isOk());
+    var captured = ArgumentCaptor.forClass(PrepayService.ApplicationDetails.class);
+    verify(service).saveApplicationDetails(any(), eq(77L), captured.capture(), eq(List.of()));
+    assertThat(captured.getValue().recipientText()).isEqualTo("Bank\nAccount123");
+    assertThat(captured.getValue().payoutAccountId()).isNull();
   }
 
   @Test

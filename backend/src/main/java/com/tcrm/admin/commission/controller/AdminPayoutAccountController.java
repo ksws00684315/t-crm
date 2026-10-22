@@ -85,6 +85,7 @@ public class AdminPayoutAccountController {
   @SaCheckPermission(
       value = {
         "payout-account:review",
+        "prepay:apply",
         "prepay:review",
         "prepay:finance-review",
         "prepay:pay",

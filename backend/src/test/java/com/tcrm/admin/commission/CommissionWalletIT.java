@@ -23,6 +23,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -103,9 +105,10 @@ class CommissionWalletIT {
     jdbc.update("DELETE FROM crm_kol WHERE tenant_id = ? AND id = ?", TENANT_ID, kolId);
   }
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   @Transactional
-  void shouldCompleteRealPrepayWorkflowAndKeepPaymentAndDeductionIdempotent() {
+  void shouldCompleteRealPrepayWorkflowAndKeepPaymentAndDeductionIdempotent(boolean manual) {
     try (var ignored = TenantScope.openCompany(TENANT_ID)) {
       // This test uses a local creator ID and the test transaction rolls every row back.
       long creator = createKol();
@@ -131,13 +134,13 @@ class CommissionWalletIT {
       var application =
           new PrepayService.PrepayApplication(UUID.randomUUID().toString(), creator, "300.00");
       var pending = prepays.apply(user, application);
-      assertThat(pending.status()).isEqualTo("PENDING_APPROVAL");
+      assertThat(pending.status()).isEqualTo("WAITING_DETAILS");
       assertThat(pending.deductFromCommission()).isNull();
       assertThat(prepays.apply(user, application).id()).isEqualTo(pending.id());
       assertThatThrownBy(() -> prepays.approval(user, pending.id(), "APPROVE", null))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_DETAILS_REQUIRED));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_STATE_CONFLICT));
 
       long payout = IdWorker.getId();
       jdbc.update(
@@ -149,16 +152,48 @@ class CommissionWalletIT {
           "t4***@example.invalid",
           "Test recipient",
           operator);
-      prepays.saveApplicationDetails(
-          user,
-          pending.id(),
-          new PrepayService.ApplicationDetails(
-              "t47 business advance", LocalDate.of(2026, 10, 23), payout, true),
-          List.of());
+      String recipient = "银行转账\n收款人 张三\n账号 123456789\nCNY\n" + "资".repeat(969);
+      var completed =
+          prepays.saveApplicationDetails(
+              user,
+              pending.id(),
+              new PrepayService.ApplicationDetails(
+                  "t47 business advance",
+                  LocalDate.of(2026, 10, 23),
+                  manual ? null : payout,
+                  true,
+                  manual ? recipient : null),
+              List.of());
+      assertThat(completed.status()).isEqualTo("PENDING_OPERATIONS_REVIEW");
+      assertThat(prepays.approval(user, pending.id(), "APPROVE", null).status())
+          .isEqualTo("PENDING_FINANCE_REVIEW");
       assertThat(prepays.approval(user, pending.id(), "APPROVE", null).status())
           .isEqualTo("APPROVED");
+      assertThatThrownBy(
+              () ->
+                  prepays.saveApplicationDetails(
+                      user,
+                      pending.id(),
+                      new PrepayService.ApplicationDetails(
+                          "changed", LocalDate.of(2026, 10, 23), null, false, "new"),
+                      List.of()))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_STATE_CONFLICT));
+      if (manual) {
+        assertThat(completed.payoutAccountId()).isNull();
+        assertThat(completed.payoutAccountSnapshot().type()).isEqualTo("MANUAL");
+        String encrypted =
+            jdbc.queryForObject(
+                "SELECT payout_account_cipher FROM crm_prepay WHERE tenant_id=? AND id=?",
+                String.class,
+                TENANT_ID,
+                pending.id());
+        assertThat(encrypted).startsWith("v1:").doesNotContain(recipient);
+        assertThat(cipher.decrypt(encrypted)).isEqualTo(recipient);
+      }
       assertThat(prepays.recipient(user, pending.id()).account())
-          .isEqualTo("t47_recipient@example.invalid");
+          .isEqualTo(manual ? recipient : "t47_recipient@example.invalid");
       var payment =
           new PrepayService.PaymentCommand(
               UUID.randomUUID().toString(), "300.00", "2026-10-22T12:00:00+08:00", "BANK", null);
@@ -168,6 +203,25 @@ class CommissionWalletIT {
               "%PDF-1.7\nt47 test receipt".getBytes(java.nio.charset.StandardCharsets.UTF_8));
       var paid = prepays.pay(user, pending.id(), payment, voucher);
       assertThat(paid.status()).isEqualTo("PAID");
+      assertThat(paid.payment().operatorName()).isEqualTo("Test");
+      assertThat(paid.payment().operatorRole()).isEqualTo("PAYMENT");
+      assertThat(paid.timeline())
+          .extracting(PrepayService.Timeline::operatorRole)
+          .containsExactly(
+              "BUSINESS", "BUSINESS", "OPERATIONS_REVIEW", "FINANCE_REVIEW", "PAYMENT");
+      assertThat(paid.timeline())
+          .extracting(PrepayService.Timeline::operatorName)
+          .containsOnly("Test");
+      assertThat(prepays.summaries(user, List.of(creator)).getFirst().paidAmountCny())
+          .isEqualTo("300.00");
+      assertThat(
+              prepays
+                  .apply(
+                      user,
+                      new PrepayService.PrepayApplication(
+                          UUID.randomUUID().toString(), creator, "50"))
+                  .status())
+          .isEqualTo("WAITING_DETAILS");
       assertThat(paid.walletBalanceCny()).isEqualTo("-300.00");
       assertThat(prepays.pay(user, pending.id(), payment, voucher).payment().voucherFileId())
           .isEqualTo(paid.payment().voucherFileId());

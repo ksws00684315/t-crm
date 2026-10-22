@@ -100,7 +100,23 @@ class PrepayMigrationIT {
                   String.class))
           .contains("tenant_id, kol_id")
           .contains("WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
-      flyway(postgres, "202610222000").migrate();
+      flyway(postgres, "202610231000").migrate();
+      assertThat(jdbc.queryForList("SELECT status FROM crm_prepay ORDER BY id", String.class))
+          .containsExactly("REJECTED", "APPROVED", "WAITING_DETAILS", "PENDING_OPERATIONS_REVIEW");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT operator_role FROM crm_prepay_history WHERE prepay_id=4710",
+                  String.class))
+          .isEqualTo("SYSTEM");
+      String largeCipher = "v1:" + "x".repeat(6000);
+      jdbc.update(
+          "UPDATE crm_prepay SET payout_account_type='MANUAL', payout_account_id=NULL, payout_account_cipher=? WHERE id=4712",
+          largeCipher);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT payout_account_cipher FROM crm_prepay WHERE id=4712", String.class))
+          .isEqualTo(largeCipher);
+      flyway(postgres, "202610231000").migrate();
       assertThat(jdbc.queryForObject("SELECT count(*) FROM sys_user_permission", Integer.class))
           .isEqualTo(6);
     }

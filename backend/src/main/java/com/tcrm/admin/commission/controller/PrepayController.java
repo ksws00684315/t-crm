@@ -43,7 +43,13 @@ public class PrepayController {
 
   @GetMapping("/admin-api/commission/prepays")
   @SaCheckPermission(
-      value = {"prepay:review", "prepay:finance-review", "prepay:pay", "commission:view"},
+      value = {
+        "prepay:apply",
+        "prepay:review",
+        "prepay:finance-review",
+        "prepay:pay",
+        "commission:view"
+      },
       mode = SaMode.OR)
   public R<com.tcrm.admin.shared.PageResult<PrepayService.PrepayRow>> list(
       @Valid @ModelAttribute Query request) {
@@ -118,7 +124,8 @@ public class PrepayController {
                 request.reason(),
                 request.expectedPayDate(),
                 request.payoutAccountId(),
-                request.deductFromCommission()),
+                request.deductFromCommission(),
+                request.recipientText()),
             attachments == null
                 ? List.of()
                 : attachments.stream()
@@ -145,7 +152,13 @@ public class PrepayController {
 
   @GetMapping("/admin-api/commission/prepays/{id}")
   @SaCheckPermission(
-      value = {"prepay:review", "prepay:finance-review", "prepay:pay", "commission:view"},
+      value = {
+        "prepay:apply",
+        "prepay:review",
+        "prepay:finance-review",
+        "prepay:pay",
+        "commission:view"
+      },
       mode = SaMode.OR)
   public R<PrepayService.PrepayDetail> detail(@PathVariable @Positive Long id) {
     return R.ok(prepays.detail(current.user(), id));
@@ -168,7 +181,15 @@ public class PrepayController {
   }
 
   @GetMapping("/admin-api/commission/prepays/{id}/recipient")
-  @SaCheckPermission("prepay:pay")
+  @SaCheckPermission(
+      value = {
+        "prepay:apply",
+        "prepay:review",
+        "prepay:finance-review",
+        "prepay:pay",
+        "commission:view"
+      },
+      mode = SaMode.OR)
   public R<PrepayService.Recipient> recipient(@PathVariable @Positive Long id) {
     return R.ok(prepays.recipient(current.user(), id));
   }
@@ -203,8 +224,9 @@ public class PrepayController {
   public record DetailsRequest(
       @NotBlank String reason,
       @NotNull LocalDate expectedPayDate,
-      @NotNull @Positive Long payoutAccountId,
-      @NotNull Boolean deductFromCommission) {}
+      @Positive Long payoutAccountId,
+      @NotNull Boolean deductFromCommission,
+      @jakarta.validation.constraints.Size(max = 1000) String recipientText) {}
 
   public record Query(
       String prepayNo,

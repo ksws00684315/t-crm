@@ -634,6 +634,63 @@ class PrepayServiceTest {
   }
 
   @Test
+  void shouldEncryptManualRecipientAndSnapshotBusinessIdentityWithoutAnAccountArchive() {
+    String recipient = "银行转账\n张三\n账号123456789\nCNY";
+    when(cipher.encrypt(recipient)).thenReturn("v1:manual-encrypted");
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", false)).when(service).detail(any(), anyLong());
+    service.saveApplicationDetails(
+        user("prepay:apply"),
+        ID,
+        new PrepayService.ApplicationDetails(
+            "reason", LocalDate.of(2026, 10, 23), null, false, recipient),
+        List.of());
+    assertThat(write("UPDATE crm_prepay SET reason").args())
+        .contains("MANUAL", "v1:manual-encrypted", false)
+        .doesNotContain(recipient);
+    verify(accounts, never()).selectById(anyLong());
+    assertThat(write("INSERT INTO crm_prepay_history").args()).contains("BUSINESS", "Test");
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {" ", "\n"})
+  void shouldRejectMissingManualRecipient(String recipient) {
+    fails(
+        () ->
+            service.saveApplicationDetails(
+                user("prepay:apply"),
+                ID,
+                new PrepayService.ApplicationDetails(
+                    "reason", LocalDate.of(2026, 10, 23), null, false, recipient),
+                List.of()),
+        ErrorCode.COMMON_VALIDATION_FAILED);
+    assertThat(writes).isEmpty();
+  }
+
+  @Test
+  void shouldRejectConflictingRecipientInputsAndOverlongText() {
+    for (var request :
+        List.of(
+            new PrepayService.ApplicationDetails(
+                "reason", LocalDate.of(2026, 10, 23), 33L, true, "manual"),
+            new PrepayService.ApplicationDetails(
+                "reason", LocalDate.of(2026, 10, 23), null, true, "x".repeat(1001)))) {
+      fails(
+          () -> service.saveApplicationDetails(user("prepay:apply"), ID, request, List.of()),
+          ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    assertThat(writes).isEmpty();
+  }
+
+  @Test
+  void shouldEnforceOwnScopeBeforeDecryptingRecipient() {
+    when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(999L)));
+    fails(() -> service.recipient(user("commission:view"), ID), ErrorCode.COMMON_NOT_FOUND);
+    verify(cipher, never()).decrypt(any());
+    verify(audit, never()).recordTenantOperation(anyLong(), anyLong(), any(), any(), any(), any());
+  }
+
+  @Test
   void shouldAuditAndDecryptOnlyFrozenRecipient_whenPayerViewsAccount() {
     rows(
         sql -> sql.contains("SELECT payout_account_type"),
@@ -925,7 +982,7 @@ class PrepayServiceTest {
     fails(
         () -> service.pay(user("prepay:review"), ID, payment("300", null), voucher()),
         ErrorCode.AUTH_FORBIDDEN);
-    fails(() -> service.recipient(user("prepay:review"), ID), ErrorCode.AUTH_FORBIDDEN);
+    fails(() -> service.recipient(noAccess, ID), ErrorCode.AUTH_FORBIDDEN);
     fails(() -> service.cancel(noAccess, ID, null), ErrorCode.AUTH_FORBIDDEN);
     fails(
         () -> service.saveApplicationDetails(noAccess, ID, details(true), null),
