@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    /* Sidebar Container */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+    }
+
+    /* Header */
+    .header {
+      background: #fff;
+      padding: 14px 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+      color: #1a73e8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-icon {
+      width: 24px;
+      height: 24px;
+      background: #1a73e8;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    /* Tab Navigation */
+    .tab-nav {
+      background: #fff;
+      border-bottom: 1px solid #e8eaed;
+      flex-shrink: 0;
+      padding: 12px 14px;
+    }
+    .tab-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      appearance: none;
+    }
+    .tab-select:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.1);
+    }
+    .tab-select-wrapper {
+      position: relative;
+    }
+    .tab-select-arrow {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #5f6368;
+      pointer-events: none;
+      font-size: 12px;
+    }
+
+    /* Tab Content */
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .tab-content::-webkit-scrollbar {
+      width: 5px;
+    }
+    .tab-content::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.3);
+      border-radius: 3px;
+    }
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* Cards */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+    }
+    .card:last-child {
+      margin-bottom: 0;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: #5f6368;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 11px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e8eaed;
+    }
+    .card-icon {
+      width: 16px;
+      height: 16px;
+      background: #1a73e8;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 9px;
+    }
+
+    /* Form Elements */
+    .form-row {
+      display: flex;
+      gap: 8px;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+    .form-group {
+      margin-bottom: 11px;
+      position: relative;
+    }
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    .input-wrapper {
+      position: relative;
+    }
+    .material-input {
+      width: 100%;
+      padding: 10px 10px 5px;
+      border: 1px solid #dadce0;
+      border-radius: 5px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      transition: all 0.2s;
+    }
+    .material-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.1);
+    }
+    .material-input.error {
+      border-color: #ea4335;
+    }
+    select.material-input {
+      appearance: none;
+      cursor: pointer;
+      padding-right: 24px;
+    }
+    .select-arrow {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #5f6368;
+      pointer-events: none;
+      font-size: 10px;
+    }
+    .floating-label {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #5f6368;
+      font-size: 13px;
+      pointer-events: none;
+      transition: all 0.2s;
+      background: #fff;
+      padding: 0 2px;
+    }
+    .material-input:focus ~ .floating-label,
+    .material-input:not(:placeholder-shown) ~ .floating-label {
+      top: 0;
+      font-size: 9px;
+      color: #1a73e8;
+    }
+    .required {
+      color: #ea4335;
+    }
+    .helper-text {
+      font-size: 11px;
+      color: #5f6368;
+      margin-top: 3px;
+    }
+    .error-message {
+      color: #ea4335;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .checkbox-wrapper input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      accent-color: #1a73e8;
+    }
+	    .checkbox-wrapper label {
+	      margin: 0;
+	      cursor: pointer;
+	    }
+	    .legacy-create-option {
+	      display: none;
+	    }
+
+    /* Buttons */
+    .button-container {
+      display: flex;
+      gap: 8px;
+      margin-top: 11px;
+    }
+    .btn {
+      flex: 1;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .btn-primary {
+      background: #1a73e8;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #1557b0;
+    }
+    .btn-secondary {
+      background: #f1f3f4;
+      color: #3c4043;
+    }
+    .btn-secondary:hover {
+      background: #e8eaed;
+    }
+    .btn-success {
+      background: #137333;
+      color: #fff;
+    }
+    .btn-success:hover {
+      background: #0d652d;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: bold;
+    }
+    .btn-primary .btn-icon {
+      background: #fff;
+      color: #1a73e8;
+    }
+    .btn-secondary .btn-icon {
+      background: #5f6368;
+      color: #fff;
+    }
+    .btn-success .btn-icon {
+      background: #fff;
+      color: #137333;
+    }
+
+    /* Small Button for Inline Refresh */
+    .btn-secondary-small {
+      padding: 6px 10px;
+      border: none;
+      background: #f1f3f4;
+      color: #3c4043;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 4px;
+      min-width: auto;
+    }
+    .btn-secondary-small:hover {
+      background: #e8eaed;
+    }
+
+    /* Status Messages */
+    .status-message {
+      padding: 9px 11px;
+      border-radius: 5px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-message.success {
+      background: #e6f4ea;
+      color: #137333;
+    }
+    .status-message.error {
+      background: #fce8e6;
+      color: #c5221f;
+    }
+    .status-message.info {
+      background: #e8f0fe;
+      color: #1967d2;
+    }
+    .status-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .success .status-icon { background: #137333; }
+    .error .status-icon { background: #c5221f; }
+    .info .status-icon { background: #1967d2; }
+
+    /* Loading Spinner */
+    .loading-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Info Box */
+    .info-box {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 11px;
+      font-size: 12px;
+      color: #5f6368;
+    }
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .info-item:last-child {
+      margin-bottom: 0;
+    }
+    .info-dot {
+      width: 4px;
+      height: 4px;
+      background: #1a73e8;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Range Info */
+    .range-info {
+      padding: 8px 11px;
+      background: #e8f0fe;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #1967d2;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .range-icon {
+      width: 15px;
+      height: 15px;
+      background: #1967d2;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 8px;
+    }
+
+    /* Links in status */
+    .status-message a {
+      color: inherit;
+      text-decoration: underline;
+    }
+
+    /* Select Option Groups */
+    optgroup {
+      font-weight: 500;
+      color: #5f6368;
+      font-size: 12px;
+    }
+    option {
+      font-size: 12px;
+      padding: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <!-- Header -->
+    <div class="header">
+      <h1>
+        <div class="header-icon">🔧</div>
+        链接工具箱
+      </h1>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- 链接替换 Tab -->
+      <div class="tab-pane active" id="tab-replace">
+        <div class="card">
+          <div class="range-info" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <div class="range-icon">■</div>
+              <span id="rangeInfoReplace">已选择: 加载中...</span>
+            </div>
+            <button id="refreshReplaceBtn" class="btn-secondary-small">
+              ↻ 刷新
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><div class="card-icon">1</div>基础信息</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="input-wrapper">
+                <input type="text" id="cellContent" class="material-input" placeholder=" ">
+                <label for="cellContent" class="floating-label">匹配内容 <span class="required">*</span></label>
+              </div>
+              <div id="cellContentError" class="error-message"></div>
+            </div>
+            <div class="form-group">
+              <div class="input-wrapper">
+                <input type="text" id="newContent" class="material-input" placeholder=" ">
+                <label for="newContent" class="floating-label">替换内容 <span class="required">*</span></label>
+              </div>
+              <div id="newContentError" class="error-message"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+	          <div class="card-title"><div class="card-icon">2</div>任务配置</div>
+	          <div class="form-group">
+	            <div class="input-wrapper">
+	              <input type="text" id="token" class="material-input" placeholder=" ">
+	              <label for="token" class="floating-label">商品 Token <span class="required">*</span></label>
+		            </div>
+		            <div id="tokenError" class="error-message"></div>
+		          </div>
+		          <div class="form-row">
+		            <div class="form-group">
+		              <div class="input-wrapper">
+		                <input type="text" id="productJobCode" class="material-input" placeholder=" ">
+		                <label for="productJobCode" class="floating-label">任务编号</label>
+		              </div>
+		              <div class="helper-text">在当前选区按来源商品 ID 匹配成功结果，失败或未匹配的商品保留原链接。</div>
+		            </div>
+		            <div class="form-group" style="flex:0 0 120px;">
+		              <button id="resumeReplaceBtn" class="btn btn-secondary" type="button" style="height:43px;margin-top:0;">
+		                <div class="btn-icon">↻</div>继续替换
+		              </button>
+		            </div>
+		          </div>
+		          <div class="form-group legacy-create-option">
+		            <div class="input-wrapper">
+		              <input type="text" id="markUp" class="material-input" placeholder=" ">
+	              <label for="markUp" class="floating-label">加价规则</label>
+	            </div>
+	          </div>
+	          <div class="checkbox-wrapper legacy-create-option">
+	            <input type="checkbox" id="onlyTbAliMarkUp">
+	            <label for="onlyTbAliMarkUp">仅淘宝/1688加价（勾选后仅对淘宝/1688按规则加价，其他平台不加价）</label>
+	          </div>
+	        </div>
+
+	        <div class="card legacy-create-option">
+	          <div class="card-title"><div class="card-icon">3</div>店铺信息</div>
+          <div class="form-row">
+            <div class="form-group">
+              <div class="input-wrapper">
+                <input type="number" id="shopId" class="material-input" placeholder=" ">
+                <label for="shopId" class="floating-label">店铺ID</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="input-wrapper">
+                <input type="text" id="businessId" class="material-input" placeholder=" ">
+                <label for="businessId" class="floating-label">达人ID</label>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="input-wrapper">
+              <input type="text" id="channelId" class="material-input" placeholder=" ">
+              <label for="channelId" class="floating-label">渠道ID</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+	          <div class="card-title"><div class="card-icon">3</div>链接模板</div>
+	          <div class="form-group">
+	            <div class="input-wrapper">
+	              <select id="platform" class="material-input">
+	                <option value="">模板加载中...</option>
+	              </select>
+	              <span class="select-arrow">▼</span>
+	              <label class="floating-label">选择平台</label>
+	            </div>
+	            <div id="platformError" class="error-message"></div>
+	          </div>
+	          <div class="helper-text" id="templateMatchHint">打开后会根据当前链接自动识别模板</div>
+	          <div class="form-group">
+            <div class="input-wrapper">
+              <input type="text" id="invitationCode" class="material-input" placeholder=" ">
+              <label for="invitationCode" class="floating-label">邀请码</label>
+            </div>
+          </div>
+	          <div class="checkbox-wrapper legacy-create-option">
+	            <input type="checkbox" id="allowsDuplicates">
+	            <label for="allowsDuplicates">达人/渠道可重复建品</label>
+	          </div>
+	          <div class="checkbox-wrapper legacy-create-option">
+	            <input type="checkbox" id="rename">
+	            <label for="rename">产品重命名</label>
+	          </div>
+	          <div class="checkbox-wrapper legacy-create-option">
+	            <input type="checkbox" id="version" checked>
+	            <label for="version">使用迁移版</label>
+	          </div>
+        </div>
+
+        <div class="card">
+          <div class="button-container">
+	            <button id="submitReplaceBtn" class="btn btn-primary">
+	              <div class="btn-icon">✓</div>开始替换
+	            </button>
+          </div>
+          <div id="replaceStatus" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+	    const REPLACE_AUTO_POLL_INTERVAL_MS = 30000;
+	    const REPLACE_APPLY_POLL_INTERVAL_MS = 1000;
+	    const REPLACE_AUTO_POLL_MAX_TIMES = 120;
+	    let replaceAutoPollTimer = null;
+	    let replaceAutoPollCount = 0;
+	    let replaceRequestInFlight = false;
+	    let replacePending = false;
+	    let replaceActiveFormData = null;
+	    // 只保存当前最多 50 个单元格的结果；这一批写完即释放，不保存整个任务。
+	    let replaceResultSnapshot = null;
+	    let replaceResultScope = null;
+	    let replaceLoadingButtonId = null;
+	    let replaceConfigurationLoads = 0;
+	    const REPLACE_CONTROL_IDS = ['submitReplaceBtn', 'resumeReplaceBtn', 'refreshReplaceBtn',
+	      'cellContent', 'newContent', 'token', 'platform', 'invitationCode', 'productJobCode'];
+
+	    function replaceControlsLocked() {
+	      return replaceRequestInFlight || replacePending || replaceConfigurationLoads > 0;
+	    }
+
+	    function updateReplaceControls() {
+	      const locked = replaceControlsLocked();
+	      REPLACE_CONTROL_IDS.forEach(id => { document.getElementById(id).disabled = locked; });
+	    }
+
+	    function beginReplaceConfigurationLoad() {
+	      replaceConfigurationLoads += 1;
+	      updateReplaceControls();
+	    }
+
+	    function endReplaceConfigurationLoad() {
+	      replaceConfigurationLoads = Math.max(0, replaceConfigurationLoads - 1);
+	      updateReplaceControls();
+	    }
+
+    // ===== Utility Functions =====
+    function showStatus(elementId, message, type) {
+      const el = document.getElementById(elementId);
+      const icons = { success: '✓', error: '!', info: 'i' };
+      el.className = 'status-message ' + type;
+      el.innerHTML = `<div class="status-icon">${icons[type]}</div><span>${message}</span>`;
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function setButtonLoading(btnId, loading, originalHtml) {
+      const btn = document.getElementById(btnId);
+      if (loading) {
+        btn.disabled = true;
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML = '<div class="loading-spinner"></div>处理中...';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml || btn.dataset.originalHtml || btn.innerHTML;
+      }
+    }
+
+    // ===== Initialize =====
+	    function init() {
+	      // Load range info for all tabs
+	      refreshAllRangeInfo();
+	      loadDrafts(loadReplaceBootstrapData);
+	    }
+
+    // 刷新所有tab的选区信息
+	    function refreshAllRangeInfo() {
+	      beginReplaceConfigurationLoad();
+	      google.script.run.withSuccessHandler(data => {
+	        try {
+	        const selectedRanges = data.selectedRanges || [];
+	        const rangeA1 = selectedRanges.length > 0 ? selectedRanges[0] : '';
+	        const rangeLabel = rangeA1
+	          ? ('已选择: ' + (data.sheetName ? data.sheetName + ' · ' : '') + rangeA1 + (selectedRanges.length > 1 ? '（仅处理第一个选区）' : ''))
+	          : '已选择: 未选择';
+
+	        // 更新各个tab的选区显示
+	        document.getElementById('rangeInfoReplace').textContent = rangeLabel;
+	        storeReplaceSelection(rangeA1, data);
+	        } finally {
+	          endReplaceConfigurationLoad();
+	        }
+	        }).withFailureHandler(err => {
+	          endReplaceConfigurationLoad();
+	          showStatus('replaceStatus', '选区读取失败：' + escapeHtml(err.message), 'error');
+	        }).getUiState();
+	    }
+
+	    function loadReplaceInitialData() {
+	      loadReplaceBootstrapData();
+	    }
+
+	    function loadReplaceBootstrapData() {
+	      beginReplaceConfigurationLoad();
+	      google.script.run
+	        .withSuccessHandler(data => {
+	          try {
+	          if (!data) return;
+	          window.productLinkTemplates = data.templates || [];
+	          renderProductLinkTemplates(window.productLinkTemplates);
+	          if (Object.prototype.hasOwnProperty.call(data, 'rangeA1Notation')) {
+	            storeReplaceSelection(data.rangeA1Notation || '', data);
+	            document.getElementById('rangeInfoReplace').textContent = data.rangeA1Notation
+	              ? '已选择: ' + (data.sheetName ? data.sheetName + ' · ' : '') + data.rangeA1Notation
+	              : '已选择: 未选择';
+	          }
+	          const cellContent = document.getElementById('cellContent');
+	          if (cellContent && !cellContent.value && data.cellContent) {
+	            cellContent.value = data.cellContent;
+	          }
+	          const newContent = document.getElementById('newContent');
+	          if (newContent && !newContent.value) {
+	            newContent.value = data.cellContent || 'LINK';
+	          }
+	          applyMatchedTemplate(data.matchedTemplate);
+	          } finally {
+	            endReplaceConfigurationLoad();
+	          }
+	        })
+	        .withFailureHandler(err => {
+	          renderProductLinkTemplates([]);
+	          endReplaceConfigurationLoad();
+	          showStatus('replaceStatus', '模板加载失败：' + escapeHtml(err.message), 'error');
+	        })
+	        .getProductLinkReplaceBootstrap();
+	    }
+
+	    function renderProductLinkTemplates(templates) {
+	      const select = document.getElementById('platform');
+	      const previousValue = select.value;
+	      select.innerHTML = '<option value="">选择平台...</option>';
+	      (templates || []).forEach(template => {
+	        const option = document.createElement('option');
+	        option.value = template.templateUrl;
+	        option.textContent = template.templateName || template.templateCode;
+	        option.dataset.templateId = template.id || '';
+	        option.dataset.templateCode = template.templateCode || '';
+	        option.dataset.channelCode = template.channelCode || '';
+	        select.appendChild(option);
+	      });
+	      if (previousValue) {
+	        select.value = previousValue;
+	      }
+		    }
+
+	    function selectedTemplate() {
+	      const select = document.getElementById('platform');
+	      const option = select.options[select.selectedIndex];
+	      const templateId = option ? option.dataset.templateId : '';
+	      const templateCode = option ? option.dataset.templateCode : '';
+	      return (window.productLinkTemplates || []).find(item => String(item.id) === String(templateId))
+	        || (window.productLinkTemplates || []).find(item => item.templateCode === templateCode)
+	        || (window.productLinkTemplates || []).find(item => item.templateUrl === select.value)
+	        || null;
+	    }
+
+	    function selectTemplateByCode(templateCode) {
+	      if (!templateCode) return false;
+	      const select = document.getElementById('platform');
+		      const option = Array.from(select.options).find(item => item.dataset.templateCode === templateCode);
+		      if (!option) return false;
+		      select.value = option.value;
+		      return true;
+		    }
+
+	    function applyMatchedTemplate(match) {
+	      const hint = document.getElementById('templateMatchHint');
+	      if (!match || !match.templateCode) {
+	        hint.textContent = '未从当前链接识别到模板，可手动选择';
+	        return;
+	      }
+	      selectTemplateByCode(match.templateCode);
+	      if (match.invitationCode) {
+	        document.getElementById('invitationCode').value = match.invitationCode;
+	      }
+	      hint.textContent = '已识别：' + (match.templateName || match.templateCode)
+	        + (match.productId ? '，商品ID ' + match.productId : '');
+	    }
+
+    // 「仅淘宝/1688加价」勾选时，markUp 输入框清空并禁用编辑；取消勾选时恢复可编辑。
+    // 加价值 /0.55 不在 UI 上展示，提交时由表单组装环节注入给后端。
+    function syncOnlyTbAliMarkUp() {
+      const cb = document.getElementById('onlyTbAliMarkUp');
+      const markUpInput = document.getElementById('markUp');
+      if (!cb || !markUpInput) return;
+      if (cb.checked) {
+        markUpInput.value = '';      // 无条件清空，避免草稿回填的历史值（含旧版 /0.55）在禁用框里残留显示
+        markUpInput.disabled = true;
+      } else {
+        markUpInput.disabled = false;
+      }
+    }
+    document.getElementById('onlyTbAliMarkUp').addEventListener('change', syncOnlyTbAliMarkUp);
+
+    function loadDrafts(afterSubmitDraftLoaded) {
+      const drafts = [
+	        { key: 'submitFromCache', fields: ['cellContent', 'newContent', 'token', 'platform', 'invitationCode', 'productJobCode'], checkboxes: {} }
+      ];
+
+      drafts.forEach(draft => {
+        beginReplaceConfigurationLoad();
+        google.script.run.withSuccessHandler(data => {
+          try {
+            if (data) {
+              if (Array.isArray(draft.fields)) {
+	                draft.fields.forEach(field => {
+	                  const el = document.getElementById(field);
+                  if (el && data[field] !== undefined) {
+                    if (el.type === 'checkbox') {
+                      el.checked = data[field];
+                    } else {
+                      el.value = data[field];
+                    }
+                  }
+                });
+                if (draft.checkboxes) {
+                  Object.keys(draft.checkboxes).forEach(key => {
+                    const el = document.getElementById(key);
+                    if (el && data[key] !== undefined) {
+                      el.checked = data[key];
+                    }
+                  });
+                  // 草稿加载完后同步「仅淘宝/1688加价」锁定状态
+                  syncOnlyTbAliMarkUp();
+                }
+              } else {
+                Object.keys(draft.fields).forEach(dataKey => {
+                  const elId = draft.fields[dataKey];
+                  const el = document.getElementById(elId);
+                  if (el && data[dataKey] !== undefined) {
+                    if (el.type === 'checkbox') {
+                      el.checked = data[dataKey];
+                    } else {
+                      el.value = data[dataKey];
+                    }
+                  }
+                });
+              }
+            }
+          } finally {
+            try {
+              if (draft.key === 'submitFromCache' && afterSubmitDraftLoaded) {
+                afterSubmitDraftLoaded();
+              }
+            } finally {
+              endReplaceConfigurationLoad();
+            }
+          }
+        }).withFailureHandler(() => {
+          try {
+            if (draft.key === 'submitFromCache' && afterSubmitDraftLoaded) {
+              afterSubmitDraftLoaded();
+            }
+          } finally {
+            endReplaceConfigurationLoad();
+          }
+        }).getDraft(draft.key);
+      });
+    }
+
+		    // ===== Replace Tab Functions =====
+			    document.getElementById('submitReplaceBtn').addEventListener('click', () => {
+			      if (replaceControlsLocked() || !validateReplaceForm(true)) return;
+	
+			      clearReplaceAutoPoll();
+			      replaceResultSnapshot = null;
+			      replaceActiveFormData = copyReplaceFormData(buildReplaceFormData());
+			      beginReplaceRequest('submitReplaceBtn');
+			      showStatus('replaceStatus', '正在创建商品任务，完成后会自动替换链接...', 'info');
+
+      google.script.run
+        .withSuccessHandler(handleReplaceResult)
+	        .withFailureHandler(handleReplaceFailure)
+        .processFormSubmission(copyReplaceFormData(replaceActiveFormData));
+    });
+
+	    document.getElementById('resumeReplaceBtn').addEventListener('click', () => {
+	      if (replaceControlsLocked() || !validateReplaceForm(false)) return;
+	      const formData = buildReplaceFormData();
+		      if (!formData.productJobCode) {
+		        showStatus('replaceStatus', '请填写任务编号', 'error');
+		        return;
+		      }
+	
+		      clearReplaceAutoPoll();
+		      if (!hasReplaceResultSnapshot(formData.productJobCode, formData)) replaceResultSnapshot = null;
+		      replaceActiveFormData = copyReplaceFormData(replaceFormScope(formData) === replaceFormScope(replaceActiveFormData)
+		        ? Object.assign({}, replaceActiveFormData, formData) : formData);
+		      beginReplaceRequest('resumeReplaceBtn');
+		      showStatus('replaceStatus', hasReplaceResultSnapshot(formData.productJobCode)
+		        ? '正在使用已获取的这一批结果继续替换链接...'
+		        : '正在根据任务编号检查结果，并按来源商品 ID 匹配当前选区...', 'info');
+		      requestReplaceContinuation(true);
+	    });
+
+	    document.getElementById('productJobCode').addEventListener('input', () => {
+	      if (!hasReplaceResultSnapshot(document.getElementById('productJobCode').value.trim())) {
+	        replaceResultSnapshot = null;
+	      }
+	    });
+
+	    document.getElementById('platform').addEventListener('change', () => {
+	      document.getElementById('platformError').textContent = '';
+	      document.getElementById('platform').classList.remove('error');
+	    });
+
+	    function validateReplaceForm(requireToken) {
+	      const required = ['cellContent', 'token', 'platform', 'newContent'];
+	      let isValid = true;
+
+	      required.forEach(fieldId => {
+	        const field = document.getElementById(fieldId);
+	        const errorEl = document.getElementById(fieldId + 'Error');
+	        if (!field.value.trim()) {
+	          if (errorEl) errorEl.textContent = '必填项';
+	          field.classList.add('error');
+	          isValid = false;
+	        } else {
+	          if (errorEl) errorEl.textContent = '';
+	          field.classList.remove('error');
+	        }
+	      });
+
+	      if (!window.rangeA1Notation) {
+	        showStatus('replaceStatus', '请先在表格里选择要处理的单元格范围', 'error');
+	        return false;
+	      }
+
+	      const template = document.getElementById('platform').value;
+	      if (template.indexOf('{PRODUCT_ID}') < 0) {
+	        document.getElementById('platformError').textContent = '链接模板必须包含 {PRODUCT_ID}';
+	        document.getElementById('platform').classList.add('error');
+	        isValid = false;
+	      }
+
+	      return isValid;
+	    }
+
+		    function buildReplaceFormData() {
+	      const template = selectedTemplate();
+	      return {
+	        spreadsheetId: window.spreadsheetId,
+	        sheetId: window.sheetId,
+	        sheetName: window.sheetName,
+	        rangeA1Notation: window.rangeA1Notation,
+	        cellContent: document.getElementById('cellContent').value.trim(),
+	        newContent: document.getElementById('newContent').value,
+	        token: document.getElementById('token').value,
+	        platform: document.getElementById('platform').value,
+	        templateId: template ? template.id : '',
+	        templateCode: template ? template.templateCode : '',
+	        invitationCode: document.getElementById('invitationCode').value,
+	        productJobCode: document.getElementById('productJobCode').value.trim(),
+	        linkTemplates: window.productLinkTemplates || []
+	      };
+		    }
+
+		    function storeReplaceSelection(rangeA1Notation, source) {
+		      window.rangeA1Notation = rangeA1Notation;
+		      window.spreadsheetId = source.spreadsheetId;
+		      window.sheetId = source.sheetId;
+		      window.sheetName = source.sheetName;
+		    }
+
+		    function copyReplaceFormData(formData) {
+		      const copy = JSON.parse(JSON.stringify(formData || {}));
+		      delete copy.replacementSnapshot;
+		      return copy;
+		    }
+
+		    function replaceFormScope(formData) {
+		      const form = formData || {};
+		      return JSON.stringify(['spreadsheetId', 'sheetId', 'rangeA1Notation', 'productJobCode',
+		        'cellContent', 'newContent', 'platform', 'templateId', 'templateCode', 'invitationCode', 'token', 'useFormula']
+		        .map(key => form[key] == null ? '' : String(form[key])));
+		    }
+
+		    function hasReplaceResultSnapshot(jobCode, formData) {
+		      return !!(replaceResultSnapshot && replaceResultSnapshot.version === 2
+		        && replaceResultSnapshot.jobCode === jobCode && replaceResultSnapshot.results
+		        && typeof replaceResultSnapshot.scope === 'string' && replaceResultSnapshot.scope
+		        && typeof replaceResultSnapshot.resultVersion === 'string' && replaceResultSnapshot.resultVersion
+		        && Array.isArray(replaceResultSnapshot.cells) && replaceResultSnapshot.cells.length > 0
+		        && replaceResultSnapshot.cells.length <= 50
+		        && replaceResultSnapshot.results.bySource && replaceResultSnapshot.results.targetIds
+		        && replaceResultSnapshot.results.unsuccessful
+		        && replaceResultScope === replaceFormScope(formData || replaceActiveFormData));
+		    }
+
+		    function requestReplaceContinuation(manualResume) {
+		      const runner = google.script.run
+		        .withSuccessHandler(handleReplaceResult)
+		        .withFailureHandler(handleReplaceFailure);
+		      const formData = copyReplaceFormData(replaceActiveFormData);
+		      if (hasReplaceResultSnapshot(formData.productJobCode)) {
+		        runner.applyProductLinkReplacementBatch(formData, replaceResultSnapshot, manualResume === true);
+		      } else if (manualResume) {
+		        runner.resumeProductLinkReplacement(formData);
+		      } else {
+		        runner.checkProductLinkReplacementOnce(formData);
+		      }
+		    }
+
+		    function beginReplaceRequest(buttonId) {
+		      replaceRequestInFlight = true;
+		      replaceLoadingButtonId = buttonId || null;
+		      if (replaceLoadingButtonId) setButtonLoading(replaceLoadingButtonId, true);
+		      updateReplaceControls();
+		    }
+
+		    function finishReplaceRequest() {
+		      replaceRequestInFlight = false;
+		      if (replaceLoadingButtonId) setButtonLoading(replaceLoadingButtonId, false);
+		      replaceLoadingButtonId = null;
+		    }
+
+		    function applyReplaceResultFormData(formData) {
+		      if (!formData || typeof formData !== 'object') return;
+		      replaceActiveFormData = replaceActiveFormData || {};
+		      Object.keys(formData).forEach(key => {
+		        if (key !== 'replacementSnapshot' && formData[key] !== undefined) replaceActiveFormData[key] = formData[key];
+		      });
+		      ['cellContent', 'newContent', 'token', 'invitationCode', 'productJobCode'].forEach(id => {
+		        if (formData[id] !== undefined) document.getElementById(id).value = formData[id] == null ? '' : formData[id];
+		      });
+		      if (formData.platform !== undefined) {
+		        const select = document.getElementById('platform');
+		        if (formData.platform && !Array.from(select.options).some(option => option.value === formData.platform)) {
+		          const option = document.createElement('option');
+		          option.value = formData.platform;
+		          option.textContent = formData.templateCode || '本轮链接模板';
+		          option.dataset.templateId = formData.templateId || '';
+		          option.dataset.templateCode = formData.templateCode || '';
+		          select.appendChild(option);
+		        }
+		        select.value = formData.platform || '';
+		      }
+		      if (formData.rangeA1Notation !== undefined) {
+		        storeReplaceSelection(formData.rangeA1Notation, replaceActiveFormData);
+		        const sheetName = formData.sheetName || (formData.sheetId !== undefined ? '工作表 ' + formData.sheetId : '');
+		        document.getElementById('rangeInfoReplace').textContent = '本轮范围: '
+		          + (sheetName ? sheetName + ' · ' : '') + (formData.rangeA1Notation || '未选择');
+		      }
+		    }
+
+		    function handleReplaceFailure(err) {
+		      clearReplaceAutoPoll();
+		      replacePending = false;
+		      finishReplaceRequest();
+		      updateReplaceControls();
+		      showStatus('replaceStatus', '错误: ' + escapeHtml(err && err.message ? err.message : String(err || '处理失败，请重试')), 'error');
+		    }
+	
+		    function clearReplaceAutoPoll() {
+		      if (replaceAutoPollTimer) {
+		        clearTimeout(replaceAutoPollTimer);
+		        replaceAutoPollTimer = null;
+		      }
+		      replaceAutoPollCount = 0;
+		    }
+
+		    function scheduleReplaceAutoPoll(phase) {
+		      if (replaceAutoPollTimer) return;
+		      // 等待任务完成有次数上限；正常逐批推进不计入等待次数。
+		      if (phase === 'waiting' && replaceAutoPollCount >= REPLACE_AUTO_POLL_MAX_TIMES) {
+		        clearReplaceAutoPoll();
+		        replacePending = false;
+		        updateReplaceControls();
+		        showStatus('replaceStatus', '自动检查已达到次数上限，当前进度已保留。可使用当前任务编号点击“继续替换”，按来源商品 ID 继续匹配所选区域。', 'info');
+		        return;
+		      }
+		      const interval = phase === 'waiting' ? REPLACE_AUTO_POLL_INTERVAL_MS : REPLACE_APPLY_POLL_INTERVAL_MS;
+		      replaceAutoPollTimer = setTimeout(() => {
+		        if (phase === 'waiting') replaceAutoPollCount += 1;
+		        checkReplaceJobOnce();
+		      }, interval);
+		    }
+
+		    function checkReplaceJobOnce() {
+		      replaceAutoPollTimer = null;
+		      if (replaceRequestInFlight || !replacePending) return;
+		      if (!replaceActiveFormData || !replaceActiveFormData.productJobCode) {
+		        handleReplaceFailure(new Error('没有收到有效任务编号，请填写任务编号后继续替换。'));
+		        return;
+		      }
+		      beginReplaceRequest();
+
+		      requestReplaceContinuation(false);
+		    }
+
+		    function handleReplaceResult(res) {
+		      applyReplaceResultFormData(res && res.details && res.details.formData);
+		      if (res && res.jobCode) {
+		        document.getElementById('productJobCode').value = res.jobCode;
+		        replaceActiveFormData = replaceActiveFormData || {};
+		        replaceActiveFormData.productJobCode = res.jobCode;
+		      }
+		      const jobCode = replaceActiveFormData && replaceActiveFormData.productJobCode;
+		      if (!hasReplaceResultSnapshot(jobCode)) replaceResultSnapshot = null;
+		      if (res && res.details && res.details.replacementSnapshot) {
+		        replaceResultSnapshot = res.details.replacementSnapshot;
+		        if (Array.isArray(replaceResultSnapshot.linkTemplates) && replaceResultSnapshot.linkTemplates.length) {
+		          replaceActiveFormData.linkTemplates = replaceResultSnapshot.linkTemplates;
+		        }
+		        replaceResultScope = replaceFormScope(replaceActiveFormData);
+		        if (!hasReplaceResultSnapshot(jobCode)) {
+		          replaceResultSnapshot = null;
+		          handleReplaceFailure(new Error('收到的任务结果与当前任务不匹配，请刷新配置后继续。'));
+		          return;
+		        }
+		      }
+		      if (res && ['next_batch', 'complete', 'cache_preparing', 'waiting'].includes(res.phase)) {
+		        replaceResultSnapshot = null;
+		        replaceResultScope = null;
+		      }
+		      if (res && res.phase === 'applying' && !hasReplaceResultSnapshot(jobCode)) {
+		        handleReplaceFailure(new Error('未收到可复用的任务结果，已停止自动处理。请刷新配置后继续。'));
+		        return;
+		      }
+		      replacePending = !!(res && res.pending && !['cache_preparing', 'apply_paused'].includes(res.phase));
+		      finishReplaceRequest();
+		      const type = replacePending || (res && res.phase === 'cache_preparing')
+		        ? 'info' : res && res.success !== false ? 'success' : 'error';
+		      showStatus('replaceStatus', (res && res.message) || (type === 'error' ? '处理失败，请重试' : '处理完成'), type);
+		      updateReplaceControls();
+		      if (replacePending) {
+		        if (!replaceActiveFormData || !replaceActiveFormData.productJobCode) {
+		          handleReplaceFailure(new Error('没有收到有效任务编号，请填写任务编号后继续替换。'));
+		          return;
+		        }
+		        scheduleReplaceAutoPoll(res.phase || (res.details && res.details.phase));
+		      } else {
+		        clearReplaceAutoPoll();
+		      }
+		    }
+    // ===== Refresh Range Buttons =====
+		    function refreshReplaceSelection() {
+		      if (replaceControlsLocked()) return;
+		      replaceResultSnapshot = null;
+		      refreshAllRangeInfo();
+	      loadReplaceBootstrapData();
+	    }
+    document.getElementById('refreshReplaceBtn').addEventListener('click', refreshReplaceSelection);
+
+    // Start initialization
+    init();
+  </script>
+</body>
+</html>

@@ -272,6 +272,10 @@ const zhCN = {
     COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
     COPY_TARGET_SHOP_MISSING: "未配置默认复制店铺，且令牌未指定目标店铺",
     PRODUCT_LINK_RATE_LIMITED: "请求过于频繁，请稍后再试",
+    SHORT_URL_INVALID: "地址必须是 http 或 https，且不超过 2048 个字符",
+    SHORT_URL_HOST_NOT_ALLOWED: "地址域名不在短链白名单内",
+    SHORT_URL_ADDRESS_NOT_ALLOWED: "地址解析到了内网或保留地址，已拒绝",
+    SHORT_URL_RESOLVE_FAILED: "短链解析失败，请稍后重试",
     KOL_DISABLED: "达人已停用",
     KOL_PROMO_SHEET_INVALID: "推广表不是可读取的 .xlsx 文件，请检查后重新上传",
     KOL_PROMO_SHEET_TOO_LARGE: "推广表超过 300MB",
@@ -408,7 +412,8 @@ const zhCN = {
       product_links_ip_per_minute: "复制接口每 IP 每分钟上限",
       product_links_convert_token_per_minute: "令牌转换每分钟上限",
       product_links_resolve_token_per_minute: "令牌解析每分钟上限",
-      weidian_qps: "微店接口每秒请求数"
+      weidian_qps: "微店接口每秒请求数",
+      link_short_url_allowed_hosts: "短链解析域名白名单"
     },
     restoreDefault: "恢复默认",
     integerRequired: "请输入整数",

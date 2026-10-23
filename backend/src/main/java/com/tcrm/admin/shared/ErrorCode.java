@@ -100,7 +100,11 @@ public enum ErrorCode {
   COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
   KOL_REVIEW_ALREADY_DONE(409, "KOL review is already done"),
   KOL_REVIEW_REQUIRED(409, "KOL must be reviewed before promotion config can be saved"),
-  PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later");
+  PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later"),
+  SHORT_URL_INVALID(400, "URL must be http or https and at most 2048 characters"),
+  SHORT_URL_HOST_NOT_ALLOWED(422, "URL host is not in the allowed list"),
+  SHORT_URL_ADDRESS_NOT_ALLOWED(422, "URL resolves to a non-public address"),
+  SHORT_URL_RESOLVE_FAILED(502, "Short URL could not be resolved");
   private final int status;
   private final String message;
 
