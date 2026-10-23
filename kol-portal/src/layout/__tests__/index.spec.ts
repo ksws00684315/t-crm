@@ -73,6 +73,15 @@ describe("layout navigation", () => {
     expect(links[2].attributes("aria-current")).toBeUndefined();
   });
 
+  it("gives every side-menu entry an Element Plus icon", async () => {
+    const wrapper = await mountAt("/");
+    const links = wrapper.findAll(".shell__nav-link");
+    expect(links).toHaveLength(NAV_ITEMS.length);
+    for (const link of links) {
+      expect(link.find(".el-icon").exists()).toBe(true);
+    }
+  });
+
   it("marks the payout entry current on its page and translates it", async () => {
     const wrapper = await mountAt("/payout-accounts");
     expect(wrapper.findAll(".shell__nav-link")[1].attributes("aria-current")).toBe("page");

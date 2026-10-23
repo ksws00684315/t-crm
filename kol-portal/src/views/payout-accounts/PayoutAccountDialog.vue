@@ -304,7 +304,7 @@ function close() {
 
 <style scoped>
 .el-alert {
-  margin-bottom: 16px;
+  margin-bottom: var(--tcrm-space-4);
 }
 .el-select {
   width: 100%;
@@ -312,12 +312,12 @@ function close() {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--tcrm-space-2);
 }
 .qr-current {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--tcrm-space-3);
 }
 .qr-current__image {
   width: 96px;
@@ -326,7 +326,7 @@ function close() {
   border-radius: 8px;
 }
 .qr-hint {
-  margin: 8px 0 0;
+  margin: var(--tcrm-space-2) 0 0;
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: 20px;
