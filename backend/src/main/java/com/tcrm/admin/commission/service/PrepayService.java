@@ -477,6 +477,10 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     requirePermission(user, operations ? "prepay:review" : "prepay:finance-review");
+    // Keep prepay:review on BD template; still block the applicant from reviewing their own task.
+    if (detail.applicantId() != null && detail.applicantId().equals(user.id())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
     boolean approve = "APPROVE".equals(decision);
     if (!approve && !"REJECT".equals(decision)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -829,11 +833,11 @@ public class PrepayService {
   @Transactional(readOnly = true)
   public byte[] export(AccountDTO user, Filter filter) {
     requireTenant(user);
-    if (user.role() != Role.SUPER_ADMIN
-        && (!user.permissions().contains("data:export")
-            || !hasFinanceAccess(user) && !user.permissions().contains("commission:view"))) {
+    // data:export AND the same list permission gate as page()/detail (design §4.12 / API table).
+    if (user.role() != Role.SUPER_ADMIN && !user.permissions().contains("data:export")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
+    requireDetailPermission(user);
     return TenantScope.callCompany(user.tenantId(), () -> exportInCompany(user, filter));
   }
 

@@ -328,7 +328,7 @@ class PrepayServiceTest {
   @Test
   void shouldApproveOnlyCompleteDetails_whenReviewerApproves() {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
-    service.approval(user("prepay:review"), ID, "APPROVE", null);
+    service.approval(reviewer("prepay:review"), ID, "APPROVE", null);
     assertThat(write("UPDATE crm_prepay SET status").args()).contains("PENDING_FINANCE_REVIEW");
     assertThat(writes).noneMatch(write -> write.sql().contains("outbox"));
   }
@@ -336,12 +336,12 @@ class PrepayServiceTest {
   @Test
   void shouldRequireFinanceReviewPermissionForSecondStage() {
     doReturn(detail("PENDING_FINANCE_REVIEW", true)).when(service).detail(any(), anyLong());
-    service.approval(user("prepay:finance-review"), ID, "APPROVE", null);
+    service.approval(reviewer("prepay:finance-review"), ID, "APPROVE", null);
     assertThat(write("UPDATE crm_prepay SET status").args()).contains("APPROVED");
     assertThat(write("INSERT INTO crm_prepay_outbox").args()).contains("APPROVED");
     doReturn(detail("PENDING_FINANCE_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
-        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "APPROVE", null),
         ErrorCode.AUTH_FORBIDDEN);
   }
 
@@ -358,7 +358,7 @@ class PrepayServiceTest {
   void shouldRequireFinanceDetailsBeforeApproval_whenApplicationHasOnlyAmount() {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", null)).when(service).detail(any(), anyLong());
     fails(
-        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "APPROVE", null),
         ErrorCode.PREPAY_DETAILS_REQUIRED);
     assertThat(writes).isEmpty();
   }
@@ -366,7 +366,7 @@ class PrepayServiceTest {
   @Test
   void shouldRejectWithTrimmedReasonWithoutRequiringDetails_whenReviewerRejects() {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", null)).when(service).detail(any(), anyLong());
-    service.approval(user("prepay:review"), ID, "REJECT", "  Needs correction  ");
+    service.approval(reviewer("prepay:review"), ID, "REJECT", "  Needs correction  ");
     assertThat(write("UPDATE crm_prepay SET status").args())
         .contains("REJECTED", "Needs correction");
     assertThat(write("INSERT INTO crm_prepay_outbox").args()).contains("REJECTED");
@@ -376,17 +376,17 @@ class PrepayServiceTest {
   void shouldRejectInvalidDecisionsOrMissingReasons_whenReviewing() {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
-        () -> service.approval(user("prepay:review"), ID, "OTHER", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "OTHER", null),
         ErrorCode.COMMON_VALIDATION_FAILED);
     fails(
-        () -> service.approval(user("prepay:review"), ID, "REJECT", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "REJECT", null),
         ErrorCode.COMMON_VALIDATION_FAILED);
     fails(
-        () -> service.approval(user("prepay:review"), ID, "REJECT", " "),
+        () -> service.approval(reviewer("prepay:review"), ID, "REJECT", " "),
         ErrorCode.COMMON_VALIDATION_FAILED);
     doReturn(detail("PAID", true)).when(service).detail(any(), anyLong());
     fails(
-        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "APPROVE", null),
         ErrorCode.PREPAY_STATE_CONFLICT);
   }
 
@@ -395,7 +395,7 @@ class PrepayServiceTest {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     changed = 0;
     fails(
-        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        () -> service.approval(reviewer("prepay:review"), ID, "APPROVE", null),
         ErrorCode.PREPAY_STATE_CONFLICT);
     assertThat(writes).hasSize(1);
   }
@@ -571,7 +571,7 @@ class PrepayServiceTest {
   void shouldRejectOverlongRejectionReasonBeforeDatabaseWrite() {
     doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
     fails(
-        () -> service.approval(user("prepay:review"), ID, "REJECT", "x".repeat(1001)),
+        () -> service.approval(reviewer("prepay:review"), ID, "REJECT", "x".repeat(1001)),
         ErrorCode.COMMON_VALIDATION_FAILED);
     assertThat(writes).isEmpty();
   }
@@ -948,7 +948,8 @@ class PrepayServiceTest {
     var noAccess = user();
     fails(() -> service.apply(noAccess, application("300")), ErrorCode.AUTH_FORBIDDEN);
     fails(
-        () -> service.approval(user("prepay:pay"), ID, "APPROVE", null), ErrorCode.AUTH_FORBIDDEN);
+        () -> service.approval(reviewer("prepay:pay"), ID, "APPROVE", null),
+        ErrorCode.AUTH_FORBIDDEN);
     fails(
         () -> service.pay(user("prepay:review"), ID, payment("300", null), voucher()),
         ErrorCode.AUTH_FORBIDDEN);
@@ -991,8 +992,40 @@ class PrepayServiceTest {
         .isNotEmpty();
   }
 
+  @Test
+  void shouldRejectApplicantReviewingOwnApplication() {
+    doReturn(detail("PENDING_OPERATIONS_REVIEW", true)).when(service).detail(any(), anyLong());
+    fails(
+        () -> service.approval(user("prepay:review"), ID, "APPROVE", null),
+        ErrorCode.AUTH_FORBIDDEN);
+    doReturn(detail("PENDING_FINANCE_REVIEW", true)).when(service).detail(any(), anyLong());
+    fails(
+        () -> service.approval(user("prepay:finance-review"), ID, "REJECT", "no"),
+        ErrorCode.AUTH_FORBIDDEN);
+    assertThat(writes).isEmpty();
+  }
+
+  @Test
+  void shouldAllowExportWhenApplicantAlsoHasExportPermission() {
+    doReturn(new PageResult<>(List.of(prepayRow("WAITING_DETAILS")), 1, 1, 100))
+        .when(service)
+        .page(any(), any());
+    assertThat(
+            new String(
+                service.export(
+                    user("data:export", "prepay:apply"),
+                    new PrepayService.Filter(null, null, null, 1, 20)),
+                StandardCharsets.UTF_8))
+        .contains("WAITING_DETAILS");
+  }
+
   private static AccountDTO user(String... permissions) {
     return accountUser(5L, Role.STAFF, DataScope.OWN, COMPANY, permissions);
+  }
+
+  /** Reviewer distinct from the fixture applicant (id 5). */
+  private static AccountDTO reviewer(String... permissions) {
+    return accountUser(6L, Role.STAFF, DataScope.ALL, COMPANY, permissions);
   }
 
   private static AccountDTO accountUser(
