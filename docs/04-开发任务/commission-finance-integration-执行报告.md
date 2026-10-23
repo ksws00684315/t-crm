@@ -4,7 +4,7 @@
 分支：`task/commission-finance-integration`
 工作树：`D:\1-达人分销CRM\代码核对\t-crm\.worktrees\commission-finance-integration`
 
-整合基线更新至 `origin/main`（`5c9e7fd`）和预付后端最新提交（`1c927ee`）；预付前端分支 `origin/task/47-prepay-frontend` 已包含在分支历史中。
+整合基线更新至 `origin/main`（`b51fa7e`）和预付后端最新提交（`1c927ee`）；预付前端分支 `origin/task/47-prepay-frontend` 已包含在分支历史中。最新主线增加的微店实测测试有 `weidian-live` 标签，默认和 Docker 构建排除；本次默认 verify 已完成编译验证。
 
 ## 整合结果
 
@@ -25,7 +25,7 @@
 
 - 浏览器：原系统管理端 `http://127.0.0.1:18941/`，达人端 `http://127.0.0.1:18944/`。截图和矩阵见 `assets/task-commission-integration/` 与 `assets/task-commission-integration/浏览器验收记录.md`。
 - 后端 Maven `verify`：BUILD SUCCESS；1718项单元测试、架构、格式和静态检查通过。
-- 后端 `-Pdocker-it verify`：BUILD SUCCESS；Failsafe 246项全部通过，Testcontainers 空库验证75个迁移。JaCoCo 对 JSQLParser 生成方法有插桩告警，但 Maven 和用例均成功。
+- 后端最新主线 `mvn verify`：BUILD SUCCESS；1718项单测、架构、格式和静态检查通过。后端 `-Pdocker-it verify`：BUILD SUCCESS；Failsafe 246项全部通过，Testcontainers 空库验证75个迁移。JaCoCo 对 JSQLParser 生成方法有插桩告警，但 Maven 和用例均成功。
 - 达人端：lint、类型检查、209项测试、构建和生产依赖审计通过。
 - 管理端：lint、Prettier、类型检查、生产构建和生产依赖审计通过；全量98个测试文件、678项通过。合并页测试夹具已覆盖有权审核场景。
 - 两端许可证清单已使用 Windows 等价命令手工生成并比对一致。仓库的 `notices:check` 脚本使用 Unix `mkdir -p` 和 `diff`，在 PowerShell 下直接运行失败，属于脚本平台兼容问题。
@@ -55,7 +55,7 @@
 - `assets/task-commission-integration/浏览器验收记录.md`
 - `assets/task-commission-integration/final-income-1280-zh.png`
 - `assets/task-commission-integration/creator-apply-validation-375-zh.png`
-- `.cache/integration-checks/backend-final-verify.log`
-- `.cache/integration-checks/backend-final-docker-it.log`
+- `.cache/integration-checks/backend-after-task55-verify.log`
+- `.cache/integration-checks/backend-latest-docker-it.log`
 - `.cache/integration-checks/admin-ui-final-test.log`
 - `.cache/integration-checks/kol-portal-final-test.log`
