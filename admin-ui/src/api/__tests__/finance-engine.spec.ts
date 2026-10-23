@@ -223,3 +223,32 @@ describe("finance permissions and state transitions", () => {
     expect(() => api.listWithdrawals("SUPER_ADMIN", "error", {})).toThrow();
   });
 });
+
+describe("preview creator identity snapshot", () => {
+  it("uses session display identity for search and submission history", () => {
+    const api = createFinanceDemo();
+    const identity = { name: "t1023_Commission Preview", kolCode: "KOL-LMD004" };
+    const row = api.apply(
+      "KOL",
+      "data",
+      {
+        amount: "200.00",
+        account,
+        note: "t1023_identity",
+        idempotencyKey: "identity"
+      },
+      identity
+    );
+    expect(row.kolName).toBe(identity.name);
+    expect(row.kolCode).toBe(identity.kolCode);
+    expect(row.history[0].actor).toBe(identity.name);
+    expect(api.listWithdrawals("SUPER_ADMIN", "data", { kol: identity.name }).items).toContainEqual(
+      row
+    );
+    expect(
+      api.listWithdrawals("SUPER_ADMIN", "data", { kol: identity.kolCode }).items
+    ).toContainEqual(row);
+    identity.name = "changed";
+    expect(api.withdrawal("KOL", "data", row.id).kolName).toBe("t1023_Commission Preview");
+  });
+});

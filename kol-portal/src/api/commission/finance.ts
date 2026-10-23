@@ -1,3 +1,5 @@
+import { getActivePinia } from "pinia";
+import { useSessionStore } from "@/stores/session";
 import { http } from "../http";
 import { financePreview, previewContext } from "@/utils/finance";
 import { financeError, createFinanceDemo } from "./finance-engine";
@@ -59,7 +61,12 @@ export const getMyWithdrawal = (id: string) =>
   );
 export const applyWithdrawal = (payload: WithdrawalRequest) =>
   call<Withdrawal>("post", "/withdrawals", payload, () =>
-    demo!.apply("KOL", previewContext.scenario, payload)
+    demo!.apply(
+      "KOL",
+      previewContext.scenario,
+      payload,
+      getActivePinia() ? (useSessionStore().kol ?? undefined) : undefined
+    )
   );
 export const cancelWithdrawal = (id: string) =>
   call<Withdrawal>("put", `/withdrawals/${id}/withdraw`, {}, () =>

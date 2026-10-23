@@ -314,7 +314,12 @@ export function createFinanceDemo() {
     idempotency.set(`payment:${id}:${key}`, fingerprint);
     return structuredClone(row);
   }
-  function apply(role: FinanceRole, scenario: Scenario, payload: WithdrawalRequest) {
+  function apply(
+    role: FinanceRole,
+    scenario: Scenario,
+    payload: WithdrawalRequest,
+    identity?: { name: string; kolCode: string }
+  ) {
     guard(role, scenario);
     if (role !== "KOL") financeError(403, "AUTH_FORBIDDEN");
     const fingerprint = JSON.stringify(payload);
@@ -343,6 +348,8 @@ export function createFinanceDemo() {
     Object.assign(row, {
       id,
       applicationNo: `t1023_W${id}`,
+      kolName: identity?.name ?? row.kolName,
+      kolCode: identity?.kolCode ?? row.kolCode,
       amount: payload.amount,
       account: structuredClone(payload.account),
       note: payload.note,
@@ -353,7 +360,7 @@ export function createFinanceDemo() {
         {
           action: "SUBMITTED",
           at: new Date().toISOString(),
-          actor: "t1023_Alex",
+          actor: identity?.name ?? "t1023_Alex",
           note: payload.note
         }
       ]
