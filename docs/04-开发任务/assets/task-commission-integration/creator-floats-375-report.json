@@ -1,0 +1,152 @@
+{
+  "cases": [
+    {
+      "name": "creator-apply-validation-375-zh",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "zh-CN",
+      "text": "SparkTrack 达人端\n中文\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\n我的账号\n佣金概览\n首页\n收款账户\n我的订单\n我的商品\n达人预付\n演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。\n完整数据\n佣金概览\n刷新\n申请提现\n预估总佣金\n¥2600.00\n冻结佣金\n¥400.00\n可提现\n¥600.00\n已付金额\n¥1320.00\n佣金付款 ¥700.00\n预付款 ¥620.00\n申请占用\n¥600.00\n预付待抵扣\n¥200.00\n预付已抵扣\n¥300.00\n累计已付佣金\n¥700.00\n\n预估总佣金、冻结佣金、可提现为截至当前值。已付金额为所选期间人民币记账金额。\n\n可提现＝预估总佣金－冻结佣金－有效申请占用－累计已付佣金－已发生预付抵扣。允许负余额；待抵扣预付不重复扣减。\n\n最低提现 200.00 CNY；可提现 600.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n尚有 1 条待核实记录未计入金额，不能按零佣金理解。\n佣金流水\n申请记录\n付款记录\nt1023_Canvas Tote\n微店确认结算\n订单号\nt1023_WD001\n商品行ID\n102361\n计佣基数\n13000.00\n佣金比例\n20%\n历史比例版本\nRATE-2026-09-V2\n规则版本\nWD-2026-10-V1\n达人佣金\n2600.00\n退款调整\n0.00\n业务时间\n2026/10/12 16:00:00\nt1023_Travel Pouch\n微店明确未结算，保持冻结\n订单号\nt1023_WD002\n商品行ID\n102362\n计佣基数\n2000.00\n佣金比例\n20%\n历史比例版本\nRATE-2026-09-V2\n规则版本\nWD-2026-10-V1\n达人佣金\n400.00\n退款调整\n0.00\n业务时间\n2026/10/18 16:00:00\nt1023_Canvas Tote\n微店确认结算\n订单号\nt1023_WD001\n商品行ID\n102361\n计佣基数\n11000.00\n佣金比例\n20%\n历史比例版本\nRATE-2026-09-V2\n规则版本\nWD-2026-10-V1\n达人佣金\n-400.00\n退款调整\n-400.00\n业务时间\n2026/10/19 16:00:00\nt1023_Weekend Bag\n待核实\n订单号\nt1023_WD003\n商品行ID\n102363\n计佣基数\n待核实\n佣金比例\n待核实\n历史比例版本\n待核实\n规则版本\nWD-2026-10-V1\n达人佣金\n待核实\n退款调整\n待核实\n业务时间\n2026/10/20 16:00:00\n申请提现\n最低提现 200.00 CNY；可提现 600.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n金额\nCNY\n请输入大于零且最多两位小数的金额\n收款信息快照\n本人已审核收款信息\n填写本次收款信息\n选择本人收款信息\nPAYPAL · t1023_creator@example.com\n收款方式\nPayPal\n收款账号\n收款人姓名\n币种\nUSD\n申请备注\n0 / 500\n\n本次收款信息会保存为申请快照；USDT不等于USD，不提供自动换汇。\n\n取消\n确认",
+      "headers": [],
+      "layout": false,
+      "dialogs": [
+        {
+          "text": "申请提现\n最低提现 200.00 CNY；可提现 600.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n金额\nCNY\n请输入大于零且最多两位小数的金额\n收款信息快照\n本人已审核收款信息\n填写本次收款信息\n选择本人收款信息\nPAYPAL · t1023_creator@example.com\n收款方式\nPayPal\n收款账号\n收款人姓名\n币种\nUSD\n申请备注\n0 / 500\n\n本次收款信息会保存为申请快照；USDT不等于USD，不提供自动换汇。\n\n取消\n确认",
+          "x": 11.25,
+          "y": 33.75,
+          "h": 776.46875,
+          "w": 352.5,
+          "overlayScroll": 0
+        }
+      ]
+    },
+    {
+      "name": "creator-record-detail-375-zh",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "zh-CN",
+      "text": "SparkTrack 达人端\n中文\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\n我的账号\n佣金概览\n首页\n收款账户\n我的订单\n我的商品\n达人预付\n演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。\n完整数据\n佣金概览\n刷新\n申请提现\n预估总佣金\n¥2600.00\n冻结佣金\n¥400.00\n可提现\n¥600.00\n已付金额\n¥1320.00\n佣金付款 ¥700.00\n预付款 ¥620.00\n申请占用\n¥600.00\n预付待抵扣\n¥200.00\n预付已抵扣\n¥300.00\n累计已付佣金\n¥700.00\n\n预估总佣金、冻结佣金、可提现为截至当前值。已付金额为所选期间人民币记账金额。\n\n可提现＝预估总佣金－冻结佣金－有效申请占用－累计已付佣金－已发生预付抵扣。允许负余额；待抵扣预付不重复扣减。\n\n最低提现 200.00 CNY；可提现 600.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n尚有 1 条待核实记录未计入金额，不能按零佣金理解。\n佣金流水\n申请记录\n付款记录\nt1023_W001\n待审核\n\n¥200.00 · 2026/10/12 16:00:00\n\n查看\n撤回\nt1023_W002\n待支付\n\n¥200.00 · 2026/10/13 16:00:00\n\n查看\nt1023_W003\n待支付\n\n¥200.00 · 2026/10/14 16:00:00\n\n暂停付款\n\n关联商品行发生退款，需驳回释放占用后按最新余额重新申请。\n\n查看\nt1023_W004\n已支付\n\n¥700.00 · 2026/10/15 16:00:00\n\n查看\nt1023_W005\n已驳回\n\n¥200.00 · 2026/10/16 16:00:00\n\n收款资料需要补充，请核对后重新申请。\n\n查看\n修改并重新提交\nt1023_W006\n已撤回\n\n¥200.00 · 2026/10/17 16:00:00\n\n查看\n1\n查看\n申请编号\nt1023_W001\n申请类型\n佣金提现\n金额\n200.00\n币种\nCNY\n申请时间\n2026/10/12 16:00:00\n状态\n待审核\n收款信息快照\nPAYPAL · t1023_creator@example.com · t1023_Alex USD\n申请备注\nt1023_application_note\n审核备注\n—\n审批记录\n已提交 · t1023_Alex\n\n2026/10/12 16:00:00",
+      "headers": [],
+      "layout": false,
+      "dialogs": [
+        {
+          "text": "查看\n申请编号\nt1023_W001\n申请类型\n佣金提现\n金额\n200.00\n币种\nCNY\n申请时间\n2026/10/12 16:00:00\n状态\n待审核\n收款信息快照\nPAYPAL · t1023_creator@example.com · t1023_Alex USD\n申请备注\nt1023_application_note\n审核备注\n—\n审批记录\n已提交 · t1023_Alex\n\n2026/10/12 16:00:00",
+          "x": 11.25,
+          "y": 126.59375,
+          "h": 512.53125,
+          "w": 352.5,
+          "overlayScroll": 0
+        }
+      ]
+    },
+    {
+      "name": "creator-empty-375-zh",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "zh-CN",
+      "text": "SparkTrack 达人端\n中文\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\n我的账号\n佣金概览\n首页\n收款账户\n我的订单\n我的商品\n达人预付\n演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。\n空数据\n佣金概览\n刷新\n申请提现\n预估总佣金\n¥0.00\n冻结佣金\n¥0.00\n可提现\n¥0.00\n已付金额\n¥0.00\n佣金付款 ¥0.00\n预付款 ¥0.00\n申请占用\n¥0.00\n预付待抵扣\n¥0.00\n预付已抵扣\n¥0.00\n累计已付佣金\n¥0.00\n\n预估总佣金、冻结佣金、可提现为截至当前值。已付金额为所选期间人民币记账金额。\n\n可提现＝预估总佣金－冻结佣金－有效申请占用－累计已付佣金－已发生预付抵扣。允许负余额；待抵扣预付不重复扣减。\n\n最低提现 200.00 CNY；可提现 0.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n佣金流水\n申请记录\n付款记录\n\n暂无数据\n\n1",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    },
+    {
+      "name": "creator-long-375-zh",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "zh-CN",
+      "text": "SparkTrack 达人端\n中文\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\n我的账号\n佣金概览\n首页\n收款账户\n我的订单\n我的商品\n达人预付\n演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。\n长内容\n佣金概览\n刷新\n申请提现\n预估总佣金\n¥2600.00\n冻结佣金\n¥400.00\n可提现\n¥600.00\n已付金额\n¥1320.00\n佣金付款 ¥700.00\n预付款 ¥620.00\n申请占用\n¥600.00\n预付待抵扣\n¥200.00\n预付已抵扣\n¥300.00\n累计已付佣金\n¥700.00\n\n预估总佣金、冻结佣金、可提现为截至当前值。已付金额为所选期间人民币记账金额。\n\n可提现＝预估总佣金－冻结佣金－有效申请占用－累计已付佣金－已发生预付抵扣。允许负余额；待抵扣预付不重复扣减。\n\n最低提现 200.00 CNY；可提现 600.00 CNY。冻结、占用、预付抵扣及资料不齐会影响申请。\n尚有 1 条待核实记录未计入金额，不能按零佣金理解。\n佣金流水\n申请记录\n付款记录\nt1023_W001\n待审核\n\n¥200.00 · 2026/10/12 16:00:00\n\n查看\n撤回\nt1023_W002\n待支付\n\n¥200.00 · 2026/10/13 16:00:00\n\n查看\nt1023_W003\n待支付\n\n¥200.00 · 2026/10/14 16:00:00\n\n暂停付款\n\n关联商品行发生退款，需驳回释放占用后按最新余额重新申请。\n\n查看\nt1023_W004\n已支付\n\n¥700.00 · 2026/10/15 16:00:00\n\n查看\nt1023_W005\n已驳回\n\n¥200.00 · 2026/10/16 16:00:00\n\n收款资料需要补充，请核对后重新申请。\n\n查看\n修改并重新提交\nt1023_W006\n已撤回\n\n¥200.00 · 2026/10/17 16:00:00\n\n查看\n1",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    },
+    {
+      "name": "creator-error-375-zh",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "zh-CN",
+      "text": "SparkTrack 达人端\n中文\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\n我的账号\n佣金概览\n首页\n收款账户\n我的订单\n我的商品\n达人预付\n演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。\n接口失败\n佣金概览\n刷新\n申请提现\n数据加载失败，请重试\n\n重试",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    },
+    {
+      "name": "creator-apply-validation-375-en",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "en-US",
+      "text": "SparkTrack Creator Portal\nEnglish\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\nMy account\nCommission overview\nHome\nPayout accounts\nMy orders\nMy items\nCreator prepays\nDemo data · These commission pages use sample data. Actions never write real financial records.\nFull data\nCommission overview\nRefresh\nRequest withdrawal\nEstimated commission\n¥2600.00\nFrozen commission\n¥400.00\nAvailable to withdraw\n¥600.00\nPaid amount\n¥1320.00\nCommission payments ¥700.00\nPrepayments ¥620.00\nReserved by applications\n¥600.00\nPrepayment pending offset\n¥200.00\nPrepayment offset applied\n¥300.00\nLifetime commission paid\n¥700.00\n\nEstimated commission, frozen commission and available balance are current totals. Paid amount is the CNY book value for the selected period.\n\nAvailable = estimated commission − frozen − active reservations − lifetime commission payments − applied prepayment offsets. Balances can be negative. Pending offsets are not deducted again.\n\nMinimum 200.00 CNY; available 600.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\n1 unverified records are excluded from totals. Their commission is unknown, not zero.\nCommission ledger\nApplications\nPayment records\nt1023_Canvas Tote\nWeidian settlement confirmed\nOrder number\nt1023_WD001\nItem ID\n102361\nCommission basis\n13000.00\nCommission rate\n20%\nHistorical rate version\nRATE-2026-09-V2\nRule version\nWD-2026-10-V1\nCreator commission\n2600.00\nRefund adjustment\n0.00\nBusiness time\n10/12/2026, 16:00:00\nt1023_Travel Pouch\nExplicitly unsettled by Weidian; stays frozen\nOrder number\nt1023_WD002\nItem ID\n102362\nCommission basis\n2000.00\nCommission rate\n20%\nHistorical rate version\nRATE-2026-09-V2\nRule version\nWD-2026-10-V1\nCreator commission\n400.00\nRefund adjustment\n0.00\nBusiness time\n10/18/2026, 16:00:00\nt1023_Canvas Tote\nWeidian settlement confirmed\nOrder number\nt1023_WD001\nItem ID\n102361\nCommission basis\n11000.00\nCommission rate\n20%\nHistorical rate version\nRATE-2026-09-V2\nRule version\nWD-2026-10-V1\nCreator commission\n-400.00\nRefund adjustment\n-400.00\nBusiness time\n10/19/2026, 16:00:00\nt1023_Weekend Bag\nNeeds verification\nOrder number\nt1023_WD003\nItem ID\n102363\nCommission basis\nNeeds verification\nCommission rate\nNeeds verification\nHistorical rate version\nNeeds verification\nRule version\nWD-2026-10-V1\nCreator commission\nNeeds verification\nRefund adjustment\nNeeds verification\nBusiness time\n10/20/2026, 16:00:00\nRequest withdrawal\nMinimum 200.00 CNY; available 600.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\nAmount\nCNY\nEnter a positive amount with at most two decimal places\nRecipient snapshot\nMy approved recipient details\nEnter recipient details for this application\nChoose my recipient details\nPAYPAL · t1023_creator@example.com\nPayment account type\nPayPal\nRecipient account\nRecipient name\nCurrency\nUSD\nApplication notes\n0 / 500\n\nRecipient details are saved as this application’s snapshot. USDT is not USD. No automatic currency conversion.\n\nCancel\nConfirm",
+      "headers": [],
+      "layout": false,
+      "dialogs": [
+        {
+          "text": "Request withdrawal\nMinimum 200.00 CNY; available 600.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\nAmount\nCNY\nEnter a positive amount with at most two decimal places\nRecipient snapshot\nMy approved recipient details\nEnter recipient details for this application\nChoose my recipient details\nPAYPAL · t1023_creator@example.com\nPayment account type\nPayPal\nRecipient account\nRecipient name\nCurrency\nUSD\nApplication notes\n0 / 500\n\nRecipient details are saved as this application’s snapshot. USDT is not USD. No automatic currency conversion.\n\nCancel\nConfirm",
+          "x": 11.25,
+          "y": 33.75,
+          "h": 776.46875,
+          "w": 352.5,
+          "overlayScroll": 0
+        }
+      ]
+    },
+    {
+      "name": "creator-record-detail-375-en",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "en-US",
+      "text": "SparkTrack Creator Portal\nEnglish\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\nMy account\nCommission overview\nHome\nPayout accounts\nMy orders\nMy items\nCreator prepays\nDemo data · These commission pages use sample data. Actions never write real financial records.\nFull data\nCommission overview\nRefresh\nRequest withdrawal\nEstimated commission\n¥2600.00\nFrozen commission\n¥400.00\nAvailable to withdraw\n¥600.00\nPaid amount\n¥1320.00\nCommission payments ¥700.00\nPrepayments ¥620.00\nReserved by applications\n¥600.00\nPrepayment pending offset\n¥200.00\nPrepayment offset applied\n¥300.00\nLifetime commission paid\n¥700.00\n\nEstimated commission, frozen commission and available balance are current totals. Paid amount is the CNY book value for the selected period.\n\nAvailable = estimated commission − frozen − active reservations − lifetime commission payments − applied prepayment offsets. Balances can be negative. Pending offsets are not deducted again.\n\nMinimum 200.00 CNY; available 600.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\n1 unverified records are excluded from totals. Their commission is unknown, not zero.\nCommission ledger\nApplications\nPayment records\nt1023_W001\nPending review\n\n¥200.00 · 10/12/2026, 16:00:00\n\nView\nWithdraw application\nt1023_W002\nPending payment\n\n¥200.00 · 10/13/2026, 16:00:00\n\nView\nt1023_W003\nPending payment\n\n¥200.00 · 10/14/2026, 16:00:00\n\nPayment paused\n\nA linked item was refunded. Reject to release reservations; the creator must reapply using the updated balance.\n\nView\nt1023_W004\nPaid\n\n¥700.00 · 10/15/2026, 16:00:00\n\nView\nt1023_W005\nRejected\n\n¥200.00 · 10/16/2026, 16:00:00\n\nPlease complete and verify the recipient details, then reapply.\n\nView\nEdit and reapply\nt1023_W006\nWithdrawn\n\n¥200.00 · 10/17/2026, 16:00:00\n\nView\n1\nView\nApplication number\nt1023_W001\nApplication type\nCommission withdrawal\nAmount\n200.00\nCurrency\nCNY\nApplication time\n10/12/2026, 16:00:00\nStatus\nPending review\nRecipient snapshot\nPAYPAL · t1023_creator@example.com · t1023_Alex USD\nApplication notes\nt1023_application_note\nReview notes\n—\nApproval history\nSubmitted · t1023_Alex\n\n10/12/2026, 16:00:00",
+      "headers": [],
+      "layout": false,
+      "dialogs": [
+        {
+          "text": "View\nApplication number\nt1023_W001\nApplication type\nCommission withdrawal\nAmount\n200.00\nCurrency\nCNY\nApplication time\n10/12/2026, 16:00:00\nStatus\nPending review\nRecipient snapshot\nPAYPAL · t1023_creator@example.com · t1023_Alex USD\nApplication notes\nt1023_application_note\nReview notes\n—\nApproval history\nSubmitted · t1023_Alex\n\n10/12/2026, 16:00:00",
+          "x": 11.25,
+          "y": 126.59375,
+          "h": 512.53125,
+          "w": 352.5,
+          "overlayScroll": 0
+        }
+      ]
+    },
+    {
+      "name": "creator-empty-375-en",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "en-US",
+      "text": "SparkTrack Creator Portal\nEnglish\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\nMy account\nCommission overview\nHome\nPayout accounts\nMy orders\nMy items\nCreator prepays\nDemo data · These commission pages use sample data. Actions never write real financial records.\nEmpty data\nCommission overview\nRefresh\nRequest withdrawal\nEstimated commission\n¥0.00\nFrozen commission\n¥0.00\nAvailable to withdraw\n¥0.00\nPaid amount\n¥0.00\nCommission payments ¥0.00\nPrepayments ¥0.00\nReserved by applications\n¥0.00\nPrepayment pending offset\n¥0.00\nPrepayment offset applied\n¥0.00\nLifetime commission paid\n¥0.00\n\nEstimated commission, frozen commission and available balance are current totals. Paid amount is the CNY book value for the selected period.\n\nAvailable = estimated commission − frozen − active reservations − lifetime commission payments − applied prepayment offsets. Balances can be negative. Pending offsets are not deducted again.\n\nMinimum 200.00 CNY; available 0.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\nCommission ledger\nApplications\nPayment records\n\nNo Data\n\n1",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    },
+    {
+      "name": "creator-long-375-en",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "en-US",
+      "text": "SparkTrack Creator Portal\nEnglish\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\nMy account\nCommission overview\nHome\nPayout accounts\nMy orders\nMy items\nCreator prepays\nDemo data · These commission pages use sample data. Actions never write real financial records.\nLong content\nCommission overview\nRefresh\nRequest withdrawal\nEstimated commission\n¥2600.00\nFrozen commission\n¥400.00\nAvailable to withdraw\n¥600.00\nPaid amount\n¥1320.00\nCommission payments ¥700.00\nPrepayments ¥620.00\nReserved by applications\n¥600.00\nPrepayment pending offset\n¥200.00\nPrepayment offset applied\n¥300.00\nLifetime commission paid\n¥700.00\n\nEstimated commission, frozen commission and available balance are current totals. Paid amount is the CNY book value for the selected period.\n\nAvailable = estimated commission − frozen − active reservations − lifetime commission payments − applied prepayment offsets. Balances can be negative. Pending offsets are not deducted again.\n\nMinimum 200.00 CNY; available 600.00 CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.\n1 unverified records are excluded from totals. Their commission is unknown, not zero.\nCommission ledger\nApplications\nPayment records\nt1023_W001\nPending review\n\n¥200.00 · 10/12/2026, 16:00:00\n\nView\nWithdraw application\nt1023_W002\nPending payment\n\n¥200.00 · 10/13/2026, 16:00:00\n\nView\nt1023_W003\nPending payment\n\n¥200.00 · 10/14/2026, 16:00:00\n\nPayment paused\n\nA linked item was refunded. Reject to release reservations; the creator must reapply using the updated balance.\n\nView\nt1023_W004\nPaid\n\n¥700.00 · 10/15/2026, 16:00:00\n\nView\nt1023_W005\nRejected\n\n¥200.00 · 10/16/2026, 16:00:00\n\nPlease complete and verify the recipient details, then reapply.\n\nView\nEdit and reapply\nt1023_W006\nWithdrawn\n\n¥200.00 · 10/17/2026, 16:00:00\n\nView\n1",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    },
+    {
+      "name": "creator-error-375-en",
+      "url": "http://127.0.0.1:18944/commissions",
+      "width": 375,
+      "scrollWidth": 375,
+      "lang": "en-US",
+      "text": "SparkTrack Creator Portal\nEnglish\ntcommissionintegration_1792737705246_达人 · tcommissionintegration_1792737705246\nMy account\nCommission overview\nHome\nPayout accounts\nMy orders\nMy items\nCreator prepays\nDemo data · These commission pages use sample data. Actions never write real financial records.\nAPI failure\nCommission overview\nRefresh\nRequest withdrawal\nUnable to load data. Please retry.\n\nRetry",
+      "headers": [],
+      "layout": false,
+      "dialogs": []
+    }
+  ],
+  "errors": [],
+  "logins": []
+}

@@ -60,28 +60,34 @@ describe("layout navigation", () => {
     const wrapper = await mountAt("/");
     const links = wrapper.findAll(".shell__nav-link");
     expect(links.map(link => link.text())).toEqual([
+      "Commission overview",
       "Home",
       "Payout accounts",
       "My orders",
       "My items",
       "Creator prepays"
     ]);
-    expect(links[0].attributes("href")).toBe("/");
-    expect(links[1].attributes("href")).toBe("/payout-accounts");
-    expect(links[2].attributes("href")).toBe("/orders");
-    expect(links[0].attributes("aria-current")).toBe("page");
-    expect(links[1].attributes("aria-current")).toBeUndefined();
-    expect(links[2].attributes("aria-current")).toBeUndefined();
+    expect(wrapper.get('[data-test="nav-Home"]').attributes("href")).toBe("/");
+    expect(wrapper.get('[data-test="nav-PayoutAccounts"]').attributes("href")).toBe(
+      "/payout-accounts"
+    );
+    expect(wrapper.get('[data-test="nav-Orders"]').attributes("href")).toBe("/orders");
+    expect(wrapper.get('[data-test="nav-Home"]').attributes("aria-current")).toBe("page");
+    expect(
+      wrapper.get('[data-test="nav-PayoutAccounts"]').attributes("aria-current")
+    ).toBeUndefined();
+    expect(wrapper.get('[data-test="nav-Orders"]').attributes("aria-current")).toBeUndefined();
   });
 
   it("marks the payout entry current on its page and translates it", async () => {
     const wrapper = await mountAt("/payout-accounts");
-    expect(wrapper.findAll(".shell__nav-link")[1].attributes("aria-current")).toBe("page");
-    expect(wrapper.findAll(".shell__nav-link")[0].attributes("aria-current")).toBeUndefined();
+    expect(wrapper.get('[data-test="nav-PayoutAccounts"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.get('[data-test="nav-Home"]').attributes("aria-current")).toBeUndefined();
 
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
     expect(wrapper.findAll(".shell__nav-link").map(link => link.text())).toEqual([
+      "佣金概览",
       "首页",
       "收款账户",
       "我的订单",
@@ -91,9 +97,9 @@ describe("layout navigation", () => {
   });
   it("marks the prepay entry current and translates it", async () => {
     const wrapper = await mountAt("/income/prepays");
-    expect(wrapper.findAll(".shell__nav-link")[4].attributes("aria-current")).toBe("page");
+    expect(wrapper.get('[data-test="nav-PrepayResults"]').attributes("aria-current")).toBe("page");
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
-    expect(wrapper.findAll(".shell__nav-link")[4].text()).toBe("达人预付");
+    expect(wrapper.get('[data-test="nav-PrepayResults"]').text()).toBe("达人预付");
   });
 });

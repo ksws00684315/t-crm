@@ -1,3 +1,4 @@
+import finance from "./finance-en-US";
 /**
  * Base message pack. Keys follow "area.meaning" (common.signOut, login.title, errors.AUTH_*,
  * route.notFound); never the English or Chinese sentence itself. `zh-CN.ts` must have exactly the
@@ -7,6 +8,7 @@
 import prepay from "./prepay-en-US";
 const enUS = {
   prepay,
+  finance,
   app: {
     title: "SparkTrack Creator Portal",
     titleSuffix: " Creator Portal"

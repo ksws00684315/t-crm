@@ -1,0 +1,38 @@
+[
+  {
+    "app": "admin",
+    "lang": "zh-CN",
+    "file": "existing-admin-unauth-1440-zh.png",
+    "url": "http://127.0.0.1:8890/login?redirect=/kol/income",
+    "errors": [],
+    "overflow": false,
+    "text": "SparkTrack 管理端\n用户名\n密码\n验证码\n登录\n中文"
+  },
+  {
+    "app": "admin",
+    "lang": "en-US",
+    "file": "existing-admin-unauth-1440-en.png",
+    "url": "http://127.0.0.1:8890/login?redirect=/kol/income",
+    "errors": [],
+    "overflow": false,
+    "text": "SparkTrack Admin\nUsername\nPassword\nCaptcha\nSign in\nEnglish"
+  },
+  {
+    "app": "portal",
+    "lang": "zh-CN",
+    "file": "existing-portal-unauth-390-zh.png",
+    "url": "http://127.0.0.1:8891/commissions",
+    "errors": [],
+    "overflow": false,
+    "text": "404\n\n页面不存在\n\n返回首页"
+  },
+  {
+    "app": "portal",
+    "lang": "en-US",
+    "file": "existing-portal-unauth-390-en.png",
+    "url": "http://127.0.0.1:8891/commissions",
+    "errors": [],
+    "overflow": false,
+    "text": "404\n\nPage not found\n\nBack to home"
+  }
+]

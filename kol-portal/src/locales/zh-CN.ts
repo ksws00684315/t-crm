@@ -1,3 +1,4 @@
+import finance from "./finance-zh-CN";
 import type { MessageSchema } from "./en-US";
 
 /**
@@ -8,6 +9,7 @@ import type { MessageSchema } from "./en-US";
 import prepay from "./prepay-zh-CN";
 const zhCN: MessageSchema = {
   prepay,
+  finance,
   app: {
     title: "SparkTrack Creator Portal",
     titleSuffix: " 达人端"

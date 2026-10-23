@@ -1,9 +1,11 @@
+import finance from "./finance-en-US";
 import type { MessageSchema } from "./zh-CN";
 
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
 import prepay from "./prepay-en-US";
 const enUS: MessageSchema = {
   prepay,
+  finance,
   app: {
     title: "SparkTrack Admin",
     titleSuffix: " Admin"

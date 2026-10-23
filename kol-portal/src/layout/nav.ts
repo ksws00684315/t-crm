@@ -9,6 +9,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  { name: "Commissions", path: "/commissions", title: "finance.overview" },
   { name: "Home", path: "/", title: "nav.home" },
   { name: "PayoutAccounts", path: "/payout-accounts", title: "nav.payoutAccounts" }, // 15b
   { name: "Orders", path: "/orders", title: "nav.orders" }, // 19b

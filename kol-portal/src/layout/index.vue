@@ -61,6 +61,7 @@ async function signOut() {
         <RouterLink
           v-for="item in NAV_ITEMS"
           :key="item.name"
+          :data-test="`nav-${item.name}`"
           :to="item.path"
           class="shell__nav-link"
           :aria-current="isActive(item.path) ? 'page' : undefined"

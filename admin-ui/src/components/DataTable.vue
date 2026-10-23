@@ -402,7 +402,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         <el-button text :aria-label="t('table.refresh')" @click="emit('refresh')">
           <el-icon><Refresh /></el-icon>
         </el-button>
-        <el-popover trigger="click" :width="280" placement="bottom-end">
+        <el-popover trigger="click" width="min(420px, calc(100vw - 24px))" placement="bottom-end">
           <template #reference>
             <el-button text data-test="column-settings">
               <el-icon><Setting /></el-icon>
@@ -611,6 +611,20 @@ function canMove(index: number, delta: -1 | 1): boolean {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-1);
+}
+.data-table__column :deep(.el-checkbox) {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  margin-right: 0;
+}
+.data-table__column :deep(.el-checkbox__label) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.data-table__column :deep(.el-button) {
+  flex-shrink: 0;
+  margin: 0;
 }
 .data-table__empty {
   padding: var(--tcrm-space-4) 0;
