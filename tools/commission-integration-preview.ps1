@@ -12,10 +12,14 @@ foreach ($port in @($AdminPort,$PortalPort)) {
 $savedDemo = $env:VITE_COMMISSION_DEMO
 $savedAdmin = $env:VITE_ADMIN_API_TARGET
 $savedPortal = $env:VITE_KOL_API_TARGET
+$savedPreviewStore = $env:VITE_COMMISSION_PREVIEW_STORE_URL
+$savedPortalOrigin = $env:VITE_COMMISSION_PREVIEW_PORTAL_ORIGIN
 try {
   $env:VITE_COMMISSION_DEMO = 'true'
   $env:VITE_ADMIN_API_TARGET = $Backend
   $env:VITE_KOL_API_TARGET = $PortalBackend
+  $env:VITE_COMMISSION_PREVIEW_STORE_URL = "http://127.0.0.1:$AdminPort/__commission_preview__/state"
+  $env:VITE_COMMISSION_PREVIEW_PORTAL_ORIGIN = "http://127.0.0.1:$PortalPort"
   $processes = foreach ($entry in @(@{App='admin-ui';Port=$AdminPort},@{App='kol-portal';Port=$PortalPort})) {
     $app = Join-Path $root $entry.App
     $vite = Join-Path $app 'node_modules/vite/bin/vite.js'
@@ -29,4 +33,6 @@ try {
   $env:VITE_COMMISSION_DEMO = $savedDemo
   $env:VITE_ADMIN_API_TARGET = $savedAdmin
   $env:VITE_KOL_API_TARGET = $savedPortal
+  $env:VITE_COMMISSION_PREVIEW_STORE_URL = $savedPreviewStore
+  $env:VITE_COMMISSION_PREVIEW_PORTAL_ORIGIN = $savedPortalOrigin
 }

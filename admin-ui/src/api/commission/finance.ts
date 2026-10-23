@@ -7,6 +7,12 @@ import {
   financePreviewAllows
 } from "@/utils/finance";
 import { financeError, createFinanceDemo } from "./finance-engine";
+import {
+  clearPreviewState,
+  loadPreviewState,
+  savePreviewState,
+  withPreviewState
+} from "./finance-preview-sync";
 import type {
   IncomeDetail,
   IncomeQuery,
@@ -30,8 +36,12 @@ async function call<T>(
   if (financePreview) {
     if (!financePreviewAllows("view")) financeError(403, "AUTH_FORBIDDEN");
     if (previewContext.failWrites && method !== "get") financeError(503, "COMMON_INTERNAL_ERROR");
-    await Promise.resolve();
-    return local();
+    return withPreviewState(async () => {
+      await loadPreviewState(demo!);
+      const result = local();
+      if (method !== "get") await savePreviewState(demo!);
+      return result;
+    });
   }
   return http.request<T>({
     url,
@@ -84,8 +94,13 @@ export const listSettlements = (query: SettlementQuery) =>
   call<Page<Settlement>>("get", "/commission/settlement-details", query, () =>
     demo!.settlements(role(), scenario(), query)
   );
-export const resetFinanceDemo = () => {
-  if (financePreview) demo!.reset();
+export const resetFinanceDemo = async () => {
+  if (financePreview) {
+    await withPreviewState(async () => {
+      await clearPreviewState();
+      demo!.reset();
+    });
+  }
 };
 export async function uploadWithdrawalVoucher(file: File): Promise<{ fileId: string }> {
   if (financePreview) return { fileId: `t1023_preview_voucher_${file.size}` };
@@ -111,6 +126,7 @@ export async function exportWithdrawals(query: WithdrawalQuery) {
   if (!financePreview)
     return http.download({ url: "/commission/withdrawals/export", method: "get", params: query });
   if (!financePreviewAllows("export")) financeError(403, "AUTH_FORBIDDEN");
+  await withPreviewState(() => loadPreviewState(demo!));
   const rows: Withdrawal[] = [];
   let current = 1;
   let total = 0;

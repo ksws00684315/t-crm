@@ -26,6 +26,13 @@ import type {
 export function financeError(status: number, errorCode = "COMMON_VALIDATION_FAILED"): never {
   throw new ApiError({ status, errorCode, traceId: "t1023_preview" });
 }
+export interface FinanceDemoState {
+  incomes: typeof seedIncomes;
+  payments: typeof seedPayments;
+  withdrawals: typeof seedWithdrawals;
+  config: SettlementConfig;
+  idempotency: [string, string][];
+}
 export function createFinanceDemo() {
   let incomes = structuredClone(seedIncomes);
   let payments = structuredClone(seedPayments);
@@ -374,6 +381,29 @@ export function createFinanceDemo() {
     return structuredClone(row);
   }
   return {
+    snapshot: (): FinanceDemoState => ({
+      incomes: structuredClone(incomes),
+      payments: structuredClone(payments),
+      withdrawals: structuredClone(withdrawals),
+      config: structuredClone(config),
+      idempotency: [...idempotency.entries()]
+    }),
+    hydrate: (state: FinanceDemoState) => {
+      if (
+        !Array.isArray(state.incomes) ||
+        !Array.isArray(state.payments) ||
+        !Array.isArray(state.withdrawals) ||
+        !Array.isArray(state.idempotency) ||
+        !state.config
+      )
+        financeError(503, "COMMON_INTERNAL_ERROR");
+      incomes = structuredClone(state.incomes);
+      payments = structuredClone(state.payments);
+      withdrawals = structuredClone(state.withdrawals);
+      config = structuredClone(state.config);
+      idempotency.clear();
+      for (const [key, value] of state.idempotency) idempotency.set(key, value);
+    },
     listIncome,
     incomeDetail,
     listWithdrawals,

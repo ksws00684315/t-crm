@@ -60,3 +60,22 @@
 - `.cache/integration-checks/backend-latest-docker-it.log`
 - `.cache/integration-checks/admin-ui-final-test.log`
 - `.cache/integration-checks/kol-portal-final-test.log`
+
+## 2026-10-23 跨端演示提现同步修复
+
+- 根因：两端演示引擎各自持有内存，达人端新申请没有传递到管理端。仅在显式 `commission-preview` 本地模式增加共用状态端点，保存在工作树 `.cache/integrated-preview/commission-demo-state.json`，不接入真实佣金后端。
+- 每次演示查询先读取共享状态，操作成功后才写回；页面内操作顺序执行，跨页面写入用 revision 校验，冲突返回409。存储先写临时文件并重命名，写盘成功才发布内存状态，失败后队列可继续处理。管理端导出也先同步读取。
+- 验证：两端定向回归40项通过（管理21、达人19），覆盖状态还原、revision传递、存储失败、冲突和失败后队列恢复；两端变更ESLint及类型检查通过。两端财务文件及管理Vite配置完成Prettier格式化。
+- 实际浏览器双源模块验证：达人18944提交测试申请 `t1023_W102407`（id102407），管理18941查询到同号并审核，达人刷新后状态为 `PENDING_PAYMENT`；同revision并发提交结果200/409。证据为本地 `.cache/integrated-preview/cross-origin-check.json`。本项通过Vite浏览器模块执行，未将其描述为管理页面登录后的点击验收。
+- 预览管理端查看位置：财务任务/佣金提现任务，路由 `/fund/payouts`；该演示引擎的达人仍是固定样例 `t1023_Alex Morgan`，不是当前注册账号名称。查找时使用申请号，避免按注册达人名称筛选。
+- 旧版本仅在浏览器内存里的申请无法恢复。刷新达人佣金页后重新申请即可生成跨端共享的新单；上述申请是验收测试单。
+
+| 复核项 | 结果 |
+|---|---|
+| 达人申请后管理端同号读取 | 通过，t1023_W102407 |
+| 管理审核后达人刷新读取 | 通过，PENDING_PAYMENT |
+| 刷新持久化 | 通过，共享JSON文件持久化 |
+| 并发写覆盖保护 | 通过，一个200、一个409 |
+| 存储不可用和队列恢复 | 回归测试通过 |
+| 真实佣金后端及共享中间件 | 未修改，未停止 |
+- 已通过真实注册预览账号登录达人端，在申请记录页看到同一申请号；截图：`assets/task-commission-integration/creator-shared-withdrawal.png`。

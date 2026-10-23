@@ -1,6 +1,12 @@
 import { http } from "../http";
 import { financePreview, previewContext } from "@/utils/finance";
 import { financeError, createFinanceDemo } from "./finance-engine";
+import {
+  clearPreviewState,
+  loadPreviewState,
+  savePreviewState,
+  withPreviewState
+} from "./finance-preview-sync";
 import type {
   AccountSnapshot,
   IncomeDetail,
@@ -19,8 +25,12 @@ async function call<T>(
 ): Promise<T> {
   if (financePreview) {
     if (previewContext.failWrites && method !== "get") financeError(503, "COMMON_INTERNAL_ERROR");
-    await Promise.resolve();
-    return local();
+    return withPreviewState(async () => {
+      await loadPreviewState(demo!);
+      const result = local();
+      if (method !== "get") await savePreviewState(demo!);
+      return result;
+    });
   }
   return http.request<T>({
     url,
@@ -55,8 +65,13 @@ export const cancelWithdrawal = (id: string) =>
   call<Withdrawal>("put", `/withdrawals/${id}/withdraw`, {}, () =>
     demo!.cancel("KOL", previewContext.scenario, id)
   );
-export const resetFinanceDemo = () => {
-  if (financePreview) demo!.reset();
+export const resetFinanceDemo = async () => {
+  if (financePreview) {
+    await withPreviewState(async () => {
+      await clearPreviewState();
+      demo!.reset();
+    });
+  }
 };
 export const downloadWithdrawalVoucher = (id: string) =>
   financePreview
