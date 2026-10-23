@@ -1147,7 +1147,27 @@ const enUS: MessageSchema = {
     createTitle: "Create Shop",
     name: "Shop Name",
     weidianId: "Weidian Shop Identifier",
-    weidianPlaceholder: "Weidian shop identifier"
+    weidianPlaceholder: "Weidian shop identifier",
+    weidianApp: {
+      configure: "Weidian App Configuration",
+      title: "Weidian Service App Configuration",
+      callbackUrl: "OAuth Callback URL",
+      callbackHint:
+        "Register this address as the callback URL for your app on the Weidian Open Platform.",
+      callbackInvalid:
+        "The callback URL is invalid. Ask a platform administrator to set the admin URL (url.admin) in system configuration.",
+      appKey: "AppKey",
+      appKeyRequired: "Enter an AppKey",
+      appKeyTooLong: "AppKey must be 64 characters or fewer",
+      appSecret: "AppSecret",
+      appSecretRequired: "Enter an AppSecret",
+      secretConfiguredHint: "Configured. Enter it again when saving.",
+      configured: "Configured",
+      notConfigured: "Not configured",
+      lastUpdated: "Last updated",
+      saved: "Weidian app configuration saved.",
+      goConfigure: "Configure"
+    }
   },
   product: {
     onSale: "On sale",
