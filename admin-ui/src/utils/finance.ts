@@ -47,6 +47,14 @@ export function currentFinanceRole(): FinanceRole {
   if (access.isOwnScope) return "BD";
   return access.can("withdrawal:review") ? "FINANCE" : "OPERATOR";
 }
+export function currentFinanceIdentity(): { id: string; name: string } {
+  if (!getActivePinia()) return { id: "t1023_preview_user", name: "t1023_Preview User" };
+  const user = useUserStore().user;
+  return {
+    id: user?.id ?? "t1023_preview_user",
+    name: user?.nickname || user?.username || "t1023_Preview User"
+  };
+}
 export function financeAbilities(subject: AbilitySubject | null) {
   const access = accessOf(subject);
   const company = !access.isPlatformAdmin;

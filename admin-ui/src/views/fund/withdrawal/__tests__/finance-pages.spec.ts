@@ -106,11 +106,24 @@ describe("finance admin pages", () => {
     expect(wrapper.getComponent(DataTable).props("loading")).toBe(false);
     wrapper.unmount();
   });
-  it("shows review and payment actions by role and blocks refund-paused payment", async () => {
+  it("shows a single state-specific action and blocks refund-paused payment", async () => {
     const wrapper = mount(TasksPage, { global });
     await flushPromises();
-    expect(wrapper.findAll('[data-test="withdrawal-pay"]')).toHaveLength(2);
-    expect(wrapper.findAll('[data-test="withdrawal-pay"]')[1].attributes("disabled")).toBeDefined();
+    expect(
+      wrapper
+        .getComponent(DataTable)
+        .props("columns")
+        .map((column: { label: string }) => column.label)
+    ).toEqual(["申请编号", "达人名称及ID", "金额", "状态", "申请时间", "操作"]);
+    expect(wrapper.find('[data-test="withdrawal-kol-id"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test="withdrawal-progress-action"]')).toHaveLength(4);
+    expect(
+      wrapper.findAll('[data-test="withdrawal-progress-action"]')[3].attributes("disabled")
+    ).toBeDefined();
+    expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("运营审核");
+    expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("财务审核");
+    expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("财务支付");
     useUserStore().user = {
       ...useUserStore().user!,
       role: "STAFF",
@@ -118,20 +131,9 @@ describe("finance admin pages", () => {
       postTemplate: "OPERATOR"
     };
     await flushPromises();
-    expect(wrapper.find('[data-test="withdrawal-approve"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="withdrawal-pay"]').exists()).toBe(false);
-    expect(wrapper.findAll('[data-test="withdrawal-view"]')).toHaveLength(7);
-    wrapper.unmount();
-  });
-  it("does not submit a rejection without a reason", async () => {
-    const wrapper = mount(TasksPage, { global, attachTo: document.body });
-    await flushPromises();
-    await wrapper.get('[data-test="withdrawal-reject"]').trigger("click");
-    await flushPromises();
-    const submit = document.querySelector<HTMLButtonElement>('[data-test="review-submit"]');
-    submit?.click();
-    await flushPromises();
-    expect(api.reviewWithdrawal).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="withdrawal-progress-action"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="withdrawal-view"]')).toHaveLength(8);
+    expect(wrapper.find('[data-test="finance-scenario"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it("keeps configuration read only without authorization and validates amounts", async () => {

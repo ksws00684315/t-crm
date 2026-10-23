@@ -4,6 +4,7 @@ import {
   financePreview,
   previewContext,
   currentFinanceRole,
+  currentFinanceIdentity,
   financePreviewAllows
 } from "@/utils/finance";
 import { financeError, createFinanceDemo } from "./finance-engine";
@@ -23,7 +24,8 @@ import type {
   SettlementConfig,
   SettlementQuery,
   Withdrawal,
-  WithdrawalQuery
+  WithdrawalQuery,
+  WithdrawalOrder
 } from "./finance-types";
 
 const demo = financePreview ? createFinanceDemo() : null;
@@ -71,9 +73,15 @@ export const getWithdrawal = (id: string) =>
   call<Withdrawal>("get", `/commission/withdrawals/${id}`, {}, () =>
     demo!.withdrawal(role(), scenario(), id)
   );
+export const getWithdrawalOrders = (id: string, query: { page: number; size: number }) =>
+  call<Page<WithdrawalOrder>>("get", `/commission/withdrawals/${id}/orders`, query, () =>
+    demo!.withdrawalOrders(role(), scenario(), id, query)
+  );
 export const reviewWithdrawal = (id: string, decision: "APPROVE" | "REJECT", note: string) =>
   call<Withdrawal>("put", `/commission/withdrawals/${id}/review`, { decision, note }, () =>
-    previewAction("review", () => demo!.review(role(), scenario(), id, decision, note))
+    previewAction("review", () =>
+      demo!.review(role(), scenario(), id, decision, note, currentFinanceIdentity())
+    )
   );
 export const payWithdrawal = (id: string, payload: PaymentRegistration, idempotencyKey: string) =>
   call<Withdrawal>(

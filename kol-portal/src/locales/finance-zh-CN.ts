@@ -124,6 +124,7 @@ export default {
   status: "状态",
   createdAt: "申请时间",
   PENDING_REVIEW: "待审核",
+  PENDING_FINANCE_REVIEW: "财务待审核",
   PENDING_PAYMENT: "待支付",
   PAID: "已支付",
   REJECTED: "已驳回",

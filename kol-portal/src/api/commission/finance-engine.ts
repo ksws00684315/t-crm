@@ -369,6 +369,7 @@ export function createFinanceDemo() {
     incomes[0].available = decimal(cents(incomes[0].available) - cents(payload.amount));
     row.allocations[0].occupied = payload.amount;
     row.allocations[0].remainingSnapshot = incomes[0].available;
+    row.allocations[0].orderRemainingSnapshot = null;
     withdrawals.unshift(row);
     idempotency.set(`apply:${payload.idempotencyKey}`, JSON.stringify([id, fingerprint]));
     return structuredClone(row);

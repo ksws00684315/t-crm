@@ -80,6 +80,57 @@ describe("commission finance amounts and query semantics", () => {
   });
 });
 describe("finance permissions and state transitions", () => {
+  it("pages distinct orders, totals their allocations and uses only explicit order snapshots", () => {
+    const api = createFinanceDemo();
+    const saved = api.snapshot();
+    const application = saved.withdrawals[0];
+    application.allocations[0].remainingSnapshot = "3.00";
+    application.allocations[1].remainingSnapshot = "4.00";
+    application.allocations[0].orderRemainingSnapshot = "8.25";
+    application.allocations[1].orderRemainingSnapshot = "8.25";
+    application.allocations[2].orderRemainingSnapshot = undefined;
+    api.hydrate(saved);
+    const first = api.withdrawalOrders("SUPER_ADMIN", "data", application.id, {
+      page: 1,
+      size: 10
+    });
+    expect(first.total).toBe("11");
+    expect(first.items).toHaveLength(10);
+    expect(first.items[0].products).toHaveLength(2);
+    expect(first.items[0].occupied).toBe("40.00");
+    expect(first.items[0].remainingSnapshot).toBe("8.25");
+    expect(first.items[1].remainingSnapshot).toBeNull();
+    expect(
+      api.withdrawalOrders("SUPER_ADMIN", "data", application.id, { page: 2, size: 10 }).items
+    ).toHaveLength(1);
+    expect(() => api.withdrawalOrders("PLATFORM_ADMIN", "data", application.id, {})).toThrow();
+  });
+  it("requires separate identities for operations and finance review", () => {
+    const api = createFinanceDemo();
+    const operations = { id: "t1023_operator_1", name: "t1023_Operations" };
+    const finance = { id: "t1023_finance_2", name: "t1023_Finance" };
+    expect(api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", operations).status).toBe(
+      "PENDING_FINANCE_REVIEW"
+    );
+    expect(() => api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", operations)).toThrow();
+    expect(api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", finance).status).toBe(
+      "PENDING_PAYMENT"
+    );
+  });
+
+  it("returns legacy pending-payment preview rows to operations review", () => {
+    const source = createFinanceDemo();
+    const saved = source.snapshot();
+    const legacy = saved.withdrawals.find(row => row.id === "102373")!;
+    legacy.history = [legacy.history[0]];
+    const restored = createFinanceDemo();
+    restored.hydrate(saved);
+    expect(restored.withdrawal("SUPER_ADMIN", "data", "102373").status).toBe("PENDING_REVIEW");
+    expect(restored.withdrawal("SUPER_ADMIN", "data", "102373").history.at(-1)?.action).toBe(
+      "LEGACY_REVIEW_RESET"
+    );
+  });
+
   it("redacts the response of a successful business-development review", () => {
     const api = createFinanceDemo();
     const result = api.review("BD", "data", "102371", "APPROVE", "t1023_review");
@@ -99,9 +150,9 @@ describe("finance permissions and state transitions", () => {
   });
   it("masks ordinary recipient queries and hides internal finance notes from creators", () => {
     const api = createFinanceDemo();
-    expect(api.withdrawal("OPERATOR", "data", "102374").account.account).toContain("***");
-    expect(api.withdrawal("KOL", "data", "102374").payment?.financeNote).toBe("");
-    expect(api.withdrawal("SUPER_ADMIN", "data", "102374").account.account).toBe(account.account);
+    expect(api.withdrawal("OPERATOR", "data", "102375").account.account).toContain("***");
+    expect(api.withdrawal("KOL", "data", "102375").payment?.financeNote).toBe("");
+    expect(api.withdrawal("SUPER_ADMIN", "data", "102375").account.account).toBe(account.account);
   });
   it("exposes review and payment abilities only to authorized company identities", () => {
     expect(financeAbilities(previewSubject("BD"))).toMatchObject({
@@ -143,31 +194,31 @@ describe("finance permissions and state transitions", () => {
   };
   it("blocks refund-paused payments, currency mismatch and inconsistent CNY write-off", () => {
     const api = createFinanceDemo();
-    expect(() => api.pay("SUPER_ADMIN", "data", "102373", payment, "k1")).toThrow();
-    expect(() => api.pay("FINANCE", "data", "102372", payment, "k1")).toThrow();
+    expect(() => api.pay("SUPER_ADMIN", "data", "102374", payment, "k1")).toThrow();
+    expect(() => api.pay("FINANCE", "data", "102373", payment, "k1")).toThrow();
     expect(() =>
-      api.pay("SUPER_ADMIN", "data", "102372", { ...payment, amountCny: "199.99" }, "k1")
+      api.pay("SUPER_ADMIN", "data", "102373", { ...payment, amountCny: "199.99" }, "k1")
     ).toThrow();
     expect(() =>
-      api.pay("SUPER_ADMIN", "data", "102372", { ...payment, actualCurrency: "USDT" }, "k1")
+      api.pay("SUPER_ADMIN", "data", "102373", { ...payment, actualCurrency: "USDT" }, "k1")
     ).toThrow();
     expect(() =>
-      api.pay("SUPER_ADMIN", "data", "102372", { ...payment, conversionNote: "" }, "k1")
+      api.pay("SUPER_ADMIN", "data", "102373", { ...payment, conversionNote: "" }, "k1")
     ).toThrow();
   });
   it("registers a payment once, normalizes UTC and leaves available balance unchanged", () => {
     const api = createFinanceDemo();
-    const first = api.pay("SUPER_ADMIN", "data", "102372", payment, "k1");
-    expect(api.pay("SUPER_ADMIN", "data", "102372", payment, "k1")).toEqual(first);
+    const first = api.pay("SUPER_ADMIN", "data", "102373", payment, "k1");
+    expect(api.pay("SUPER_ADMIN", "data", "102373", payment, "k1")).toEqual(first);
     expect(first.payment?.paidAt).toBe("2026-10-23T02:00:00.000Z");
     const wallet = api.incomeDetail("SUPER_ADMIN", "data", "102301", {}).income;
     expect(wallet.available).toBe("600.00");
     expect(wallet.occupied).toBe("400.00");
     expect(wallet.cumulativePaid).toBe("900.00");
     expect(() =>
-      api.pay("SUPER_ADMIN", "data", "102372", { ...payment, actualAmount: "30.00" }, "k1")
+      api.pay("SUPER_ADMIN", "data", "102373", { ...payment, actualAmount: "30.00" }, "k1")
     ).toThrow();
-    expect(() => api.pay("SUPER_ADMIN", "data", "102372", payment, "new")).toThrow();
+    expect(() => api.pay("SUPER_ADMIN", "data", "102373", payment, "new")).toThrow();
   });
   it("validates the threshold and balance and snapshots a creator application idempotently", () => {
     const api = createFinanceDemo();
@@ -190,7 +241,7 @@ describe("finance permissions and state transitions", () => {
   });
   it("retains the rejected application when a creator reapplies", () => {
     const api = createFinanceDemo();
-    const original = api.withdrawal("KOL", "data", "102375");
+    const original = api.withdrawal("KOL", "data", "102376");
     const row = api.apply("KOL", "data", {
       amount: "200.00",
       account: { ...account },
@@ -242,12 +293,14 @@ describe("preview creator identity snapshot", () => {
     expect(row.kolName).toBe(identity.name);
     expect(row.kolCode).toBe(identity.kolCode);
     expect(row.history[0].actor).toBe(identity.name);
-    expect(api.listWithdrawals("SUPER_ADMIN", "data", { kol: identity.name }).items).toContainEqual(
-      row
-    );
+    expect(row.allocations[0].orderRemainingSnapshot).toBeNull();
+    expect(api.withdrawalOrders("KOL", "data", row.id, {}).items[0].remainingSnapshot).toBeNull();
     expect(
-      api.listWithdrawals("SUPER_ADMIN", "data", { kol: identity.kolCode }).items
+      api.listWithdrawals("SUPER_ADMIN", "data", { kolId: identity.kolCode }).items
     ).toContainEqual(row);
+    expect(
+      api.listWithdrawals("SUPER_ADMIN", "data", { kolId: identity.name }).items
+    ).not.toContainEqual(row);
     identity.name = "changed";
     expect(api.withdrawal("KOL", "data", row.id).kolName).toBe("t1023_Commission Preview");
   });

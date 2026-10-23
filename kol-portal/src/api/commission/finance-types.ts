@@ -1,7 +1,12 @@
 export type FinanceRole = "SUPER_ADMIN" | "OPERATOR" | "BD" | "FINANCE" | "PLATFORM_ADMIN" | "KOL";
 export type Scenario = "data" | "empty" | "error" | "long";
 export type WithdrawalStatus =
-  "PENDING_REVIEW" | "PENDING_PAYMENT" | "PAID" | "REJECTED" | "WITHDRAWN";
+  | "PENDING_REVIEW"
+  | "PENDING_FINANCE_REVIEW"
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "REJECTED"
+  | "WITHDRAWN";
 export interface Page<T> {
   items: T[];
   total: string;
@@ -98,6 +103,7 @@ export interface Allocation {
   sku: string;
   occupied: string;
   remainingSnapshot: string;
+  orderRemainingSnapshot?: string | null;
 }
 export interface AccountSnapshot {
   id?: string;

@@ -3,6 +3,7 @@ import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
 import { createFinanceDemo } from "@/api/commission/finance-engine";
+import type { Page, Withdrawal, WithdrawalOrder } from "@/api/commission/finance-types";
 import { i18n } from "@/locales";
 import { notifyError } from "@/utils/notify";
 import PaymentDialog from "../PaymentDialog.vue";
@@ -11,6 +12,7 @@ import IncomeDrawer from "@/views/kol/income/IncomeDrawer.vue";
 vi.mock("@/api/commission/finance", () => ({
   getIncome: vi.fn(),
   getWithdrawal: vi.fn(),
+  getWithdrawalOrders: vi.fn(),
   payWithdrawal: vi.fn(),
   uploadWithdrawalVoucher: vi.fn(),
   downloadWithdrawalVoucher: vi.fn()
@@ -20,7 +22,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   i18n.global.locale.value = "zh-CN";
   const demo = createFinanceDemo();
-  vi.mocked(api.getWithdrawal).mockResolvedValue(demo.withdrawal("SUPER_ADMIN", "data", "102374"));
+  vi.mocked(api.getWithdrawalOrders).mockImplementation(async (id, query) =>
+    demo.withdrawalOrders("SUPER_ADMIN", "data", id, query)
+  );
+  vi.mocked(api.getWithdrawal).mockImplementation(async id =>
+    demo.withdrawal("SUPER_ADMIN", "data", id)
+  );
   vi.mocked(api.getIncome).mockResolvedValue(
     demo.incomeDetail("SUPER_ADMIN", "data", "102301", {})
   );
@@ -56,19 +63,34 @@ describe("financial drawers and payment registration", () => {
     expect(document.querySelector('[data-test="income-retry"]')).not.toBeNull();
     wrapper.unmount();
   });
-  it("shows the immutable allocation snapshot, approval history and actual payment result", async () => {
+  it("shows the request summary and paginates ten distinct associated orders", async () => {
     const wrapper = mount(WithdrawalDrawer, {
-      props: { modelValue: false, id: "102374" },
+      props: { modelValue: false, id: "102371" },
       global,
       attachTo: document.body
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
     const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
-    expect(text).toContain("剩余快照");
-    expect(text).toContain("100.00");
-    expect(text).toContain("USD");
+    expect(text).toContain("t1023_K001");
+    expect(text).toContain("200.00 CNY");
+    expect(text).toContain("关联订单（11笔）");
     expect(text).toContain("t1023_WD001");
+    expect(text).toContain("t1023_WD010");
+    expect(text).toContain("剩余快照为本次申请占用后，该笔订单当时剩余的可提现金额。");
+    expect(text).toContain("运营备注");
+    expect(text).toContain("财务备注");
+    expect(text).not.toContain("占用合计");
+    expect(api.getWithdrawalOrders).toHaveBeenCalledWith("102371", { page: 1, size: 10 });
+    expect(text).not.toContain("t1023_WD011");
+    document
+      .querySelector<HTMLButtonElement>('[data-test="withdrawal-orders-pager"] .btn-next')!
+      .click();
+    await flushPromises();
+    expect(api.getWithdrawalOrders).toHaveBeenLastCalledWith("102371", { page: 2, size: 10 });
+    expect(document.querySelector('[data-test="withdrawal-detail"]')?.textContent).toContain(
+      "t1023_WD011"
+    );
     wrapper.unmount();
   });
   it("reports a withdrawal-detail failure", async () => {
@@ -83,8 +105,59 @@ describe("financial drawers and payment registration", () => {
     expect(notifyError).toHaveBeenCalled();
     wrapper.unmount();
   });
+  it("retries a failed order page without losing the application information", async () => {
+    vi.mocked(api.getWithdrawalOrders).mockRejectedValueOnce(new Error("orders failed"));
+    const wrapper = mount(WithdrawalDrawer, {
+      props: { modelValue: true, id: "102371" },
+      global,
+      attachTo: document.body
+    });
+    await flushPromises();
+    expect(document.querySelector(".withdrawal-info")?.textContent).toContain("t1023_W001");
+    document.querySelector<HTMLButtonElement>('[data-test="withdrawal-orders-retry"]')!.click();
+    await flushPromises();
+    expect(api.getWithdrawalOrders).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[data-test="withdrawal-orders-retry"]')).toBeNull();
+    expect(document.querySelector('[data-test="withdrawal-detail"]')?.textContent).toContain(
+      "t1023_WD010"
+    );
+    wrapper.unmount();
+  });
+  it("ignores late detail and order responses after switching applications", async () => {
+    const demo = createFinanceDemo();
+    let resolveDetail!: (value: Withdrawal) => void;
+    let resolveOrders!: (value: Page<WithdrawalOrder>) => void;
+    vi.mocked(api.getWithdrawal).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveDetail = resolve;
+        })
+    );
+    vi.mocked(api.getWithdrawalOrders).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveOrders = resolve;
+        })
+    );
+    const wrapper = mount(WithdrawalDrawer, {
+      props: { modelValue: true, id: "102371" },
+      global,
+      attachTo: document.body
+    });
+    await wrapper.setProps({ id: "102375" });
+    await flushPromises();
+    resolveDetail(demo.withdrawal("SUPER_ADMIN", "data", "102371"));
+    resolveOrders(demo.withdrawalOrders("SUPER_ADMIN", "data", "102371", { page: 1, size: 10 }));
+    await flushPromises();
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain("t1023_W005");
+    expect(text).toContain("700.00 CNY");
+    expect(text).toContain("关联订单（1笔）");
+    expect(text).not.toContain("t1023_W001");
+    wrapper.unmount();
+  });
   it("blocks incomplete payment registration and inconsistent CNY amounts", async () => {
-    const row = createFinanceDemo().withdrawal("SUPER_ADMIN", "data", "102372");
+    const row = createFinanceDemo().withdrawal("SUPER_ADMIN", "data", "102373");
     const wrapper = mount(PaymentDialog, {
       props: { modelValue: false, withdrawal: row },
       global,
@@ -98,7 +171,7 @@ describe("financial drawers and payment registration", () => {
     wrapper.unmount();
   });
   it("submits an external payment and its uploaded voucher, with an idempotency key", async () => {
-    const row = createFinanceDemo().withdrawal("SUPER_ADMIN", "data", "102372");
+    const row = createFinanceDemo().withdrawal("SUPER_ADMIN", "data", "102373");
     const wrapper = mount(PaymentDialog, {
       props: { modelValue: false, withdrawal: row },
       global,
@@ -123,7 +196,7 @@ describe("financial drawers and payment registration", () => {
     document.querySelector<HTMLButtonElement>('[data-test="pay-submit"]')!.click();
     await flushPromises();
     expect(api.payWithdrawal).toHaveBeenCalledWith(
-      "102372",
+      "102373",
       expect.objectContaining({
         actualAmount: "28.57",
         actualCurrency: "USD",

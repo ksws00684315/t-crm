@@ -1,7 +1,12 @@
 export type FinanceRole = "SUPER_ADMIN" | "OPERATOR" | "BD" | "FINANCE" | "PLATFORM_ADMIN" | "KOL";
 export type Scenario = "data" | "empty" | "error" | "long";
 export type WithdrawalStatus =
-  "PENDING_REVIEW" | "PENDING_PAYMENT" | "PAID" | "REJECTED" | "WITHDRAWN";
+  | "PENDING_REVIEW"
+  | "PENDING_FINANCE_REVIEW"
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "REJECTED"
+  | "WITHDRAWN";
 export interface Page<T> {
   items: T[];
   total: string;
@@ -98,6 +103,15 @@ export interface Allocation {
   sku: string;
   occupied: string;
   remainingSnapshot: string;
+  /** Immutable remainder of this order after allocation; never inferred from a wallet. */
+  orderRemainingSnapshot?: string | null;
+}
+export interface WithdrawalOrder {
+  id: string;
+  orderNo: string;
+  products: Pick<Allocation, "id" | "image" | "product" | "sku">[];
+  occupied: string;
+  remainingSnapshot: string | null;
 }
 export interface AccountSnapshot {
   id?: string;
@@ -115,6 +129,7 @@ export interface Withdrawal {
   kolName: string;
   kolCode: string;
   bdId: string;
+  bdName?: string;
   type: "COMMISSION";
   amount: string;
   currency: "CNY";
@@ -125,16 +140,19 @@ export interface Withdrawal {
   account: AccountSnapshot;
   note: string;
   reviewNote: string;
+  operationsNote?: string | null;
   financeNote: string;
   allocations: Allocation[];
-  history: { action: string; at: string; actor: string; note: string }[];
+  estimatedTotal?: string;
+  availableTotal?: string;
+  history: { action: string; at: string; actor: string; actorId?: string; note: string }[];
   payment: PaymentRegistration | null;
   previousId: string | null;
 }
 export interface WithdrawalQuery {
   applicationNo?: string;
-  kol?: string;
-  type?: string;
+  kolId?: string;
+  bdName?: string;
   status?: string;
   page?: number;
   size?: number;

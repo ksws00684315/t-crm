@@ -132,6 +132,7 @@ export default {
   status: "Status",
   createdAt: "Application time",
   PENDING_REVIEW: "Pending review",
+  PENDING_FINANCE_REVIEW: "Pending finance review",
   PENDING_PAYMENT: "Pending payment",
   PAID: "Paid",
   REJECTED: "Rejected",

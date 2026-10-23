@@ -20,6 +20,7 @@ import type {
   SettlementConfig,
   SettlementQuery,
   WithdrawalQuery,
+  WithdrawalOrder,
   WithdrawalRequest
 } from "./finance-types";
 
@@ -207,9 +208,9 @@ export function createFinanceDemo() {
           row =>
             owned(role, row) &&
             (!query.applicationNo || row.applicationNo.includes(query.applicationNo)) &&
-            (!query.kol ||
-              `${row.kolName} ${row.kolCode}`.toLowerCase().includes(query.kol.toLowerCase())) &&
-            (!query.type || row.type === query.type) &&
+            (!query.kolId || row.kolCode.toLowerCase().includes(query.kolId.toLowerCase())) &&
+            (!query.bdName ||
+              (row.bdName ?? "").toLowerCase().includes(query.bdName.toLowerCase())) &&
             (!query.status || row.status === query.status)
         )
         .map(row => project(role, row)),
@@ -222,33 +223,66 @@ export function createFinanceDemo() {
     if (!row || !owned(role, row)) financeError(404, "COMMON_NOT_FOUND");
     return row;
   }
+  function withdrawalOrders(
+    role: FinanceRole,
+    scenario: Scenario,
+    id: string,
+    query: { page?: number; size?: number }
+  ) {
+    const source = withdrawal(role, scenario, id);
+    const grouped = new Map<string, typeof source.allocations>();
+    for (const item of source.allocations) {
+      const items = grouped.get(item.orderNo) ?? [];
+      items.push(item);
+      grouped.set(item.orderNo, items);
+    }
+    const rows: WithdrawalOrder[] = [...grouped].map(([orderNo, items]) => {
+      const snapshots = new Set(
+        items
+          .map(item => item.orderRemainingSnapshot)
+          .filter((value): value is string => value != null)
+      );
+      return {
+        id: orderNo,
+        orderNo,
+        products: items.map(({ id, image, product, sku }) => ({ id, image, product, sku })),
+        occupied: sumMoney(items.map(item => item.occupied)),
+        remainingSnapshot: snapshots.size === 1 ? [...snapshots][0] : null
+      };
+    });
+    return page(rows, query);
+  }
   function review(
     role: FinanceRole,
     scenario: Scenario,
     id: string,
     decision: "APPROVE" | "REJECT",
-    note: string
+    note: string,
+    actor: { id: string; name: string } = { id: `t1023_${role}`, name: `t1023_${role}` }
   ) {
     guard(role, scenario, true);
     if (!["BD", "SUPER_ADMIN", "FINANCE"].includes(role)) financeError(403, "AUTH_FORBIDDEN");
     const row = withdrawal(role, scenario, id);
+    if (!["PENDING_REVIEW", "PENDING_FINANCE_REVIEW"].includes(row.status))
+      financeError(409, "COMMON_CONFLICT");
+    const operationsReview = row.history.find(event => event.action === "PENDING_FINANCE_REVIEW");
     if (
-      row.status !== "PENDING_REVIEW" &&
-      !(
-        decision === "REJECT" &&
-        row.status === "PENDING_PAYMENT" &&
-        ["SUPER_ADMIN", "FINANCE"].includes(role)
-      )
+      row.status === "PENDING_FINANCE_REVIEW" &&
+      operationsReview?.actorId &&
+      operationsReview.actorId === actor.id
     )
       financeError(409, "COMMON_CONFLICT");
     if (decision === "REJECT" && !note.trim()) financeError(400);
     if (decision === "REJECT") release(row.amount);
-    row.status = decision === "APPROVE" ? "PENDING_PAYMENT" : "REJECTED";
+    if (decision === "REJECT") row.status = "REJECTED";
+    else
+      row.status = row.status === "PENDING_REVIEW" ? "PENDING_FINANCE_REVIEW" : "PENDING_PAYMENT";
     row.reviewNote = note;
     row.history.push({
       action: row.status,
       at: new Date().toISOString(),
-      actor: `t1023_${role}`,
+      actor: actor.name,
+      actorId: actor.id,
       note
     });
     return project(role, row);
@@ -318,7 +352,7 @@ export function createFinanceDemo() {
     role: FinanceRole,
     scenario: Scenario,
     payload: WithdrawalRequest,
-    identity?: { name: string; kolCode: string }
+    identity?: { id?: string; name: string; kolCode: string }
   ) {
     guard(role, scenario);
     if (role !== "KOL") financeError(403, "AUTH_FORBIDDEN");
@@ -350,7 +384,10 @@ export function createFinanceDemo() {
       applicationNo: `t1023_W${id}`,
       kolName: identity?.name ?? row.kolName,
       kolCode: identity?.kolCode ?? row.kolCode,
+      bdName: row.bdName ?? "t1023_Jordan",
       amount: payload.amount,
+      estimatedTotal: "2600.00",
+      availableTotal: incomes[0].available,
       account: structuredClone(payload.account),
       note: payload.note,
       createdAt: new Date().toISOString(),
@@ -367,8 +404,15 @@ export function createFinanceDemo() {
     });
     incomes[0].occupied = sumMoney([incomes[0].occupied, payload.amount]);
     incomes[0].available = decimal(cents(incomes[0].available) - cents(payload.amount));
-    row.allocations[0].occupied = payload.amount;
-    row.allocations[0].remainingSnapshot = incomes[0].available;
+    row.allocations = [
+      {
+        ...row.allocations[0],
+        id: `${row.id}-allocation-1`,
+        orderRemainingSnapshot: null,
+        occupied: payload.amount,
+        remainingSnapshot: incomes[0].available
+      }
+    ];
     withdrawals.unshift(row);
     idempotency.set(`apply:${payload.idempotencyKey}`, JSON.stringify([id, fingerprint]));
     return structuredClone(row);
@@ -407,6 +451,20 @@ export function createFinanceDemo() {
       incomes = structuredClone(state.incomes);
       payments = structuredClone(state.payments);
       withdrawals = structuredClone(state.withdrawals);
+      for (const row of withdrawals) {
+        if (
+          row.status === "PENDING_PAYMENT" &&
+          !row.history.some(event => event.action === "PENDING_FINANCE_REVIEW")
+        ) {
+          row.status = "PENDING_REVIEW";
+          row.history.push({
+            action: "LEGACY_REVIEW_RESET",
+            at: new Date().toISOString(),
+            actor: "t1023_Preview System",
+            note: "t1023_legacy_pending_application_returned_to_operations_review"
+          });
+        }
+      }
       config = structuredClone(state.config);
       idempotency.clear();
       for (const [key, value] of state.idempotency) idempotency.set(key, value);
@@ -414,6 +472,7 @@ export function createFinanceDemo() {
     listIncome,
     incomeDetail,
     listWithdrawals,
+    withdrawalOrders,
     withdrawal: (role: FinanceRole, scenario: Scenario, id: string) =>
       project(role, withdrawal(role, scenario, id)),
     review,

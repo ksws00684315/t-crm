@@ -286,8 +286,8 @@ seedLines.push(
 );
 seedPayments.push({
   id: "102345",
-  sourceNo: "t1023_W007",
-  withdrawalId: "102377",
+  sourceNo: "t1023_W008",
+  withdrawalId: "102378",
   type: "COMMISSION",
   kolId: "102302",
   amountCny: "300.00",
@@ -309,6 +309,7 @@ export const sales = [
 ];
 export const seedWithdrawals: Withdrawal[] = [
   "PENDING_REVIEW",
+  "PENDING_FINANCE_REVIEW",
   "PENDING_PAYMENT",
   "PENDING_PAYMENT",
   "PAID",
@@ -321,31 +322,100 @@ export const seedWithdrawals: Withdrawal[] = [
   kolName: "t1023_Alex Morgan",
   kolCode: "t1023_K001",
   bdId: "102311",
+  bdName: "t1023_Jordan",
   type: "COMMISSION",
-  amount: index === 3 ? "700.00" : "200.00",
+  amount: index === 4 ? "700.00" : "200.00",
+  estimatedTotal: "2600.00",
+  availableTotal: "600.00",
   currency: "CNY",
   status: status as Withdrawal["status"],
   createdAt: `2026-10-${String(12 + index).padStart(2, "0")}T08:00:00Z`,
-  paused: index === 2,
-  pauseReason: index === 2 ? "refundPause" : null,
+  paused: index === 3,
+  pauseReason: index === 3 ? "refundPause" : null,
   account: structuredClone(account),
   note: "t1023_application_note",
-  reviewNote: index === 4 ? "rejectExample" : "",
+  reviewNote: index === 5 ? "rejectExample" : "",
   financeNote: "",
-  allocations: [
-    {
-      id: String(102381 + index),
-      orderNo: "t1023_WD001",
-      image: demoImage,
-      product: "t1023_Canvas Tote",
-      sku: "TOTE-NAVY",
-      occupied: index === 3 ? "700.00" : "200.00",
-      remainingSnapshot: "900.00"
-    }
-  ],
-  history: [{ action: "SUBMITTED", at: "2026-10-18T08:00:00Z", actor: "t1023_Alex", note: "" }],
+  allocations:
+    index === 0
+      ? Array.from({ length: 12 }, (_, allocationIndex) => {
+          const orderIndex = allocationIndex < 2 ? 1 : allocationIndex;
+          return {
+            id: String(102381 + allocationIndex),
+            orderNo: `t1023_WD${String(orderIndex).padStart(3, "0")}`,
+            image: demoImage,
+            product: allocationIndex === 1 ? "t1023_Canvas Tote Gift Set" : "t1023_Canvas Tote",
+            sku: allocationIndex === 1 ? "TOTE-GIFT-NAVY" : "TOTE-NAVY",
+            occupied: allocationIndex < 2 ? "20.00" : "16.00",
+            remainingSnapshot: "900.00",
+            orderRemainingSnapshot: orderIndex === 1 ? "125.00" : "0.00"
+          };
+        })
+      : [
+          {
+            id: String(102381 + index),
+            orderNo: "t1023_WD001",
+            image: demoImage,
+            product: "t1023_Canvas Tote",
+            sku: "TOTE-NAVY",
+            occupied: index === 4 ? "700.00" : "200.00",
+            remainingSnapshot: "900.00",
+            orderRemainingSnapshot: "900.00"
+          }
+        ],
+  history:
+    status === "PENDING_FINANCE_REVIEW"
+      ? [
+          {
+            action: "SUBMITTED",
+            at: "2026-10-18T08:00:00Z",
+            actor: "t1023_Alex",
+            actorId: "102301",
+            note: ""
+          },
+          {
+            action: "PENDING_FINANCE_REVIEW",
+            at: "2026-10-19T08:00:00Z",
+            actor: "t1023_Operations Demo",
+            actorId: "t1023_operations",
+            note: ""
+          }
+        ]
+      : status === "PENDING_PAYMENT" || status === "PAID"
+        ? [
+            {
+              action: "SUBMITTED",
+              at: "2026-10-18T08:00:00Z",
+              actor: "t1023_Alex",
+              actorId: "102301",
+              note: ""
+            },
+            {
+              action: "PENDING_FINANCE_REVIEW",
+              at: "2026-10-19T08:00:00Z",
+              actor: "t1023_Operations Demo",
+              actorId: "t1023_operations",
+              note: ""
+            },
+            {
+              action: "PENDING_PAYMENT",
+              at: "2026-10-20T08:00:00Z",
+              actor: "t1023_Finance Demo",
+              actorId: "t1023_finance",
+              note: ""
+            }
+          ]
+        : [
+            {
+              action: "SUBMITTED",
+              at: "2026-10-18T08:00:00Z",
+              actor: "t1023_Alex",
+              actorId: "102301",
+              note: ""
+            }
+          ],
   payment:
-    index === 3
+    index === 4
       ? {
           actualAmount: "100.00",
           actualCurrency: "USD",
@@ -444,14 +514,17 @@ seedSettlements.push(
   }
 );
 seedWithdrawals.push({
-  ...structuredClone(seedWithdrawals[3]),
-  id: "102377",
-  applicationNo: "t1023_W007",
+  ...structuredClone(seedWithdrawals[4]),
+  id: "102378",
+  applicationNo: "t1023_W008",
   kolId: "102302",
   kolName: "t1023_Emma Lee",
   kolCode: "t1023_K002",
   bdId: "102312",
+  bdName: "t1023_Taylor",
   amount: "300.00",
+  estimatedTotal: "360.00",
+  availableTotal: "-40.00",
   createdAt: "2026-09-15T08:00:00Z",
   account: {
     type: "PAYPAL",
@@ -468,7 +541,31 @@ seedWithdrawals.push({
       product: "t1023_Travel Kit",
       sku: "KIT-SAND",
       occupied: "300.00",
-      remainingSnapshot: "0.00"
+      remainingSnapshot: "0.00",
+      orderRemainingSnapshot: "0.00"
+    }
+  ],
+  history: [
+    {
+      action: "SUBMITTED",
+      at: "2026-09-15T08:00:00Z",
+      actor: "t1023_Emma",
+      actorId: "102302",
+      note: ""
+    },
+    {
+      action: "PENDING_FINANCE_REVIEW",
+      at: "2026-09-16T08:00:00Z",
+      actor: "t1023_Operations Demo",
+      actorId: "t1023_operations",
+      note: ""
+    },
+    {
+      action: "PENDING_PAYMENT",
+      at: "2026-09-17T08:00:00Z",
+      actor: "t1023_Finance Demo",
+      actorId: "t1023_finance",
+      note: ""
     }
   ],
   payment: {
@@ -483,7 +580,14 @@ seedWithdrawals.push({
   }
 });
 for (const row of seedWithdrawals) {
-  if (row.status !== "PENDING_REVIEW" && row.status !== "WITHDRAWN")
+  if (
+    row.status !== "PENDING_REVIEW" &&
+    row.status !== "WITHDRAWN" &&
+    !row.history.some(
+      event =>
+        event.action === row.status || (row.status === "PAID" && event.action === "PENDING_PAYMENT")
+    )
+  )
     row.history.push({
       action: row.status === "REJECTED" ? "REJECTED" : "PENDING_PAYMENT",
       at: new Date(Date.parse(row.createdAt) + 3600000).toISOString(),
