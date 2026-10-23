@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import { nextTick, type Component } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/auth";
+import * as payoutApi from "@/api/payout-account";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
@@ -27,13 +28,18 @@ vi.mock("@/api/auth", () => ({
   changePassword: vi.fn(),
   logout: vi.fn()
 }));
+vi.mock("@/api/payout-account", () => ({
+  listPayoutAccounts: vi.fn(),
+  createPayoutAccount: vi.fn(),
+  updatePayoutAccount: vi.fn(),
+  uploadQrFile: vi.fn()
+}));
 const kol: api.KolProfile = {
   kolCode: "TEST001",
   name: "Test Creator",
   email: "creator@example.test",
   country: "US",
-  tenantName: "Test Company",
-  sheetUrl: "https://example.test/sheet"
+  tenantName: "Test Company"
 };
 const session: api.AuthSession = {
   tokenName: "X-Kol-Token",
@@ -69,14 +75,15 @@ async function page(component: Component, path: string, props = {}) {
 async function fill(wrapper: VueWrapper, values: Record<string, string>) {
   for (const [id, value] of Object.entries(values)) await wrapper.get(`#${id}`).setValue(value);
 }
-async function send(wrapper: VueWrapper) {
-  await wrapper.get("form").trigger("submit");
+async function send(wrapper: VueWrapper, selector = "form") {
+  await wrapper.get(selector).trigger("submit");
   await flushPromises();
 }
 beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
   vi.mocked(api.getMe).mockResolvedValue(kol);
+  vi.mocked(payoutApi.listPayoutAccounts).mockResolvedValue([]);
 });
 afterEach(() => {
   wrappers.splice(0).forEach(wrapper => wrapper.unmount());
@@ -250,13 +257,17 @@ describe("forgot password", () => {
 });
 
 describe("account and logout", () => {
-  it("loads read-only identity and a safe sheet link", async () => {
-    const { wrapper } = await page(Account, "/account");
+  it("loads identity and keeps system ID and email read-only", async () => {
+    const { wrapper, store } = await page(Account, "/account");
+    store.acceptSession(session);
     await flushPromises();
     expect(api.getMe).toHaveBeenCalledOnce();
-    expect(wrapper.text()).toContain(kol.kolCode);
-    expect(wrapper.text()).toContain(kol.tenantName);
-    expect(wrapper.get('a[target="_blank"]').attributes("href")).toBe(kol.sheetUrl);
+    expect((wrapper.get("input[readonly][disabled]").element as HTMLInputElement).value).toBe(
+      kol.email
+    );
+    expect(
+      (wrapper.findAll("input[readonly][disabled]")[1]?.element as HTMLInputElement).value
+    ).toBe(kol.kolCode);
   });
   it("shows an old-password error and replaces the session after a successful change", async () => {
     vi.mocked(api.changePassword)
@@ -270,10 +281,10 @@ describe("account and logout", () => {
       "new-password": "New-password2",
       "confirm-password": "New-password2"
     });
-    await send(wrapper);
+    await send(wrapper, '[data-test="password-form"]');
     expect(wrapper.text()).toContain("current password is incorrect");
     expect(store.token).toBe(session.token);
-    await send(wrapper);
+    await send(wrapper, '[data-test="password-form"]');
     expect(api.changePassword).toHaveBeenLastCalledWith({
       oldPassword: "Old-password1",
       newPassword: "New-password2"
@@ -284,13 +295,15 @@ describe("account and logout", () => {
     expect(wrapper.text()).toContain("password has been changed");
   });
   it("does not send mismatched new passwords", async () => {
-    const { wrapper } = await page(Account, "/account");
+    const { wrapper, store } = await page(Account, "/account");
+    store.acceptSession(session);
+    await flushPromises();
     await fill(wrapper, {
       "old-password": "Old-password1",
       "new-password": "New-password2",
       "confirm-password": "New-password3"
     });
-    await send(wrapper);
+    await send(wrapper, '[data-test="password-form"]');
     expect(api.changePassword).not.toHaveBeenCalled();
   });
   it.each([false, true])("clears local state after logout (server fails: %s)", async fails => {

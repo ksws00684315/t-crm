@@ -82,6 +82,49 @@ public class BizFileService {
     return file.getId();
   }
 
+  /** Registers a payment voucher directly against the commission withdrawal being paid. */
+  public Long uploadWithdrawalVoucher(
+      long tenantId, long adminId, String fileName, byte[] content) {
+    String contentType = WithdrawalFileRules.contentType(content);
+    BizFileDO file = new BizFileDO();
+    file.setTenantId(tenantId);
+    file.setBizType(FileBizType.WITHDRAWAL_VOUCHER);
+    file.setBizId(null);
+    file.setFileName(fileName(fileName));
+    file.setContentType(contentType);
+    file.setSizeBytes((long) content.length);
+    file.setContent(content);
+    file.setCreateBy(adminId);
+    file.setCreateByType("ADMIN");
+    file.setCreateTime(Instant.now());
+    files.insert(file);
+    return file.getId();
+  }
+
+  /** Binds an uploaded voucher to one withdrawal at payment registration, exactly once. */
+  public void claimWithdrawalVoucher(long tenantId, long adminId, long fileId, long withdrawalId) {
+    BizFileDO file = files.selectById(fileId);
+    if (file == null
+        || !Long.valueOf(tenantId).equals(file.getTenantId())
+        || file.getBizType() != FileBizType.WITHDRAWAL_VOUCHER
+        || file.getBizId() != null
+        || !"ADMIN".equals(file.getCreateByType())
+        || !Long.valueOf(adminId).equals(file.getCreateBy())) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    int updated =
+        files.update(
+            null,
+            new LambdaUpdateWrapper<BizFileDO>()
+                .eq(BizFileDO::getId, fileId)
+                .eq(BizFileDO::getTenantId, tenantId)
+                .isNull(BizFileDO::getBizId)
+                .set(BizFileDO::getBizId, withdrawalId));
+    if (updated == 0) {
+      throw new BusinessException(ErrorCode.FILE_IN_USE);
+    }
+  }
+
   /**
    * The file with this id when it was uploaded by the KOL; anything else is a 404, including files
    * uploaded by someone else (task 15a §4.3).

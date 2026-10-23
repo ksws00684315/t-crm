@@ -48,15 +48,10 @@ class KolOrderControllerTest {
             "78",
             Instant.parse("2026-10-15T12:00:00Z"),
             "PAID",
-            new java.math.BigDecimal("25.00"),
-            new java.math.BigDecimal("5.00"),
-            List.of(
-                new KolOrderDTO.Line(
-                    "Widget",
-                    "Blue",
-                    2,
-                    new java.math.BigDecimal("25.00"),
-                    new java.math.BigDecimal("5.00"))));
+            null,
+            "25.00",
+            "5.00",
+            List.of(new KolOrderDTO.Line("Widget", "Blue", 2, "25.00", "5.00", null, null, null)));
     when(orders.page(any())).thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
 
     mvc.perform(
@@ -64,6 +59,8 @@ class KolOrderControllerTest {
                 .param("payFrom", "2026-10-01T00:00:00Z")
                 .param("payTo", "2026-11-01T00:00:00Z")
                 .param("orderStatus", "PAID")
+                .param("orderNo", "78")
+                .param("productName", "Widget")
                 .header(KolMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].orderNo").value("78"))
@@ -78,6 +75,8 @@ class KolOrderControllerTest {
                 Instant.parse("2026-10-01T00:00:00Z"),
                 Instant.parse("2026-11-01T00:00:00Z"),
                 "PAID",
+                "78",
+                "Widget",
                 1,
                 20));
   }

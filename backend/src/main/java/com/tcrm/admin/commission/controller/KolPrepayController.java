@@ -34,6 +34,8 @@ public class KolPrepayController {
   public record PaidPrepay(
       Long id,
       String prepayNo,
+      java.time.Instant appliedAt,
+      String maskedRecipient,
       String status,
       String payAmountCny,
       String payCurrency,
@@ -132,7 +134,7 @@ public class KolPrepayController {
 
   private PaidPrepay paidPrepay(KolAccountDTO kol, long id) {
     return jdbc.queryForObject(
-        "SELECT p.id, p.prepay_no, p.deduct_from_commission, payment.pay_amount_cny, payment.pay_time, payment.pay_method, payment.voucher_file_id, wallet.balance_cny, l.id AS deduction_id FROM crm_prepay p JOIN crm_prepay_payment payment ON payment.tenant_id = p.tenant_id AND payment.prepay_id = p.id LEFT JOIN crm_commission_wallet wallet ON wallet.tenant_id = p.tenant_id AND wallet.kol_id = p.kol_id LEFT JOIN crm_commission_ledger l ON l.tenant_id = p.tenant_id AND l.source_type = 'PREPAY' AND l.source_id = p.id AND l.entry_type = 'PREPAY_DEDUCT' WHERE p.tenant_id = ? AND p.kol_id = ? AND p.id = ? AND p.status = 'PAID'",
+        "SELECT p.id, p.prepay_no, p.create_time AS applied_at, p.payout_account_masked, p.deduct_from_commission, payment.pay_amount_cny, payment.pay_time, payment.pay_method, payment.voucher_file_id, wallet.balance_cny, l.id AS deduction_id FROM crm_prepay p JOIN crm_prepay_payment payment ON payment.tenant_id = p.tenant_id AND payment.prepay_id = p.id LEFT JOIN crm_commission_wallet wallet ON wallet.tenant_id = p.tenant_id AND wallet.kol_id = p.kol_id LEFT JOIN crm_commission_ledger l ON l.tenant_id = p.tenant_id AND l.source_type = 'PREPAY' AND l.source_id = p.id AND l.entry_type = 'PREPAY_DEDUCT' WHERE p.tenant_id = ? AND p.kol_id = ? AND p.id = ? AND p.status = 'PAID'",
         (rs, index) -> {
           Boolean deduct = (Boolean) rs.getObject("deduct_from_commission");
           Deduction deduction = null;
@@ -154,6 +156,10 @@ public class KolPrepayController {
           return new PaidPrepay(
               rs.getLong("id"),
               rs.getString("prepay_no"),
+              rs.getTimestamp("applied_at") == null
+                  ? null
+                  : rs.getTimestamp("applied_at").toInstant(),
+              rs.getString("payout_account_masked"),
               "PAID",
               rs.getBigDecimal("pay_amount_cny").setScale(2).toPlainString(),
               "CNY",

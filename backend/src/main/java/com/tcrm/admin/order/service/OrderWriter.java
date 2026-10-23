@@ -8,6 +8,9 @@ import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
+import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.CommissionSettlementApi;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
@@ -24,16 +27,22 @@ public class OrderWriter {
   private final OrderItemMapper items;
   private final RefundMapper refunds;
   private final OrderAttribution attribution;
+  private final CommissionSettlementApi commission;
+  private final CurrentTenantResolver tenants;
 
   public OrderWriter(
       OrderMapper orders,
       OrderItemMapper items,
       RefundMapper refunds,
-      OrderAttribution attribution) {
+      OrderAttribution attribution,
+      CommissionSettlementApi commission,
+      CurrentTenantResolver tenants) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
     this.attribution = attribution;
+    this.commission = commission;
+    this.tenants = tenants;
   }
 
   public OrderDO find(long shopId, String remoteId) {
@@ -101,6 +110,11 @@ public class OrderWriter {
     attribution.apply(next, all, false);
     orders.updateById(next);
     all.forEach(items::updateById);
+    all.stream()
+        .map(OrderItemDO::getKolId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .forEach(kolId -> commission.ensureOrderItems(tenantId(next), kolId));
   }
 
   private void detachRefundsFromItem(Long orderItemId) {
@@ -118,6 +132,20 @@ public class OrderWriter {
         new LambdaQueryWrapper<OrderItemDO>()
             .eq(OrderItemDO::getOrderId, orderId)
             .orderByAsc(OrderItemDO::getId));
+  }
+
+  private long tenantId(OrderDO order) {
+    Long tenantId = order.getTenantId();
+    if (tenantId == null) {
+      tenantId = TenantScope.companyId();
+    }
+    if (tenantId == null) {
+      tenantId = tenants.currentLoginTenantId();
+    }
+    if (tenantId == null) {
+      throw new IllegalStateException("Commission state needs a company scope");
+    }
+    return tenantId;
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -191,6 +219,15 @@ public class OrderWriter {
       refunds.updateById(row);
     }
     refreshCompletedRefundTotals(order, all);
+    Long linkedItemId = itemId;
+    List<OrderItemDO> affected =
+        linkedItemId == null
+            ? all
+            : all.stream().filter(i -> linkedItemId.equals(i.getId())).toList();
+    affected.stream()
+        .map(OrderItemDO::getId)
+        .filter(Objects::nonNull)
+        .forEach(id -> commission.refreshRefundState(tenantId(order), id));
   }
 
   /**
@@ -226,7 +263,12 @@ public class OrderWriter {
     row.setRefundStatus(RefundDictionary.statusOf("10").name());
     row.setRefundType(RefundDictionary.typeOf(null).name());
     refunds.insert(row);
-    refreshCompletedRefundTotals(locked, listItems(locked.getId()));
+    var affected = listItems(locked.getId());
+    refreshCompletedRefundTotals(locked, affected);
+    affected.stream()
+        .map(OrderItemDO::getId)
+        .filter(Objects::nonNull)
+        .forEach(id -> commission.refreshRefundState(tenantId(locked), id));
     return true;
   }
 

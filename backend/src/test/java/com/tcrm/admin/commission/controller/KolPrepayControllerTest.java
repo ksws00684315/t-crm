@@ -65,10 +65,13 @@ class KolPrepayControllerTest {
     when(rs.getLong("voucher_file_id")).thenReturn(88L);
     when(rs.getLong("deduction_id")).thenReturn(99L);
     when(rs.getString("prepay_no")).thenReturn("PP-test");
+    when(rs.getString("payout_account_masked")).thenReturn("a***@mail.com");
     when(rs.getString("pay_method")).thenReturn("BANK");
     when(rs.getBigDecimal("pay_amount_cny")).thenReturn(new BigDecimal("300.00"));
     when(rs.getTimestamp("pay_time"))
         .thenReturn(Timestamp.from(Instant.parse("2026-10-22T04:00:00Z")));
+    when(rs.getTimestamp("applied_at"))
+        .thenReturn(Timestamp.from(Instant.parse("2026-10-20T04:00:00Z")));
   }
 
   @ParameterizedTest
@@ -86,6 +89,8 @@ class KolPrepayControllerTest {
             .andExpect(jsonPath("$.data.id").value("77"))
             .andExpect(jsonPath("$.data.status").value("PAID"))
             .andExpect(jsonPath("$.data.payAmountCny").value("300.00"))
+            .andExpect(jsonPath("$.data.appliedAt").value("2026-10-20T04:00:00Z"))
+            .andExpect(jsonPath("$.data.maskedRecipient").value("a***@mail.com"))
             .andExpect(jsonPath("$.data.reason").doesNotExist())
             .andExpect(jsonPath("$.data.payoutAccountSnapshot").doesNotExist())
             .andExpect(jsonPath("$.data.applicantId").doesNotExist());

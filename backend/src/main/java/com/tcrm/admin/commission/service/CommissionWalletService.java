@@ -68,6 +68,78 @@ public class CommissionWalletService {
         });
   }
 
+  /**
+   * Applies a signed commission correction or a completed withdrawal to the single wallet ledger.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public BigDecimal postSignedEntry(
+      long tenantId,
+      long kolId,
+      long sourceId,
+      String sourceKey,
+      String entryType,
+      BigDecimal signedAmount,
+      Instant occurredAt,
+      Long operatorId) {
+    if (tenantId <= 0
+        || kolId <= 0
+        || sourceId <= 0
+        || sourceKey == null
+        || sourceKey.isBlank()
+        || sourceKey.length() > 120
+        || signedAmount == null
+        || signedAmount.signum() == 0
+        || signedAmount.scale() > 2
+        || occurredAt == null
+        || !List.of("COMMISSION_ADJUSTMENT", "COMMISSION_WITHDRAWAL").contains(entryType)
+        || ("COMMISSION_WITHDRAWAL".equals(entryType) && signedAmount.signum() >= 0)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          if (kols.listByIds(List.of(kolId)).isEmpty()) {
+            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+          }
+          ensureWallet(tenantId, kolId);
+          BigDecimal balance = lockBalance(tenantId, kolId);
+          BigDecimal existing =
+              existingEntry(tenantId, kolId, "COMMISSION", sourceId, sourceKey, signedAmount);
+          if (existing != null) {
+            return existing;
+          }
+          BigDecimal next = balance.add(signedAmount).setScale(2, RoundingMode.UNNECESSARY);
+          Instant now = now();
+          long ledgerId = IdWorker.getId();
+          jdbc.update(
+              "INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type, source_id, source_key, occurred_at, balance_after_cny, create_by, create_time) VALUES (?, ?, ?, ?, ?, 'COMMISSION', ?, ?, ?, ?, ?, ?)",
+              ledgerId,
+              tenantId,
+              kolId,
+              entryType,
+              signedAmount,
+              sourceId,
+              sourceKey,
+              Timestamp.from(truncate(occurredAt)),
+              next,
+              operatorId,
+              Timestamp.from(now));
+          if (signedAmount.signum() > 0) {
+            allocateFifo(
+                new CreditCommand(tenantId, kolId, sourceId, sourceKey, signedAmount, occurredAt),
+                ledgerId,
+                signedAmount);
+          }
+          jdbc.update(
+              "UPDATE crm_commission_wallet SET balance_cny = ?, update_time = ? WHERE tenant_id = ? AND kol_id = ?",
+              next,
+              Timestamp.from(now),
+              tenantId,
+              kolId);
+          return next;
+        });
+  }
+
   @Transactional(rollbackFor = Exception.class)
   public BigDecimal postPrepayDeduction(
       long tenantId,
@@ -127,7 +199,15 @@ public class CommissionWalletService {
   /** Balance and configured withdrawal threshold for the future withdrawal application flow. */
   @Transactional(readOnly = true)
   public Balance withdrawalEligibility(long tenantId, long kolId) {
-    BigDecimal minimum = BigDecimal.valueOf(configs.getInt("commission.minimum-withdrawal-cny"));
+    List<BigDecimal> configured =
+        jdbc.query(
+            "SELECT minimum_withdrawal_cny FROM crm_commission_rule_version WHERE tenant_id=? ORDER BY version_no DESC LIMIT 1",
+            (rs, index) -> rs.getBigDecimal(1),
+            tenantId);
+    BigDecimal minimum =
+        configured.isEmpty()
+            ? BigDecimal.valueOf(configs.getInt("commission.minimum-withdrawal-cny"))
+            : configured.getFirst();
     return balance(tenantId, kolId, minimum);
   }
 

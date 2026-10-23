@@ -19,6 +19,8 @@ import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
+import com.tcrm.admin.shared.api.CommissionSettlementApi;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +35,10 @@ class OrderWriterTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderAttribution attribution = mock(OrderAttribution.class);
-  private final OrderWriter writer = new OrderWriter(orders, items, refunds, attribution);
+  private final CommissionSettlementApi commission = mock(CommissionSettlementApi.class);
+  private final CurrentTenantResolver tenants = mock(CurrentTenantResolver.class);
+  private final OrderWriter writer =
+      new OrderWriter(orders, items, refunds, attribution, commission, tenants);
 
   @BeforeAll
   static void metadata() {
@@ -83,6 +88,18 @@ class OrderWriterTest {
     verify(items).insert(i);
     verify(attribution).apply(o, List.of(i), false);
     assertThat(i.getOrderId()).isEqualTo(10L);
+  }
+
+  @Test
+  void materializesCommissionRowsForAttributedLinesAfterOrderWrite() {
+    var o = order();
+    var i = item(20, "sub", "sku");
+    i.setKolId(77L);
+    when(items.selectList(any())).thenReturn(List.of(), List.of(i));
+
+    writer.save(new OrderPayloadDTO(o, List.of(i)));
+
+    verify(commission).ensureOrderItems(1L, 77L);
   }
 
   @Test

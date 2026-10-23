@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.KolMvcSupport;
 import com.tcrm.admin.kol.service.KolAuthService;
+import com.tcrm.admin.kol.service.KolPortalProfileDTO;
+import com.tcrm.admin.kol.service.KolPortalProfileService;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.ClientIpResolver;
@@ -25,12 +27,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 class KolAuthControllerTest {
   private final KolAuthService auth = mock(KolAuthService.class);
+  private final KolPortalProfileService profiles = mock(KolPortalProfileService.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final MockMvc mvc =
       KolMvcSupport.build(
           current,
           new KolAuthController(
-              auth, new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
+              auth, profiles, new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
 
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
@@ -163,12 +166,16 @@ class KolAuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"oldPassword\":\"old-pass-123\",\"newPassword\":\"new-pass-123\"}"))
         .andExpect(status().isUnauthorized());
-    verifyNoInteractions(auth, current);
+    verifyNoInteractions(auth, current, profiles);
   }
 
   @Test
   void shouldServeMeAndLogout_whenKolTokenIsPresent() throws Exception {
     when(auth.me()).thenReturn(kol());
+    when(profiles.get())
+        .thenReturn(
+            new KolPortalProfileDTO(
+                "KOL0001", "TikTok", "@alice", "APPROVED", "NORMAL", "PROMOTING", null, null));
     String token = KolMvcSupport.actAs(current, kol());
     mvc.perform(get("/kol-api/me").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk())
@@ -176,7 +183,9 @@ class KolAuthControllerTest {
         .andExpect(jsonPath("$.data.tenantName").value("Acme"))
         .andExpect(jsonPath("$.data.phone").value("+15550002222"))
         .andExpect(jsonPath("$.data.whatsapp").value("+15550001111"))
-        .andExpect(jsonPath("$.data.sheetUrl").value("https://docs.google.com/spreadsheets/d/abc"));
+        .andExpect(jsonPath("$.data.systemId").value("KOL0001"))
+        .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"))
+        .andExpect(jsonPath("$.data.sheetUrl").doesNotExist());
     mvc.perform(post("/kol-api/auth/logout").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(auth).logout();

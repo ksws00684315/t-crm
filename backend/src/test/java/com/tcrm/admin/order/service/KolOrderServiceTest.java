@@ -63,11 +63,11 @@ class KolOrderServiceTest {
                 "1234****9012",
                 order.getPayTime(),
                 "PAID",
-                new BigDecimal("25.00"),
-                new BigDecimal("5.00"),
+                null,
+                "25.00",
+                "5.00",
                 List.of(
-                    new KolOrderDTO.Line(
-                        "Widget", "Blue", 2, new BigDecimal("25.00"), new BigDecimal("5.00")))));
+                    new KolOrderDTO.Line("Widget", "Blue", 2, "25.00", "5.00", null, null, null))));
     var query = ArgumentCaptor.forClass(Wrapper.class);
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -113,6 +113,18 @@ class KolOrderServiceTest {
   }
 
   @Test
+  void shouldFilterMaskedOrderNumberAndOwnProductName() {
+    when(orders.selectPage(any(), any())).thenReturn(page());
+    service.page(new KolOrderFilterDTO(null, null, null, "1234****9012", "Widget", 1, 20));
+
+    ArgumentCaptor<Wrapper<OrderDO>> query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getCustomSqlSegment())
+        .contains("weidian_order_id", "crm_order_item", "POSITION")
+        .doesNotContain("kol_id = 999");
+  }
+
+  @Test
   void shouldReturnAnEmptyPageWithoutReadingLines_whenNothingMatches() {
     when(orders.selectPage(any(), any())).thenReturn(page());
 
@@ -142,9 +154,9 @@ class KolOrderServiceTest {
 
     var row = service.page(new KolOrderFilterDTO(null, null, null, 1, 20)).items().getFirst();
 
-    assertThat(row.payAmount()).isEqualByComparingTo("0.00");
-    assertThat(row.refundAmount()).isEqualByComparingTo("0.00");
-    assertThat(row.items().getFirst().payAmount()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(row.payAmount()).isEqualTo("0.00");
+    assertThat(row.refundAmount()).isEqualTo("0.00");
+    assertThat(row.items().getFirst().payAmount()).isEqualTo("0.00");
   }
 
   @Test

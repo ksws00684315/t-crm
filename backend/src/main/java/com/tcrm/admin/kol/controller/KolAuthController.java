@@ -2,6 +2,8 @@ package com.tcrm.admin.kol.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.tcrm.admin.kol.service.KolAuthService;
+import com.tcrm.admin.kol.service.KolPortalProfileDTO;
+import com.tcrm.admin.kol.service.KolPortalProfileService;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.ClientIpResolver;
@@ -25,10 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class KolAuthController {
   private final KolAuthService auth;
+  private final KolPortalProfileService profiles;
   private final ClientIpResolver clientIps;
 
-  public KolAuthController(KolAuthService auth, ClientIpResolver clientIps) {
+  public KolAuthController(
+      KolAuthService auth, KolPortalProfileService profiles, ClientIpResolver clientIps) {
     this.auth = auth;
+    this.profiles = profiles;
     this.clientIps = clientIps;
   }
 
@@ -84,7 +89,15 @@ public class KolAuthController {
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @GetMapping("/kol-api/me")
   public R<KolMeVO> me() {
-    return R.ok(KolMeVO.from(auth.me()));
+    return R.ok(KolMeVO.from(auth.me(), profiles.get()));
+  }
+
+  /** Updates only the fields granted to the signed-in creator. */
+  @SaCheckLogin(type = StpKolUtil.TYPE)
+  @PutMapping("/kol-api/me")
+  public R<KolMeVO> updateMe(@jakarta.validation.Valid @RequestBody KolMeUpdateRequest request) {
+    profiles.update(request.name(), request.primaryPlatform(), request.primaryHandle());
+    return R.ok(KolMeVO.from(auth.me(), profiles.get()));
   }
 
   /** Returns a fresh login so the current session survives its own password change. */
@@ -108,7 +121,7 @@ public class KolAuthController {
   /** Company choice for a multi-company login (§4.8). */
   public record KolCompanyVO(String tenantId, String tenantName) {}
 
-  /** {@code kol} mirrors GET /kol-api/me (§4.8), including the task 11 profile fields. */
+  /** {@code kol} mirrors the public part of GET /kol-api/me, including the task 60 fields. */
   public record KolMeVO(
       String kolCode,
       String name,
@@ -117,7 +130,14 @@ public class KolAuthController {
       String country,
       String tenantName,
       String whatsapp,
-      String sheetUrl) {
+      String systemId,
+      String primaryPlatform,
+      String primaryHandle,
+      String reviewStatus,
+      String loginStatus,
+      String relationStatus,
+      String commissionRate,
+      java.time.Instant rateEffectiveAt) {
     static KolMeVO from(KolAccountDTO kol) {
       return new KolMeVO(
           kol.kolCode(),
@@ -127,7 +147,33 @@ public class KolAuthController {
           kol.country(),
           kol.tenantName(),
           kol.whatsapp(),
-          kol.sheetUrl());
+          kol.kolCode(),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null);
+    }
+
+    static KolMeVO from(KolAccountDTO kol, KolPortalProfileDTO profile) {
+      return new KolMeVO(
+          kol.kolCode(),
+          kol.name(),
+          kol.email(),
+          kol.phone(),
+          kol.country(),
+          kol.tenantName(),
+          kol.whatsapp(),
+          profile.systemId(),
+          profile.primaryPlatform(),
+          profile.primaryHandle(),
+          profile.reviewStatus(),
+          profile.loginStatus(),
+          profile.relationStatus(),
+          profile.commissionRate(),
+          profile.rateEffectiveAt());
     }
   }
 

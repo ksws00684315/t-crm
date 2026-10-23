@@ -39,6 +39,8 @@ public class KolOrderService {
             && filter.payTo() != null
             && !filter.payFrom().isBefore(filter.payTo()))
         || (filter.orderStatus() != null && !STATUSES.contains(filter.orderStatus()))
+        || (filter.orderNo() != null && filter.orderNo().length() > 128)
+        || (filter.productName() != null && filter.productName().length() > 128)
         || filter.page() < 1
         || filter.page() > MAX_PAGE
         || filter.size() < 1
@@ -54,6 +56,27 @@ public class KolOrderService {
             .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
             .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
             .orderByDesc(OrderDO::getPayTime, OrderDO::getId);
+    String orderNo = trimToNull(filter.orderNo());
+    if (orderNo != null) {
+      int mask = orderNo.indexOf('*');
+      if (mask < 0) {
+        query.like(OrderDO::getWeidianOrderId, orderNo);
+      } else {
+        String prefix = orderNo.substring(0, mask);
+        String suffix = orderNo.substring(orderNo.lastIndexOf('*') + 1);
+        query.likeRight(!prefix.isEmpty(), OrderDO::getWeidianOrderId, prefix);
+        query.likeLeft(!suffix.isEmpty(), OrderDO::getWeidianOrderId, suffix);
+      }
+    }
+    String productName = trimToNull(filter.productName());
+    if (productName != null) {
+      query.exists(
+          "SELECT 1 FROM crm_order_item oi"
+              + " WHERE oi.order_id = crm_order.id AND oi.kol_id = {0}"
+              + " AND oi.is_deleted = FALSE"
+              + " AND POSITION({1} IN LOWER(oi.item_name)) > 0",
+          kol.id(), productName.toLowerCase(java.util.Locale.ROOT));
+    }
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);
     if (result.getRecords().isEmpty()) {
       return new PageResult<KolOrderDTO>(
@@ -80,8 +103,9 @@ public class KolOrderService {
                       maskOrderNo(order.getWeidianOrderId()),
                       order.getPayTime(),
                       order.getOrderStatus(),
-                      money(payAmount),
-                      money(refundAmount),
+                      null,
+                      moneyText(payAmount),
+                      moneyText(refundAmount),
                       ownItems.stream()
                           .map(
                               item ->
@@ -89,8 +113,11 @@ public class KolOrderService {
                                       item.getItemName(),
                                       item.getSkuName(),
                                       item.getQuantity(),
-                                      money(item.getPayAmount()),
-                                      money(item.getRefundAmount())))
+                                      moneyText(item.getPayAmount()),
+                                      moneyText(item.getRefundAmount()),
+                                      null,
+                                      null,
+                                      null))
                           .toList());
                 })
             .toList(),
@@ -116,9 +143,14 @@ public class KolOrderService {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
-  private static BigDecimal money(BigDecimal value) {
-    return value == null
-        ? BigDecimal.ZERO.setScale(2)
-        : value.setScale(2, java.math.RoundingMode.HALF_UP);
+  private static String moneyText(BigDecimal value) {
+    return (value == null
+            ? BigDecimal.ZERO.setScale(2)
+            : value.setScale(2, java.math.RoundingMode.HALF_UP))
+        .toPlainString();
+  }
+
+  private static String trimToNull(String value) {
+    return value == null || value.isBlank() ? null : value.strip();
   }
 }

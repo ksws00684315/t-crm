@@ -125,6 +125,17 @@ class PrepayMigrationIT {
       flyway(postgres, "202610231000").migrate();
       assertThat(jdbc.queryForObject("SELECT count(*) FROM sys_user_permission", Integer.class))
           .isEqualTo(6);
+      flyway(postgres, "202610240517").migrate();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('crm_commission_item_state','crm_commission_item_revision','crm_commission_withdrawal','crm_commission_withdrawal_allocation','crm_commission_withdrawal_payment','crm_commission_withdrawal_history')",
+                  Integer.class))
+          .isEqualTo(6);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('crm_commission_wallet','crm_commission_ledger')",
+                  Integer.class))
+          .isEqualTo(2);
     }
   }
 
