@@ -424,9 +424,19 @@ onBeforeUnmount(() => {
 .layout__watermark :deep(> div) {
   height: 100%;
   min-height: 0;
+  /* Route pages scroll inside the content area when they outgrow the viewport (task 53 §1.2);
+     the horizontal axis stays hidden so only table bodies scroll sideways. List pages still
+     scroll inside DataTable because its max-height is measured against this container. The
+     watermark mask is also a direct child div, but it is absolutely positioned without
+     content, so the overflow properties cannot affect it. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .layout__watermark :deep(> .home) {
   height: auto;
+  /* Hugs its content (task 36 review) yet is capped so a tall workbench scrolls in the
+     content area instead of being clipped. */
+  max-height: 100%;
 }
 @media (max-width: 991px) {
   .layout__label,

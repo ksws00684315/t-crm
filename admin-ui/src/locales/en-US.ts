@@ -382,12 +382,13 @@ const enUS: MessageSchema = {
   systemConfig: {
     notice:
       "Changes take effect immediately without a restart. Secrets remain in server environment variables.",
-    groups: {
-      site: "Site",
-      url: "URLs",
-      business: "Business Defaults and Limits",
-      security: "Rate Limits and Security"
-    },
+    key: "Config key",
+    description: "Description",
+    value: "Value",
+    keywordPlaceholder: "Filter by key or description",
+    editTitle: "Edit Configuration",
+    defaultValueHint: "Default: {value}",
+    rangeHint: "Allowed range: {min}–{max}",
     items: {
       site_name: "System name",
       mail_from: "Mail sender",
@@ -421,12 +422,7 @@ const enUS: MessageSchema = {
       product_links_resolve_token_per_minute: "Token resolutions per minute",
       weidian_qps: "Weidian requests per second"
     },
-    currentValue: "Current",
-    defaultValue: "Default",
-    range: "Range",
-    overridden: "Modified",
     restoreDefault: "Restore default",
-    editPrompt: "Enter a new value",
     integerRequired: "Enter an integer",
     saved: "Saved and applied immediately",
     restored: "Restored to default",

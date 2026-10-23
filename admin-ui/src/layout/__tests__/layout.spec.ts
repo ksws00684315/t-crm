@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
@@ -318,5 +320,48 @@ describe("layout tenant label", () => {
     });
     await wrapper.get("[data-test=menu-search]").trigger("click");
     expect(useMenuSearchStore().visible).toBe(true);
+  });
+});
+
+/** Declaration block of one selector in the scoped stylesheet; jsdom does not apply SFC styles. */
+function declarationsFor(css: string, selector: string): Record<string, string> {
+  const index = css.indexOf(selector);
+  expect(index, `${selector} must stay in the layout stylesheet`).toBeGreaterThanOrEqual(0);
+  const open = css.indexOf("{", index);
+  const close = css.indexOf("}", open);
+  return Object.fromEntries(
+    css
+      .slice(open + 1, close)
+      .replace(/\/\*[^]*?\*\//g, "")
+      .split(";")
+      .map(line => line.split(":"))
+      .filter(parts => parts.length >= 2)
+      .map(parts => [parts[0].trim(), parts.slice(1).join(":").trim()])
+  );
+}
+
+describe("content area scrolling (task 53 §1)", () => {
+  const source = readFileSync(resolve(__dirname, "../index.vue"), "utf8");
+  const scoped = source.slice(
+    source.indexOf("<style scoped>") + "<style scoped>".length,
+    source.indexOf("</style>")
+  );
+
+  it("lets the route page container scroll vertically, never horizontally", () => {
+    const page = declarationsFor(scoped, ".layout__watermark :deep(> div)");
+    expect(page["overflow-y"]).toBe("auto");
+    expect(page["overflow-x"]).toBe("hidden");
+  });
+
+  it("keeps the main area clipping so list pages still scroll inside DataTable", () => {
+    const main = declarationsFor(scoped, ".layout__main");
+    expect(main.overflow).toBe("hidden");
+    expect(main["min-height"]).toBe("0");
+  });
+
+  it("keeps the workbench card content-sized yet scrollable when it outgrows the viewport", () => {
+    const home = declarationsFor(scoped, ".layout__watermark :deep(> .home)");
+    expect(home.height).toBe("auto");
+    expect(home["max-height"]).toBe("100%");
   });
 });

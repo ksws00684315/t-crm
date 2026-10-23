@@ -370,7 +370,13 @@ const zhCN = {
   },
   systemConfig: {
     notice: "保存后立即生效，无需重启。密钥类配置不在此处，仍由服务器环境变量管理。",
-    groups: { site: "站点", url: "地址", business: "业务默认值与上限", security: "限流与安全" },
+    key: "配置键",
+    description: "说明",
+    value: "值",
+    keywordPlaceholder: "输入配置键或说明",
+    editTitle: "编辑配置",
+    defaultValueHint: "默认值：{value}",
+    rangeHint: "允许范围：{min}–{max}",
     items: {
       site_name: "系统名称",
       mail_from: "邮件发件人",
@@ -404,12 +410,7 @@ const zhCN = {
       product_links_resolve_token_per_minute: "令牌解析每分钟上限",
       weidian_qps: "微店接口每秒请求数"
     },
-    currentValue: "当前值",
-    defaultValue: "默认值",
-    range: "允许范围",
-    overridden: "已修改",
     restoreDefault: "恢复默认",
-    editPrompt: "请输入新的配置值",
     integerRequired: "请输入整数",
     saved: "配置已保存并立即生效",
     restored: "已恢复默认值",
