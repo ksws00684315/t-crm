@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getKolItems } from "@/api/items";
-import { i18n } from "@/locales";
+import { enUS, i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
@@ -61,7 +61,7 @@ describe("items page", () => {
     vi.mocked(getKolItems).mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
     const wrapper = await mountPage();
     await wrapper.find('[data-test="items-keyword"]').setValue("Golden");
-    await wrapper.find('[data-test="items-search"]').trigger("submit");
+    await wrapper.find('[data-test="search"]').trigger("click");
     await flushPromises();
     expect(getKolItems).toHaveBeenLastCalledWith({ keyword: "Golden", page: 1, size: 20 });
   });
@@ -98,5 +98,17 @@ describe("items page", () => {
     expect(wrapper.text()).toContain("Golden Ring");
     // No image: the card renders the initial instead of a broken image.
     expect(wrapper.find(".item-card__image--empty").exists()).toBe(true);
+  });
+
+  it("lists the item table columns with the copy action in the actions column", async () => {
+    vi.mocked(getKolItems).mockResolvedValue({ items: [item], total: 1, page: 1, size: 20 });
+    const wrapper = await mountPage();
+    const table = wrapper.find(".items-table").text();
+    expect(table).toContain(enUS.items.colItem);
+    expect(table).toContain(enUS.items.colId);
+    expect(table).toContain(enUS.items.colCreated);
+    expect(table).toContain(enUS.common.actions);
+    expect(wrapper.find('[data-test="row-actions"] [data-test="item-copy"]').exists()).toBe(true);
+    wrapper.unmount();
   });
 });

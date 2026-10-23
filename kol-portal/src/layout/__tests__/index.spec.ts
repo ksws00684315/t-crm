@@ -23,7 +23,7 @@ describe("layout header", () => {
 
   it("renders English brand and sign out by default", () => {
     const wrapper = mountLayout();
-    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack Creator Portal");
+    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack Creator");
     expect(wrapper.find("button").text()).toContain("Sign out");
     expect(wrapper.findComponent(LocaleSwitch).exists()).toBe(true);
     expect(NAV_ITEMS.map(item => item.title)).toContain("nav.orders");
@@ -71,6 +71,15 @@ describe("layout navigation", () => {
     expect(links[0].attributes("aria-current")).toBe("page");
     expect(links[1].attributes("aria-current")).toBeUndefined();
     expect(links[2].attributes("aria-current")).toBeUndefined();
+  });
+
+  it("gives every side-menu entry an Element Plus icon", async () => {
+    const wrapper = await mountAt("/");
+    const links = wrapper.findAll(".shell__nav-link");
+    expect(links).toHaveLength(NAV_ITEMS.length);
+    for (const link of links) {
+      expect(link.find(".el-icon").exists()).toBe(true);
+    }
   });
 
   it("marks the payout entry current on its page and translates it", async () => {
