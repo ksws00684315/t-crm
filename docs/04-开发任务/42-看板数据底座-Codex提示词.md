@@ -1,6 +1,6 @@
 # 任务 42：看板数据底座（后端汇总 + 管理端公共组件，1018 表 P1「GG」与「数据统计口径」）
 
-> **执行环境**：本机。工作树 `/Users/hh-mini/Public/dev/t-crm/.worktrees/42-dashboard-base`，分支 `task/42-dashboard-base`，已检出；**开工前先 `git merge origin/main`**（任务 37～41 已于 2026-10-22 全部合并）。后端端口 `TCRM_ADMIN_PORT=18421`，管理端 Vite `8842`。迁移版本号只用 `V202610231000`～`V202610231029`。
+> **执行环境**：本机。工作树 `/Users/hh-mini/Public/dev/t-crm/.worktrees/42-dashboard-base`，分支 `task/42-dashboard-base`，已检出；**开工前先 `git merge origin/main`**（任务 37～41 已于 2026-10-22 全部合并）。后端端口 `TCRM_ADMIN_PORT=18421`，管理端 Vite `8842`。迁移版本号只用 `V202610241000`～`V202610241029`。
 >
 > **先完整阅读 [`本机任务通用要求.md`](本机任务通用要求.md)**，其中的工作目录、共享中间件、子代理检查、交付规则全部适用。
 >
