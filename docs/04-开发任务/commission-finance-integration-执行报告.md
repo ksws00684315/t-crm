@@ -26,6 +26,7 @@
 - 浏览器：原系统管理端 `http://127.0.0.1:18941/`，达人端 `http://127.0.0.1:18944/`。截图和矩阵见 `assets/task-commission-integration/` 与 `assets/task-commission-integration/浏览器验收记录.md`。
 - 后端 Maven `verify`：BUILD SUCCESS；1718项单元测试、架构、格式和静态检查通过。
 - 后端最新主线 `mvn verify`：BUILD SUCCESS；1718项单测、架构、格式和静态检查通过。后端 `-Pdocker-it verify`：BUILD SUCCESS；Failsafe 246项全部通过，Testcontainers 空库验证75个迁移。JaCoCo 对 JSQLParser 生成方法有插桩告警，但 Maven 和用例均成功。
+- PR #112 的 GitHub Actions 检查未能启动：GitHub 标注账户付款失败或支出额度限制，所有工作流均在执行步骤开始前终止；这是仓库外部 CI 资源阻塞，不是检查运行后的代码失败。对应 [Actions 运行记录](https://github.com/ksws00684315/t-crm/actions/runs/39947384058)。本地前后端检查结果见上文。
 - 达人端：lint、类型检查、209项测试、构建和生产依赖审计通过。
 - 管理端：lint、Prettier、类型检查、生产构建和生产依赖审计通过；全量98个测试文件、678项通过。合并页测试夹具已覆盖有权审核场景。
 - 两端许可证清单已使用 Windows 等价命令手工生成并比对一致。仓库的 `notices:check` 脚本使用 Unix `mkdir -p` 和 `diff`，在 PowerShell 下直接运行失败，属于脚本平台兼容问题。
