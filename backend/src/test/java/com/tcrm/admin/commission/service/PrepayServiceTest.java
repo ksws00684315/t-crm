@@ -12,10 +12,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
+import com.tcrm.admin.commission.mapper.PrepayMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
 import com.tcrm.admin.commission.model.PayoutAccountStatus;
 import com.tcrm.admin.commission.model.PayoutAccountType;
+import com.tcrm.admin.commission.model.PrepayApplicationColumns;
+import com.tcrm.admin.commission.model.PrepayDeductionRow;
+import com.tcrm.admin.commission.model.PrepayHead;
+import com.tcrm.admin.commission.model.PrepayHistoryRow;
+import com.tcrm.admin.commission.model.PrepayPageQuery;
+import com.tcrm.admin.commission.model.PrepayPaymentRow;
+import com.tcrm.admin.commission.model.PrepayRecipientRow;
+import com.tcrm.admin.commission.model.PrepayWrite;
 import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
@@ -27,10 +36,10 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.system.api.AccountNameApi;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -52,11 +61,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Answers;
+import org.mockito.invocation.InvocationOnMock;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.ResultSetExtractor;
-import org.springframework.jdbc.core.RowMapper;
 
 /** State transitions, authorization and money invariants; SQL execution is covered by the ITs. */
 class PrepayServiceTest {
@@ -71,69 +77,14 @@ class PrepayServiceTest {
   private final SecretCipher cipher = mock(SecretCipher.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
+  private final AccountNameApi accountNames = mock(AccountNameApi.class);
   private final List<Write> writes = new ArrayList<>();
   private final List<String> reads = new ArrayList<>();
+  private final List<PageCall> pageCalls = new ArrayList<>();
   private final List<Rows> fixtures = new ArrayList<>();
   private final Map<String, Object> scalars = new HashMap<>();
   private int changed = 1;
-  private final JdbcTemplate jdbc =
-      mock(
-          JdbcTemplate.class,
-          invocation -> {
-            Object[] args = invocation.getArguments();
-            if (args.length == 0 || !(args[0] instanceof String sql)) {
-              return Answers.RETURNS_DEFAULTS.answer(invocation);
-            }
-            if (invocation.getMethod().getName().equals("update")) {
-              writes.add(new Write(sql, Arrays.asList(args).subList(1, args.length)));
-              return changed;
-            }
-            reads.add(sql);
-            if (args[1] instanceof Class<?> type) {
-              for (var entry : scalars.entrySet()) {
-                if (sql.contains(entry.getKey())) {
-                  return entry.getValue();
-                }
-              }
-              if (type == Integer.class) {
-                return 1;
-              }
-              if (type == Long.class) {
-                return 1L;
-              }
-              if (type == BigDecimal.class) {
-                return new BigDecimal("100.00");
-              }
-              if (type == String.class) {
-                return "WAITING_DETAILS";
-              }
-            }
-            List<Map<String, Object>> data =
-                fixtures.stream()
-                    .filter(f -> f.sql().test(sql))
-                    .findFirst()
-                    .map(Rows::data)
-                    .orElse(List.of());
-            if (args[1] instanceof RowMapper<?> mapper) {
-              List<Object> mapped = new ArrayList<>();
-              for (int index = 0; index < data.size(); index++) {
-                mapped.add(mapper.mapRow(resultSet(data.get(index)), index));
-              }
-              if (invocation.getMethod().getName().equals("queryForObject")) {
-                if (mapped.isEmpty()) {
-                  throw new EmptyResultDataAccessException(1);
-                }
-                return mapped.getFirst();
-              }
-              return mapped;
-            }
-            if (args[1] instanceof ResultSetExtractor<?> extractor) {
-              ResultSet rs = resultSet(data.isEmpty() ? Map.of() : data.getFirst());
-              when(rs.next()).thenReturn(!data.isEmpty(), false);
-              return extractor.extractData(rs);
-            }
-            return Answers.RETURNS_DEFAULTS.answer(invocation);
-          });
+  private final PrepayMapper prepays = mock(PrepayMapper.class, this::answer);
   private PrepayService service;
 
   @BeforeEach
@@ -141,8 +92,9 @@ class PrepayServiceTest {
     service =
         spy(
             new PrepayService(
-                jdbc,
+                prepays,
                 kols,
+                accountNames,
                 accounts,
                 files,
                 cipher,
@@ -809,17 +761,35 @@ class PrepayServiceTest {
 
   @Test
   void shouldListFinanceTasksAcrossBdScopeButBindCompanyAndFilters() {
+    when(kols.getByCode("KOL-test")).thenReturn(kol(5L));
     var result =
         service.page(
             user("prepay:pay"), new PrepayService.Filter(" PP-test ", " KOL-test ", "PAID", 2, 10));
     assertThat(result.page()).isEqualTo(2);
     assertThat(result.items()).hasSize(1);
-    assertThat(reads)
-        .anyMatch(
-            sql ->
-                sql.contains(
-                    "p.tenant_id = ? AND p.prepay_no = ? AND k.kol_code = ? AND p.status = ?"));
+    assertThat(pageCalls)
+        .singleElement()
+        .satisfies(
+            call -> {
+              assertThat(call.company()).isEqualTo(COMPANY);
+              assertThat(call.query().prepayNo()).isEqualTo("PP-test");
+              assertThat(call.query().kolId()).isEqualTo(KOL);
+              assertThat(call.query().status()).isEqualTo("PAID");
+              assertThat(call.query().kolIds()).isNull();
+              assertThat(call.query().limit()).isEqualTo(10);
+              assertThat(call.query().offset()).isEqualTo(10L);
+            });
     verify(kols, never()).listByBdUserId(anyLong());
+  }
+
+  @Test
+  void shouldReturnEmptyPage_whenKolCodeCaseDiffersFromStoredCode() {
+    when(kols.getByCode("kol-test")).thenReturn(kol(5L));
+    var result =
+        service.page(user("prepay:pay"), new PrepayService.Filter(null, "kol-test", null, 1, 20));
+    assertThat(result.total()).isZero();
+    assertThat(result.items()).isEmpty();
+    assertThat(pageCalls).isEmpty();
   }
 
   @Test
@@ -1191,25 +1161,378 @@ class PrepayServiceTest {
             exception -> assertThat(exception.getErrorCode()).isEqualTo(code));
   }
 
-  private static ResultSet resultSet(Map<String, Object> data) {
-    return mock(
-        ResultSet.class,
-        invocation -> {
-          Object[] args = invocation.getArguments();
-          if (args.length == 0) {
-            return Answers.RETURNS_DEFAULTS.answer(invocation);
-          }
-          Object value = data.get(args[0].toString());
-          return switch (invocation.getMethod().getName()) {
-            case "getString" -> value == null ? null : value.toString();
-            case "getLong" -> value == null ? 0L : ((Number) value).longValue();
-            case "getObject", "getTimestamp", "getBigDecimal", "getDate" -> value;
-            default -> Answers.RETURNS_DEFAULTS.answer(invocation);
-          };
-        });
+  private Object answer(InvocationOnMock invocation) {
+    return switch (invocation.getMethod().getName()) {
+      case "findByRequestId" -> headOrNull(dataFor(REQUEST_SQL));
+      case "findById" -> headOrNull(dataFor(ROW_SQL));
+      case "findActiveId", "findLatestActiveId" -> idOrNull(dataFor(ACTIVE_SQL));
+      case "statusOf" -> scalar("SELECT status FROM crm_prepay WHERE id = ?", "WAITING_DETAILS");
+      case "count" -> scalar("SELECT count(*) FROM crm_prepay", 1L);
+      case "nextSequence" -> scalar("INSERT INTO crm_prepay_sequence (id, sequence_date)", 1);
+      case "page" -> page(invocation.getArgument(0));
+      case "loadApplication" -> application(dataFor(APPLICATION_SQL));
+      case "latestApproval" -> historyOrNull(dataFor(APPROVAL_SQL));
+      case "timeline" -> dataFor(TIMELINE_SQL).stream().map(this::history).toList();
+      case "findPayment" -> paymentOrNull(dataFor(PAYMENT_SQL));
+      case "findDeduction" -> deductionOrNull(dataFor(DEDUCTION_SQL));
+      case "sumRecovered" -> new BigDecimal("100.00");
+      case "findRecipient" -> recipientOrNull(dataFor(RECIPIENT_SQL));
+      case "maskedAccount" -> textOrNull(dataFor(MASKED_SQL));
+      case "paidKolId" -> idOrNull(dataFor(KOL_FILE_SQL), "1");
+      case "findFingerprint" -> textOrNull(dataFor(FINGERPRINT_SQL));
+      case "lockById" -> 1L;
+      case "insertWaiting" -> insertWaiting(invocation.getArgument(0));
+      case "completeDetails" -> completeDetails(invocation.getArgument(0));
+      case "decide" -> decide(invocation.getArgument(0));
+      case "cancel" -> cancel(invocation.getArgument(0));
+      case "markPaid" -> markPaid(invocation.getArgument(0));
+      case "insertHistory" -> historyWrite(invocation.getArgument(0));
+      case "insertOutbox" -> outboxWrite(invocation.getArgument(0));
+      case "insertPayment" -> paymentWrite(invocation.getArgument(0));
+      default -> defaultValue(invocation);
+    };
+  }
+
+  private List<PrepayHead> page(PrepayPageQuery query) {
+    pageCalls.add(new PageCall(TenantScope.companyId(), query));
+    if (query.kolIds() != null) {
+      reads.add("SELECT id FROM crm_prepay WHERE p.kol_id IN (?)");
+    }
+    return dataFor(ROW_SQL).stream().map(this::head).toList();
+  }
+
+  private int insertWaiting(PrepayWrite.Insert row) {
+    writes.add(
+        new Write(
+            "INSERT INTO crm_prepay (id, tenant_id, kol_id, prepay_no, request_id, applicant_id, amount_cny, status, create_by, create_time, update_by, update_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'WAITING_DETAILS', ?, ?, ?, ?) ON CONFLICT (tenant_id, request_id) DO NOTHING",
+            Arrays.asList(
+                row.id(),
+                company(),
+                row.kolId(),
+                row.prepayNo(),
+                row.requestId(),
+                row.applicantId(),
+                row.amount(),
+                row.actorId(),
+                row.now(),
+                row.actorId(),
+                row.now())));
+    return changed;
+  }
+
+  private int completeDetails(PrepayWrite.Details row) {
+    writes.add(
+        new Write(
+            "UPDATE crm_prepay SET reason = ?, expected_pay_date = ?, deduct_from_commission = ?, payout_account_id = ?, payout_account_type = ?, payout_currency = ?, payout_network = ?, payout_holder_name = ?, payout_account_cipher = ?, payout_account_masked = ?, status = 'PENDING_OPERATIONS_REVIEW', update_by = ?, update_time = ? WHERE id = ? AND status = 'WAITING_DETAILS'",
+            Arrays.asList(
+                row.reason(),
+                row.expectedPayDate(),
+                row.deductFromCommission(),
+                row.payoutAccountId(),
+                row.payoutAccountType(),
+                row.payoutCurrency(),
+                row.payoutNetwork(),
+                row.payoutHolderName(),
+                row.payoutAccountCipher(),
+                row.payoutAccountMasked(),
+                row.actorId(),
+                row.now(),
+                company(),
+                row.id())));
+    return 1;
+  }
+
+  private int decide(PrepayWrite.Decision row) {
+    writes.add(
+        new Write(
+            "UPDATE crm_prepay SET status = ?, approved_by = CASE WHEN ? = 'APPROVED' THEN ? ELSE approved_by END, approved_time = CASE WHEN ? = 'APPROVED' THEN ? ELSE approved_time END, approval_reason = ?, update_by = ?, update_time = ? WHERE id = ? AND status = ?",
+            Arrays.asList(
+                row.next(),
+                row.next(),
+                row.actorId(),
+                row.next(),
+                row.now(),
+                row.reason(),
+                row.actorId(),
+                row.now(),
+                company(),
+                row.id(),
+                row.current())));
+    return changed;
+  }
+
+  private int cancel(PrepayWrite.Cancel row) {
+    writes.add(
+        new Write(
+            "UPDATE crm_prepay SET status = 'CANCELLED', cancelled_by = ?, cancelled_time = ?, cancel_reason = ?, update_by = ?, update_time = ? WHERE id = ? AND status = 'WAITING_DETAILS'",
+            Arrays.asList(
+                row.actorId(), row.now(), row.reason(), row.actorId(), row.now(), row.id())));
+    return changed;
+  }
+
+  private int markPaid(PrepayWrite.Paid row) {
+    writes.add(
+        new Write(
+            "UPDATE crm_prepay SET status = 'PAID', update_by = ?, update_time = ? WHERE id = ? AND status = 'APPROVED'",
+            Arrays.asList(row.actorId(), row.now(), row.id())));
+    return changed;
+  }
+
+  private int historyWrite(PrepayWrite.History row) {
+    writes.add(
+        new Write(
+            "INSERT INTO crm_prepay_history (id, tenant_id, prepay_id, action, operator_id, reason, create_time, operator_name, operator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            Arrays.asList(
+                row.id(),
+                company(),
+                row.prepayId(),
+                row.action(),
+                row.operatorId(),
+                row.reason(),
+                row.createTime(),
+                row.operatorName(),
+                row.operatorRole())));
+    return 1;
+  }
+
+  private int outboxWrite(PrepayWrite.Outbox row) {
+    writes.add(
+        new Write(
+            "INSERT INTO crm_prepay_outbox (id, tenant_id, prepay_id, event_type, payload, attempts, next_attempt_at, create_time) VALUES (?, ?, ?, ?, CAST(? AS jsonb), 0, ?, ?)",
+            Arrays.asList(
+                row.id(),
+                company(),
+                row.prepayId(),
+                row.eventType(),
+                row.payload(),
+                row.nextAttemptAt(),
+                row.createTime())));
+    return 1;
+  }
+
+  private int paymentWrite(PrepayWrite.Payment row) {
+    writes.add(
+        new Write(
+            "INSERT INTO crm_prepay_payment (id, tenant_id, prepay_id, request_id, request_fingerprint, pay_amount_cny, pay_time, pay_method, pay_remark, voucher_file_id, operator_id, create_time, operator_name, operator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            Arrays.asList(
+                row.id(),
+                company(),
+                row.prepayId(),
+                row.requestId(),
+                row.fingerprint(),
+                row.amount(),
+                row.payTime(),
+                row.method(),
+                row.remark(),
+                row.voucherFileId(),
+                row.operatorId(),
+                row.createTime(),
+                row.operatorName(),
+                row.operatorRole())));
+    return 1;
+  }
+
+  private List<Map<String, Object>> dataFor(String sql) {
+    for (Rows fixture : fixtures) {
+      if (fixture.sql().test(sql)) {
+        return fixture.data();
+      }
+    }
+    return List.of();
+  }
+
+  private Object scalar(String sql, Object fallback) {
+    for (var entry : scalars.entrySet()) {
+      if (sql.contains(entry.getKey())) {
+        return entry.getValue();
+      }
+    }
+    return fallback;
+  }
+
+  private PrepayHead headOrNull(List<Map<String, Object>> data) {
+    return data.isEmpty() ? null : head(data.getFirst());
+  }
+
+  private PrepayHead head(Map<String, Object> row) {
+    return new PrepayHead(
+        longOrNull(row.get("id")),
+        (String) row.get("prepay_no"),
+        longOrNull(row.get("kol_id")),
+        longOrNull(row.get("applicant_id")),
+        (BigDecimal) row.get("amount_cny"),
+        (String) row.get("status"),
+        instant(row.get("create_time")));
+  }
+
+  private PrepayApplicationColumns application(List<Map<String, Object>> data) {
+    if (data.isEmpty()) {
+      throw new EmptyResultDataAccessException(1);
+    }
+    Map<String, Object> row = data.getFirst();
+    return new PrepayApplicationColumns(
+        longOrNull(row.get("id")),
+        (String) row.get("reason"),
+        localDate(row.get("expected_pay_date")),
+        (Boolean) row.get("deduct_from_commission"),
+        longOrNull(row.get("payout_account_id")),
+        (String) row.get("payout_account_type"),
+        (String) row.get("payout_currency"),
+        (String) row.get("payout_network"),
+        (String) row.get("payout_holder_name"),
+        (String) row.get("payout_account_masked"));
+  }
+
+  private PrepayHistoryRow historyOrNull(List<Map<String, Object>> data) {
+    return data.isEmpty() ? null : history(data.getFirst());
+  }
+
+  private PrepayHistoryRow history(Map<String, Object> row) {
+    Long operatorId = longOrNull(row.get("operator_id"));
+    return new PrepayHistoryRow(
+        (String) row.get("action"),
+        operatorId == null ? 0L : operatorId,
+        (String) row.get("operator_name"),
+        (String) row.get("operator_role"),
+        instant(row.get("create_time")),
+        (String) row.get("reason"));
+  }
+
+  private PrepayPaymentRow paymentOrNull(List<Map<String, Object>> data) {
+    if (data.isEmpty()) {
+      return null;
+    }
+    Map<String, Object> row = data.getFirst();
+    return new PrepayPaymentRow(
+        (BigDecimal) row.get("pay_amount_cny"),
+        instant(row.get("pay_time")),
+        (String) row.get("pay_method"),
+        (String) row.get("pay_remark"),
+        longOrNull(row.get("voucher_file_id")),
+        longOrNull(row.get("operator_id")),
+        (String) row.get("operator_name"),
+        (String) row.get("operator_role"));
+  }
+
+  private PrepayDeductionRow deductionOrNull(List<Map<String, Object>> data) {
+    if (data.isEmpty()) {
+      return null;
+    }
+    Map<String, Object> row = data.getFirst();
+    return new PrepayDeductionRow(
+        (BigDecimal) row.get("posted"), ((Number) row.get("ledger_id")).longValue());
+  }
+
+  private PrepayRecipientRow recipientOrNull(List<Map<String, Object>> data) {
+    if (data.isEmpty()) {
+      return null;
+    }
+    Map<String, Object> row = data.getFirst();
+    return new PrepayRecipientRow(
+        (String) row.get("payout_account_type"),
+        (String) row.get("payout_currency"),
+        (String) row.get("payout_network"),
+        (String) row.get("payout_holder_name"),
+        (String) row.get("payout_account_cipher"),
+        (String) row.get("prepay_no"));
+  }
+
+  private static String textOrNull(List<Map<String, Object>> data) {
+    if (data.isEmpty()) {
+      return null;
+    }
+    Object value = data.getFirst().get("1");
+    return value == null ? null : value.toString();
+  }
+
+  private static Long idOrNull(List<Map<String, Object>> data) {
+    return idOrNull(data, "id");
+  }
+
+  private static Long idOrNull(List<Map<String, Object>> data, String key) {
+    if (data.isEmpty() || data.getFirst().get(key) == null) {
+      return null;
+    }
+    return ((Number) data.getFirst().get(key)).longValue();
+  }
+
+  private static Long longOrNull(Object value) {
+    return value == null ? null : ((Number) value).longValue();
+  }
+
+  private static Instant instant(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Timestamp timestamp) {
+      return timestamp.toInstant();
+    }
+    return (Instant) value;
+  }
+
+  private static java.time.LocalDate localDate(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof java.sql.Date date) {
+      return date.toLocalDate();
+    }
+    return (java.time.LocalDate) value;
+  }
+
+  private static Object defaultValue(InvocationOnMock invocation) {
+    Class<?> type = invocation.getMethod().getReturnType();
+    if (type == int.class || type == Integer.class) {
+      return 0;
+    }
+    if (type == long.class || type == Long.class) {
+      return 0L;
+    }
+    if (type == boolean.class || type == Boolean.class) {
+      return false;
+    }
+    if (java.util.List.class.isAssignableFrom(type)) {
+      return List.of();
+    }
+    return null;
+  }
+
+  private static long company() {
+    Long id = TenantScope.companyId();
+    if (id == null) {
+      throw new AssertionError("company scope was not opened");
+    }
+    return id;
   }
 
   private record Write(String sql, List<Object> args) {}
 
   private record Rows(Predicate<String> sql, List<Map<String, Object>> data) {}
+
+  private record PageCall(Long company, PrepayPageQuery query) {}
+
+  private static final String ROW_SQL =
+      "SELECT p.id, p.prepay_no, p.kol_id, k.kol_code, k.name AS kol_name, p.applicant_id, applicant.nickname AS applicant_name, p.amount_cny, p.status, p.create_time FROM crm_prepay p JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = p.tenant_id WHERE p.id = ?";
+  private static final String REQUEST_SQL =
+      "SELECT p.id, p.prepay_no, p.kol_id, k.kol_code, k.name AS kol_name, p.applicant_id, applicant.nickname AS applicant_name, p.amount_cny, p.status, p.create_time FROM crm_prepay p JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = p.tenant_id WHERE p.request_id = ?";
+  private static final String ACTIVE_SQL =
+      "SELECT id FROM crm_prepay WHERE status IN ('WAITING_DETAILS', 'PENDING_OPERATIONS_REVIEW', 'PENDING_FINANCE_REVIEW', 'APPROVED') LIMIT 1";
+  private static final String APPLICATION_SQL =
+      "SELECT reason, expected_pay_date, deduct_from_commission FROM crm_prepay";
+  private static final String APPROVAL_SQL =
+      "SELECT action, operator_id, operator_name, operator_role, create_time, reason FROM crm_prepay_history WHERE action IN ('OPERATIONS_APPROVED', 'FINANCE_APPROVED', 'APPROVED', 'REJECTED')";
+  private static final String TIMELINE_SQL =
+      "SELECT action, operator_id, operator_name, operator_role, create_time, reason FROM crm_prepay_history WHERE prepay_id = ? ORDER BY create_time, id";
+  private static final String PAYMENT_SQL =
+      "SELECT pay_amount_cny, pay_time, pay_method, pay_remark FROM crm_prepay_payment";
+  private static final String DEDUCTION_SQL =
+      "SELECT p.pay_amount_cny AS posted, l.id AS ledger_id FROM crm_prepay_payment p";
+  private static final String RECIPIENT_SQL =
+      "SELECT payout_account_type, payout_currency, payout_network, payout_holder_name, payout_account_cipher, prepay_no FROM crm_prepay";
+  private static final String MASKED_SQL =
+      "SELECT payout_account_masked FROM crm_prepay WHERE id = ?";
+  private static final String KOL_FILE_SQL =
+      "SELECT p.kol_id FROM crm_prepay p JOIN crm_prepay_payment payment";
+  private static final String FINGERPRINT_SQL =
+      "SELECT request_fingerprint FROM crm_prepay_payment WHERE request_id = ?";
 }

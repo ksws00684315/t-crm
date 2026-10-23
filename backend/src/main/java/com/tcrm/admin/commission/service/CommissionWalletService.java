@@ -1,6 +1,9 @@
 package com.tcrm.admin.commission.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
+import com.tcrm.admin.commission.model.LedgerSourceRow;
+import com.tcrm.admin.commission.model.OutstandingDeduction;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -8,33 +11,32 @@ import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Production write service for commission wallet balances and immutable ledger entries. */
 @Service
 public class CommissionWalletService {
-  private final JdbcTemplate jdbc;
+  private final CommissionWalletMapper wallets;
   private final KolApi kols;
   private final SystemConfigApi configs;
   private final Clock clock;
 
   @Autowired
-  public CommissionWalletService(JdbcTemplate jdbc, KolApi kols, SystemConfigApi configs) {
-    this(jdbc, kols, configs, Clock.systemUTC());
+  public CommissionWalletService(
+      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs) {
+    this(wallets, kols, configs, Clock.systemUTC());
   }
 
-  CommissionWalletService(JdbcTemplate jdbc, KolApi kols, SystemConfigApi configs, Clock clock) {
-    this.jdbc = jdbc;
+  CommissionWalletService(
+      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs, Clock clock) {
+    this.wallets = wallets;
     this.kols = kols;
     this.configs = configs;
     this.clock = clock;
@@ -82,34 +84,29 @@ public class CommissionWalletService {
     return TenantScope.callCompany(
         tenantId,
         () -> {
-          ensureWallet(tenantId, kolId);
-          BigDecimal balance = lockBalance(tenantId, kolId);
+          ensureWallet(kolId);
+          BigDecimal balance = lockBalance(kolId);
           String sourceKey = "PREPAY_DEDUCT:" + prepayId;
           BigDecimal existing =
-              existingEntry(tenantId, kolId, "PREPAY", prepayId, sourceKey, amount.negate());
+              existingEntry(kolId, "PREPAY", prepayId, sourceKey, amount.negate());
           if (existing != null) {
             return existing;
           }
           BigDecimal next = balance.subtract(amount).setScale(2, RoundingMode.UNNECESSARY);
           Instant time = truncate(occurredAt);
-          jdbc.update(
-              "INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type, source_id, source_key, occurred_at, balance_after_cny, create_by, create_time) VALUES (?, ?, ?, 'PREPAY_DEDUCT', ?, 'PREPAY', ?, ?, ?, ?, ?, ?)",
+          wallets.insertLedger(
               IdWorker.getId(),
-              tenantId,
               kolId,
+              "PREPAY_DEDUCT",
               amount.negate(),
+              "PREPAY",
               prepayId,
               sourceKey,
-              Timestamp.from(time),
+              time,
               next,
               operatorId,
-              Timestamp.from(now()));
-          jdbc.update(
-              "UPDATE crm_commission_wallet SET balance_cny = ?, update_time = ? WHERE tenant_id = ? AND kol_id = ?",
-              next,
-              Timestamp.from(now()),
-              tenantId,
-              kolId);
+              now());
+          wallets.updateBalance(kolId, next, now());
           return next;
         });
   }
@@ -133,132 +130,83 @@ public class CommissionWalletService {
 
   @Transactional(readOnly = true)
   public BigDecimal currentBalance(long tenantId, long kolId) {
-    List<BigDecimal> result =
-        jdbc.query(
-            "SELECT balance_cny FROM crm_commission_wallet WHERE tenant_id = ? AND kol_id = ?",
-            (rs, index) -> rs.getBigDecimal(1),
-            tenantId,
-            kolId);
-    return result.isEmpty() ? BigDecimal.ZERO.setScale(2) : result.getFirst();
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          BigDecimal balance = wallets.findBalance(kolId);
+          return balance == null ? BigDecimal.ZERO.setScale(2) : balance;
+        });
   }
 
   private BigDecimal postCredit(CreditCommand command) {
-    ensureWallet(command.tenantId(), command.kolId());
-    BigDecimal balance = lockBalance(command.tenantId(), command.kolId());
+    ensureWallet(command.kolId());
+    BigDecimal balance = lockBalance(command.kolId());
     BigDecimal amount = command.amountCny().setScale(2, RoundingMode.UNNECESSARY);
     BigDecimal existing =
         existingEntry(
-            command.tenantId(),
-            command.kolId(),
-            "COMMISSION",
-            command.sourceId(),
-            command.sourceKey(),
-            amount);
+            command.kolId(), "COMMISSION", command.sourceId(), command.sourceKey(), amount);
     if (existing != null) {
       return existing;
     }
     BigDecimal next = balance.add(amount).setScale(2, RoundingMode.UNNECESSARY);
     Instant now = now();
     long creditId = IdWorker.getId();
-    jdbc.update(
-        "INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type, source_id, source_key, occurred_at, balance_after_cny, create_by, create_time) VALUES (?, ?, ?, 'COMMISSION_CREDIT', ?, 'COMMISSION', ?, ?, ?, ?, NULL, ?)",
+    wallets.insertLedger(
         creditId,
-        command.tenantId(),
         command.kolId(),
+        "COMMISSION_CREDIT",
         amount,
+        "COMMISSION",
         command.sourceId(),
         command.sourceKey(),
-        Timestamp.from(truncate(command.occurredAt())),
+        truncate(command.occurredAt()),
         next,
-        Timestamp.from(now));
+        null,
+        now);
     allocateFifo(command, creditId, amount);
-    jdbc.update(
-        "UPDATE crm_commission_wallet SET balance_cny = ?, update_time = ? WHERE tenant_id = ? AND kol_id = ?",
-        next,
-        Timestamp.from(now),
-        command.tenantId(),
-        command.kolId());
+    wallets.updateBalance(command.kolId(), next, now);
     return next;
   }
 
   private void allocateFifo(CreditCommand command, long creditId, BigDecimal credit) {
-    List<Outstanding> outstanding =
-        jdbc.query(
-            "SELECT l.id, -l.amount_cny - COALESCE(SUM(r.amount_cny), 0) AS remaining FROM crm_commission_ledger l LEFT JOIN crm_commission_recovery r ON r.tenant_id = l.tenant_id AND r.deduction_ledger_id = l.id WHERE l.tenant_id = ? AND l.kol_id = ? AND l.entry_type = 'PREPAY_DEDUCT' GROUP BY l.id, l.amount_cny, l.occurred_at HAVING -l.amount_cny > COALESCE(SUM(r.amount_cny), 0) ORDER BY l.occurred_at, l.id",
-            this::outstanding,
-            command.tenantId(),
-            command.kolId());
+    List<OutstandingDeduction> outstanding = wallets.listOutstanding(command.kolId());
     BigDecimal remainingCredit = credit;
-    for (Outstanding deduction : outstanding) {
+    for (OutstandingDeduction deduction : outstanding) {
       if (remainingCredit.signum() == 0) {
         break;
       }
       BigDecimal amount = remainingCredit.min(deduction.remaining());
-      jdbc.update(
-          "INSERT INTO crm_commission_recovery (id, tenant_id, kol_id, credit_ledger_id, deduction_ledger_id, amount_cny, create_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          IdWorker.getId(),
-          command.tenantId(),
-          command.kolId(),
-          creditId,
-          deduction.ledgerId(),
-          amount,
-          Timestamp.from(now()));
+      wallets.insertRecovery(
+          IdWorker.getId(), command.kolId(), creditId, deduction.ledgerId(), amount, now());
       remainingCredit = remainingCredit.subtract(amount);
     }
   }
 
-  private Outstanding outstanding(ResultSet rs, int index) throws SQLException {
-    return new Outstanding(rs.getLong("id"), rs.getBigDecimal("remaining"));
+  private void ensureWallet(long kolId) {
+    wallets.insertIgnore(IdWorker.getId(), kolId, now());
   }
 
-  private void ensureWallet(long tenantId, long kolId) {
-    Instant now = now();
-    jdbc.update(
-        "INSERT INTO crm_commission_wallet (id, tenant_id, kol_id, balance_cny, create_time, update_time) VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (tenant_id, kol_id) DO NOTHING",
-        IdWorker.getId(),
-        tenantId,
-        kolId,
-        Timestamp.from(now),
-        Timestamp.from(now));
-  }
-
-  private BigDecimal lockBalance(long tenantId, long kolId) {
-    return jdbc.queryForObject(
-        "SELECT balance_cny FROM crm_commission_wallet WHERE tenant_id = ? AND kol_id = ? FOR UPDATE",
-        BigDecimal.class,
-        tenantId,
-        kolId);
+  private BigDecimal lockBalance(long kolId) {
+    BigDecimal balance = wallets.lockBalance(kolId);
+    if (balance == null) {
+      throw new EmptyResultDataAccessException(1);
+    }
+    return balance;
   }
 
   private BigDecimal existingEntry(
-      long tenantId,
-      long kolId,
-      String sourceType,
-      long sourceId,
-      String sourceKey,
-      BigDecimal amount) {
-    List<ExistingEntry> existing =
-        jdbc.query(
-            "SELECT amount_cny, balance_after_cny, kol_id, source_type, source_id FROM crm_commission_ledger WHERE tenant_id = ? AND source_key = ?",
-            (rs, index) ->
-                new ExistingEntry(
-                    rs.getBigDecimal(1),
-                    rs.getBigDecimal(2),
-                    rs.getLong(3),
-                    rs.getString(4),
-                    rs.getLong(5)),
-            tenantId,
-            sourceKey);
-    if (existing.isEmpty()) {
+      long kolId, String sourceType, long sourceId, String sourceKey, BigDecimal amount) {
+    LedgerSourceRow existing = wallets.findBySourceKey(sourceKey);
+    if (existing == null) {
       return null;
     }
-    if (existing.getFirst().amount().compareTo(amount) != 0
-        || existing.getFirst().kolId() != kolId
-        || !existing.getFirst().sourceType().equals(sourceType)
-        || existing.getFirst().sourceId() != sourceId) {
+    if (existing.amountCny().compareTo(amount) != 0
+        || existing.kolId() != kolId
+        || !existing.sourceType().equals(sourceType)
+        || existing.sourceId() != sourceId) {
       throw new BusinessException(ErrorCode.PREPAY_REQUEST_CONFLICT);
     }
-    return existing.getFirst().balanceAfter();
+    return existing.balanceAfterCny();
   }
 
   private static void validateCredit(CreditCommand command) {
@@ -289,9 +237,4 @@ public class CommissionWalletService {
   private static String money(BigDecimal value) {
     return value.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
   }
-
-  private record Outstanding(long ledgerId, BigDecimal remaining) {}
-
-  private record ExistingEntry(
-      BigDecimal amount, BigDecimal balanceAfter, long kolId, String sourceType, long sourceId) {}
 }
