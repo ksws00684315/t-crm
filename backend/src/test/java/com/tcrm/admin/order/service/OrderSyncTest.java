@@ -520,6 +520,136 @@ class OrderSyncTest {
     }
   }
 
+  @Test
+  void shouldFinishRefundSyncAndAdvanceCursor_whenTotalNumMissingAndPageIsEmpty() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var state = new OrderSyncStateDO();
+    when(states.selectOne(any())).thenReturn(state);
+    // 任务 55 实测：窗口内没有退款时，微店响应根字段只有 list，没有 totalNum。
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), null, null));
+    var now = Instant.parse("2026-10-23T00:00:00Z");
+    var failuresWriter = mock(OrderSyncFailureWriter.class);
+    var tx = mock(org.springframework.transaction.support.TransactionTemplate.class);
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              call.getArgument(0, java.util.function.Consumer.class).accept(null);
+              return null;
+            })
+        .when(tx)
+        .executeWithoutResult(any());
+    var sync =
+        new OrderSync(
+            api,
+            states,
+            mock(OrderWriter.class),
+            new OrderNormalizer("test"),
+            Clock.fixed(now, ZoneOffset.UTC),
+            null,
+            null,
+            tx,
+            failuresWriter);
+
+    assertThat(sync.synchronize(1, "REFUND")).isTrue();
+
+    assertThat(state.getRefundCursor()).isEqualTo(now);
+    assertThat(state.getLastError()).isNull();
+    verify(failuresWriter, org.mockito.Mockito.never())
+        .record(org.mockito.ArgumentMatchers.anyLong(), any(), any(), any());
+  }
+
+  @Test
+  void shouldProcessBothPages_whenTotalNumMissingAndFirstPageIsFull() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var writer = mock(OrderWriter.class);
+    when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null));
+    var rows =
+        java.util.stream.IntStream.rangeClosed(51, 103)
+            .mapToObj(
+                n ->
+                    new WeidianBusinessApi.RefundListItem(
+                        String.valueOf(n), "100", null, null, null))
+            .toList();
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.RefundListResponse(rows.subList(0, 50), null, null),
+            new WeidianBusinessApi.RefundListResponse(rows.subList(50, 53), null, null));
+    when(api.refundDetail(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenAnswer(
+            call -> {
+              WeidianBusinessApi.RefundDetailRequest req = call.getArgument(1);
+              return new WeidianBusinessApi.RefundDetailResponse(
+                  null, null, req.refundNo().toString(), "100", java.math.BigDecimal.TEN, null);
+            });
+    when(writer.find(1, "100")).thenReturn(new com.tcrm.admin.order.model.OrderDO());
+
+    assertThat(new OrderSync(api, states, writer, new OrderNormalizer("test")).synchronize(1))
+        .isTrue();
+
+    var pages = ArgumentCaptor.forClass(WeidianBusinessApi.RefundListRequest.class);
+    verify(api, org.mockito.Mockito.times(2))
+        .refundList(org.mockito.ArgumentMatchers.eq(1L), pages.capture());
+    assertThat(
+            pages.getAllValues().stream()
+                .map(WeidianBusinessApi.RefundListRequest::pageNum)
+                .toList())
+        .containsExactly(0, 1);
+    verify(writer, org.mockito.Mockito.times(53))
+        .saveRefund(org.mockito.ArgumentMatchers.eq(1L), any());
+  }
+
+  @Test
+  void shouldFailAndKeepCursors_whenRefundPaginationExceedsSafetyLimit() {
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var writer = mock(OrderWriter.class);
+    var state = new OrderSyncStateDO();
+    Instant previous = Instant.parse("2026-10-22T00:00:00Z");
+    state.setOrderCursor(previous);
+    state.setRefundCursor(previous);
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null));
+    // Every page claims to be full (50 items) without totalNum, so only the safety cap ends it.
+    var rows =
+        java.util.stream.IntStream.rangeClosed(1, 50)
+            .mapToObj(
+                n ->
+                    new WeidianBusinessApi.RefundListItem(
+                        String.valueOf(n), "100", null, null, null))
+            .toList();
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenAnswer(call -> new WeidianBusinessApi.RefundListResponse(rows, null, null));
+    when(api.refundDetail(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenAnswer(
+            call -> {
+              WeidianBusinessApi.RefundDetailRequest req = call.getArgument(1);
+              return new WeidianBusinessApi.RefundDetailResponse(
+                  null, null, req.refundNo().toString(), "100", java.math.BigDecimal.TEN, null);
+            });
+    when(writer.find(1, "100")).thenReturn(new com.tcrm.admin.order.model.OrderDO());
+    Instant now = Instant.parse("2026-10-23T00:00:00Z");
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    writer,
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1))
+        .isFalse();
+
+    verify(api, org.mockito.Mockito.times(200))
+        .refundList(org.mockito.ArgumentMatchers.eq(1L), any());
+    assertThat(state.getOrderCursor()).isEqualTo(previous);
+    assertThat(state.getRefundCursor()).isEqualTo(previous);
+    assertThat(state.getLastError()).isNotBlank();
+  }
+
   private abstract static class PhaseCase {
     final String kind;
 
