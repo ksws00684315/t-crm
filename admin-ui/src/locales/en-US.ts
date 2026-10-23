@@ -407,12 +407,13 @@ const enUS: MessageSchema = {
   systemConfig: {
     notice:
       "Changes take effect immediately without a restart. Secrets remain in server environment variables.",
-    groups: {
-      site: "Site",
-      url: "URLs",
-      business: "Business Defaults and Limits",
-      security: "Rate Limits and Security"
-    },
+    key: "Config key",
+    description: "Description",
+    value: "Value",
+    keywordPlaceholder: "Filter by key or description",
+    editTitle: "Edit Configuration",
+    defaultValueHint: "Default: {value}",
+    rangeHint: "Allowed range: {min}–{max}",
     items: {
       site_name: "System name",
       mail_from: "Mail sender",
@@ -446,12 +447,7 @@ const enUS: MessageSchema = {
       product_links_resolve_token_per_minute: "Token resolutions per minute",
       weidian_qps: "Weidian requests per second"
     },
-    currentValue: "Current",
-    defaultValue: "Default",
-    range: "Range",
-    overridden: "Modified",
     restoreDefault: "Restore default",
-    editPrompt: "Enter a new value",
     integerRequired: "Enter an integer",
     saved: "Saved and applied immediately",
     restored: "Restored to default",
@@ -1172,7 +1168,27 @@ const enUS: MessageSchema = {
     createTitle: "Create Shop",
     name: "Shop Name",
     weidianId: "Weidian Shop Identifier",
-    weidianPlaceholder: "Weidian shop identifier"
+    weidianPlaceholder: "Weidian shop identifier",
+    weidianApp: {
+      configure: "Weidian App Configuration",
+      title: "Weidian Service App Configuration",
+      callbackUrl: "OAuth Callback URL",
+      callbackHint:
+        "Register this address as the callback URL for your app on the Weidian Open Platform.",
+      callbackInvalid:
+        "The callback URL is invalid. Ask a platform administrator to set the admin URL (url.admin) in system configuration.",
+      appKey: "AppKey",
+      appKeyRequired: "Enter an AppKey",
+      appKeyTooLong: "AppKey must be 64 characters or fewer",
+      appSecret: "AppSecret",
+      appSecretRequired: "Enter an AppSecret",
+      secretConfiguredHint: "Configured. Enter it again when saving.",
+      configured: "Configured",
+      notConfigured: "Not configured",
+      lastUpdated: "Last updated",
+      saved: "Weidian app configuration saved.",
+      goConfigure: "Configure"
+    }
   },
   product: {
     onSale: "On sale",
