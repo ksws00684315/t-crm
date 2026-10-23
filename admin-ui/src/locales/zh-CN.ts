@@ -1119,7 +1119,25 @@ const zhCN = {
     createTitle: "新增店铺",
     name: "店铺名称",
     weidianId: "微店店铺标识",
-    weidianPlaceholder: "微店店铺标识"
+    weidianPlaceholder: "微店店铺标识",
+    weidianApp: {
+      configure: "微店应用配置",
+      title: "微店服务型应用配置",
+      callbackUrl: "OAuth 回调地址",
+      callbackHint: "请将此地址登记到微店开放平台应用的回调地址",
+      callbackInvalid: "回调地址无效，请平台管理员在系统配置中设置管理端地址（url.admin）",
+      appKey: "AppKey",
+      appKeyRequired: "请输入 AppKey",
+      appKeyTooLong: "AppKey 最长为 64 个字符",
+      appSecret: "AppSecret",
+      appSecretRequired: "请输入 AppSecret",
+      secretConfiguredHint: "已配置，保存时需重新填写",
+      configured: "已配置",
+      notConfigured: "未配置",
+      lastUpdated: "最后更新时间",
+      saved: "微店应用配置已保存",
+      goConfigure: "去配置"
+    }
   },
   product: {
     onSale: "在售",
