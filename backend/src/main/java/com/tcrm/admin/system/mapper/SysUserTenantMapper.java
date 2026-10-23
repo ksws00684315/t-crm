@@ -85,6 +85,16 @@ public interface SysUserTenantMapper extends BaseMapper<SysUserTenantDO> {
           + " AND m.is_deleted = FALSE AND u.status = 1 ORDER BY m.user_id")
   List<Long> listEnabledSuperAdminIds(@Param("tenantId") Long tenantId);
 
+  /** Enabled staff accounts explicitly granted prepay review in this company. */
+  @Select(
+      "SELECT m.user_id FROM sys_user_tenant m"
+          + " JOIN sys_user u ON u.id = m.user_id AND u.is_deleted = FALSE"
+          + " JOIN sys_user_permission p ON p.user_id = m.user_id AND p.tenant_id = m.tenant_id"
+          + " AND p.permission_code = 'prepay:review'"
+          + " WHERE m.tenant_id = #{tenantId} AND m.role = 'STAFF' AND m.status = 1"
+          + " AND m.is_deleted = FALSE AND u.status = 1 ORDER BY m.user_id")
+  List<Long> listEnabledPrepayReviewerIds(@Param("tenantId") Long tenantId);
+
   /**
    * Usable BDs of this company ordered by username: enabled account and membership, STAFF with OWN
    * scope, holding {@code kolEditCode} in this company.
