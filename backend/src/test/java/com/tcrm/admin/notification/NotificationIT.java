@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.CompanySessions.OpenedCompany;
 import com.tcrm.admin.WeidianTestProperties;
-import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
+import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;

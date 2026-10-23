@@ -1,4 +1,4 @@
-package com.tcrm.admin.commission.api;
+package com.tcrm.admin.notification.api;
 
 /** A creator created or resubmitted a payout account, which is now PENDING. */
 public record PayoutAccountSubmittedEvent(

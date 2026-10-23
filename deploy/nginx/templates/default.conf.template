@@ -109,6 +109,13 @@ server {
     # roughly 100MB on the free plan.
     client_max_body_size 21m;
 
+    # Five 10 MiB prepay attachments plus multipart metadata (task 47).
+    location ~ ^/admin-api/commission/prepays/[0-9]+/application-details$ {
+        client_max_body_size 51m;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass http://crm-admin:8080;
+    }
+
     location = /admin-api/auth/login {
         limit_req zone=tcrm_login burst=5 nodelay;
         limit_req_status 429;

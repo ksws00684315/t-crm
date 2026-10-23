@@ -1,8 +1,8 @@
 package com.tcrm.admin.notification.service;
 
-import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
+import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.notification.model.NotificationType;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;

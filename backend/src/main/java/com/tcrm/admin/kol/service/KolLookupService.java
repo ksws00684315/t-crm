@@ -52,6 +52,19 @@ public class KolLookupService implements KolApi {
   }
 
   @Override
+  public List<KolRefDTO> listByIdsIncludingDeleted(Collection<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return List.of();
+    }
+    return kols.listByIdsIncludingDeleted(ids).stream()
+        .map(
+            kol ->
+                new KolRefDTO(
+                    kol.getId(), kol.getKolCode(), kol.getName(), enabled(kol), kol.getBdUserId()))
+        .toList();
+  }
+
+  @Override
   public List<KolRefDTO> listAll() {
     return toDto(
         kols.selectList(
