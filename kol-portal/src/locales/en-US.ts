@@ -7,7 +7,7 @@
 const enUS = {
   app: {
     title: "SparkTrack Creator Portal",
-    titleSuffix: " Creator Portal"
+    titleSuffix: " Creator"
   },
   common: {
     language: "Language",

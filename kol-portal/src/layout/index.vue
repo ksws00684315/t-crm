@@ -19,6 +19,8 @@ const session = useSessionStore();
 const signingOut = ref(false);
 
 /** Breadcrumb of the current page, the same slot the admin header uses. */
+const brandText = computed(() => `${siteName.value}${t("app.titleSuffix")}`);
+
 const pageTitle = computed(() => {
   void locale.value;
   return route.meta.title ? translate(String(route.meta.title)) : "";
@@ -47,7 +49,7 @@ async function signOut() {
 <template>
   <div class="shell">
     <aside class="shell__aside">
-      <div class="shell__brand">{{ siteName }}{{ t("app.titleSuffix") }}</div>
+      <div class="shell__brand" :title="brandText" data-test="brand">{{ brandText }}</div>
       <nav class="shell__nav" :aria-label="t('nav.label')">
         <RouterLink
           v-for="item in NAV_ITEMS"
@@ -116,8 +118,13 @@ async function signOut() {
 .shell__brand {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
   height: var(--tcrm-header-height);
   padding: 0 var(--tcrm-space-4);
+  border-bottom: 1px solid var(--tcrm-color-border);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--tcrm-color-text);
   font-size: var(--tcrm-font-size-title);
   font-weight: 600;

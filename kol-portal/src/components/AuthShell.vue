@@ -46,8 +46,18 @@ h1 {
 }
 :deep(.auth-links) {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: var(--tcrm-space-4);
   margin-top: var(--tcrm-space-4);
+}
+/* Links inside the auth card follow the admin console: primary colour, underline on hover only. */
+:deep(a) {
+  color: var(--tcrm-color-primary-text);
+  text-decoration: none;
+}
+:deep(a:hover) {
+  text-decoration: underline;
 }
 @media (max-width: 767px) {
   :deep(.el-button),

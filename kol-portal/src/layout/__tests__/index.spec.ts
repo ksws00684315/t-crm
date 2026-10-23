@@ -23,7 +23,7 @@ describe("layout header", () => {
 
   it("renders English brand and sign out by default", () => {
     const wrapper = mountLayout();
-    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack Creator Portal");
+    expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack Creator");
     expect(wrapper.find("button").text()).toContain("Sign out");
     expect(wrapper.findComponent(LocaleSwitch).exists()).toBe(true);
     expect(NAV_ITEMS.map(item => item.title)).toContain("nav.orders");
