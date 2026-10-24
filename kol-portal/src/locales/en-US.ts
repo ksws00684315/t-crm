@@ -307,8 +307,8 @@ const enUS = {
     WITHDRAWAL_INSUFFICIENT_AVAILABLE: "The withdrawal amount exceeds the available balance.",
     WITHDRAWAL_KOL_FROZEN: "This creator is frozen from new withdrawal applications.",
     WITHDRAWAL_NOT_RESUBMITTABLE:
-    WITHDRAWAL_PAUSED: "This withdrawal is paused until its source is verified.",
       "The linked previous application is not a rejected withdrawal of this creator.",
+    WITHDRAWAL_PAUSED: "This withdrawal is paused until its source is verified.",
     WITHDRAWAL_PAYMENT_CONFLICT:
       "A successful payment already exists or the request" + "id conflicts.",
     WITHDRAWAL_FROZEN_ALREADY: "This creator is already frozen from withdrawals.",
