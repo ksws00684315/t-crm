@@ -12,6 +12,7 @@ import com.tcrm.admin.kol.service.KolWriter;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
 import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.shared.TenantScope;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -248,6 +249,7 @@ class KolOrderIT {
 
   private void order(
       long id, long tenantId, String orderNo, long kolId, String status, Instant payTime) {
+    Instant orderTime = payTime == null ? PAY_A : payTime.minusSeconds(3600);
     jdbc.update(
         "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,kol_id,attribution_status,"
             + "order_status,raw_status,order_time,pay_time,total_amount,pay_amount,freight,"
@@ -258,8 +260,8 @@ class KolOrderIT {
         orderNo,
         kolId,
         status,
-        payTime == null ? PAY_A : payTime.minusSeconds(3600),
-        payTime,
+        Timestamp.from(orderTime),
+        payTime == null ? null : Timestamp.from(payTime),
         150.00,
         150.00);
   }

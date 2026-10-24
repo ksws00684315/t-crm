@@ -558,7 +558,7 @@ class KolAuthIT {
     String code =
         jdbc.queryForObject("SELECT kol_code FROM crm_kol WHERE id = ?", String.class, kolId);
     jdbc.update(
-        "UPDATE crm_kol SET social_accounts = ? WHERE id = ?",
+        "UPDATE crm_kol SET social_accounts = ?::jsonb WHERE id = ?",
         "[{\"platform\":\"TikTok\",\"handle\":\"@seeded\",\"url\":null,\"followers\":null,"
             + "\"primary\":true},{\"platform\":\"Instagram\",\"handle\":\"@second\","
             + "\"url\":null,\"followers\":10,\"primary\":false}]",
