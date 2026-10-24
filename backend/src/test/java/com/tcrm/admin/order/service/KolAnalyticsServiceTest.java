@@ -3,6 +3,7 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,11 +39,16 @@ class KolAnalyticsServiceTest {
   private final OrderMapper orders = mock(OrderMapper.class);
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
-  private final KolAnalyticsService service = new KolAnalyticsService(orders, items, current);
+  private final com.tcrm.admin.order.api.CommissionOrderStateApi commissionStates =
+      mock(com.tcrm.admin.order.api.CommissionOrderStateApi.class);
+  private final KolAnalyticsService service =
+      new KolAnalyticsService(orders, items, current, commissionStates);
 
   @BeforeEach
   void setUp() {
     when(current.kol()).thenReturn(kol());
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any())).thenReturn(List.of());
+    when(commissionStates.listByKol(anyLong())).thenReturn(List.of());
   }
 
   @Test
@@ -107,6 +113,68 @@ class KolAnalyticsServiceTest {
     for (Runnable run : invalid) {
       assertThatThrownBy(run::run).isInstanceOf(BusinessException.class);
     }
+  }
+
+  @Test
+  void shouldSumCommissionByPayDayAndReportCurrentFrozen() {
+    // Two orders in range: commission 3.00 (paid 10-01) and 2.00 (paid 10-02); plus one more
+    // line outside the range whose 5.00 accrual (2.00 released) only feeds the frozen total.
+    when(orders.selectList(any()))
+        .thenReturn(
+            List.of(order(21L, "2026-09-30T17:00:00Z"), order(22L, "2026-10-01T16:00:00Z")));
+    when(items.selectList(any()))
+        .thenReturn(List.of(line(21L, 700L, "100.50"), line(22L, 700L, "49.50")));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    700L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.0300"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    22L,
+                    701L,
+                    "FROZEN",
+                    new BigDecimal("0.0400"),
+                    new BigDecimal("2.00"),
+                    BigDecimal.ZERO)));
+    // Frozen over ALL live rows: (3.00 - 3.00) + (2.00 - 0.00) + (5.00 - 2.00) = 5.00.
+    when(commissionStates.listByKol(anyLong()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    700L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.0300"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    22L,
+                    701L,
+                    "FROZEN",
+                    new BigDecimal("0.0400"),
+                    new BigDecimal("2.00"),
+                    BigDecimal.ZERO),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    99L,
+                    800L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.0500"),
+                    new BigDecimal("5.00"),
+                    new BigDecimal("2.00"))));
+
+    var overview = service.overview("2026-10-01T00:00:00+08:00", "2026-10-03T00:00:00+08:00");
+
+    assertThat(overview.commissionCny()).isEqualByComparingTo("5.00");
+    assertThat(overview.withdrawnCny()).isEqualByComparingTo("0.00");
+    assertThat(overview.withdrawingCny()).isEqualByComparingTo("0.00");
+    assertThat(overview.frozenCny()).isEqualByComparingTo("5.00");
+    assertThat(overview.daily().get(0).commissionCny()).isEqualByComparingTo("3.00");
+    assertThat(overview.daily().get(1).commissionCny()).isEqualByComparingTo("2.00");
   }
 
   private static KolAccountDTO kol() {
