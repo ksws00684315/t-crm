@@ -149,3 +149,24 @@ describe("shared frontend visual tokens", () => {
     ).toEqual([]);
   });
 });
+
+describe("shared component styles (task 59 R-08)", () => {
+  function styleBlock(path: string): string {
+    const source = readFileSync(resolve(repoRoot, path), "utf8");
+    const match = source.match(/<style scoped>([\s\S]*?)<\/style>/);
+    expect(match, `${path} has a scoped style block`).not.toBeNull();
+    return match![1];
+  }
+
+  it("keeps the DataTable stylesheet identical across both apps", () => {
+    expect(styleBlock("kol-portal/src/components/DataTable.vue")).toBe(
+      styleBlock("admin-ui/src/components/DataTable.vue")
+    );
+  });
+
+  it("keeps the CopyText stylesheet identical across both apps (R-05)", () => {
+    expect(styleBlock("kol-portal/src/components/CopyText.vue")).toBe(
+      styleBlock("admin-ui/src/components/CopyText.vue")
+    );
+  });
+});

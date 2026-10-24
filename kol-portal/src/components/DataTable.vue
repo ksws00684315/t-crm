@@ -64,6 +64,11 @@ const props = withDefaults(
     expandable?: boolean;
     /** Opens every row's detail on render (the matching pool shows lines by default). */
     defaultExpandAll?: boolean;
+    /**
+     * Body-row class, e.g. to mark the record a navigation landed on (task 59 R-02): a string for
+     * every row or a per-row function, handed straight to el-table.
+     */
+    rowClassName?: string | ((scope: { row: object; rowIndex: number }) => string);
   }>(),
   {
     loading: false,
@@ -468,6 +473,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         v-loading="loading"
         :data="rows"
         :row-key="rowKey"
+        :row-class-name="rowClassName"
         size="default"
         :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
