@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --blue: #1a73e8; --pale: #edf4ff; --ink: #202124; --muted: #5f6368; --line: #dadce0; --paper: #fff; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    button, select, input { font: inherit; }
+    button, select, input[type="radio"], input[type="checkbox"] { cursor: pointer; }
+    button:disabled, select:disabled, input:disabled { cursor: default; }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #9fc3f5; outline-offset: 3px; }
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    main { padding: 18px 22px; flex: 1; }
+    h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; letter-spacing: .2px; }
+    p { margin: 0; }
+    .muted, .hint { color: var(--muted); }
+    .hint { font-size: 12px; }
+    .section { margin-top: 17px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 7px; }
+    .label, legend { font-weight: 600; }
+    .text-button { border: 0; padding: 3px 0; background: transparent; color: var(--blue); font-size: 12px; white-space: nowrap; }
+    button:disabled { opacity: .5; }
+    .selection { padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: #f8f9fa; }
+    .selection-range { font: 13px/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace; overflow-wrap: anywhere; }
+    .selection-meta { margin-top: 2px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+    select { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; color: var(--ink); background: var(--paper); }
+    .field-hint { margin-top: 5px; }
+    .notice { padding: 8px 10px; margin-top: 9px; border-left: 3px solid #d99500; background: #fff8e6; color: #745010; font-size: 12px; overflow-wrap: anywhere; }
+    .notice.error { border-color: #c5221f; background: #fce8e6; color: #a50e0e; }
+    fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+    legend { padding: 0; margin-bottom: 7px; }
+    .directions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .direction { padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; display: flex; align-items: center; gap: 7px; cursor: pointer; }
+    .direction.selected { background: var(--pale); border-color: var(--blue); }
+    input { accent-color: var(--blue); margin: 0; }
+    .cell-flow { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 11px; padding: 10px; background: #f8f9fa; border-radius: 7px; }
+    .cell { display: flex; align-items: baseline; gap: 8px; }
+    .cell-address { font: 600 20px/1.2 "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    .cell-target .cell-address { color: var(--blue); }
+    .cell-caption { color: var(--muted); font-size: 11px; }
+    .flow-arrow { color: var(--muted); font-size: 18px; }
+    .preview { margin-top: 8px; font-size: 12px; }
+    .preview-label { color: var(--muted); }
+    .preview-url { display: inline-block; margin-top: 3px; font: 600 13px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", monospace; color: var(--blue); }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .overwrite-hint { margin: 3px 0 0 22px; }
+    .footer { position: sticky; bottom: 0; padding: 12px 22px; display: flex; justify-content: space-between; gap: 12px; align-items: center; border-top: 1px solid var(--line); background: var(--paper); }
+    .footer-status { font-size: 12px; color: var(--muted); }
+    .primary { flex-shrink: 0; border: 1px solid var(--blue); border-radius: 6px; padding: 9px 20px; background: var(--blue); color: var(--paper); font-weight: 600; }
+    .primary:hover:enabled { background: #155fc0; }
+    .results { border-top: 1px solid var(--line); padding-top: 15px; scroll-margin-bottom: 82px; }
+    .counts { display: flex; flex-wrap: wrap; gap: 20px; margin: 8px 0; }
+    .count { font-size: 12px; color: var(--muted); }
+    .count strong { color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+    .table-scroll { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; margin-top: 9px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+    th { position: sticky; top: 0; background: #f8f9fa; color: var(--muted); font-weight: 500; }
+    td, th { padding: 7px 9px; vertical-align: top; border-bottom: 1px solid #edf0f2; }
+    td:first-child { white-space: nowrap; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    th:first-child { white-space: nowrap; }
+    td:last-child { overflow-wrap: anywhere; }
+    tr:last-child td { border-bottom: 0; }
+    .status-success { color: #137333; white-space: nowrap; }
+    .status-skipped { color: #8a5700; white-space: nowrap; }
+    .status-failed { color: #c5221f; white-space: nowrap; }
+    @media (max-width: 420px) {
+      main { padding: 15px; }
+      .footer { padding: 12px 15px; }
+      .directions { grid-template-columns: 1fr; gap: 6px; }
+      .cell-flow { gap: 10px; }
+      .cell { flex-direction: column; align-items: center; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main>
+      <h1>转换为微店原始链接</h1>
+      <p class="hint">从选中格的链接提取商品信息，写入同行相邻格。</p>
+
+      <section class="section" aria-labelledby="selectionHeading">
+        <div class="section-heading">
+          <span class="label" id="selectionHeading">当前选区</span>
+          <button class="text-button" id="refreshSelection" type="button" data-control>刷新选区</button>
+        </div>
+        <div class="selection">
+          <div class="selection-range" id="selectionRanges">正在读取选区…</div>
+          <div class="selection-meta" id="selectionMeta">选择单个格子、连续范围或多个不连续范围。</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <label class="label" for="templateSelect">来源链接模板</label>
+          <button class="text-button" id="reloadTemplates" type="button" data-control>重新加载模板</button>
+        </div>
+        <select id="templateSelect" aria-describedby="templateHint" data-control>
+          <option value="auto">自动识别</option>
+        </select>
+        <p class="hint field-hint" id="templateHint">批量转换时逐格匹配；无法识别时可手动指定模板。</p>
+        <p class="notice" id="templateNotice" role="status" hidden></p>
+      </section>
+
+      <section class="section">
+        <fieldset>
+          <legend>写入位置</legend>
+          <div class="directions">
+            <label class="direction" id="leftOption"><input type="radio" name="direction" value="left" data-control>前一列（左侧）</label>
+            <label class="direction selected" id="rightOption"><input type="radio" name="direction" value="right" checked data-control>后一列（右侧）</label>
+          </div>
+        </fieldset>
+        <div class="cell-flow" aria-label="写入位置示例">
+          <div class="cell"><span class="cell-caption">源格</span><span class="cell-address" id="sourceCell">—</span></div>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <div class="cell cell-target"><span class="cell-caption">目标格</span><span class="cell-address" id="targetCell">—</span></div>
+        </div>
+        <div class="preview" aria-live="polite">
+          <p class="preview-label" id="previewLabel">正在准备首个链接预览…</p>
+          <a class="preview-url" id="previewUrl" target="_blank" rel="noopener noreferrer" hidden>LINK</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <label class="checkbox-label"><input id="overwrite" type="checkbox" data-control>覆盖目标格已有内容</label>
+        <p class="hint overwrite-hint" id="overwriteHint">默认跳过已有内容的目标格；目标位于源选区时也会跳过，保留源链接。</p>
+      </section>
+
+      <p class="notice error" id="errorNotice" role="alert" hidden></p>
+
+      <section class="section results" id="results" aria-labelledby="resultHeading" hidden>
+        <div class="label" id="resultHeading">转换结果</div>
+        <div class="counts" aria-live="polite">
+          <span class="count"><strong id="successCount">0</strong>成功</span>
+          <span class="count"><strong id="skippedCount">0</strong>跳过</span>
+          <span class="count"><strong id="failedCount">0</strong>失败</span>
+        </div>
+        <p class="hint" id="resultMessage"></p>
+        <div class="table-scroll" id="resultTable">
+          <table>
+            <thead><tr><th scope="col">源格 → 目标格</th><th scope="col">状态</th><th scope="col">说明</th></tr></thead>
+            <tbody id="resultRows"></tbody>
+          </table>
+        </div>
+        <p class="hint field-hint" id="truncatedNotice" hidden>明细仅显示部分单元格，上方数量包含全部处理结果。</p>
+      </section>
+    </main>
+    <footer class="footer">
+      <span class="footer-status" id="footerStatus" role="status">正在加载…</span>
+      <button class="primary" id="convertButton" type="button" disabled data-control>开始转换</button>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var state = { selection: null, templates: [], busy: '', previewVersion: 0 };
+      function el(id) { return document.getElementById(id); }
+      function text(id, value) { el(id).textContent = value == null ? '' : String(value); }
+      function errorMessage(error) { return error && error.message ? error.message : String(error || '操作失败，请重试。'); }
+      function showError(message) { text('errorNotice', message); el('errorNotice').hidden = !message; }
+      function templateIndex() { return el('templateSelect').value === 'auto' ? null : Number(el('templateSelect').value); }
+      function direction() { return document.querySelector('input[name="direction"]:checked').value; }
+      function hasSelection() { return !!(state.selection && state.selection.ranges && state.selection.ranges.length && state.selection.cellCount > 0); }
+
+      function setBusy(busy, message) {
+        state.busy = busy;
+        document.querySelectorAll('[data-control]').forEach(function (control) { control.disabled = !!busy; });
+        el('convertButton').disabled = !!busy || !hasSelection();
+        text('convertButton', busy === 'converting' ? '正在转换…' : '开始转换');
+        if (message !== undefined) text('footerStatus', message);
+      }
+
+      function adjacentCell(a1, offset) {
+        var match = String(a1 || '').match(/^\$?([A-Za-z]+)\$?(\d+)$/);
+        if (!match) return '—';
+        var letters = match[1].toUpperCase();
+        var column = 0;
+        for (var i = 0; i < letters.length; i++) column = column * 26 + letters.charCodeAt(i) - 64;
+        column += offset;
+        if (column < 1) return '无左侧格';
+        var result = '';
+        while (column > 0) {
+          column--;
+          result = String.fromCharCode(65 + column % 26) + result;
+          column = Math.floor(column / 26);
+        }
+        return result + match[2];
+      }
+
+      function renderPosition() {
+        var selectedDirection = direction();
+        el('leftOption').classList.toggle('selected', selectedDirection === 'left');
+        el('rightOption').classList.toggle('selected', selectedDirection === 'right');
+        var firstCell = state.selection && state.selection.firstCell;
+        text('sourceCell', firstCell || '—');
+        text('targetCell', firstCell ? adjacentCell(firstCell, selectedDirection === 'left' ? -1 : 1) : '—');
+      }
+
+      function renderSelection(selection) {
+        state.selection = selection || null;
+        if (selection && selection.ranges && selection.ranges.length) {
+          text('selectionRanges', selection.ranges.join('，'));
+          text('selectionMeta', selection.sheetName + ' · ' + (selection.cellCount > 0 ? Number(selection.cellCount).toLocaleString('zh-CN') + ' 个格子' : '选区中没有已用单元格'));
+        } else {
+          text('selectionRanges', '尚未选择格子');
+          text('selectionMeta', '在表格中选中要转换的链接，然后点击“刷新选区”。');
+        }
+        renderPosition();
+      }
+
+      function templateKey(template) {
+        return template ? [template.id, template.templateCode, template.templateUrl].join('|') : '';
+      }
+
+      function renderTemplates(templates, loadError) {
+        var previousIndex = templateIndex();
+        var previousKey = previousIndex === null ? '' : templateKey(state.templates[previousIndex]);
+        state.templates = Array.isArray(templates) ? templates : [];
+        var select = el('templateSelect');
+        select.textContent = '';
+        var automatic = document.createElement('option');
+        automatic.value = 'auto';
+        automatic.textContent = '自动识别';
+        select.appendChild(automatic);
+        state.templates.forEach(function (template, index) {
+          var option = document.createElement('option');
+          option.value = String(index);
+          option.textContent = template.templateName || template.templateCode || ('模板 ' + (index + 1));
+          select.appendChild(option);
+          if (previousKey && previousKey === templateKey(template)) select.value = String(index);
+        });
+        var notice = loadError ? loadError + '。可重新加载模板；微店原始链接仍可直接解析。' :
+          (state.templates.length ? '' : '当前没有可用模板。微店原始链接仍可直接解析；其他链接请配置模板后重新加载。');
+        text('templateNotice', notice);
+        el('templateNotice').hidden = !notice;
+      }
+
+      function updatePreview() {
+        var version = ++state.previewVersion;
+        var index = templateIndex();
+        text('templateHint', index === null ? '批量转换时逐格匹配；无法识别时可手动指定模板。' : '按所选模板解析当前选区，无法解析的格子会显示原因。');
+        el('previewUrl').hidden = true;
+        el('previewUrl').removeAttribute('href');
+        el('previewUrl').removeAttribute('title');
+        var url = state.selection && state.selection.firstUrl;
+        if (!url) {
+          text('previewLabel', hasSelection() ? '选区内没有可预览的链接；转换后会显示每格处理结果。' : '选中链接后，这里会预览首个链接的转换结果。');
+          return;
+        }
+        text('previewLabel', '正在解析首个链接…');
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (version !== state.previewVersion) return;
+            if (result && result.ok) {
+              text('previewLabel', '首个链接预览' + (result.templateName ? ' · ' + result.templateName : ''));
+              text('previewUrl', 'LINK');
+              el('previewUrl').href = result.url;
+              el('previewUrl').title = result.url;
+              el('previewUrl').hidden = false;
+            } else {
+              text('previewLabel', '首个链接：' + (result && result.reason ? result.reason : '无法解析，请尝试指定来源模板。'));
+            }
+          })
+          .withFailureHandler(function (error) {
+            if (version !== state.previewVersion) return;
+            text('previewLabel', '预览失败：' + errorMessage(error));
+          })
+          .previewWeidianOriginalLink({ url: url, templates: state.templates, templateIndex: index });
+      }
+
+      function loadBootstrap(initial) {
+        if (state.busy) return;
+        ++state.previewVersion;
+        showError('');
+        setBusy('loading', initial ? '正在读取选区和模板…' : '正在重新加载模板…');
+        google.script.run
+          .withSuccessHandler(function (data) {
+            data = data || {};
+            if (initial || !state.selection) renderSelection(data.selection);
+            renderTemplates(data.templates, data.templateError);
+            setBusy('', hasSelection() ? '准备就绪' : '请先选择要转换的格子');
+            updatePreview();
+          })
+          .withFailureHandler(function (error) {
+            if (!state.selection) renderSelection(null);
+            showError('加载失败：' + errorMessage(error) + '。点击“重新加载模板”重试。');
+            setBusy('', '加载失败，可重试');
+            updatePreview();
+          })
+          .getWeidianOriginalBootstrap();
+      }
+
+      function refreshSelection() {
+        if (state.busy) return;
+        ++state.previewVersion;
+        showError('');
+        setBusy('refreshing', '正在读取选区…');
+        google.script.run
+          .withSuccessHandler(function (selection) {
+            renderSelection(selection);
+            el('results').hidden = true;
+            setBusy('', hasSelection() ? '选区已更新' : '请先选择要转换的格子');
+            updatePreview();
+          })
+          .withFailureHandler(function (error) {
+            showError('读取选区失败：' + errorMessage(error) + '。当前选区保持不变，可点击“刷新选区”重试。');
+            setBusy('', '选区刷新失败');
+            updatePreview();
+          })
+          .getWeidianOriginalSelection();
+      }
+
+      function renderResults(result) {
+        result = result || {};
+        text('successCount', result.successCount || 0);
+        text('skippedCount', result.skippedCount || 0);
+        text('failedCount', result.failedCount || 0);
+        text('resultMessage', result.message || ('已处理 ' + (result.scannedCount || 0) + ' 个格子。'));
+        var rows = el('resultRows');
+        rows.textContent = '';
+        var items = Array.isArray(result.items) ? result.items : [];
+        items.forEach(function (item) {
+          var row = document.createElement('tr');
+          var location = document.createElement('td');
+          location.textContent = (item.source || '—') + ' → ' + (item.target || '—');
+          var status = document.createElement('td');
+          var knownStatus = ['success', 'skipped', 'failed'].indexOf(item.status) >= 0 ? item.status : 'failed';
+          status.className = 'status-' + knownStatus;
+          status.textContent = { success: '成功', skipped: '跳过', failed: '失败' }[knownStatus];
+          var message = document.createElement('td');
+          message.textContent = item.message || '';
+          row.appendChild(location);
+          row.appendChild(status);
+          row.appendChild(message);
+          rows.appendChild(row);
+        });
+        el('resultTable').hidden = !items.length;
+        el('truncatedNotice').hidden = !result.detailsTruncated;
+        el('results').hidden = false;
+        el('results').scrollIntoView({ block: 'nearest' });
+      }
+
+      function convert() {
+        if (state.busy || !hasSelection()) return;
+        var options = {
+          sheetId: state.selection.sheetId,
+          ranges: state.selection.ranges.slice(),
+          templates: state.templates,
+          templateIndex: templateIndex(),
+          direction: direction(),
+          overwrite: el('overwrite').checked
+        };
+        ++state.previewVersion;
+        showError('');
+        el('results').hidden = true;
+        setBusy('converting', '正在处理选区，请稍候…');
+        google.script.run
+          .withSuccessHandler(function (result) {
+            renderResults(result);
+            setBusy('', '转换完成');
+            updatePreview();
+          })
+          .withFailureHandler(function (error) {
+            showError('转换中断：' + errorMessage(error) + '。请检查表格后重试；部分格子可能已写入。');
+            setBusy('', '转换中断，可重试');
+            updatePreview();
+          })
+          .convertSelectedToWeidianOriginal(options);
+      }
+
+      el('refreshSelection').addEventListener('click', refreshSelection);
+      el('reloadTemplates').addEventListener('click', function () { loadBootstrap(false); });
+      el('templateSelect').addEventListener('change', updatePreview);
+      el('convertButton').addEventListener('click', convert);
+      document.querySelectorAll('input[name="direction"]').forEach(function (radio) { radio.addEventListener('change', renderPosition); });
+      el('overwrite').addEventListener('change', function () {
+        text('overwriteHint', (this.checked ? '目标格已有内容时，将替换为转换后的链接。' : '默认跳过已有内容的目标格。') + '目标位于源选区时也会跳过，保留源链接。');
+      });
+      loadBootstrap(true);
+    }());
+  </script>
+</body>
+</html>

@@ -59,22 +59,24 @@ function save() {
     <el-button v-if="profileError" :loading="profileLoading" @click="loadProfile">{{
       t("account.retry")
     }}</el-button>
-    <dl v-if="session.kol" class="profile">
-      <template
-        v-for="field in ['kolCode', 'name', 'email', 'phone', 'country', 'tenantName'] as const"
-        :key="field"
-        ><dt>{{ t(`account.${field}`) }}</dt>
-        <dd>{{ session.kol[field] || t("account.unavailable") }}</dd></template
-      >
-      <template v-if="sheetUrl"
-        ><dt>{{ t("account.sheet") }}</dt>
-        <dd>
-          <a :href="sheetUrl" target="_blank" rel="noopener noreferrer">{{
-            t("account.openSheet")
-          }}</a>
-        </dd></template
-      >
-    </dl>
+    <el-card v-if="session.kol" class="profile-card" shadow="never">
+      <dl class="profile">
+        <template
+          v-for="field in ['kolCode', 'name', 'email', 'phone', 'country', 'tenantName'] as const"
+          :key="field"
+          ><dt>{{ t(`account.${field}`) }}</dt>
+          <dd>{{ session.kol[field] || t("account.unavailable") }}</dd></template
+        >
+        <template v-if="sheetUrl"
+          ><dt>{{ t("account.sheet") }}</dt>
+          <dd>
+            <a :href="sheetUrl" target="_blank" rel="noopener noreferrer">{{
+              t("account.openSheet")
+            }}</a>
+          </dd></template
+        >
+      </dl>
+    </el-card>
     <el-card class="password-card" shadow="never">
       <h2>{{ t("account.changePassword") }}</h2>
       <el-alert
@@ -124,7 +126,7 @@ function save() {
 .profile {
   display: grid;
   grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
-  gap: 12px 24px;
+  gap: var(--tcrm-space-3) var(--tcrm-space-5);
 }
 dt {
   color: var(--el-text-color-secondary);
@@ -135,7 +137,7 @@ dd {
 }
 .password-card {
   max-width: 480px;
-  margin-top: 24px;
+  margin-top: var(--tcrm-space-5);
 }
 h2 {
   margin-top: 0;
@@ -143,11 +145,16 @@ h2 {
   line-height: var(--tcrm-line-height-section);
 }
 .el-alert {
-  margin-bottom: 16px;
+  margin-bottom: var(--tcrm-space-4);
 }
-:deep(.el-button),
-:deep(.el-input__wrapper) {
-  min-height: 44px;
+.profile-card {
+  margin-bottom: var(--tcrm-space-4);
+}
+@media (max-width: 767px) {
+  :deep(.el-button),
+  :deep(.el-input__wrapper) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
 }
 @media (max-width: 480px) {
   .password-card,

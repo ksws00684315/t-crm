@@ -7,47 +7,33 @@ body,
 
 body {
   -webkit-text-size-adjust: 100%;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
-    sans-serif;
+  font-family: var(--tcrm-font-sans);
   font-size: var(--tcrm-font-size-body);
   font-weight: 400;
-  line-height: 22px;
-  color: #303133;
-  background: #f5f7fa;
+  line-height: var(--tcrm-line-height-body);
+  color: var(--tcrm-color-text);
+  background: var(--tcrm-color-page);
 }
 
 * {
   box-sizing: border-box;
 }
 
-:root {
-  --tcrm-space-1: 4px;
-  --tcrm-space-2: 8px;
-  --tcrm-space-3: 12px;
-  --tcrm-space-4: 16px;
-  --tcrm-space-5: 24px;
-  --tcrm-space-6: 32px;
-  --tcrm-control-height: 32px;
-  --tcrm-control-height-mobile: 44px;
-  --tcrm-font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
-    sans-serif;
-  --tcrm-font-size-body: 14px;
-  --tcrm-line-height-body: 22px;
-  --tcrm-font-size-title: 20px;
-  --tcrm-line-height-title: 28px;
-  --tcrm-font-size-section: 16px;
-  --tcrm-line-height-section: 24px;
-  --tcrm-font-size-help: 12px;
-  --tcrm-line-height-help: 20px;
-  --el-font-family: var(--tcrm-font-sans);
-  --el-font-size-base: var(--tcrm-font-size-body);
-  --el-font-size-extra-large: var(--tcrm-font-size-title);
-  --el-font-size-large: var(--tcrm-font-size-section);
-  --el-font-size-medium: var(--tcrm-font-size-body);
-  --el-font-size-small: var(--tcrm-font-size-help);
-  --el-component-size: var(--tcrm-control-height);
+.tcrm-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cards match the admin console: hairline border and radius come from tokens.css; 16px padding. */
+.el-card {
+  --el-card-padding: var(--tcrm-space-4);
+}
+
+#app .el-card__header {
+  padding: var(--tcrm-space-4);
+  font-size: var(--tcrm-font-size-section);
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-section);
 }
 
 /* Keep typography stable across page-level scoped styles and body-mounted overlays. */

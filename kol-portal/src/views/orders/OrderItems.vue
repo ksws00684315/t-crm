@@ -30,3 +30,26 @@ defineProps<{
     </div>
   </div>
 </template>
+
+<style scoped>
+.item-list {
+  display: grid;
+  gap: var(--tcrm-space-2);
+}
+.item-list__head,
+.item-list__row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 0.6fr 1fr 1fr;
+  gap: var(--tcrm-space-2);
+}
+.item-list__head {
+  font-weight: 600;
+}
+@media (max-width: 767px) {
+  .item-list__head,
+  .item-list__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    overflow-wrap: anywhere;
+  }
+}
+</style>

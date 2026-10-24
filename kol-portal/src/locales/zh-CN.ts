@@ -19,7 +19,10 @@ const zhCN: MessageSchema = {
     comingSoon: "即将上线",
     cancel: "取消",
     edit: "修改",
-    copy: "复制"
+    copy: "复制",
+    actions: "操作",
+    search: "查询",
+    reset: "重置"
   },
   /** 页头导航（任务 15b §4.3）；键由 `layout/nav.ts` 引用。 */
   nav: {
@@ -92,7 +95,10 @@ const zhCN: MessageSchema = {
     emptyHint: "商务完成推广配置后，你的商品会显示在这里。",
     unnamed: "未命名商品",
     copyLink: "复制链接",
-    copied: "已复制"
+    copied: "已复制",
+    colItem: "商品",
+    colId: "商品 ID",
+    colCreated: "创建时间"
   },
   orders: {
     title: "我的订单",
@@ -227,6 +233,38 @@ const zhCN: MessageSchema = {
     },
     handle: "核心社媒ID",
     submit: "创建达人账号"
+  },
+  copy: {
+    done: "已复制 {text}",
+    failed: "复制失败，请手动复制"
+  },
+  search: {
+    expand: "展开",
+    collapse: "收起",
+    chip: "{label}：{text}",
+    clearAll: "清除全部"
+  },
+  table: {
+    total: "共 {total} 条",
+    range: "第 {from}–{to} 条 / 共 {total} 条",
+    densityDefault: "默认",
+    densityCompact: "紧凑",
+    densityLoose: "宽松",
+    refresh: "刷新",
+    columns: "列设置",
+    hidden: "已隐藏 {n} 列",
+    moveUp: "上移",
+    moveDown: "下移",
+    reset: "重置",
+    fullscreen: "表格全屏",
+    exitFullscreen: "退出表格全屏",
+    empty: "暂无数据",
+    emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
+    clearFilters: "清除筛选",
+    export: "导出",
+    selected: "已选 {n} 项",
+    selectedPageOnly: "仅限当前页",
+    clearSelection: "取消选择"
   },
   errors: {
     PREPAY_REQUEST_CONFLICT: "该申请编号已用于其他内容，请核对申请列表后重试。",
