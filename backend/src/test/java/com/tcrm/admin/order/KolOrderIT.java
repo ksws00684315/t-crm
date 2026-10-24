@@ -12,6 +12,7 @@ import com.tcrm.admin.kol.service.KolWriter;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
 import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.shared.TenantScope;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -123,6 +124,7 @@ class KolOrderIT {
             "crm_kol_auth_token",
             "crm_kol_bd_history",
             "crm_kol_item",
+            "crm_kol",
             "crm_shop",
             "sys_oper_log")) {
       jdbc.update("DELETE FROM " + table);
@@ -281,7 +283,7 @@ class KolOrderIT {
         String.valueOf(8000L + id),
         "0",
         name,
-        payAmount);
+        new BigDecimal(payAmount));
   }
 
   private String kolLogin(String email) throws Exception {
