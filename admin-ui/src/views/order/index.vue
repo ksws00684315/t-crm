@@ -108,7 +108,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "shopName", label: t("order.shop"), minWidth: px(170, 162) },
   { key: "kol", label: t("order.kol"), minWidth: px(170, 160) },
   { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 116) },
-  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 132) },
+  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 126) },
   { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
   {
     key: "freight",
@@ -117,7 +117,7 @@ const columns = computed<DataColumn[]>(() => [
     amount: true,
     defaultHidden: true
   },
-  { key: "payTime", label: t("order.payTime"), width: px(170, 160) },
+  { key: "payTime", label: t("order.payTime"), width: px(170, 166) },
   { key: "createTime", label: t("order.createTime"), width: 170, defaultHidden: true },
   { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
