@@ -9,6 +9,7 @@ import {
   listSyncStates,
   triggerOrderSync
 } from "@/api/order/order";
+import { listShops } from "@/api/product/shop";
 import type {
   KindSyncVO,
   OrderSyncStateVO,
@@ -18,7 +19,7 @@ import type {
 } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { orderAbilities } from "@/utils/permission";
 import { notifyError } from "@/utils/notify";
 import { syncSourceText } from "@/utils/order";
@@ -142,11 +143,31 @@ async function loadFailures() {
   failuresLoading.value = true;
   try {
     failures.value = await listSyncFailures();
+    // L-003: show the failure shops as "name (code)". The failure VO carries no code, so map it
+    // from the shop options; without product:view (or on failure) the plain name stays.
+    const codes = new Map<string, string>();
+    try {
+      for (const shop of await listShops()) {
+        if (shop.shopCode) codes.set(shop.id, shop.shopCode);
+      }
+      shopCodes.value = codes;
+    } catch {
+      shopCodes.value = new Map();
+    }
   } catch (error) {
     notifyError(error);
   } finally {
     failuresLoading.value = false;
   }
+}
+
+/** Shop codes for the "name (code)" display on the failures tab (L-003). */
+const shopCodes = ref(new Map<string, string>());
+
+function failureShopText(failure: SyncFailureVO): string {
+  if (!failure.shopName && !failure.shopId) return "-";
+  const code = failure.shopId ? shopCodes.value.get(failure.shopId) : undefined;
+  return code ? formatNameWithCode(failure.shopName ?? "-", code) : (failure.shopName ?? "-");
 }
 
 watch(
@@ -335,7 +356,7 @@ function close() {
           :paged="false"
           :loading="failuresLoading"
         >
-          <template #cell-shopName="{ row }">{{ asFailure(row).shopName ?? "-" }}</template>
+          <template #cell-shopName="{ row }">{{ failureShopText(asFailure(row)) }}</template>
           <template #cell-kind="{ row }">{{ failureKindText(asFailure(row).kind) }}</template>
           <template #cell-time="{ row }">{{ formatInstant(asFailure(row).time) }}</template>
           <template #cell-error="{ row }">{{ asFailure(row).error ?? "-" }}</template>

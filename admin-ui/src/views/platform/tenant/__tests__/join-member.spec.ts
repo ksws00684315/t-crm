@@ -1,5 +1,6 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
+import { createPinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantVO } from "@/api/platform/tenant";
 import * as tenantApi from "@/api/platform/tenant";
@@ -55,7 +56,7 @@ async function openWithAccount(found: platformUserApi.PlatformUserVO | null = ac
   vi.mocked(platformUserApi.findPlatformUser).mockResolvedValue(found);
   const wrapper = mount(JoinMemberDialog, {
     props: { modelValue: false, tenant },
-    global: { plugins: [ElementPlus, i18n] },
+    global: { plugins: [ElementPlus, i18n, createPinia()] },
     attachTo: document.body
   });
   await wrapper.setProps({ modelValue: true });
@@ -81,7 +82,7 @@ describe("platform: add an existing account to a company", () => {
     vi.mocked(tenantApi.listTenantAdmins).mockResolvedValue([]);
     const wrapper = mount(TenantAdminsDialog, {
       props: { modelValue: true, tenant },
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [ElementPlus, i18n, createPinia()] },
       attachTo: document.body
     });
     await flushPromises();

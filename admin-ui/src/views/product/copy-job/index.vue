@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
@@ -12,6 +12,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import RowActions from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { readPageSize } from "@/utils/table-prefs";
@@ -82,12 +83,18 @@ function itemStatusText(status: string): string {
   }
 }
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+/** Action and result columns get a width per language: the labels differ in length (norm 10 §3). */
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
   { key: "jobCode", label: t("copyJob.jobCode"), minWidth: 180 },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
   { key: "status", label: t("copyJob.status"), width: 110 },
-  { key: "result", label: t("copyJob.result"), minWidth: 280 },
-  { key: "errorMessage", label: t("copyJob.error"), minWidth: 160 },
+  // R-01 (browser-measured, assets/task-59/measurements-{zh,en}.md): three nowrap tags need
+  // ~232px (zh, 1-digit counts) to ~292px (en, 3-digit counts) including cell padding.
+  { key: "result", label: t("copyJob.result"), minWidth: px(240, 300) },
+  { key: "errorMessage", label: t("copyJob.error"), minWidth: 160, tooltip: true },
   { key: "createTime", label: t("copyJob.createTime"), width: 170 },
   { key: "finishTime", label: t("copyJob.finishTime"), width: 170 },
   { key: "kolId", label: t("copyJob.kolId"), width: 140, defaultHidden: true },
@@ -95,7 +102,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "kolName", label: t("copyJob.kolName"), minWidth: 120, defaultHidden: true },
   { key: "targetShopCode", label: t("copyJob.targetShopCode"), width: 140, defaultHidden: true },
   { key: "targetShopName", label: t("copyJob.targetShopName"), minWidth: 140, defaultHidden: true },
-  { key: "actions", label: t("common.actions"), width: 120 }
+  // View items: zh canvas 56px, en 98px, +24px headroom (task 59 R-11 measurements).
+  { key: "actions", label: t("common.actions"), width: px(84, 128) }
 ]);
 
 const itemColumns = computed<DataColumn[]>(() => [
@@ -210,12 +218,24 @@ function rowActions(row: CopyJobVO) {
   ];
 }
 
+/**
+ * R-03: the order chain pushes ?jobCode=… here even when this tab is already open (one tab per
+ * path, the page is kept alive), so watch the route instead of reading it once on mount.
+ */
+watch(
+  () => route.query.jobCode,
+  jobCode => {
+    const wanted = typeof jobCode === "string" ? jobCode.trim() : "";
+    if (!wanted || wanted === query.jobCode) return;
+    query.jobCode = wanted;
+    search();
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
-  const fromRoute = route.query.jobCode;
-  if (typeof fromRoute === "string" && fromRoute.trim()) {
-    query.jobCode = fromRoute.trim();
-  }
-  void load();
+  // The immediate route watch above already searched when a jobCode came with the URL.
+  if (!query.jobCode) void load();
 });
 </script>
 
@@ -408,7 +428,16 @@ onMounted(() => {
   gap: 6px;
 }
 
+/* R-01: the result tags were flex children that shrank into unreadable slivers when the cell ran
+   out of width. Freeze them at their text width; the "has failures" hint drops onto its own line
+   inside the cell instead of stretching the row. */
+.copy-job__result :deep(.el-tag) {
+  flex: none;
+  white-space: nowrap;
+}
+
 .copy-job__hint {
+  flex-basis: 100%;
   color: var(--tcrm-color-danger);
   font-size: var(--tcrm-font-size-help);
 }

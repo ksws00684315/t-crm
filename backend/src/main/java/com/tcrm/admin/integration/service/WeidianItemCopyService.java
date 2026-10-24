@@ -39,6 +39,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
 
   static final String SOURCE_INCOMPLETE = "来源商品信息不完整";
 
+  /** Weidian reported success for vdian.item.add but no item id could be read from the result. */
+  static final String ITEM_ID_MISSING = "微店已返回成功但未识别新商品 ID，商品可能已在微店创建，请在微店后台核对";
+
   private final WeidianBusinessApi weidian;
   private final WeidianShopAuthMapper auths;
 
@@ -58,7 +61,8 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
     AddItemResponse created = weidian.addItem(targetShopId, add);
     if (created == null || created.itemId() == null) {
-      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
+      logItemIdMissing(targetShopId, created);
+      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, ITEM_ID_MISSING, null);
     }
     String newId = Long.toString(created.itemId());
     List<SaveItemDetailBlock> blocks = toSaveBlocks(detail);
@@ -207,6 +211,31 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     // Conjectured item-missing codes for vdian.item.get — verify with a real account at M0.
     int code = error.statusCode();
     return code == 10003 || code == 20003 || code == 21001;
+  }
+
+  /**
+   * Logs only the field names of Weidian's result object (plus the JSON type of a nested {@code
+   * result} child), or only the JSON type when the result is not an object; values may contain shop
+   * data.
+   */
+  private static void logItemIdMissing(long targetShopId, AddItemResponse created) {
+    JsonNode result = created == null ? null : created.raw();
+    String shape;
+    if (result != null && result.isObject()) {
+      List<String> fields = new ArrayList<>();
+      fields.addAll(result.propertyNames());
+      shape = "result fields=" + fields;
+      JsonNode inner = result.get("result");
+      if (inner != null) {
+        shape += ", inner result type=" + inner.getNodeType();
+      }
+    } else {
+      shape = "result type=" + (result == null ? "null" : result.getNodeType());
+    }
+    LOG.warn(
+        "Weidian vdian.item.add returned success without a recognised item id in shop {}; {}",
+        targetShopId,
+        shape);
   }
 
   private static String safeReason(Throwable e) {

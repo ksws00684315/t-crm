@@ -38,6 +38,7 @@
   --tcrm-sidebar-width: 224px;
   --tcrm-sidebar-collapsed: 64px;
   --tcrm-header-height: 56px;
+  --tcrm-table-header-height: 40px;
   --tcrm-font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
     sans-serif;

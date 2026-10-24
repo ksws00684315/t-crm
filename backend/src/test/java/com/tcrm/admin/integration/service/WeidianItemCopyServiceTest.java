@@ -10,6 +10,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponse;
@@ -23,17 +27,32 @@ import com.tcrm.admin.shared.ErrorCode;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 class WeidianItemCopyServiceTest {
   private final WeidianBusinessApi weidian = mock(WeidianBusinessApi.class);
   private final WeidianShopAuthMapper auths = mock(WeidianShopAuthMapper.class);
+  private final JsonMapper json = JsonMapper.builder().build();
+  private final WeidianBusinessApiParser parser = new WeidianBusinessApiParser();
+  private final Logger copyLogger = (Logger) LoggerFactory.getLogger(WeidianItemCopyService.class);
+  private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
   private WeidianItemCopyService service;
 
   @BeforeEach
   void setUp() {
     service = new WeidianItemCopyService(weidian, auths);
+    logs.start();
+    copyLogger.addAppender(logs);
+  }
+
+  @AfterEach
+  void tearDown() {
+    copyLogger.detachAppender(logs);
   }
 
   @Test
@@ -154,5 +173,103 @@ class WeidianItemCopyServiceTest {
     CopyResult result = service.copy(1L, "10", 2L);
     assertThat(result.detailWarning()).isNull();
     verify(weidian).saveItemDetail(eq(2L), any());
+  }
+
+  @Test
+  void shouldCopyAndSaveDetail_whenAddReturnsItemidField() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any()))
+        .thenReturn(
+            new ItemDetailResponse(
+                List.of(new ItemDetailResponseBlock(1, "https://img", null, 1, null, null, null)),
+                null));
+    when(weidian.addItem(eq(2L), any()))
+        .thenReturn(parser.addItem(json.readTree("{\"add_sku_ids\":[],\"itemid\":2234677858}")));
+    when(weidian.saveItemDetail(eq(2L), any())).thenReturn(new SaveItemDetailResponse("tmp", null));
+
+    CopyResult result = service.copy(1L, "10", 2L);
+
+    assertThat(result.newItemId()).isEqualTo("2234677858");
+    assertThat(result.detailWarning()).isNull();
+    verify(weidian).saveItemDetail(eq(2L), any());
+  }
+
+  @Test
+  void shouldFailWithExplicitMessage_whenAddSucceedsButNoItemIdRecognised() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    JsonNode raw = json.readTree("{\"add_sku_ids\":[],\"new_goods\":\"SECRET-VALUE-42\"}");
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e -> {
+              BusinessException be = (BusinessException) e;
+              assertThat(be.getErrorCode()).isEqualTo(ErrorCode.WEIDIAN_API_FAILED);
+              assertThat(be.getMessage()).isEqualTo(WeidianItemCopyService.ITEM_ID_MISSING);
+            });
+    verify(weidian, never()).saveItemDetail(anyLong(), any());
+    assertThat(logs.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .isEqualTo(
+                      "Weidian vdian.item.add returned success without a recognised item id"
+                          + " in shop 2; result fields=[add_sku_ids, new_goods]");
+            });
+    assertThat(logs.list)
+        .allSatisfy(
+            event -> assertThat(event.getFormattedMessage()).doesNotContain("SECRET-VALUE-42"));
+  }
+
+  @Test
+  void shouldLogInnerResultTypeOnly_whenAddResultNestsScalar() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    JsonNode raw = json.readTree("{\"result\":12345}");
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L)).isInstanceOf(BusinessException.class);
+
+    assertThat(logs.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .isEqualTo(
+                      "Weidian vdian.item.add returned success without a recognised item id"
+                          + " in shop 2; result fields=[result], inner result type=NUMBER");
+            });
+    assertThat(logs.list)
+        .allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain("12345"));
+  }
+
+  @Test
+  void shouldLogJsonTypeOnly_whenAddResultIsNotAnObject() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    JsonNode raw = json.readTree("\"SECRET-VALUE-42\"");
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L)).isInstanceOf(BusinessException.class);
+
+    assertThat(logs.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .isEqualTo(
+                      "Weidian vdian.item.add returned success without a recognised item id"
+                          + " in shop 2; result type=STRING");
+            });
+    assertThat(logs.list)
+        .allSatisfy(
+            event -> assertThat(event.getFormattedMessage()).doesNotContain("SECRET-VALUE-42"));
   }
 }

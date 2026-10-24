@@ -1,12 +1,18 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import ElementPlus from "element-plus";
+import ElementPlus, { ElMessage } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
+import { reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as taskApi from "@/api/task/task";
 import { i18n } from "@/locales";
 import ImportTaskPage from "../index.vue";
 
 vi.mock("@/api/task/task");
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: routeQuery })
+}));
+/** Reactive so that mutating it drives the page's route.query watcher (task 59 R-02). */
+const routeQuery = reactive<Record<string, string | undefined>>({});
 
 /**
  * 上传文件 (task 32 §2.3, contract 33 §3.5): the import task list with type and status
@@ -41,7 +47,58 @@ describe("import task page (task 32 §2.3)", () => {
     document.body.innerHTML = "";
     localStorage.removeItem("tcrm.admin.table.import-tasks");
     vi.mocked(taskApi.downloadTaskErrorFile).mockReset();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     setActivePinia(createPinia());
+  });
+
+  it("locates the taskId from the route: filters by its type and status, highlights the row (R-02)", async () => {
+    vi.mocked(taskApi.getTask).mockResolvedValue({
+      id: "9007199254740999",
+      taskType: "ORDER_IMPORT",
+      status: "FAILED",
+      total: 20,
+      done: 20,
+      failed: 3,
+      message: null,
+      hasErrorFile: false,
+      createTime: "2026-10-23T01:00:00Z",
+      startedAt: null,
+      finishedAt: null
+    });
+    routeQuery.taskId = " 9007199254740999 ";
+    const wrapper = await mountPage("1", [
+      { ...task, id: "9007199254740999", type: "ORDER_IMPORT", status: "FAILED" }
+    ]);
+    expect(taskApi.getTask).toHaveBeenCalledWith("9007199254740999");
+    expect(taskApi.listImportTasks).toHaveBeenLastCalledWith(
+      1,
+      20,
+      expect.objectContaining({ type: "ORDER_IMPORT", status: "FAILED" })
+    );
+    expect(wrapper.findAll("tr.import-task-row--located")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("tells the user when the located task is not on the current page (R-02)", async () => {
+    vi.mocked(taskApi.getTask).mockResolvedValue({
+      id: "9007199254740999",
+      taskType: "ORDER_IMPORT",
+      status: "FAILED",
+      total: 20,
+      done: 20,
+      failed: 3,
+      message: null,
+      hasErrorFile: false,
+      createTime: "2026-10-23T01:00:00Z",
+      startedAt: null,
+      finishedAt: null
+    });
+    routeQuery.taskId = "9007199254740999";
+    const info = vi.spyOn(ElMessage, "info").mockImplementation(() => undefined as never);
+    const wrapper = await mountPage();
+    expect(info).toHaveBeenCalledWith("该任务不在当前页，已按其类型与状态筛选。");
+    info.mockRestore();
+    wrapper.unmount();
   });
 
   it("lists the file, counts, submitter and the finish time", async () => {

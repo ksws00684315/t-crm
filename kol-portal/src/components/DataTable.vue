@@ -64,6 +64,11 @@ const props = withDefaults(
     expandable?: boolean;
     /** Opens every row's detail on render (the matching pool shows lines by default). */
     defaultExpandAll?: boolean;
+    /**
+     * Body-row class, e.g. to mark the record a navigation landed on (task 59 R-02): a string for
+     * every row or a per-row function, handed straight to el-table.
+     */
+    rowClassName?: string | ((scope: { row: object; rowIndex: number }) => string);
   }>(),
   {
     loading: false,
@@ -473,6 +478,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         v-loading="loading"
         :data="rows"
         :row-key="rowKey"
+        :row-class-name="rowClassName"
         size="default"
         :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
@@ -634,7 +640,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
   background: var(--tcrm-color-muted);
 }
 .data-table :deep(.el-table th.el-table__cell) {
-  height: 40px;
+  height: var(--tcrm-table-header-height);
   padding-block: 0;
 }
 /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
