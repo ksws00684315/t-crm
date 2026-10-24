@@ -1,4 +1,9 @@
 export default {
+  number: "Prepay number",
+  paidAmount: "Paid amount",
+  entryType: "Entry type",
+  entryAmount: "Entry amount",
+  occurredAt: "Entry time",
   title: "Creator prepays",
   amount: "Requested amount (CNY)",
   payTime: "Payment time",
