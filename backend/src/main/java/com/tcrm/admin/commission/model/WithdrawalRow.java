@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Full withdrawal row as stored (敏感列 accountCipher 只在解密方使用，不进接口出参). */
+/** Full withdrawal row as stored (accountCipher 只在解密方使用，不进接口出参). */
 public record WithdrawalRow(
     long id,
     long kolId,
@@ -14,6 +14,8 @@ public record WithdrawalRow(
     Long previousId,
     BigDecimal amountCny,
     String status,
+    boolean paused,
+    String pauseReason,
     Long accountId,
     String accountType,
     String accountCipher,

@@ -136,6 +136,10 @@ const enUS: MessageSchema = {
       name: "Review withdrawals",
       desc: "Approve or reject a creator's withdrawal request"
     },
+    "withdrawal:pay": {
+      name: "Register withdrawal payments",
+      desc: "Register offline payments, reject before payment and read full payout snapshots"
+    },
     "prepay:apply": {
       name: "Apply for prepay",
       desc: "Submit or withdraw a prepay request for a creator"
@@ -333,7 +337,8 @@ const enUS: MessageSchema = {
     WITHDRAWAL_BELOW_MINIMUM: "The withdrawal amount is below the configured minimum.",
     WITHDRAWAL_INSUFFICIENT_AVAILABLE: "The withdrawal amount exceeds the available balance.",
     WITHDRAWAL_KOL_FROZEN: "This creator is frozen from new withdrawal applications.",
-    WITHDRAWAL_PREVIOUS_INVALID:
+    WITHDRAWAL_NOT_RESUBMITTABLE:
+    WITHDRAWAL_PAUSED: "This withdrawal is paused until its source is verified.",
       "The linked previous application is not a rejected withdrawal of this creator.",
     WITHDRAWAL_PAYMENT_CONFLICT:
       "A successful payment already exists or the request" + "id conflicts.",

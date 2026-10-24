@@ -306,7 +306,8 @@ const enUS = {
     WITHDRAWAL_BELOW_MINIMUM: "The withdrawal amount is below the configured minimum.",
     WITHDRAWAL_INSUFFICIENT_AVAILABLE: "The withdrawal amount exceeds the available balance.",
     WITHDRAWAL_KOL_FROZEN: "This creator is frozen from new withdrawal applications.",
-    WITHDRAWAL_PREVIOUS_INVALID:
+    WITHDRAWAL_NOT_RESUBMITTABLE:
+    WITHDRAWAL_PAUSED: "This withdrawal is paused until its source is verified.",
       "The linked previous application is not a rejected withdrawal of this creator.",
     WITHDRAWAL_PAYMENT_CONFLICT:
       "A successful payment already exists or the request" + "id conflicts.",

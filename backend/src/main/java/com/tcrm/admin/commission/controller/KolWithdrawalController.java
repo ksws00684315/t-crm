@@ -1,10 +1,10 @@
 package com.tcrm.admin.commission.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import com.tcrm.admin.commission.service.BizFileService;
 import com.tcrm.admin.commission.service.WithdrawalService;
 import com.tcrm.admin.commission.service.WithdrawalService.AccountInput;
 import com.tcrm.admin.commission.service.WithdrawalService.ApplyCommand;
+import com.tcrm.admin.commission.service.WithdrawalService.RecipientOption;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.security.api.StpKolUtil;
@@ -15,12 +15,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,29 +25,39 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * KOL-portal withdrawal endpoints (task 63, rows 12.01/12.02/13.02). The creator identity always
- * comes from the login state; another creator's application is a 404. Full payout snapshots are the
- * creator's own data; the admin side sees masks until allowed to reveal.
+ * KOL-portal withdrawal endpoints (task 63, contract §6.3): conditions with the settlement numbers,
+ * referenceable approved accounts, applications with per-application payout snapshots, the own list
+ * and detail, and withdrawal before the review. The creator identity always comes from the login
+ * state; another creator's application is a 404. Lists and details show the masked snapshot; the
+ * full account is only in the admin reveal endpoint.
  */
 @RestController
 public class KolWithdrawalController {
   private final WithdrawalService withdrawals;
-  private final BizFileService files;
   private final CurrentKolContext current;
 
-  public KolWithdrawalController(
-      WithdrawalService withdrawals, BizFileService files, CurrentKolContext current) {
+  public KolWithdrawalController(WithdrawalService withdrawals, CurrentKolContext current) {
     this.withdrawals = withdrawals;
-    this.files = files;
     this.current = current;
   }
 
-  /** Withdrawal conditions (11.03): threshold, frozen money, occupation, available balance. */
+  /** Withdrawal conditions (11.03): threshold, frozen, occupation, available, can-apply. */
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @GetMapping("/kol-api/withdrawals/conditions")
   public R<ConditionsVO> conditions() {
     KolAccountDTO kol = current.kol();
     return R.ok(ConditionsVO.from(withdrawals.conditions(kol.tenantId(), kol.id())));
+  }
+
+  /** The creator's approved accounts they can reference on an application (contract §6.3). */
+  @SaCheckLogin(type = StpKolUtil.TYPE)
+  @GetMapping("/kol-api/withdrawals/recipient-options")
+  public R<List<RecipientOptionVO>> recipientOptions() {
+    KolAccountDTO kol = current.kol();
+    return R.ok(
+        withdrawals.recipientOptions(kol.tenantId(), kol.id()).stream()
+            .map(RecipientOptionVO::from)
+            .toList());
   }
 
   /** The creator's own applications, newest first (13.02). */
@@ -85,7 +90,7 @@ public class KolWithdrawalController {
                 kol,
                 new ApplyCommand(
                     request.idempotencyKey(),
-                    request.amountCny(),
+                    request.amount(),
                     request.previousId(),
                     request.payoutAccountId(),
                     request.account() == null
@@ -108,26 +113,6 @@ public class KolWithdrawalController {
     return R.ok(WithdrawalDetailVO.from(withdrawals.withdraw(kol, id)));
   }
 
-  /** The payment voucher of the creator's own paid withdrawal. */
-  @SaCheckLogin(type = StpKolUtil.TYPE)
-  @GetMapping("/kol-api/withdrawals/{id}/voucher")
-  public ResponseEntity<byte[]> voucher(@PathVariable @Min(1) long id) {
-    KolAccountDTO kol = current.kol();
-    return attachment(withdrawals.kolVoucher(kol.tenantId(), kol.id(), id));
-  }
-
-  private static ResponseEntity<byte[]> attachment(BizFileService.FileDTO file) {
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename(file.fileName(), StandardCharsets.UTF_8)
-                .build()
-                .toString())
-        .contentType(MediaType.parseMediaType(file.contentType()))
-        .body(file.content());
-  }
-
   /** Inline payout input (12.01): PayPal needs email, holder and currency; USDT address, QR. */
   public record AccountRequest(
       @NotBlank String type,
@@ -139,7 +124,7 @@ public class KolWithdrawalController {
 
   public record ApplyRequest(
       @NotBlank String idempotencyKey,
-      @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String amountCny,
+      @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String amount,
       @Min(1) Long previousId,
       @Min(1) Long payoutAccountId,
       AccountRequest account,
@@ -147,23 +132,40 @@ public class KolWithdrawalController {
 
   record ConditionsVO(
       String currency,
-      String minimumWithdrawalCny,
-      String frozenCny,
-      String occupiedCny,
-      String walletBalanceCny,
-      String availableCny,
-      boolean kolFrozen,
-      boolean eligible) {
+      String minimum,
+      String version,
+      String available,
+      String occupied,
+      String frozen,
+      String estimated,
+      boolean withdrawalFrozen,
+      String unverifiedCount,
+      boolean canApply) {
     static ConditionsVO from(WithdrawalService.Conditions conditions) {
       return new ConditionsVO(
           conditions.currency(),
-          conditions.minimumWithdrawalCny(),
-          conditions.frozenCny(),
-          conditions.occupiedCny(),
-          conditions.walletBalanceCny(),
-          conditions.availableCny(),
-          conditions.kolFrozen(),
-          conditions.eligible());
+          conditions.minimum(),
+          conditions.version(),
+          conditions.available(),
+          conditions.occupied(),
+          conditions.frozen(),
+          conditions.estimated(),
+          conditions.withdrawalFrozen(),
+          Long.toString(conditions.unverifiedCount()),
+          conditions.canApply());
+    }
+  }
+
+  record RecipientOptionVO(
+      String id, String type, String account, String holder, String currency, String network) {
+    static RecipientOptionVO from(RecipientOption option) {
+      return new RecipientOptionVO(
+          Long.toString(option.id()),
+          option.type(),
+          option.account(),
+          option.holder(),
+          option.currency(),
+          option.network());
     }
   }
 
@@ -270,12 +272,13 @@ public class KolWithdrawalController {
       String amountCny,
       String currency,
       String status,
+      boolean paused,
+      String pauseReason,
       String createdAt,
       String note,
       String reviewNote,
       String financeNote,
       String previousId,
-      String allocationCount,
       AccountVO account,
       List<HistoryVO> history,
       PaymentVO payment) {
@@ -292,12 +295,13 @@ public class KolWithdrawalController {
           detail.amountCny(),
           detail.currency(),
           detail.status(),
+          detail.paused(),
+          detail.pauseReason(),
           detail.createdAt().toString(),
           detail.note(),
           detail.reviewNote(),
           detail.financeNote(),
           detail.previousId() == null ? null : detail.previousId().toString(),
-          Long.toString(detail.allocationCount()),
           AccountVO.from(detail.account()),
           detail.history().stream().map(HistoryVO::from).toList(),
           PaymentVO.from(detail.payment()));

@@ -8,12 +8,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.commission.service.WithdrawalService;
+import com.tcrm.admin.commission.service.WithdrawalService.AdminRow;
+import com.tcrm.admin.commission.service.WithdrawalService.Detail;
+import com.tcrm.admin.commission.service.WithdrawalService.FinanceTask;
+import com.tcrm.admin.commission.service.WithdrawalService.OrderView;
+import com.tcrm.admin.commission.service.WithdrawalService.ProductView;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Role;
@@ -23,11 +29,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Controller slice for the admin withdrawal endpoints (task 63): access, envelope, payloads. */
+/**
+ * Controller slice for the admin withdrawal endpoints (task 63, contract §6.2): access control,
+ * envelope shape and the file-first payment registration.
+ */
 class AdminWithdrawalControllerTest {
   private static final String BASE = "/admin-api/commission/withdrawals";
   private static final Instant NOW = Instant.parse("2026-10-25T10:00:00Z");
@@ -43,26 +53,26 @@ class AdminWithdrawalControllerTest {
 
   private String actAsReviewer() {
     return AdminMvcSupport.actAs(
-        current,
-        6L,
-        Role.STAFF,
-        DataScope.ALL,
-        Set.of("withdrawal:review", "prepay:pay", "data:export"));
+        current, 6L, Role.STAFF, DataScope.ALL, Set.of("withdrawal:review", "data:export"));
+  }
+
+  private String actAsPayer() {
+    return AdminMvcSupport.actAs(current, 7L, Role.STAFF, DataScope.ALL, Set.of("withdrawal:pay"));
   }
 
   private String actAsViewer() {
-    return AdminMvcSupport.actAs(current, 7L, Role.STAFF, DataScope.ALL, Set.of("order:view"));
+    return AdminMvcSupport.actAs(current, 8L, Role.STAFF, DataScope.ALL, Set.of("order:view"));
   }
 
   @Test
-  void shouldListWithdrawals_withMaskedAccountOnly() throws Exception {
+  void shouldListWithdrawals_withNotesAndPausedState() throws Exception {
     when(withdrawals.page(any(), any()))
         .thenReturn(
             new PageResult<>(
                 List.of(
-                    new WithdrawalService.AdminRow(
+                    new AdminRow(
                         77L,
-                        "CW20261025000001",
+                        "W20261025000001",
                         22L,
                         "KOL-test",
                         "Creator",
@@ -72,54 +82,56 @@ class AdminWithdrawalControllerTest {
                         "400.00",
                         "CNY",
                         "PENDING_REVIEW",
-                        NOW,
+                        false,
+                        null,
+                        "note",
+                        "review note",
+                        null,
+                        null,
                         "PAYPAL",
-                        "cr***@example.com")),
+                        "cr***@example.com",
+                        NOW)),
                 1L,
                 1,
                 20));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].applicationNo").value("CW20261025000001"))
-        .andExpect(jsonPath("$.data.items[0].amountCny").value("400.00"))
+        .andExpect(jsonPath("$.data.items[0].applicationNo").value("W20261025000001"))
         .andExpect(jsonPath("$.data.items[0].accountMasked").value("cr***@example.com"))
+        .andExpect(jsonPath("$.data.items[0].paused").value(false))
+        .andExpect(jsonPath("$.data.items[0].reviewNote").value("review note"))
         .andExpect(jsonPath("$.data.items[0].id").value("77"));
   }
 
   @Test
-  void shouldRefuseList_withoutWithdrawalOrCommissionPermission() throws Exception {
+  void shouldRefuseList_withoutWithdrawalPermission() throws Exception {
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, actAsViewer()))
         .andExpect(status().isForbidden());
     verify(withdrawals, never()).page(any(), any());
   }
 
   @Test
-  void shouldReturnDetailWithMaskedAccount_andKeepEnvelopeShape() throws Exception {
+  void shouldReturnDetailWithAllocations() throws Exception {
     when(withdrawals.detail(any(), eq(77L))).thenReturn(detail());
     mvc.perform(get(BASE + "/77").header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.type").value("COMMISSION_WITHDRAWAL"))
-        .andExpect(jsonPath("$.data.currency").value("CNY"))
         .andExpect(jsonPath("$.data.account.account").value("cr***@example.com"))
-        .andExpect(jsonPath("$.data.allocationCount").value("2"));
+        .andExpect(jsonPath("$.data.allocations[0].occupied").value("350.00"));
   }
 
   @Test
-  void shouldPageAllocatedOrders_withMoneyStrings() throws Exception {
+  void shouldPageOrderSnapshots_withProducts() throws Exception {
     when(withdrawals.orders(any(), eq(77L), eq(1), eq(10)))
         .thenReturn(
             new PageResult<>(
                 List.of(
-                    new com.tcrm.admin.commission.model.WithdrawalRows.AllocationRow(
+                    new OrderView(
                         901L,
-                        101L,
                         "WD1001",
-                        "Hat",
-                        "Red",
-                        "https://img/hat.png",
-                        new java.math.BigDecimal("350.00"),
-                        new java.math.BigDecimal("0.00"),
-                        new java.math.BigDecimal("350.00"))),
+                        List.of(new ProductView(101L, "img", "Hat", "Red")),
+                        "350.00",
+                        "0.00")),
                 1L,
                 1,
                 10));
@@ -128,9 +140,9 @@ class AdminWithdrawalControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].orderNo").value("WD1001"))
-        .andExpect(jsonPath("$.data.items[0].occupiedCny").value("350.00"))
-        .andExpect(jsonPath("$.data.items[0].remainingSnapshotCny").value("0.00"))
-        .andExpect(jsonPath("$.data.items[0].sourceReleasedCny").value("350.00"));
+        .andExpect(jsonPath("$.data.items[0].occupied").value("350.00"))
+        .andExpect(jsonPath("$.data.items[0].remainingSnapshot").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].products[0].sku").value("Red"));
   }
 
   @Test
@@ -144,37 +156,56 @@ class AdminWithdrawalControllerTest {
     verify(withdrawals, never()).review(any(), any(Long.class), any(), any());
   }
 
-  private static byte[] paymentPayload() {
-    return ("{\"requestId\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
-            + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
-            + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
-            + "\"method\":\"bank\"}")
-        .getBytes(StandardCharsets.UTF_8);
-  }
-
   @Test
-  void shouldPassPaymentRegistrationWithVoucherPart() throws Exception {
-    when(withdrawals.pay(any(), eq(77L), any(), any())).thenReturn(detail());
+  void shouldUploadVoucherThenRegisterPaymentByFileId() throws Exception {
+    when(withdrawals.uploadVoucher(any(), any(), any())).thenReturn(881L);
+    when(withdrawals.pay(any(), eq(77L), any())).thenReturn(detail());
     mvc.perform(
-            multipartPut(BASE + "/77/payment")
-                .file(new MockMultipartFile("payload", "", "application/json", paymentPayload()))
-                .file(new MockMultipartFile("voucher", "receipt.png", "image/png", new byte[] {1}))
-                .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
+            multipart("/admin-api/files")
+                .file(
+                    new MockMultipartFile(
+                        "file",
+                        "receipt.png",
+                        "image/png",
+                        new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47}))
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsPayer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.fileId").value(881));
+    mvc.perform(
+            put(BASE + "/77/payment")
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsPayer())
+                .contentType("application/json")
+                .content(
+                    "{\"idempotencyKey\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
+                        + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
+                        + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
+                        + "\"method\":\"bank\",\"voucherFileId\":881}"))
         .andExpect(status().isOk());
-    verify(withdrawals).pay(any(), eq(77L), any(), any());
+    ArgumentCaptor<WithdrawalService.PaymentCommand> command =
+        ArgumentCaptor.forClass(WithdrawalService.PaymentCommand.class);
+    verify(withdrawals).pay(any(), eq(77L), command.capture());
+    assertThat(command.getValue().voucherFileId()).isEqualTo(881L);
   }
 
   @Test
-  void shouldRefusePaymentWithoutPrepayPayPermission() throws Exception {
-    String token =
-        AdminMvcSupport.actAs(current, 8L, Role.STAFF, DataScope.ALL, Set.of("withdrawal:review"));
+  void shouldRefusePaymentWithoutWithdrawalPay() throws Exception {
     mvc.perform(
-            multipartPut(BASE + "/77/payment")
-                .file(new MockMultipartFile("payload", "", "application/json", paymentPayload()))
-                .file(new MockMultipartFile("voucher", "receipt.png", "image/png", new byte[] {1}))
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
+            put(BASE + "/77/payment")
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer())
+                .contentType("application/json")
+                .content(
+                    "{\"idempotencyKey\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
+                        + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
+                        + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
+                        + "\"method\":\"bank\",\"voucherFileId\":881}"))
         .andExpect(status().isForbidden());
-    verify(withdrawals, never()).pay(any(), any(Long.class), any(), any());
+    verify(withdrawals, never()).pay(any(), any(Long.class), any());
+  }
+
+  @Test
+  void shouldRefuseRecipientWithoutWithdrawalPay() throws Exception {
+    mvc.perform(get(BASE + "/77/recipient").header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -190,12 +221,12 @@ class AdminWithdrawalControllerTest {
   }
 
   @Test
-  void shouldListUnifiedFinanceTasks() throws Exception {
+  void shouldListUnifiedFinanceTasksWithRawStatus() throws Exception {
     when(withdrawals.financeTasks(any(), any()))
         .thenReturn(
             new PageResult<>(
                 List.of(
-                    new WithdrawalService.FinanceTask(
+                    new FinanceTask(
                         3L,
                         "PP1",
                         22L,
@@ -205,7 +236,6 @@ class AdminWithdrawalControllerTest {
                         "BD",
                         "PREPAY",
                         "APPROVED",
-                        "PENDING_PAYMENT",
                         "70.00",
                         "CNY",
                         NOW)),
@@ -217,7 +247,8 @@ class AdminWithdrawalControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].taskType").value("PREPAY"))
-        .andExpect(jsonPath("$.data.items[0].status").value("PENDING_PAYMENT"));
+        .andExpect(jsonPath("$.data.items[0].status").value("APPROVED"))
+        .andExpect(jsonPath("$.data.items[0].kolName").value("Creator"));
   }
 
   @Test
@@ -244,23 +275,10 @@ class AdminWithdrawalControllerTest {
         current, 9L, Role.STAFF, DataScope.ALL, Set.of("commission:freeze"));
   }
 
-  /** PUT multipart: the standard builder defaults to POST, so the method is overridden. */
-  private static org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder
-      multipartPut(String url) {
-    var builder =
-        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(url);
-    builder.with(
-        request -> {
-          request.setMethod("PUT");
-          return request;
-        });
-    return builder;
-  }
-
-  private static WithdrawalService.Detail detail() {
-    return new WithdrawalService.Detail(
+  private static Detail detail() {
+    return new Detail(
         77L,
-        "CW20261025000001",
+        "W20261025000001",
         22L,
         "KOL-test",
         "Creator",
@@ -270,12 +288,16 @@ class AdminWithdrawalControllerTest {
         "400.00",
         "CNY",
         "PENDING_REVIEW",
+        false,
+        null,
         NOW,
         "note",
         null,
         null,
         null,
-        2L,
+        List.of(
+            new WithdrawalService.AllocationView(
+                101L, "WD1001", "Hat", "Red", "img", "350.00", "0.00")),
         new WithdrawalService.AccountView(
             null, "PAYPAL", "cr***@example.com", "Cr****", "USD", null, null),
         List.of(new WithdrawalService.HistoryItem("SUBMITTED", 22L, "Creator", "KOL", "note", NOW)),

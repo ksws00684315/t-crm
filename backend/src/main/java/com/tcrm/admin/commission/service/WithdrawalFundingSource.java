@@ -4,22 +4,31 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Released commission per order item — the settlement side of the withdrawal contract (task 61
- * §13.04: 占用金额 + 剩余快照). Task 62's settlement engine implements this against its item state; until
- * that lands, {@link UnsettledWithdrawalFundingSource} keeps the bean available and tests stub it
- * with fixed rows.
+ * Settlement side of the withdrawal contract (ADR-032 §6): released order items for the FIFO
+ * allocation plus the numbers the withdrawal conditions show. Task 62's settlement engine
+ * implements this against commission item state; until that merges, {@link
+ * UnsettledWithdrawalFundingSource} keeps the bean available and tests stub it with fixed rows.
  */
 public interface WithdrawalFundingSource {
   /**
    * Order items of this creator whose commission has been released to the wallet, in stable FIFO
-   * order (release time, then order item id). Each row carries the item's total released amount;
-   * the withdrawal side subtracts its own allocations.
+   * order (release time, then order item id). Each row carries the item's total released amount and
+   * its commission item state id; the withdrawal side subtracts its own allocations.
    */
   List<FundingRow> listReleasedRows(long kolId);
 
   /** Commission accrued but not released yet (frozen money, shown by the withdrawal conditions). */
   BigDecimal frozenCny(long kolId);
 
+  /** Estimated total commission of verified rows (shown by the withdrawal conditions). */
+  BigDecimal estimatedCny(long kolId);
+
+  /** Order item rows not verified yet (shown by the withdrawal conditions). */
+  long unverifiedCount(long kolId);
+
+  /** Current settlement config version ("0" before task 62's rule versions exist). */
+  String configVersion(long kolId);
+
   /** One released order item. */
-  record FundingRow(long orderItemId, BigDecimal releasedCny) {}
+  record FundingRow(long orderItemId, long itemStateId, BigDecimal releasedCny) {}
 }

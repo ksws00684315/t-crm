@@ -73,8 +73,8 @@ public class WithdrawalService {
   private static final BigDecimal MAX_MONEY = new BigDecimal("999999999999.99");
   private static final List<String> STATUSES =
       List.of("PENDING_REVIEW", "PENDING_PAYMENT", "REJECTED", "WITHDRAWN", "PAID");
-  private static final List<String> TASK_STATUSES =
-      List.of("PENDING_REVIEW", "PENDING_PAYMENT", "PAID", "REJECTED", "CANCELLED");
+  private static final List<String> WITHDRAWAL_STATUSES =
+      List.of("PENDING_REVIEW", "PENDING_PAYMENT", "PAID", "REJECTED", "WITHDRAWN");
   private static final List<String> PREPAY_STATUSES =
       List.of(
           "WAITING_DETAILS",
@@ -172,16 +172,18 @@ public class WithdrawalService {
     this.clock = clock;
   }
 
-  /** Withdrawal conditions for the KOL portal (11.03): threshold, occupation, frozen money. */
+  /** Withdrawal conditions for the KOL portal (11.03, contract §6.3). */
   public record Conditions(
       String currency,
-      String minimumWithdrawalCny,
-      String frozenCny,
-      String occupiedCny,
-      String walletBalanceCny,
-      String availableCny,
-      boolean kolFrozen,
-      boolean eligible) {}
+      String minimum,
+      String version,
+      String available,
+      String occupied,
+      String frozen,
+      String estimated,
+      boolean withdrawalFrozen,
+      long unverifiedCount,
+      boolean canApply) {}
 
   /** Payout snapshot of one application; masked unless the viewer may see the full account. */
   public record AccountView(
@@ -213,9 +215,8 @@ public class WithdrawalService {
       String paidAt,
       String method,
       String financeNote,
-      String conversionNote) {}
-
-  public record UploadedFile(String fileName, byte[] content) {}
+      String conversionNote,
+      Long voucherFileId) {}
 
   public record HistoryItem(
       String action, Long actorId, String actorName, String actorRole, String note, Instant at) {}
@@ -244,17 +245,29 @@ public class WithdrawalService {
       String amountCny,
       String currency,
       String status,
+      boolean paused,
+      String pauseReason,
       Instant createdAt,
       String note,
       String reviewNote,
       String financeNote,
       Long previousId,
-      long allocationCount,
+      List<AllocationView> allocations,
       AccountView account,
       List<HistoryItem> history,
       PaymentView payment) {}
 
-  /** Admin list row (13.02): masked account only, review note hidden from list pages. */
+  /** Row-level allocation shown by the detail (13.04 allocations[]). */
+  public record AllocationView(
+      long orderItemId,
+      String orderNo,
+      String itemName,
+      String skuName,
+      String imageUrl,
+      String occupiedCny,
+      String remainingSnapshotCny) {}
+
+  /** Admin list row (13.02, contract §6.2): masked snapshot, notes by permission, paused state. */
   public record AdminRow(
       long id,
       String applicationNo,
@@ -267,9 +280,15 @@ public class WithdrawalService {
       String amountCny,
       String currency,
       String status,
-      Instant createdAt,
+      boolean paused,
+      String pauseReason,
+      String note,
+      String reviewNote,
+      String financeNote,
+      Long previousId,
       String accountType,
-      String accountMasked) {}
+      String accountMasked,
+      Instant createdAt) {}
 
   /** KOL list row: the owner sees their own full account snapshot. */
   public record KolRow(
@@ -288,10 +307,17 @@ public class WithdrawalService {
   public record Recipient(
       String type, String account, String holder, String currency, String network) {}
 
-  public record Filter(String applicationNo, String kolCode, String status, int page, int size) {}
+  public record Filter(
+      String applicationNo,
+      Long kolId,
+      String kolKeyword,
+      Long bdUserId,
+      String status,
+      int page,
+      int size) {}
 
   public record FinanceFilter(
-      String applicationNo, String kolCode, String type, String status, int page, int size) {}
+      String applicationNo, Long kolId, String type, String status, int page, int size) {}
 
   /** One row of the unified finance task list enriched with creator and BD display names. */
   public record FinanceTask(
@@ -303,7 +329,6 @@ public class WithdrawalService {
       Long bdId,
       String bdName,
       String taskType,
-      String sourceStatus,
       String status,
       String amountCny,
       String currency,
@@ -332,18 +357,25 @@ public class WithdrawalService {
           BigDecimal balance = nz(wallets.findBalance(kolId));
           BigDecimal occupied = nz(withdrawals.sumActiveOccupied(kolId));
           BigDecimal frozen = funding.frozenCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
+          BigDecimal estimated = funding.estimatedCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
+          long unverified = funding.unverifiedCount(kolId);
           BigDecimal available = balance.subtract(occupied).setScale(2, RoundingMode.UNNECESSARY);
           BigDecimal minimum = minimum();
-          boolean kolFrozen = freezes.latest(kolId) != null && freezes.latest(kolId).active();
+          boolean withdrawalFrozen =
+              freezes.latest(kolId) != null && freezes.latest(kolId).active();
+          boolean canApply =
+              !withdrawalFrozen && available.compareTo(minimum) >= 0 && unverified == 0;
           return new Conditions(
               "CNY",
               money(minimum),
-              money(frozen),
-              money(occupied),
-              money(balance),
+              funding.configVersion(kolId),
               money(available),
-              kolFrozen,
-              !kolFrozen && available.compareTo(minimum) >= 0);
+              money(occupied),
+              money(frozen),
+              money(estimated),
+              withdrawalFrozen,
+              unverified,
+              canApply);
         });
   }
 
@@ -452,6 +484,41 @@ public class WithdrawalService {
         });
   }
 
+  /**
+   * The creator's approved payout accounts they can reference on an application (contract §6.3
+   * recipient-options); the owner sees the full account values.
+   */
+  @Transactional(readOnly = true)
+  public List<RecipientOption> recipientOptions(long tenantId, long kolId) {
+    return TenantScope.callCompany(
+        tenantId,
+        () ->
+            payoutAccounts
+                .selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                            PayoutAccountDO>()
+                        .eq(PayoutAccountDO::getKolId, kolId)
+                        .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
+                        .orderByAsc(PayoutAccountDO::getId))
+                .stream()
+                .map(
+                    account ->
+                        new RecipientOption(
+                            account.getId(),
+                            account.getAccountType().name(),
+                            cipher.decrypt(account.getAccountCipher()),
+                            account.getHolderName(),
+                            account.getCurrency(),
+                            account.getUsdtNetwork() == null
+                                ? null
+                                : account.getUsdtNetwork().name()))
+                .toList());
+  }
+
+  /** One referenceable approved account of the signed-in creator. */
+  public record RecipientOption(
+      Long id, String type, String account, String holder, String currency, String network) {}
+
   /** The creator's own applications, newest first. */
   @Transactional(readOnly = true)
   public PageResult<KolRow> pageKol(long tenantId, long kolId, int page, int size) {
@@ -460,7 +527,8 @@ public class WithdrawalService {
         () -> {
           requirePage(page, size);
           WithdrawalPageQuery query =
-              new WithdrawalPageQuery(null, kolId, null, null, size, (long) (page - 1) * size);
+              new WithdrawalPageQuery(
+                  null, kolId, null, null, null, null, size, (long) (page - 1) * size);
           Long total = withdrawals.count(query);
           List<KolRow> rows = withdrawals.page(query).stream().map(head -> toKolRow(head)).toList();
           return new PageResult<>(rows, total == null ? 0L : total, page, size);
@@ -473,7 +541,7 @@ public class WithdrawalService {
   @Transactional(rollbackFor = Exception.class)
   public Detail review(AccountDTO user, long id, String decision, String note) {
     long tenantId = requireTenant(user);
-    requireAnyPermission(user, "withdrawal:review", "prepay:pay");
+    requireAnyPermission(user, "withdrawal:review", "withdrawal:pay");
     return TenantScope.callCompany(tenantId, () -> reviewInCompany(user, id, decision, note));
   }
 
@@ -486,12 +554,12 @@ public class WithdrawalService {
     if (!pending && !awaitingPayment) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_STATE_CONFLICT);
     }
-    // Before payment only the pay permission may reject (design §4.8 step 4); the review queue is
+    // Before payment only the pay permission may reject (ADR-032 §7); the review queue is
     // withdrawal:review. The reviewer never reviews their own submission (same rule as prepay).
     if (pending) {
       requirePermission(user, "withdrawal:review");
     } else {
-      requirePermission(user, "prepay:pay");
+      requirePermission(user, "withdrawal:pay");
     }
     if (row.actorId() == user.id()) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
@@ -542,22 +610,23 @@ public class WithdrawalService {
   }
 
   /**
-   * Payment registration (13.01): one successful payment per task, voucher required, and the wallet
-   * ledger is written in the same transaction.
+   * Payment registration (13.01, ADR-032 §9): the voucher is uploaded first (POST /admin-api/files)
+   * and referenced by id; one successful payment per task; the wallet ledger is written in the same
+   * transaction.
    */
   @Transactional(rollbackFor = Exception.class)
-  public Detail pay(AccountDTO user, long id, PaymentCommand command, UploadedFile voucher) {
+  public Detail pay(AccountDTO user, long id, PaymentCommand command) {
     long tenantId = requireTenant(user);
-    requirePermission(user, "prepay:pay");
+    requirePermission(user, "withdrawal:pay");
     UUID requestId = parseUuid(command == null ? null : command.requestId());
     BigDecimal amount = money(command.amountCny());
-    BigDecimal actualAmount = money(command.actualAmount());
+    BigDecimal actualAmount = actualMoney(command.actualAmount());
     String actualCurrency = currency(command.actualCurrency());
     String method = textRequired(command.method(), 100, "method");
     String financeNote = text(command.financeNote(), 1000);
     String conversionNote = text(command.conversionNote(), 1000);
     Instant paidAt = payTime(command.paidAt());
-    if (voucher == null || voucher.content() == null) {
+    if (command.voucherFileId() == null || command.voucherFileId() <= 0) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     if (!"CNY".equals(actualCurrency) && (conversionNote == null || conversionNote.isEmpty())) {
@@ -574,7 +643,7 @@ public class WithdrawalService {
             method,
             financeNote,
             conversionNote,
-            voucher.content());
+            command.voucherFileId());
     return TenantScope.callCompany(
         tenantId,
         () ->
@@ -589,8 +658,8 @@ public class WithdrawalService {
                 method,
                 financeNote,
                 conversionNote,
-                fingerprint,
-                voucher));
+                command.voucherFileId(),
+                fingerprint));
   }
 
   private Detail payInCompany(
@@ -604,8 +673,8 @@ public class WithdrawalService {
       String method,
       String financeNote,
       String conversionNote,
-      String fingerprint,
-      UploadedFile voucher) {
+      long voucherFileId,
+      String fingerprint) {
     if (paymentRecorded(requestId, fingerprint)) {
       return detail(user, id);
     }
@@ -621,25 +690,24 @@ public class WithdrawalService {
     if (!"PENDING_PAYMENT".equals(row.status())) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_STATE_CONFLICT);
     }
+    // A paused application blocks payment until its source is verified (ADR-032 §12).
+    if (row.paused()) {
+      throw new BusinessException(ErrorCode.WITHDRAWAL_PAUSED);
+    }
     if (row.amountCny().compareTo(amount) != 0) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    // A same-currency shortfall needs an explanation; foreign amounts carry the conversion note.
-    if ("CNY".equals(actualCurrency)
-        && actualAmount.compareTo(amount) != 0
-        && (financeNote == null || financeNote.isEmpty())) {
+    // ADR-032 §9: CNY payments must equal the application amount exactly; foreign amounts keep
+    // their conversion note and full precision instead.
+    if ("CNY".equals(actualCurrency) && actualAmount.compareTo(amount) != 0) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     if (nz(withdrawals.sumAllocated(id)).compareTo(amount) != 0) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_STATE_CONFLICT);
     }
-    if (voucher.content().length > MAX_VOUCHER_BYTES) {
-      throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
-    }
-    String contentType = PrepayFileRules.contentType(voucher.content());
-    Long voucherId =
-        files.uploadWithdrawalVoucher(
-            user.tenantId(), user.id(), id, voucher.fileName(), voucher.content());
+    // The voucher was uploaded through POST /admin-api/files; claiming binds it to this task once.
+    files.claimVoucherFile(user.tenantId(), user.id(), voucherFileId, id);
+    Long voucherId = voucherFileId;
     Instant now = now();
     int inserted;
     try {
@@ -686,8 +754,6 @@ public class WithdrawalService {
             + row.applicationNo()
             + "\",\"voucherFileId\":\""
             + voucherId
-            + "\",\"contentType\":\""
-            + contentType
             + "\"}");
     return detail(user, id);
   }
@@ -703,23 +769,35 @@ public class WithdrawalService {
   }
 
   private PageResult<AdminRow> pageInCompany(AccountDTO user, Filter filter, String status) {
-    Long kolId = null;
-    String kolCode = text(filter.kolCode(), 64);
-    if (kolCode != null) {
-      KolRefDTO match = kols.getByCode(kolCode);
-      if (match == null || !kolCode.equals(match.kolCode())) {
+    Long kolId = filter.kolId();
+    String keyword = text(filter.kolKeyword(), 64);
+    List<Long> keywordIds = null;
+    if (kolId == null && keyword != null) {
+      // kol code or display name contains the keyword (contract §6.2 kolKeyword)
+      keywordIds = kols.findIdsByKeyword(keyword);
+      if (keywordIds.isEmpty()) {
         return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
       }
-      kolId = match.id();
     }
     List<Long> ownIds = ownKolIds(user);
     if (ownIds != null && ownIds.isEmpty()) {
       return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
     }
+    List<Long> bdIds = null;
+    if (filter.bdUserId() != null && ownIds == null) {
+      // filter by the creator's current BD; OWN viewers always stay on their own creators
+      bdIds =
+          kols.listByBdUserId(filter.bdUserId()).stream().map(KolRefDTO::id).distinct().toList();
+      if (bdIds.isEmpty()) {
+        return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
+      }
+    }
     WithdrawalPageQuery query =
         new WithdrawalPageQuery(
             text(filter.applicationNo(), 64),
             kolId,
+            keywordIds,
+            bdIds,
             status,
             ownIds,
             filter.size(),
@@ -730,11 +808,13 @@ public class WithdrawalService {
     Map<Long, String> bdNames =
         namesById(
             kolById.values().stream().map(KolRefDTO::bdUserId).filter(Objects::nonNull).toList());
+    boolean financeVisible = financeVisible(user);
     List<AdminRow> rows =
         heads.stream()
             .map(
                 head -> {
                   KolRefDTO kol = kolById.get(head.kolId());
+                  WithdrawalRow full = withdrawals.findRow(head.id());
                   return new AdminRow(
                       head.id(),
                       head.applicationNo(),
@@ -747,16 +827,22 @@ public class WithdrawalService {
                       money(head.amountCny()),
                       "CNY",
                       head.status(),
-                      head.createTime(),
-                      null,
-                      null);
+                      full != null && full.paused(),
+                      full == null ? null : full.pauseReason(),
+                      full == null ? null : full.note(),
+                      full == null ? null : full.reviewNote(),
+                      full == null || !financeVisible ? null : full.financeNote(),
+                      full == null ? null : full.previousId(),
+                      full == null ? null : full.accountType(),
+                      full == null ? null : full.accountMasked(),
+                      head.createTime());
                 })
             .toList();
     return new PageResult<>(rows, total == null ? 0L : total, filter.page(), filter.size());
   }
 
-  /** Detail (13.04): masked payout, finance notes only for finance viewers, audit on reveal. */
-  @Transactional(readOnly = true)
+  /** Detail (13.04): masked payout, finance notes for {@code withdrawal:pay}; read audited. */
+  @Transactional(rollbackFor = Exception.class)
   public Detail detail(AccountDTO user, long id) {
     long tenantId = requireTenant(user);
     requireDetailPermission(user);
@@ -773,7 +859,7 @@ public class WithdrawalService {
           if (row.kolId() != kolId) {
             throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
           }
-          return toDetail(row, null, true, false);
+          return toDetail(row, null, true, true, false);
         });
   }
 
@@ -781,20 +867,49 @@ public class WithdrawalService {
     WithdrawalRow row = requireRow(id);
     KolRefDTO kol = requireKol(row.kolId());
     requireKolScope(user, kol);
-    return toDetail(row, kol, false, financeVisible(user));
+    audit.recordTenantOperation(
+        user.tenantId(),
+        user.id(),
+        "Withdrawal",
+        "View detail",
+        "/admin-api/commission/withdrawals/" + id,
+        "{\"applicationNo\":\"" + row.applicationNo() + "\"}");
+    boolean reviewVisible = kolViewerLike(user);
+    return toDetail(row, kol, false, reviewVisible, financeVisible(user));
+  }
+
+  /** History notes are for the creator and withdrawal:review viewers (contract §6.2). */
+  private static boolean kolViewerLike(AccountDTO user) {
+    return user.role() == Role.SUPER_ADMIN || user.permissions().contains("withdrawal:review");
   }
 
   private Detail toDetail(
-      WithdrawalRow row, KolRefDTO kol, boolean kolViewer, boolean financeVisible) {
+      WithdrawalRow row,
+      KolRefDTO kol,
+      boolean kolViewer,
+      boolean reviewVisible,
+      boolean financeVisible) {
     WithdrawalRows.PaymentRow payment = withdrawals.findPayment(row.id());
-    List<HistoryItem> history = history(row.id(), kolViewer, financeVisible);
+    List<HistoryItem> history = history(row.id(), kolViewer, reviewVisible);
     String bdName = null;
     Long bdId = null;
     if (kol != null) {
       bdId = kol.bdUserId();
       bdName = bdId == null ? null : namesById(List.of(bdId)).get(bdId);
     }
-    Long allocationCount = withdrawals.countAllocations(row.id());
+    List<AllocationView> allocations =
+        withdrawals.pageAllocations(row.id(), 100, 0).stream()
+            .map(
+                item ->
+                    new AllocationView(
+                        item.orderItemId(),
+                        item.orderNo(),
+                        item.itemName(),
+                        item.skuName(),
+                        item.imageUrl(),
+                        money(item.occupiedCny()),
+                        money(item.remainingSnapshotCny())))
+            .toList();
     return new Detail(
         row.id(),
         row.applicationNo(),
@@ -807,23 +922,24 @@ public class WithdrawalService {
         money(row.amountCny()),
         "CNY",
         row.status(),
+        row.paused(),
+        row.pauseReason(),
         row.createTime(),
         row.note(),
         row.reviewNote(),
         financeVisible ? row.financeNote() : null,
         row.previousId(),
-        allocationCount == null ? 0L : allocationCount,
+        allocations,
         accountView(row, kolViewer),
         history,
         payment == null ? null : paymentView(payment, financeVisible));
   }
 
-  /** Full payout snapshot for reviewers and payers only; every read is audited (13.04). */
+  /** Full payout snapshot for the payer only (contract §6.2); every read is audited. */
   @Transactional(rollbackFor = Exception.class)
   public Recipient recipient(AccountDTO user, long id) {
     long tenantId = requireTenant(user);
-    if (!user.effectivePermissions().contains("withdrawal:review")
-        && !user.effectivePermissions().contains("prepay:pay")) {
+    if (!user.effectivePermissions().contains("withdrawal:pay")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return TenantScope.callCompany(
@@ -847,10 +963,13 @@ public class WithdrawalService {
         });
   }
 
-  /** Order items occupied by one application (13.04), paged, immutable snapshots. */
+  /**
+   * Order-level allocation snapshots (13.04, contract §6.2): one row per order from the persisted
+   * order snapshot table; the products[] come from the row-level allocations of that order. The
+   * order remaining snapshot is the persisted history value, null when unknown.
+   */
   @Transactional(readOnly = true)
-  public PageResult<WithdrawalRows.AllocationRow> orders(
-      AccountDTO user, long id, int page, int size) {
+  public PageResult<OrderView> orders(AccountDTO user, long id, int page, int size) {
     long tenantId = requireTenant(user);
     requireDetailPermission(user);
     requirePage(page, size);
@@ -859,64 +978,90 @@ public class WithdrawalService {
         () -> {
           WithdrawalRow row = requireRow(id);
           requireKolScope(user, requireKol(row.kolId()));
-          Long total = withdrawals.countAllocations(id);
-          List<WithdrawalRows.AllocationRow> items =
-              withdrawals.pageAllocations(id, size, (long) (page - 1) * size);
+          Long total = withdrawals.countOrderSnapshots(id);
+          List<OrderView> items = new ArrayList<>();
+          for (WithdrawalMapper.OrderSnapshotRow snapshot :
+              withdrawals.pageOrderSnapshots(id, size, (long) (page - 1) * size)) {
+            List<ProductView> products =
+                withdrawals.allocationsOfOrder(id, snapshot.orderNo()).stream()
+                    .map(
+                        item ->
+                            new ProductView(
+                                item.orderItemId(),
+                                item.imageUrl(),
+                                item.itemName(),
+                                item.skuName()))
+                    .toList();
+            items.add(
+                new OrderView(
+                    snapshot.id(),
+                    snapshot.orderNo(),
+                    products,
+                    money(snapshot.occupiedCny()),
+                    snapshot.remainingSnapshotCny() == null
+                        ? null
+                        : money(snapshot.remainingSnapshotCny())));
+          }
           return new PageResult<>(items, total == null ? 0L : total, page, size);
         });
   }
 
-  /** Streams the payment voucher of one withdrawal; every download keeps the detail permission. */
-  @Transactional(readOnly = true)
-  public BizFileService.FileDTO voucher(AccountDTO user, long id) {
+  /** One order row of the allocation pagination (contract §6.2 / #112). */
+  public record OrderView(
+      long id,
+      String orderNo,
+      List<ProductView> products,
+      String occupied,
+      String remainingSnapshot) {}
+
+  /** One product line inside an order row. */
+  public record ProductView(long id, String image, String product, String sku) {}
+
+  /**
+   * Upload of the payment voucher before registration (contract §6.2 POST /admin-api/files):
+   * PNG/JPEG/PDF up to 10MB, unattached until the payment claims it.
+   */
+  public Long uploadVoucher(AccountDTO user, String fileName, byte[] content) {
     long tenantId = requireTenant(user);
-    requireDetailPermission(user);
+    requirePermission(user, "withdrawal:pay");
+    if (content == null || content.length == 0) {
+      throw new BusinessException(ErrorCode.PREPAY_FILE_INVALID);
+    }
+    if (content.length > MAX_VOUCHER_BYTES) {
+      throw new BusinessException(ErrorCode.PREPAY_FILE_TOO_LARGE);
+    }
+    PrepayFileRules.contentType(content);
+    return TenantScope.callCompany(
+        tenantId,
+        () -> files.uploadWithdrawalVoucher(user.tenantId(), user.id(), fileName, content));
+  }
+
+  /**
+   * Streams a WITHDRAWAL_VOUCHER file by its id (the shared GET /admin-api/files/{id} routes here):
+   * only withdrawal:pay holders, and only files already bound to a payment task.
+   */
+  @Transactional(readOnly = true)
+  public BizFileService.FileDTO voucherFile(AccountDTO user, long fileId) {
+    long tenantId = requireTenant(user);
+    requirePermission(user, "withdrawal:pay");
     return TenantScope.callCompany(
         tenantId,
         () -> {
-          WithdrawalRow row = requireRow(id);
-          requireKolScope(user, requireKol(row.kolId()));
-          WithdrawalRows.PaymentRow payment = withdrawals.findPayment(id);
-          if (payment == null || payment.voucherFileId() == null) {
-            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-          }
-          BizFileService.AttachedFile file = files.attachedFile(payment.voucherFileId());
+          BizFileService.AttachedFile file = files.attachedFile(fileId);
           if (file.bizType() != FileBizType.WITHDRAWAL_VOUCHER
               || file.bizId() == null
-              || file.bizId() != id) {
+              || withdrawals.findPayment(file.bizId()) == null) {
             throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
           }
+          WithdrawalRow row = requireRow(file.bizId());
+          requireKolScope(user, requireKol(row.kolId()));
           audit.recordTenantOperation(
               user.tenantId(),
               user.id(),
               "Withdrawal",
               "Download voucher",
-              "/admin-api/commission/withdrawals/" + id + "/voucher",
+              "/admin-api/files/" + fileId,
               "{\"applicationNo\":\"" + row.applicationNo() + "\"}");
-          return file.download();
-        });
-  }
-
-  /** The KOL's own payment voucher; anyone else's file is a 404. */
-  @Transactional(readOnly = true)
-  public BizFileService.FileDTO kolVoucher(long tenantId, long kolId, long id) {
-    return TenantScope.callCompany(
-        tenantId,
-        () -> {
-          WithdrawalRows.PaymentRow payment = withdrawals.findPayment(id);
-          if (payment == null || payment.voucherFileId() == null) {
-            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-          }
-          WithdrawalRow row = requireRow(id);
-          if (row.kolId() != kolId || !"PAID".equals(row.status())) {
-            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-          }
-          BizFileService.AttachedFile file = files.attachedFile(payment.voucherFileId());
-          if (file.bizType() != FileBizType.WITHDRAWAL_VOUCHER
-              || file.bizId() == null
-              || file.bizId() != id) {
-            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-          }
           return file.download();
         });
   }
@@ -993,7 +1138,7 @@ public class WithdrawalService {
             "\uFEFF申请编号,达人编号,达人名称,金额(CNY),状态,收款方式,脱敏收款账户,申请时间,审核备注,"
                 + "付款金额(CNY),支付时间,实际支付金额,实际支付币种\r\n");
     PageResult<AdminRow> first =
-        page(user, new Filter(filter.applicationNo(), filter.kolCode(), filter.status(), 1, 100));
+        page(user, new Filter(filter.applicationNo(), null, null, null, filter.status(), 1, 100));
     if (first.total() > 100000) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -1003,7 +1148,7 @@ public class WithdrawalService {
           csv,
           page(
                   user,
-                  new Filter(filter.applicationNo(), filter.kolCode(), filter.status(), page, 100))
+                  new Filter(filter.applicationNo(), null, null, null, filter.status(), page, 100))
               .items());
     }
     audit.recordTenantOperation(
@@ -1115,43 +1260,36 @@ public class WithdrawalService {
     long tenantId = requireTenant(user);
     requireFinanceTaskPermission(user);
     requirePage(filter.page(), filter.size());
-    String status = statusOrNull(filter.status(), TASK_STATUSES);
-    String type = typeOrNull(filter.type());
+    String status = rawTaskStatus(filter.status());
+    String type = taskTypeOrNull(filter.type());
     return TenantScope.callCompany(
         tenantId, () -> financeTasksInCompany(user, filter, status, type));
   }
 
   private PageResult<FinanceTask> financeTasksInCompany(
       AccountDTO user, FinanceFilter filter, String status, String type) {
-    Long kolId = null;
-    String kolCode = text(filter.kolCode(), 64);
-    if (kolCode != null) {
-      KolRefDTO match = kols.getByCode(kolCode);
-      if (match == null || !kolCode.equals(match.kolCode())) {
-        return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
-      }
-      kolId = match.id();
-    }
-    List<Long> ownIds = ownKolIds(user);
-    if (ownIds != null && ownIds.isEmpty()) {
+    // The prepay branch follows the prepay scope rules (design §4.12): finance-permission holders
+    // see the whole company, commission:view-only OWN viewers their own creators. The withdrawal
+    // branch always narrows OWN viewers to their own creators (§4.8).
+    List<Long> withdrawalScope = ownKolIds(user);
+    List<Long> prepayScope =
+        user.ownScope() && !hasPrepayFinanceAccess(user) ? withdrawalScope : null;
+    if (withdrawalScope != null && withdrawalScope.isEmpty()) {
       return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
     }
-    List<String> withdrawalStatuses = status == null ? null : withdrawalStatusesFor(status);
-    List<String> prepayStatuses = status == null ? null : prepayStatusesFor(status);
     int limit = filter.page() * filter.size();
     FinanceTaskQuery query =
         new FinanceTaskQuery(
             text(filter.applicationNo(), 64),
-            kolId,
+            filter.kolId(),
             status,
             type,
-            ownIds,
-            withdrawalStatuses,
-            prepayStatuses,
+            withdrawalScope,
+            prepayScope,
             limit);
     long total = 0;
     List<FinanceTaskRow> merged = new ArrayList<>();
-    if (type == null || "COMMISSION_WITHDRAWAL".equals(type)) {
+    if (type == null || "COMMISSION".equals(type)) {
       total += nz(withdrawals.countWithdrawalTasks(query));
       merged.addAll(withdrawals.pageWithdrawalTasks(query));
     }
@@ -1188,7 +1326,6 @@ public class WithdrawalService {
                   kol == null ? null : kol.bdUserId(),
                   kol == null || kol.bdUserId() == null ? null : bdNames.get(kol.bdUserId()),
                   row.taskType(),
-                  row.sourceStatus(),
                   row.status(),
                   money(row.amountCny()),
                   "CNY",
@@ -1312,7 +1449,7 @@ public class WithdrawalService {
   private void requireRejectedPrevious(long kolId, long previousId) {
     WithdrawalRow previous = withdrawals.findRow(previousId);
     if (previous == null || previous.kolId() != kolId || !"REJECTED".equals(previous.status())) {
-      throw new BusinessException(ErrorCode.WITHDRAWAL_PREVIOUS_INVALID);
+      throw new BusinessException(ErrorCode.WITHDRAWAL_NOT_RESUBMITTABLE);
     }
   }
 
@@ -1339,7 +1476,10 @@ public class WithdrawalService {
     }
   }
 
-  /** FIFO allocation over released order items (13.04: 占用金额 + 剩余快照). */
+  /**
+   * FIFO allocation over released order items (13.04: 占用金额 + 剩余快照; ADR-032 §6). Both the row-level
+   * and the order-level snapshots are persisted here and never recomputed on reads.
+   */
   private void allocate(long withdrawalId, long kolId, BigDecimal amount, Instant now) {
     List<FundingRow> rows = funding.listReleasedRows(kolId);
     List<Long> itemIds = rows.stream().map(FundingRow::orderItemId).toList();
@@ -1366,10 +1506,11 @@ public class WithdrawalService {
       }
     }
     BigDecimal remaining = amount;
+    // order_no -> {occupied, remainingAfter, orderId}: the persisted order-level snapshot
+    Map<String, BigDecimal> orderOccupied = new LinkedHashMap<>();
+    Map<String, BigDecimal> orderRemaining = new LinkedHashMap<>();
+    Map<String, Long> orderIds = new HashMap<>();
     for (FundingRow row : rows) {
-      if (remaining.signum() == 0) {
-        break;
-      }
       OrderItemInfoDTO item = itemById.get(row.orderItemId());
       if (item == null) {
         // The order line is gone, so its money cannot be displayed on the finance pages; it stays
@@ -1378,53 +1519,69 @@ public class WithdrawalService {
       }
       BigDecimal itemRemaining =
           row.releasedCny().subtract(nz(occupiedByItem.get(row.orderItemId())));
-      if (itemRemaining.signum() <= 0) {
-        continue;
+      BigDecimal afterAllocation = itemRemaining;
+      if (remaining.signum() > 0 && itemRemaining.signum() > 0) {
+        BigDecimal take = remaining.min(itemRemaining);
+        withdrawals.insertAllocation(
+            new WithdrawalWrite.Allocation(
+                IdWorker.getId(),
+                withdrawalId,
+                row.orderItemId(),
+                item.orderNo(),
+                item.itemName(),
+                item.skuName(),
+                item.productId() == null ? null : imageByProduct.get(item.productId()),
+                take.setScale(2, RoundingMode.UNNECESSARY),
+                itemRemaining.subtract(take).setScale(2, RoundingMode.UNNECESSARY),
+                row.releasedCny().setScale(2, RoundingMode.UNNECESSARY),
+                row.itemStateId() <= 0 ? null : row.itemStateId(),
+                now));
+        remaining = remaining.subtract(take);
+        afterAllocation = itemRemaining.subtract(take);
       }
-      BigDecimal take = remaining.min(itemRemaining);
-      withdrawals.insertAllocation(
-          new WithdrawalWrite.Allocation(
-              IdWorker.getId(),
-              withdrawalId,
-              row.orderItemId(),
-              item.orderNo(),
-              item.itemName(),
-              item.skuName(),
-              item.productId() == null ? null : imageByProduct.get(item.productId()),
-              take.setScale(2, RoundingMode.UNNECESSARY),
-              itemRemaining.subtract(take).setScale(2, RoundingMode.UNNECESSARY),
-              row.releasedCny().setScale(2, RoundingMode.UNNECESSARY),
-              now));
-      remaining = remaining.subtract(take);
+      orderOccupied.merge(
+          item.orderNo(),
+          itemRemaining.subtract(afterAllocation).setScale(2, RoundingMode.UNNECESSARY),
+          BigDecimal::add);
+      orderRemaining.merge(
+          item.orderNo(), afterAllocation.setScale(2, RoundingMode.UNNECESSARY), BigDecimal::add);
+      orderIds.putIfAbsent(item.orderNo(), item.orderId());
     }
     if (remaining.signum() > 0) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE);
     }
+    for (Map.Entry<String, BigDecimal> entry : orderOccupied.entrySet()) {
+      if (entry.getValue().signum() <= 0) {
+        continue;
+      }
+      withdrawals.insertOrderSnapshot(
+          new WithdrawalWrite.OrderSnapshot(
+              IdWorker.getId(),
+              withdrawalId,
+              orderIds.get(entry.getKey()),
+              entry.getKey(),
+              entry.getValue(),
+              orderRemaining.get(entry.getKey()),
+              now));
+    }
   }
 
   private AccountView accountView(WithdrawalRow row, boolean kolViewer) {
-    String account = kolViewer ? cipher.decrypt(row.accountCipher()) : row.accountMasked();
-    String holder = kolViewer ? row.accountHolder() : AccountMasker.mask(row.accountHolder());
     return new AccountView(
         row.accountId(),
         row.accountType(),
-        account,
-        holder,
+        row.accountMasked(),
+        AccountMasker.mask(row.accountHolder()),
         row.accountCurrency(),
         row.accountNetwork(),
         row.accountQrFileId());
   }
 
-  private List<HistoryItem> history(long id, boolean kolViewer, boolean financeVisible) {
+  private List<HistoryItem> history(long id, boolean kolViewer, boolean reviewVisible) {
     List<HistoryItem> items = new ArrayList<>();
     for (WithdrawalRows.HistoryRow row : withdrawals.timeline(id)) {
-      String note = row.note();
-      if (kolViewer && !"REJECTED".equals(row.action()) && !"SUBMITTED".equals(row.action())) {
-        note = null;
-      }
-      if (!financeVisible && "PAID".equals(row.action())) {
-        note = null;
-      }
+      // Contract §6.2: history notes are for the creator and withdrawal:review viewers.
+      String note = kolViewer || reviewVisible ? row.note() : null;
       items.add(
           new HistoryItem(
               row.action(), row.actorId(), row.actorName(), row.actorRole(), note, row.at()));
@@ -1489,7 +1646,7 @@ public class WithdrawalService {
     if (sequence == null) {
       throw new BusinessException(ErrorCode.COMMON_CONFLICT);
     }
-    return "CW" + date.format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", sequence);
+    return "W" + date.format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", sequence);
   }
 
   private boolean paymentRecorded(UUID requestId, String fingerprint) {
@@ -1566,12 +1723,13 @@ public class WithdrawalService {
   }
 
   private static boolean financeVisible(AccountDTO user) {
-    return user.role() == Role.SUPER_ADMIN || user.permissions().contains("prepay:pay");
+    return user.role() == Role.SUPER_ADMIN || user.permissions().contains("withdrawal:pay");
   }
 
   private static void requireDetailPermission(AccountDTO user) {
     if (user.role() != Role.SUPER_ADMIN
         && !user.permissions().contains("withdrawal:review")
+        && !user.permissions().contains("withdrawal:pay")
         && !user.permissions().contains("commission:view")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
@@ -1580,12 +1738,20 @@ public class WithdrawalService {
   private static void requireFinanceTaskPermission(AccountDTO user) {
     if (user.role() != Role.SUPER_ADMIN
         && !user.permissions().contains("withdrawal:review")
+        && !user.permissions().contains("withdrawal:pay")
         && !user.permissions().contains("prepay:review")
         && !user.permissions().contains("prepay:finance-review")
         && !user.permissions().contains("prepay:pay")
         && !user.permissions().contains("commission:view")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
+  }
+
+  private static boolean hasPrepayFinanceAccess(AccountDTO user) {
+    return user.role() == Role.SUPER_ADMIN
+        || user.permissions().contains("prepay:review")
+        || user.permissions().contains("prepay:finance-review")
+        || user.permissions().contains("prepay:pay");
   }
 
   private static void requirePermission(AccountDTO user, String code) {
@@ -1626,20 +1792,6 @@ public class WithdrawalService {
     }
   }
 
-  /** Raw withdrawal statuses whose shared lifecycle equals the filter. */
-  private static List<String> withdrawalStatusesFor(String unified) {
-    return STATUSES.stream()
-        .filter(status -> FinanceTaskRow.mapWithdrawalStatus(status).equals(unified))
-        .toList();
-  }
-
-  /** Raw prepay statuses whose shared lifecycle equals the filter. */
-  private static List<String> prepayStatusesFor(String unified) {
-    return PREPAY_STATUSES.stream()
-        .filter(status -> FinanceTaskRow.mapPrepayStatus(status).equals(unified))
-        .toList();
-  }
-
   private static String statusOrNull(String value, List<String> allowed) {
     String status = text(value, 32);
     if (status == null) {
@@ -1651,12 +1803,24 @@ public class WithdrawalService {
     return status;
   }
 
-  private static String typeOrNull(String value) {
+  /** The finance task status filter takes either workflow's raw status value (contract §6.2). */
+  private static String rawTaskStatus(String value) {
+    String status = text(value, 32);
+    if (status == null) {
+      return null;
+    }
+    if (!WITHDRAWAL_STATUSES.contains(status) && !PREPAY_STATUSES.contains(status)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return status;
+  }
+
+  private static String taskTypeOrNull(String value) {
     String type = text(value, 32);
     if (type == null) {
       return null;
     }
-    if (!"COMMISSION_WITHDRAWAL".equals(type) && !"PREPAY".equals(type)) {
+    if (!"COMMISSION".equals(type) && !"PREPAY".equals(type)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return type;
@@ -1690,6 +1854,18 @@ public class WithdrawalService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     return stripped;
+  }
+
+  /** Foreign actual amounts keep up to six decimals (NUMERIC(20,6) per the contract). */
+  private static BigDecimal actualMoney(String value) {
+    if (value == null || !value.matches("(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,6})?")) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    BigDecimal amount = new BigDecimal(value);
+    if (amount.signum() <= 0 || amount.compareTo(new BigDecimal("999999999999.999999")) > 0) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return amount;
   }
 
   private static BigDecimal money(String value) {
@@ -1767,7 +1943,7 @@ public class WithdrawalService {
       String method,
       String financeNote,
       String conversionNote,
-      byte[] voucher) {
+      Long voucherFileId) {
     String canonical =
         id
             + "|"
@@ -1786,8 +1962,9 @@ public class WithdrawalService {
             + (financeNote == null ? "" : financeNote)
             + "|"
             + (conversionNote == null ? "" : conversionNote)
-            + "|";
-    return sha256ThenBytes(canonical, voucher);
+            + "|"
+            + (voucherFileId == null ? "" : voucherFileId);
+    return sha256(canonical);
   }
 
   private static String sha256(String value) {

@@ -14,6 +14,8 @@ CREATE TABLE crm_commission_withdrawal (
   previous_id BIGINT,
   amount_cny NUMERIC(14,2) NOT NULL,
   status VARCHAR(24) NOT NULL,
+  paused BOOLEAN NOT NULL DEFAULT FALSE,
+  pause_reason VARCHAR(500),
   account_id BIGINT,
   account_type VARCHAR(8) NOT NULL,
   account_cipher TEXT NOT NULL,
@@ -33,6 +35,8 @@ CREATE TABLE crm_commission_withdrawal (
   update_time TIMESTAMPTZ(3) NOT NULL,
   CONSTRAINT pk_crm_commission_withdrawal PRIMARY KEY (id),
   CONSTRAINT ck_crm_commission_withdrawal_id CHECK (id > 0),
+  CONSTRAINT ck_crm_commission_withdrawal_pause CHECK (
+    (paused = FALSE AND pause_reason IS NULL) OR (paused = TRUE)),
   CONSTRAINT uk_crm_commission_withdrawal_no UNIQUE (tenant_id, application_no),
   CONSTRAINT uk_crm_commission_withdrawal_request UNIQUE (tenant_id, kol_id, request_id),
   CONSTRAINT ck_crm_commission_withdrawal_amount CHECK (amount_cny > 0),
@@ -47,13 +51,15 @@ CREATE TABLE crm_commission_withdrawal (
 COMMENT ON TABLE crm_commission_withdrawal IS
   '佣金提现申请：达人每次提交时快照并加密收款信息；一个 UUID 只能成功一笔；驳回后重新提交生成新单并引用 previous_id';
 COMMENT ON COLUMN crm_commission_withdrawal.kol_id IS '提现达人 crm_kol.id';
-COMMENT ON COLUMN crm_commission_withdrawal.application_no IS '申请编号：CW+北京时间日期yyyyMMdd+六位序号';
+COMMENT ON COLUMN crm_commission_withdrawal.application_no IS '申请编号：W+北京时间日期yyyyMMdd+六位序号（ADR-032 第 12 条），公司内唯一';
 COMMENT ON COLUMN crm_commission_withdrawal.request_id IS '达人端幂等 UUID，公司内 (kol_id, request_id) 唯一';
 COMMENT ON COLUMN crm_commission_withdrawal.request_fingerprint IS 'SHA-256(金额|previousId|收款|备注)，同 UUID 不同内容返回 409';
 COMMENT ON COLUMN crm_commission_withdrawal.previous_id IS '驳回后重新提交时引用的原申请 id；首单为空';
 COMMENT ON COLUMN crm_commission_withdrawal.amount_cny IS '申请金额（人民币）';
 COMMENT ON COLUMN crm_commission_withdrawal.status IS
   '状态：PENDING_REVIEW 待审核、PENDING_PAYMENT 待支付、REJECTED 已驳回、WITHDRAWN 已撤回、PAID 已支付';
+COMMENT ON COLUMN crm_commission_withdrawal.paused IS '退款或来源核验阻断标记（任务 62 写入）；阻断期间不能付款';
+COMMENT ON COLUMN crm_commission_withdrawal.pause_reason IS '阻断原因；未阻断为空';
 COMMENT ON COLUMN crm_commission_withdrawal.account_id IS '引用的已审核收款账户 crm_payout_account.id；每次手填时为空';
 COMMENT ON COLUMN crm_commission_withdrawal.account_type IS '收款方式：PAYPAL 或 USDT';
 COMMENT ON COLUMN crm_commission_withdrawal.account_cipher IS '收款账号（邮箱或钱包地址）密文，v1: 前缀 AES-256-GCM';
@@ -96,6 +102,7 @@ CREATE TABLE crm_commission_withdrawal_allocation (
   tenant_id BIGINT NOT NULL,
   withdrawal_id BIGINT NOT NULL,
   order_item_id BIGINT NOT NULL,
+  item_state_id BIGINT,
   order_no VARCHAR(32) NOT NULL,
   item_name VARCHAR(255) NOT NULL,
   sku_name VARCHAR(255),
@@ -115,6 +122,7 @@ CREATE TABLE crm_commission_withdrawal_allocation (
 COMMENT ON TABLE crm_commission_withdrawal_allocation IS
   '提现按先进先出分配到订单商品行：每行记录占用金额与分配后剩余快照；分配合计恒等于申请金额';
 COMMENT ON COLUMN crm_commission_withdrawal_allocation.order_item_id IS '订单商品行 crm_order_item.id';
+COMMENT ON COLUMN crm_commission_withdrawal_allocation.item_state_id IS '对应任务 62 的商品行计佣状态 crm_commission_item_state.id；建表时为空，任务 62 合并后回填，供退款阻断反查';
 COMMENT ON COLUMN crm_commission_withdrawal_allocation.order_no IS '订单号快照（下单时保存）';
 COMMENT ON COLUMN crm_commission_withdrawal_allocation.item_name IS '商品名称快照';
 COMMENT ON COLUMN crm_commission_withdrawal_allocation.sku_name IS '型号名称快照；可空';
@@ -127,6 +135,36 @@ COMMENT ON COLUMN crm_commission_withdrawal_allocation.source_released_cny IS
 
 CREATE INDEX idx_crm_commission_withdrawal_allocation_item
   ON crm_commission_withdrawal_allocation (tenant_id, order_item_id, withdrawal_id);
+CREATE INDEX idx_crm_commission_withdrawal_allocation_state
+  ON crm_commission_withdrawal_allocation (tenant_id, item_state_id, withdrawal_id)
+  WHERE item_state_id IS NOT NULL;
+
+CREATE TABLE crm_commission_withdrawal_order (
+  id BIGINT NOT NULL,
+  tenant_id BIGINT NOT NULL,
+  withdrawal_id BIGINT NOT NULL,
+  order_id BIGINT NOT NULL,
+  order_no VARCHAR(32) NOT NULL,
+  occupied_cny NUMERIC(14,2) NOT NULL,
+  remaining_snapshot_cny NUMERIC(14,2),
+  create_time TIMESTAMPTZ(3) NOT NULL,
+  CONSTRAINT pk_crm_commission_withdrawal_order PRIMARY KEY (id),
+  CONSTRAINT ck_crm_commission_withdrawal_order_id CHECK (id > 0),
+  CONSTRAINT uk_crm_commission_withdrawal_order UNIQUE (tenant_id, withdrawal_id, order_id),
+  CONSTRAINT ck_crm_commission_withdrawal_order_occupied CHECK (occupied_cny > 0),
+  CONSTRAINT ck_crm_commission_withdrawal_order_remaining CHECK (remaining_snapshot_cny IS NULL OR remaining_snapshot_cny >= 0)
+);
+
+COMMENT ON TABLE crm_commission_withdrawal_order IS
+  '提现订单级占用快照（申请时固化，之后不改写）；关联订单分页按本表每单一行';
+COMMENT ON COLUMN crm_commission_withdrawal_order.order_id IS '订单 crm_order.id';
+COMMENT ON COLUMN crm_commission_withdrawal_order.order_no IS '订单号快照（下单时保存）';
+COMMENT ON COLUMN crm_commission_withdrawal_order.occupied_cny IS '该订单被本申请占用的合计金额';
+COMMENT ON COLUMN crm_commission_withdrawal_order.remaining_snapshot_cny IS
+  '申请时刻该订单分配后剩余可提现金额的历史值；缺失为 NULL 由前端显示待核实，禁止以当前钱包或行级求和代替';
+
+CREATE INDEX idx_crm_commission_withdrawal_order_page
+  ON crm_commission_withdrawal_order (tenant_id, withdrawal_id, id);
 
 CREATE TABLE crm_commission_withdrawal_history (
   id BIGINT NOT NULL,
@@ -141,7 +179,7 @@ CREATE TABLE crm_commission_withdrawal_history (
   CONSTRAINT pk_crm_commission_withdrawal_history PRIMARY KEY (id),
   CONSTRAINT ck_crm_commission_withdrawal_history_id CHECK (id > 0),
   CONSTRAINT ck_crm_commission_withdrawal_history_action CHECK (
-    action IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'PAID')),
+    action IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'PAID', 'PAUSED', 'RESUMED')),
   CONSTRAINT ck_crm_commission_withdrawal_history_role CHECK (
     actor_role IN ('KOL', 'REVIEW', 'PAYMENT', 'SYSTEM'))
 );
@@ -149,7 +187,7 @@ CREATE TABLE crm_commission_withdrawal_history (
 COMMENT ON TABLE crm_commission_withdrawal_history IS
   '提现操作历史（只追加）：商务转交后已完成的审批保留原操作人快照，不随达人改归属';
 COMMENT ON COLUMN crm_commission_withdrawal_history.action IS
-  '动作：SUBMITTED 提交、APPROVED 审核通过、REJECTED 驳回、WITHDRAWN 撤回、PAID 付款登记';
+  '动作：SUBMITTED 提交、APPROVED 审核通过、REJECTED 驳回、WITHDRAWN 撤回、PAID 付款登记、PAUSED/RESUMED 阻断与解除（任务 62 写入）';
 COMMENT ON COLUMN crm_commission_withdrawal_history.actor_id IS '操作人：达人为 crm_kol.id，管理端为 sys_user.id';
 COMMENT ON COLUMN crm_commission_withdrawal_history.actor_name IS '操作人姓名快照';
 COMMENT ON COLUMN crm_commission_withdrawal_history.actor_role IS '操作方：KOL 达人、REVIEW 审核、PAYMENT 付款、SYSTEM 系统';
@@ -164,7 +202,7 @@ CREATE TABLE crm_commission_withdrawal_payment (
   request_id UUID NOT NULL,
   request_fingerprint CHAR(64) NOT NULL,
   amount_cny NUMERIC(14,2) NOT NULL,
-  actual_amount NUMERIC(14,2) NOT NULL,
+  actual_amount NUMERIC(20,6) NOT NULL,
   actual_currency VARCHAR(8) NOT NULL,
   paid_at TIMESTAMPTZ(3) NOT NULL,
   method VARCHAR(100) NOT NULL,
@@ -180,7 +218,7 @@ CREATE TABLE crm_commission_withdrawal_payment (
   CONSTRAINT uk_crm_commission_withdrawal_payment_task UNIQUE (tenant_id, withdrawal_id),
   CONSTRAINT uk_crm_commission_withdrawal_payment_request UNIQUE (tenant_id, request_id),
   CONSTRAINT ck_crm_commission_withdrawal_payment_amount CHECK (amount_cny > 0),
-  CONSTRAINT ck_crm_commission_withdrawal_payment_actual CHECK (actual_amount > 0)
+  CONSTRAINT ck_crm_commission_withdrawal_payment_actual CHECK (actual_amount > 0 AND actual_amount <= 999999999999.999999)
 );
 
 COMMENT ON TABLE crm_commission_withdrawal_payment IS
@@ -188,7 +226,7 @@ COMMENT ON TABLE crm_commission_withdrawal_payment IS
 COMMENT ON COLUMN crm_commission_withdrawal_payment.request_id IS '付款登记幂等 UUID';
 COMMENT ON COLUMN crm_commission_withdrawal_payment.request_fingerprint IS 'SHA-256(申请|请求|金额|币种|时间|方式|备注|凭证)，重放比对';
 COMMENT ON COLUMN crm_commission_withdrawal_payment.amount_cny IS '结算金额（人民币），与申请金额一致';
-COMMENT ON COLUMN crm_commission_withdrawal_payment.actual_amount IS '实际支付金额（与 actual_currency 对应）';
+COMMENT ON COLUMN crm_commission_withdrawal_payment.actual_amount IS '实际支付金额（与 actual_currency 对应；非 CNY 按来源币种保留最多 6 位小数）';
 COMMENT ON COLUMN crm_commission_withdrawal_payment.actual_currency IS '实际支付币种；非 CNY 时必须填写折算说明';
 COMMENT ON COLUMN crm_commission_withdrawal_payment.paid_at IS '支付时间（UTC）';
 COMMENT ON COLUMN crm_commission_withdrawal_payment.method IS '支付方式（线下渠道描述）';
@@ -259,3 +297,14 @@ CREATE UNIQUE INDEX uk_crm_commission_withdrawal_freeze_active
 
 CREATE INDEX idx_crm_commission_withdrawal_freeze_kol
   ON crm_commission_withdrawal_freeze (tenant_id, kol_id, frozen_time DESC, id DESC);
+
+-- Task 63 / ADR-032: the payment voucher is uploaded before registration and may be a PDF like the
+-- prepay vouchers, so WITHDRAWAL_VOUCHER joins the 10MB group in the shared file-size rule.
+ALTER TABLE crm_file DROP CONSTRAINT ck_crm_file_size;
+ALTER TABLE crm_file ADD CONSTRAINT ck_crm_file_size CHECK (
+  size_bytes > 0 AND
+  ((biz_type = 'PAYOUT_QR' AND size_bytes <= 2097152) OR
+   (biz_type IN ('WITHDRAWAL_VOUCHER', 'PREPAY_ATTACHMENT', 'PREPAY_VOUCHER')
+      AND size_bytes <= 10485760))
+);
+COMMENT ON COLUMN crm_file.size_bytes IS '文件字节数；收款二维码≤2MB，预付附件/凭证与提现凭证≤10MB';

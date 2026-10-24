@@ -65,6 +65,7 @@ class WithdrawalServiceTest {
   private static final long ITEM_2 = 102L;
   private static final Instant NOW = Instant.parse("2026-10-25T10:00:00.987654Z");
   private static final String UUID_TEXT = "7565e681-dfd4-48bb-9f83-82e66cbb04ad";
+  private static final long VOUCHER_ID = 881L;
 
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final WithdrawalFreezeMapper freezes = mock(WithdrawalFreezeMapper.class);
@@ -110,11 +111,14 @@ class WithdrawalServiceTest {
     when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("500.00"));
     when(withdrawals.sumActiveOccupied(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("120.00"));
+    when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
+    when(funding.unverifiedCount(KOL)).thenReturn(0L);
+    when(funding.configVersion(KOL)).thenReturn("0");
     when(funding.listReleasedRows(KOL))
         .thenReturn(
             List.of(
-                new FundingRow(ITEM_1, new BigDecimal("350.00")),
-                new FundingRow(ITEM_2, new BigDecimal("150.00"))));
+                new FundingRow(ITEM_1, 0L, new BigDecimal("350.00")),
+                new FundingRow(ITEM_2, 0L, new BigDecimal("150.00"))));
     when(orderItems.listByIds(anyList()))
         .thenReturn(
             List.of(
@@ -148,10 +152,10 @@ class WithdrawalServiceTest {
     when(withdrawals.sumActiveOccupied(KOL)).thenReturn(new BigDecimal("120.00"));
     // available = 300.00 - 120.00 = 180.00 < minimum 200.00 → not eligible
     var conditions = service.conditions(COMPANY, KOL);
-    assertThat(conditions.availableCny()).isEqualTo("180.00");
-    assertThat(conditions.occupiedCny()).isEqualTo("120.00");
-    assertThat(conditions.minimumWithdrawalCny()).isEqualTo("200.00");
-    assertThat(conditions.eligible()).isFalse();
+    assertThat(conditions.available()).isEqualTo("180.00");
+    assertThat(conditions.occupied()).isEqualTo("120.00");
+    assertThat(conditions.minimum()).isEqualTo("200.00");
+    assertThat(conditions.canApply()).isFalse();
   }
 
   // ------------------------------------------------------------------ apply
@@ -159,7 +163,7 @@ class WithdrawalServiceTest {
   @Test
   void shouldAllocateFifoAndSnapshotRemainder_whenApplicationIsValid() {
     var detail = service.apply(kol(), apply("400.00", null));
-    assertThat(detail.applicationNo()).isEqualTo("CW20261025000007");
+    assertThat(detail.applicationNo()).isEqualTo("W20261025000007");
     ArgumentCaptor<WithdrawalWrite.Insert> insert =
         ArgumentCaptor.forClass(WithdrawalWrite.Insert.class);
     verify(withdrawals).insert(insert.capture());
@@ -224,7 +228,7 @@ class WithdrawalServiceTest {
   void shouldRejectWhenFundingRowsAreShort() {
     // wallet 500.00 but released rows total only 350.00 → 400.00 cannot be allocated
     when(funding.listReleasedRows(KOL))
-        .thenReturn(List.of(new FundingRow(ITEM_1, new BigDecimal("350.00"))));
+        .thenReturn(List.of(new FundingRow(ITEM_1, 0L, new BigDecimal("350.00"))));
     assertThatThrownBy(() -> service.apply(kol(), apply("400.00", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
@@ -272,7 +276,7 @@ class WithdrawalServiceTest {
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.WITHDRAWAL_PREVIOUS_INVALID));
+                    .isEqualTo(ErrorCode.WITHDRAWAL_NOT_RESUBMITTABLE));
     when(withdrawals.findRow(55L)).thenReturn(rejectedRow(55L));
     service.apply(kol(), apply("400.00", 55L));
     verify(withdrawals).insert(any());
@@ -327,7 +331,7 @@ class WithdrawalServiceTest {
             new WithdrawalRow.Head(
                 ID,
                 999L,
-                "CW20261025000007",
+                "W20261025000007",
                 new BigDecimal("400.00"),
                 "PENDING_REVIEW",
                 999L,
@@ -407,7 +411,7 @@ class WithdrawalServiceTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
-    service.review(reviewer("prepay:pay"), ID, "REJECT", "refund dispute");
+    service.review(reviewer("withdrawal:pay"), ID, "REJECT", "refund dispute");
     verify(withdrawals).insertHistory(historyAction("REJECTED"));
   }
 
@@ -415,7 +419,7 @@ class WithdrawalServiceTest {
   void shouldRefuseIllegalTransitions() {
     // approving an already approved task, or reviewing a finished one
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_PAYMENT"));
-    assertThatThrownBy(() -> service.review(reviewer("prepay:pay"), ID, "APPROVE", null))
+    assertThatThrownBy(() -> service.review(reviewer("withdrawal:pay"), ID, "APPROVE", null))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -448,13 +452,13 @@ class WithdrawalServiceTest {
   void shouldRegisterPaymentOnce_andDebitTheWalletLedger() {
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_PAYMENT"));
     when(withdrawals.sumAllocated(ID)).thenReturn(new BigDecimal("400.00"));
-    when(files.uploadWithdrawalVoucher(anyLong(), anyLong(), anyLong(), any(), any()))
-        .thenReturn(88L);
+    org.mockito.Mockito.doNothing()
+        .when(files)
+        .claimVoucherFile(anyLong(), anyLong(), anyLong(), anyLong());
     when(withdrawals.markPaid(any())).thenReturn(1);
     when(withdrawals.findPaymentFingerprint(any(UUID.class))).thenReturn(null);
     doReturn(detail("PAID")).when(service).detail(any(), anyLong());
-    var result =
-        service.pay(reviewer("prepay:pay"), ID, payment("400.00", "400.00", "CNY"), voucher());
+    var result = service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY"));
     assertThat(result.status()).isEqualTo("PAID");
     // wallet leaves exactly the application amount at the payment time
     verify(wallet)
@@ -469,9 +473,7 @@ class WithdrawalServiceTest {
   void shouldRefusePaymentOutsidePaymentState() {
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW"));
     assertThatThrownBy(
-            () ->
-                service.pay(
-                    reviewer("prepay:pay"), ID, payment("400.00", "400.00", "CNY"), voucher()))
+            () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY")))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -485,9 +487,7 @@ class WithdrawalServiceTest {
     when(withdrawals.sumAllocated(ID)).thenReturn(new BigDecimal("400.00"));
     when(withdrawals.findPayment(ID)).thenReturn(paymentRow());
     assertThatThrownBy(
-            () ->
-                service.pay(
-                    reviewer("prepay:pay"), ID, payment("400.00", "400.00", "CNY"), voucher()))
+            () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY")))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -501,16 +501,15 @@ class WithdrawalServiceTest {
     when(withdrawals.findPaymentFingerprint(any(UUID.class)))
         .thenReturn(paymentFingerprint("400.00", "400.00", "CNY"));
     when(withdrawals.sumAllocated(ID)).thenReturn(new BigDecimal("400.00"));
-    when(files.uploadWithdrawalVoucher(anyLong(), anyLong(), anyLong(), any(), any()))
-        .thenReturn(88L);
+    org.mockito.Mockito.doNothing()
+        .when(files)
+        .claimVoucherFile(anyLong(), anyLong(), anyLong(), anyLong());
     when(withdrawals.markPaid(any())).thenReturn(1);
     doReturn(detail("PAID")).when(service).detail(any(), anyLong());
-    service.pay(reviewer("prepay:pay"), ID, payment("400.00", "400.00", "CNY"), voucher());
+    service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY"));
     // the real fingerprint of the second request differs → 409, nothing written
     assertThatThrownBy(
-            () ->
-                service.pay(
-                    reviewer("prepay:pay"), ID, payment("400.00", "380.00", "USD"), voucher()))
+            () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "380.00", "USD")))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -523,8 +522,16 @@ class WithdrawalServiceTest {
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_PAYMENT"));
     var foreignWithoutNote =
         new WithdrawalService.PaymentCommand(
-            UUID_TEXT, "400.00", "56.00", "USD", "2026-10-25T12:00:00+08:00", "bank", null, null);
-    assertThatThrownBy(() -> service.pay(reviewer("prepay:pay"), ID, foreignWithoutNote, voucher()))
+            UUID_TEXT,
+            "400.00",
+            "56.00",
+            "USD",
+            "2026-10-25T12:00:00+08:00",
+            "bank",
+            null,
+            null,
+            VOUCHER_ID);
+    assertThatThrownBy(() -> service.pay(reviewer("withdrawal:pay"), ID, foreignWithoutNote))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -538,7 +545,7 @@ class WithdrawalServiceTest {
     assertThatThrownBy(
             () ->
                 service.pay(
-                    reviewer("prepay:pay"),
+                    reviewer("withdrawal:pay"),
                     ID,
                     new WithdrawalService.PaymentCommand(
                         UUID_TEXT,
@@ -548,8 +555,8 @@ class WithdrawalServiceTest {
                         "2026-10-25T12:00:00+08:00",
                         "bank",
                         null,
-                        null),
-                    voucher()))
+                        null,
+                        VOUCHER_ID)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -568,20 +575,20 @@ class WithdrawalServiceTest {
 
   @Test
   void shouldRevealFullPayoutAndAudit_forPermittedReaders() {
-    var recipient = service.recipient(reviewer("withdrawal:review"), ID);
+    var recipient = service.recipient(reviewer("withdrawal:pay"), ID);
     assertThat(recipient.account()).isEqualTo("creator@example.com");
     assertThat(recipient.holder()).isEqualTo("Creator Name");
     verify(audit).recordTenantOperation(anyLong(), anyLong(), any(), any(), any(), any());
-    assertThatThrownBy(() -> service.recipient(reviewer("commission:view"), ID))
+    assertThatThrownBy(() -> service.recipient(reviewer("withdrawal:review"), ID))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
   }
 
   @Test
-  void shouldGiveCreatorOwnFullSnapshot_withoutFinanceNotes() {
+  void shouldGiveCreatorMaskedSnapshot_withoutFinanceNotes() {
     var detail = service.kolDetail(COMPANY, KOL, ID);
-    assertThat(detail.account().account()).isEqualTo("creator@example.com");
+    assertThat(detail.account().account()).isEqualTo("cr***@example.com");
     assertThat(detail.financeNote()).isNull();
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW", 999L));
     assertThatThrownBy(() -> service.kolDetail(COMPANY, KOL, ID))
@@ -602,7 +609,8 @@ class WithdrawalServiceTest {
     // the requested creator belongs to BD 9, the viewer is BD 5 → empty page
     var page =
         service.page(
-            user("withdrawal:review"), new WithdrawalService.Filter(null, "KOL-test", null, 1, 20));
+            user("withdrawal:review"),
+            new WithdrawalService.Filter(null, null, "KOL-test", null, null, 1, 20));
     assertThat(page.total()).isZero();
   }
 
@@ -612,7 +620,7 @@ class WithdrawalServiceTest {
             () ->
                 service.export(
                     user("withdrawal:review"),
-                    new WithdrawalService.Filter(null, null, null, 1, 20)))
+                    new WithdrawalService.Filter(null, null, null, null, null, 1, 20)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
@@ -625,9 +633,9 @@ class WithdrawalServiceTest {
     var csv =
         service.export(
             reviewer("data:export", "withdrawal:review"),
-            new WithdrawalService.Filter(null, null, null, 1, 20));
+            new WithdrawalService.Filter(null, null, null, null, null, 1, 20));
     var text = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
-    assertThat(text).contains("CW20261025000007").contains("PENDING_REVIEW");
+    assertThat(text).contains("W20261025000007").contains("PENDING_REVIEW");
     assertThat(text).doesNotContain("creator@example.com");
   }
 
@@ -676,18 +684,16 @@ class WithdrawalServiceTest {
                 new FinanceTaskRow(
                     1L,
                     KOL,
-                    "CW1",
-                    "COMMISSION_WITHDRAWAL",
-                    "PENDING_REVIEW",
+                    "W1",
+                    "COMMISSION",
                     "PENDING_REVIEW",
                     new BigDecimal("100.00"),
                     NOW.minusSeconds(60)),
                 new FinanceTaskRow(
                     2L,
                     KOL,
-                    "CW2",
-                    "COMMISSION_WITHDRAWAL",
-                    "PAID",
+                    "W2",
+                    "COMMISSION",
                     "PAID",
                     new BigDecimal("50.00"),
                     NOW.minusSeconds(600))));
@@ -695,14 +701,7 @@ class WithdrawalServiceTest {
         .thenReturn(
             List.of(
                 new FinanceTaskRow(
-                    3L,
-                    KOL,
-                    "PP1",
-                    "PREPAY",
-                    "APPROVED",
-                    "PENDING_PAYMENT",
-                    new BigDecimal("70.00"),
-                    NOW)));
+                    3L, KOL, "PP1", "PREPAY", "APPROVED", new BigDecimal("70.00"), NOW)));
     var page =
         service.financeTasks(
             reviewer("commission:view"),
@@ -710,18 +709,17 @@ class WithdrawalServiceTest {
     assertThat(page.total()).isEqualTo(3L);
     assertThat(page.items()).hasSize(2);
     assertThat(page.items().get(0).taskNo()).isEqualTo("PP1");
-    assertThat(page.items().get(1).taskNo()).isEqualTo("CW1");
-    // the status filter maps to each branch's raw statuses
+    assertThat(page.items().get(1).taskNo()).isEqualTo("W1");
+    // the raw status passes straight through to both branches
     ArgumentCaptor<FinanceTaskQuery> query = ArgumentCaptor.forClass(FinanceTaskQuery.class);
     verify(withdrawals).pageWithdrawalTasks(query.capture());
-    assertThat(query.getValue().withdrawalStatuses()).isNull();
+    assertThat(query.getValue().status()).isNull();
     var filtered =
         service.financeTasks(
             reviewer("commission:view"),
             new WithdrawalService.FinanceFilter(null, null, null, "PENDING_PAYMENT", 1, 20));
     verify(withdrawals, times(2)).pageWithdrawalTasks(query.capture());
-    assertThat(query.getValue().withdrawalStatuses()).containsExactly("PENDING_PAYMENT");
-    assertThat(query.getValue().prepayStatuses()).containsExactly("APPROVED");
+    assertThat(query.getValue().status()).isEqualTo("PENDING_PAYMENT");
     assertThat(filtered).isNotNull();
   }
 
@@ -792,18 +790,8 @@ class WithdrawalServiceTest {
         "2026-10-25T12:00:00+08:00",
         "bank",
         null,
-        "rate 7.1");
-  }
-
-  private static WithdrawalService.UploadedFile voucher() {
-    // real PNG signature so PrepayFileRules.contentType accepts the bytes
-    byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2};
-    return new WithdrawalService.UploadedFile("receipt.png", png);
-  }
-
-  /** Voucher bytes reused by the payment fingerprint helper. */
-  private static byte[] voucherBytes() {
-    return voucher().content();
+        "rate 7.1",
+        VOUCHER_ID);
   }
 
   /** Mirrors the service's canonical payment fingerprint for the standard payment fixture. */
@@ -819,11 +807,12 @@ class WithdrawalServiceTest {
             + new BigDecimal(actualAmount).setScale(2).toPlainString()
             + "|"
             + actualCurrency
-            + "|2026-10-25T04:00:00Z|bank||rate 7.1|";
+            + "|2026-10-25T04:00:00Z|bank||rate 7.1|"
+            + VOUCHER_ID;
     try {
       var digest = java.security.MessageDigest.getInstance("SHA-256");
-      digest.update(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      return java.util.HexFormat.of().formatHex(digest.digest(voucherBytes()));
+      return java.util.HexFormat.of()
+          .formatHex(digest.digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     } catch (java.security.NoSuchAlgorithmException exception) {
       throw new IllegalStateException(exception);
     }
@@ -895,12 +884,14 @@ class WithdrawalServiceTest {
     return new WithdrawalRow(
         ID,
         kolId,
-        "CW20261025000007",
+        "W20261025000007",
         UUID.fromString(UUID_TEXT),
         fingerprint,
         null,
         new BigDecimal("400.00"),
         status,
+        false,
+        null,
         null,
         "PAYPAL",
         CIPHER_TEXT,
@@ -928,6 +919,8 @@ class WithdrawalServiceTest {
         null,
         new BigDecimal("400.00"),
         "REJECTED",
+        false,
+        null,
         null,
         "PAYPAL",
         CIPHER_TEXT,
@@ -947,13 +940,13 @@ class WithdrawalServiceTest {
 
   private static WithdrawalRow.Head head() {
     return new WithdrawalRow.Head(
-        ID, KOL, "CW20261025000007", new BigDecimal("400.00"), "PENDING_REVIEW", KOL, NOW);
+        ID, KOL, "W20261025000007", new BigDecimal("400.00"), "PENDING_REVIEW", KOL, NOW);
   }
 
   private static WithdrawalService.Detail detail(String status) {
     return new WithdrawalService.Detail(
         ID,
-        "CW20261025000007",
+        "W20261025000007",
         KOL,
         "KOL-test",
         "Test creator",
@@ -963,12 +956,14 @@ class WithdrawalServiceTest {
         "400.00",
         "CNY",
         status,
+        false,
+        null,
         NOW,
         null,
         null,
         null,
         null,
-        1L,
+        List.of(),
         null,
         List.of(),
         null);

@@ -52,6 +52,7 @@ class WithdrawalServiceBranchTest {
   private static final long ITEM_1 = 101L;
   private static final Instant NOW = Instant.parse("2026-10-25T10:00:00.987Z");
   private static final String UUID_TEXT = "7565e681-dfd4-48bb-9f83-82e66cbb04ad";
+  private static final long VOUCHER_ID = 901L;
 
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final WithdrawalFreezeMapper freezes = mock(WithdrawalFreezeMapper.class);
@@ -97,8 +98,11 @@ class WithdrawalServiceBranchTest {
     when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("500.00"));
     when(withdrawals.sumActiveOccupied(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("0.00"));
+    when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
+    when(funding.unverifiedCount(KOL)).thenReturn(0L);
+    when(funding.configVersion(KOL)).thenReturn("0");
     when(funding.listReleasedRows(KOL))
-        .thenReturn(List.of(new FundingRow(ITEM_1, new BigDecimal("350.00"))));
+        .thenReturn(List.of(new FundingRow(ITEM_1, 0L, new BigDecimal("350.00"))));
     when(orderItems.listByIds(anyList()))
         .thenReturn(
             List.of(
@@ -212,9 +216,9 @@ class WithdrawalServiceBranchTest {
     // no wallet row yet: conditions still answer with zero instead of failing
     when(wallets.findBalance(KOL)).thenReturn(null);
     var conditions = service.conditions(COMPANY, KOL);
-    assertThat(conditions.walletBalanceCny()).isEqualTo("0.00");
-    assertThat(conditions.frozenCny()).isEqualTo("0.00");
-    assertThat(conditions.eligible()).isFalse();
+    assertThat(conditions.available()).isEqualTo("0.00");
+    assertThat(conditions.frozen()).isEqualTo("0.00");
+    assertThat(conditions.canApply()).isFalse();
   }
 
   // ------------------------------------------------------------------ reads
@@ -246,7 +250,7 @@ class WithdrawalServiceBranchTest {
     assertThat(page.total()).isEqualTo(1);
     assertThat(page.items().getFirst().rejectReason()).isEqualTo("wrong account");
     assertThat(page.items().getFirst().actualCurrency()).isEqualTo("USD");
-    assertThat(page.items().getFirst().account().account()).isEqualTo("creator@example.com");
+    assertThat(page.items().getFirst().account().account()).isEqualTo("cr***@example.com");
     assertThatThrownBy(() -> service.pageKol(COMPANY, KOL, 0, 20))
         .isInstanceOfSatisfying(
             BusinessException.class,
@@ -292,40 +296,33 @@ class WithdrawalServiceBranchTest {
   }
 
   @Test
-  void shouldRefuseVoucherDownloadsWithoutAPaidTask() {
-    var finance = staff(6L, DataScope.ALL, Set.of("commission:view"));
-    when(withdrawals.findPayment(anyLong())).thenReturn(null);
-    assertThatThrownBy(() -> service.voucher(finance, ID))
+  void shouldRefuseVoucherDownloadsOutsideAPaidTask() {
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
+    // a viewer without withdrawal:pay is refused before anything is read
+    assertThatThrownBy(
+            () -> service.voucherFile(staff(7L, DataScope.ALL, Set.of("order:view")), 88L))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
-    when(withdrawals.findPayment(anyLong()))
-        .thenReturn(
-            new WithdrawalRows.PaymentRow(
-                new BigDecimal("250.00"),
-                new BigDecimal("250.00"),
-                "CNY",
-                NOW,
-                "BANK",
-                null,
-                null,
-                88L,
-                6L,
-                "Test",
-                "PAYMENT"));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
     when(files.attachedFile(88L))
         .thenReturn(
             new BizFileService.AttachedFile(
                 com.tcrm.admin.commission.model.FileBizType.PREPAY_VOUCHER,
-                ID,
+                null,
                 new BizFileService.FileDTO(88L, "v.png", "image/png", 1L, new byte[] {1})));
-    assertThatThrownBy(() -> service.voucher(finance, ID))
+    assertThatThrownBy(() -> service.voucherFile(payer, 88L))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
-    // the KOL side also refuses anything that is not their own paid task
-    when(withdrawals.findRow(anyLong())).thenReturn(row("PENDING_PAYMENT"));
-    assertThatThrownBy(() -> service.kolVoucher(COMPANY, KOL, ID))
+    // an attached withdrawal voucher without a payment fact is refused too
+    when(files.attachedFile(88L))
+        .thenReturn(
+            new BizFileService.AttachedFile(
+                com.tcrm.admin.commission.model.FileBizType.WITHDRAWAL_VOUCHER,
+                ID,
+                new BizFileService.FileDTO(88L, "v.png", "image/png", 1L, new byte[] {1})));
+    when(withdrawals.findPayment(anyLong())).thenReturn(null);
+    assertThatThrownBy(() -> service.voucherFile(payer, 88L))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
@@ -341,21 +338,14 @@ class WithdrawalServiceBranchTest {
         .thenReturn(
             List.of(
                 new FinanceTaskRow(
-                    3L,
-                    KOL,
-                    "PP1",
-                    "PREPAY",
-                    "WAITING_DETAILS",
-                    "PENDING_REVIEW",
-                    new BigDecimal("70.00"),
-                    NOW)));
+                    3L, KOL, "PP1", "PREPAY", "WAITING_DETAILS", new BigDecimal("70.00"), NOW)));
     // type=PREPAY skips the withdrawal branch entirely
     var page =
         service.financeTasks(
             viewer, new WithdrawalService.FinanceFilter(null, null, "PREPAY", null, 1, 20));
     assertThat(page.items()).hasSize(1);
     assertThat(page.items().getFirst().kolCode()).isEqualTo("KOL-test");
-    assertThat(page.items().getFirst().status()).isEqualTo("PENDING_REVIEW");
+    assertThat(page.items().getFirst().status()).isEqualTo("WAITING_DETAILS");
     assertThatThrownBy(
             () ->
                 service.financeTasks(
@@ -370,15 +360,6 @@ class WithdrawalServiceBranchTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
-    // an unknown creator code answers an empty page without querying
-    when(kols.getByCode("KOL-none")).thenReturn(null);
-    assertThat(
-            service
-                .financeTasks(
-                    viewer,
-                    new WithdrawalService.FinanceFilter(null, "KOL-none", null, null, 1, 20))
-                .total())
-        .isZero();
   }
 
   @Test
@@ -414,8 +395,11 @@ class WithdrawalServiceBranchTest {
 
   @Test
   void shouldRefusePaymentWithMalformedInput() {
-    var payer = staff(6L, DataScope.ALL, Set.of("prepay:pay"));
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
     when(withdrawals.findRow(anyLong())).thenReturn(row("PENDING_PAYMENT"));
+    org.mockito.Mockito.doNothing()
+        .when(files)
+        .claimVoucherFile(anyLong(), anyLong(), anyLong(), anyLong());
     when(withdrawals.findPaymentFingerprint(any(UUID.class))).thenReturn(null);
     // amount different from the application
     assertThatThrownBy(
@@ -431,8 +415,8 @@ class WithdrawalServiceBranchTest {
                         "2026-10-25T12:00:00+08:00",
                         "bank",
                         null,
-                        null),
-                    voucher()))
+                        null,
+                        VOUCHER_ID)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -443,8 +427,15 @@ class WithdrawalServiceBranchTest {
                     payer,
                     ID,
                     new WithdrawalService.PaymentCommand(
-                        UUID_TEXT, "400.00", "400.00", "CNY", "25-10-2026", "bank", null, null),
-                    voucher()))
+                        UUID_TEXT,
+                        "400.00",
+                        "400.00",
+                        "CNY",
+                        "25-10-2026",
+                        "bank",
+                        null,
+                        null,
+                        VOUCHER_ID)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -461,8 +452,8 @@ class WithdrawalServiceBranchTest {
                         "2026-10-25T12:00:00+08:00",
                         "bank",
                         null,
-                        null),
-                    voucher()))
+                        null,
+                        VOUCHER_ID)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -479,8 +470,8 @@ class WithdrawalServiceBranchTest {
                         "2026-10-25T12:00:00+08:00",
                         " ",
                         null,
-                        null),
-                    voucher()))
+                        null,
+                        VOUCHER_ID)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -497,8 +488,8 @@ class WithdrawalServiceBranchTest {
                         "2026-10-25T12:00:00+08:00",
                         "bank",
                         null,
-                        null),
-                    null))
+                        null,
+                        null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -590,7 +581,9 @@ class WithdrawalServiceBranchTest {
     var exporter = staff(6L, DataScope.ALL, Set.of("data:export", "withdrawal:review"));
     when(withdrawals.count(any())).thenReturn(100001L);
     assertThatThrownBy(
-            () -> service.export(exporter, new WithdrawalService.Filter(null, null, null, 1, 20)))
+            () ->
+                service.export(
+                    exporter, new WithdrawalService.Filter(null, null, null, null, null, 1, 20)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
@@ -608,9 +601,8 @@ class WithdrawalServiceBranchTest {
         null);
   }
 
-  private static WithdrawalService.UploadedFile voucher() {
-    byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-    return new WithdrawalService.UploadedFile("receipt.png", png);
+  private static byte[] pngBytes() {
+    return new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1};
   }
 
   private KolAccountDTO kol() {
@@ -658,12 +650,14 @@ class WithdrawalServiceBranchTest {
     return new WithdrawalRow(
         ID,
         KOL,
-        "CW1",
+        "W1",
         UUID.fromString(UUID_TEXT),
         "f".repeat(64),
         null,
         new BigDecimal("400.00"),
         status,
+        false,
+        null,
         null,
         "PAYPAL",
         new SecretCipher(java.util.Base64.getEncoder().encodeToString(new byte[32]))

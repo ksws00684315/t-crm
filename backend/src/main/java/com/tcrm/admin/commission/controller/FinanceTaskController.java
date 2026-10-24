@@ -47,7 +47,7 @@ public class FinanceTaskController {
                 current.user(),
                 new FinanceFilter(
                     request.applicationNo(),
-                    request.kolCode(),
+                    request.kolId(),
                     request.type(),
                     request.status(),
                     request.pageNumber(),
@@ -57,7 +57,7 @@ public class FinanceTaskController {
 
   public record Query(
       String applicationNo,
-      String kolCode,
+      @jakarta.validation.constraints.Min(1) Long kolId,
       String type,
       String status,
       @Min(1) Integer page,
@@ -80,7 +80,6 @@ public class FinanceTaskController {
       String bdId,
       String bdName,
       String taskType,
-      String sourceStatus,
       String status,
       String amountCny,
       String currency,
@@ -95,7 +94,6 @@ public class FinanceTaskController {
           row.bdId() == null ? null : row.bdId().toString(),
           row.bdName(),
           row.taskType(),
-          row.sourceStatus(),
           row.status(),
           row.amountCny(),
           row.currency(),

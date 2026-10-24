@@ -2,15 +2,15 @@ package com.tcrm.admin.commission.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
-import com.tcrm.admin.commission.model.WithdrawalRows;
-import com.tcrm.admin.commission.service.BizFileService;
 import com.tcrm.admin.commission.service.WithdrawalService;
 import com.tcrm.admin.commission.service.WithdrawalService.AccountView;
+import com.tcrm.admin.commission.service.WithdrawalService.AdminRow;
 import com.tcrm.admin.commission.service.WithdrawalService.Detail;
 import com.tcrm.admin.commission.service.WithdrawalService.HistoryItem;
+import com.tcrm.admin.commission.service.WithdrawalService.OrderView;
 import com.tcrm.admin.commission.service.WithdrawalService.PaymentCommand;
 import com.tcrm.admin.commission.service.WithdrawalService.PaymentView;
-import com.tcrm.admin.commission.service.WithdrawalService.UploadedFile;
+import com.tcrm.admin.commission.service.WithdrawalService.ProductView;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.BusinessException;
@@ -21,6 +21,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,17 +33,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Management API for commission withdrawals (task 63, rows 13.01-13.04): the finance task pages,
- * review decisions, payment registration with voucher, the recipient reveal endpoint (audited) and
- * CSV export. All endpoints AND their service keep the OWN data scope.
+ * Management API for commission withdrawals (task 63, ADR-032 §6.2): the finance task pages, review
+ * decisions, voucher upload and JSON payment registration, the audited recipient reveal,
+ * order-level allocation snapshots and CSV export. Endpoints keep the OWN data scope.
  */
 @RestController
 public class AdminWithdrawalController {
@@ -54,10 +55,10 @@ public class AdminWithdrawalController {
     this.current = current;
   }
 
-  /** List (13.02): reviewers and read-only viewers; OWN scope sees only own creators. */
+  /** List (contract §6.2): review, pay and read-only viewers; OWN scope sees own creators. */
   @GetMapping("/admin-api/commission/withdrawals")
   @SaCheckPermission(
-      value = {"withdrawal:review", "commission:view"},
+      value = {"commission:view", "withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
   public R<PageResult<WithdrawalRowVO>> list(@Valid @ModelAttribute Query request) {
     return R.ok(
@@ -66,7 +67,9 @@ public class AdminWithdrawalController {
                 current.user(),
                 new WithdrawalService.Filter(
                     request.applicationNo(),
-                    request.kolCode(),
+                    request.kolId(),
+                    request.kolKeyword(),
+                    request.bdUserId(),
                     request.status(),
                     request.pageNumber(),
                     request.pageSize()))
@@ -75,7 +78,7 @@ public class AdminWithdrawalController {
 
   /**
    * CSV export (13.01): the annotation requires {@code data:export}; the service also requires a
-   * withdrawal list permission, matching the design "export AND list scope".
+   * withdrawal list permission, matching the contract "export AND list scope".
    */
   @GetMapping("/admin-api/commission/withdrawals/export")
   @SaCheckPermission("data:export")
@@ -84,7 +87,13 @@ public class AdminWithdrawalController {
         withdrawals.export(
             current.user(),
             new WithdrawalService.Filter(
-                request.applicationNo(), request.kolCode(), request.status(), 1, 100));
+                request.applicationNo(),
+                request.kolId(),
+                request.kolKeyword(),
+                request.bdUserId(),
+                request.status(),
+                1,
+                100));
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
@@ -96,60 +105,39 @@ public class AdminWithdrawalController {
         .body(content);
   }
 
-  /** Detail (13.04): masked payout; finance notes only for finance viewers. */
+  /** Detail (13.04): masked payout, finance notes for {@code withdrawal:pay}; read audited. */
   @GetMapping("/admin-api/commission/withdrawals/{id}")
   @SaCheckPermission(
-      value = {"withdrawal:review", "commission:view"},
+      value = {"commission:view", "withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
   @AuditLog(module = "Withdrawal", action = "View detail")
   public R<WithdrawalDetailVO> detail(@PathVariable @Min(1) long id) {
     return R.ok(WithdrawalDetailVO.from(withdrawals.detail(current.user(), id)));
   }
 
-  /** Full payout snapshot for reviewers and payers; every read is audited (13.04). */
+  /** Full payout snapshot for the payer only (contract §6.2); every read is audited. */
   @GetMapping("/admin-api/commission/withdrawals/{id}/recipient")
-  @SaCheckPermission(
-      value = {"withdrawal:review", "prepay:pay"},
-      mode = SaMode.OR)
+  @SaCheckPermission("withdrawal:pay")
   public R<WithdrawalRecipientVO> recipient(@PathVariable @Min(1) long id) {
     return R.ok(WithdrawalRecipientVO.from(withdrawals.recipient(current.user(), id)));
   }
 
-  /** Order items occupied by one application (13.04), paged, immutable snapshots. */
+  /** Order-level allocation snapshots (13.04): one row per order from the persisted table. */
   @GetMapping("/admin-api/commission/withdrawals/{id}/orders")
   @SaCheckPermission(
-      value = {"withdrawal:review", "commission:view"},
+      value = {"commission:view", "withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
-  public R<PageResult<WithdrawalAllocationVO>> orders(
+  public R<PageResult<WithdrawalOrderVO>> orders(
       @PathVariable @Min(1) long id,
       @RequestParam(defaultValue = "1") @Min(1) @Max(10000) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size) {
-    return R.ok(
-        withdrawals.orders(current.user(), id, page, size).map(WithdrawalAllocationVO::from));
-  }
-
-  /** The payment voucher of one withdrawal (13.04 关联支付凭证). */
-  @GetMapping("/admin-api/commission/withdrawals/{id}/voucher")
-  @SaCheckPermission(
-      value = {"withdrawal:review", "prepay:pay", "commission:view"},
-      mode = SaMode.OR)
-  public ResponseEntity<byte[]> voucher(@PathVariable @Min(1) long id) {
-    BizFileService.FileDTO file = withdrawals.voucher(current.user(), id);
-    return ResponseEntity.ok()
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename(file.fileName(), StandardCharsets.UTF_8)
-                .build()
-                .toString())
-        .contentType(MediaType.parseMediaType(file.contentType()))
-        .body(file.content());
+    return R.ok(withdrawals.orders(current.user(), id, page, size).map(WithdrawalOrderVO::from));
   }
 
   /** Review decision (12.02): approve moves to PENDING_PAYMENT; reject needs a reason. */
   @PutMapping("/admin-api/commission/withdrawals/{id}/review")
   @SaCheckPermission(
-      value = {"withdrawal:review", "prepay:pay"},
+      value = {"withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
   public R<WithdrawalDetailVO> review(
       @PathVariable @Min(1) long id, @Valid @RequestBody ReviewRequest request) {
@@ -158,30 +146,51 @@ public class AdminWithdrawalController {
             withdrawals.review(current.user(), id, request.decision(), request.note())));
   }
 
-  /** Payment registration (13.01): one successful payment per task, voucher required. */
-  @PutMapping(
-      value = "/admin-api/commission/withdrawals/{id}/payment",
-      consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @SaCheckPermission("prepay:pay")
+  /**
+   * Voucher upload before registration (contract §6.2 POST /admin-api/files): PNG/JPEG/PDF up to
+   * 10MB, referenced by {@code fileId} in the payment registration.
+   */
+  @PostMapping("/admin-api/files")
+  @SaCheckPermission("withdrawal:pay")
+  public R<FileUploadVO> uploadVoucher(
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(defaultValue = "WITHDRAWAL_VOUCHER") String bizType) {
+    if (!"WITHDRAWAL_VOUCHER".equals(bizType)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    try {
+      return R.ok(
+          new FileUploadVO(
+              withdrawals.uploadVoucher(
+                  current.user(), file.getOriginalFilename(), file.getBytes())));
+    } catch (IOException exception) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+  }
+
+  /**
+   * Payment registration (13.01, contract §6.2): JSON body referencing the uploaded voucher; {@code
+   * withdrawal:pay}; one successful payment per task.
+   */
+  @PutMapping("/admin-api/commission/withdrawals/{id}/payment")
+  @SaCheckPermission("withdrawal:pay")
   public R<WithdrawalDetailVO> pay(
-      @PathVariable @Min(1) long id,
-      @Valid @RequestPart("payload") PaymentRequest request,
-      @RequestPart("voucher") MultipartFile voucher) {
+      @PathVariable @Min(1) long id, @Valid @RequestBody PaymentRequest request) {
     return R.ok(
         WithdrawalDetailVO.from(
             withdrawals.pay(
                 current.user(),
                 id,
                 new PaymentCommand(
-                    request.requestId(),
+                    request.idempotencyKey(),
                     request.amountCny(),
                     request.actualAmount(),
                     request.actualCurrency(),
                     request.paidAt(),
                     request.method(),
                     request.financeNote(),
-                    request.conversionNote()),
-                uploaded(voucher))));
+                    request.conversionNote(),
+                    request.voucherFileId()))));
   }
 
   /** Withdrawal occupations of order items for the order chain (09.04 提现占用). */
@@ -196,17 +205,11 @@ public class AdminWithdrawalController {
             .toList());
   }
 
-  private static UploadedFile uploaded(MultipartFile file) {
-    try {
-      return new UploadedFile(file.getOriginalFilename(), file.getBytes());
-    } catch (IOException exception) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
-  }
-
   public record Query(
       String applicationNo,
-      String kolCode,
+      @Min(1) Long kolId,
+      String kolKeyword,
+      @Min(1) Long bdUserId,
       String status,
       @Min(1) Integer page,
       @Min(1) @Max(100) Integer size) {
@@ -223,14 +226,17 @@ public class AdminWithdrawalController {
       @NotBlank @Pattern(regexp = "APPROVE|REJECT") String decision, String note) {}
 
   public record PaymentRequest(
-      @NotBlank String requestId,
+      @NotBlank String idempotencyKey,
       @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String amountCny,
-      @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String actualAmount,
+      @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,6})?") String actualAmount,
       @NotBlank @Pattern(regexp = "[A-Z]{3,8}") String actualCurrency,
       @NotBlank String paidAt,
       @NotBlank String method,
       String financeNote,
-      String conversionNote) {}
+      String conversionNote,
+      @NotNull @Min(1) Long voucherFileId) {}
+
+  record FileUploadVO(Long fileId) {}
 
   record WithdrawalRowVO(
       String id,
@@ -244,10 +250,16 @@ public class AdminWithdrawalController {
       String amountCny,
       String currency,
       String status,
-      String createdAt,
+      boolean paused,
+      String pauseReason,
+      String note,
+      String reviewNote,
+      String financeNote,
+      String previousId,
       String accountType,
-      String accountMasked) {
-    static WithdrawalRowVO from(WithdrawalService.AdminRow row) {
+      String accountMasked,
+      String createdAt) {
+    static WithdrawalRowVO from(AdminRow row) {
       return new WithdrawalRowVO(
           Long.toString(row.id()),
           row.applicationNo(),
@@ -260,9 +272,15 @@ public class AdminWithdrawalController {
           row.amountCny(),
           row.currency(),
           row.status(),
-          row.createdAt().toString(),
+          row.paused(),
+          row.pauseReason(),
+          row.note(),
+          row.reviewNote(),
+          row.financeNote(),
+          row.previousId() == null ? null : row.previousId().toString(),
           row.accountType(),
-          row.accountMasked());
+          row.accountMasked(),
+          row.createdAt().toString());
     }
   }
 
@@ -316,6 +334,26 @@ public class AdminWithdrawalController {
     }
   }
 
+  record AllocationVO(
+      String orderItemId,
+      String orderNo,
+      String image,
+      String product,
+      String sku,
+      String occupied,
+      String remainingSnapshot) {
+    static AllocationVO from(WithdrawalService.AllocationView view) {
+      return new AllocationVO(
+          Long.toString(view.orderItemId()),
+          view.orderNo(),
+          view.imageUrl(),
+          view.itemName(),
+          view.skuName(),
+          view.occupiedCny(),
+          view.remainingSnapshotCny());
+    }
+  }
+
   record WithdrawalDetailVO(
       String id,
       String applicationNo,
@@ -328,12 +366,14 @@ public class AdminWithdrawalController {
       String amountCny,
       String currency,
       String status,
+      boolean paused,
+      String pauseReason,
       String createdAt,
       String note,
       String reviewNote,
       String financeNote,
       String previousId,
-      String allocationCount,
+      List<AllocationVO> allocations,
       AccountVO account,
       List<HistoryVO> history,
       PaymentVO payment) {
@@ -350,12 +390,14 @@ public class AdminWithdrawalController {
           detail.amountCny(),
           detail.currency(),
           detail.status(),
+          detail.paused(),
+          detail.pauseReason(),
           detail.createdAt().toString(),
           detail.note(),
           detail.reviewNote(),
           detail.financeNote(),
           detail.previousId() == null ? null : detail.previousId().toString(),
-          Long.toString(detail.allocationCount()),
+          detail.allocations().stream().map(AllocationVO::from).toList(),
           AccountVO.from(detail.account()),
           detail.history().stream().map(HistoryVO::from).toList(),
           PaymentVO.from(detail.payment()));
@@ -374,27 +416,27 @@ public class AdminWithdrawalController {
     }
   }
 
-  record WithdrawalAllocationVO(
+  /** One order row of the allocation pagination (contract §6.2 / #112). */
+  record WithdrawalOrderVO(
       String id,
-      String orderItemId,
       String orderNo,
-      String itemName,
-      String skuName,
-      String imageUrl,
-      String occupiedCny,
-      String remainingSnapshotCny,
-      String sourceReleasedCny) {
-    static WithdrawalAllocationVO from(WithdrawalRows.AllocationRow row) {
-      return new WithdrawalAllocationVO(
-          Long.toString(row.id()),
-          Long.toString(row.orderItemId()),
-          row.orderNo(),
-          row.itemName(),
-          row.skuName(),
-          row.imageUrl(),
-          row.occupiedCny().setScale(2).toPlainString(),
-          row.remainingSnapshotCny().setScale(2).toPlainString(),
-          row.sourceReleasedCny().setScale(2).toPlainString());
+      List<ProductVO> products,
+      String occupied,
+      String remainingSnapshot) {
+    static WithdrawalOrderVO from(OrderView order) {
+      return new WithdrawalOrderVO(
+          Long.toString(order.id()),
+          order.orderNo(),
+          order.products().stream().map(ProductVO::from).toList(),
+          order.occupied(),
+          order.remainingSnapshot());
+    }
+  }
+
+  record ProductVO(String id, String image, String product, String sku) {
+    static ProductVO from(ProductView product) {
+      return new ProductVO(
+          Long.toString(product.id()), product.image(), product.product(), product.sku());
     }
   }
 

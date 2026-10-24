@@ -42,9 +42,10 @@ public interface WithdrawalMapper {
   @Select(
       """
       SELECT id, kol_id, application_no, request_id, request_fingerprint, previous_id, amount_cny,
-             status, account_id, account_type, account_cipher, account_masked, account_currency,
-             account_network, account_holder, account_qr_file_id, note, review_note, finance_note,
-             reviewer_id, reviewed_at, actor_id, create_time
+             status, paused, pause_reason, account_id, account_type, account_cipher,
+             account_masked, account_currency, account_network, account_holder,
+             account_qr_file_id, note, review_note, finance_note, reviewer_id, reviewed_at,
+             actor_id, create_time
       FROM crm_commission_withdrawal
       WHERE id = #{id}
       """)
@@ -124,6 +125,14 @@ public interface WithdrawalMapper {
           AND kol_id IN
           <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
+        <if test="q.bdIds != null">
+          AND kol_id IN
+          <foreach collection="q.bdIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="q.ownIds != null">
+          AND kol_id IN
+          <foreach collection="q.ownIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
       </where>
       ORDER BY create_time DESC, id DESC
       LIMIT #{q.limit} OFFSET #{q.offset}
@@ -142,6 +151,14 @@ public interface WithdrawalMapper {
         <if test="q.kolIds != null">
           AND kol_id IN
           <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="q.bdIds != null">
+          AND kol_id IN
+          <foreach collection="q.bdIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="q.ownIds != null">
+          AND kol_id IN
+          <foreach collection="q.ownIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
       </where>
       </script>
@@ -185,11 +202,12 @@ public interface WithdrawalMapper {
   @Insert(
       """
       INSERT INTO crm_commission_withdrawal_allocation (
-        id, withdrawal_id, order_item_id, order_no, item_name, sku_name, image_url, occupied_cny,
-        remaining_snapshot_cny, source_released_cny, create_time)
+        id, withdrawal_id, order_item_id, item_state_id, order_no, item_name, sku_name, image_url,
+        occupied_cny, remaining_snapshot_cny, source_released_cny, create_time)
       VALUES (
-        #{row.id}, #{row.withdrawalId}, #{row.orderItemId}, #{row.orderNo}, #{row.itemName},
-        #{row.skuName,jdbcType=VARCHAR}, #{row.imageUrl,jdbcType=VARCHAR}, #{row.occupied},
+        #{row.id}, #{row.withdrawalId}, #{row.orderItemId}, #{row.itemStateId,jdbcType=BIGINT},
+        #{row.orderNo}, #{row.itemName}, #{row.skuName,jdbcType=VARCHAR},
+        #{row.imageUrl,jdbcType=VARCHAR}, #{row.occupied},
         #{row.remainingSnapshot}, #{row.sourceReleased}, #{row.createTime})
       """)
   int insertAllocation(@Param("row") WithdrawalWrite.Allocation row);
@@ -210,6 +228,43 @@ public interface WithdrawalMapper {
 
   @Select("SELECT count(*) FROM crm_commission_withdrawal_allocation WHERE withdrawal_id = #{id}")
   Long countAllocations(@Param("id") long id);
+
+  @Insert(
+      """
+      INSERT INTO crm_commission_withdrawal_order (
+        id, withdrawal_id, order_id, order_no, occupied_cny, remaining_snapshot_cny, create_time)
+      VALUES (
+        #{row.id}, #{row.withdrawalId}, #{row.orderId}, #{row.orderNo}, #{row.occupied},
+        #{row.remainingSnapshot,jdbcType=NUMERIC}, #{row.createTime})
+      """)
+  int insertOrderSnapshot(@Param("row") WithdrawalWrite.OrderSnapshot row);
+
+  /** Order-level snapshot pagination (13.04): one row per order, id ascending. */
+  @Select(
+      """
+      SELECT id, order_id, order_no, occupied_cny, remaining_snapshot_cny
+      FROM crm_commission_withdrawal_order
+      WHERE withdrawal_id = #{id}
+      ORDER BY id
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  List<OrderSnapshotRow> pageOrderSnapshots(
+      @Param("id") long id, @Param("limit") int limit, @Param("offset") long offset);
+
+  @Select("SELECT count(*) FROM crm_commission_withdrawal_order WHERE withdrawal_id = #{id}")
+  Long countOrderSnapshots(@Param("id") long id);
+
+  /** Row-level allocations of one order snapshot, for the products[] of that order row. */
+  @Select(
+      """
+      SELECT id, order_item_id, order_no, item_name, sku_name, image_url, occupied_cny,
+             remaining_snapshot_cny, source_released_cny
+      FROM crm_commission_withdrawal_allocation
+      WHERE withdrawal_id = #{withdrawalId} AND order_no = #{orderNo}
+      ORDER BY id
+      """)
+  List<WithdrawalRows.AllocationRow> allocationsOfOrder(
+      @Param("withdrawalId") long withdrawalId, @Param("orderNo") String orderNo);
 
   @Select(
       """
@@ -319,29 +374,20 @@ public interface WithdrawalMapper {
       """)
   Long countActiveByAccount(@Param("accountId") long accountId);
 
-  /** Unified finance task list (13.03): the withdrawal branch (see design §6.2). */
+  /** Unified finance task list (13.03): the withdrawal branch (contract §6.2). */
   @Select(
       """
       <script>
-      SELECT id, kol_id, application_no AS task_no, 'COMMISSION_WITHDRAWAL' AS task_type,
-             status AS source_status,
-             CASE status
-               WHEN 'PENDING_REVIEW' THEN 'PENDING_REVIEW'
-               WHEN 'PENDING_PAYMENT' THEN 'PENDING_PAYMENT'
-               WHEN 'PAID' THEN 'PAID'
-               WHEN 'REJECTED' THEN 'REJECTED'
-               ELSE 'CANCELLED' END AS status,
-             amount_cny, create_time AS created_at
+      SELECT id, kol_id, application_no AS task_no, 'COMMISSION' AS task_type,
+             status, amount_cny, create_time AS created_at
       FROM crm_commission_withdrawal
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status IN
-          <foreach collection="q.withdrawalStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
-        </if>
-        <if test="q.kolIds != null">
+        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.withdrawalScope != null">
           AND kol_id IN
-          <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          <foreach collection="q.withdrawalScope" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
       </where>
       ORDER BY create_time DESC, id DESC
@@ -357,42 +403,30 @@ public interface WithdrawalMapper {
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status IN
-          <foreach collection="q.withdrawalStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
-        </if>
-        <if test="q.kolIds != null">
+        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.withdrawalScope != null">
           AND kol_id IN
-          <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          <foreach collection="q.withdrawalScope" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
       </where>
       </script>
       """)
   Long countWithdrawalTasks(@Param("q") FinanceTaskQuery query);
 
-  /** Unified finance task list (13.03): the prepay branch (see design §6.2). */
+  /** Unified finance task list (13.03): the prepay branch (contract §6.2). */
   @Select(
       """
       <script>
-      SELECT id, kol_id, prepay_no AS task_no, 'PREPAY' AS task_type, status AS source_status,
-             CASE status
-               WHEN 'WAITING_DETAILS' THEN 'PENDING_REVIEW'
-               WHEN 'PENDING_OPERATIONS_REVIEW' THEN 'PENDING_REVIEW'
-               WHEN 'PENDING_FINANCE_REVIEW' THEN 'PENDING_REVIEW'
-               WHEN 'APPROVED' THEN 'PENDING_PAYMENT'
-               WHEN 'PAID' THEN 'PAID'
-               WHEN 'REJECTED' THEN 'REJECTED'
-               ELSE 'CANCELLED' END AS status,
-             amount_cny, create_time AS created_at
+      SELECT id, kol_id, prepay_no AS task_no, 'PREPAY' AS task_type, status, amount_cny,
+             create_time AS created_at
       FROM crm_prepay
       <where>
         <if test="q.applicationNo != null">AND prepay_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status IN
-          <foreach collection="q.prepayStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
-        </if>
-        <if test="q.kolIds != null">
+        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.prepayScope != null">
           AND kol_id IN
-          <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          <foreach collection="q.prepayScope" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
       </where>
       ORDER BY create_time DESC, id DESC
@@ -408,17 +442,23 @@ public interface WithdrawalMapper {
       <where>
         <if test="q.applicationNo != null">AND prepay_no = #{q.applicationNo}</if>
         <if test="q.kolId != null">AND kol_id = #{q.kolId}</if>
-        <if test="q.status != null">AND status IN
-          <foreach collection="q.prepayStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
-        </if>
-        <if test="q.kolIds != null">
+        <if test="q.status != null">AND status = #{q.status}</if>
+        <if test="q.prepayScope != null">
           AND kol_id IN
-          <foreach collection="q.kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          <foreach collection="q.prepayScope" item="id" open="(" separator="," close=")">#{id}</foreach>
         </if>
       </where>
       </script>
       """)
   Long countPrepayTasks(@Param("q") FinanceTaskQuery query);
+
+  /** One persisted order-level snapshot row (13.04: 每单一行). */
+  record OrderSnapshotRow(
+      long id,
+      long orderId,
+      String orderNo,
+      BigDecimal occupiedCny,
+      BigDecimal remainingSnapshotCny) {}
 
   /** One order-item occupation of one withdrawal, as shown by the order chain. */
   record OccupationRow(

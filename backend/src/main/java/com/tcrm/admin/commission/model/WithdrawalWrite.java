@@ -39,6 +39,7 @@ public final class WithdrawalWrite {
       BigDecimal occupied,
       BigDecimal remainingSnapshot,
       BigDecimal sourceReleased,
+      Long itemStateId,
       Instant createTime) {}
 
   public record Decide(
@@ -47,6 +48,15 @@ public final class WithdrawalWrite {
   public record Withdraw(long id, long kolId, Instant now) {}
 
   public record Paid(long id, String financeNote, long operatorId, Instant now) {}
+
+  public record OrderSnapshot(
+      long id,
+      long withdrawalId,
+      long orderId,
+      String orderNo,
+      BigDecimal occupied,
+      BigDecimal remainingSnapshot,
+      Instant createTime) {}
 
   public record History(
       long id,

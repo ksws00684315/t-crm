@@ -140,6 +140,10 @@ const zhCN = {
       name: "审核提现",
       desc: "审核或驳回达人提现申请"
     },
+    "withdrawal:pay": {
+      name: "提现付款登记",
+      desc: "登记线下付款、打款前驳回与读取完整收款快照"
+    },
     "prepay:apply": {
       name: "申请预付",
       desc: "为达人提交或撤回预付申请"
@@ -322,7 +326,8 @@ const zhCN = {
     WITHDRAWAL_BELOW_MINIMUM: "提现金额低于最低提现金额。",
     WITHDRAWAL_INSUFFICIENT_AVAILABLE: "提现金额超过可用余额。",
     WITHDRAWAL_KOL_FROZEN: "该达人已被冻结提现，暂不能提交新申请。",
-    WITHDRAWAL_PREVIOUS_INVALID: "关联的原申请不是本人已驳回的提现申请。",
+    WITHDRAWAL_NOT_RESUBMITTABLE: "关联的原申请不是本人已驳回的提现申请。",
+    WITHDRAWAL_PAUSED: "该提现的来源核实未解除，暂不能付款。",
     WITHDRAWAL_PAYMENT_CONFLICT: "该提现的付款登记已存在或请求 UUID 冲突。",
     WITHDRAWAL_FROZEN_ALREADY: "该达人已处于提现冻结状态。",
     WITHDRAWAL_NOT_FROZEN: "该达人未处于提现冻结状态。",

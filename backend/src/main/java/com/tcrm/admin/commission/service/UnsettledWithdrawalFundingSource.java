@@ -6,8 +6,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Placeholder funding source until the settlement engine (task 62) merges: no order item is
- * verifiably released, so every withdrawal application is rejected with insufficient funds. Task 62
- * replaces this bean with the real implementation backed by commission item state.
+ * verifiably released, so every withdrawal application is rejected with insufficient funds and the
+ * estimated/unverified numbers stay at their neutral defaults. Task 62 replaces this bean with the
+ * real implementation backed by commission item state.
  */
 @Component
 public class UnsettledWithdrawalFundingSource implements WithdrawalFundingSource {
@@ -19,5 +20,20 @@ public class UnsettledWithdrawalFundingSource implements WithdrawalFundingSource
   @Override
   public BigDecimal frozenCny(long kolId) {
     return BigDecimal.ZERO.setScale(2);
+  }
+
+  @Override
+  public BigDecimal estimatedCny(long kolId) {
+    return BigDecimal.ZERO.setScale(2);
+  }
+
+  @Override
+  public long unverifiedCount(long kolId) {
+    return 0L;
+  }
+
+  @Override
+  public String configVersion(long kolId) {
+    return "0";
   }
 }

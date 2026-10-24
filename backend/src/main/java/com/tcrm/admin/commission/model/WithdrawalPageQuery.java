@@ -2,6 +2,16 @@ package com.tcrm.admin.commission.model;
 
 import java.util.List;
 
-/** Withdrawal page query; {@code kolIds} narrows an OWN-scope viewer to their own creators. */
+/**
+ * Withdrawal page query (contract §6.2): {@code kolId} exact, {@code kolIds} narrows the
+ * keyword/BD/OWN filters, and {@code ownIds} keeps an OWN-scope viewer on their own creators.
+ */
 public record WithdrawalPageQuery(
-    String applicationNo, Long kolId, String status, List<Long> kolIds, int limit, long offset) {}
+    String applicationNo,
+    Long kolId,
+    List<Long> kolIds,
+    List<Long> bdIds,
+    String status,
+    List<Long> ownIds,
+    int limit,
+    long offset) {}

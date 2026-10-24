@@ -111,6 +111,23 @@ class WithdrawalIT {
     public BigDecimal frozenCny(long kolId) {
       return new BigDecimal("0.00");
     }
+
+    @Override
+    public BigDecimal estimatedCny(long kolId) {
+      return rowsByKol.getOrDefault(kolId, List.of()).stream()
+          .map(FundingRow::releasedCny)
+          .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Override
+    public long unverifiedCount(long kolId) {
+      return 0L;
+    }
+
+    @Override
+    public String configVersion(long kolId) {
+      return "0";
+    }
   }
 
   @Autowired private JdbcTemplate jdbc;
@@ -182,8 +199,8 @@ class WithdrawalIT {
       long[] items = createReleasedItems(kolId, "350.00", "150.00");
       funding.release(
           kolId,
-          new FundingRow(items[0], new BigDecimal("350.00")),
-          new FundingRow(items[1], new BigDecimal("150.00")));
+          new FundingRow(items[0], 0L, new BigDecimal("350.00")),
+          new FundingRow(items[1], 0L, new BigDecimal("150.00")));
       // wallet 500.00 (credit 500.00 hand set through the production credit service)
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
@@ -195,8 +212,8 @@ class WithdrawalIT {
               Instant.now()));
 
       var conditions = withdrawals.conditions(TENANT_ID, kolId);
-      assertThat(conditions.availableCny()).isEqualTo("500.00");
-      assertThat(conditions.eligible()).isTrue();
+      assertThat(conditions.available()).isEqualTo("500.00");
+      assertThat(conditions.canApply()).isTrue();
 
       var applied =
           withdrawals.apply(
@@ -210,16 +227,22 @@ class WithdrawalIT {
                       "PAYPAL", PREFIX + "pay@example.invalid", "T63 Creator", "USD", null, null),
                   "t63 first"));
       assertThat(applied.status()).isEqualTo("PENDING_REVIEW");
-      assertThat(applied.applicationNo()).startsWith("CW");
-      // FIFO: item1 350.00 occupied with 0.00 left; item2 50.00 occupied with 100.00 left
+      assertThat(applied.applicationNo()).startsWith("W");
+      // FIFO: one order holds both items, 400.00 occupied with 0.00 left at the order level; the
+      // row-level detail keeps item1 350.00/0.00 and item2 50.00/100.00
       var orders = withdrawals.orders(superAdmin(operator), applied.id(), 1, 10);
-      assertThat(orders.total()).isEqualTo(2);
-      assertThat(orders.items().get(0).occupiedCny()).isEqualByComparingTo("350.00");
-      assertThat(orders.items().get(0).remainingSnapshotCny()).isEqualByComparingTo("0.00");
-      assertThat(orders.items().get(1).occupiedCny()).isEqualByComparingTo("50.00");
-      assertThat(orders.items().get(1).remainingSnapshotCny()).isEqualByComparingTo("100.00");
+      assertThat(orders.total()).isEqualTo(1);
+      assertThat(orders.items().getFirst().occupied()).isEqualTo("400.00");
+      // order-level remainder keeps both rows' leftovers: (350-350) + (150-50) = 100.00
+      assertThat(orders.items().getFirst().remainingSnapshot()).isEqualTo("100.00");
+      assertThat(orders.items().getFirst().products()).hasSize(2);
+      var detailRows = withdrawals.detail(superAdmin(operator), applied.id()).allocations();
+      assertThat(detailRows.get(0).occupiedCny()).isEqualTo("350.00");
+      assertThat(detailRows.get(0).remainingSnapshotCny()).isEqualTo("0.00");
+      assertThat(detailRows.get(1).occupiedCny()).isEqualTo("50.00");
+      assertThat(detailRows.get(1).remainingSnapshotCny()).isEqualTo("100.00");
       // occupation now holds wallet money: available 500.00 - 400.00 = 100.00
-      assertThat(withdrawals.conditions(TENANT_ID, kolId).availableCny()).isEqualTo("100.00");
+      assertThat(withdrawals.conditions(TENANT_ID, kolId).available()).isEqualTo("100.00");
       // a second application clears the minimum but exceeds the available 100.00
       assertThatThrownBy(
               () ->
@@ -248,6 +271,8 @@ class WithdrawalIT {
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
 
+      long voucherFileId =
+          withdrawals.uploadVoucher(superAdmin(operator), PREFIX + "receipt.png", voucherPng());
       var paid =
           withdrawals.pay(
               superAdmin(operator),
@@ -260,8 +285,8 @@ class WithdrawalIT {
                   "2026-10-25T12:00:00+08:00",
                   "PAYPAL",
                   null,
-                  "t63 rate 7.14"),
-              voucher());
+                  "t63 rate 7.14",
+                  voucherFileId));
       assertThat(paid.status()).isEqualTo("PAID");
       assertThat(paid.payment().actualCurrency()).isEqualTo("USD");
       // wallet 500.00 - 400.00 = 100.00; one negative COMMISSION_WITHDRAWAL ledger row
@@ -294,8 +319,8 @@ class WithdrawalIT {
                           "2026-10-25T12:00:00+08:00",
                           "PAYPAL",
                           null,
-                          "t63 rate 7.14"),
-                      voucher()))
+                          "t63 rate 7.14",
+                          voucherFileId)))
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.WITHDRAWAL_PAYMENT_CONFLICT));
@@ -331,7 +356,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "500.00");
-      funding.release(kolId, new FundingRow(items[0], new BigDecimal("500.00")));
+      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("500.00")));
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -351,7 +376,7 @@ class WithdrawalIT {
           withdrawals.review(superAdmin(IdWorker.getId()), applied.id(), "REJECT", "t63 wrong");
       assertThat(rejected.status()).isEqualTo("REJECTED");
       // rejected money is released: available 500.00 again
-      assertThat(withdrawals.conditions(TENANT_ID, kolId).availableCny()).isEqualTo("500.00");
+      assertThat(withdrawals.conditions(TENANT_ID, kolId).available()).isEqualTo("500.00");
       // a rejected application cannot be withdrawn either
       assertThatThrownBy(() -> withdrawals.withdraw(kol(kolId), applied.id()))
           .isInstanceOfSatisfying(
@@ -370,7 +395,7 @@ class WithdrawalIT {
                       "PAYPAL", PREFIX + "pay2@example.invalid", "T63 Creator", "USD", null, null),
                   "t63 fixed"));
       assertThat(resubmitted.previousId()).isEqualTo(applied.id());
-      assertThat(withdrawals.conditions(TENANT_ID, kolId).availableCny()).isEqualTo("250.00");
+      assertThat(withdrawals.conditions(TENANT_ID, kolId).available()).isEqualTo("250.00");
       // a creator withdrawal before the review releases the money again
       var open =
           withdrawals.apply(
@@ -384,7 +409,7 @@ class WithdrawalIT {
                       "PAYPAL", PREFIX + "pay3@example.invalid", "T63 Creator", "USD", null, null),
                   null));
       assertThat(withdrawals.withdraw(kol(kolId), open.id()).status()).isEqualTo("WITHDRAWN");
-      assertThat(withdrawals.conditions(TENANT_ID, kolId).availableCny()).isEqualTo("250.00");
+      assertThat(withdrawals.conditions(TENANT_ID, kolId).available()).isEqualTo("250.00");
     }
   }
 
@@ -395,7 +420,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "500.00");
-      funding.release(kolId, new FundingRow(items[0], new BigDecimal("500.00")));
+      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("500.00")));
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -432,7 +457,7 @@ class WithdrawalIT {
     kolId = createKol(bdA);
     try {
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], new BigDecimal("300.00")));
+      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -447,7 +472,8 @@ class WithdrawalIT {
       // the current BD sees the todo (07.05)
       assertThat(
               withdrawals
-                  .page(reviewerA, new WithdrawalService.Filter(null, null, null, 1, 20))
+                  .page(
+                      reviewerA, new WithdrawalService.Filter(null, null, null, null, null, 1, 20))
                   .total())
           .isEqualTo(1);
       // after the transfer the open todo belongs to the new BD only
@@ -458,12 +484,14 @@ class WithdrawalIT {
           kolId);
       assertThat(
               withdrawals
-                  .page(reviewerA, new WithdrawalService.Filter(null, null, null, 1, 20))
+                  .page(
+                      reviewerA, new WithdrawalService.Filter(null, null, null, null, null, 1, 20))
                   .total())
           .isZero();
       assertThat(
               withdrawals
-                  .page(reviewerB, new WithdrawalService.Filter(null, null, null, 1, 20))
+                  .page(
+                      reviewerB, new WithdrawalService.Filter(null, null, null, null, null, 1, 20))
                   .total())
           .isEqualTo(1);
       assertThatThrownBy(() -> withdrawals.detail(reviewerA, applied.id()))
@@ -489,7 +517,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], new BigDecimal("300.00")));
+      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -503,7 +531,7 @@ class WithdrawalIT {
       long otherKol = IdWorker.getId();
       createKolInTenant(2L, otherKol);
       long otherItem = createReleasedItemsInTenant(2L, otherKol);
-      funding.release(otherKol, new FundingRow(otherItem, new BigDecimal("300.00")));
+      funding.release(otherKol, new FundingRow(otherItem, 0L, new BigDecimal("300.00")));
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               2L,
@@ -545,7 +573,9 @@ class WithdrawalIT {
       // company 1's list never sees the other company's application
       assertThat(
               withdrawals
-                  .page(superAdmin(operator), new WithdrawalService.Filter(null, null, null, 1, 20))
+                  .page(
+                      superAdmin(operator),
+                      new WithdrawalService.Filter(null, null, null, null, null, 1, 20))
                   .items()
                   .stream()
                   .map(WithdrawalService.AdminRow::id))
@@ -565,7 +595,7 @@ class WithdrawalIT {
     kolId = createKol(operator);
     try {
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], new BigDecimal("300.00")));
+      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
       TenantScope.runCompany(
           TENANT_ID,
           () ->
@@ -611,6 +641,9 @@ class WithdrawalIT {
               TENANT_ID,
               () -> {
                 withdrawals.review(superAdmin(IdWorker.getId()), applied.id(), "APPROVE", null);
+                long outboxVoucherId =
+                    withdrawals.uploadVoucher(
+                        superAdmin(operator), PREFIX + "receipt.png", voucherPng());
                 return withdrawals.pay(
                     superAdmin(operator),
                     applied.id(),
@@ -622,8 +655,8 @@ class WithdrawalIT {
                         "2026-10-25T12:00:00+08:00",
                         "BANK",
                         null,
-                        null),
-                    voucher());
+                        null,
+                        outboxVoucherId));
               });
       assertThat(paid.status()).isEqualTo("PAID");
       outbox.deliverOne();
@@ -660,9 +693,8 @@ class WithdrawalIT {
             null));
   }
 
-  private static WithdrawalService.UploadedFile voucher() {
-    byte[] png = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 't', '6', '3'};
-    return new WithdrawalService.UploadedFile(PREFIX + "receipt.png", png);
+  private static byte[] voucherPng() {
+    return new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 't', '6', '3'};
   }
 
   private long operatorId() {
