@@ -1,7 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
 import type { OrderDetailVO, OrderVO, Role } from "@/api/types";
@@ -124,8 +124,12 @@ async function mountPage() {
     attachTo: document.body
   });
   await flushPromises();
+  mountedRouter = router;
   return wrapper;
 }
+
+/** The router of the most recent mount, for tests that follow a navigation (R-17). */
+let mountedRouter: Router | undefined;
 
 function element(testId: string): DOMWrapper<Element> {
   const matches = [...document.body.querySelectorAll(`[data-test="${testId}"]`)];
@@ -174,17 +178,18 @@ describe("order list page (task 40)", () => {
     const labels = wrapper.findAll("th").map(item => item.text());
     for (const header of [
       "订单号",
-      "渠道",
       "店铺",
       "达人",
       "订单状态",
       "退款状态",
       "支付金额",
-      "运费",
-      "支付时间",
-      "创建时间"
+      "支付时间"
     ]) {
       expect(labels).toContain(header);
+    }
+    // L-002: channel, freight and create time start hidden (column settings can show them).
+    for (const hidden of ["渠道", "运费", "创建时间"]) {
+      expect(labels).not.toContain(hidden);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功", "无退款"]);
     // Shop and creator follow the "name (code)" form; unattributed shows "-".
@@ -227,7 +232,7 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("disables the chain action for unattributed orders and opens a tab otherwise", async () => {
+  it("disables the chain action for unattributed orders and opens the chain tab otherwise (R-17)", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     const wrapper = await mountPage();
@@ -235,9 +240,11 @@ describe("order list page (task 40)", () => {
     expect(buttons[1].disabled).toBe(true);
     expect(buttons[0].disabled).toBe(false);
     buttons[0].click();
-    await flushPromises();
-    expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toContain("/order/orders/101/chain");
+    // R-17: the chain opens inside the tab system (router.push), never a new browser tab.
+    await vi.waitFor(() =>
+      expect(mountedRouter?.currentRoute.value.path).toBe("/order/orders/101/chain")
+    );
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
     wrapper.unmount();
   });

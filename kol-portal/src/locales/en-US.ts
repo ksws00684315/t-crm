@@ -86,6 +86,7 @@ const enUS = {
   },
   items: {
     title: "My items",
+    searchLabel: "Product name",
     searchPlaceholder: "Search by item name",
     search: "Search",
     loadFailed: "Could not load your items. Please try again.",

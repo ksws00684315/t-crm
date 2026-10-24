@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
+import { reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
 import type { RefundDetailVO, RefundVO, Role } from "@/api/types";
@@ -11,6 +12,11 @@ import RefundPage from "../refund/index.vue";
 
 vi.mock("@/api/order/order");
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: routeQuery })
+}));
+/** Reactive so that mutating it drives the page's route.query watcher (task 59). */
+const routeQuery = reactive<Record<string, string | undefined>>({});
 
 /**
  * The refund query page (task 40 §3): filters by refund no., order no. and channel (status and
@@ -104,9 +110,26 @@ function statusTags(): HTMLElement[] {
 }
 
 describe("refund query page (task 40)", () => {
+  it("prefills the refund number from the route and re-filters when it changes (task 59)", async () => {
+    routeQuery.refundNo = " R20261021001 ";
+    const wrapper = await mountPage();
+    expect((element("filter-refund-no").element as HTMLInputElement).value).toBe("R20261021001");
+    expect(orderApi.listRefunds).toHaveBeenCalledWith(
+      expect.objectContaining({ refundNo: "R20261021001" })
+    );
+
+    routeQuery.refundNo = "R20261021002";
+    await flushPromises();
+    expect(orderApi.listRefunds).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, refundNo: "R20261021002" })
+    );
+    wrapper.unmount();
+  });
+
   beforeEach(() => {
     document.body.innerHTML = "";
     localStorage.clear();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     vi.mocked(orderApi.listRefunds).mockReset();
     vi.mocked(orderApi.getRefund).mockReset();
     vi.mocked(orderApi.getOrder).mockReset();
@@ -124,15 +147,21 @@ describe("refund query page (task 40)", () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    expect(labels).toContain("退款类型");
+    // R-06: channel, type and finish time start hidden; status stays visible.
+    expect(labels).not.toContain("退款类型");
     expect(labels).toContain("退款状态");
     expect(labels).not.toContain("退款类型/状态");
     const tags = statusTags();
     expect(tags[0].textContent).toBe("退款中");
     expect(tags[0].className).not.toContain("el-tag--success");
     expect(tags[1].textContent).toBe("退款成功");
-    expect(wrapper.text()).toContain("退货退款");
-    expect(wrapper.text()).toContain("仅退款");
+    // The type column exists but starts hidden (R-06); its values stay in the column settings.
+    const typeColumn = wrapper
+      .findComponent({ name: "DataTable" })
+      .props("columns")
+      .find((column: { key: string }) => column.key === "refundType");
+    expect(typeColumn).toBeTruthy();
+    expect((typeColumn as { defaultHidden?: boolean }).defaultHidden).toBe(true);
     expect(wrapper.text()).toContain("t40 Shop（S001）");
     expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
     wrapper.unmount();

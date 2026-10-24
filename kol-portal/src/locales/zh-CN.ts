@@ -86,6 +86,7 @@ const zhCN: MessageSchema = {
   },
   items: {
     title: "我的商品",
+    searchLabel: "商品名称",
     searchPlaceholder: "按商品名称搜索",
     search: "搜索",
     loadFailed: "商品加载失败，请重试。",

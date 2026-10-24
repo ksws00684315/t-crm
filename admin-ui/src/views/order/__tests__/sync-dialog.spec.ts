@@ -4,7 +4,8 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
-import type { OrderSyncStateVO, Role, SyncFailureVO } from "@/api/types";
+import * as shopApi from "@/api/product/shop";
+import type { OrderSyncStateVO, Role, ShopOptionVO, SyncFailureVO } from "@/api/types";
 import { useUserStore } from "@/stores/user";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
@@ -12,6 +13,7 @@ import { notifyError } from "@/utils/notify";
 import SyncStatesDialog from "../SyncStatesDialog.vue";
 
 vi.mock("@/api/order/order");
+vi.mock("@/api/product/shop");
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 /**
@@ -113,6 +115,14 @@ describe("sync states dialog (task 40)", () => {
     vi.mocked(orderApi.listSyncStates).mockResolvedValue([shop]);
     vi.mocked(orderApi.listSyncFailures).mockResolvedValue(failures);
     vi.mocked(orderApi.deleteSyncFailures).mockResolvedValue(3);
+    const shopOption: ShopOptionVO = {
+      id: "1",
+      shopCode: "SHOP-1",
+      shopName: "t40 Shop",
+      channel: "WEIDIAN",
+      status: 1
+    };
+    vi.mocked(shopApi.listShops).mockResolvedValue([shopOption]);
   });
 
   it("shows an order and a refund row per shop with the monitoring fields", async () => {
@@ -156,6 +166,11 @@ describe("sync states dialog (task 40)", () => {
     failureTab?.click();
     await flushPromises();
     expect(vi.mocked(orderApi.listSyncFailures)).toHaveBeenCalledTimes(1);
+    // L-003: the failure shops read "name (code)" via the shop options. The failures table is
+    // the second one in the dialog (the states tab keeps its own table).
+    const bodies = [...document.body.querySelectorAll(".el-table__body")];
+    const shopCell = bodies[bodies.length - 1]?.textContent ?? "";
+    expect(shopCell).toContain("t40 Shop（SHOP-1）");
     const taskLinks = [
       ...document.body.querySelectorAll<HTMLButtonElement>('[data-test="failure-task"]')
     ].filter(item => item.closest("tr") !== null);
@@ -217,5 +232,18 @@ describe("sync states dialog (task 40)", () => {
     prompt.mockRestore();
     confirm.mockRestore();
     success.mockRestore();
+  });
+
+  it("keeps the plain shop name when the shop options cannot load (L-003 fallback)", async () => {
+    vi.mocked(shopApi.listShops).mockRejectedValue(new Error("no product:view"));
+    const { wrapper } = await mountDialog();
+    const tabs = [...document.body.querySelectorAll<HTMLElement>(".el-tabs__item")];
+    tabs.find(tab => tab.textContent?.includes("失败任务"))?.click();
+    await flushPromises();
+    const bodies = [...document.body.querySelectorAll(".el-table__body")];
+    const shopCell = bodies[bodies.length - 1]?.textContent ?? "";
+    expect(shopCell).toContain("t40 Shop");
+    expect(shopCell).not.toContain("SHOP-1");
+    wrapper.unmount();
   });
 });
