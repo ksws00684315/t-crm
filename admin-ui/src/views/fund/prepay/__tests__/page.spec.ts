@@ -12,9 +12,11 @@ describe("finance prepay tasks", () => {
   it.each([
     ["WAITING_DETAILS", "prepay:apply", "7", "完善申请"],
     ["WAITING_DETAILS", "prepay:apply", "8", "查看"],
-    ["PENDING_OPERATIONS_REVIEW", "prepay:review", "7", "审批"],
+    ["PENDING_OPERATIONS_REVIEW", "prepay:review", "7", "查看"],
+    ["PENDING_OPERATIONS_REVIEW", "prepay:review", "8", "审批"],
     ["PENDING_OPERATIONS_REVIEW", "prepay:finance-review", "7", "查看"],
-    ["PENDING_FINANCE_REVIEW", "prepay:finance-review", "7", "审批"],
+    ["PENDING_FINANCE_REVIEW", "prepay:finance-review", "7", "查看"],
+    ["PENDING_FINANCE_REVIEW", "prepay:finance-review", "8", "审批"],
     ["PENDING_FINANCE_REVIEW", "prepay:review", "7", "查看"],
     ["APPROVED", "prepay:pay", "7", "登记付款"],
     ["APPROVED", "prepay:review", "7", "查看"],
