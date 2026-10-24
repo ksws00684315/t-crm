@@ -63,7 +63,8 @@ export const routes: RouteRecordRaw[] = [
       {
         path: "items",
         name: "Items",
-        redirect: "/"
+        component: () => import("@/views/items/index.vue"),
+        meta: { title: "route.items" }
       }
     ]
   },

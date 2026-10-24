@@ -275,6 +275,7 @@ export function getFundSummary() {
   if (isDemoMode) return Promise.resolve({ fundSummary: demoFunds });
   return http
     .request<{
+      asOf: string;
       income: {
         estimated: string;
         available: string;
@@ -288,7 +289,7 @@ export function getFundSummary() {
         commissionPaid: string;
       };
     }>({ method: "GET", url: "/commissions/overview" })
-    .then(({ income }) => ({
+    .then(({ income, asOf }) => ({
       fundSummary: {
         totalIncomeCny: income.paid,
         commissionIncomeCny: income.commissionPaid,
@@ -305,7 +306,7 @@ export function getFundSummary() {
         availableCny: income.available,
         prepayDeductionCny: income.deducted,
         prepayOutstandingCny: income.pendingDeduction,
-        asOf: new Date().toISOString()
+        asOf
       }
     }));
 }
@@ -334,9 +335,34 @@ export interface WithdrawalRecord {
   account: WithdrawalAccountOption;
 }
 
-export function getWithdrawalConditions() {
-  if (isDemoMode) return Promise.resolve({ currency: "CNY", minimum: "200.00" });
-  return http.request<{ currency: string; minimum: string }>({
+export interface WithdrawalConditions {
+  currency: string;
+  minimum: string;
+  version: number;
+  available: string;
+  occupied: string;
+  frozen: string;
+  estimated: string;
+  withdrawalFrozen: boolean;
+  canApply: boolean;
+  unverifiedCount: number;
+}
+
+export function getWithdrawalConditions(): Promise<WithdrawalConditions> {
+  if (isDemoMode)
+    return Promise.resolve({
+      currency: "CNY",
+      minimum: "200.00",
+      version: 1,
+      available: demoFunds.availableCny,
+      occupied: demoFunds.withdrawingCny,
+      frozen: demoFunds.frozenCny,
+      estimated: demoFunds.estimatedCommissionCny,
+      withdrawalFrozen: false,
+      canApply: true,
+      unverifiedCount: 0
+    });
+  return http.request<WithdrawalConditions>({
     method: "GET",
     url: "/withdrawals/conditions"
   });
@@ -414,6 +440,7 @@ export function submitWithdrawal(data: {
     qrFileId?: number;
   };
   note: string;
+  previousId?: string;
   idempotencyKey: string;
 }) {
   if (isDemoMode) {

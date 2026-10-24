@@ -254,7 +254,7 @@ describe("Copy job page", () => {
 
   it("freezes the result tags against flex shrinking and gives the hint its own line (R-01)", () => {
     // jsdom applies no CSS; assert the protective rules in the component source instead.
-    const source = readFileSync(resolve(__dirname, "../index.vue"), "utf8");
+    const source = readFileSync(resolve(__dirname, "../index.vue"), "utf8").replace(/\r\n/g, "\n");
     expect(source).toContain(".copy-job__result :deep(.el-tag) {\n  flex: none;");
     expect(source).toContain("white-space: nowrap");
     expect(source).toContain(".copy-job__hint {\n  flex-basis: 100%;");

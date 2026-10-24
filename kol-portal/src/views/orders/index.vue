@@ -70,14 +70,14 @@ function rate(row: CreatorOrder) {
   const number = Number(value);
   return Number.isFinite(number) ? `${(number * 100).toFixed(2)}%` : value;
 }
-function statusType(value?: SettlementStatus | null) {
+function statusType(value?: SettlementStatus | null): "success" | "warning" | "info" | "primary" {
   return (
     {
       WITHDRAWN: "success",
       FROZEN: "warning",
       INVALID: "info",
       WITHDRAWING: "primary",
-      WITHDRAWABLE: ""
+      WITHDRAWABLE: "success"
     } as const
   )[value ?? "INVALID"];
 }
@@ -222,11 +222,9 @@ onMounted(load);
         commission(row) == null ? "—" : money(commission(row)!)
       }}</template>
       <template #cell-settlementStatus="{ row }"
-        ><el-tag
-          v-if="row.settlementStatus"
-          :type="statusType(row.settlementStatus)"
-          :class="`settlement--${row.settlementStatus.toLowerCase()}`"
-          >{{ t(`orders.settlement.${row.settlementStatus}`) }}</el-tag
+        ><el-tag v-if="row.settlementStatus" :type="statusType(row.settlementStatus)">{{
+          t(`orders.settlement.${row.settlementStatus}`)
+        }}</el-tag
         ><el-tooltip v-if="hasSplitSettlement(row)" :content="t('orders.splitHint')"
           ><el-tag type="warning">{{ t("orders.split") }}</el-tag></el-tooltip
         ><span v-if="!row.settlementStatus">—</span></template
@@ -301,31 +299,6 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-:deep(.settlement--withdrawn) {
-  --el-tag-bg-color: #eaf7ef;
-  --el-tag-border-color: #b8e4c7;
-  --el-tag-text-color: #247a43;
-}
-:deep(.settlement--withdrawing) {
-  --el-tag-bg-color: #eaf2ff;
-  --el-tag-border-color: #bdd2f6;
-  --el-tag-text-color: #285fa8;
-}
-:deep(.settlement--frozen) {
-  --el-tag-bg-color: #fff5df;
-  --el-tag-border-color: #efd79b;
-  --el-tag-text-color: #946b12;
-}
-:deep(.settlement--invalid) {
-  --el-tag-bg-color: #f0f1f3;
-  --el-tag-border-color: #d6d8dc;
-  --el-tag-text-color: #69707b;
-}
-:deep(.settlement--withdrawable) {
-  --el-tag-bg-color: #f3eaff;
-  --el-tag-border-color: #d8c3f5;
-  --el-tag-text-color: #7644a8;
 }
 .order-cards,
 .orders-pager {

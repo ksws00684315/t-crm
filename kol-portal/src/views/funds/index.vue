@@ -13,6 +13,7 @@ import {
   type FundRecord,
   type FundSummary,
   type WithdrawalAccountOption,
+  type WithdrawalConditions,
   type WithdrawalRecord
 } from "@/api/creator";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -24,7 +25,7 @@ const summary = ref<FundSummary | null>(null);
 const records = ref<FundRecord[]>([]);
 const withdrawals = ref<WithdrawalRecord[]>([]);
 const accounts = ref<WithdrawalAccountOption[]>([]);
-const conditions = ref<{ currency: string; minimum: string } | null>(null);
+const conditions = ref<WithdrawalConditions | null>(null);
 const loading = ref(false);
 const failure = ref(false);
 const page = ref(1);
@@ -35,6 +36,7 @@ const submitting = ref(false);
 const applyError = ref("");
 const form = reactive({
   amount: "",
+  previousId: "",
   payoutAccountId: "",
   note: "",
   type: "PAYPAL" as "PAYPAL" | "USDT",
@@ -101,7 +103,7 @@ async function load() {
     loading.value = false;
   }
 }
-async function openApply() {
+async function openApply(previousId = "") {
   applyError.value = "";
   try {
     const [limits, options] = await Promise.all([
@@ -111,6 +113,9 @@ async function openApply() {
     conditions.value = limits;
     accounts.value = options;
     form.payoutAccountId = options.find(option => option.id)?.id ?? "manual";
+    const rejected = withdrawals.value.find(item => item.id === previousId);
+    form.previousId = previousId;
+    form.amount = rejected?.amount ?? "";
     applyVisible.value = true;
   } catch {
     applyError.value = t("funds.loadFailed");
@@ -132,6 +137,10 @@ async function submit() {
   }
   if (!form.payoutAccountId) {
     applyError.value = t("funds.accountRequired");
+    return;
+  }
+  if (conditions.value?.canApply === false) {
+    applyError.value = conditionBlockMessage.value;
     return;
   }
   if (manualAccount.value) {
@@ -159,10 +168,12 @@ async function submit() {
           }
         : { payoutAccountId: form.payoutAccountId }),
       note: form.note,
+      ...(form.previousId ? { previousId: form.previousId } : {}),
       idempotencyKey: crypto.randomUUID()
     });
     applyVisible.value = false;
     form.amount = "";
+    form.previousId = "";
     form.note = "";
     form.account = "";
     form.holder = "";
@@ -197,6 +208,12 @@ function pageChanged(value: number) {
 function recordType(value: FundRecord["type"]) {
   return value === "PREPAY" ? t("funds.prepay") : t("funds.withdrawal");
 }
+const conditionBlockMessage = computed(() => {
+  if (conditions.value?.withdrawalFrozen) return t("funds.withdrawalFrozen");
+  if (conditions.value && conditions.value.unverifiedCount > 0)
+    return t("funds.unverifiedBlocked", { count: conditions.value.unverifiedCount });
+  return t("funds.cannotApply");
+});
 onMounted(load);
 </script>
 
@@ -329,6 +346,14 @@ onMounted(load);
             >
               {{ t("funds.withdrawAction") }}
             </el-button>
+            <el-button
+              v-if="item.status === 'REJECTED'"
+              link
+              type="primary"
+              @click="openApply(item.id)"
+            >
+              {{ t("funds.resubmit") }}
+            </el-button>
           </div>
         </div>
         <el-empty v-else :description="t('funds.noWithdrawals')" />
@@ -337,6 +362,30 @@ onMounted(load);
     <el-dialog v-model="applyVisible" :title="t('funds.applyTitle')" width="520px" destroy-on-close>
       <el-alert v-if="applyError" type="error" :closable="false" :title="applyError" />
       <el-form label-position="top" @submit.prevent="submit">
+        <div v-if="conditions" class="conditions-summary" data-test="withdrawal-conditions">
+          <p>{{ t("funds.availableBalance", { amount: money(conditions.available) }) }}</p>
+          <p>{{ t("funds.occupiedBalance", { amount: money(conditions.occupied) }) }}</p>
+          <p>{{ t("funds.frozenBalance", { amount: money(conditions.frozen) }) }}</p>
+          <p>{{ t("funds.estimatedBalance", { amount: money(conditions.estimated) }) }}</p>
+          <el-alert
+            v-if="conditions.withdrawalFrozen"
+            type="warning"
+            :closable="false"
+            :title="t('funds.withdrawalFrozen')"
+          />
+          <el-alert
+            v-else-if="conditions.unverifiedCount > 0"
+            type="warning"
+            :closable="false"
+            :title="t('funds.unverifiedBlocked', { count: conditions.unverifiedCount })"
+          />
+          <el-alert
+            v-else-if="!conditions.canApply"
+            type="warning"
+            :closable="false"
+            :title="t('funds.cannotApply')"
+          />
+        </div>
         <el-form-item :label="t('funds.amount')"
           ><el-input v-model="form.amount" inputmode="decimal"
             ><template #append>{{ conditions?.currency ?? "CNY" }}</template></el-input
@@ -395,9 +444,13 @@ onMounted(load);
       </el-form>
       <template #footer
         ><el-button @click="applyVisible = false">{{ t("common.cancel") }}</el-button
-        ><el-button type="primary" :loading="submitting" @click="submit">{{
-          t("funds.submit")
-        }}</el-button></template
+        ><el-button
+          type="primary"
+          :loading="submitting"
+          :disabled="conditions?.canApply === false"
+          @click="submit"
+          >{{ t("funds.submit") }}</el-button
+        ></template
       >
     </el-dialog>
   </section>
@@ -489,6 +542,19 @@ h1 {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-help);
+}
+.conditions-summary {
+  display: grid;
+  gap: var(--tcrm-space-1);
+  margin-bottom: var(--tcrm-space-4);
+  padding: var(--tcrm-space-3);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-muted);
+}
+.conditions-summary p {
+  margin: 0;
+  color: var(--tcrm-color-text-secondary);
 }
 .summary-notes p {
   margin: 0;

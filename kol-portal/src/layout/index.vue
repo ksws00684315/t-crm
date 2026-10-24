@@ -285,7 +285,7 @@ async function signOut() {
     flex: 1;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
+    gap: var(--tcrm-space-1);
     min-width: 0;
     min-height: 52px;
     margin: 0;
@@ -307,8 +307,10 @@ async function signOut() {
     display: none;
   }
   .shell__main {
+    --kol-mobile-nav-height: 68px;
     overflow: visible;
-    padding: var(--tcrm-space-3) var(--tcrm-space-3) calc(68px + env(safe-area-inset-bottom));
+    padding: var(--tcrm-space-3) var(--tcrm-space-3)
+      calc(var(--kol-mobile-nav-height) + env(safe-area-inset-bottom));
   }
 }
 </style>

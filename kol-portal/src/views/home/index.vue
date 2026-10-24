@@ -164,6 +164,7 @@ onMounted(load);
             </div>
           </div>
           <RouterLink to="/funds" class="fund-link">{{ t("home.viewFunds") }} →</RouterLink>
+          <RouterLink to="/items" class="fund-link">{{ t("home.viewItems") }} →</RouterLink>
         </el-card>
       </div>
       <p class="as-of">
@@ -300,13 +301,13 @@ h1 {
   background: var(--tcrm-color-success);
 }
 .withdrawing {
-  background: #3478c8;
+  background: var(--tcrm-color-primary);
 }
 .frozen {
   background: var(--tcrm-color-warning);
 }
 .available {
-  background: #7251c7;
+  background: var(--tcrm-color-success);
 }
 .fund-link {
   display: inline-block;
