@@ -14,11 +14,14 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.kol.model.KolPromotionRecordDO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.system.api.ExternalAuditApi;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -30,14 +33,18 @@ import org.mockito.ArgumentCaptor;
 class KolPortalProfileServiceTest {
   @BeforeAll
   static void metadata() {
-    TableInfoHelper.initTableInfo(
-        new MapperBuilderAssistant(new MybatisConfiguration(), ""), KolDO.class);
+    for (var type : List.of(KolDO.class, KolPromotionRecordDO.class)) {
+      TableInfoHelper.initTableInfo(
+          new MapperBuilderAssistant(new MybatisConfiguration(), ""), type);
+    }
   }
 
   private final KolMapper kols = mock(KolMapper.class);
+  private final KolPromotionRecordMapper promotionRecords = mock(KolPromotionRecordMapper.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
-  private final KolPortalProfileService service = new KolPortalProfileService(kols, current, audit);
+  private final KolPortalProfileService service =
+      new KolPortalProfileService(kols, promotionRecords, current, audit);
 
   @BeforeEach
   void setUp() {
@@ -48,13 +55,49 @@ class KolPortalProfileServiceTest {
   }
 
   @Test
-  void shouldExposePrimarySocialStatusesAndNullCommissionFields() {
+  void shouldExposePrimarySocialStatusesWithNullRateFields_whenNoRateIsConfigured() {
     KolPortalProfileDTO profile = service.get();
 
     assertThat(profile)
         .isEqualTo(
             new KolPortalProfileDTO(
                 "KOL0700", "TikTok", "@alice", "APPROVED", "NORMAL", "PROMOTING", null, null));
+  }
+
+  @Test
+  void shouldExposeTheDefaultRateAndItsLatestConfigEffectiveTime() {
+    KolDO kol = kol();
+    kol.setDefaultRate(new BigDecimal("0.1550"));
+    when(kols.selectById(700L)).thenReturn(kol);
+    Instant effective = Instant.parse("2026-10-01T00:00:00Z");
+    KolPromotionRecordDO config = new KolPromotionRecordDO();
+    config.setKolId(700L);
+    config.setChangeType("CONFIG");
+    config.setEffectiveTime(effective);
+    when(promotionRecords.selectList(any())).thenReturn(List.of(config));
+
+    KolPortalProfileDTO profile = service.get();
+
+    assertThat(profile.commissionRate()).isEqualTo("15.50");
+    assertThat(profile.rateEffectiveAt()).isEqualTo(effective);
+  }
+
+  @Test
+  void shouldReadTheEffectiveTimeEvenWithoutADefaultRate() {
+    KolDO kol = kol();
+    kol.setDefaultRate(null);
+    when(kols.selectById(700L)).thenReturn(kol);
+    Instant effective = Instant.parse("2026-09-01T00:00:00Z");
+    KolPromotionRecordDO config = new KolPromotionRecordDO();
+    config.setKolId(700L);
+    config.setChangeType("CONFIG");
+    config.setEffectiveTime(effective);
+    when(promotionRecords.selectList(any())).thenReturn(List.of(config));
+
+    KolPortalProfileDTO profile = service.get();
+
+    assertThat(profile.commissionRate()).isNull();
+    assertThat(profile.rateEffectiveAt()).isEqualTo(effective);
   }
 
   @Test

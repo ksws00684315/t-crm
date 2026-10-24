@@ -1,13 +1,19 @@
 package com.tcrm.admin.kol.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.model.KolDO;
+import com.tcrm.admin.kol.model.KolPromotionRecordDO;
+import com.tcrm.admin.kol.model.PromotionChangeType;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.system.api.ExternalAuditApi;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,17 +25,23 @@ import org.springframework.transaction.annotation.Transactional;
  * id and tenant always come from the session, never from the request. Validation keeps the
  * registration pairing rule (platform and handle are set or cleared together) and the field length
  * bounds; the platform value itself stays free-form so profiles saved from the back office keep
- * passing validation.
+ * passing validation. The promotion rate is the KOL's own back-office data ({@code default_rate}
+ * and the latest CONFIG record), so it is served here rather than through the commission module.
  */
 @Service
 public class KolPortalProfileService {
   private final KolMapper kols;
+  private final KolPromotionRecordMapper promotionRecords;
   private final CurrentKolContext current;
   private final ExternalAuditApi audit;
 
   public KolPortalProfileService(
-      KolMapper kols, CurrentKolContext current, ExternalAuditApi audit) {
+      KolMapper kols,
+      KolPromotionRecordMapper promotionRecords,
+      CurrentKolContext current,
+      ExternalAuditApi audit) {
     this.kols = kols;
+    this.promotionRecords = promotionRecords;
     this.current = current;
     this.audit = audit;
   }
@@ -42,6 +54,7 @@ public class KolPortalProfileService {
             .filter(SocialAccountDTO::primary)
             .findFirst()
             .orElse(null);
+    Instant rateEffectiveAt = latestConfigEffectiveTime(account.id());
     return new KolPortalProfileDTO(
         kol.getKolCode(),
         primary == null ? null : primary.platform(),
@@ -49,8 +62,8 @@ public class KolPortalProfileService {
         kol.getReviewStatus(),
         loginStatus(kol),
         kol.getRelationStatus(),
-        null,
-        null);
+        percentText(kol.getDefaultRate()),
+        rateEffectiveAt);
   }
 
   /** Only the nickname and the existing primary social-account slot can change here. */
@@ -100,6 +113,26 @@ public class KolPortalProfileService {
         "/kol-api/me",
         clientIp,
         "{\"kolId\":\"" + account.id() + "\"}");
+  }
+
+  /** Effective time of the newest promotion-config record, or null when none exists. */
+  private Instant latestConfigEffectiveTime(long kolId) {
+    List<KolPromotionRecordDO> records =
+        promotionRecords.selectList(
+            new LambdaQueryWrapper<KolPromotionRecordDO>()
+                .eq(KolPromotionRecordDO::getKolId, kolId)
+                .eq(KolPromotionRecordDO::getChangeType, PromotionChangeType.CONFIG.name())
+                .isNotNull(KolPromotionRecordDO::getEffectiveTime)
+                .orderByDesc(KolPromotionRecordDO::getEffectiveTime)
+                .orderByDesc(KolPromotionRecordDO::getId));
+    return records.isEmpty() ? null : records.getFirst().getEffectiveTime();
+  }
+
+  /** Default rate as percentage text with two decimals ("15.50"); null stays null. */
+  private static String percentText(BigDecimal rate) {
+    return rate == null
+        ? null
+        : rate.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString();
   }
 
   private KolDO requireOwnRow(KolAccountDTO account, boolean lock) {

@@ -158,6 +158,19 @@ class KolOrderServiceTest {
   }
 
   @Test
+  void shouldEscapeLikeWildcards_inKeywordFilters() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+
+    service.page(new KolOrderFilterDTO(null, null, null, "50%_1\\", null, 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("ESCAPE");
+    assertThat(params(query.getValue()).values()).contains("%50\\%\\_1\\\\%");
+  }
+
+  @Test
   void shouldReturnAnEmptyPageWithoutReadingLines_whenNothingMatches() {
     when(orders.selectPage(any(), any())).thenReturn(page());
 

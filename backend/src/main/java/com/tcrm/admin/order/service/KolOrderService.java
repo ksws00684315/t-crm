@@ -58,14 +58,15 @@ public class KolOrderService {
             .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
             .orderByDesc(OrderDO::getPayTime, OrderDO::getId);
     if (notBlank(filter.orderNo())) {
-      query.apply("weidian_order_id ILIKE {0}", "%" + filter.orderNo().strip() + "%");
+      query.apply(
+          "weidian_order_id ILIKE {0} ESCAPE '\\'", "%" + likeLiteral(filter.orderNo()) + "%");
     }
     if (notBlank(filter.productName())) {
       // Only the creator's own lines count; other items of the same order stay invisible.
       query.exists(
           "SELECT 1 FROM crm_order_item oi WHERE oi.order_id = crm_order.id"
-              + " AND oi.kol_id = {0} AND oi.item_name ILIKE {1}",
-          kol.id(), "%" + filter.productName().strip() + "%");
+              + " AND oi.kol_id = {0} AND oi.item_name ILIKE {1} ESCAPE '\\'",
+          kol.id(), "%" + likeLiteral(filter.productName()) + "%");
     }
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);
     if (result.getRecords().isEmpty()) {
@@ -131,6 +132,11 @@ public class KolOrderService {
 
   private static boolean notBlank(String value) {
     return value != null && !value.isBlank();
+  }
+
+  /** Escapes LIKE wildcards so the keyword matches itself, with backslash as the escape char. */
+  private static String likeLiteral(String value) {
+    return value.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 
   private static BigDecimal money(BigDecimal value) {

@@ -7,6 +7,7 @@ import com.tcrm.admin.product.model.KolItemDO;
 import com.tcrm.admin.product.model.KolItemLinkRow;
 import com.tcrm.admin.product.model.KolItemOwnerRow;
 import com.tcrm.admin.product.model.KolItemShopRow;
+import com.tcrm.admin.product.model.KolPortalItemRow;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -202,6 +203,26 @@ public interface KolItemMapper extends BaseMapper<KolItemDO> {
       WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL
       """)
   List<KolItemShopRow> listCurrentItemsWithShop(@Param("kolId") Long kolId);
+
+  /**
+   * The KOL's current mappings for the portal item list (task 26), keyword-filtered by display name
+   * (original product name first, then the sheet snapshot). Pages by creation time.
+   */
+  @Select(
+      "<script>"
+          + "SELECT ki.id, ki.weidian_item_id, p.name AS product_name, ki.item_name,"
+          + " p.image_url, ki.create_time"
+          + " FROM crm_kol_item ki"
+          + " LEFT JOIN crm_product p ON p.id = ki.product_id AND p.is_deleted = FALSE"
+          + " WHERE ki.kol_id = #{kolId} AND ki.valid_to IS NULL"
+          + "<if test='keyword != null'>"
+          + " AND COALESCE(NULLIF(p.name, ''), NULLIF(ki.item_name, '')) ILIKE"
+          + " '%' || #{keyword} || '%'"
+          + "</if>"
+          + " ORDER BY ki.create_time DESC, ki.id DESC"
+          + "</script>")
+  IPage<KolPortalItemRow> pagePortalItems(
+      Page<KolPortalItemRow> page, @Param("kolId") Long kolId, @Param("keyword") String keyword);
 
   /** Ends current mappings of a KOL (task 25a idle cleanup via product.api). */
   @Update(
