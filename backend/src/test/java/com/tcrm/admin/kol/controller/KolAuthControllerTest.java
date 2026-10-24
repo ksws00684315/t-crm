@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.KolMvcSupport;
 import com.tcrm.admin.kol.service.KolAuthService;
+import com.tcrm.admin.kol.service.KolPortalProfileDTO;
+import com.tcrm.admin.kol.service.KolPortalProfileService;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.ClientIpResolver;
@@ -25,12 +27,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 class KolAuthControllerTest {
   private final KolAuthService auth = mock(KolAuthService.class);
+  private final KolPortalProfileService profiles = mock(KolPortalProfileService.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final MockMvc mvc =
       KolMvcSupport.build(
           current,
           new KolAuthController(
-              auth, new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
+              auth, profiles, new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
 
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
@@ -54,6 +57,11 @@ class KolAuthControllerTest {
 
   private static KolAuthService.LoginResult login() {
     return new KolAuthService.LoginResult("X-Kol-Token", "the-token", 604800, kol());
+  }
+
+  private static KolPortalProfileDTO profile() {
+    return new KolPortalProfileDTO(
+        "KOL0001", "TikTok", "@alice", "APPROVED", "NORMAL", "PROMOTING", null, null);
   }
 
   @Test
@@ -157,29 +165,74 @@ class KolAuthControllerTest {
   @Test
   void shouldRequireKolLogin_forMeLogoutAndPassword() throws Exception {
     mvc.perform(get("/kol-api/me")).andExpect(status().isUnauthorized());
+    mvc.perform(
+            put("/kol-api/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Alice\"}"))
+        .andExpect(status().isUnauthorized());
     mvc.perform(post("/kol-api/auth/logout")).andExpect(status().isUnauthorized());
     mvc.perform(
             put("/kol-api/me/password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"oldPassword\":\"old-pass-123\",\"newPassword\":\"new-pass-123\"}"))
         .andExpect(status().isUnauthorized());
-    verifyNoInteractions(auth, current);
+    verifyNoInteractions(auth, current, profiles);
   }
 
   @Test
   void shouldServeMeAndLogout_whenKolTokenIsPresent() throws Exception {
     when(auth.me()).thenReturn(kol());
+    when(profiles.get()).thenReturn(profile());
     String token = KolMvcSupport.actAs(current, kol());
     mvc.perform(get("/kol-api/me").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.kolCode").value("KOL0001"))
+        .andExpect(jsonPath("$.data.systemId").value("KOL0001"))
         .andExpect(jsonPath("$.data.tenantName").value("Acme"))
         .andExpect(jsonPath("$.data.phone").value("+15550002222"))
         .andExpect(jsonPath("$.data.whatsapp").value("+15550001111"))
-        .andExpect(jsonPath("$.data.sheetUrl").value("https://docs.google.com/spreadsheets/d/abc"));
+        .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"))
+        .andExpect(jsonPath("$.data.primaryHandle").value("@alice"))
+        .andExpect(jsonPath("$.data.reviewStatus").value("APPROVED"))
+        .andExpect(jsonPath("$.data.loginStatus").value("NORMAL"))
+        .andExpect(jsonPath("$.data.relationStatus").value("PROMOTING"))
+        .andExpect(jsonPath("$.data.commissionRate").doesNotExist())
+        .andExpect(jsonPath("$.data.sheetUrl").doesNotExist());
     mvc.perform(post("/kol-api/auth/logout").header(KolMvcSupport.TOKEN_HEADER, token))
         .andExpect(status().isOk());
     verify(auth).logout();
+  }
+
+  @Test
+  void shouldUpdateOwnProfile_withWhitelistedFieldsOnly() throws Exception {
+    when(auth.me()).thenReturn(kol());
+    when(profiles.get()).thenReturn(profile());
+    String token = KolMvcSupport.actAs(current, kol());
+    mvc.perform(
+            put("/kol-api/me")
+                .header(KolMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"name\":\"Alice Kim\",\"primaryPlatform\":\"Instagram\","
+                        + "\"primaryHandle\":\"@alice.kim\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("Alice"))
+        .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"));
+    verify(profiles).update("Alice Kim", "Instagram", "@alice.kim", "127.0.0.1");
+  }
+
+  @Test
+  void shouldRejectInvalidProfileBodies_atBinding() throws Exception {
+    String token = KolMvcSupport.actAs(current, kol());
+    for (String body : List.of("{}", "{\"name\":\"  \"}")) {
+      mvc.perform(
+              put("/kol-api/me")
+                  .header(KolMvcSupport.TOKEN_HEADER, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest());
+    }
+    verifyNoInteractions(profiles);
   }
 
   @Test
