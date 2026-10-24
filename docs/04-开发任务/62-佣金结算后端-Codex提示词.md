@@ -15,6 +15,7 @@
   - 达人收入列表与详情（11.02）：汇总、付款流水；明细可追溯到订单、规则与凭证。商务按 `OWN` 范围只看自己的达人；
   - 结算明细与订单清算详情（13.05）：「已入账」与付款「已支付」分别记录，不能混用。
 - **达人端接口**：佣金概览（预估总佣金、冻结、可提现、申请占用、已付）与资金流水。达人 ID 从登录态取得。申请占用由任务 63 写入，本任务先按契约返回 0，或读取任务 63 的表（视合并顺序而定）。
+- **达人端订单的佣金字段**：按设计说明书 §6.3 `/kol-api/orders` 的契约，由本任务通过 commission 模块 `api` 提供商品行级的 `settlementStatus`、`rateSnapshot`、`commissionAmount`，以及订单级结算状态的取值规则；订单号、商品名等筛选由任务 64 实现。两个任务谁后合并，谁负责在 `KolOrderService` 中完成衔接。
 - 可以参考 #116 分支（`origin/task/60-kol-portal`）中 `CommissionSettlementRules`、`CommissionSettlementService` 等实现，但必须满足：
   - 数据访问走 MyBatis-Plus Mapper，由公司插件隔离；
   - controller 不访问数据；
