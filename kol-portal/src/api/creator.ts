@@ -5,8 +5,12 @@ const moneyCents = (value: string) => {
   const [whole, fraction = ""] = value.split(".");
   return BigInt(whole) * 100n + BigInt((fraction + "00").slice(0, 2));
 };
-const centsMoney = (value: bigint) => `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
+const centsMoney = (value: bigint) =>
+  `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
 const demoFunds: FundSummary = {
+  totalIncomeCny: "2400.00",
+  commissionIncomeCny: "2400.00",
+  estimatedCommissionCny: "5960.00",
   totalCommissionCny: "4680.00",
   withdrawnCny: "2400.00",
   withdrawingCny: "800.00",
@@ -185,6 +189,9 @@ export interface CreatorAnalyticsOverview {
 }
 
 export interface FundSummary {
+  totalIncomeCny: string;
+  commissionIncomeCny: string;
+  estimatedCommissionCny: string;
   totalCommissionCny: string;
   withdrawnCny: string;
   withdrawingCny: string;
@@ -267,19 +274,30 @@ export function getCreatorAnalytics(params: { from: string; to: string }) {
 export function getFundSummary() {
   if (isDemoMode) return Promise.resolve({ fundSummary: demoFunds });
   return http
-    .request<{ income: {
-      estimated: string;
-      available: string;
-      occupied: string;
-      cumulativePaid: string;
-      frozen: string;
-      deducted: string;
-      pendingDeduction: string;
-      prepayPaid: string;
-    } }>({ method: "GET", url: "/commissions/overview" })
+    .request<{
+      income: {
+        estimated: string;
+        available: string;
+        occupied: string;
+        cumulativePaid: string;
+        frozen: string;
+        deducted: string;
+        pendingDeduction: string;
+        prepayPaid: string;
+        paid: string;
+        commissionPaid: string;
+      };
+    }>({ method: "GET", url: "/commissions/overview" })
     .then(({ income }) => ({
       fundSummary: {
-        totalCommissionCny: centsMoney(moneyCents(income.cumulativePaid) + moneyCents(income.occupied) + moneyCents(income.frozen)),
+        totalIncomeCny: income.paid,
+        commissionIncomeCny: income.commissionPaid,
+        estimatedCommissionCny: income.estimated,
+        totalCommissionCny: centsMoney(
+          moneyCents(income.cumulativePaid) +
+            moneyCents(income.occupied) +
+            moneyCents(income.frozen)
+        ),
         withdrawnCny: income.cumulativePaid,
         withdrawingCny: income.occupied,
         frozenCny: income.frozen,
@@ -336,30 +354,65 @@ export function getWithdrawalAccounts() {
         network: null
       }
     ]);
-  return http.request<{ id: string; type: "PAYPAL" | "USDT"; account: string; holder: string | null; currency: string | null; network: string | null }[]>({
-    method: "GET",
-    url: "/withdrawals/recipient-options"
-  }).then(rows => rows.map(row => ({ id: row.id, accountType: row.type, account: row.account, holderName: row.holder, currency: row.currency, network: row.network })));
+  return http
+    .request<
+      {
+        id: string;
+        type: "PAYPAL" | "USDT";
+        account: string;
+        holder: string | null;
+        currency: string | null;
+        network: string | null;
+      }[]
+    >({
+      method: "GET",
+      url: "/withdrawals/recipient-options"
+    })
+    .then(rows =>
+      rows.map(row => ({
+        id: row.id,
+        accountType: row.type,
+        account: row.account,
+        holderName: row.holder,
+        currency: row.currency,
+        network: row.network
+      }))
+    );
 }
 
 export function getWithdrawals(params: { page: number; size: number }) {
   if (isDemoMode)
     return Promise.resolve({ ...demoWithdrawalPage, page: params.page, size: params.size });
-  return http.request<{
-    items: WithdrawalRecord[];
-    total: number | string;
-    page: number;
-    size: number;
-  }>({ method: "GET", url: "/withdrawals", params }).then(page => ({
-    ...page,
-    items: page.items.map(item => ({ ...item, account: { ...item.account, accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type } }))
-  }));
+  return http
+    .request<{
+      items: WithdrawalRecord[];
+      total: number | string;
+      page: number;
+      size: number;
+    }>({ method: "GET", url: "/withdrawals", params })
+    .then(page => ({
+      ...page,
+      items: page.items.map(item => ({
+        ...item,
+        account: {
+          ...item.account,
+          accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type
+        }
+      }))
+    }));
 }
 
 export function submitWithdrawal(data: {
   amount: string;
   payoutAccountId?: string;
-  account?: { type: "PAYPAL" | "USDT"; account: string; currency?: string; network?: string; holder: string; qrFileId?: number };
+  account?: {
+    type: "PAYPAL" | "USDT";
+    account: string;
+    currency?: string;
+    network?: string;
+    holder: string;
+    qrFileId?: number;
+  };
   note: string;
   idempotencyKey: string;
 }) {
@@ -387,17 +440,24 @@ export function submitWithdrawal(data: {
     };
     return Promise.resolve(record);
   }
-  return http.request<WithdrawalRecord>({ method: "POST", url: "/withdrawals", data }).then(item => ({
-    ...item,
-    account: { ...item.account, accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type }
-  }));
+  return http
+    .request<WithdrawalRecord>({ method: "POST", url: "/withdrawals", data })
+    .then(item => ({
+      ...item,
+      account: {
+        ...item.account,
+        accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type
+      }
+    }));
 }
 
 export function withdrawWithdrawal(id: string) {
   if (isDemoMode) {
     demoWithdrawalPage = {
       ...demoWithdrawalPage,
-      items: demoWithdrawalPage.items.map(item => item.id === id ? { ...item, status: "WITHDRAWN" } : item)
+      items: demoWithdrawalPage.items.map(item =>
+        item.id === id ? { ...item, status: "WITHDRAWN" } : item
+      )
     };
     return Promise.resolve();
   }

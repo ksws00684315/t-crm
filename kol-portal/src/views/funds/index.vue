@@ -33,7 +33,16 @@ const total = ref(0);
 const applyVisible = ref(false);
 const submitting = ref(false);
 const applyError = ref("");
-const form = reactive({ amount: "", payoutAccountId: "", note: "", type: "PAYPAL" as "PAYPAL" | "USDT", account: "", holder: "", currency: "USD", network: "TRC20" });
+const form = reactive({
+  amount: "",
+  payoutAccountId: "",
+  note: "",
+  type: "PAYPAL" as "PAYPAL" | "USDT",
+  account: "",
+  holder: "",
+  currency: "USD",
+  network: "TRC20"
+});
 const manualAccount = computed(() => form.payoutAccountId === "manual");
 const money = (value: string) => formatMoney(value, locale.value);
 const columns = computed<DataColumn[]>(() => [
@@ -44,25 +53,34 @@ const columns = computed<DataColumn[]>(() => [
   { key: "recipient", label: t("funds.recipient"), minWidth: 170 },
   { key: "receivedAt", label: t("funds.receivedAt"), minWidth: 170 }
 ]);
-const chartParts = computed(() => {
-  const data = summary.value;
-  if (!data) return [];
-  return [
-    { key: "withdrawn", value: Number(data.withdrawnCny), color: "var(--tcrm-color-success)" },
-    { key: "withdrawing", value: Number(data.withdrawingCny), color: "#3478c8" },
-    { key: "frozen", value: Number(data.frozenCny), color: "var(--tcrm-color-warning)" }
-  ];
-});
-const sumParts = computed(() => chartParts.value.reduce((sum, part) => sum + part.value, 0));
-const chartBackground = computed(() => {
-  let start = 0;
-  const stops = chartParts.value.map(part => {
-    const from = start;
-    start += sumParts.value > 0 ? (part.value / sumParts.value) * 100 : 0;
-    return `${part.color} ${from}% ${start}%`;
-  });
-  return `linear-gradient(90deg, ${stops.join(", ")})`;
-});
+const commissionParts = computed(() =>
+  summary.value
+    ? [
+        { key: "withdrawn", amount: summary.value.withdrawnCny },
+        { key: "currentAvailable", amount: summary.value.availableCny },
+        { key: "frozen", amount: summary.value.frozenCny },
+        { key: "withdrawing", amount: summary.value.withdrawingCny }
+      ]
+    : []
+);
+function summaryMoney(value: string) {
+  return `${Number(value).toLocaleString(locale.value, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })} CNY`;
+}
+function cents(value: string) {
+  const [whole, fraction = ""] = value.split(".");
+  const unsigned = BigInt(whole.replace("-", "")) * 100n + BigInt(fraction.padEnd(2, "0"));
+  return value.startsWith("-") ? -unsigned : unsigned;
+}
+// Only draw an equality when the displayed states reconcile; deductions remain separate below.
+const commissionReconciles = computed(
+  () =>
+    summary.value &&
+    cents(summary.value.estimatedCommissionCny) ===
+      commissionParts.value.reduce((sum, part) => sum + cents(part.amount), 0n)
+);
 
 async function load() {
   loading.value = true;
@@ -102,7 +120,10 @@ async function submit() {
   applyError.value = "";
   const normalized = form.amount.trim();
   const validAmount = /^\d+(\.\d{1,2})?$/.test(normalized);
-  const cents = validAmount ? BigInt(normalized.split(".")[0]) * 100n + BigInt(((normalized.split(".")[1] ?? "") + "00").slice(0, 2)) : 0n;
+  const cents = validAmount
+    ? BigInt(normalized.split(".")[0]) * 100n +
+      BigInt(((normalized.split(".")[1] ?? "") + "00").slice(0, 2))
+    : 0n;
   const minimum = (conditions.value?.minimum ?? "0.00").split(".");
   const minimumCents = BigInt(minimum[0]) * 100n + BigInt(((minimum[1] ?? "") + "00").slice(0, 2));
   if (!validAmount || cents <= 0n || cents < minimumCents) {
@@ -114,9 +135,10 @@ async function submit() {
     return;
   }
   if (manualAccount.value) {
-    const accountValid = form.type === "PAYPAL"
-      ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.account.trim()) && Boolean(form.currency)
-      : /^[A-Za-z0-9]{3,128}$/.test(form.account.trim()) && Boolean(form.network);
+    const accountValid =
+      form.type === "PAYPAL"
+        ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.account.trim()) && Boolean(form.currency)
+        : /^[A-Za-z0-9]{3,128}$/.test(form.account.trim()) && Boolean(form.network);
     if (!accountValid || !form.holder.trim()) {
       applyError.value = t("funds.accountRequired");
       return;
@@ -127,12 +149,14 @@ async function submit() {
     await submitWithdrawal({
       amount: `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`,
       ...(manualAccount.value
-        ? { account: {
-            type: form.type,
-            account: form.account.trim(),
-            holder: form.holder.trim(),
-            ...(form.type === "PAYPAL" ? { currency: form.currency } : { network: form.network })
-          } }
+        ? {
+            account: {
+              type: form.type,
+              account: form.account.trim(),
+              holder: form.holder.trim(),
+              ...(form.type === "PAYPAL" ? { currency: form.currency } : { network: form.network })
+            }
+          }
         : { payoutAccountId: form.payoutAccountId }),
       note: form.note,
       idempotencyKey: crypto.randomUUID()
@@ -151,7 +175,9 @@ async function submit() {
 }
 async function cancelWithdrawal(item: WithdrawalRecord) {
   try {
-    await ElMessageBox.confirm(t("funds.withdrawConfirm"), t("funds.withdrawAction"), { type: "warning" });
+    await ElMessageBox.confirm(t("funds.withdrawConfirm"), t("funds.withdrawAction"), {
+      type: "warning"
+    });
     await withdrawWithdrawal(item.id);
     ElMessage.success(t("funds.withdrawSuccess"));
     await load();
@@ -192,42 +218,63 @@ onMounted(load);
     />
     <el-skeleton v-if="loading && !summary" :rows="4" animated />
     <template v-else-if="summary">
-      <el-card shadow="never" class="summary-card">
-        <div class="summary-heading">
-          <div>
-            <span>{{ t("funds.totalCommission") }}</span
-            ><strong>{{ money(summary.totalCommissionCny) }}</strong>
-          </div>
-          <span class="formula">{{ t("funds.formula") }}</span>
+      <section class="summary-card">
+        <div class="income-banner" :aria-label="t('funds.incomeFormula')">
+          <dl class="income-metric">
+            <dt>{{ t("funds.totalIncome") }}</dt>
+            <dd>{{ summaryMoney(summary.totalIncomeCny) }}</dd>
+          </dl>
+          <span class="income-operator" aria-hidden="true">=</span>
+          <dl class="income-metric">
+            <dt>{{ t("funds.commissionIncome") }}</dt>
+            <dd>{{ summaryMoney(summary.commissionIncomeCny) }}</dd>
+          </dl>
+          <span class="income-operator" aria-hidden="true">+</span>
+          <dl class="income-metric">
+            <dt>{{ t("funds.prepayIncome") }}</dt>
+            <dd>{{ summaryMoney(summary.receivedPrepayCny) }}</dd>
+          </dl>
         </div>
-        <div class="distribution" role="img" :aria-label="t('funds.distribution')">
-          <span :style="{ background: chartBackground }" />
+        <div class="commission-breakdown" :aria-label="t('funds.commissionBreakdown')">
+          <dl class="commission-metric commission-metric--total">
+            <dt>{{ t("funds.estimatedCommission") }}</dt>
+            <dd>{{ summaryMoney(summary.estimatedCommissionCny) }}</dd>
+          </dl>
+          <template v-for="(part, index) in commissionParts" :key="part.key">
+            <span class="commission-operator" aria-hidden="true">{{
+              commissionReconciles ? (index === 0 ? "=" : "+") : ""
+            }}</span>
+            <dl class="commission-metric" :data-state="part.key">
+              <dt>{{ t(`funds.${part.key}`) }}</dt>
+              <dd :class="{ negative: part.amount.startsWith('-') }">
+                {{ summaryMoney(part.amount) }}
+              </dd>
+            </dl>
+          </template>
         </div>
-        <div class="legend">
-          <div v-for="part in chartParts" :key="part.key">
-            <i :style="{ background: part.color }" /><span>{{ t(`funds.${part.key}`) }}</span
-            ><strong>{{ money(String(part.value)) }}</strong>
+        <div class="summary-notes">
+          <p>{{ t("funds.incomeHint") }}</p>
+          <div class="summary-reconciliation">
+            <span
+              >{{ t("funds.formula") }}：<strong>{{
+                summaryMoney(summary.totalCommissionCny)
+              }}</strong></span
+            >
+            <span
+              >{{ t("funds.prepayDeduction") }}：<strong
+                :class="{ negative: Number(summary.prepayDeductionCny) > 0 }"
+                >{{
+                  summaryMoney(
+                    Number(summary.prepayDeductionCny) > 0
+                      ? `-${summary.prepayDeductionCny}`
+                      : "0.00"
+                  )
+                }}</strong
+              ></span
+            >
           </div>
         </div>
-        <div class="summary-extra">
-          <div>
-            <span>{{ t("funds.prepayReceived") }}</span
-            ><strong>{{ money(summary.receivedPrepayCny) }}</strong>
-          </div>
-          <div>
-            <span>{{ t("funds.available") }}</span
-            ><strong>{{ money(summary.availableCny) }}</strong>
-          </div>
-          <div>
-            <span>{{ t("funds.prepayDeduction") }}</span
-            ><strong :class="{ negative: Number(summary.prepayDeductionCny) > 0 }">{{
-              Number(summary.prepayDeductionCny) > 0
-                ? `-${money(summary.prepayDeductionCny)}`
-                : money("0")
-            }}</strong>
-          </div>
-        </div>
-      </el-card>
+      </section>
       <el-card shadow="never" class="records-card">
         <div class="section-heading">
           <h2>{{ t("funds.history") }}</h2>
@@ -274,7 +321,12 @@ onMounted(load);
             ><strong>{{ money(item.amount) }} {{ item.currency }}</strong
             ><el-tag>{{ t(`funds.status.${item.status}`, item.status) }}</el-tag
             ><span>{{ dateLabel(item.createdAt) }}</span>
-            <el-button v-if="item.status === 'PENDING_REVIEW'" link type="danger" @click="cancelWithdrawal(item)">
+            <el-button
+              v-if="item.status === 'PENDING_REVIEW'"
+              link
+              type="danger"
+              @click="cancelWithdrawal(item)"
+            >
               {{ t("funds.withdrawAction") }}
             </el-button>
           </div>
@@ -294,8 +346,7 @@ onMounted(load);
         >
         <el-form-item :label="t('funds.recipient')"
           ><el-select v-model="form.payoutAccountId" :placeholder="t('funds.chooseAccount')"
-            ><el-option :value="'manual'" :label="t('funds.manualAccount')" />
-            ><el-option
+            ><el-option :value="'manual'" :label="t('funds.manualAccount')" /> ><el-option
               v-for="account in accounts"
               :key="account.id"
               :value="account.id"
@@ -311,18 +362,30 @@ onMounted(load);
               <el-option value="USDT" label="USDT" />
             </el-select>
           </el-form-item>
-          <el-form-item :label="form.type === 'PAYPAL' ? t('funds.paypalEmail') : t('funds.usdtAddress')">
+          <el-form-item
+            :label="form.type === 'PAYPAL' ? t('funds.paypalEmail') : t('funds.usdtAddress')"
+          >
             <el-input v-model="form.account" autocomplete="off" />
           </el-form-item>
           <el-form-item :label="t('funds.holder')"><el-input v-model="form.holder" /></el-form-item>
           <el-form-item v-if="form.type === 'PAYPAL'" :label="t('funds.currency')">
             <el-select v-model="form.currency">
-              <el-option v-for="currency in ['USD','EUR','GBP','CNY']" :key="currency" :value="currency" :label="currency" />
+              <el-option
+                v-for="currency in ['USD', 'EUR', 'GBP', 'CNY']"
+                :key="currency"
+                :value="currency"
+                :label="currency"
+              />
             </el-select>
           </el-form-item>
           <el-form-item v-else :label="t('funds.network')">
             <el-select v-model="form.network">
-              <el-option v-for="network in ['TRC20','ERC20','BEP20','SOL','TON']" :key="network" :value="network" :label="network" />
+              <el-option
+                v-for="network in ['TRC20', 'ERC20', 'BEP20', 'SOL', 'TON']"
+                :key="network"
+                :value="network"
+                :label="network"
+              />
             </el-select>
           </el-form-item>
         </template>
@@ -364,71 +427,76 @@ h1 {
   margin: var(--tcrm-space-1) 0 0;
   color: var(--tcrm-color-text-secondary);
 }
-.summary-card :deep(.el-card__body) {
+.summary-card {
   display: grid;
-  gap: var(--tcrm-space-4);
+  gap: var(--tcrm-space-5);
 }
-.summary-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--tcrm-space-4);
-}
-.summary-heading > div,
-.summary-extra > div {
+.income-banner {
   display: grid;
-  gap: var(--tcrm-space-2);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--tcrm-space-5);
+  padding: var(--tcrm-space-6);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-primary);
+  color: var(--tcrm-color-on-primary);
 }
-.summary-heading span,
-.summary-extra span,
-.formula {
-  color: var(--tcrm-color-text-secondary);
+.income-metric,
+.commission-metric {
+  display: grid;
+  align-content: center;
+  gap: var(--tcrm-space-4);
+  min-width: 0;
+  margin: 0;
 }
-.summary-heading strong {
+#app .income-metric dt,
+#app .commission-metric dt {
+  font-size: var(--tcrm-font-size-section) !important;
+  line-height: var(--tcrm-line-height-section) !important;
+}
+#app .income-metric dd,
+#app .commission-metric dd {
+  margin: 0;
+  font-size: var(--tcrm-font-size-title) !important;
+  line-height: var(--tcrm-line-height-title) !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.income-operator,
+.commission-operator {
   font-size: var(--tcrm-font-size-title);
   line-height: var(--tcrm-line-height-title);
+  text-align: center;
 }
-.formula {
-  text-align: right;
+.commission-breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, auto minmax(0, 1fr));
+  align-items: center;
+  gap: var(--tcrm-space-3);
 }
-.distribution {
-  height: 20px;
-  padding: 2px;
-  border: 1px solid var(--tcrm-color-border);
-  border-radius: 999px;
-  overflow: hidden;
+.commission-metric {
+  align-content: space-between;
+  align-self: stretch;
+  padding: var(--tcrm-space-5) var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-primary);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-card);
 }
-.distribution span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
+.summary-notes {
+  display: grid;
+  gap: var(--tcrm-space-2);
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
-.legend {
+.summary-notes p {
+  margin: 0;
+}
+.summary-reconciliation {
   display: flex;
   flex-wrap: wrap;
   gap: var(--tcrm-space-4);
-}
-.legend div {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
-}
-.legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-.legend strong,
-.summary-extra strong {
-  font-variant-numeric: tabular-nums;
-}
-.summary-extra {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tcrm-space-4);
-  padding-top: var(--tcrm-space-4);
-  border-top: 1px solid var(--tcrm-color-border);
 }
 .negative {
   color: var(--tcrm-color-danger);
@@ -472,13 +540,30 @@ h1 {
 small {
   color: var(--tcrm-color-text-secondary);
 }
-@media (max-width: 767px) {
-  .summary-extra {
+@media (max-width: 1279px) {
+  .commission-operator {
+    display: none;
+  }
+  .commission-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .commission-metric--total {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 1023px) {
+  .income-banner {
     grid-template-columns: 1fr;
+    padding: var(--tcrm-space-5);
   }
-  .formula {
-    max-width: 50%;
+  .income-metric {
+    gap: var(--tcrm-space-2);
   }
+  .income-operator {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
   .withdrawal-row {
     grid-template-columns: 1fr auto;
   }
