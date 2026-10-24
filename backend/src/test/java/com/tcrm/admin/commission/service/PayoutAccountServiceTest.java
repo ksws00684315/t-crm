@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
 import com.tcrm.admin.commission.model.PayoutAccountStatus;
@@ -59,16 +60,18 @@ class PayoutAccountServiceTest {
       new PayoutAccountService.KolAudit(2L, "kol@example.com", "127.0.0.1", "/kol-api/x");
 
   private final PayoutAccountMapper accounts = mock(PayoutAccountMapper.class);
+  private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final BizFileService files = mock(BizFileService.class);
   private final KolApi kols = mock(KolApi.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final PayoutAccountService service =
       new PayoutAccountService(
-          accounts, files, kols, CIPHER, TestTransactions.template(), audit, events);
+          accounts, withdrawals, files, kols, CIPHER, TestTransactions.template(), audit, events);
 
   @BeforeEach
   void insertAssignsId() {
+    when(withdrawals.countActiveByAccount(ACCOUNT_ID)).thenReturn(0L);
     when(kols.lockKol(KOL)).thenReturn(true);
     when(accounts.insert(any(PayoutAccountDO.class)))
         .thenAnswer(
