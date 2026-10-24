@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
+import { reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as kolApi from "@/api/kol/kol";
 import * as linkApi from "@/api/link/link";
@@ -17,6 +20,11 @@ vi.mock("@/api/link/link");
 vi.mock("@/api/product/kol-item");
 vi.mock("@/api/product/shop");
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: routeQuery })
+}));
+/** Reactive so that mutating it drives the page's route.query watcher (task 59). */
+const routeQuery = reactive<Record<string, string | undefined>>({});
 
 const row: KolItemVO = {
   id: "1",
@@ -111,6 +119,32 @@ describe("Kol item page", () => {
     setActivePinia(createPinia());
     i18n.global.locale.value = "zh-CN";
     vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+  });
+
+  it("formats every kol label through formatNameWithCode in both locales (R-09)", () => {
+    const source = readFileSync(resolve(__dirname, "../index.vue"), "utf8");
+    expect(source).not.toMatch(/kol\.name}[（(]/);
+    expect(source.match(/formatNameWithCode\(kol\.name, kol\.kolCode\)/g)).toHaveLength(4);
+  });
+
+  it("prefills the linkCode filter from the route and re-filters when it changes (task 59)", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    routeQuery.linkCode = " from-route ";
+    const wrapper = await mountPage();
+    expect((wrapper.get('[data-test="link-code"]').element as HTMLInputElement).value).toBe(
+      "from-route"
+    );
+    expect(kolItemApi.listKolItems).toHaveBeenCalledWith(
+      expect.objectContaining({ linkCode: "from-route" })
+    );
+
+    routeQuery.linkCode = "KPL-SECOND001";
+    await flushPromises();
+    expect(kolItemApi.listKolItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, linkCode: "KPL-SECOND001" })
+    );
+    wrapper.unmount();
   });
 
   it("loads the list on open and shows the task columns", async () => {
