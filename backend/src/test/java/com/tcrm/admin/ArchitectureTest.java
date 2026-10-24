@@ -25,6 +25,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,6 +35,24 @@ class ArchitectureTest {
       new ClassFileImporter()
           .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
           .importPackages("com.tcrm.admin");
+
+  @Test
+  void shouldNotUseJdbcFromControllersOrPrepayModules() {
+    noClasses()
+        .that()
+        .resideInAPackage("..controller..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("org.springframework.jdbc..")
+        .check(classes);
+    noClasses()
+        .that()
+        .resideInAnyPackage("com.tcrm.admin.commission..", "com.tcrm.admin.notification..")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName(JdbcTemplate.class.getName())
+        .check(classes);
+  }
 
   @Test
   void shouldRespectLayers_whenInspectingProductionClasses() {

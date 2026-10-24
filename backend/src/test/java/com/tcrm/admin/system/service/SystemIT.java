@@ -172,6 +172,9 @@ class SystemIT {
         .extracting(row -> row.get("table_name") + ":" + row.get("is_nullable"))
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
+            "crm_commission_ledger:NO",
+            "crm_commission_recovery:NO",
+            "crm_commission_wallet:NO",
             "crm_copy_job:NO",
             "crm_copy_job_item:NO",
             "crm_file:NO",
@@ -194,6 +197,11 @@ class SystemIT {
             "crm_order_sync_failure:NO",
             "crm_order_sync_state:NO",
             "crm_payout_account:NO",
+            "crm_prepay:NO",
+            "crm_prepay_history:NO",
+            "crm_prepay_outbox:NO",
+            "crm_prepay_payment:NO",
+            "crm_prepay_sequence:NO",
             "crm_product:NO",
             "crm_refund:NO",
             "crm_sheet_source:NO",

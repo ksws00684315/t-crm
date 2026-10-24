@@ -20,6 +20,12 @@ public interface KolApi {
   List<KolRefDTO> listByIds(Collection<Long> ids);
 
   /**
+   * Same as {@link #listByIds}, but keeps logically deleted KOLs so a historical prepay can still
+   * show the creator's code and name. An empty collection returns an empty list without querying.
+   */
+  List<KolRefDTO> listByIdsIncludingDeleted(Collection<Long> ids);
+
+  /**
    * Returns every undeleted KOL, enabled or not, ordered by ID (task 06 link index rebuild). The
    * design capacity is a few hundred KOLs.
    */

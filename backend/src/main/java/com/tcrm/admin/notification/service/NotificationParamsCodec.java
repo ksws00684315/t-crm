@@ -18,6 +18,8 @@ final class NotificationParamsCodec {
           case ORDER_SYNC_FAILED -> new ShopParams(params.shopName());
           case BD_TRANSFER_CANCELLED -> new TransferParams(params.kolCode(), params.reason());
           case KOLS_UNASSIGNED -> new UnassignedParams(params.bdName(), params.count());
+          case PREPAY_SUBMITTED, PREPAY_APPROVED, PREPAY_REJECTED, PREPAY_PAID ->
+              new PrepayParams(params.prepayNo());
           case DEPARTURE_PLAN_SUBMITTED ->
               new DepartureParams(params.bdName(), params.effectiveAt());
           case DEPARTURE_PLAN_EXECUTED ->
@@ -45,6 +47,7 @@ final class NotificationParamsCodec {
           text(node, "reason"),
           text(node, "bdName"),
           count,
+          text(node, "prepayNo"),
           text(node, "heirName"),
           text(node, "effectiveAt"),
           text(node, "result"),
@@ -55,7 +58,7 @@ final class NotificationParamsCodec {
   }
 
   private static NotificationParamsDTO empty() {
-    return new NotificationParamsDTO(null, null, null, null, null, null);
+    return new NotificationParamsDTO(null, null, null, null, null, null, null);
   }
 
   private static String text(JsonNode node, String field) {
@@ -73,6 +76,8 @@ final class NotificationParamsCodec {
   private record TransferParams(String kolCode, String reason) {}
 
   private record UnassignedParams(String bdName, Integer count) {}
+
+  private record PrepayParams(String prepayNo) {}
 
   private record DepartureParams(String bdName, String effectiveAt) {}
 

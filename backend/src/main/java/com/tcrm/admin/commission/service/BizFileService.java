@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.commission.mapper.BizFileMapper;
 import com.tcrm.admin.commission.model.BizFileDO;
@@ -24,6 +25,8 @@ public class BizFileService {
   /** A file plus the business record it belongs to, for authorization before a download. */
   public record AttachedFile(FileBizType bizType, Long bizId, FileDTO download) {}
 
+  public record FileMeta(Long id, String name, String mimeType, Long size) {}
+
   private final BizFileMapper files;
 
   public BizFileService(BizFileMapper files) {
@@ -47,6 +50,33 @@ public class BizFileService {
     file.setContent(content);
     file.setCreateBy(kolId);
     file.setCreateByType("KOL");
+    file.setCreateTime(Instant.now());
+    files.insert(file);
+    return file.getId();
+  }
+
+  /** Stores an attached prepay document; actual MIME is determined from its signature. */
+  public Long uploadPrepayAdmin(
+      long tenantId,
+      long adminId,
+      long prepayId,
+      FileBizType bizType,
+      String fileName,
+      byte[] content) {
+    if (bizType != FileBizType.PREPAY_ATTACHMENT && bizType != FileBizType.PREPAY_VOUCHER) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    String contentType = PrepayFileRules.contentType(content);
+    BizFileDO file = new BizFileDO();
+    file.setTenantId(tenantId);
+    file.setBizType(bizType);
+    file.setBizId(prepayId);
+    file.setFileName(fileName(fileName));
+    file.setContentType(contentType);
+    file.setSizeBytes((long) content.length);
+    file.setContent(content);
+    file.setCreateBy(adminId);
+    file.setCreateByType("ADMIN");
     file.setCreateTime(Instant.now());
     files.insert(file);
     return file.getId();
@@ -79,6 +109,26 @@ public class BizFileService {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     return new AttachedFile(file.getBizType(), file.getBizId(), toDto(file));
+  }
+
+  public java.util.List<FileMeta> prepayAttachments(long prepayId) {
+    return files
+        .selectList(
+            new LambdaQueryWrapper<BizFileDO>()
+                .select(
+                    BizFileDO::getId,
+                    BizFileDO::getFileName,
+                    BizFileDO::getContentType,
+                    BizFileDO::getSizeBytes)
+                .eq(BizFileDO::getBizType, FileBizType.PREPAY_ATTACHMENT)
+                .eq(BizFileDO::getBizId, prepayId)
+                .orderByAsc(BizFileDO::getId))
+        .stream()
+        .map(
+            file ->
+                new FileMeta(
+                    file.getId(), file.getFileName(), file.getContentType(), file.getSizeBytes()))
+        .toList();
   }
 
   /**

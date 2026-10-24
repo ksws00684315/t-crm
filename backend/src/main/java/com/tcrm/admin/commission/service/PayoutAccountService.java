@@ -3,7 +3,6 @@ package com.tcrm.admin.commission.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
@@ -12,6 +11,7 @@ import com.tcrm.admin.commission.model.PayoutAccountType;
 import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -456,6 +456,10 @@ public class PayoutAccountService {
     }
     requireAdminAccount(admin, file.bizId());
     return file.download();
+  }
+
+  public BizFileService.AttachedFile attachedFile(long fileId) {
+    return files.attachedFile(fileId);
   }
 
   // -------------------------------------------------------------------- helpers
