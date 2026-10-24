@@ -39,6 +39,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
 
   static final String SOURCE_INCOMPLETE = "来源商品信息不完整";
 
+  /** Weidian reported success for vdian.item.add but no item id could be read from the result. */
+  static final String ITEM_ID_MISSING = "微店已返回成功但未识别新商品 ID，商品可能已在微店创建，请在微店后台核对";
+
   private final WeidianBusinessApi weidian;
   private final WeidianShopAuthMapper auths;
 
@@ -58,7 +61,8 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
     AddItemResponse created = weidian.addItem(targetShopId, add);
     if (created == null || created.itemId() == null) {
-      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
+      logItemIdMissing(targetShopId, created);
+      throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, ITEM_ID_MISSING, null);
     }
     String newId = Long.toString(created.itemId());
     List<SaveItemDetailBlock> blocks = toSaveBlocks(detail);
@@ -207,6 +211,20 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     // Conjectured item-missing codes for vdian.item.get — verify with a real account at M0.
     int code = error.statusCode();
     return code == 10003 || code == 20003 || code == 21001;
+  }
+
+  /** Logs only the field names of Weidian's result object; values may contain shop data. */
+  private static void logItemIdMissing(long targetShopId, AddItemResponse created) {
+    List<String> fields = new ArrayList<>();
+    JsonNode result = created == null || created.raw() == null ? null : created.raw().get("result");
+    if (result != null && result.isObject()) {
+      fields.addAll(result.propertyNames());
+    }
+    LOG.warn(
+        "Weidian vdian.item.add returned success without a recognised item id in shop {};"
+            + " result fields={}",
+        targetShopId,
+        fields);
   }
 
   private static String safeReason(Throwable e) {
