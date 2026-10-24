@@ -169,10 +169,6 @@
         <version>3.10.4</version>
         <configuration>
           <java>
-            <!-- Keep the cross-service resolver mirror byte-for-byte aligned; parity is checked separately. -->
-            <excludes>
-              <exclude>src/main/java/com/tcrm/admin/shared/ClientIpResolver.java</exclude>
-            </excludes>
             <removeUnusedImports/>
             <googleJavaFormat>
               <version>1.28.0</version>

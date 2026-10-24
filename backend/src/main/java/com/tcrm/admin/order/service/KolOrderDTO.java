@@ -1,24 +1,21 @@
 package com.tcrm.admin.order.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** Masked KOL order summary; amounts are decimal strings and missing settlement data stays null. */
+/** Masked KOL order summary; excludes every internal order, shop and product identifier. */
 public record KolOrderDTO(
     String orderNo,
     Instant payTime,
     String orderStatus,
-    String settlementStatus,
-    String payAmount,
-    String refundAmount,
+    BigDecimal payAmount,
+    BigDecimal refundAmount,
     List<Line> items) {
   public record Line(
       String itemName,
       String skuName,
       int quantity,
-      String payAmount,
-      String refundAmount,
-      String rateSnapshot,
-      String commissionAmount,
-      String settlementStatus) {}
+      BigDecimal payAmount,
+      BigDecimal refundAmount) {}
 }

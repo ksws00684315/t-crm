@@ -447,14 +447,65 @@ class PromoSheetIT {
   }
 
   @Test
-  void shouldHideRetiredPortalItemListFromTheLoggedInKol() throws Exception {
+  void shouldListOwnItemsForTheLoggedInKol() throws Exception {
     long[] kols = seed();
     long kolA = kols[0];
+    long kolB = kols[1];
+    insertMapping(kolA, 99L, "1111111111", "SHEET_UPLOAD");
+    insertMapping(kolA, null, "3333333333", "SHEET_UPLOAD");
+    jdbc.update(
+        "UPDATE crm_kol_item SET item_name = 'Golden Ring' WHERE kol_id = ?"
+            + " AND weidian_item_id = '3333333333'",
+        kolA);
     activateKol(kolA, "pass-123-456");
+    activateKol(kolB, "pass-123-456");
     String tokenA = kolLogin("a@example.com", "pass-123-456");
-    mvc.perform(get("/kol-api/items").header(KOL_TOKEN, tokenA))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+    String tokenB = kolLogin("b@example.com", "pass-123-456");
+
+    String body =
+        mvc.perform(get("/kol-api/items").header(KOL_TOKEN, tokenA))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    JsonNode items = json.readTree(body).at("/data");
+    assertThat(items.at("/total").asInt()).isEqualTo(3);
+    JsonNode byId = findItem(items.at("/items"), "1111111111");
+    assertThat(byId).isNotNull();
+    // The original product's name and image win when they exist.
+    assertThat(byId.at("/itemName").asString()).isEqualTo("Original Silver Ring");
+    assertThat(byId.at("/imageUrl").asString()).isEqualTo("https://img.example.com/ring.png");
+    assertThat(byId.at("/transitUrl").asString()).isEqualTo("https://t.example.com/i/1111111111");
+    JsonNode snapshot = findItem(items.at("/items"), "3333333333");
+    assertThat(snapshot).isNotNull();
+    assertThat(snapshot.at("/itemName").asString()).isEqualTo("Golden Ring");
+    assertThat(snapshot.at("/imageUrl").isNull()).isTrue();
+    assertThat(snapshot.at("/transitUrl").asString())
+        .isEqualTo("https://t.example.com/i/3333333333");
+
+    // The keyword matches both product names and snapshots.
+    mvc.perform(get("/kol-api/items").param("keyword", "Golden").header(KOL_TOKEN, tokenA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1));
+    mvc.perform(get("/kol-api/items").param("keyword", "Silver").header(KOL_TOKEN, tokenA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1));
+
+    // The size cap and the other KOL's isolation.
+    mvc.perform(get("/kol-api/items").param("size", "51").header(KOL_TOKEN, tokenA))
+        .andExpect(status().isBadRequest());
+    mvc.perform(get("/kol-api/items").header(KOL_TOKEN, tokenB))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1));
+  }
+
+  private static JsonNode findItem(JsonNode items, String weidianItemId) {
+    for (JsonNode item : items) {
+      if (weidianItemId.equals(item.at("/weidianItemId").asString())) {
+        return item;
+      }
+    }
+    return null;
   }
 
   @Test

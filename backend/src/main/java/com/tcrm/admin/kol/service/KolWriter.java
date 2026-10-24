@@ -5,10 +5,7 @@ import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.CurrentTenantResolver;
 import com.tcrm.admin.shared.ErrorCode;
-import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.shared.api.CommissionSettlementApi;
 import java.time.Instant;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
@@ -28,22 +25,13 @@ public class KolWriter {
   private final KolBdHistoryMapper history;
   private final KolCodeGenerator codes;
   private final TransactionTemplate tx;
-  private final CommissionSettlementApi commission;
-  private final CurrentTenantResolver tenants;
 
   public KolWriter(
-      KolMapper kols,
-      KolBdHistoryMapper history,
-      KolCodeGenerator codes,
-      TransactionTemplate tx,
-      CommissionSettlementApi commission,
-      CurrentTenantResolver tenants) {
+      KolMapper kols, KolBdHistoryMapper history, KolCodeGenerator codes, TransactionTemplate tx) {
     this.kols = kols;
     this.history = history;
     this.codes = codes;
     this.tx = tx;
-    this.commission = commission;
-    this.tenants = tenants;
   }
 
   /**
@@ -77,22 +65,6 @@ public class KolWriter {
 
   private void insertRows(KolDO kol, Long actor) {
     kols.insert(kol);
-    if (kol.getDefaultRate() != null && actor != null) {
-      Long tenantId = kol.getTenantId() == null ? TenantScope.companyId() : kol.getTenantId();
-      if (tenantId == null) {
-        tenantId = tenants.currentLoginTenantId();
-      }
-      if (tenantId == null) {
-        throw new IllegalStateException("KOL commission rate needs a company scope");
-      }
-      commission.recordRateVersion(
-          tenantId,
-          kol.getId(),
-          kol.getDefaultRate(),
-          Instant.now(),
-          actor,
-          "Initial KOL default rate; effective from KOL creation");
-    }
     if (kol.getBdUserId() != null) {
       KolBdHistoryDO period = new KolBdHistoryDO();
       period.setKolId(kol.getId());

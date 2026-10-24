@@ -15,11 +15,7 @@ import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.shared.BusinessException;
-import com.tcrm.admin.shared.CurrentTenantResolver;
 import com.tcrm.admin.shared.ErrorCode;
-import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.shared.api.CommissionSettlementApi;
-import java.math.BigDecimal;
 import java.sql.SQLException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,16 +28,9 @@ class KolWriterTest {
   private final KolMapper kols = mock(KolMapper.class);
   private final KolBdHistoryMapper history = mock(KolBdHistoryMapper.class);
   private final KolCodeGenerator codes = mock(KolCodeGenerator.class);
-  private final CommissionSettlementApi commission = mock(CommissionSettlementApi.class);
-  private final CurrentTenantResolver tenants = mock(CurrentTenantResolver.class);
   private final KolWriter writer =
       new KolWriter(
-          kols,
-          history,
-          codes,
-          new TransactionTemplate(mock(PlatformTransactionManager.class)),
-          commission,
-          tenants);
+          kols, history, codes, new TransactionTemplate(mock(PlatformTransactionManager.class)));
 
   @BeforeEach
   void ids() {
@@ -82,32 +71,6 @@ class KolWriterTest {
     assertThat(period.getValue().getStartTime()).isNotNull();
     assertThat(period.getValue().getEndTime()).isNull();
     assertThat(period.getValue().getCreateBy()).isEqualTo(1L);
-  }
-
-  @Test
-  void recordsInitialCommissionRateInsideTheKolInsertTransaction() {
-    doAnswer(
-            i -> {
-              i.<KolDO>getArgument(0).setId(11L);
-              return 1;
-            })
-        .when(kols)
-        .insert(any(KolDO.class));
-    KolDO input = kol(null);
-    input.setDefaultRate(new BigDecimal("0.2000"));
-
-    try (var scope = TenantScope.openCompany(12L)) {
-      writer.insert(input, null, 1L);
-    }
-
-    verify(commission)
-        .recordRateVersion(
-            org.mockito.ArgumentMatchers.eq(12L),
-            org.mockito.ArgumentMatchers.eq(11L),
-            org.mockito.ArgumentMatchers.eq(new BigDecimal("0.2000")),
-            any(),
-            org.mockito.ArgumentMatchers.eq(1L),
-            org.mockito.ArgumentMatchers.contains("Initial KOL default rate"));
   }
 
   @Test

@@ -24,7 +24,6 @@ import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TestTransactions;
-import com.tcrm.admin.shared.api.CommissionSettlementApi;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.util.List;
@@ -42,7 +41,6 @@ class KolPromotionServiceTest {
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final AuditSanitizer sanitizer = mock(AuditSanitizer.class);
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-  private final CommissionSettlementApi commission = mock(CommissionSettlementApi.class);
   private KolPromotionService service;
 
   @BeforeEach
@@ -58,8 +56,7 @@ class KolPromotionServiceTest {
             TestTransactions.template(),
             audit,
             sanitizer,
-            events,
-            commission);
+            events);
     when(current.user()).thenReturn(admin());
     when(sanitizer.sanitize(any())).thenReturn("{}");
   }

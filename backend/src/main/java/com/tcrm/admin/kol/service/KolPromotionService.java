@@ -21,7 +21,6 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TransactionalEvents;
-import com.tcrm.admin.shared.api.CommissionSettlementApi;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
@@ -59,7 +58,6 @@ public class KolPromotionService {
   private final ExternalAuditApi audit;
   private final AuditSanitizer sanitizer;
   private final ApplicationEventPublisher events;
-  private final CommissionSettlementApi commission;
 
   public KolPromotionService(
       KolMapper kols,
@@ -71,8 +69,7 @@ public class KolPromotionService {
       TransactionTemplate tx,
       ExternalAuditApi audit,
       AuditSanitizer sanitizer,
-      ApplicationEventPublisher events,
-      CommissionSettlementApi commission) {
+      ApplicationEventPublisher events) {
     this.kols = kols;
     this.platforms = platforms;
     this.records = records;
@@ -83,7 +80,6 @@ public class KolPromotionService {
     this.audit = audit;
     this.sanitizer = sanitizer;
     this.events = events;
-    this.commission = commission;
   }
 
   public PromotionConfigDTO getConfig(Long id) {
@@ -238,13 +234,6 @@ public class KolPromotionService {
                 .set(KolDO::getUpdateBy, actorId)
                 .set(KolDO::getUpdateTime, now));
     requireUpdated(updated, user);
-    commission.recordRateVersion(
-        user.tenantId(),
-        kol.getId(),
-        rate,
-        now,
-        actorId,
-        "Promotion configuration version " + version);
     replacePlatforms(kol.getId(), platformInputs, actorId);
   }
 
