@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
 import com.tcrm.admin.commission.model.PayoutAccountStatus;
@@ -113,6 +114,7 @@ public class PayoutAccountService {
   }
 
   private final PayoutAccountMapper accounts;
+  private final WithdrawalMapper withdrawals;
   private final BizFileService files;
   private final KolApi kols;
   private final SecretCipher cipher;
@@ -123,6 +125,7 @@ public class PayoutAccountService {
   @Autowired
   public PayoutAccountService(
       PayoutAccountMapper accounts,
+      WithdrawalMapper withdrawals,
       BizFileService files,
       KolApi kols,
       SecretCipher cipher,
@@ -131,6 +134,7 @@ public class PayoutAccountService {
       ApplicationEventPublisher events,
       SystemConfigApi configs) {
     this.accounts = accounts;
+    this.withdrawals = withdrawals;
     this.files = files;
     this.kols = kols;
     this.cipher = cipher;
@@ -142,6 +146,7 @@ public class PayoutAccountService {
 
   PayoutAccountService(
       PayoutAccountMapper accounts,
+      WithdrawalMapper withdrawals,
       BizFileService files,
       KolApi kols,
       SecretCipher cipher,
@@ -150,6 +155,7 @@ public class PayoutAccountService {
       ApplicationEventPublisher events) {
     this(
         accounts,
+        withdrawals,
         files,
         kols,
         cipher,
@@ -324,6 +330,13 @@ public class PayoutAccountService {
    */
   public void disable(long kolId, long accountId, KolAudit auditContext) {
     PayoutAccountDO account = requireKolAccount(kolId, accountId);
+    // A payout account referenced by a withdrawal still awaiting review or payment cannot be
+    // disabled (task 15a §4.2.6 checkpoint, wired by task 63): finance must still be able to
+    // verify and pay against the snapshot's source account.
+    Long inFlight = withdrawals.countActiveByAccount(accountId);
+    if (inFlight != null && inFlight > 0) {
+      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_IN_USE);
+    }
     Instant now = Instant.now();
     tx.executeWithoutResult(
         status ->

@@ -29,6 +29,8 @@ final class NotificationParamsCodec {
                   params.heirName(),
                   params.result(),
                   params.planType());
+          case WITHDRAWAL_SUBMITTED, WITHDRAWAL_APPROVED, WITHDRAWAL_REJECTED, WITHDRAWAL_PAID ->
+              new WithdrawalParams(params.kolCode(), params.applicationNo());
         };
     return JSON.writeValueAsString(body);
   }
@@ -51,7 +53,8 @@ final class NotificationParamsCodec {
           text(node, "heirName"),
           text(node, "effectiveAt"),
           text(node, "result"),
-          text(node, "planType"));
+          text(node, "planType"),
+          text(node, "applicationNo"));
     } catch (JacksonException ex) {
       return empty();
     }
@@ -83,4 +86,6 @@ final class NotificationParamsCodec {
 
   private record DepartureExecutedParams(
       String bdName, String effectiveAt, String heirName, String result, String planType) {}
+
+  private record WithdrawalParams(String kolCode, String applicationNo) {}
 }

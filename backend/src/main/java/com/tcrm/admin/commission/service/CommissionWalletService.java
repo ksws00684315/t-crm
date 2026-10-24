@@ -111,6 +111,57 @@ public class CommissionWalletService {
         });
   }
 
+  /**
+   * Money a paid withdrawal takes out of the wallet (task 63): one negative COMMISSION_WITHDRAWAL
+   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. The balance may
+   * go negative only if a prepay deduction raced in between approval and payment; that state is
+   * recovered by later commission credits like any other deduction.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public BigDecimal postWithdrawalDebit(
+      long tenantId,
+      long kolId,
+      long withdrawalId,
+      BigDecimal amount,
+      Instant occurredAt,
+      long operatorId) {
+    if (amount == null || amount.signum() <= 0 || amount.scale() > 2) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          ensureWallet(kolId);
+          BigDecimal balance = lockBalance(kolId);
+          String sourceKey = "WITHDRAWAL:" + withdrawalId;
+          BigDecimal existing =
+              existingEntry(
+                  kolId,
+                  "WITHDRAWAL",
+                  withdrawalId,
+                  sourceKey,
+                  amount.negate().setScale(2, RoundingMode.UNNECESSARY));
+          if (existing != null) {
+            return existing;
+          }
+          BigDecimal next = balance.subtract(amount).setScale(2, RoundingMode.UNNECESSARY);
+          wallets.insertLedger(
+              IdWorker.getId(),
+              kolId,
+              "COMMISSION_WITHDRAWAL",
+              amount.negate().setScale(2, RoundingMode.UNNECESSARY),
+              "WITHDRAWAL",
+              withdrawalId,
+              sourceKey,
+              truncate(occurredAt),
+              next,
+              operatorId,
+              now());
+          wallets.updateBalance(kolId, next, now());
+          return next;
+        });
+  }
+
   @Transactional(readOnly = true)
   public Balance balance(long tenantId, long kolId, BigDecimal minimumWithdrawalCny) {
     BigDecimal available = currentBalance(tenantId, kolId);

@@ -66,11 +66,28 @@ public class BizFileService {
     if (bizType != FileBizType.PREPAY_ATTACHMENT && bizType != FileBizType.PREPAY_VOUCHER) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
+    return insertAttached(tenantId, adminId, prepayId, bizType, fileName, content);
+  }
+
+  /** Stores the payment voucher of a withdrawal registration (task 63, ≤2MB by crm_file rules). */
+  public Long uploadWithdrawalVoucher(
+      long tenantId, long adminId, long withdrawalId, String fileName, byte[] content) {
+    return insertAttached(
+        tenantId, adminId, withdrawalId, FileBizType.WITHDRAWAL_VOUCHER, fileName, content);
+  }
+
+  private Long insertAttached(
+      long tenantId,
+      long adminId,
+      long bizId,
+      FileBizType bizType,
+      String fileName,
+      byte[] content) {
     String contentType = PrepayFileRules.contentType(content);
     BizFileDO file = new BizFileDO();
     file.setTenantId(tenantId);
     file.setBizType(bizType);
-    file.setBizId(prepayId);
+    file.setBizId(bizId);
     file.setFileName(fileName(fileName));
     file.setContentType(contentType);
     file.setSizeBytes((long) content.length);
