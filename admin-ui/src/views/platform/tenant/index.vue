@@ -6,6 +6,8 @@ import { listTenants, updateTenantStatus, type TenantVO } from "@/api/platform/t
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import TenantAdminsDialog from "./TenantAdminsDialog.vue";
@@ -25,13 +27,18 @@ function asTenant(row: object): TenantVO {
   return row as TenantVO;
 }
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+/** One width per language: the action labels differ in length (norm 10 §3). */
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
   { key: "tenantCode", label: t("tenant.code"), minWidth: 150 },
   { key: "name", label: t("tenant.name"), prop: "name", minWidth: 160 },
   { key: "status", label: t("common.status"), width: 100 },
   { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 200, tooltip: true },
   { key: "createdAt", label: t("common.createdAt"), width: 180 },
-  { key: "actions", label: t("common.actions"), width: 290 }
+  // Edit / Admins / Disable via RowActions (R-10): zh canvas 84 / en 180 + gaps, padding, headroom.
+  { key: "actions", label: t("common.actions"), width: px(128, 184) }
 ]);
 
 async function load() {
@@ -81,6 +88,32 @@ async function toggleStatus(row: TenantVO) {
   }
 }
 
+/** Row actions via RowActions (norm 11 §2, R-10): the status toggle flips type and label. */
+function rowActions(row: TenantVO): RowAction[] {
+  const enabled = row.status === 1;
+  return [
+    {
+      key: "edit",
+      label: t("common.edit"),
+      testId: "tenant-edit",
+      onClick: () => openEdit(row)
+    },
+    {
+      key: "admins",
+      label: t("tenant.admins"),
+      testId: "tenant-admins",
+      onClick: () => openAdmins(row)
+    },
+    {
+      key: "status",
+      label: enabled ? t("common.disable") : t("common.enable"),
+      testId: "tenant-status",
+      type: enabled ? "danger" : "success",
+      onClick: () => void toggleStatus(row)
+    }
+  ];
+}
+
 onMounted(load);
 </script>
 
@@ -108,19 +141,7 @@ onMounted(load);
       </template>
       <template #cell-createdAt="{ row }">{{ formatInstant(asTenant(row).createTime) }}</template>
       <template #actions="{ row }">
-        <el-button link type="primary" @click="openEdit(asTenant(row))">{{
-          t("common.edit")
-        }}</el-button>
-        <el-button link type="primary" @click="openAdmins(asTenant(row))">
-          {{ t("tenant.admins") }}
-        </el-button>
-        <el-button
-          link
-          :type="asTenant(row).status === 1 ? 'danger' : 'success'"
-          @click="toggleStatus(asTenant(row))"
-        >
-          {{ asTenant(row).status === 1 ? t("common.disable") : t("common.enable") }}
-        </el-button>
+        <RowActions :actions="rowActions(asTenant(row))" />
       </template>
     </DataTable>
 
