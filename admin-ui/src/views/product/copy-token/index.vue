@@ -17,6 +17,7 @@ import { copyText } from "@/utils/copy";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { accessOf } from "@/utils/permission";
+import { useLocaleStore } from "@/stores/locale";
 import { readPageSize } from "@/utils/table-prefs";
 import CopyTokenCreateDialog from "./CopyTokenCreateDialog.vue";
 
@@ -86,6 +87,10 @@ function statusText(status: CopyTokenDisplayStatus): string {
   }
 }
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+/** One width per language: the action labels differ in length (norm 10 §3). */
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
     { key: "hint", label: t("copyToken.hint"), minWidth: 200 },
@@ -99,7 +104,8 @@ const columns = computed<DataColumn[]>(() => {
     { key: "createTime", label: t("common.createdAt"), width: 170 }
   ];
   if (canManage.value) {
-    list.push({ key: "actions", label: t("common.actions"), width: 100 });
+    // Revoke: zh DOM 100px / en canvas 73px + 24px headroom (task 59 R-11 measurements).
+    list.push({ key: "actions", label: t("common.actions"), width: px(124, 104) });
   }
   return list;
 });
@@ -286,7 +292,7 @@ onMounted(() => {
             :loading="kolSearching"
             :placeholder="t('copyToken.kolPlaceholder')"
             data-test="filter-kol"
-            style="width: 220px"
+            class="filter-w-md"
           >
             <el-option
               v-for="kol in kolOptions"
@@ -301,18 +307,13 @@ onMounted(() => {
             v-model="query.targetChannel"
             clearable
             data-test="filter-channel"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option :label="t('copyToken.channelWeidian')" value="WEIDIAN" />
           </el-select>
         </el-form-item>
         <el-form-item :label="t('common.status')">
-          <el-select
-            v-model="query.status"
-            clearable
-            data-test="filter-status"
-            style="width: 140px"
-          >
+          <el-select v-model="query.status" clearable data-test="filter-status" class="filter-w-sm">
             <el-option
               v-for="status in STATUSES"
               :key="status"

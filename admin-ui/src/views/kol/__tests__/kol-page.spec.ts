@@ -165,22 +165,33 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header th .cell")
       .map(item => item.text())
       .filter(Boolean);
+    // R-07: contact, platform, prepay and inviter start hidden; the visible order is unchanged.
     expect(headers).toEqual([
       "达人ID",
       "达人名称",
-      "Phone/WhatsApp",
       "邮箱",
-      "社媒平台/ID",
       "佣金比例",
-      "预付金额",
       "邀请时间",
-      "邀请人",
       "审核状态",
       "登录状态",
       "关系状态",
       "操作"
     ]);
-    expect(wrapper.text()).toContain("开发中");
+    const columns = wrapper.findComponent({ name: "DataTable" }).props("columns") as {
+      key: string;
+      label: string;
+      defaultHidden?: boolean;
+    }[];
+    for (const [key, label] of [
+      ["contact", "Phone/WhatsApp"],
+      ["platform", "社媒平台/ID"],
+      ["prepay", "预付金额"],
+      ["inviter", "邀请人"]
+    ]) {
+      const column = columns.find(item => item.key === key);
+      expect(column?.label).toBe(label);
+      expect(column?.defaultHidden).toBe(true);
+    }
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
@@ -190,8 +201,8 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
-    expect(fixed.length).toBe(13);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1160);
+    expect(fixed.length).toBe(9);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(900);
     wrapper.unmount();
   });
 
@@ -202,6 +213,15 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", phone: null, whatsapp: "+8613900000000" },
       { ...row, id: "3", phone: null, whatsapp: null }
     ]);
+    // The contact column starts hidden (R-07): show it through the column settings first.
+    await element("column-settings").trigger("click");
+    await flushPromises();
+    const checkbox = [...document.body.querySelectorAll(".el-checkbox")]
+      .find(item => item.textContent?.includes("Phone/WhatsApp"))
+      ?.querySelector("input");
+    expect(checkbox).toBeTruthy();
+    await new DOMWrapper(checkbox!).setValue(true);
+    await flushPromises();
     const contacts = new Set(
       [...document.body.querySelectorAll("tr td")]
         .map(td => td.textContent ?? "")

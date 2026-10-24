@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { listRefunds, type RefundQuery } from "@/api/order/order";
 import type { Channel, PageResult, RefundStatus, RefundType, RefundVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
@@ -24,6 +25,8 @@ import OrderDetailDrawer from "@/views/order/OrderDetailDrawer.vue";
 import RefundDetailDrawer from "./RefundDetailDrawer.vue";
 
 defineOptions({ name: "OrderRefundPage" });
+
+const route = useRoute();
 
 /**
  * Refund query (requirement 09.04, task 40 §3): type and status are two separate columns and
@@ -69,15 +72,23 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   { key: "refundNo", label: t("order.refund.no"), width: 150 },
   { key: "orderNo", label: t("order.refund.orderNo"), width: 150 },
-  { key: "channel", label: t("order.channel"), width: 80 },
+  // R-06: channel, type and finish time are secondary; hidden by default so the core columns fit
+  // a 1440 viewport without sliding under the pinned action column (column settings can show them).
+  { key: "channel", label: t("order.channel"), width: 80, defaultHidden: true },
   { key: "shop", label: t("order.shop"), minWidth: 170 },
   { key: "kol", label: t("order.kol"), minWidth: 170 },
-  { key: "refundType", label: t("order.refund.typeColumn"), width: px(100, 130) },
+  {
+    key: "refundType",
+    label: t("order.refund.typeColumn"),
+    width: px(100, 130),
+    defaultHidden: true
+  },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: px(90, 110) },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
   { key: "applyTime", label: t("order.refund.applyTime"), width: 170 },
-  { key: "finishTime", label: t("order.refund.finishTime"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: px(70, 80) }
+  { key: "finishTime", label: t("order.refund.finishTime"), width: 170, defaultHidden: true },
+  // View: zh canvas 28px / en 57px + 24px headroom (task 59 R-11 measurements).
+  { key: "actions", label: t("common.actions"), width: px(70, 84) }
 ]);
 
 const applied = ref(snapshot());
@@ -211,8 +222,24 @@ function rowActions(refund: RefundVO): RowAction[] {
   ];
 }
 
+/**
+ * The order chain pushes ?refundNo=… here (task 59); the tab may already be open and kept alive,
+ * so watch the route instead of reading it once on mount.
+ */
+watch(
+  () => route.query.refundNo,
+  refundNo => {
+    const wanted = typeof refundNo === "string" ? refundNo.trim() : "";
+    if (!wanted || wanted === query.refundNo) return;
+    query.refundNo = wanted;
+    search();
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
-  void load();
+  // The immediate route watch above already searched when a refundNo came with the URL.
+  if (!query.refundNo) void load();
 });
 </script>
 

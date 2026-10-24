@@ -134,6 +134,8 @@ function rowOwned(row: KolVO): boolean {
  * that locale gets wider columns and, as before, scrolls inside the card. Emails, phone numbers and
  * social handles are the only values that ellipsize either way; the visual guide allows that as long
  * as the tooltip shows the rest.
+ * R-07 (task 59): at 1440 the roster slid under the pinned action column, so contact, platform,
+ * prepay and inviter start hidden; with them off, zh shows 1098px and en 1006px of columns.
  */
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
@@ -144,13 +146,33 @@ const columns = computed<DataColumn[]>(() => [
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
   // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
   // those pixels: its values ellipsize with a tooltip either way.
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(140, 146), tooltip: true },
+  // R-07: contact, platform, prepay and inviter are secondary — hidden by default so the core
+  // columns fit 1440 without sliding under the pinned action column (column settings can show them).
+  {
+    key: "contact",
+    label: t("kol.phoneWhatsapp"),
+    width: px(140, 146),
+    tooltip: true,
+    defaultHidden: true
+  },
   { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true },
-  { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
+  {
+    key: "platform",
+    label: t("kol.primaryPlatform"),
+    width: px(160, 176),
+    tooltip: true,
+    defaultHidden: true
+  },
   { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
-  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
+  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true, defaultHidden: true },
   { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 136), tooltip: true },
-  { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
+  {
+    key: "inviter",
+    label: t("kol.inviter"),
+    width: px(80, 104),
+    tooltip: true,
+    defaultHidden: true
+  },
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },

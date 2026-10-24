@@ -222,6 +222,23 @@ describe("shop list buttons", () => {
     wrapper.unmount();
   });
 
+  it("closes the persistent app-not-configured notice when the config dialog opens (L-005)", async () => {
+    signIn("SUPER_ADMIN", []);
+    vi.mocked(weidianApi.startWeidianAuthorization).mockRejectedValue(
+      new ApiError({ status: 409, errorCode: "WEIDIAN_APP_NOT_CONFIGURED", traceId: "t59" })
+    );
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="authorize-1"]').trigger("click");
+    await flushPromises();
+
+    // duration: 0 keeps the notice on screen; it must disappear once the config dialog opens.
+    expect(document.body.textContent).toContain("尚未配置微店服务型应用");
+    await wrapper.get('[data-test="weidian-app-config"]').trigger("click");
+    await flushPromises();
+    expect(document.body.textContent).not.toContain("尚未配置微店服务型应用");
+    wrapper.unmount();
+  });
+
   it("reports a configuration save failure without closing the dialog", async () => {
     signIn("SUPER_ADMIN", []);
     vi.mocked(weidianApi.getWeidianApp).mockResolvedValue({

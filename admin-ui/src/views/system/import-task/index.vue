@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { ElMessage } from "element-plus";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { downloadTaskErrorFile, listImportTasks, type ImportTaskVO } from "@/api/task/task";
+import { useRoute } from "vue-router";
+import {
+  downloadTaskErrorFile,
+  getTask,
+  listImportTasks,
+  type ImportTaskVO
+} from "@/api/task/task";
 import type { TaskStatus, TaskType } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { readPageSize } from "@/utils/table-prefs";
@@ -16,6 +24,7 @@ defineOptions({ name: "SystemImportTaskPage" });
  * and, when rows failed, the error file download.
  */
 const { t } = useI18n();
+const route = useRoute();
 
 const TYPES: TaskType[] = [
   "PRODUCT_IMPORT",
@@ -61,6 +70,10 @@ const chips = computed<SearchChip[]>(() => {
   return list;
 });
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+/** One width per language: the action labels differ in length (norm 10 §3). */
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
   {
     key: "fileName",
@@ -77,7 +90,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "submitter", label: t("importTask.submitter"), prop: "operatorName", width: 120 },
   { key: "submitTime", label: t("importTask.submitTime"), width: 170 },
   { key: "finishTime", label: t("importTask.finishTime"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: 130 }
+  // Error file: zh DOM 130px / en 166px + 24px headroom (task 59 R-11 measurements).
+  { key: "actions", label: t("common.actions"), width: px(154, 190) }
 ]);
 
 async function load() {
@@ -139,7 +153,53 @@ async function downloadError(row: ImportTaskVO) {
   }
 }
 
-onMounted(load);
+/** The row the sync dialog navigated to (R-02); highlighted until the filters change. */
+const locatedTaskId = ref("");
+
+function rowLocated({ row }: { row: object }): string {
+  return asTask(row).id === locatedTaskId.value ? "import-task-row--located" : "";
+}
+
+/**
+ * R-02: /system/tasks?taskId=… from the sync dialog's failed-jobs tab. Fetch the task, filter the
+ * list to its type and status, and highlight the row — with a notice when it is not on page 1.
+ */
+async function locateTask(wanted: string): Promise<void> {
+  try {
+    const task = await getTask(wanted);
+    query.type = task.taskType;
+    query.status = task.status;
+    applied.value = { type: task.taskType, status: task.status };
+    query.page = 1;
+    await load();
+    if (rows.value.some(row => asTask(row).id === wanted)) {
+      locatedTaskId.value = wanted;
+      await nextTick();
+      document
+        .querySelector(".import-task-row--located")
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    } else {
+      ElMessage.info(t("importTask.notOnPage"));
+    }
+  } catch (error) {
+    notifyError(error);
+  }
+}
+
+watch(
+  () => route.query.taskId,
+  taskId => {
+    const wanted = typeof taskId === "string" ? taskId.trim() : "";
+    if (!wanted) return;
+    void locateTask(wanted);
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  // The immediate route watch above already searched when a taskId came with the URL.
+  if (!route.query.taskId) void load();
+});
 </script>
 
 <template>
@@ -190,6 +250,7 @@ onMounted(load);
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
+      :row-class-name="rowLocated"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
@@ -234,5 +295,9 @@ onMounted(load);
 }
 .fail {
   color: var(--tcrm-color-danger);
+}
+/* R-02: the row the sync dialog navigated to. */
+:deep(.import-task-row--located) td {
+  background: var(--tcrm-color-warning-bg);
 }
 </style>
