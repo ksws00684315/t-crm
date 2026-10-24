@@ -185,11 +185,7 @@ class WeidianItemCopyServiceTest {
                 List.of(new ItemDetailResponseBlock(1, "https://img", null, 1, null, null, null)),
                 null));
     when(weidian.addItem(eq(2L), any()))
-        .thenReturn(
-            parser.addItem(
-                json.readTree(
-                    "{\"result\":{\"add_sku_ids\":[],\"itemid\":2234677858},"
-                        + "\"status\":{\"status_code\":0}}")));
+        .thenReturn(parser.addItem(json.readTree("{\"add_sku_ids\":[],\"itemid\":2234677858}")));
     when(weidian.saveItemDetail(eq(2L), any())).thenReturn(new SaveItemDetailResponse("tmp", null));
 
     CopyResult result = service.copy(1L, "10", 2L);
@@ -204,10 +200,7 @@ class WeidianItemCopyServiceTest {
     when(weidian.item(anyLong(), any()))
         .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
     when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
-    JsonNode raw =
-        json.readTree(
-            "{\"result\":{\"add_sku_ids\":[],\"new_goods\":\"SECRET-VALUE-42\"},"
-                + "\"status\":{\"status_code\":0}}");
+    JsonNode raw = json.readTree("{\"add_sku_ids\":[],\"new_goods\":\"SECRET-VALUE-42\"}");
     when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
 
     assertThatThrownBy(() -> service.copy(1L, "10", 2L))
@@ -227,6 +220,30 @@ class WeidianItemCopyServiceTest {
                   .isEqualTo(
                       "Weidian vdian.item.add returned success without a recognised item id"
                           + " in shop 2; result fields=[add_sku_ids, new_goods]");
+            });
+    assertThat(logs.list)
+        .allSatisfy(
+            event -> assertThat(event.getFormattedMessage()).doesNotContain("SECRET-VALUE-42"));
+  }
+
+  @Test
+  void shouldLogJsonTypeOnly_whenAddResultIsNotAnObject() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    JsonNode raw = json.readTree("\"SECRET-VALUE-42\"");
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L)).isInstanceOf(BusinessException.class);
+
+    assertThat(logs.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .isEqualTo(
+                      "Weidian vdian.item.add returned success without a recognised item id"
+                          + " in shop 2; result type=STRING");
             });
     assertThat(logs.list)
         .allSatisfy(

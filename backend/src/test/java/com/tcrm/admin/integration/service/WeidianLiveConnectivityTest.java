@@ -213,7 +213,7 @@ class WeidianLiveConnectivityTest {
       if (detail.succeeded()) {
         // The parser is fed the same result node as production (WeidianBusinessApiClient).
         JsonNode root = detail.result();
-        JsonNode blocks = child(child(root, "result"), "detail_content");
+        JsonNode blocks = child(root, "detail_content");
         JsonNode first = firstOf(blocks);
         run.add(
             "vdian.item.getItemDetail",
@@ -222,7 +222,7 @@ class WeidianLiveConnectivityTest {
             size(blocks) + sample(itemId),
             first == null
                 ? "detail_content 为空，未检查字段"
-                : fields(child(root, "result"), "detail_content")
+                : fields(root, "detail_content")
                     + "；首块 "
                     + fields(first, "type", "url", "text", "pos"),
             parsed(() -> PARSER.itemDetail(root)));
