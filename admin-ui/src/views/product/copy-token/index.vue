@@ -12,6 +12,7 @@ import { listKols } from "@/api/kol/kol";
 import type { CopyTokenVO, KolVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import NameCode from "@/components/NameCode.vue";
 import { useUserStore } from "@/stores/user";
 import { copyText } from "@/utils/copy";
 import { formatInstant } from "@/utils/format";
@@ -68,9 +69,9 @@ function rowId(row: object): string {
 
 function statusTag(status: CopyTokenDisplayStatus): "success" | "warning" | "info" | "danger" {
   if (status === "ACTIVE") return "success";
-  if (status === "EXHAUSTED") return "warning";
-  if (status === "EXPIRED") return "info";
-  return "danger";
+  if (status === "EXHAUSTED") return "info";
+  if (status === "EXPIRED") return "warning";
+  return "info";
 }
 
 /** Map display status to locale key without dynamic casting issues. */
@@ -239,7 +240,7 @@ function clickReveal(event: Event) {
 
 async function clickRevoke(event: Event) {
   const id = (event.currentTarget as HTMLElement | null)?.getAttribute("data-id");
-  if (!id) return;
+  if (!id || !rows.value.some(row => row.id === id && canRevoke(row))) return;
   try {
     await ElMessageBox.confirm(t("copyToken.revokeConfirm"), t("copyToken.revoke"), {
       type: "warning"
@@ -257,7 +258,7 @@ async function clickRevoke(event: Event) {
 }
 
 function canRevoke(row: CopyTokenVO): boolean {
-  return row.displayStatus !== "REVOKED";
+  return row.displayStatus === "ACTIVE";
 }
 
 function channelText(channel: string): string {
@@ -273,7 +274,7 @@ onMounted(() => {
   <div v-if="!canManage" class="empty">{{ t("errors.AUTH_FORBIDDEN") }}</div>
   <div v-else class="list-page">
     <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
-      <template #filters>
+      <template #primary>
         <el-form-item :label="t('copyToken.hint')">
           <el-input
             v-model="query.hint"
@@ -292,14 +293,15 @@ onMounted(() => {
             :loading="kolSearching"
             :placeholder="t('copyToken.kolPlaceholder')"
             data-test="filter-kol"
-            class="filter-w-md"
+            class="token-filter"
           >
             <el-option
               v-for="kol in kolOptions"
               :key="kol.id"
               :label="`${kol.name} (${kol.kolCode})`"
               :value="kol.id"
-            />
+              ><NameCode :name="kol.name" :code="kol.kolCode"
+            /></el-option>
           </el-select>
         </el-form-item>
         <el-form-item :label="t('copyToken.channel')">
@@ -307,13 +309,20 @@ onMounted(() => {
             v-model="query.targetChannel"
             clearable
             data-test="filter-channel"
-            class="filter-w-sm"
+            class="token-filter"
           >
             <el-option :label="t('copyToken.channelWeidian')" value="WEIDIAN" />
           </el-select>
         </el-form-item>
+      </template>
+      <template #more>
         <el-form-item :label="t('common.status')">
-          <el-select v-model="query.status" clearable data-test="filter-status" class="filter-w-sm">
+          <el-select
+            v-model="query.status"
+            clearable
+            data-test="filter-status"
+            class="token-filter"
+          >
             <el-option
               v-for="status in STATUSES"
               :key="status"
@@ -358,10 +367,7 @@ onMounted(() => {
         </button>
       </template>
       <template #cell-kol="{ row }">
-        <span>{{ asRow(row).kolName || "-" }}</span>
-        <el-tag v-if="asRow(row).kolCode" size="small" class="kol-code" data-test="kol-code">
-          {{ asRow(row).kolCode }}
-        </el-tag>
+        <NameCode :name="asRow(row).kolName" :code="asRow(row).kolCode" />
       </template>
       <template #cell-channel="{ row }">
         {{ channelText(asRow(row).targetChannel) }}
@@ -386,11 +392,11 @@ onMounted(() => {
       <template #cell-createTime="{ row }">{{ formatInstant(asRow(row).createTime) }}</template>
       <template #actions="{ row }">
         <button
-          v-if="canRevoke(asRow(row))"
           type="button"
           class="link-btn link-btn--danger"
           data-test="revoke"
           :data-id="rowId(row)"
+          :disabled="!canRevoke(asRow(row))"
           @click="clickRevoke"
         >
           {{ t("copyToken.revoke") }}
@@ -403,6 +409,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.token-filter {
+  width: 100%;
+}
 .empty {
   padding: 24px;
 }
@@ -423,5 +432,10 @@ onMounted(() => {
 }
 .link-btn--danger {
   color: var(--el-color-danger);
+}
+.link-btn--danger:disabled {
+  color: var(--tcrm-color-text-secondary);
+  cursor: not-allowed;
+  opacity: 1;
 }
 </style>

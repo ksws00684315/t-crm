@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
@@ -161,6 +162,7 @@ async function submit() {
     width="560px"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <NameCode v-if="kol" :name="kol?.name" :code="kol?.kolCode" />
     <el-form ref="formRef" :model="form" :rules="rules" label-width="130px" @submit.prevent>
       <el-form-item :label="t('kol.code')">
         <el-input :model-value="kol?.kolCode ?? ''" disabled data-test="profile-code" />

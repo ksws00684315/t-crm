@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { Picture } from "@element-plus/icons-vue";
 import { useRoute } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -142,7 +143,7 @@ const importLimitHint = computed(() => t("mapping.limitHint"));
 const linksVisible = ref(false);
 const linksKol = ref<{ kolCode: string; kolName: string } | null>(null);
 const promoSheetVisible = ref(false);
-const promoSheetKol = ref<{ id: string; label: string } | null>(null);
+const promoSheetKol = ref<{ id: string; label: string; name: string; code: string } | null>(null);
 const commissionVisible = ref(false);
 const commissionKol = ref<KolVO | null>(null);
 const kolPickerVisible = ref(false);
@@ -241,7 +242,12 @@ async function searchKolList(
 function pickKol(kolId: string) {
   const kol = kolOptions.value.find(item => item.id === kolId);
   if (!kol) return;
-  promoSheetKol.value = { id: kol.id, label: formatNameWithCode(kol.name, kol.kolCode) };
+  promoSheetKol.value = {
+    id: kol.id,
+    label: formatNameWithCode(kol.name, kol.kolCode),
+    name: kol.name,
+    code: kol.kolCode
+  };
   kolPickerVisible.value = false;
   promoSheetVisible.value = true;
 }
@@ -432,7 +438,8 @@ onMounted(() => {
               :key="kol.id"
               :label="formatNameWithCode(kol.name, kol.kolCode)"
               :value="kol.id"
-            />
+              ><NameCode :name="kol.name" :code="kol.kolCode"
+            /></el-option>
           </el-select>
         </el-form-item>
         <el-form-item :label="t('mapping.targetShop')">
@@ -520,7 +527,9 @@ onMounted(() => {
           <span class="product-name">{{ asItem(row).itemName || "-" }}</span>
         </div>
       </template>
-      <template #cell-kol="{ row }">{{ kolText(asItem(row)) }}</template>
+      <template #cell-kol="{ row }"
+        ><NameCode :name="asItem(row).kolName" :code="asItem(row).kolCode"
+      /></template>
       <template #cell-targetShop="{ row }">{{ shopText(asItem(row)) }}</template>
       <template #cell-targetChannel="{ row }">
         {{ named("channels", asItem(row).targetChannel) }}
@@ -593,13 +602,16 @@ onMounted(() => {
           :key="kol.id"
           :label="formatNameWithCode(kol.name, kol.kolCode)"
           :value="kol.id"
-        />
+          ><NameCode :name="kol.name" :code="kol.kolCode"
+        /></el-option>
       </el-select>
     </el-dialog>
     <PromoSheetUploadDialog
       v-model="promoSheetVisible"
       :kol-id="promoSheetKol?.id ?? null"
       :kol-label="promoSheetKol?.label ?? ''"
+      :kol-name="promoSheetKol?.name"
+      :kol-code="promoSheetKol?.code"
     />
     <KolItemDetailDrawer v-if="detailVisible" v-model="detailVisible" :item-id="detailId" />
   </div>

@@ -134,9 +134,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
-    // Action column per L-001: browser-measured max .cell scrollWidth (zh 485 / en 675,
-    // assets/task-59/measurements-{zh,en}.md) + 24px headroom. Re-measure when actions change.
-    list.push({ key: "actions", label: t("common.actions"), width: px(509, 699) });
+    list.push({ key: "actions", label: t("common.actions"), width: px(280, 380) });
   }
   return list;
 });
@@ -499,6 +497,19 @@ function authStatusText(row: ShopVO): string {
   return t("shop.authUnauthorized");
 }
 
+// Owner's 10/24 adjustment: only these shop actions move into More.
+const MORE_ACTIONS = new Set(["authorize", "source", "copy-pool", "status", "api-check"]);
+function inlineActions(row: ShopVO): RowAction[] {
+  return rowActions(row).filter(action => !MORE_ACTIONS.has(action.key));
+}
+function moreActions(row: ShopVO): RowAction[] {
+  return rowActions(row).filter(action => MORE_ACTIONS.has(action.key) && !action.hidden);
+}
+function runMoreAction(row: ShopVO, key: string): void {
+  const action = moreActions(row).find(item => item.key === key);
+  if (action && !action.disabled) action.onClick?.();
+}
+
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
   const authResult = params.get("weidianAuth");
@@ -639,11 +650,19 @@ onMounted(() => {
               :content="asShop(row).apiStatus[kind].error ?? ''"
               placement="top"
             >
-              <span
-                :class="{ 'api-status-item--failed': asShop(row).apiStatus[kind].ok === false }"
-              >
+              <span>
                 {{ t(`shop.api${kind[0].toUpperCase()}${kind.slice(1)}`) }}
-                {{ apiStatusText(asShop(row).apiStatus[kind].ok) }}
+                <el-tag
+                  :type="
+                    asShop(row).apiStatus[kind].ok === true
+                      ? 'success'
+                      : asShop(row).apiStatus[kind].ok === false
+                        ? 'danger'
+                        : 'info'
+                  "
+                  :data-test="`api-${kind}-${asShop(row).id}`"
+                  >{{ apiStatusText(asShop(row).apiStatus[kind].ok) }}</el-tag
+                >
               </span>
             </el-tooltip>
           </span>
@@ -675,7 +694,30 @@ onMounted(() => {
         </el-tag>
       </template>
       <template #actions="{ row }">
-        <RowActions :actions="rowActions(asShop(row))" />
+        <div class="shop-actions">
+          <RowActions :actions="inlineActions(asShop(row))" />
+          <el-dropdown
+            v-if="moreActions(asShop(row)).length"
+            trigger="click"
+            @command="runMoreAction(asShop(row), $event)"
+          >
+            <el-button link :data-test="`more-${asShop(row).id}`">{{ t("common.more") }}</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="action in moreActions(asShop(row))"
+                  :key="action.key"
+                  :command="action.key"
+                  :disabled="action.disabled"
+                  :data-test="action.testId"
+                  :title="action.tooltip"
+                >
+                  {{ action.label }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </template>
     </DataTable>
 
@@ -812,6 +854,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.shop-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+}
 .inline-status,
 .capacity-cell,
 .api-status-list {

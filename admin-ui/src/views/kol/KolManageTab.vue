@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -211,12 +212,9 @@ onMounted(loadBdUsers);
           style="width: 100%"
           data-test="transfer-kols"
         >
-          <el-option
-            v-for="kol in foundKols"
-            :key="kol.id"
-            :label="kolLabel(kol)"
-            :value="kol.id"
-          />
+          <el-option v-for="kol in foundKols" :key="kol.id" :label="kolLabel(kol)" :value="kol.id"
+            ><NameCode :name="kol.name" :code="kol.kolCode"
+          /></el-option>
         </el-select>
       </el-form-item>
       <el-form-item :label="t('bdTransfer.targetBd')">

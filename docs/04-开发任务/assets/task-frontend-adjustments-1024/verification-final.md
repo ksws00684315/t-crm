@@ -1,0 +1,16 @@
+# 前端调整1024验证结果
+
+- 管理端：lint、typecheck、production build 全部通过；95个测试文件、677项通过。
+- 达人端：lint、typecheck、production build 全部通过；31个测试文件、232项通过。
+- Edge 浏览器矩阵：管理端中文/英文及1440、1280、2560宽度；达人端中文/英文及390、375宽度。包括有数据、空态、模拟API失败、权限、Token四状态、筛选和任务详情。
+- API 全部由浏览器脚本拦截：管理端168条、达人端9条，无未预期请求或真实后端请求。唯一非GET请求为mock Token reveal，不写入业务数据。
+- `generate-license-file` 校验因本机缺少可用 pnpm launcher（指向不存在的 pnpm.mjs）未运行；没有改依赖或 NOTICE 文件。
+
+截图：
+
+- [Token四状态与作废按钮](tokens-statuses-long-name-1440-zh-CN.png)
+- [店铺更多菜单](shops-more-1440-zh-CN.png)
+- [商品任务明细十列](copyjob-details-1440-zh-CN.png)
+- [达人端账号身份](portal-account-long-name-390-zh-CN.png)
+
+逐请求记录见 `admin-browser-results.json` 与 `portal-browser-results.json`。

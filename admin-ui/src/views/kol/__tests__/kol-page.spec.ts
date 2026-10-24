@@ -172,8 +172,7 @@ describe("creator list page (task 32 §2.2)", () => {
     // Owner decision 2026-10-24 (task 59 review): every requirement column shows by default and
     // the table scrolls horizontally inside the card when it overflows.
     expect(headers).toEqual([
-      "达人ID",
-      "达人名称",
+      "达人ID/达人名",
       "Phone/WhatsApp",
       "邮箱",
       "社媒平台/ID",
@@ -196,8 +195,8 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
-    expect(fixed.length).toBe(13);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1160);
+    expect(fixed.length).toBe(12);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1000);
     wrapper.unmount();
   });
 

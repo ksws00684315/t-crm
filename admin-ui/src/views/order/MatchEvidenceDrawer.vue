@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getMatchEvidence } from "@/api/order/order";
@@ -18,11 +19,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-
-function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
-  if (!name && !code) return "-";
-  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
-}
 
 /**
  * Matching-pool evidence (requirement 10.01, task 40 §6). Orders can carry several unmatched
@@ -148,9 +144,9 @@ const mappingColumns = computed<DataColumn[]>(() => [
             :paged="false"
           >
             <template #cell-kol="{ row }">
-              <span v-if="asMapping(row).kolCode">{{
-                kolLabel(asMapping(row).kolName, asMapping(row).kolCode)
-              }}</span>
+              <span v-if="asMapping(row).kolCode"
+                ><NameCode :name="asMapping(row).kolName" :code="asMapping(row).kolCode"
+              /></span>
               <span v-else>-</span>
             </template>
             <template #cell-linkCode="{ row }">{{ asMapping(row).linkCode ?? "-" }}</template>

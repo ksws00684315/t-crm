@@ -162,7 +162,12 @@ describe("Kol item page", () => {
     expect(wrapper.text()).toContain("支付金额");
     expect(wrapper.text()).toContain("清理状态");
     expect(wrapper.text()).toContain("KPL-ABCDEF123456");
-    expect(wrapper.text()).toContain("Alice（KOL-TAA001）");
+    expect(
+      wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Alice")
+    ).toBe(true);
+    expect(
+      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-TAA001")
+    ).toBe(true);
     expect(wrapper.text()).toContain("14.00");
     expect(wrapper.text()).toContain("清理失败");
     expect(wrapper.find('[data-test="image-placeholder"]').exists()).toBe(true);

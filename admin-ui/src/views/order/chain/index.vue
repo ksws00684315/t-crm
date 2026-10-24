@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -32,10 +33,6 @@ function shopLabel(name: string | null | undefined, code: string | null | undefi
   return code ? formatNameWithCode(name ?? "-", code) : (name ?? "-");
 }
 
-function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
-  if (!name && !code) return "-";
-  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
-}
 const route = useRoute();
 const router = useRouter();
 
@@ -112,7 +109,9 @@ onMounted(async () => {
             {{ shopLabel(detail.shopName, detail.shopCode) }}
           </el-descriptions-item>
           <el-descriptions-item v-if="detail" :label="t('order.kol')">
-            <span v-if="detail.kolCode">{{ kolLabel(detail.kolName, detail.kolCode) }}</span>
+            <span v-if="detail.kolCode"
+              ><NameCode :name="detail.kolName" :code="detail.kolCode"
+            /></span>
             <span v-else>-</span>
           </el-descriptions-item>
           <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
@@ -178,9 +177,9 @@ onMounted(async () => {
               </div>
               <div class="chain-block__text">
                 {{ t("order.kol") }}:
-                <span v-if="line.link.kolCode">{{
-                  kolLabel(line.link.kolName, line.link.kolCode)
-                }}</span>
+                <span v-if="line.link.kolCode"
+                  ><NameCode :name="line.link.kolName" :code="line.link.kolCode"
+                /></span>
                 <span v-else>-</span>
               </div>
             </template>

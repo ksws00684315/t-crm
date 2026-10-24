@@ -172,7 +172,12 @@ describe("order chain page (task 40)", () => {
     expect(text).toContain("LC001");
     expect(text).toContain("8001");
     expect(text).toContain("9001");
-    expect(text).toContain("Zoe（KOL-ZS01）");
+    expect(wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Zoe")).toBe(
+      true
+    );
+    expect(
+      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-ZS01")
+    ).toBe(true);
     expect(text).toContain("t40 Shop（S001）");
     wrapper.unmount();
   });

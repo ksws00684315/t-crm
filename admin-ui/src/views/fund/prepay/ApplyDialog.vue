@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
@@ -130,8 +131,12 @@ async function save() {
   >
     <template #header>
       <div class="prepay-identity" data-test="prepay-creator">
-        <h2 data-test="prepay-creator-name">{{ kol?.name }}</h2>
-        <p data-test="prepay-creator-code">{{ kol?.kolCode }}</p>
+        <NameCode :name="kol?.name" :code="kol?.kolCode"
+          ><span data-test="prepay-creator-name">{{ kol?.name }}</span
+          ><template #code
+            ><span data-test="prepay-creator-code">{{ kol?.kolCode }}</span></template
+          ></NameCode
+        >
       </div>
     </template>
     <div data-test="prepay-apply">

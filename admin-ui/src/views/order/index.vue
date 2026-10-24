@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -88,12 +89,6 @@ function shopText(order: OrderVO): string {
 }
 
 /** Creator cell per 09.04: "name (code)"; "-" while the order is not attributed to a creator. */
-function kolText(order: OrderVO): string {
-  if (!order.kolId && !order.kolCode) return "-";
-  return order.kolCode
-    ? formatNameWithCode(order.kolName ?? order.kolCode, order.kolCode)
-    : (order.kolName ?? "-");
-}
 
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
@@ -436,9 +431,9 @@ onMounted(() => {
           data-test="order-kol"
           @click="openKol(asOrder(row))"
         >
-          {{ kolText(asOrder(row)) }}
+          <NameCode :name="asOrder(row).kolName" :code="asOrder(row).kolCode" />
         </el-button>
-        <span v-else>{{ kolText(asOrder(row)) }}</span>
+        <span v-else><NameCode :name="asOrder(row).kolName" :code="asOrder(row).kolCode" /></span>
       </template>
       <template #cell-orderStatus="{ row }">
         {{ orderStatusText(asOrder(row).orderStatus) }}

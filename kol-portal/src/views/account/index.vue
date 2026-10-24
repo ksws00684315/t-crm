@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { changePassword, getMe } from "@/api/auth";
@@ -60,10 +61,9 @@ function save() {
       t("account.retry")
     }}</el-button>
     <el-card v-if="session.kol" class="profile-card" shadow="never">
+      <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
       <dl class="profile">
-        <template
-          v-for="field in ['kolCode', 'name', 'email', 'phone', 'country', 'tenantName'] as const"
-          :key="field"
+        <template v-for="field in ['email', 'phone', 'country', 'tenantName'] as const" :key="field"
           ><dt>{{ t(`account.${field}`) }}</dt>
           <dd>{{ session.kol[field] || t("account.unavailable") }}</dd></template
         >

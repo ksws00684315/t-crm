@@ -195,7 +195,12 @@ describe("order list page (task 40)", () => {
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功", "无退款"]);
     // Shop and creator follow the "name (code)" form; unattributed shows "-".
     expect(wrapper.text()).toContain("t40 Shop（S001）");
-    expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
+    expect(wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Zoe")).toBe(
+      true
+    );
+    expect(
+      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-ZS01")
+    ).toBe(true);
     wrapper.unmount();
   });
 

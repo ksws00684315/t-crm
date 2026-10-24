@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -358,7 +359,7 @@ onMounted(() => {
       </template>
       <template #cell-kol="{ row }">
         <span v-if="asOrder(row).kolCode">
-          {{ asOrder(row).kolCode }}{{ asOrder(row).kolName ? ` · ${asOrder(row).kolName}` : "" }}
+          <NameCode :name="asOrder(row).kolName" :code="asOrder(row).kolCode" />
         </span>
         <span v-else>-</span>
       </template>
@@ -404,7 +405,8 @@ onMounted(() => {
               :key="kol.id"
               :label="kol.kolCode + (kol.name ? ` · ${kol.name}` : '')"
               :value="kol.id"
-            />
+              ><NameCode :name="kol.name" :code="kol.kolCode"
+            /></el-option>
           </el-select>
         </el-form-item>
         <el-form-item :label="t('order.pool.reason')" required>

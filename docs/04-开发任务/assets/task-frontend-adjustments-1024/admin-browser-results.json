@@ -1,0 +1,1908 @@
+{
+  "scope": "isolated mock API frontend navigation; no real backend calls",
+  "summary": [
+    {
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 900,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "序号",
+        "旧商品 ID",
+        "所属渠道",
+        "所属店铺及ID",
+        "目标渠道",
+        "目标店铺及ID",
+        "新商品 ID",
+        "新商品链接",
+        "状态",
+        "失败原因"
+      ],
+      "errors": []
+    },
+    {
+      "locale": "zh-CN",
+      "width": 1280,
+      "height": 800,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "序号",
+        "旧商品 ID",
+        "所属渠道",
+        "所属店铺及ID",
+        "目标渠道",
+        "目标店铺及ID",
+        "新商品 ID",
+        "新商品链接",
+        "状态",
+        "失败原因"
+      ],
+      "errors": []
+    },
+    {
+      "locale": "zh-CN",
+      "width": 2560,
+      "height": 1440,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "序号",
+        "旧商品 ID",
+        "所属渠道",
+        "所属店铺及ID",
+        "目标渠道",
+        "目标店铺及ID",
+        "新商品 ID",
+        "新商品链接",
+        "状态",
+        "失败原因"
+      ],
+      "errors": []
+    },
+    {
+      "locale": "en-US",
+      "width": 1440,
+      "height": 900,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "No.",
+        "Old item ID",
+        "Source channel",
+        "Source shop",
+        "Target channel",
+        "Target shop",
+        "New item ID",
+        "New item link",
+        "Status",
+        "Failure reason"
+      ],
+      "errors": []
+    },
+    {
+      "locale": "en-US",
+      "width": 1280,
+      "height": 800,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "No.",
+        "Old item ID",
+        "Source channel",
+        "Source shop",
+        "Target channel",
+        "Target shop",
+        "New item ID",
+        "New item link",
+        "Status",
+        "Failure reason"
+      ],
+      "errors": []
+    },
+    {
+      "locale": "en-US",
+      "width": 2560,
+      "height": 1440,
+      "case": "admin populated",
+      "nameCode": [
+        {
+          "name": "",
+          "code": "",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        },
+        {
+          "name": "t1024 长名称达人 Alexander International Creator With A Deliberately Long Display Name",
+          "code": "KOL-T1024-0001",
+          "nameSize": "14px",
+          "codeSize": "14px",
+          "nameColor": "rgb(21, 24, 29)",
+          "codeColor": "rgb(92, 100, 112)",
+          "align": "center",
+          "flex": "column"
+        }
+      ],
+      "detailHeaders": [
+        "No.",
+        "Old item ID",
+        "Source channel",
+        "Source shop",
+        "Target channel",
+        "Target shop",
+        "New item ID",
+        "New item link",
+        "Status",
+        "Failure reason"
+      ],
+      "errors": []
+    },
+    {
+      "case": "simulated API failure",
+      "route": "/product/shops",
+      "errors": []
+    },
+    {
+      "case": "simulated API failure",
+      "route": "/product/copy-tokens",
+      "errors": []
+    },
+    {
+      "case": "simulated API failure",
+      "route": "/product/tasks",
+      "errors": []
+    }
+  ],
+  "apiAudit": [
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/kols",
+      "method": "GET",
+      "query": {
+        "keyword": "t1024",
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20",
+        "hint": "t1024-filter",
+        "kolId": "t1024_kol",
+        "targetChannel": "WEIDIAN"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/kols",
+      "method": "GET",
+      "query": {
+        "keyword": "t1024",
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20",
+        "hint": "t1024-filter",
+        "kolId": "t1024_kol",
+        "targetChannel": "WEIDIAN"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens/t1024_token_0/reveal",
+      "method": "POST",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs/t1024_job_0/items",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/kol/copy-tokens",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/product/copy-jobs",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/commission/payout-accounts/pending-count",
+      "method": "GET",
+      "query": {},
+      "role": "SUPER_ADMIN",
+      "empty": true,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "PLATFORM_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "PLATFORM_ADMIN",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/public/site-config",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/notification/notifications/unread-count",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/product/shops",
+      "method": "GET",
+      "query": {
+        "page": "1",
+        "size": "20"
+      },
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    },
+    {
+      "route": "/auth/me",
+      "method": "GET",
+      "query": {},
+      "role": "STAFF",
+      "empty": false,
+      "portal": false
+    }
+  ]
+}

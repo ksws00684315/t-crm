@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -57,13 +58,6 @@ function shopText(refund: RefundVO): string {
   return refund.shopCode
     ? formatNameWithCode(refund.shopName ?? "-", refund.shopCode)
     : (refund.shopName ?? "-");
-}
-
-function kolText(refund: RefundVO): string {
-  if (!refund.kolCode && !refund.kolName) return "-";
-  return refund.kolCode
-    ? formatNameWithCode(refund.kolName ?? refund.kolCode, refund.kolCode)
-    : (refund.kolName ?? "-");
 }
 
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
@@ -339,7 +333,9 @@ onMounted(() => {
       </template>
       <template #cell-channel="{ row }">{{ channelText(asRefund(row).channel) }}</template>
       <template #cell-shop="{ row }">{{ shopText(asRefund(row)) }}</template>
-      <template #cell-kol="{ row }">{{ kolText(asRefund(row)) }}</template>
+      <template #cell-kol="{ row }"
+        ><NameCode :name="asRefund(row).kolName" :code="asRefund(row).kolCode"
+      /></template>
       <template #cell-refundType="{ row }">{{ refundTypeText(asRefund(row).refundType) }}</template>
       <template #cell-refundStatus="{ row }">
         <el-tag :type="refundTagType(asRefund(row).refundStatus)" data-test="refund-status-tag">

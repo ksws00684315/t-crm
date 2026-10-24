@@ -78,10 +78,10 @@ describe("merged tab pages (task 32 §2.1)", () => {
     signIn();
   });
 
-  it("shop management carries the shops, source products and sheet source tabs", async () => {
+  it("shop management shows only the shops page without legacy tabs", async () => {
     const wrapper = await mountPage(ShopManagementPage, "/product/shops");
-    const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["店铺", "原商品", "商品源表"]);
+    expect(wrapper.find(".shop-management").exists()).toBe(true);
+    expect(wrapper.findAll(".el-tabs__item")).toHaveLength(0);
     wrapper.unmount();
   });
 
