@@ -1,0 +1,619 @@
+
+> tcrm-admin-ui@0.1.0 test D:\1-达人分销CRM\代码核对\t-crm\.worktrees\menu-platform-maintenance\admin-ui
+> vitest run "--maxWorkers=1"
+
+
+ RUN  v5.0.5 D:/1-达人分销CRM/代码核对/t-crm/.worktrees/menu-platform-maintenance/admin-ui
+
+Not implemented: Window's open() method
+Not implemented: Window's open() method
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ src/style/__tests__/tokens.spec.ts (10 tests | 4 failed) 192ms
+   ❯ shared frontend visual tokens (6)
+     × ships the same tokens.css in both apps, byte for byte 17ms
+     × keeps type, spacing, font stack, and control sizing in sync with the creator portal 2ms
+   ❯ shared component styles (task 59 R-08) (2)
+     × keeps the DataTable stylesheet identical across both apps 10ms
+     × keeps the CopyText stylesheet identical across both apps (R-05) 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/style/__tests__/tokens.spec.ts > shared frontend visual tokens > ships the same tokens.css in both apps, byte for byte
+AssertionError: expected '/*\r\n * Design tokens for the admin …' to be '/*\n * Design tokens for the admin co…' // Object.is equality
+
+- Expected
++ Received
+
+- /*
++ /*
+-  * Design tokens for the admin console. Light values live on :root. The dark-mode switch was
++  * Design tokens for the admin console. Light values live on :root. The dark-mode switch was
+-  * removed from the header (task 32), so the dark overrides are gone with it and the console
++  * removed from the header (task 32), so the dark overrides are gone with it and the console
+-  * stays in the single light theme.
++  * stays in the single light theme.
+-  *
++  *
+-  * Contrast (body, secondary text, status tags vs their backgrounds) is at least 4.5:1.
++  * Contrast (body, secondary text, status tags vs their backgrounds) is at least 4.5:1.
+-  */
+-
++  */
++ 
+- :root {
++ :root {
+-   --tcrm-color-primary: #2457d6;
++   --tcrm-color-primary: #2457d6;
+-   --tcrm-color-primary-text: #2457d6;
++   --tcrm-color-primary-text: #2457d6;
+-   --tcrm-color-on-primary: #ffffff;
++   --tcrm-color-on-primary: #ffffff;
+-   --tcrm-color-page: #f5f6f8;
++   --tcrm-color-page: #f5f6f8;
+-   --tcrm-color-card: #ffffff;
++   --tcrm-color-card: #ffffff;
+-   --tcrm-color-muted: #f0f2f5;
++   --tcrm-color-muted: #f0f2f5;
+-   --tcrm-color-border: #e2e5ea;
++   --tcrm-color-border: #e2e5ea;
+-   --tcrm-color-text: #15181d;
++   --tcrm-color-text: #15181d;
+-   --tcrm-color-text-secondary: #5c6470;
++   --tcrm-color-text-secondary: #5c6470;
+-   --tcrm-color-success: #1e7a4c;
++   --tcrm-color-success: #1e7a4c;
+-   --tcrm-color-success-bg: #e6f4ec;
++   --tcrm-color-success-bg: #e6f4ec;
+-   --tcrm-color-warning: #94570a;
++   --tcrm-color-warning: #94570a;
+-   --tcrm-color-warning-bg: #fbf1de;
++   --tcrm-color-warning-bg: #fbf1de;
+-   --tcrm-color-danger: #b42318;
++   --tcrm-color-danger: #b42318;
+-   --tcrm-color-danger-bg: #fdecea;
++   --tcrm-color-danger-bg: #fdecea;
+-   --tcrm-shadow-overlay: 0 8px 24px rgba(21, 24, 29, 0.12);
+-
++   --tcrm-shadow-overlay: 0 8px 24px rgba(21, 24, 29, 0.12);
++ 
+-   --tcrm-space-1: 4px;
++   --tcrm-space-1: 4px;
+-   --tcrm-space-2: 8px;
++   --tcrm-space-2: 8px;
+-   --tcrm-space-3: 12px;
++   --tcrm-space-3: 12px;
+-   --tcrm-space-4: 16px;
++   --tcrm-space-4: 16px;
+-   --tcrm-space-5: 24px;
++   --tcrm-space-5: 24px;
+-   --tcrm-space-6: 32px;
++   --tcrm-space-6: 32px;
+-   --tcrm-control-height: 32px;
++   --tcrm-control-height: 32px;
+-   --tcrm-control-height-mobile: 44px;
++   --tcrm-control-height-mobile: 44px;
+-   --tcrm-radius-card: 12px;
++   --tcrm-radius-card: 12px;
+-   --tcrm-radius-control: 8px;
++   --tcrm-radius-control: 8px;
+-   --tcrm-radius-tag: 6px;
++   --tcrm-radius-tag: 6px;
+-   --tcrm-sidebar-width: 224px;
++   --tcrm-sidebar-width: 224px;
+-   --tcrm-sidebar-collapsed: 64px;
++   --tcrm-sidebar-collapsed: 64px;
+-   --tcrm-header-height: 56px;
++   --tcrm-header-height: 56px;
+-   --tcrm-table-header-height: 40px;
++   --tcrm-table-header-height: 40px;
+-   --tcrm-font-sans:
++   --tcrm-font-sans:
+-     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
++     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
+-     sans-serif;
++     sans-serif;
+-   --tcrm-font-size-body: 14px;
++   --tcrm-font-size-body: 14px;
+-   --tcrm-line-height-body: 22px;
++   --tcrm-line-height-body: 22px;
+-   --tcrm-font-size-title: 20px;
++   --tcrm-font-size-title: 20px;
+-   --tcrm-line-height-title: 28px;
++   --tcrm-line-height-title: 28px;
+-   --tcrm-font-size-section: 16px;
++   --tcrm-font-size-section: 16px;
+-   --tcrm-line-height-section: 24px;
++   --tcrm-line-height-section: 24px;
+-   --tcrm-font-size-help: 12px;
++   --tcrm-font-size-help: 12px;
+-   --tcrm-line-height-help: 20px;
+-
++   --tcrm-line-height-help: 20px;
++ 
+-   --el-color-primary: var(--tcrm-color-primary);
++   --el-color-primary: var(--tcrm-color-primary);
+-   --el-color-success: var(--tcrm-color-success);
++   --el-color-success: var(--tcrm-color-success);
+-   --el-color-warning: var(--tcrm-color-warning);
++   --el-color-warning: var(--tcrm-color-warning);
+-   --el-color-danger: var(--tcrm-color-danger);
++   --el-color-danger: var(--tcrm-color-danger);
+-   --el-color-info: var(--tcrm-color-text-secondary);
++   --el-color-info: var(--tcrm-color-text-secondary);
+-   --el-color-success-light-9: var(--tcrm-color-success-bg);
++   --el-color-success-light-9: var(--tcrm-color-success-bg);
+-   --el-color-warning-light-9: var(--tcrm-color-warning-bg);
++   --el-color-warning-light-9: var(--tcrm-color-warning-bg);
+-   --el-color-danger-light-9: var(--tcrm-color-danger-bg);
++   --el-color-danger-light-9: var(--tcrm-color-danger-bg);
+-   --el-color-info-light-9: var(--tcrm-color-muted);
++   --el-color-info-light-9: var(--tcrm-color-muted);
+-   --el-color-success-light-8: var(--tcrm-color-success-bg);
++   --el-color-success-light-8: var(--tcrm-color-success-bg);
+-   --el-color-warning-light-8: var(--tcrm-color-warning-bg);
++   --el-color-warning-light-8: var(--tcrm-color-warning-bg);
+-   --el-color-danger-light-8: var(--tcrm-color-danger-bg);
++   --el-color-danger-light-8: var(--tcrm-color-danger-bg);
+-   --el-color-info-light-8: var(--tcrm-color-muted);
++   --el-color-info-light-8: var(--tcrm-color-muted);
+-   --el-bg-color: var(--tcrm-color-card);
++   --el-bg-color: var(--tcrm-color-card);
+-   --el-bg-color-page: var(--tcrm-color-page);
++   --el-bg-color-page: var(--tcrm-color-page);
+-   --el-bg-color-overlay: var(--tcrm-color-card);
++   --el-bg-color-overlay: var(--tcrm-color-card);
+-   --el-text-color-primary: var(--tcrm-color-text);
++   --el-text-color-primary: var(--tcrm-color-text);
+-   --el-text-color-regular: var(--tcrm-color-text);
++   --el-text-color-regular: var(--tcrm-color-text);
+-   --el-text-color-secondary: var(--tcrm-color-text-secondary);
++   --el-text-color-secondary: var(--tcrm-color-text-secondary);
+-   --el-text-color-placeholder: var(--tcrm-color-text-secondary);
++   --el-text-color-placeholder: var(--tcrm-color-text-secondary);
+-   --el-border-color: var(--tcrm-color-border);
++   --el-border-color: var(--tcrm-color-border);
+-   --el-border-color-light: var(--tcrm-color-border);
++   --el-border-color-light: var(--tcrm-color-border);
+-   --el-border-color-lighter: var(--tcrm-color-border);
++   --el-border-color-lighter: var(--tcrm-color-border);
+-   --el-border-color-extra-light: var(--tcrm-color-border);
++   --el-border-color-extra-light: var(--tcrm-color-border);
+-   --el-fill-color: var(--tcrm-color-muted);
++   --el-fill-color: var(--tcrm-color-muted);
+-   --el-fill-color-light: var(--tcrm-color-muted);
++   --el-fill-color-light: var(--tcrm-color-muted);
+-   --el-fill-color-blank: var(--tcrm-color-card);
++   --el-fill-color-blank: var(--tcrm-color-card);
+-   --el-mask-color: rgba(21, 24, 29, 0.45);
++   --el-mask-color: rgba(21, 24, 29, 0.45);
+-   --el-border-radius-base: var(--tcrm-radius-control);
++   --el-border-radius-base: var(--tcrm-radius-control);
+-   --el-border-radius-small: var(--tcrm-radius-tag);
++   --el-border-radius-small: var(--tcrm-radius-tag);
+-   --el-component-size: var(--tcrm-control-height);
++   --el-component-size: var(--tcrm-control-height);
+-   --el-font-family: var(--tcrm-font-sans);
++   --el-font-family: var(--tcrm-font-sans);
+-   --el-font-size-base: var(--tcrm-font-size-body);
++   --el-font-size-base: var(--tcrm-font-size-body);
+-   --el-font-size-extra-large: var(--tcrm-font-size-title);
++   --el-font-size-extra-large: var(--tcrm-font-size-title);
+-   --el-font-size-large: var(--tcrm-font-size-section);
++   --el-font-size-large: var(--tcrm-font-size-section);
+-   --el-font-size-medium: var(--tcrm-font-size-body);
++   --el-font-size-medium: var(--tcrm-font-size-body);
+-   --el-font-size-small: var(--tcrm-font-size-help);
++   --el-font-size-small: var(--tcrm-font-size-help);
+-   --el-box-shadow: var(--tcrm-shadow-overlay);
++   --el-box-shadow: var(--tcrm-shadow-overlay);
+-   --el-box-shadow-light: var(--tcrm-shadow-overlay);
++   --el-box-shadow-light: var(--tcrm-shadow-overlay);
+-   color-scheme: light;
++   color-scheme: light;
+- }
+-
++ }
++ 
+- /* Cards use a hairline border. Shadows stay on overlays (menus, dialogs, notices). */
++ /* Cards use a hairline border. Shadows stay on overlays (menus, dialogs, notices). */
+- .el-card {
++ .el-card {
+-   --el-card-border-radius: var(--tcrm-radius-card);
++   --el-card-border-radius: var(--tcrm-radius-card);
+-   border: 1px solid var(--tcrm-color-border);
++   border: 1px solid var(--tcrm-color-border);
+-   box-shadow: none;
++   box-shadow: none;
+- }
+-
++ }
++ 
+- .el-tag {
++ .el-tag {
+-   --el-tag-border-radius: var(--tcrm-radius-tag);
++   --el-tag-border-radius: var(--tcrm-radius-tag);
+- }
+-
++ }
++ 
+- .el-button,
++ .el-button,
+- .el-input__wrapper,
++ .el-input__wrapper,
+- .el-select__wrapper {
++ .el-select__wrapper {
+-   border-radius: var(--tcrm-radius-control);
++   border-radius: var(--tcrm-radius-control);
+- }
++ }
+
+
+ ❯ src/style/__tests__/tokens.spec.ts:56:23
+     54| describe("shared frontend visual tokens", () => {
+     55|   it("ships the same tokens.css in both apps, byte for byte", () => {
+     56|     expect(portalCss).toBe(css);
+       |                       ^
+     57|   });
+     58|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/style/__tests__/tokens.spec.ts > shared frontend visual tokens > keeps type, spacing, font stack, and control sizing in sync with the creator portal
+AssertionError: tcrm-font-sans must match both apps: expected '-apple-system, BlinkMacSystemFont, "S…' to be '-apple-system, BlinkMacSystemFont, "S…' // Object.is equality
+
+- Expected
++ Received
+
+- -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
++ -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
+      sans-serif
+
+ ❯ src/style/__tests__/tokens.spec.ts:82:77
+     80|
+     81|     for (const token of tokens) {
+     82|       expect(tokenValue(portalCss, token), `${token} must match both a…
+       |                                                                             ^
+     83|         tokenValue(css, token)
+     84|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/style/__tests__/tokens.spec.ts > shared component styles (task 59 R-08) > keeps the DataTable stylesheet identical across both apps
+AssertionError: expected '\r\n.data-table {\r\n  display: flex;…' to be '\n.data-table {\n  display: flex;\n  …' // Object.is equality
+
+- Expected
++ Received
+
+-
++ 
+- .data-table {
++ .data-table {
+-   display: flex;
++   display: flex;
+-   flex-direction: column;
++   flex-direction: column;
+-   gap: var(--tcrm-space-2);
++   gap: var(--tcrm-space-2);
+-   flex: 0 1 auto;
++   flex: 0 1 auto;
+-   min-height: 0;
++   min-height: 0;
+-   max-height: 100%;
++   max-height: 100%;
+-   height: auto;
++   height: auto;
+-   padding: var(--tcrm-space-3);
++   padding: var(--tcrm-space-3);
+-   background: var(--tcrm-color-card);
++   background: var(--tcrm-color-card);
+-   border: 1px solid var(--tcrm-color-border);
++   border: 1px solid var(--tcrm-color-border);
+-   border-radius: var(--tcrm-radius-card);
++   border-radius: var(--tcrm-radius-card);
+- }
++ }
+- .data-table__batch {
++ .data-table__batch {
+-   display: flex;
++   display: flex;
+-   align-items: center;
++   align-items: center;
+-   flex-wrap: wrap;
++   flex-wrap: wrap;
+-   gap: var(--tcrm-space-2);
++   gap: var(--tcrm-space-2);
+- }
++ }
+- .data-table__batch-count {
++ .data-table__batch-count {
+-   font-weight: 600;
++   font-weight: 600;
+-   color: var(--tcrm-color-primary-text, var(--el-color-primary));
++   color: var(--tcrm-color-primary-text, var(--el-color-primary));
+- }
++ }
+- .data-table__batch-hint {
++ .data-table__batch-hint {
+-   font-size: var(--tcrm-font-size-help);
++   font-size: var(--tcrm-font-size-help);
+-   line-height: 20px;
++   line-height: 20px;
+-   color: var(--tcrm-color-text-secondary);
++   color: var(--tcrm-color-text-secondary);
+- }
++ }
+- .data-table.is-plain {
++ .data-table.is-plain {
+-   flex: initial;
++   flex: initial;
+-   height: auto;
++   height: auto;
+-   min-height: 0;
++   min-height: 0;
+-   padding: 0;
++   padding: 0;
+-   border: none;
++   border: none;
+-   background: transparent;
++   background: transparent;
+- }
++ }
+- .data-table.is-fullscreen {
++ .data-table.is-fullscreen {
+-   position: fixed;
++   position: fixed;
+-   z-index: 30;
++   z-index: 30;
+-   top: calc(var(--tcrm-header-height) + 40px);
++   top: calc(var(--tcrm-header-height) + 40px);
+-   right: 0;
++   right: 0;
+-   bottom: 0;
++   bottom: 0;
+-   left: var(--layout-aside-width, 0px);
++   left: var(--layout-aside-width, 0px);
+-   height: auto;
++   height: auto;
+-   border-radius: 0;
++   border-radius: 0;
+- }
++ }
+- .data-table__toolbar,
++ .data-table__toolbar,
+- .data-table__pager,
++ .data-table__pager,
+- .data-table__column {
++ .data-table__column {
+-   display: flex;
++   display: flex;
+-   align-items: center;
++   align-items: center;
+-   justify-content: space-between;
++   justify-content: space-between;
+-   gap: var(--tcrm-space-2);
++   gap: var(--tcrm-space-2);
+-   flex-shrink: 0;
++   flex-shrink: 0;
+- }
++ }
+- .data-table__tools {
++ .data-table__tools {
+-   display: flex;
++   display: flex;
+-   align-items: center;
++   align-items: center;
+-   gap: var(--tcrm-space-1);
++   gap: var(--tcrm-space-1);
+- }
++ }
+- .data-table__total {
++ .data-table__total {
+-   color: var(--tcrm-color-text-secondary);
++   color: var(--tcrm-color-text-secondary);
+- }
++ }
+- .data-table__body {
++ .data-table__body {
+-   flex: 1 1 auto;
++   flex: 1 1 auto;
+-   min-height: 0;
++   min-height: 0;
+-   /* el-table owns vertical and horizontal scrolling; the card clips nothing itself. */
++   /* el-table owns vertical and horizontal scrolling; the card clips nothing itself. */
+-   overflow: hidden;
++   overflow: hidden;
+- }
++ }
+- .data-table__columns {
++ .data-table__columns {
+-   display: flex;
++   display: flex;
+-   flex-direction: column;
++   flex-direction: column;
+-   gap: var(--tcrm-space-1);
++   gap: var(--tcrm-space-1);
+- }
++ }
+- .data-table__empty {
++ .data-table__empty {
+-   padding: var(--tcrm-space-4) 0;
++   padding: var(--tcrm-space-4) 0;
+-   color: var(--tcrm-color-text-secondary);
++   color: var(--tcrm-color-text-secondary);
+- }
++ }
+- .data-table :deep(.el-table__header th) {
++ .data-table :deep(.el-table__header th) {
+-   background: var(--tcrm-color-muted);
++   background: var(--tcrm-color-muted);
+- }
++ }
+- .data-table :deep(.el-table th.el-table__cell) {
++ .data-table :deep(.el-table th.el-table__cell) {
+-   height: var(--tcrm-table-header-height);
++   height: var(--tcrm-table-header-height);
+-   padding-block: 0;
++   padding-block: 0;
+- }
++ }
+- /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
++ /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
+-    its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
++    its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
+-    left shadow — without it a clipped column reads as a rendering bug. */
++    left shadow — without it a clipped column reads as a rendering bug. */
+- .data-table :deep(.el-scrollbar__bar.is-horizontal) {
++ .data-table :deep(.el-scrollbar__bar.is-horizontal) {
+-   display: block !important;
++   display: block !important;
+-   height: 6px;
++   height: 6px;
+-   opacity: 1 !important;
++   opacity: 1 !important;
+- }
++ }
+- .data-table :deep(.el-scrollbar__bar.is-horizontal > div) {
++ .data-table :deep(.el-scrollbar__bar.is-horizontal > div) {
+-   background: color-mix(in srgb, var(--tcrm-color-text-secondary) 40%, transparent);
++   background: color-mix(in srgb, var(--tcrm-color-text-secondary) 40%, transparent);
+-   border-radius: 3px;
++   border-radius: 3px;
+- }
++ }
+- .data-table :deep(.el-table-fixed-column--right.is-first-column) {
++ .data-table :deep(.el-table-fixed-column--right.is-first-column) {
+-   box-shadow: inset 10px 0 8px -8px color-mix(in srgb, var(--tcrm-color-text) 16%, transparent);
++   box-shadow: inset 10px 0 8px -8px color-mix(in srgb, var(--tcrm-color-text) 16%, transparent);
+- }
++ }
+- .data-table :deep(.el-table .el-table__cell) {
++ .data-table :deep(.el-table .el-table__cell) {
+-   padding-block: var(--tcrm-space-3);
++   padding-block: var(--tcrm-space-3);
+- }
++ }
+- .data-table.density-small :deep(.el-table .el-table__cell) {
++ .data-table.density-small :deep(.el-table .el-table__cell) {
+-   padding-block: var(--tcrm-space-2);
++   padding-block: var(--tcrm-space-2);
+- }
++ }
+- .data-table.density-large :deep(.el-table .el-table__cell) {
++ .data-table.density-large :deep(.el-table .el-table__cell) {
+-   padding-block: var(--tcrm-space-4);
++   padding-block: var(--tcrm-space-4);
+- }
++ }
+- .data-table :deep(.el-table__body tr:hover > td) {
++ .data-table :deep(.el-table__body tr:hover > td) {
+-   background: var(--tcrm-color-muted);
++   background: var(--tcrm-color-muted);
+- }
++ }
+- /* A link button carries a 28px box next to 22px cell text, so rows with a link (the creator column
++ /* A link button carries a 28px box next to 22px cell text, so rows with a link (the creator column
+-    of the order list, the download action of the import list) were 4px taller than rows without one.
++    of the order list, the download action of the import list) were 4px taller than rows without one.
+-    Drop the button onto the text line and every row keeps one height. */
++    Drop the button onto the text line and every row keeps one height. */
+- .data-table :deep(.el-table .cell .el-button.is-link) {
++ .data-table :deep(.el-table .cell .el-button.is-link) {
+-   height: auto;
++   height: auto;
+-   padding: 0;
++   padding: 0;
+-   line-height: var(--tcrm-line-height-body);
++   line-height: var(--tcrm-line-height-body);
+-   vertical-align: baseline;
++   vertical-align: baseline;
+- }
++ }
+
+
+ ❯ src/style/__tests__/tokens.spec.ts:166:67
+    164|
+    165|   it("keeps the DataTable stylesheet identical across both apps", () =…
+    166|     expect(styleBlock("kol-portal/src/components/DataTable.vue")).toBe(
+       |                                                                   ^
+    167|       styleBlock("admin-ui/src/components/DataTable.vue")
+    168|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/style/__tests__/tokens.spec.ts > shared component styles (task 59 R-08) > keeps the CopyText stylesheet identical across both apps (R-05)
+AssertionError: expected '\r\n.copy-text {\r\n  display: inline…' to be '\n.copy-text {\n  display: inline-fle…' // Object.is equality
+
+- Expected
++ Received
+
+-
++ 
+- .copy-text {
++ .copy-text {
+-   display: inline-flex;
++   display: inline-flex;
+-   align-items: center;
++   align-items: center;
+-   gap: var(--tcrm-space-1);
++   gap: var(--tcrm-space-1);
+-   min-width: 0;
++   min-width: 0;
+-   max-width: 100%;
++   max-width: 100%;
+- }
++ }
+- .copy-text__value {
++ .copy-text__value {
+-   min-width: 0;
++   min-width: 0;
+-   overflow: hidden;
++   overflow: hidden;
+-   text-overflow: ellipsis;
++   text-overflow: ellipsis;
+-   white-space: nowrap;
++   white-space: nowrap;
+- }
++ }
+
+
+ ❯ src/style/__tests__/tokens.spec.ts:172:66
+    170|
+    171|   it("keeps the CopyText stylesheet identical across both apps (R-05)"…
+    172|     expect(styleBlock("kol-portal/src/components/CopyText.vue")).toBe(
+       |                                                                  ^
+    173|       styleBlock("admin-ui/src/components/CopyText.vue")
+    174|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 93 passed (94)
+      Tests  4 failed | 669 passed (673)
+   Start at  18:23:44
+   Duration  647.90s (environment 44%, import 24%, tests 18%, transform 9%, setup 4%)
+
+Environment  jsdom was created 94 times · 275.36s total, 44% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+ ELIFECYCLE  Test failed. See above for more details.
