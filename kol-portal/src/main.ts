@@ -8,6 +8,7 @@ import { i18n } from "./locales";
 import router from "./router";
 import { useLocaleStore } from "./stores/locale";
 import { loadSiteConfig, startSiteConfigRefresh } from "./stores/site-config";
+import "./style/tokens.css";
 import "./style/index.css";
 
 const app = createApp(App);

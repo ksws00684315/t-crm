@@ -1,19 +1,14 @@
 import { translate } from "@/locales";
 import { http } from "../http";
 import {
-  financePreview,
+  financeApiReady,
   previewContext,
   currentFinanceRole,
   currentFinanceIdentity,
   financePreviewAllows
 } from "@/utils/finance";
-import { financeError, createFinanceDemo } from "./finance-engine";
-import {
-  clearPreviewState,
-  loadPreviewState,
-  savePreviewState,
-  withPreviewState
-} from "./finance-preview-sync";
+import { ApiError } from "@/utils/http/error";
+import type { FinanceDemo } from "../../../preview/commission/finance-engine";
 import type {
   IncomeDetail,
   IncomeQuery,
@@ -28,23 +23,40 @@ import type {
   WithdrawalOrder
 } from "./finance-types";
 
-const demo = financePreview ? createFinanceDemo() : null;
+type Demo = FinanceDemo;
+const previewBuild =
+  import.meta.env.MODE === "commission-preview" && import.meta.env.VITE_COMMISSION_DEMO === "true";
+let demo: Demo | undefined;
+function financeError(status: number, errorCode = "COMMON_INTERNAL_ERROR"): never {
+  throw new ApiError({ status, errorCode, traceId: "finance-api-unavailable" });
+}
+async function previewModules() {
+  if (!previewBuild || !financePreview) financeError(503);
+  const [{ createFinanceDemo }, sync] = await Promise.all([
+    import("../../../preview/commission/finance-engine"),
+    import("../../../preview/commission/finance-preview-sync")
+  ]);
+  demo ??= createFinanceDemo();
+  return { demo, sync };
+}
 async function call<T>(
   method: "get" | "put",
   url: string,
   payload: unknown,
-  local: () => T
+  local: (preview: Demo) => T
 ): Promise<T> {
-  if (financePreview) {
+  if (previewBuild && financePreview) {
     if (!financePreviewAllows("view")) financeError(403, "AUTH_FORBIDDEN");
     if (previewContext.failWrites && method !== "get") financeError(503, "COMMON_INTERNAL_ERROR");
-    return withPreviewState(async () => {
-      await loadPreviewState(demo!);
-      const result = local();
-      if (method !== "get") await savePreviewState(demo!);
+    const { demo: preview, sync } = await previewModules();
+    return sync.withPreviewState(async () => {
+      await sync.loadPreviewState(preview);
+      const result = local(preview);
+      if (method !== "get") await sync.savePreviewState(preview);
       return result;
     });
   }
+  if (!financeApiReady) financeError(503);
   return http.request<T>({
     url,
     method,
@@ -58,29 +70,30 @@ function previewAction<T>(capability: "review" | "pay" | "configure", action: ()
 const role = () => currentFinanceRole();
 const scenario = () => previewContext.scenario;
 export const listIncome = (query: IncomeQuery) =>
-  call<IncomeResult>("get", "/commission/incomes", query, () =>
-    demo!.listIncome(role(), scenario(), query)
+  call<IncomeResult>("get", "/commission/incomes", query, preview =>
+    preview.listIncome(role(), scenario(), query)
   );
 export const getIncome = (id: string, query: IncomeQuery) =>
-  call<IncomeDetail>("get", `/commission/incomes/${id}`, query, () =>
-    demo!.incomeDetail(role(), scenario(), id, query)
+  call<IncomeDetail>("get", `/commission/incomes/${id}`, query, preview =>
+    preview.incomeDetail(role(), scenario(), id, query)
   );
-export const listWithdrawals = (query: WithdrawalQuery) =>
-  call<Page<Withdrawal>>("get", "/commission/withdrawals", query, () =>
-    demo!.listWithdrawals(role(), scenario(), query)
+export const listWithdrawals = (query: WithdrawalQuery) => {
+  return call<Page<Withdrawal>>("get", "/commission/withdrawals", query, preview =>
+    preview.listWithdrawals(role(), scenario(), query)
   );
+};
 export const getWithdrawal = (id: string) =>
-  call<Withdrawal>("get", `/commission/withdrawals/${id}`, {}, () =>
-    demo!.withdrawal(role(), scenario(), id)
+  call<Withdrawal>("get", `/commission/withdrawals/${id}`, {}, preview =>
+    preview.withdrawal(role(), scenario(), id)
   );
 export const getWithdrawalOrders = (id: string, query: { page: number; size: number }) =>
-  call<Page<WithdrawalOrder>>("get", `/commission/withdrawals/${id}/orders`, query, () =>
-    demo!.withdrawalOrders(role(), scenario(), id, query)
+  call<Page<WithdrawalOrder>>("get", `/commission/withdrawals/${id}/orders`, query, preview =>
+    preview.withdrawalOrders(role(), scenario(), id, query)
   );
 export const reviewWithdrawal = (id: string, decision: "APPROVE" | "REJECT", note: string) =>
-  call<Withdrawal>("put", `/commission/withdrawals/${id}/review`, { decision, note }, () =>
+  call<Withdrawal>("put", `/commission/withdrawals/${id}/review`, { decision, note }, preview =>
     previewAction("review", () =>
-      demo!.review(role(), scenario(), id, decision, note, currentFinanceIdentity())
+      preview.review(role(), scenario(), id, decision, note, currentFinanceIdentity())
     )
   );
 export const payWithdrawal = (id: string, payload: PaymentRegistration, idempotencyKey: string) =>
@@ -88,30 +101,33 @@ export const payWithdrawal = (id: string, payload: PaymentRegistration, idempote
     "put",
     `/commission/withdrawals/${id}/payment`,
     { ...payload, idempotencyKey },
-    () => previewAction("pay", () => demo!.pay(role(), scenario(), id, payload, idempotencyKey))
+    preview =>
+      previewAction("pay", () => preview.pay(role(), scenario(), id, payload, idempotencyKey))
   );
 export const getConfig = () =>
-  call<SettlementConfig>("get", "/commission/settlement-configs/current", {}, () =>
-    demo!.getConfig(role(), scenario())
+  call<SettlementConfig>("get", "/commission/settlement-configs/current", {}, preview =>
+    preview.getConfig(role(), scenario())
   );
 export const saveConfig = (payload: SettlementConfig) =>
-  call<SettlementConfig>("put", "/commission/settlement-configs/current", payload, () =>
-    previewAction("configure", () => demo!.saveConfig(role(), scenario(), payload))
+  call<SettlementConfig>("put", "/commission/settlement-configs/current", payload, preview =>
+    previewAction("configure", () => preview.saveConfig(role(), scenario(), payload))
   );
 export const listSettlements = (query: SettlementQuery) =>
-  call<Page<Settlement>>("get", "/commission/settlement-details", query, () =>
-    demo!.settlements(role(), scenario(), query)
+  call<Page<Settlement>>("get", "/commission/settlement-details", query, preview =>
+    preview.settlements(role(), scenario(), query)
   );
 export const resetFinanceDemo = async () => {
-  if (financePreview) {
-    await withPreviewState(async () => {
-      await clearPreviewState();
-      demo!.reset();
+  if (previewBuild && financePreview) {
+    const { demo: preview, sync } = await previewModules();
+    await sync.withPreviewState(async () => {
+      await sync.clearPreviewState();
+      preview.reset();
     });
   }
 };
 export async function uploadWithdrawalVoucher(file: File): Promise<{ fileId: string }> {
-  if (financePreview) return { fileId: `t1023_preview_voucher_${file.size}` };
+  if (previewBuild && financePreview) return { fileId: `t1023_preview_voucher_${file.size}` };
+  if (!financeApiReady) financeError(503);
   const data = new FormData();
   data.append("file", file);
   data.append("bizType", "WITHDRAWAL_VOUCHER");
@@ -123,23 +139,39 @@ export async function uploadWithdrawalVoucher(file: File): Promise<{ fileId: str
   });
 }
 export const downloadWithdrawalVoucher = (id: string) =>
-  financePreview
+  previewBuild
     ? Promise.resolve({
         blob: new Blob(["t1023_demo_payment_voucher"], { type: "text/plain" }),
         fileName: "t1023_voucher.txt"
       })
-    : http.download({ url: `/files/${id}`, method: "get" });
+    : financeApiReady
+      ? http.download({ url: `/files/${id}`, method: "get" })
+      : Promise.reject(
+          new ApiError({
+            status: 503,
+            errorCode: "COMMON_INTERNAL_ERROR",
+            traceId: "finance-api-unavailable"
+          })
+        );
 
 export async function exportWithdrawals(query: WithdrawalQuery) {
-  if (!financePreview)
-    return http.download({ url: "/commission/withdrawals/export", method: "get", params: query });
+  if (!previewBuild) {
+    if (!financeApiReady) financeError(503);
+    const { kolId, ...rest } = query;
+    return http.download({
+      url: "/commission/withdrawals/export",
+      method: "get",
+      params: { ...rest, ...(kolId?.trim() ? { kol: kolId.trim() } : {}) }
+    });
+  }
   if (!financePreviewAllows("export")) financeError(403, "AUTH_FORBIDDEN");
-  await withPreviewState(() => loadPreviewState(demo!));
+  const { demo: preview, sync } = await previewModules();
+  await sync.withPreviewState(() => sync.loadPreviewState(preview));
   const rows: Withdrawal[] = [];
   let current = 1;
   let total = 0;
   do {
-    const result = demo!.listWithdrawals(role(), scenario(), {
+    const result = preview.listWithdrawals(role(), scenario(), {
       ...query,
       page: current,
       size: 100

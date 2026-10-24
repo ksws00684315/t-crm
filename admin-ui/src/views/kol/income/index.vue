@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
+import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { listIncome } from "@/api/commission/finance";
 import type { Income, IncomeQuery, IncomeResult } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -9,7 +10,7 @@ import ListSearch from "@/components/ListSearch.vue";
 import RowActions from "@/components/RowActions.vue";
 import CopyText from "@/components/CopyText.vue";
 import { formatInstant, formatPrice } from "@/utils/format";
-import { previewContext, periodBounds } from "@/utils/finance";
+import { financeApiReady, previewContext, periodBounds } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import IncomeDrawer from "./IncomeDrawer.vue";
 defineOptions({ name: "KolIncomePage" });
@@ -30,6 +31,7 @@ function query(): IncomeQuery {
 }
 
 async function load() {
+  if (!financeApiReady) return;
   loading.value = true;
   failed.value = false;
   try {
@@ -129,7 +131,8 @@ watch(
 onMounted(load);
 </script>
 <template>
-  <div class="finance-page" data-test="income-page">
+  <FinanceUnavailable v-if="!financeApiReady" />
+  <div v-else class="finance-page" data-test="income-page">
     <FinancePreviewNotice />
     <div class="finance-content">
       <ListSearch :chips="chips" @search="search" @reset="reset" @remove="remove"

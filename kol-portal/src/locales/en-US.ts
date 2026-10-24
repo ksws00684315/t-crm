@@ -1,4 +1,3 @@
-import finance from "./finance-en-US";
 /**
  * Base message pack. Keys follow "area.meaning" (common.signOut, login.title, errors.AUTH_*,
  * route.notFound); never the English or Chinese sentence itself. `zh-CN.ts` must have exactly the
@@ -8,10 +7,9 @@ import finance from "./finance-en-US";
 import prepay from "./prepay-en-US";
 const enUS = {
   prepay,
-  finance,
   app: {
     title: "SparkTrack Creator Portal",
-    titleSuffix: " Creator Portal"
+    titleSuffix: " Creator"
   },
   common: {
     language: "Language",
@@ -20,7 +18,10 @@ const enUS = {
     comingSoon: "Coming soon",
     cancel: "Cancel",
     edit: "Edit",
-    copy: "Copy"
+    copy: "Copy",
+    actions: "Actions",
+    search: "Search",
+    reset: "Reset"
   },
   /** Header navigation (task 15b §4.3); keys are referenced by `layout/nav.ts`. */
   nav: {
@@ -94,7 +95,10 @@ const enUS = {
     emptyHint: "Your items appear here once your manager finishes the promotion setup.",
     unnamed: "Unnamed item",
     copyLink: "Copy link",
-    copied: "Copied"
+    copied: "Copied",
+    colItem: "Item",
+    colId: "Item ID",
+    colCreated: "Created"
   },
   orders: {
     title: "My orders",
@@ -231,6 +235,38 @@ const enUS = {
     },
     handle: "Social account",
     submit: "Create creator account"
+  },
+  copy: {
+    done: "Copied {text}",
+    failed: "Could not copy. Select the text and copy it manually."
+  },
+  search: {
+    expand: "Expand",
+    collapse: "Collapse",
+    chip: "{label}: {text}",
+    clearAll: "Clear all"
+  },
+  table: {
+    total: "{total} in total",
+    range: "{from}–{to} of {total}",
+    densityDefault: "Default",
+    densityCompact: "Compact",
+    densityLoose: "Loose",
+    refresh: "Refresh",
+    columns: "Columns",
+    hidden: "{n} hidden",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    reset: "Reset",
+    fullscreen: "Table full screen",
+    exitFullscreen: "Exit table full screen",
+    empty: "No data",
+    emptyFiltered: "No matching data · {n} filters applied",
+    clearFilters: "Clear filters",
+    export: "Export",
+    selected: "{n} selected",
+    selectedPageOnly: "current page only",
+    clearSelection: "Clear selection"
   },
   errors: {
     PREPAY_REQUEST_CONFLICT:

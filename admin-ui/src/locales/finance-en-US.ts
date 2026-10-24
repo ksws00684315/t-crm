@@ -45,6 +45,8 @@ export default {
   KOL: "Current creator",
   forbidden: "This identity cannot access company financial data.",
   developing: "In development · Live financial APIs await backend authorization.",
+  backendNotReady:
+    "Commission APIs are not enabled yet. This page will be available after the backend is deployed.",
   language: "Language",
   keyword: "Creator name / ID / email",
   paymentType: "Payment type",

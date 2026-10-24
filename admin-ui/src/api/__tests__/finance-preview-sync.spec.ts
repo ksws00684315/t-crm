@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createFinanceDemo } from "../commission/finance-engine";
+import { createFinanceDemo } from "../../../preview/commission/finance-engine";
 import {
   loadPreviewState,
   savePreviewState,
   withPreviewState
-} from "../commission/finance-preview-sync";
+} from "../../../preview/commission/finance-preview-sync";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("shared commission preview state", () => {

@@ -36,7 +36,7 @@ onBeforeUnmount(() => {
 const operationsNote = computed(
   () =>
     detail.value?.operationsNote ||
-    detail.value?.history.find(event => event.action === "PENDING_FINANCE_REVIEW")?.note ||
+    detail.value?.history.find(event => event.action === "APPROVED")?.note ||
     "—"
 );
 const financeNote = computed(

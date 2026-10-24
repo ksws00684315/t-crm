@@ -28,11 +28,13 @@ const { t } = useI18n();
 .home-entries {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--tcrm-space-4);
 }
 .home-entry {
   display: inline-block;
-  margin-top: 8px;
+  margin-top: var(--tcrm-space-2);
+  color: var(--el-color-primary);
   font-weight: 600;
+  text-decoration: none;
 }
 </style>

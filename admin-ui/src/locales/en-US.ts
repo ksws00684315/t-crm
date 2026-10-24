@@ -1,8 +1,8 @@
-import finance from "./finance-en-US";
 import type { MessageSchema } from "./zh-CN";
 
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
 import prepay from "./prepay-en-US";
+import finance from "./finance-en-US";
 const enUS: MessageSchema = {
   prepay,
   finance,
@@ -303,6 +303,10 @@ const enUS: MessageSchema = {
     COPY_TARGET_SHOP_MISSING:
       "No default copy shop is set and the token does not name a target shop",
     PRODUCT_LINK_RATE_LIMITED: "Too many requests; please try again later",
+    SHORT_URL_INVALID: "The URL must be http or https and at most 2048 characters",
+    SHORT_URL_HOST_NOT_ALLOWED: "The URL host is not in the short-URL allow-list",
+    SHORT_URL_ADDRESS_NOT_ALLOWED: "The URL resolves to a private or reserved address",
+    SHORT_URL_RESOLVE_FAILED: "The short URL could not be resolved; try again later",
     KOL_DISABLED: "The creator account is disabled",
     KOL_PROMO_SHEET_INVALID: "The promo sheet is not a readable .xlsx workbook; upload it again.",
     KOL_PROMO_SHEET_TOO_LARGE: "The promo sheet exceeds 300MB.",
@@ -445,7 +449,8 @@ const enUS: MessageSchema = {
       product_links_ip_per_minute: "Copy API requests per IP per minute",
       product_links_convert_token_per_minute: "Token conversions per minute",
       product_links_resolve_token_per_minute: "Token resolutions per minute",
-      weidian_qps: "Weidian requests per second"
+      weidian_qps: "Weidian requests per second",
+      link_short_url_allowed_hosts: "Short-URL allow-list hosts"
     },
     restoreDefault: "Restore default",
     integerRequired: "Enter an integer",

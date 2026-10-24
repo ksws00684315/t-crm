@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createFinanceDemo } from "../commission/finance-engine";
-import { account } from "../commission/finance-demo";
+import { createFinanceDemo } from "../../../preview/commission/finance-engine";
+import { account } from "../../../preview/commission/finance-demo";
 import type { PaymentRegistration } from "../commission/finance-types";
 import { cents, decimal, financeAbilities, previewSubject, sumMoney } from "@/utils/finance";
 

@@ -328,13 +328,13 @@ load();
 .payout {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--tcrm-space-4);
 }
 .payout__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--tcrm-space-3);
   flex-wrap: wrap;
 }
 .payout__head h1 {
@@ -343,34 +343,34 @@ load();
   line-height: var(--tcrm-line-height-title);
 }
 .payout__limit {
-  margin: -8px 0 0;
+  margin: calc(var(--tcrm-space-2) * -1) 0 0;
   color: var(--el-text-color-secondary);
 }
 .payout__list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--tcrm-space-3);
   min-height: 120px;
 }
 .payout__card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--tcrm-space-2);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--tcrm-space-2);
 }
 .payout__type {
   font-weight: 600;
 }
 .payout__tags {
   display: inline-flex;
-  gap: 8px;
+  gap: var(--tcrm-space-2);
 }
 .payout__fields {
   display: grid;
   grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
-  gap: 8px 16px;
+  gap: var(--tcrm-space-2) var(--tcrm-space-4);
   margin: 0;
 }
 .payout__fields dt {
@@ -383,20 +383,20 @@ load();
 .payout__account {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--tcrm-space-1);
 }
 .payout__account-value {
   overflow-wrap: anywhere;
   font-family: var(--tcrm-font-sans);
 }
 .payout__reject {
-  margin-top: 12px;
+  margin-top: var(--tcrm-space-3);
 }
 .payout__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 12px;
+  gap: var(--tcrm-space-1);
+  margin-top: var(--tcrm-space-3);
 }
 .payout__qr-view {
   width: 100%;

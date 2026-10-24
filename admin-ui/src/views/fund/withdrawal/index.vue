@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
+import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { exportWithdrawals, listWithdrawals } from "@/api/commission/finance";
 import type { Withdrawal, WithdrawalQuery } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -10,7 +11,7 @@ import RowActions from "@/components/RowActions.vue";
 import CopyText from "@/components/CopyText.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
-import { financeAbilities, previewContext } from "@/utils/finance";
+import { financeAbilities, financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import { saveBlob } from "@/utils/download";
 import WithdrawalDrawer from "./WithdrawalDrawer.vue";
@@ -67,6 +68,7 @@ const chips = computed(() =>
 );
 
 async function load() {
+  if (!financeApiReady) return;
   loading.value = true;
   failed.value = false;
   try {
@@ -183,7 +185,8 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="tasks-page" data-test="withdrawal-page">
+  <FinanceUnavailable v-if="!financeApiReady" />
+  <div v-else class="tasks-page" data-test="withdrawal-page">
     <FinancePreviewNotice />
     <div class="finance-content">
       <ListSearch :chips="chips" @search="search" @reset="reset" @remove="remove">

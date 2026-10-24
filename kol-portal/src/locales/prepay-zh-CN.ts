@@ -1,4 +1,9 @@
 export default {
+  number: "预付单号",
+  paidAmount: "实付金额",
+  entryType: "流水类型",
+  entryAmount: "流水金额",
+  occurredAt: "入账时间",
   title: "达人预付",
   amount: "申请金额（CNY）",
   payTime: "支付时间",

@@ -32,6 +32,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class OrderSync {
   private static final Logger LOG = LoggerFactory.getLogger(OrderSync.class);
   private static final Duration OVERLAP = Duration.ofMinutes(10);
+  private static final int REFUND_PAGE_SIZE = 50;
+  private static final int MAX_REFUND_PAGES = 200;
   private static final DateTimeFormatter TIME =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Asia/Shanghai"));
   private final WeidianBusinessApi api;
@@ -308,7 +310,7 @@ public class OrderSync {
                     TIME.format(from),
                     TIME.format(to),
                     number,
-                    50,
+                    REFUND_PAGE_SIZE,
                     null,
                     null,
                     null));
@@ -326,16 +328,23 @@ public class OrderSync {
           }
           writer.saveRefund(shopId, detail);
         }
-        if (page.totalNum() == null) {
-          throw new IllegalStateException("Refund count missing");
-        }
-        if ((number + 1L) * 50 >= page.totalNum()) {
+        if (page.totalNum() != null) {
+          if ((number + 1L) * REFUND_PAGE_SIZE >= page.totalNum()) {
+            break;
+          }
+          if (page.list().isEmpty()) {
+            throw new IllegalStateException("Refund page missing");
+          }
+        } else if (page.list().size() < REFUND_PAGE_SIZE) {
+          // Weidian omits totalNum when the window has no refunds (task 55 live test),
+          // so a short page is the only end marker.
           break;
         }
-        if (page.list().isEmpty()) {
-          throw new IllegalStateException("Refund page missing");
-        }
         number++;
+        if (number >= MAX_REFUND_PAGES) {
+          throw new IllegalStateException(
+              "Refund pagination exceeded " + MAX_REFUND_PAGES + " pages in one window");
+        }
       }
       from = to;
     }

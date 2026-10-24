@@ -34,10 +34,12 @@ const emit = defineEmits<{ "update:modelValue": [value: boolean]; saved: [] }>()
 const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => prepayAbilities(me.user));
-const canApprove = computed(() =>
-  detail.value?.status === "PENDING_OPERATIONS_REVIEW"
-    ? abilities.value.operationsReview
-    : detail.value?.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview
+const canApprove = computed(
+  () =>
+    detail.value?.applicantId !== me.user?.id &&
+    (detail.value?.status === "PENDING_OPERATIONS_REVIEW"
+      ? abilities.value.operationsReview
+      : detail.value?.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview)
 );
 const detail = ref<PrepayDetail | null>(null);
 const loading = ref(false);

@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
-import { createFinanceDemo } from "@/api/commission/finance-engine";
+import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import DataTable from "@/components/DataTable.vue";
@@ -29,7 +29,8 @@ vi.mock("@/api/commission/finance", () => ({
 }));
 vi.mock("@/utils/finance", async original => ({
   ...(await original<typeof FinanceUtils>()),
-  financePreview: true
+  financePreview: true,
+  financeApiReady: true
 }));
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 beforeEach(() => {

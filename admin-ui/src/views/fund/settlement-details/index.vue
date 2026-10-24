@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { useI18n } from "vue-i18n";
 import { subscribeNarrow } from "@/utils/sidebar";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
+import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { listSettlements } from "@/api/commission/finance";
 import type { Settlement } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -12,7 +13,7 @@ import RowActions from "@/components/RowActions.vue";
 import CommissionTable from "@/components/CommissionTable.vue";
 import { formatRate } from "@/utils/rate";
 import { formatInstant, formatPrice } from "@/utils/format";
-import { previewContext } from "@/utils/finance";
+import { financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 defineOptions({ name: "SettlementDetailsPage" });
 const { t, locale } = useI18n();
@@ -74,6 +75,7 @@ const chips = computed(() =>
     }))
 );
 async function load() {
+  if (!financeApiReady) return;
   loading.value = true;
   failed.value = false;
   try {
@@ -126,7 +128,8 @@ watch(
 onMounted(load);
 </script>
 <template>
-  <div class="settlement-page" data-test="settlement-page">
+  <FinanceUnavailable v-if="!financeApiReady" />
+  <div v-else class="settlement-page" data-test="settlement-page">
     <FinancePreviewNotice />
     <div class="finance-content">
       <ListSearch :chips="chips" @search="search" @reset="reset" @remove="remove"

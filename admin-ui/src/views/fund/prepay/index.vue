@@ -126,9 +126,15 @@ function actions(row: PrepayRow): RowAction[] {
 function processMode(row: PrepayRow) {
   if (row.status === "WAITING_DETAILS" && abilities.value.apply && row.applicantId === me.user?.id)
     return "complete";
-  if (row.status === "PENDING_OPERATIONS_REVIEW" && abilities.value.operationsReview)
+  const otherApplicant = row.applicantId !== me.user?.id;
+  if (
+    row.status === "PENDING_OPERATIONS_REVIEW" &&
+    otherApplicant &&
+    abilities.value.operationsReview
+  )
     return "approve";
-  if (row.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview) return "approve";
+  if (row.status === "PENDING_FINANCE_REVIEW" && otherApplicant && abilities.value.financeReview)
+    return "approve";
   if (row.status === "APPROVED" && abilities.value.pay) return "pay";
   return "";
 }

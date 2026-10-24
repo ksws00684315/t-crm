@@ -272,7 +272,11 @@ describe("prepay safe submission", () => {
   });
   it("shows review actions only to reviewers and refreshes after approval conflict", async () => {
     useUserStore().user!.permissions = ["prepay:review"];
-    vi.mocked(api.getPrepay).mockResolvedValue({ ...detail, status: "PENDING_OPERATIONS_REVIEW" });
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      applicantId: "8",
+      status: "PENDING_OPERATIONS_REVIEW"
+    });
     vi.mocked(api.approvePrepay).mockRejectedValue(
       new ApiError({ status: 409, errorCode: "PREPAY_STATE_CONFLICT", traceId: "test" })
     );
@@ -283,6 +287,26 @@ describe("prepay safe submission", () => {
     expect(api.approvePrepay).toHaveBeenCalledWith("9", "APPROVE", undefined);
     expect(api.getPrepay).toHaveBeenCalledTimes(2);
   });
+  it.each([
+    ["PENDING_OPERATIONS_REVIEW", "prepay:review", "7", false],
+    ["PENDING_OPERATIONS_REVIEW", "prepay:review", "8", true],
+    ["PENDING_OPERATIONS_REVIEW", "prepay:finance-review", "8", false],
+    ["PENDING_FINANCE_REVIEW", "prepay:finance-review", "7", false],
+    ["PENDING_FINANCE_REVIEW", "prepay:finance-review", "8", true],
+    ["PENDING_FINANCE_REVIEW", "prepay:review", "8", false]
+  ] as const)(
+    "controls review buttons for %s with %s and applicant %s",
+    async (status, permission, applicantId, allowed) => {
+      useUserStore().user!.permissions = [permission];
+      vi.mocked(api.getPrepay).mockResolvedValue({ ...detail, status, applicantId });
+      const wrapper = await open(DetailDrawer);
+      // A stale approval action or direct detail link must never expose self-review.
+      await wrapper.setProps({ initialAction: "approve" });
+      expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(allowed);
+      expect(wrapper.find('[data-test="prepay-reject"]').exists()).toBe(allowed);
+      expect(api.approvePrepay).not.toHaveBeenCalled();
+    }
+  );
   it("shows only identity amount and readonly state and submits a minimal application", async () => {
     vi.mocked(api.applyPrepay).mockResolvedValue({ ...detail, status: "WAITING_DETAILS" });
     useUserStore().user!.nickname = "Business operator";

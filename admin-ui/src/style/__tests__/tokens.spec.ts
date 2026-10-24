@@ -4,10 +4,17 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = resolve(__dirname, "../../../..");
 const css = readFileSync(resolve(__dirname, "../tokens.css"), "utf8");
-const portalCss = readFileSync(
-  resolve(__dirname, "../../../../kol-portal/src/style/index.css"),
-  "utf8"
-);
+const portalCss = readFileSync(resolve(repoRoot, "kol-portal/src/style/tokens.css"), "utf8");
+
+/**
+ * Spacing literals the portal may keep. Empty today: every margin, padding and gap uses a token.
+ * Add an entry only with a reason, as `"kol-portal/src/...:line" -> "reason"`.
+ */
+const SPACING_ALLOWLIST = new Map<string, string>();
+
+const RAW_COLOR = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
+const RAW_SPACING =
+  /(?:^|[^-\w])(?:margin|padding|gap|row-gap|column-gap)(?:-[a-z]+)*\s*:[^;]*\b\d+px\b/;
 
 /** Every .vue/.css source of one app, minus the file allowed to define raw font-size values. */
 function sourceFiles(appDir: string, allowed: string[] = []): string[] {
@@ -17,7 +24,10 @@ function sourceFiles(appDir: string, allowed: string[] = []): string[] {
       const full = join(dir, name);
       if (statSync(full).isDirectory()) {
         walk(full);
-      } else if (/\.(vue|css)$/.test(name) && !allowed.includes(relative(repoRoot, full))) {
+      } else if (
+        /\.(vue|css)$/.test(name) &&
+        !allowed.includes(relative(repoRoot, full).replaceAll("\\", "/"))
+      ) {
         out.push(full);
       }
     }
@@ -42,6 +52,10 @@ describe("light-only tokens (dark switch removed, task 32)", () => {
 });
 
 describe("shared frontend visual tokens", () => {
+  it("ships the same tokens.css in both apps, byte for byte", () => {
+    expect(portalCss).toBe(css);
+  });
+
   it("keeps type, spacing, font stack, and control sizing in sync with the creator portal", () => {
     const tokens = [
       "tcrm-space-1",
@@ -100,6 +114,41 @@ describe("shared frontend visual tokens", () => {
     expect(
       offenders,
       "numeric font-size declarations must use tokens:\n" + offenders.join("\n")
+    ).toEqual([]);
+  });
+
+  it("keeps raw colors out of portal components and styles", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles("kol-portal/src", ["kol-portal/src/style/tokens.css"])) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          if (RAW_COLOR.test(line)) {
+            offenders.push(`${relative(repoRoot, file)}:${index + 1}: ${line.trim()}`);
+          }
+        });
+    }
+    expect(
+      offenders,
+      "portal colors must come from tokens.css variables:\n" + offenders.join("\n")
+    ).toEqual([]);
+  });
+
+  it("uses spacing tokens instead of pixel margins, paddings and gaps in portal styles", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles("kol-portal/src", ["kol-portal/src/style/tokens.css"])) {
+      readFileSync(file, "utf8")
+        .split("\n")
+        .forEach((line, index) => {
+          const location = `${relative(repoRoot, file)}:${index + 1}`;
+          if (RAW_SPACING.test(line) && !SPACING_ALLOWLIST.has(location)) {
+            offenders.push(`${location}: ${line.trim()}`);
+          }
+        });
+    }
+    expect(
+      offenders,
+      "portal spacing must use --tcrm-space-* tokens:\n" + offenders.join("\n")
     ).toEqual([]);
   });
 });

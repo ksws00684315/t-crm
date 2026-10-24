@@ -51,6 +51,6 @@ describe("app root", () => {
     expect(document.title).toBe("登录 | SparkTrack 达人端");
     useLocaleStore().setLocale("en-US");
     await nextTick();
-    expect(document.title).toBe("Sign in | SparkTrack Creator Portal");
+    expect(document.title).toBe("Sign in | SparkTrack Creator");
   });
 });

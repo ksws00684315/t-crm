@@ -43,6 +43,7 @@ export default {
   KOL: "达人本人",
   forbidden: "当前身份无权访问公司财务数据",
   developing: "开发中 · 真实财务接口待后端授权实施",
+  backendNotReady: "佣金结算接口尚未启用，请在后端接口部署完成后开放此页面。",
   language: "语言",
   keyword: "达人名称／ID／邮箱",
   paymentType: "付款类型",

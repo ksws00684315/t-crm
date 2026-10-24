@@ -3,7 +3,8 @@ import { createPinia, setActivePinia } from "pinia";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
-import { createFinanceDemo } from "@/api/commission/finance-engine";
+import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
+import type * as FinanceUtils from "@/utils/finance";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import { currentFinanceRole, financePreviewAllows } from "@/utils/finance";
@@ -26,6 +27,10 @@ vi.mock("@/api/commission/finance", () => ({
   exportWithdrawals: vi.fn(),
   uploadWithdrawalVoucher: vi.fn(),
   downloadWithdrawalVoucher: vi.fn()
+}));
+vi.mock("@/utils/finance", async original => ({
+  ...(await original<typeof FinanceUtils>()),
+  financeApiReady: true
 }));
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 

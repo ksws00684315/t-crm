@@ -2,12 +2,13 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
+import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { getConfig, saveConfig } from "@/api/commission/finance";
 import type { SettlementConfig } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
-import { financeAbilities, previewContext, validMoney } from "@/utils/finance";
+import { financeAbilities, financeApiReady, previewContext, validMoney } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 defineOptions({ name: "SettlementConfigPage" });
 const { t } = useI18n();
@@ -35,6 +36,7 @@ const columns = computed<DataColumn[]>(() =>
   }))
 );
 async function load() {
+  if (!financeApiReady) return;
   loading.value = true;
   failed.value = false;
   try {
@@ -71,7 +73,8 @@ watch(() => [previewContext.role, previewContext.scenario], load);
 onMounted(load);
 </script>
 <template>
-  <div class="config-page" v-loading="loading" data-test="config-page">
+  <FinanceUnavailable v-if="!financeApiReady" />
+  <div v-else class="config-page" v-loading="loading" data-test="config-page">
     <FinancePreviewNotice />
     <el-result v-if="failed" icon="error" :title="t('finance.loadFailed')"
       ><template #extra

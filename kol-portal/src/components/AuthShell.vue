@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
-import { siteName } from "@/stores/site-config";
 defineProps<{ title: string }>();
 </script>
 
 <template>
   <main class="auth-shell">
     <div class="auth-shell__bar"><LocaleSwitch /></div>
-    <el-card class="auth-shell__card" shadow="never">
-      <div class="auth-shell__brand">{{ siteName }}</div>
+    <el-card class="auth-shell__card" shadow="always">
       <h1>{{ title }}</h1>
       <slot />
     </el-card>
@@ -22,50 +20,50 @@ defineProps<{ title: string }>();
   align-items: center;
   justify-content: center;
   min-height: 100%;
-  padding: 80px 16px 32px;
+  padding: var(--tcrm-space-6) var(--tcrm-space-4);
 }
 .auth-shell__bar {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: var(--tcrm-space-4);
+  right: var(--tcrm-space-4);
 }
 .auth-shell__card {
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
 }
 h1 {
-  margin: 0 0 24px;
+  margin: 0 0 var(--tcrm-space-5);
   font-size: var(--tcrm-font-size-title);
-  line-height: 28px;
+  line-height: var(--tcrm-line-height-title);
   text-align: center;
-}
-.auth-shell__brand {
-  margin-bottom: 8px;
-  color: var(--el-color-primary);
-  font-size: var(--tcrm-font-size-body);
-  font-weight: 600;
-  text-align: center;
-}
-:deep(.el-button) {
-  min-height: 44px;
-  margin-block: 2px;
-}
-:deep(.el-input__wrapper) {
-  min-height: 44px;
 }
 :deep(.auth-submit) {
   width: 100%;
-  margin-top: 8px;
+  margin-top: var(--tcrm-space-2);
 }
 :deep(.el-alert) {
-  margin-bottom: 20px;
+  margin-bottom: var(--tcrm-space-4);
 }
 :deep(.auth-links) {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  margin-top: 20px;
+  gap: var(--tcrm-space-4);
+  margin-top: var(--tcrm-space-4);
 }
-@media (max-width: 480px) {
+/* Links inside the auth card follow the admin console: primary colour, underline on hover only. */
+:deep(a) {
+  color: var(--tcrm-color-primary-text);
+  text-decoration: none;
+}
+:deep(a:hover) {
+  text-decoration: underline;
+}
+@media (max-width: 767px) {
+  :deep(.el-button),
+  :deep(.el-input__wrapper) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
   .auth-shell__card {
     max-width: none;
   }

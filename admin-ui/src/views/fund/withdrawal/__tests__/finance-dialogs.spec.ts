@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
-import { createFinanceDemo } from "@/api/commission/finance-engine";
+import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
 import type { Page, Withdrawal, WithdrawalOrder } from "@/api/commission/finance-types";
 import { i18n } from "@/locales";
 import { notifyError } from "@/utils/notify";
