@@ -4,6 +4,9 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -51,9 +54,8 @@ public class PrepayController {
         "commission:view"
       },
       mode = SaMode.OR)
-  public R<com.tcrm.admin.shared.PageResult<PrepayService.PrepayRow>> list(
-      @Valid @ModelAttribute Query request) {
-    return R.ok(
+  public R<PageResult<PrepayRowVO>> list(@Valid @ModelAttribute Query request) {
+    PageResult<PrepayService.PrepayRow> page =
         prepays.page(
             current.user(),
             new PrepayService.Filter(
@@ -61,21 +63,28 @@ public class PrepayController {
                 request.kolCode(),
                 request.status(),
                 request.pageNumber(),
-                request.pageSize())));
+                request.pageSize()));
+    return R.ok(page == null ? null : page.map(PrepayRowVO::from));
   }
 
   @GetMapping("/admin-api/commission/prepays/active")
   @SaCheckPermission("prepay:apply")
-  public R<PrepayService.PrepayDetail> active(@RequestParam @Positive Long kolId) {
-    return R.ok(prepays.activeApplication(current.user(), kolId));
+  public R<PrepayDetailVO> active(@RequestParam @Positive Long kolId) {
+    return R.ok(PrepayDetailVO.from(prepays.activeApplication(current.user(), kolId)));
   }
 
   @GetMapping("/admin-api/commission/prepays/kol-summaries")
   @SaCheckPermission("kol:view")
-  public R<List<PrepayService.KolSummary>> summaries(@RequestParam List<@Positive Long> kolId) {
-    return R.ok(prepays.summaries(current.user(), kolId));
+  public R<List<PrepayKolSummaryVO>> summaries(@RequestParam List<@Positive Long> kolId) {
+    List<PrepayService.KolSummary> rows = prepays.summaries(current.user(), kolId);
+    return R.ok(rows == null ? List.of() : rows.stream().map(PrepayKolSummaryVO::from).toList());
   }
 
+  /**
+   * CSV export. Annotation requires {@code data:export}; service also requires a prepay list
+   * permission ({@code prepay:apply}/{@code prepay:review}/{@code prepay:finance-review}/{@code
+   * prepay:pay}/{@code commission:view}), matching the design "export AND list scope".
+   */
   @GetMapping("/admin-api/commission/prepays/export")
   @SaCheckPermission("data:export")
   public ResponseEntity<byte[]> export(@Valid @ModelAttribute Query request) {
@@ -99,55 +108,46 @@ public class PrepayController {
       value = "/admin-api/commission/prepays",
       consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
   @SaCheckPermission("prepay:apply")
-  public R<PrepayService.PrepayDetail> apply(@Valid @RequestPart("payload") ApplyRequest request) {
+  public R<PrepayDetailVO> apply(@Valid @RequestPart("payload") ApplyRequest request) {
     return R.ok(
-        prepays.apply(
-            current.user(),
-            new PrepayService.PrepayApplication(
-                request.requestId(), request.kolId(), request.amountCny())));
+        PrepayDetailVO.from(
+            prepays.apply(
+                current.user(),
+                new PrepayService.PrepayApplication(
+                    request.requestId(), request.kolId(), request.amountCny()))));
   }
 
   @PutMapping(
       value = "/admin-api/commission/prepays/{id}/application-details",
       consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
   @SaCheckPermission("prepay:apply")
-  public R<PrepayService.PrepayDetail> saveApplicationDetails(
+  public R<PrepayDetailVO> saveApplicationDetails(
       @PathVariable @Positive Long id,
       @Valid @RequestPart("payload") DetailsRequest request,
-      @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments)
-      throws IOException {
+      @RequestPart(value = "attachments", required = false) List<MultipartFile> attachments) {
     return R.ok(
-        prepays.saveApplicationDetails(
-            current.user(),
-            id,
-            new PrepayService.ApplicationDetails(
-                request.reason(),
-                request.expectedPayDate(),
-                request.payoutAccountId(),
-                request.deductFromCommission(),
-                request.recipientText()),
-            attachments == null
-                ? List.of()
-                : attachments.stream()
-                    .map(
-                        file -> {
-                          try {
-                            return new PrepayService.UploadedFile(
-                                file.getOriginalFilename(), file.getBytes());
-                          } catch (IOException exception) {
-                            throw new IllegalArgumentException(
-                                "Unable to read uploaded file", exception);
-                          }
-                        })
-                    .toList()));
+        PrepayDetailVO.from(
+            prepays.saveApplicationDetails(
+                current.user(),
+                id,
+                new PrepayService.ApplicationDetails(
+                    request.reason(),
+                    request.expectedPayDate(),
+                    request.payoutAccountId(),
+                    request.deductFromCommission(),
+                    request.recipientText()),
+                attachments == null
+                    ? List.of()
+                    : attachments.stream().map(PrepayController::uploaded).toList())));
   }
 
   @GetMapping("/admin-api/commission/prepays/payout-accounts")
   @SaCheckPermission(
       value = {"prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay"},
       mode = SaMode.OR)
-  public R<List<PrepayService.PayoutOption>> payoutAccounts(@RequestParam @Positive Long kolId) {
-    return R.ok(prepays.payoutOptions(current.user(), kolId));
+  public R<List<PrepayPayoutOptionVO>> payoutAccounts(@RequestParam @Positive Long kolId) {
+    List<PrepayService.PayoutOption> rows = prepays.payoutOptions(current.user(), kolId);
+    return R.ok(rows == null ? List.of() : rows.stream().map(PrepayPayoutOptionVO::from).toList());
   }
 
   @GetMapping("/admin-api/commission/prepays/{id}")
@@ -160,24 +160,28 @@ public class PrepayController {
         "commission:view"
       },
       mode = SaMode.OR)
-  public R<PrepayService.PrepayDetail> detail(@PathVariable @Positive Long id) {
-    return R.ok(prepays.detail(current.user(), id));
+  public R<PrepayDetailVO> detail(@PathVariable @Positive Long id) {
+    return R.ok(PrepayDetailVO.from(prepays.detail(current.user(), id)));
   }
 
   @PutMapping("/admin-api/commission/prepays/{id}/approval")
   @SaCheckPermission(
       value = {"prepay:review", "prepay:finance-review"},
       mode = SaMode.OR)
-  public R<PrepayService.PrepayDetail> approval(
+  public R<PrepayDetailVO> approval(
       @PathVariable @Positive Long id, @Valid @RequestBody ApprovalRequest request) {
-    return R.ok(prepays.approval(current.user(), id, request.decision(), request.reason()));
+    return R.ok(
+        PrepayDetailVO.from(
+            prepays.approval(current.user(), id, request.decision(), request.reason())));
   }
 
   @PutMapping("/admin-api/commission/prepays/{id}/cancel")
   @SaCheckPermission("prepay:apply")
-  public R<PrepayService.PrepayDetail> cancel(
+  public R<PrepayDetailVO> cancel(
       @PathVariable @Positive Long id, @RequestBody(required = false) CancelRequest request) {
-    return R.ok(prepays.cancel(current.user(), id, request == null ? null : request.reason()));
+    return R.ok(
+        PrepayDetailVO.from(
+            prepays.cancel(current.user(), id, request == null ? null : request.reason())));
   }
 
   @GetMapping("/admin-api/commission/prepays/{id}/recipient")
@@ -190,30 +194,38 @@ public class PrepayController {
         "commission:view"
       },
       mode = SaMode.OR)
-  public R<PrepayService.Recipient> recipient(@PathVariable @Positive Long id) {
-    return R.ok(prepays.recipient(current.user(), id));
+  public R<PrepayRecipientVO> recipient(@PathVariable @Positive Long id) {
+    return R.ok(PrepayRecipientVO.from(prepays.recipient(current.user(), id)));
   }
 
   @PutMapping(
       value = "/admin-api/commission/prepays/{id}/paid",
       consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
   @SaCheckPermission("prepay:pay")
-  public R<PrepayService.PrepayDetail> pay(
+  public R<PrepayDetailVO> pay(
       @PathVariable @Positive Long id,
       @Valid @RequestPart("payload") PaymentRequest request,
-      @RequestPart("voucher") MultipartFile voucher)
-      throws IOException {
+      @RequestPart("voucher") MultipartFile voucher) {
     return R.ok(
-        prepays.pay(
-            current.user(),
-            id,
-            new PrepayService.PaymentCommand(
-                request.requestId(),
-                request.payAmountCny(),
-                request.payTime(),
-                request.payMethod(),
-                request.payRemark()),
-            new PrepayService.UploadedFile(voucher.getOriginalFilename(), voucher.getBytes())));
+        PrepayDetailVO.from(
+            prepays.pay(
+                current.user(),
+                id,
+                new PrepayService.PaymentCommand(
+                    request.requestId(),
+                    request.payAmountCny(),
+                    request.payTime(),
+                    request.payMethod(),
+                    request.payRemark()),
+                uploaded(voucher))));
+  }
+
+  private static PrepayService.UploadedFile uploaded(MultipartFile file) {
+    try {
+      return new PrepayService.UploadedFile(file.getOriginalFilename(), file.getBytes());
+    } catch (IOException exception) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
   }
 
   public record ApplyRequest(

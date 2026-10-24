@@ -1,10 +1,8 @@
 package com.tcrm.admin.commission.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.commission.service.BizFileService;
-import com.tcrm.admin.commission.service.CommissionWithdrawalService;
 import com.tcrm.admin.commission.service.PayoutAccountService;
 import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentUserContext;
@@ -13,7 +11,6 @@ import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -22,12 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Admin-side payout accounts (task 15a §4.4). The list is readable with the review permission or
@@ -40,25 +34,12 @@ public class AdminPayoutAccountController {
   private final PayoutAccountService accounts;
   private final CurrentUserContext current;
   private final PrepayService prepays;
-  private final BizFileService files;
-  private final CommissionWithdrawalService withdrawals;
-
-  public AdminPayoutAccountController(
-      PayoutAccountService accounts,
-      CurrentUserContext current,
-      PrepayService prepays,
-      BizFileService files,
-      CommissionWithdrawalService withdrawals) {
-    this.accounts = accounts;
-    this.current = current;
-    this.prepays = prepays;
-    this.files = files;
-    this.withdrawals = withdrawals;
-  }
 
   public AdminPayoutAccountController(
       PayoutAccountService accounts, CurrentUserContext current, PrepayService prepays) {
-    this(accounts, current, prepays, null, null);
+    this.accounts = accounts;
+    this.current = current;
+    this.prepays = prepays;
   }
 
   /** Review queue by default (PENDING); {@code status=ALL} lists everything. */
@@ -118,9 +99,7 @@ public class AdminPayoutAccountController {
     BizFileService.FileDTO file =
         attached.bizType() == com.tcrm.admin.commission.model.FileBizType.PAYOUT_QR
             ? payoutQrFile(user, id)
-            : attached.bizType() == com.tcrm.admin.commission.model.FileBizType.WITHDRAWAL_VOUCHER
-                ? withdrawalVoucherFile(user, id, attached)
-                : prepays.adminFile(user, id);
+            : prepays.adminFile(user, id);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
@@ -132,42 +111,7 @@ public class AdminPayoutAccountController {
         .body(file.content());
   }
 
-  @PostMapping("/admin-api/files")
-  @SaCheckRole("SUPER_ADMIN")
-  @AuditLog(module = "CommissionWithdrawal", action = "Upload payment voucher")
-  public R<FileUploadVO> uploadWithdrawalVoucher(
-      @RequestParam("bizType") com.tcrm.admin.commission.model.FileBizType bizType,
-      @RequestParam("file") MultipartFile file)
-      throws IOException {
-    var admin = current.user();
-    if (admin.role() != com.tcrm.admin.security.api.Role.SUPER_ADMIN) {
-      throw new com.tcrm.admin.shared.BusinessException(
-          com.tcrm.admin.shared.ErrorCode.AUTH_FORBIDDEN);
-    }
-    if (bizType != com.tcrm.admin.commission.model.FileBizType.WITHDRAWAL_VOUCHER) {
-      throw new com.tcrm.admin.shared.BusinessException(
-          com.tcrm.admin.shared.ErrorCode.COMMON_VALIDATION_FAILED);
-    }
-    long fileId =
-        files.uploadWithdrawalVoucher(
-            admin.tenantId(), admin.id(), file.getOriginalFilename(), file.getBytes());
-    return R.ok(new FileUploadVO(Long.toString(fileId)));
-  }
-
   record PendingCountVO(Long count) {}
-
-  record FileUploadVO(String fileId) {}
-
-  private BizFileService.FileDTO withdrawalVoucherFile(
-      com.tcrm.admin.security.api.AccountDTO user,
-      long fileId,
-      BizFileService.AttachedFile attached) {
-    if (user.role() != com.tcrm.admin.security.api.Role.SUPER_ADMIN || attached.bizId() == null) {
-      throw new com.tcrm.admin.shared.BusinessException(
-          com.tcrm.admin.shared.ErrorCode.COMMON_NOT_FOUND);
-    }
-    return withdrawals.adminVoucher(user, fileId);
-  }
 
   private BizFileService.FileDTO payoutQrFile(
       com.tcrm.admin.security.api.AccountDTO user, long fileId) {

@@ -4,7 +4,9 @@
  * same keys: its type is `MessageSchema` below, so a missing or extra key fails `pnpm typecheck`,
  * and messages.spec.ts checks the same at runtime.
  */
+import prepay from "./prepay-en-US";
 const enUS = {
+  prepay,
   app: {
     title: "SparkTrack Creator Portal",
     titleSuffix: " Creator"
@@ -401,6 +403,15 @@ const enUS = {
     clearSelection: "Clear selection"
   },
   errors: {
+    PREPAY_REQUEST_CONFLICT:
+      "This request ID was used for different data. Check the application list before retrying.",
+    PREPAY_STATE_CONFLICT: "The prepay task has changed. Refresh before continuing.",
+    PREPAY_DETAILS_REQUIRED:
+      "Complete the application details in the pending finance task before approval.",
+    PREPAY_PAYMENT_CONFLICT:
+      "Payment is already recorded or this payment ID has different data. Check the payment result.",
+    PREPAY_FILE_INVALID: "Prepay attachments and vouchers must be valid PNG, JPEG or PDF files.",
+    PREPAY_FILE_TOO_LARGE: "Prepay attachments and vouchers must not exceed 10 MB.",
     COMMON_VALIDATION_FAILED:
       "Some of the information you entered is not valid. Please check and try again.",
     COMMON_NOT_FOUND: "The requested item does not exist.",

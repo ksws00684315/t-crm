@@ -3,7 +3,6 @@ package com.tcrm.admin.commission.controller;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.service.BizFileService;
-import com.tcrm.admin.commission.service.CommissionWithdrawalService;
 import com.tcrm.admin.commission.service.PayoutAccountService;
 import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentKolContext;
@@ -44,22 +43,6 @@ public class KolPayoutAccountController {
   private final CurrentKolContext current;
   private final ClientIpResolver clientIps;
   private final PrepayService prepays;
-  private final CommissionWithdrawalService withdrawals;
-
-  public KolPayoutAccountController(
-      PayoutAccountService accounts,
-      BizFileService files,
-      CurrentKolContext current,
-      ClientIpResolver clientIps,
-      PrepayService prepays,
-      CommissionWithdrawalService withdrawals) {
-    this.accounts = accounts;
-    this.files = files;
-    this.current = current;
-    this.clientIps = clientIps;
-    this.prepays = prepays;
-    this.withdrawals = withdrawals;
-  }
 
   public KolPayoutAccountController(
       PayoutAccountService accounts,
@@ -67,7 +50,11 @@ public class KolPayoutAccountController {
       CurrentKolContext current,
       ClientIpResolver clientIps,
       PrepayService prepays) {
-    this(accounts, files, current, clientIps, prepays, null);
+    this.accounts = accounts;
+    this.files = files;
+    this.current = current;
+    this.clientIps = clientIps;
+    this.prepays = prepays;
   }
 
   /** The KOL's own accounts without the disabled ones; the owner sees full accounts. */
@@ -145,9 +132,7 @@ public class KolPayoutAccountController {
     var file =
         attached.bizType() == FileBizType.PAYOUT_QR
             ? files.kolFile(kol.id(), id)
-            : attached.bizType() == FileBizType.WITHDRAWAL_VOUCHER
-                ? withdrawals.kolVoucher(kol, id)
-                : prepays.kolFile(kol.id(), id);
+            : prepays.kolFile(kol.id(), id);
     return attachment(file);
   }
 

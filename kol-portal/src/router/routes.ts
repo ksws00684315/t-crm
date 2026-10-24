@@ -25,6 +25,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("@/layout/index.vue"),
     children: [
       {
+        path: "income/prepays",
+        name: "PrepayResults",
+        component: () => import("@/views/income/prepay/index.vue"),
+        meta: { title: "prepay.title", componentName: "PrepayResultsPage" }
+      },
+      {
         path: "account",
         name: "Account",
         component: () => import("@/views/account/index.vue"),

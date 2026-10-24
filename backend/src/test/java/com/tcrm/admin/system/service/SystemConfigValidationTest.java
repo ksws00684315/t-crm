@@ -12,6 +12,8 @@ class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
     assertThat(SystemConfigDefinition.values()).hasSize(33);
+    assertThat(SystemConfigDefinition.find("link.short-url.allowed-hosts"))
+        .isEqualTo(SystemConfigDefinition.SHORT_URL_ALLOWED_HOSTS);
     assertThat(SystemConfigDefinition.find("commission.minimum-withdrawal-cny"))
         .isEqualTo(SystemConfigDefinition.MINIMUM_WITHDRAWAL_CNY);
     assertThat(SystemConfigDefinition.list())

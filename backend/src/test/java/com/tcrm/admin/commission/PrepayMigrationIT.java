@@ -13,7 +13,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Tag("docker")
 class PrepayMigrationIT {
   @Test
-  void shouldPreserveLegacyPermissionsAndGrantReviewWithoutCollidingWithExistingIds() {
+  void shouldPreserveLegacyPermissionsWithoutRewritingOperatorTemplates() {
     try (var postgres =
         new PostgreSQLContainer("postgres:17.11")
             .withDatabaseName("tcrm")
@@ -61,12 +61,12 @@ class PrepayMigrationIT {
               jdbc.queryForObject(
                   "SELECT count(*) FROM sys_user_permission WHERE tenant_id=1 AND user_id=4701 AND permission_code='prepay:review' AND id>900000000000000000",
                   Integer.class))
-          .isEqualTo(1);
+          .isEqualTo(0);
       assertThat(
               jdbc.queryForObject(
                   "SELECT count(*) FROM sys_user_permission WHERE permission_code='prepay:review'",
                   Integer.class))
-          .isEqualTo(2);
+          .isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
                   "SELECT count(*) FROM sys_user_permission WHERE permission_code='prepay:pay'",
@@ -124,18 +124,7 @@ class PrepayMigrationIT {
           .isEqualTo(largeCipher);
       flyway(postgres, "202610231000").migrate();
       assertThat(jdbc.queryForObject("SELECT count(*) FROM sys_user_permission", Integer.class))
-          .isEqualTo(6);
-      flyway(postgres, "202610240517").migrate();
-      assertThat(
-              jdbc.queryForObject(
-                  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('crm_commission_item_state','crm_commission_item_revision','crm_commission_withdrawal','crm_commission_withdrawal_allocation','crm_commission_withdrawal_payment','crm_commission_withdrawal_history')",
-                  Integer.class))
-          .isEqualTo(6);
-      assertThat(
-              jdbc.queryForObject(
-                  "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('crm_commission_wallet','crm_commission_ledger')",
-                  Integer.class))
-          .isEqualTo(2);
+          .isEqualTo(5);
     }
   }
 

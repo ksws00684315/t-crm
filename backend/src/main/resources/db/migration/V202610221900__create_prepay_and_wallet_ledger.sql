@@ -268,26 +268,5 @@ CREATE UNIQUE INDEX uk_crm_notification_prepay_event
   ON crm_notification (tenant_id, user_id, biz_type, biz_id, type)
   WHERE biz_type = 'PREPAY';
 
--- Grant only the review right to existing operator-template staff. Existing finance accounts must
--- be explicitly configured by the company super administrator; never bulk-grant payment rights.
--- Serialize with permission writers before reserving IDs above all legacy and snowflake values.
-LOCK TABLE sys_user_permission IN SHARE ROW EXCLUSIVE MODE;
-INSERT INTO sys_user_permission (id, tenant_id, user_id, permission_code, create_by, create_time)
-SELECT (SELECT COALESCE(MAX(id), 0) FROM sys_user_permission)
-         + row_number() OVER (ORDER BY ut.tenant_id, u.id),
-       ut.tenant_id,
-       u.id,
-       'prepay:review',
-       NULL,
-       CURRENT_TIMESTAMP(3)
-FROM sys_user u
-JOIN sys_user_tenant ut ON ut.user_id = u.id
-WHERE u.role = 'MEMBER'
-  AND ut.role = 'STAFF'
-  AND ut.post_template = 'OPERATOR'
-  AND ut.status = 1
-  AND NOT ut.is_deleted
-  AND NOT EXISTS (
-    SELECT 1 FROM sys_user_permission p
-    WHERE p.user_id = u.id AND p.tenant_id = ut.tenant_id AND p.permission_code = 'prepay:review'
-  );
+-- Do not copy prepay:review onto members who already exist. Design §3.1: a company edit to a
+-- post template applies only to accounts created afterwards. Payment rights stay explicit too.

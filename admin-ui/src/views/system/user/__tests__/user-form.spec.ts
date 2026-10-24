@@ -141,7 +141,7 @@ describe("user form dialog", () => {
     expect(document.body.textContent).toContain("查看达人");
     expect(document.body.textContent).toContain("NEWGROUP");
     expect(document.body.textContent).toContain(
-      "用户与权限、系统配置、操作日志、审批预付、标记打款、转移达人"
+      "用户与权限、系统配置、操作日志、提现标记打款、转移达人。预付审核与支付可分别授权给子账号。"
     );
     expect(byTest(wrapper, "ElRadioGroup", "data-scope").props("modelValue")).toBe("OWN");
 

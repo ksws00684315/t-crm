@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
@@ -21,6 +21,9 @@ import CommissionDialog from "./CommissionDialog.vue";
 import InviteKolDialog from "./InviteKolDialog.vue";
 import KolManageTab from "./KolManageTab.vue";
 import KolProfileDialog from "./KolProfileDialog.vue";
+import PrepayApplyDialog from "@/views/fund/prepay/ApplyDialog.vue";
+import { prepayAbilities } from "@/utils/prepay";
+import { getPrepayKolSummaries } from "@/api/commission/prepay";
 
 defineOptions({ name: "KolListPage" });
 
@@ -41,6 +44,7 @@ const loading = ref(false);
 const rows = ref<KolVO[]>([]);
 const total = ref(0);
 const cleanupRemaining = ref<Record<string, number>>({});
+const prepayTotals = ref<Record<string, string>>({});
 const activeTab = ref("list");
 
 /**
@@ -77,6 +81,12 @@ async function load() {
     });
     rows.value = page.items;
     total.value = Number(page.total);
+    const summaries = page.items.length
+      ? await getPrepayKolSummaries(page.items.map(row => row.id))
+      : [];
+    prepayTotals.value = Object.fromEntries(
+      summaries.map(item => [item.kolId, item.paidAmountCny])
+    );
     const configured = page.items.filter(row => row.autoCleanupDays != null).map(row => row.id);
     cleanupRemaining.value = configured.length
       ? await getCleanupRemaining(configured).catch(() => ({}))
@@ -86,6 +96,10 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+function onPrepayUpdated() {
+  void load();
 }
 
 function search() {
@@ -192,6 +206,13 @@ const commissionKol = ref<KolVO | null>(null);
 const cleanupVisible = ref(false);
 const cleanupKol = ref<KolVO | null>(null);
 const inviteVisible = ref(false);
+const prepayVisible = ref(false);
+const prepayKol = ref<KolVO | null>(null);
+
+function openPrepay(row: KolVO) {
+  prepayKol.value = row;
+  prepayVisible.value = true;
+}
 
 function openEdit(row: KolVO) {
   profileKol.value = row;
@@ -242,8 +263,8 @@ function rowActions(row: KolVO): RowAction[] {
       key: "prepay",
       label: t("kol.actionPrepay"),
       testId: `action-prepay-${row.id}`,
-      disabled: true,
-      tooltip: t("common.developing")
+      disabled: !prepayAbilities(me.user).apply || !rowOwned(row),
+      onClick: () => openPrepay(row)
     },
     {
       key: "cleanup",
@@ -292,8 +313,10 @@ async function toggleStatus(row: KolVO) {
 }
 
 onMounted(() => {
+  window.addEventListener("prepay-updated", onPrepayUpdated);
   void load();
 });
+onBeforeUnmount(() => window.removeEventListener("prepay-updated", onPrepayUpdated));
 </script>
 
 <template>
@@ -360,8 +383,8 @@ onMounted(() => {
           <template #cell-email="{ row }">{{ asKol(row).email }}</template>
           <template #cell-platform="{ row }">{{ platformText(asKol(row)) }}</template>
           <template #cell-rate="{ row }">{{ formatRate(asKol(row).defaultRate) }}</template>
-          <template #cell-prepay>
-            <span class="developing">{{ t("common.developing") }}</span>
+          <template #cell-prepay="{ row }">
+            <span data-test="kol-prepay-total">{{ prepayTotals[asKol(row).id] ?? "0.00" }}</span>
           </template>
           <template #cell-inviteTime="{ row }">
             <span data-test="invite-time">{{ formatInstantToMinute(asKol(row).inviteTime) }}</span>
@@ -432,6 +455,7 @@ onMounted(() => {
       @saved="load"
     />
     <CommissionDialog v-model="commissionVisible" :kol="commissionKol" @saved="load" />
+    <PrepayApplyDialog v-model="prepayVisible" :kol="prepayKol" @saved="load" />
     <CleanupConfigDialog v-model="cleanupVisible" :kol="cleanupKol" @changed="load" />
     <InviteKolDialog v-model="inviteVisible" />
   </div>

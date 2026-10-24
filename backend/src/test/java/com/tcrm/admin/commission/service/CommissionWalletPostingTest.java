@@ -5,13 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
+import com.tcrm.admin.commission.model.LedgerSourceRow;
+import com.tcrm.admin.commission.model.OutstandingDeduction;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -25,9 +30,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Answers;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import org.mockito.invocation.InvocationOnMock;
 
 class CommissionWalletPostingTest {
   private static final Instant TIME = Instant.parse("2026-10-22T04:00:00Z");
@@ -36,37 +39,10 @@ class CommissionWalletPostingTest {
   private List<ResultSet> existing = List.of();
   private List<ResultSet> outstanding = List.of();
   private List<ResultSet> balances = List.of();
-  private final JdbcTemplate jdbc =
-      mock(
-          JdbcTemplate.class,
-          invocation -> {
-            Object[] args = invocation.getArguments();
-            if (args.length == 0 || !(args[0] instanceof String sql)) {
-              return Answers.RETURNS_DEFAULTS.answer(invocation);
-            }
-            if (invocation.getMethod().getName().equals("update")) {
-              writes.add(new Write(sql, Arrays.asList(args).subList(1, args.length)));
-              return 1;
-            }
-            if (invocation.getMethod().getName().equals("queryForObject")) {
-              return new BigDecimal("-300.00");
-            }
-            if (args[1] instanceof RowMapper<?> mapper) {
-              List<ResultSet> data =
-                  sql.contains("source_key =")
-                      ? existing
-                      : sql.contains("HAVING") ? outstanding : balances;
-              List<Object> mapped = new ArrayList<>();
-              for (int index = 0; index < data.size(); index++) {
-                mapped.add(mapper.mapRow(data.get(index), index));
-              }
-              return mapped;
-            }
-            return Answers.RETURNS_DEFAULTS.answer(invocation);
-          });
+  private final CommissionWalletMapper wallets = mock(CommissionWalletMapper.class, this::answer);
   private final CommissionWalletService service =
       new CommissionWalletService(
-          jdbc, kols, mock(SystemConfigApi.class), Clock.fixed(TIME, ZoneOffset.UTC));
+          wallets, kols, mock(SystemConfigApi.class), Clock.fixed(TIME, ZoneOffset.UTC));
 
   @BeforeEach
   void prepare() {
@@ -236,6 +212,93 @@ class CommissionWalletPostingTest {
     when(rs.getString(4)).thenReturn(type);
     when(rs.getLong(5)).thenReturn(source);
     return rs;
+  }
+
+  private Object answer(InvocationOnMock invocation) throws SQLException {
+    return switch (invocation.getMethod().getName()) {
+      case "insertIgnore" -> {
+        writes.add(
+            new Write(
+                "INSERT INTO crm_commission_wallet (id, tenant_id, kol_id, balance_cny, create_time, update_time) VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (tenant_id, kol_id) DO NOTHING",
+                Arrays.asList(
+                    invocation.getArgument(0),
+                    company(),
+                    invocation.getArgument(1),
+                    invocation.getArgument(2),
+                    invocation.getArgument(2))));
+        yield 1;
+      }
+      case "lockBalance" -> new BigDecimal("-300.00");
+      case "findBalance" -> balances.isEmpty() ? null : balances.getFirst().getBigDecimal(1);
+      case "findBySourceKey" -> {
+        if (existing.isEmpty()) {
+          yield null;
+        }
+        ResultSet row = existing.getFirst();
+        yield new LedgerSourceRow(
+            row.getBigDecimal(1),
+            row.getBigDecimal(2),
+            row.getLong(3),
+            row.getString(4),
+            row.getLong(5));
+      }
+      case "insertLedger" -> {
+        writes.add(
+            new Write(
+                "INSERT INTO crm_commission_ledger (id, tenant_id, kol_id, entry_type, amount_cny, source_type, source_id, source_key, occurred_at, balance_after_cny, create_by, create_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                Arrays.asList(
+                    invocation.getArgument(0),
+                    company(),
+                    invocation.getArgument(1),
+                    invocation.getArgument(3),
+                    invocation.getArgument(4),
+                    invocation.getArgument(5),
+                    invocation.getArgument(6),
+                    invocation.getArgument(8))));
+        yield 1;
+      }
+      case "updateBalance" -> {
+        writes.add(
+            new Write(
+                "UPDATE crm_commission_wallet SET balance_cny = ?, update_time = ? WHERE tenant_id = ? AND kol_id = ?",
+                Arrays.asList(
+                    invocation.getArgument(1),
+                    invocation.getArgument(2),
+                    company(),
+                    invocation.getArgument(0))));
+        yield 1;
+      }
+      case "listOutstanding" -> {
+        List<OutstandingDeduction> rows = new ArrayList<>();
+        for (ResultSet row : outstanding) {
+          rows.add(new OutstandingDeduction(row.getLong("id"), row.getBigDecimal("remaining")));
+        }
+        yield rows;
+      }
+      case "insertRecovery" -> {
+        writes.add(
+            new Write(
+                "INSERT INTO crm_commission_recovery (id, tenant_id, kol_id, credit_ledger_id, deduction_ledger_id, amount_cny, create_time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                Arrays.asList(
+                    invocation.getArgument(0),
+                    company(),
+                    invocation.getArgument(1),
+                    invocation.getArgument(2),
+                    invocation.getArgument(3),
+                    invocation.getArgument(4),
+                    invocation.getArgument(5))));
+        yield 1;
+      }
+      default -> null;
+    };
+  }
+
+  private static long company() {
+    Long id = TenantScope.companyId();
+    if (id == null) {
+      throw new AssertionError("company scope was not opened");
+    }
+    return id;
   }
 
   private static void fails(Runnable action, ErrorCode code) {

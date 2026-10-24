@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
-import com.tcrm.admin.commission.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
+import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
 import com.tcrm.admin.system.api.DeparturePlanSubmittedEvent;

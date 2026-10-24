@@ -2,6 +2,10 @@ import { http } from "../http";
 import type { PageResult } from "../types";
 
 export type NotificationType =
+  | "PREPAY_SUBMITTED"
+  | "PREPAY_APPROVED"
+  | "PREPAY_REJECTED"
+  | "PREPAY_PAID"
   | "PAYOUT_ACCOUNT_SUBMITTED"
   | "ORDER_SYNC_FAILED"
   | "BD_TRANSFER_CANCELLED"
@@ -17,6 +21,7 @@ export interface NotificationParams {
   reason: string | null;
   bdName: string | null;
   count: number | null;
+  prepayNo?: string | null;
   /** Departure messages: heir display name, ISO instant, result and plan type of the plan. */
   heirName: string | null;
   effectiveAt: string | null;

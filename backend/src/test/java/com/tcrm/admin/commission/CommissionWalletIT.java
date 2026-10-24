@@ -115,29 +115,16 @@ class CommissionWalletIT {
       long operator =
           jdbc.queryForObject(
               "SELECT id FROM sys_user WHERE username = ?", Long.class, "bootstrap");
-      AccountDTO user =
-          new AccountDTO(
-              operator,
-              "bootstrap",
-              null,
-              "Test",
-              null,
-              Role.SUPER_ADMIN,
-              DataScope.ALL,
-              1,
-              null,
-              Instant.now(),
-              0,
-              TENANT_ID,
-              "Test",
-              true);
+      // Applicant and reviewer must differ: service rejects self-review (AUTH_FORBIDDEN).
+      AccountDTO applicant = superAdmin(operator);
+      AccountDTO reviewer = superAdmin(IdWorker.getId());
       var application =
           new PrepayService.PrepayApplication(UUID.randomUUID().toString(), creator, "300.00");
-      var pending = prepays.apply(user, application);
+      var pending = prepays.apply(applicant, application);
       assertThat(pending.status()).isEqualTo("WAITING_DETAILS");
       assertThat(pending.deductFromCommission()).isNull();
-      assertThat(prepays.apply(user, application).id()).isEqualTo(pending.id());
-      assertThatThrownBy(() -> prepays.approval(user, pending.id(), "APPROVE", null))
+      assertThat(prepays.apply(applicant, application).id()).isEqualTo(pending.id());
+      assertThatThrownBy(() -> prepays.approval(reviewer, pending.id(), "APPROVE", null))
           .isInstanceOfSatisfying(
               BusinessException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_STATE_CONFLICT));
@@ -155,7 +142,7 @@ class CommissionWalletIT {
       String recipient = "银行转账\n收款人 张三\n账号 123456789\nCNY\n" + "资".repeat(969);
       var completed =
           prepays.saveApplicationDetails(
-              user,
+              applicant,
               pending.id(),
               new PrepayService.ApplicationDetails(
                   "t47 business advance",
@@ -165,14 +152,14 @@ class CommissionWalletIT {
                   manual ? recipient : null),
               List.of());
       assertThat(completed.status()).isEqualTo("PENDING_OPERATIONS_REVIEW");
-      assertThat(prepays.approval(user, pending.id(), "APPROVE", null).status())
+      assertThat(prepays.approval(reviewer, pending.id(), "APPROVE", null).status())
           .isEqualTo("PENDING_FINANCE_REVIEW");
-      assertThat(prepays.approval(user, pending.id(), "APPROVE", null).status())
+      assertThat(prepays.approval(reviewer, pending.id(), "APPROVE", null).status())
           .isEqualTo("APPROVED");
       assertThatThrownBy(
               () ->
                   prepays.saveApplicationDetails(
-                      user,
+                      applicant,
                       pending.id(),
                       new PrepayService.ApplicationDetails(
                           "changed", LocalDate.of(2026, 10, 23), null, false, "new"),
@@ -192,7 +179,7 @@ class CommissionWalletIT {
         assertThat(encrypted).startsWith("v1:").doesNotContain(recipient);
         assertThat(cipher.decrypt(encrypted)).isEqualTo(recipient);
       }
-      assertThat(prepays.recipient(user, pending.id()).account())
+      assertThat(prepays.recipient(reviewer, pending.id()).account())
           .isEqualTo(manual ? recipient : "t47_recipient@example.invalid");
       var payment =
           new PrepayService.PaymentCommand(
@@ -201,7 +188,7 @@ class CommissionWalletIT {
           new PrepayService.UploadedFile(
               "t47_receipt.pdf",
               "%PDF-1.7\nt47 test receipt".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-      var paid = prepays.pay(user, pending.id(), payment, voucher);
+      var paid = prepays.pay(reviewer, pending.id(), payment, voucher);
       assertThat(paid.status()).isEqualTo("PAID");
       assertThat(paid.payment().operatorName()).isEqualTo("Test");
       assertThat(paid.payment().operatorRole()).isEqualTo("PAYMENT");
@@ -212,18 +199,18 @@ class CommissionWalletIT {
       assertThat(paid.timeline())
           .extracting(PrepayService.Timeline::operatorName)
           .containsOnly("Test");
-      assertThat(prepays.summaries(user, List.of(creator)).getFirst().paidAmountCny())
+      assertThat(prepays.summaries(reviewer, List.of(creator)).getFirst().paidAmountCny())
           .isEqualTo("300.00");
       assertThat(
               prepays
                   .apply(
-                      user,
+                      applicant,
                       new PrepayService.PrepayApplication(
                           UUID.randomUUID().toString(), creator, "50"))
                   .status())
           .isEqualTo("WAITING_DETAILS");
       assertThat(paid.walletBalanceCny()).isEqualTo("-300.00");
-      assertThat(prepays.pay(user, pending.id(), payment, voucher).payment().voucherFileId())
+      assertThat(prepays.pay(reviewer, pending.id(), payment, voucher).payment().voucherFileId())
           .isEqualTo(paid.payment().voucherFileId());
       assertThat(
               jdbc.queryForObject(
@@ -303,6 +290,24 @@ class CommissionWalletIT {
                   kolId))
           .isEqualTo(2L);
     }
+  }
+
+  private static AccountDTO superAdmin(long id) {
+    return new AccountDTO(
+        id,
+        "bootstrap",
+        null,
+        "Test",
+        null,
+        Role.SUPER_ADMIN,
+        DataScope.ALL,
+        1,
+        null,
+        Instant.now(),
+        0,
+        TENANT_ID,
+        "Test",
+        true);
   }
 
   private long createKol() {

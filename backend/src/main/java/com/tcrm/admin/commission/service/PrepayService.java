@@ -1,10 +1,23 @@
 package com.tcrm.admin.commission.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
+import com.tcrm.admin.commission.mapper.PrepayMapper;
 import com.tcrm.admin.commission.model.FileBizType;
+import com.tcrm.admin.commission.model.KolLedgerRow;
+import com.tcrm.admin.commission.model.KolPaidPrepayRow;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
 import com.tcrm.admin.commission.model.PayoutAccountStatus;
+import com.tcrm.admin.commission.model.PrepayApplicationColumns;
+import com.tcrm.admin.commission.model.PrepayDeductionRow;
+import com.tcrm.admin.commission.model.PrepayHead;
+import com.tcrm.admin.commission.model.PrepayHistoryRow;
+import com.tcrm.admin.commission.model.PrepayPageQuery;
+import com.tcrm.admin.commission.model.PrepayPaidSum;
+import com.tcrm.admin.commission.model.PrepayPaymentRow;
+import com.tcrm.admin.commission.model.PrepayRecipientRow;
+import com.tcrm.admin.commission.model.PrepayWrite;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -14,41 +27,49 @@ import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.system.api.AccountNameApi;
+import com.tcrm.admin.system.api.AccountNameDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Prepay creation and finance completion rules. All SQL includes the current company explicitly.
- */
+/** Prepay creation, review and payment. Company isolation is the tenant plugin's job. */
 @Service
 public class PrepayService {
   private static final ZoneId NUMBER_ZONE = ZoneId.of("Asia/Shanghai");
   private static final BigDecimal MAX_MONEY = new BigDecimal("999999999999.99");
-  private final JdbcTemplate jdbc;
+  private static final List<String> STATUSES =
+      List.of(
+          "WAITING_DETAILS",
+          "PENDING_OPERATIONS_REVIEW",
+          "PENDING_FINANCE_REVIEW",
+          "APPROVED",
+          "PAID",
+          "REJECTED",
+          "CANCELLED");
+  private final PrepayMapper prepays;
   private final KolApi kols;
+  private final AccountNameApi accountNames;
   private final PayoutAccountMapper payoutAccounts;
   private final BizFileService files;
   private final SecretCipher cipher;
@@ -58,27 +79,39 @@ public class PrepayService {
 
   @Autowired
   public PrepayService(
-      JdbcTemplate jdbc,
+      PrepayMapper prepays,
       KolApi kols,
+      AccountNameApi accountNames,
       PayoutAccountMapper payoutAccounts,
       BizFileService files,
       SecretCipher cipher,
       CommissionWalletService wallet,
       ExternalAuditApi audit) {
-    this(jdbc, kols, payoutAccounts, files, cipher, wallet, audit, Clock.systemUTC());
+    this(
+        prepays,
+        kols,
+        accountNames,
+        payoutAccounts,
+        files,
+        cipher,
+        wallet,
+        audit,
+        Clock.systemUTC());
   }
 
   PrepayService(
-      JdbcTemplate jdbc,
+      PrepayMapper prepays,
       KolApi kols,
+      AccountNameApi accountNames,
       PayoutAccountMapper payoutAccounts,
       BizFileService files,
       SecretCipher cipher,
       CommissionWalletService wallet,
       ExternalAuditApi audit,
       Clock clock) {
-    this.jdbc = jdbc;
+    this.prepays = prepays;
     this.kols = kols;
+    this.accountNames = accountNames;
     this.payoutAccounts = payoutAccounts;
     this.files = files;
     this.cipher = cipher;
@@ -205,6 +238,30 @@ public class PrepayService {
   public record Recipient(
       String type, String currency, String network, String holderName, String account) {}
 
+  /** Paid prepay projected for the signed-in creator. */
+  public record PaidPrepay(
+      Long id,
+      String prepayNo,
+      String status,
+      String payAmountCny,
+      String payCurrency,
+      Instant payTime,
+      String payMethod,
+      Long voucherFileId,
+      Boolean deductFromCommission,
+      Deduction deduction,
+      String walletBalanceCny) {}
+
+  /** One creator-ledger line: the payment itself, or the commission deduction. */
+  public record LedgerRow(
+      Long entryId,
+      Long prepayId,
+      String prepayNo,
+      String entryType,
+      String amountCny,
+      Instant occurredAt,
+      String balanceAfterCny) {}
+
   @Transactional(rollbackFor = Exception.class)
   public PrepayDetail apply(AccountDTO user, PrepayApplication request) {
     requirePermission(user, "prepay:apply");
@@ -212,65 +269,49 @@ public class PrepayService {
     UUID requestId = parseUuid(request.requestId());
     long kolId = requirePositive(request.kolId());
     BigDecimal amount = money(request.amountCny());
-    var existing = findByRequest(tenantId, requestId);
+    return TenantScope.callCompany(tenantId, () -> applyInCompany(user, requestId, kolId, amount));
+  }
+
+  private PrepayDetail applyInCompany(
+      AccountDTO user, UUID requestId, long kolId, BigDecimal amount) {
+    PrepayRow existing = findByRequest(requestId);
     if (existing != null) {
       return returnExistingRequest(user, existing, kolId, amount);
     }
     if (!kols.lockKol(kolId)) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    existing = findByRequest(tenantId, requestId);
+    existing = findByRequest(requestId);
     if (existing != null) {
       return returnExistingRequest(user, existing, kolId, amount);
     }
     KolRefDTO kol = requireKol(kolId);
     requireKolScope(user, kol);
-    Long active =
-        jdbc
-            .query(
-                "SELECT id FROM crm_prepay WHERE tenant_id = ? AND kol_id = ? AND status IN ('WAITING_DETAILS', 'PENDING_OPERATIONS_REVIEW', 'PENDING_FINANCE_REVIEW', 'APPROVED') LIMIT 1",
-                (rs, index) -> rs.getLong(1),
-                tenantId,
-                kolId)
-            .stream()
-            .findFirst()
-            .orElse(null);
-    if (active != null) {
+    if (prepays.findActiveId(kolId) != null) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     Instant now = now();
     long id = IdWorker.getId();
-    String prepayNo = nextPrepayNo(tenantId, id, now);
+    String prepayNo = nextPrepayNo(id, now);
     int created;
     try {
       created =
-          jdbc.update(
-              "INSERT INTO crm_prepay (id, tenant_id, kol_id, prepay_no, request_id, applicant_id, amount_cny, status, create_by, create_time, update_by, update_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'WAITING_DETAILS', ?, ?, ?, ?) ON CONFLICT (tenant_id, request_id) DO NOTHING",
-              id,
-              tenantId,
-              kolId,
-              prepayNo,
-              requestId,
-              user.id(),
-              amount,
-              user.id(),
-              Timestamp.from(now),
-              user.id(),
-              Timestamp.from(now));
+          prepays.insertWaiting(
+              new PrepayWrite.Insert(
+                  id, kolId, prepayNo, requestId, user.id(), amount, user.id(), now));
     } catch (DuplicateKeyException exception) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     if (created == 0) {
-      PrepayRow duplicate = findByRequest(tenantId, requestId);
+      PrepayRow duplicate = findByRequest(requestId);
       if (duplicate == null) {
         throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
       }
       return returnExistingRequest(user, duplicate, kolId, amount);
     }
-    // The creator row is locked above, so concurrent requests for different UUIDs serialize.
-    insertHistory(tenantId, id, "SUBMITTED", user, "BUSINESS", null, now);
+    insertHistory(id, "SUBMITTED", user, "BUSINESS", null, now);
     audit.recordTenantWriteOperation(
-        tenantId,
+        user.tenantId(),
         user.id(),
         "Prepay",
         "Submit application",
@@ -289,30 +330,30 @@ public class PrepayService {
     return detail(user, existing.id());
   }
 
-  /** Saves finance-supplied fields while the task is pending; null deduction is never inferred. */
+  /**
+   * Saves applicant-supplied fields while the task is waiting; null deduction is never inferred.
+   */
   @Transactional(rollbackFor = Exception.class)
   public PrepayDetail saveApplicationDetails(
       AccountDTO user, long id, ApplicationDetails details, List<UploadedFile> attachments) {
     requirePermission(user, "prepay:apply");
     long tenantId = requireTenant(user);
     validateApplicationDetails(details);
-    PrepayRow row = requireTaskLocked(tenantId, id);
-    if (!"WAITING_DETAILS".equals(status(tenantId, id)) || !row.applicantId().equals(user.id())) {
+    return TenantScope.callCompany(
+        tenantId, () -> saveDetailsInCompany(user, id, details, attachments));
+  }
+
+  private PrepayDetail saveDetailsInCompany(
+      AccountDTO user, long id, ApplicationDetails details, List<UploadedFile> attachments) {
+    PrepayRow row = requireTaskLocked(id);
+    if (!"WAITING_DETAILS".equals(status(id)) || !row.applicantId().equals(user.id())) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     requireKolScope(user, requireKol(row.kolId()));
     KolRefDTO kol = requireKol(row.kolId());
-    PayoutAccountDO account = null;
     boolean manual = details.recipientText() != null;
-    if (!manual) {
-      account = payoutAccounts.selectById(details.payoutAccountId());
-      if (account == null
-          || !tenantIdEquals(account.getTenantId(), tenantId)
-          || !row.kolId().equals(account.getKolId())
-          || account.getStatus() != PayoutAccountStatus.APPROVED) {
-        throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-      }
-    }
+    PayoutAccountDO account =
+        manual ? null : approvedAccount(user.tenantId(), row.kolId(), details);
     Instant now = now();
     List<BizFileService.FileMeta> existingFiles = files.prepayAttachments(id);
     List<UploadedFile> additions = attachments == null ? List.of() : List.copyOf(attachments);
@@ -321,33 +362,21 @@ public class PrepayService {
     }
     for (UploadedFile attachment : additions) {
       files.uploadPrepayAdmin(
-          tenantId,
+          user.tenantId(),
           user.id(),
           id,
           FileBizType.PREPAY_ATTACHMENT,
           attachment.fileName(),
           attachment.content());
     }
-    jdbc.update(
-        "UPDATE crm_prepay SET reason = ?, expected_pay_date = ?, deduct_from_commission = ?, payout_account_id = ?, payout_account_type = ?, payout_currency = ?, payout_network = ?, payout_holder_name = ?, payout_account_cipher = ?, payout_account_masked = ?, status = 'PENDING_OPERATIONS_REVIEW', update_by = ?, update_time = ? WHERE tenant_id = ? AND id = ? AND status = 'WAITING_DETAILS'",
-        details.reason().strip(),
-        Date.valueOf(details.expectedPayDate()),
-        details.deductFromCommission(),
-        manual ? null : account.getId(),
-        manual ? "MANUAL" : account.getAccountType().name(),
-        manual ? null : account.getCurrency(),
-        manual || account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
-        manual ? null : account.getHolderName(),
-        manual ? cipher.encrypt(details.recipientText()) : account.getAccountCipher(),
-        manual ? "***" : account.getAccountMasked(),
-        user.id(),
-        Timestamp.from(now),
-        tenantId,
-        id);
-    insertHistory(tenantId, id, "DETAILS_COMPLETED", user, "BUSINESS", null, now);
-    insertOutbox(tenantId, id, "SUBMITTED", row.prepayNo(), now);
+    String cipherText =
+        manual ? cipher.encrypt(details.recipientText()) : account.getAccountCipher();
+    prepays.completeDetails(
+        detailsCommand(id, details, account, manual, cipherText, user.id(), now));
+    insertHistory(id, "DETAILS_COMPLETED", user, "BUSINESS", null, now);
+    insertOutbox(id, "SUBMITTED", row.prepayNo(), now);
     audit.recordTenantWriteOperation(
-        tenantId,
+        user.tenantId(),
         user.id(),
         "Prepay",
         "Complete application details",
@@ -359,42 +388,45 @@ public class PrepayService {
 
   public List<PayoutOption> payoutOptions(AccountDTO user, long kolId) {
     requireAnyPermission(user, "prepay:apply", "prepay:review", "prepay:pay");
-    requireTenant(user);
-    KolRefDTO kol = requireKol(kolId);
-    if (!hasFinanceAccess(user)) {
-      requireKolScope(user, kol);
-    }
-    return payoutAccounts
-        .selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayoutAccountDO>()
-                .eq(PayoutAccountDO::getKolId, kolId)
-                .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
-                .orderByAsc(PayoutAccountDO::getId))
-        .stream()
-        .map(
-            account ->
-                new PayoutOption(
-                    account.getId(),
-                    account.getAccountType().name(),
-                    account.getCurrency(),
-                    account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
-                    account.getAccountMasked(),
-                    account.getHolderName()))
-        .toList();
+    long tenantId = requireTenant(user);
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          KolRefDTO kol = requireKol(kolId);
+          if (!hasFinanceAccess(user)) {
+            requireKolScope(user, kol);
+          }
+          return payoutAccounts
+              .selectList(
+                  new LambdaQueryWrapper<PayoutAccountDO>()
+                      .eq(PayoutAccountDO::getKolId, kolId)
+                      .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
+                      .orderByAsc(PayoutAccountDO::getId))
+              .stream()
+              .map(
+                  account ->
+                      new PayoutOption(
+                          account.getId(),
+                          account.getAccountType().name(),
+                          account.getCurrency(),
+                          account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
+                          account.getAccountMasked(),
+                          account.getHolderName()))
+              .toList();
+        });
   }
 
   public PrepayDetail activeApplication(AccountDTO user, long kolId) {
     requirePermission(user, "prepay:apply");
     long tenantId = requireTenant(user);
-    KolRefDTO kol = requireKol(kolId);
-    requireKolScope(user, kol);
-    List<Long> ids =
-        jdbc.query(
-            "SELECT id FROM crm_prepay WHERE tenant_id = ? AND kol_id = ? AND status IN ('WAITING_DETAILS', 'PENDING_OPERATIONS_REVIEW', 'PENDING_FINANCE_REVIEW', 'APPROVED') ORDER BY create_time DESC LIMIT 1",
-            (rs, index) -> rs.getLong(1),
-            tenantId,
-            kolId);
-    return ids.isEmpty() ? null : detail(user, ids.getFirst());
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          KolRefDTO kol = requireKol(kolId);
+          requireKolScope(user, kol);
+          Long id = prepays.findLatestActiveId(kolId);
+          return id == null ? null : detail(user, id);
+        });
   }
 
   public List<KolSummary> summaries(AccountDTO user, List<Long> kolIds) {
@@ -407,28 +439,20 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     List<Long> requested = kolIds.stream().distinct().toList();
+    return TenantScope.callCompany(tenantId, () -> summariesInCompany(user, requested));
+  }
+
+  private List<KolSummary> summariesInCompany(AccountDTO user, List<Long> requested) {
     if (user.ownScope()) {
       List<Long> visible = kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).toList();
       if (!visible.containsAll(requested)) {
         throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
       }
     }
-    List<Object> args = new ArrayList<>();
-    args.add(tenantId);
-    args.addAll(requested);
-    String placeholders = String.join(",", java.util.Collections.nCopies(requested.size(), "?"));
-    java.util.Map<Long, BigDecimal> paidByKol = new java.util.HashMap<>();
-    jdbc.query(
-        "SELECT p.kol_id, SUM(payment.pay_amount_cny) AS paid_amount_cny FROM crm_prepay p JOIN crm_prepay_payment payment ON payment.tenant_id = p.tenant_id AND payment.prepay_id = p.id WHERE p.tenant_id = ? AND p.status = 'PAID' AND p.kol_id IN ("
-            + placeholders
-            + ") GROUP BY p.kol_id",
-        rs -> {
-          while (rs.next()) {
-            paidByKol.put(rs.getLong("kol_id"), rs.getBigDecimal("paid_amount_cny"));
-          }
-          return null;
-        },
-        args.toArray());
+    Map<Long, BigDecimal> paidByKol = new HashMap<>();
+    for (PrepayPaidSum sum : prepays.sumPaid(requested)) {
+      paidByKol.put(sum.kolId(), sum.paidAmountCny());
+    }
     List<KolSummary> result = new ArrayList<>();
     for (Long kolId : requested) {
       BigDecimal paid = paidByKol.get(kolId);
@@ -441,7 +465,11 @@ public class PrepayService {
   public PrepayDetail approval(AccountDTO user, long id, String decision, String reason) {
     requireAnyPermission(user, "prepay:review", "prepay:finance-review");
     long tenantId = requireTenant(user);
-    requireTaskLocked(tenantId, id);
+    return TenantScope.callCompany(tenantId, () -> approvalInCompany(user, id, decision, reason));
+  }
+
+  private PrepayDetail approvalInCompany(AccountDTO user, long id, String decision, String reason) {
+    requireTaskLocked(id);
     PrepayDetail detail = detail(user, id);
     boolean operations = "PENDING_OPERATIONS_REVIEW".equals(detail.status());
     boolean finance = "PENDING_FINANCE_REVIEW".equals(detail.status());
@@ -449,6 +477,10 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     requirePermission(user, operations ? "prepay:review" : "prepay:finance-review");
+    // Keep prepay:review on BD template; still block the applicant from reviewing their own task.
+    if (detail.applicantId() != null && detail.applicantId().equals(user.id())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
     boolean approve = "APPROVE".equals(decision);
     if (!approve && !"REJECT".equals(decision)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -466,26 +498,15 @@ public class PrepayService {
     Instant now = now();
     String next = approve ? (operations ? "PENDING_FINANCE_REVIEW" : "APPROVED") : "REJECTED";
     int changed =
-        jdbc.update(
-            "UPDATE crm_prepay SET status = ?, approved_by = CASE WHEN ? = 'APPROVED' THEN ? ELSE approved_by END, approved_time = CASE WHEN ? = 'APPROVED' THEN ? ELSE approved_time END, approval_reason = ?, update_by = ?, update_time = ? WHERE tenant_id = ? AND id = ? AND status = ?",
-            next,
-            next,
-            user.id(),
-            next,
-            Timestamp.from(now),
-            approve ? null : normalizedReason,
-            user.id(),
-            Timestamp.from(now),
-            tenantId,
-            id,
-            detail.status());
+        prepays.decide(
+            new PrepayWrite.Decision(
+                id, next, detail.status(), user.id(), now, approve ? null : normalizedReason));
     if (changed != 1) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     String action =
         approve ? (operations ? "OPERATIONS_APPROVED" : "FINANCE_APPROVED") : "REJECTED";
     insertHistory(
-        tenantId,
         id,
         action,
         user,
@@ -493,10 +514,10 @@ public class PrepayService {
         normalizedReason,
         now);
     if (!operations || !approve) {
-      insertOutbox(tenantId, id, approve ? "APPROVED" : action, detail.prepayNo(), now);
+      insertOutbox(id, approve ? "APPROVED" : action, detail.prepayNo(), now);
     }
     audit.recordTenantWriteOperation(
-        tenantId,
+        user.tenantId(),
         user.id(),
         "Prepay",
         approve ? "Approve" : "Reject",
@@ -510,34 +531,28 @@ public class PrepayService {
   public PrepayDetail cancel(AccountDTO user, long id, String reason) {
     requirePermission(user, "prepay:apply");
     long tenantId = requireTenant(user);
-    requireTaskLocked(tenantId, id);
+    return TenantScope.callCompany(tenantId, () -> cancelInCompany(user, id, reason));
+  }
+
+  private PrepayDetail cancelInCompany(AccountDTO user, long id, String reason) {
+    requireTaskLocked(id);
     PrepayDetail detail = detail(user, id);
     if (!"WAITING_DETAILS".equals(detail.status()) || !detail.applicantId().equals(user.id())) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
-    KolRefDTO kol = requireKol(detail.kolId());
-    requireKolScope(user, kol);
+    requireKolScope(user, requireKol(detail.kolId()));
     Instant now = now();
     String normalizedReason = reason == null || reason.isBlank() ? null : reason.strip();
     if (normalizedReason != null && normalizedReason.length() > 1000) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    int changed =
-        jdbc.update(
-            "UPDATE crm_prepay SET status = 'CANCELLED', cancelled_by = ?, cancelled_time = ?, cancel_reason = ?, update_by = ?, update_time = ? WHERE tenant_id = ? AND id = ? AND status = 'WAITING_DETAILS'",
-            user.id(),
-            Timestamp.from(now),
-            normalizedReason,
-            user.id(),
-            Timestamp.from(now),
-            tenantId,
-            id);
+    int changed = prepays.cancel(new PrepayWrite.Cancel(id, user.id(), now, normalizedReason));
     if (changed != 1) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
-    insertHistory(tenantId, id, "CANCELLED", user, "BUSINESS", normalizedReason, now);
+    insertHistory(id, "CANCELLED", user, "BUSINESS", normalizedReason, now);
     audit.recordTenantWriteOperation(
-        tenantId,
+        user.tenantId(),
         user.id(),
         "Prepay",
         "Cancel application",
@@ -553,12 +568,7 @@ public class PrepayService {
     long tenantId = requireTenant(user);
     UUID requestId = parseUuid(request.requestId());
     BigDecimal amount = money(request.payAmountCny());
-    Instant payTime;
-    try {
-      payTime = OffsetDateTime.parse(request.payTime()).toInstant().truncatedTo(ChronoUnit.MILLIS);
-    } catch (RuntimeException exception) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
+    Instant payTime = payTime(request.payTime());
     String method = request.payMethod() == null ? "" : request.payMethod().strip();
     String remark = request.payRemark() == null ? null : request.payRemark().strip();
     if (method.isEmpty() || method.length() > 100 || (remark != null && remark.length() > 1000)) {
@@ -569,12 +579,28 @@ public class PrepayService {
     }
     String fingerprint =
         paymentFingerprint(id, requestId, amount, payTime, method, remark, voucher.content());
-    if (paymentRecorded(tenantId, requestId, fingerprint)) {
+    return TenantScope.callCompany(
+        tenantId,
+        () ->
+            payInCompany(
+                user, id, requestId, amount, payTime, method, remark, fingerprint, voucher));
+  }
+
+  private PrepayDetail payInCompany(
+      AccountDTO user,
+      long id,
+      UUID requestId,
+      BigDecimal amount,
+      Instant payTime,
+      String method,
+      String remark,
+      String fingerprint,
+      UploadedFile voucher) {
+    if (paymentRecorded(requestId, fingerprint)) {
       return detail(user, id);
     }
-    PrepayRow row = requireTaskLocked(tenantId, id);
-    // A duplicate may commit while this request waits for the task lock.
-    if (paymentRecorded(tenantId, requestId, fingerprint)) {
+    PrepayRow row = requireTaskLocked(id);
+    if (paymentRecorded(requestId, fingerprint)) {
       return detail(user, id);
     }
     PrepayDetail task = detail(user, id);
@@ -590,46 +616,39 @@ public class PrepayService {
     }
     Long voucherId =
         files.uploadPrepayAdmin(
-            tenantId,
+            user.tenantId(),
             user.id(),
             id,
             FileBizType.PREPAY_VOUCHER,
             voucher.fileName(),
             voucher.content());
     Instant now = now();
-    jdbc.update(
-        "INSERT INTO crm_prepay_payment (id, tenant_id, prepay_id, request_id, request_fingerprint, pay_amount_cny, pay_time, pay_method, pay_remark, voucher_file_id, operator_id, create_time, operator_name, operator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        IdWorker.getId(),
-        tenantId,
-        id,
-        requestId,
-        fingerprint,
-        amount,
-        Timestamp.from(payTime),
-        method,
-        remark,
-        voucherId,
-        user.id(),
-        Timestamp.from(now),
-        user.nickname(),
-        "PAYMENT");
-    int changed =
-        jdbc.update(
-            "UPDATE crm_prepay SET status = 'PAID', update_by = ?, update_time = ? WHERE tenant_id = ? AND id = ? AND status = 'APPROVED'",
+    prepays.insertPayment(
+        new PrepayWrite.Payment(
+            IdWorker.getId(),
+            id,
+            requestId,
+            fingerprint,
+            amount,
+            payTime,
+            method,
+            remark,
+            voucherId,
             user.id(),
-            Timestamp.from(now),
-            tenantId,
-            id);
+            now,
+            user.nickname(),
+            "PAYMENT"));
+    int changed = prepays.markPaid(new PrepayWrite.Paid(id, user.id(), now));
     if (changed != 1) {
       throw new BusinessException(ErrorCode.PREPAY_STATE_CONFLICT);
     }
     if (Boolean.TRUE.equals(task.deductFromCommission())) {
-      wallet.postPrepayDeduction(tenantId, row.kolId(), id, amount, payTime, user.id());
+      wallet.postPrepayDeduction(user.tenantId(), row.kolId(), id, amount, payTime, user.id());
     }
-    insertHistory(tenantId, id, "PAID", user, "PAYMENT", null, now);
-    insertOutbox(tenantId, id, "PAID", row.prepayNo(), now);
+    insertHistory(id, "PAID", user, "PAYMENT", null, now);
+    insertOutbox(id, "PAID", row.prepayNo(), now);
     audit.recordTenantWriteOperation(
-        tenantId,
+        user.tenantId(),
         user.id(),
         "Prepay",
         "Record payment",
@@ -643,7 +662,11 @@ public class PrepayService {
   public Recipient recipient(AccountDTO user, long id) {
     long tenantId = requireTenant(user);
     requireDetailPermission(user);
-    PrepayRow row = findRow(tenantId, id);
+    return TenantScope.callCompany(tenantId, () -> recipientInCompany(user, id));
+  }
+
+  private Recipient recipientInCompany(AccountDTO user, long id) {
+    PrepayRow row = findRow(id);
     if (row == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
@@ -651,46 +674,42 @@ public class PrepayService {
     if (!hasFinanceAccess(user)) {
       requireKolScope(user, kol);
     }
-    try {
-      jdbc.queryForObject(
-          "SELECT id FROM crm_prepay WHERE tenant_id = ? AND id = ? FOR UPDATE",
-          Long.class,
-          tenantId,
-          id);
-      return jdbc.queryForObject(
-          "SELECT payout_account_type, payout_currency, payout_network, payout_holder_name, payout_account_cipher, prepay_no FROM crm_prepay WHERE tenant_id = ? AND id = ? AND payout_account_cipher IS NOT NULL",
-          (rs, index) -> {
-            audit.recordTenantOperation(
-                tenantId,
-                user.id(),
-                "Prepay",
-                "View recipient",
-                "/admin-api/commission/prepays/" + id + "/recipient",
-                "{\"prepayNo\":\"" + rs.getString("prepay_no") + "\"}");
-            return new Recipient(
-                rs.getString("payout_account_type"),
-                rs.getString("payout_currency"),
-                rs.getString("payout_network"),
-                rs.getString("payout_holder_name"),
-                cipher.decrypt(rs.getString("payout_account_cipher")));
-          },
-          tenantId,
-          id);
-    } catch (EmptyResultDataAccessException exception) {
+    if (prepays.lockById(id) == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
+    PrepayRecipientRow stored = prepays.findRecipient(id);
+    if (stored == null) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    audit.recordTenantOperation(
+        user.tenantId(),
+        user.id(),
+        "Prepay",
+        "View recipient",
+        "/admin-api/commission/prepays/" + id + "/recipient",
+        "{\"prepayNo\":\"" + stored.prepayNo() + "\"}");
+    return new Recipient(
+        stored.payoutAccountType(),
+        stored.payoutCurrency(),
+        stored.payoutNetwork(),
+        stored.payoutHolderName(),
+        cipher.decrypt(stored.payoutAccountCipher()));
   }
 
   public BizFileService.FileDTO adminFile(AccountDTO user, long fileId) {
     requireDetailPermission(user);
     long tenantId = requireTenant(user);
+    return TenantScope.callCompany(tenantId, () -> adminFileInCompany(user, fileId));
+  }
+
+  private BizFileService.FileDTO adminFileInCompany(AccountDTO user, long fileId) {
     BizFileService.AttachedFile file = files.attachedFile(fileId);
     if ((file.bizType() != FileBizType.PREPAY_ATTACHMENT
             && file.bizType() != FileBizType.PREPAY_VOUCHER)
         || file.bizId() == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    PrepayRow row = findRow(tenantId, file.bizId());
+    PrepayRow row = findRow(file.bizId());
     if (row == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
@@ -705,226 +724,124 @@ public class PrepayService {
     if (file.bizType() != FileBizType.PREPAY_VOUCHER || file.bizId() == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    Long prepayKol =
-        jdbc.query(
-            "SELECT p.kol_id FROM crm_prepay p JOIN crm_prepay_payment payment ON payment.tenant_id = p.tenant_id AND payment.prepay_id = p.id WHERE p.tenant_id = ? AND p.id = ? AND payment.voucher_file_id = ? AND p.status = 'PAID'",
-            rs -> rs.next() ? rs.getLong(1) : null,
-            TenantScope.companyId(),
-            file.bizId(),
-            fileId);
+    Long prepayKol = prepays.paidKolId(file.bizId(), fileId);
     if (prepayKol == null || prepayKol != kolId) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     return file.download();
   }
 
-  private static boolean detailsComplete(PrepayDetail detail) {
-    return detail.reason() != null
-        && !detail.reason().isBlank()
-        && detail.expectedPayDate() != null
-        && detail.deductFromCommission() != null
-        && detail.payoutAccountSnapshot() != null;
-  }
-
   public PrepayDetail detail(AccountDTO user, long id) {
     long tenantId = requireTenant(user);
     requireDetailPermission(user);
-    PrepayRow row = findRow(tenantId, id);
-    if (row == null) {
+    return TenantScope.callCompany(tenantId, () -> detailInCompany(user, id));
+  }
+
+  private PrepayDetail detailInCompany(AccountDTO user, long id) {
+    PrepayHead head = prepays.findById(id);
+    if (head == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    KolRefDTO kol = requireKol(row.kolId());
-    if (hasFinanceAccess(user)) {
-      // Finance permissions deliberately see every task in the current company.
-    } else {
+    KolRefDTO kol = requireKol(head.kolId());
+    if (!hasFinanceAccess(user)) {
       requireKolScope(user, kol);
     }
-    AppValues values =
-        jdbc.queryForObject(
-            "SELECT reason, expected_pay_date, deduct_from_commission, payout_account_id, payout_account_type, payout_currency, payout_network, payout_holder_name, payout_account_masked FROM crm_prepay WHERE tenant_id = ? AND id = ?",
-            (rs, index) ->
-                new AppValues(
-                    rs.getString("reason"),
-                    localDate(rs, "expected_pay_date"),
-                    (Boolean) rs.getObject("deduct_from_commission"),
-                    rs.getObject("payout_account_id", Long.class),
-                    rs.getString("payout_account_type") == null
-                        ? null
-                        : new PayoutOption(
-                            rs.getObject("payout_account_id", Long.class),
-                            rs.getString("payout_account_type"),
-                            rs.getString("payout_currency"),
-                            rs.getString("payout_network"),
-                            rs.getString("payout_account_masked"),
-                            rs.getString("payout_holder_name")),
-                    files.prepayAttachments(id)),
-            tenantId,
-            id);
-    List<Approval> approvals =
-        jdbc.query(
-            "SELECT action, operator_id, operator_name, operator_role, create_time, reason FROM crm_prepay_history WHERE tenant_id = ? AND prepay_id = ? AND action IN ('OPERATIONS_APPROVED', 'FINANCE_APPROVED', 'APPROVED', 'REJECTED') ORDER BY create_time DESC, id DESC LIMIT 1",
-            (rs, index) ->
-                new Approval(
-                    "REJECTED".equals(rs.getString("action")) ? "REJECT" : "APPROVE",
-                    rs.getLong("operator_id"),
-                    rs.getTimestamp("create_time").toInstant(),
-                    rs.getString("reason"),
-                    actorName(rs),
-                    actorRole(rs)),
-            tenantId,
-            id);
-    List<Payment> payments =
-        jdbc.query(
-            "SELECT pay_amount_cny, pay_time, pay_method, pay_remark, voucher_file_id, operator_id, operator_name, operator_role FROM crm_prepay_payment WHERE tenant_id = ? AND prepay_id = ?",
-            (rs, index) ->
-                new Payment(
-                    money(rs.getBigDecimal("pay_amount_cny")),
-                    "CNY",
-                    rs.getTimestamp("pay_time").toInstant(),
-                    rs.getString("pay_method"),
-                    rs.getString("pay_remark"),
-                    rs.getLong("voucher_file_id"),
-                    rs.getLong("operator_id"),
-                    actorName(rs),
-                    actorRole(rs)),
-            tenantId,
-            id);
-    List<Timeline> timeline =
-        jdbc.query(
-            "SELECT action, operator_id, operator_name, operator_role, create_time, reason FROM crm_prepay_history WHERE tenant_id = ? AND prepay_id = ? ORDER BY create_time, id",
-            (rs, index) ->
-                new Timeline(
-                    rs.getString("action"),
-                    rs.getLong("operator_id"),
-                    rs.getTimestamp("create_time").toInstant(),
-                    rs.getString("reason"),
-                    actorName(rs),
-                    actorRole(rs)),
-            tenantId,
-            id);
-    Deduction deduction = deduction(tenantId, id, row.status(), values.deductFromCommission());
+    PrepayApplicationColumns values = application(id);
+    PrepayHistoryRow approval = prepays.latestApproval(id);
+    PrepayPaymentRow payment = prepays.findPayment(id);
+    List<Timeline> timeline = prepays.timeline(id).stream().map(this::timeline).toList();
+    String applicantName = applicantName(head.applicantId());
     return new PrepayDetail(
-        row.id(),
-        row.prepayNo(),
-        row.financeTaskType(),
-        row.financeTaskId(),
-        row.kolId(),
-        row.kolCode(),
-        row.kolName(),
-        row.applicantId(),
-        row.applicantName(),
-        row.amountCny(),
-        row.currency(),
-        row.status(),
-        row.createdAt(),
+        head.id(),
+        head.prepayNo(),
+        "PREPAY",
+        head.id(),
+        head.kolId(),
+        kol.kolCode(),
+        kol.name(),
+        head.applicantId(),
+        applicantName,
+        money(head.amountCny()),
+        "CNY",
+        head.status(),
+        head.createTime(),
         values.reason(),
         values.expectedPayDate(),
         values.deductFromCommission(),
         values.payoutAccountId(),
-        values.payoutAccountSnapshot(),
-        values.attachments(),
-        approvals.isEmpty() ? null : approvals.getFirst(),
-        payments.isEmpty() ? null : payments.getFirst(),
+        snapshot(values),
+        files.prepayAttachments(id),
+        approval == null ? null : approval(approval),
+        payment == null ? null : payment(payment),
         timeline,
-        deduction,
-        money(wallet.currentBalance(tenantId, row.kolId())));
-  }
-
-  private Deduction deduction(long tenantId, long prepayId, String status, Boolean deduct) {
-    if (!"PAID".equals(status) || !Boolean.TRUE.equals(deduct)) {
-      return null;
-    }
-    List<Deduction> result =
-        jdbc.query(
-            "SELECT p.pay_amount_cny AS posted, l.id AS ledger_id FROM crm_prepay_payment p JOIN crm_commission_ledger l ON l.tenant_id = p.tenant_id AND l.source_id = p.prepay_id AND l.source_type = 'PREPAY' AND l.entry_type = 'PREPAY_DEDUCT' WHERE p.tenant_id = ? AND p.prepay_id = ?",
-            (rs, index) -> {
-              BigDecimal posted = rs.getBigDecimal("posted");
-              BigDecimal recovered =
-                  jdbc.queryForObject(
-                      "SELECT COALESCE(SUM(amount_cny), 0) FROM crm_commission_recovery WHERE tenant_id = ? AND deduction_ledger_id = ?",
-                      BigDecimal.class,
-                      tenantId,
-                      rs.getLong("ledger_id"));
-              return new Deduction(
-                  money(posted), money(recovered), money(posted.subtract(recovered)));
-            },
-            tenantId,
-            prepayId);
-    return result.isEmpty() ? null : result.getFirst();
+        deduction(id, head.status(), values.deductFromCommission()),
+        money(wallet.currentBalance(user.tenantId(), head.kolId())));
   }
 
   public PageResult<PrepayRow> page(AccountDTO user, Filter filter) {
     long tenantId = requireTenant(user);
-    if (!hasFinanceAccess(user)
-        && !user.permissions().contains("commission:view")
-        && !user.permissions().contains("prepay:apply")) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
+    requireDetailPermission(user);
     if (filter.page() < 1 || filter.size() < 1 || filter.size() > 100) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    List<Object> args = new ArrayList<>();
-    StringBuilder where = new StringBuilder(" WHERE p.tenant_id = ?");
-    args.add(tenantId);
-    if (filter.prepayNo() != null && !filter.prepayNo().isBlank()) {
-      where.append(" AND p.prepay_no = ?");
-      args.add(filter.prepayNo().strip());
+    String status = stripToNull(filter.status());
+    if (status != null && !STATUSES.contains(status)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    if (filter.kolCode() != null && !filter.kolCode().isBlank()) {
-      where.append(" AND k.kol_code = ?");
-      args.add(filter.kolCode().strip());
-    }
-    if (filter.status() != null && !filter.status().isBlank()) {
-      if (!List.of(
-              "WAITING_DETAILS",
-              "PENDING_OPERATIONS_REVIEW",
-              "PENDING_FINANCE_REVIEW",
-              "APPROVED",
-              "PAID",
-              "REJECTED",
-              "CANCELLED")
-          .contains(filter.status())) {
-        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-      }
-      where.append(" AND p.status = ?");
-      args.add(filter.status());
-    }
-    if (!hasFinanceAccess(user) && user.ownScope()) {
-      List<Long> visible =
-          kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).distinct().toList();
-      if (visible.isEmpty()) {
+    return TenantScope.callCompany(tenantId, () -> pageInCompany(user, filter, status));
+  }
+
+  private PageResult<PrepayRow> pageInCompany(AccountDTO user, Filter filter, String status) {
+    String prepayNo = stripToNull(filter.prepayNo());
+    String kolCode = stripToNull(filter.kolCode());
+    Long kolId = null;
+    if (kolCode != null) {
+      KolRefDTO match = kols.getByCode(kolCode);
+      if (match == null || match.kolCode() == null || !match.kolCode().equals(kolCode)) {
         return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
       }
-      where.append(" AND p.kol_id IN (");
-      where.append(String.join(",", java.util.Collections.nCopies(visible.size(), "?")));
-      where.append(')');
-      args.addAll(visible);
+      kolId = match.id();
     }
-    String from =
-        " FROM crm_prepay p JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = p.tenant_id";
-    Long total = jdbc.queryForObject("SELECT count(*)" + from + where, Long.class, args.toArray());
-    args.add(filter.size());
-    args.add((long) (filter.page() - 1) * filter.size());
+    List<Long> ownIds = null;
+    if (!hasFinanceAccess(user) && user.ownScope()) {
+      ownIds = kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).distinct().toList();
+      if (ownIds.isEmpty()) {
+        return new PageResult<>(List.of(), 0L, filter.page(), filter.size());
+      }
+    }
+    PrepayPageQuery query =
+        new PrepayPageQuery(
+            prepayNo,
+            kolId,
+            status,
+            ownIds,
+            filter.size(),
+            (long) (filter.page() - 1) * filter.size());
+    Long total = prepays.count(query);
+    List<PrepayHead> heads = prepays.page(query);
+    Map<Long, KolRefDTO> kolById =
+        kolsById(heads.stream().map(PrepayHead::kolId).distinct().toList());
+    Map<Long, String> names =
+        namesById(heads.stream().map(PrepayHead::applicantId).distinct().toList());
     List<PrepayRow> rows =
-        jdbc.query(
-            "SELECT p.id, p.prepay_no, p.kol_id, k.kol_code, k.name AS kol_name, p.applicant_id, applicant.nickname AS applicant_name, p.amount_cny, p.status, p.create_time"
-                + from
-                + " JOIN sys_user applicant ON applicant.id = p.applicant_id"
-                + where
-                + " ORDER BY p.create_time DESC, p.id DESC LIMIT ? OFFSET ?",
-            this::mapRow,
-            args.toArray());
+        heads.stream()
+            .map(head -> toRow(head, kolById.get(head.kolId()), names.get(head.applicantId())))
+            .toList();
     return new PageResult<>(rows, total == null ? 0L : total, filter.page(), filter.size());
   }
 
   @Transactional(readOnly = true)
   public byte[] export(AccountDTO user, Filter filter) {
     requireTenant(user);
-    if (user.role() != Role.SUPER_ADMIN
-        && (!user.permissions().contains("data:export")
-            || !hasFinanceAccess(user) && !user.permissions().contains("commission:view"))) {
+    // data:export AND the same list permission gate as page()/detail (design §4.12 / API table).
+    if (user.role() != Role.SUPER_ADMIN && !user.permissions().contains("data:export")) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
+    requireDetailPermission(user);
+    return TenantScope.callCompany(user.tenantId(), () -> exportInCompany(user, filter));
+  }
+
+  private byte[] exportInCompany(AccountDTO user, Filter filter) {
     StringBuilder csv =
         new StringBuilder("\uFEFF预付编号,达人编号,达人名称,申请人ID,申请金额(CNY),状态,付款金额(CNY),付款时间,付款方式,脱敏收款账户\r\n");
     PageResult<PrepayRow> first =
@@ -932,11 +849,12 @@ public class PrepayService {
     if (first.total() > 100000) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    appendExportRows(csv, user, first.items());
+    appendExportRows(csv, first.items());
     for (int page = 2; (long) (page - 1) * 100 < first.total(); page++) {
-      PageResult<PrepayRow> next =
-          page(user, new Filter(filter.prepayNo(), filter.kolCode(), filter.status(), page, 100));
-      appendExportRows(csv, user, next.items());
+      appendExportRows(
+          csv,
+          page(user, new Filter(filter.prepayNo(), filter.kolCode(), filter.status(), page, 100))
+              .items());
     }
     audit.recordTenantOperation(
         user.tenantId(),
@@ -948,24 +866,92 @@ public class PrepayService {
     return csv.toString().getBytes(StandardCharsets.UTF_8);
   }
 
-  private void appendExportRows(StringBuilder csv, AccountDTO user, List<PrepayRow> rows) {
+  @Transactional(readOnly = true)
+  public PageResult<PaidPrepay> listPaid(long tenantId, long kolId, int page, int size) {
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          Long total = prepays.countPaid(kolId);
+          List<PaidPrepay> items = new ArrayList<>();
+          for (Long id : prepays.listPaidIds(kolId, size, (long) (page - 1) * size)) {
+            items.add(toPaid(prepays.findPaid(kolId, id)));
+          }
+          return new PageResult<>(items, total == null ? 0L : total, page, size);
+        });
+  }
+
+  @Transactional(readOnly = true)
+  public PaidPrepay paid(long tenantId, long kolId, long id) {
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          Long count = prepays.countPaidOne(kolId, id);
+          if (count == null || count != 1L) {
+            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+          }
+          KolPaidPrepayRow row = prepays.findPaid(kolId, id);
+          if (row == null) {
+            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+          }
+          return toPaid(row);
+        });
+  }
+
+  @Transactional(readOnly = true)
+  public PageResult<LedgerRow> ledger(long tenantId, long kolId, int page, int size) {
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          long total =
+              nz(prepays.countPaidPayments(kolId)) + nz(prepays.countPaidDeductions(kolId));
+          List<LedgerRow> rows =
+              prepays.listLedger(kolId, size, (long) (page - 1) * size).stream()
+                  .map(this::ledgerRow)
+                  .toList();
+          return new PageResult<>(rows, total, page, size);
+        });
+  }
+
+  private PaidPrepay toPaid(KolPaidPrepayRow row) {
+    Deduction deduction = null;
+    if (Boolean.TRUE.equals(row.deductFromCommission()) && row.deductionId() != null) {
+      BigDecimal posted = row.payAmountCny();
+      BigDecimal recovered = nz(prepays.sumRecovered(row.deductionId()));
+      deduction =
+          new Deduction(
+              posted.setScale(2).toPlainString(),
+              recovered.setScale(2).toPlainString(),
+              posted.subtract(recovered).setScale(2).toPlainString());
+    }
+    BigDecimal balance = row.balanceCny();
+    return new PaidPrepay(
+        row.id(),
+        row.prepayNo(),
+        "PAID",
+        row.payAmountCny().setScale(2).toPlainString(),
+        "CNY",
+        row.payTime(),
+        row.payMethod(),
+        row.voucherFileId(),
+        row.deductFromCommission(),
+        deduction,
+        balance == null ? "0.00" : balance.setScale(2).toPlainString());
+  }
+
+  private LedgerRow ledgerRow(KolLedgerRow row) {
+    return new LedgerRow(
+        row.entryId(),
+        row.prepayId(),
+        row.prepayNo(),
+        row.entryType(),
+        row.amountCny().setScale(2).toPlainString(),
+        row.occurredAt(),
+        row.balanceAfterCny() == null ? null : row.balanceAfterCny().setScale(2).toPlainString());
+  }
+
+  private void appendExportRows(StringBuilder csv, List<PrepayRow> rows) {
     for (PrepayRow row : rows) {
-      List<Payment> payments =
-          jdbc.query(
-              "SELECT pay_amount_cny, pay_time, pay_method FROM crm_prepay_payment WHERE tenant_id = ? AND prepay_id = ?",
-              (rs, index) ->
-                  new Payment(
-                      money(rs.getBigDecimal("pay_amount_cny")),
-                      "CNY",
-                      rs.getTimestamp("pay_time").toInstant(),
-                      rs.getString("pay_method"),
-                      null,
-                      null,
-                      null,
-                      null,
-                      null),
-              user.tenantId(),
-              row.id());
+      PrepayPaymentRow payment = prepays.findPayment(row.id());
       String[] fields = {
         row.prepayNo(),
         row.kolCode(),
@@ -973,10 +959,10 @@ public class PrepayService {
         row.applicantId().toString(),
         row.amountCny(),
         row.status(),
-        payments.isEmpty() ? "" : payments.getFirst().payAmountCny(),
-        payments.isEmpty() ? "" : payments.getFirst().payTime().toString(),
-        payments.isEmpty() ? "" : payments.getFirst().payMethod(),
-        maskedAccount(user.tenantId(), row.id())
+        payment == null ? "" : money(payment.payAmountCny()),
+        payment == null ? "" : payment.payTime().toString(),
+        payment == null ? "" : payment.payMethod(),
+        maskedAccount(row.id())
       };
       for (int index = 0; index < fields.length; index++) {
         if (index > 0) {
@@ -988,14 +974,9 @@ public class PrepayService {
     }
   }
 
-  private String maskedAccount(long tenantId, long id) {
-    List<String> rows =
-        jdbc.query(
-            "SELECT payout_account_masked FROM crm_prepay WHERE tenant_id = ? AND id = ?",
-            (rs, index) -> rs.getString(1),
-            tenantId,
-            id);
-    return rows.isEmpty() ? "" : rows.getFirst();
+  private String maskedAccount(long id) {
+    String masked = prepays.maskedAccount(id);
+    return masked == null ? "" : masked;
   }
 
   private static String csvCell(String raw) {
@@ -1026,59 +1007,160 @@ public class PrepayService {
     }
   }
 
-  private PrepayRow requireTaskLocked(long tenantId, long id) {
-    PrepayRow row = findRow(tenantId, id);
+  private PayoutAccountDO approvedAccount(long tenantId, long kolId, ApplicationDetails details) {
+    PayoutAccountDO account = payoutAccounts.selectById(details.payoutAccountId());
+    if (account == null
+        || !tenantIdEquals(account.getTenantId(), tenantId)
+        || !Long.valueOf(kolId).equals(account.getKolId())
+        || account.getStatus() != PayoutAccountStatus.APPROVED) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    return account;
+  }
+
+  private static PrepayWrite.Details detailsCommand(
+      long id,
+      ApplicationDetails details,
+      PayoutAccountDO account,
+      boolean manual,
+      String cipherText,
+      long actorId,
+      Instant now) {
+    return new PrepayWrite.Details(
+        id,
+        details.reason().strip(),
+        details.expectedPayDate(),
+        details.deductFromCommission(),
+        manual ? null : account.getId(),
+        manual ? "MANUAL" : account.getAccountType().name(),
+        manual ? null : account.getCurrency(),
+        manual || account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
+        manual ? null : account.getHolderName(),
+        cipherText,
+        manual ? "***" : account.getAccountMasked(),
+        actorId,
+        now);
+  }
+
+  private PrepayRow requireTaskLocked(long id) {
+    PrepayRow row = findRow(id);
     if (row == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
-    jdbc.queryForObject(
-        "SELECT id FROM crm_prepay WHERE tenant_id = ? AND id = ? FOR UPDATE",
-        Long.class,
-        tenantId,
-        id);
+    if (prepays.lockById(id) == null) {
+      throw new EmptyResultDataAccessException(1);
+    }
     return row;
   }
 
-  private String status(long tenantId, long id) {
-    return jdbc.queryForObject(
-        "SELECT status FROM crm_prepay WHERE tenant_id = ? AND id = ?", String.class, tenantId, id);
+  private String status(long id) {
+    String value = prepays.statusOf(id);
+    if (value == null) {
+      throw new EmptyResultDataAccessException(1);
+    }
+    return value;
   }
 
-  private PrepayRow findByRequest(long tenantId, UUID requestId) {
-    List<PrepayRow> rows =
-        jdbc.query(
-            "SELECT p.id, p.prepay_no, p.kol_id, k.kol_code, k.name AS kol_name, p.applicant_id, applicant.nickname AS applicant_name, p.amount_cny, p.status, p.create_time FROM crm_prepay p JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = p.tenant_id JOIN sys_user applicant ON applicant.id = p.applicant_id WHERE p.tenant_id = ? AND p.request_id = ?",
-            this::mapRow,
-            tenantId,
-            requestId);
-    return rows.isEmpty() ? null : rows.getFirst();
+  private PrepayApplicationColumns application(long id) {
+    PrepayApplicationColumns columns = prepays.loadApplication(id);
+    if (columns == null) {
+      throw new EmptyResultDataAccessException(1);
+    }
+    return columns;
   }
 
-  private PrepayRow findRow(long tenantId, long id) {
-    List<PrepayRow> rows =
-        jdbc.query(
-            "SELECT p.id, p.prepay_no, p.kol_id, k.kol_code, k.name AS kol_name, p.applicant_id, applicant.nickname AS applicant_name, p.amount_cny, p.status, p.create_time FROM crm_prepay p JOIN crm_kol k ON k.id = p.kol_id AND k.tenant_id = p.tenant_id JOIN sys_user applicant ON applicant.id = p.applicant_id WHERE p.tenant_id = ? AND p.id = ?",
-            this::mapRow,
-            tenantId,
-            id);
-    return rows.isEmpty() ? null : rows.getFirst();
+  private PrepayRow findByRequest(UUID requestId) {
+    return toIdentity(prepays.findByRequestId(requestId));
   }
 
-  private PrepayRow mapRow(ResultSet rs, int index) throws SQLException {
+  private PrepayRow findRow(long id) {
+    return toIdentity(prepays.findById(id));
+  }
+
+  private PrepayRow toIdentity(PrepayHead head) {
+    if (head == null) {
+      return null;
+    }
+    return toRow(head, null, null);
+  }
+
+  private PrepayRow toRow(PrepayHead head, KolRefDTO kol, String applicantName) {
     return new PrepayRow(
-        rs.getLong("id"),
-        rs.getString("prepay_no"),
+        head.id(),
+        head.prepayNo(),
         "PREPAY",
-        rs.getLong("id"),
-        rs.getLong("kol_id"),
-        rs.getString("kol_code"),
-        rs.getString("kol_name"),
-        rs.getLong("applicant_id"),
-        rs.getString("applicant_name"),
-        rs.getBigDecimal("amount_cny").setScale(2, RoundingMode.UNNECESSARY).toPlainString(),
+        head.id(),
+        head.kolId(),
+        kol == null ? null : kol.kolCode(),
+        kol == null ? null : kol.name(),
+        head.applicantId(),
+        applicantName,
+        money(head.amountCny()),
         "CNY",
-        rs.getString("status"),
-        rs.getTimestamp("create_time").toInstant());
+        head.status(),
+        head.createTime());
+  }
+
+  private PayoutOption snapshot(PrepayApplicationColumns values) {
+    if (values.payoutAccountType() == null) {
+      return null;
+    }
+    return new PayoutOption(
+        values.payoutAccountId(),
+        values.payoutAccountType(),
+        values.payoutCurrency(),
+        values.payoutNetwork(),
+        values.payoutAccountMasked(),
+        values.payoutHolderName());
+  }
+
+  private Approval approval(PrepayHistoryRow row) {
+    return new Approval(
+        "REJECTED".equals(row.action()) ? "REJECT" : "APPROVE",
+        row.operatorId(),
+        row.createTime(),
+        row.reason(),
+        actorName(row),
+        actorRole(row));
+  }
+
+  private Payment payment(PrepayPaymentRow row) {
+    return new Payment(
+        money(row.payAmountCny()),
+        "CNY",
+        row.payTime(),
+        row.payMethod(),
+        row.payRemark(),
+        row.voucherFileId(),
+        row.operatorId(),
+        actorName(row.operatorId(), row.operatorName()),
+        actorRole(row.operatorId(), row.operatorRole()));
+  }
+
+  private Timeline timeline(PrepayHistoryRow row) {
+    return new Timeline(
+        row.action(),
+        row.operatorId(),
+        row.createTime(),
+        row.reason(),
+        actorName(row),
+        actorRole(row));
+  }
+
+  private Deduction deduction(long prepayId, String status, Boolean deduct) {
+    if (!"PAID".equals(status) || !Boolean.TRUE.equals(deduct)) {
+      return null;
+    }
+    PrepayDeductionRow row = prepays.findDeduction(prepayId);
+    if (row == null) {
+      return null;
+    }
+    BigDecimal recovered = prepays.sumRecovered(row.ledgerId());
+    if (recovered == null) {
+      recovered = BigDecimal.ZERO;
+    }
+    return new Deduction(
+        money(row.posted()), money(recovered), money(row.posted().subtract(recovered)));
   }
 
   private KolRefDTO requireKol(long kolId) {
@@ -1087,6 +1169,29 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     return rows.getFirst();
+  }
+
+  private String applicantName(Long applicantId) {
+    if (applicantId == null) {
+      return null;
+    }
+    return namesById(List.of(applicantId)).get(applicantId);
+  }
+
+  private Map<Long, KolRefDTO> kolsById(List<Long> ids) {
+    Map<Long, KolRefDTO> byId = new HashMap<>();
+    for (KolRefDTO kol : kols.listByIdsIncludingDeleted(ids)) {
+      byId.put(kol.id(), kol);
+    }
+    return byId;
+  }
+
+  private Map<Long, String> namesById(List<Long> ids) {
+    Map<Long, String> byId = new HashMap<>();
+    for (AccountNameDTO name : accountNames.listByIds(ids)) {
+      byId.put(name.id(), name.nickname());
+    }
+    return byId;
   }
 
   private static void requireKolScope(AccountDTO user, KolRefDTO kol) {
@@ -1100,12 +1205,6 @@ public class PrepayService {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return user.tenantId();
-  }
-
-  private static boolean hasAny(AccountDTO user, String first, String second) {
-    return user.role() == Role.SUPER_ADMIN
-        || user.permissions().contains(first)
-        || user.permissions().contains(second);
   }
 
   private static boolean hasFinanceAccess(AccountDTO user) {
@@ -1139,6 +1238,22 @@ public class PrepayService {
     }
   }
 
+  private static void requireDetailPermission(AccountDTO user) {
+    if (!hasFinanceAccess(user)
+        && !user.permissions().contains("commission:view")
+        && !user.permissions().contains("prepay:apply")) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+  }
+
+  private static boolean detailsComplete(PrepayDetail detail) {
+    return detail.reason() != null
+        && !detail.reason().isBlank()
+        && detail.expectedPayDate() != null
+        && detail.deductFromCommission() != null
+        && detail.payoutAccountSnapshot() != null;
+  }
+
   private static BigDecimal money(String value) {
     if (value == null || !value.matches("(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?")) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -1150,6 +1265,10 @@ public class PrepayService {
     return amount;
   }
 
+  private static String money(BigDecimal value) {
+    return value.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
+  }
+
   private static UUID parseUuid(String value) {
     try {
       UUID parsed = UUID.fromString(value);
@@ -1157,6 +1276,14 @@ public class PrepayService {
         throw new IllegalArgumentException("A canonical UUID is required");
       }
       return parsed;
+    } catch (RuntimeException exception) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+  }
+
+  private static Instant payTime(String value) {
+    try {
+      return OffsetDateTime.parse(value).toInstant().truncatedTo(ChronoUnit.MILLIS);
     } catch (RuntimeException exception) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -1192,17 +1319,12 @@ public class PrepayService {
     }
   }
 
-  private boolean paymentRecorded(long tenantId, UUID requestId, String fingerprint) {
-    List<String> priorFingerprints =
-        jdbc.query(
-            "SELECT request_fingerprint FROM crm_prepay_payment WHERE tenant_id = ? AND request_id = ?",
-            (rs, index) -> rs.getString(1),
-            tenantId,
-            requestId);
-    if (priorFingerprints.isEmpty()) {
+  private boolean paymentRecorded(UUID requestId, String fingerprint) {
+    String prior = prepays.findFingerprint(requestId);
+    if (prior == null) {
       return false;
     }
-    if (!fingerprint.equals(priorFingerprints.getFirst())) {
+    if (!fingerprint.equals(prior)) {
       throw new BusinessException(ErrorCode.PREPAY_PAYMENT_CONFLICT);
     }
     return true;
@@ -1219,98 +1341,67 @@ public class PrepayService {
     return id != null && id == tenantId;
   }
 
-  private String nextPrepayNo(long tenantId, long id, Instant now) {
+  private static String stripToNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.strip();
+  }
+
+  private String nextPrepayNo(long id, Instant now) {
     LocalDate date = now.atZone(NUMBER_ZONE).toLocalDate();
-    Integer sequence =
-        jdbc.queryForObject(
-            "INSERT INTO crm_prepay_sequence (id, tenant_id, sequence_date, last_value) VALUES (?, ?, ?, 1) ON CONFLICT (tenant_id, sequence_date) DO UPDATE SET last_value = crm_prepay_sequence.last_value + 1 WHERE crm_prepay_sequence.last_value < 999999 RETURNING last_value",
-            Integer.class,
-            id,
-            tenantId,
-            Date.valueOf(date));
+    Integer sequence = prepays.nextSequence(id, date);
     if (sequence == null) {
       throw new BusinessException(ErrorCode.COMMON_CONFLICT);
     }
-    return "PP"
-        + date.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
-        + String.format("%06d", sequence);
+    return "PP" + date.format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", sequence);
   }
 
   private void insertHistory(
-      long tenantId,
-      long id,
-      String action,
-      AccountDTO actor,
-      String actorRole,
-      String reason,
-      Instant now) {
-    jdbc.update(
-        "INSERT INTO crm_prepay_history (id, tenant_id, prepay_id, action, operator_id, reason, create_time, operator_name, operator_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        IdWorker.getId(),
-        tenantId,
-        id,
-        action,
-        actor.id(),
-        reason,
-        Timestamp.from(now),
-        actor.nickname(),
-        actorRole);
+      long id, String action, AccountDTO actor, String actorRole, String reason, Instant now) {
+    prepays.insertHistory(
+        new PrepayWrite.History(
+            IdWorker.getId(), id, action, actor.id(), reason, now, actor.nickname(), actorRole));
   }
 
-  private static String actorName(ResultSet rs) throws SQLException {
-    if (rs.getLong("operator_id") == 0) {
+  private static String actorName(PrepayHistoryRow row) {
+    return actorName(row.operatorId(), row.operatorName());
+  }
+
+  private static String actorRole(PrepayHistoryRow row) {
+    return actorRole(row.operatorId(), row.operatorRole());
+  }
+
+  private static String actorName(Long operatorId, String operatorName) {
+    if (operatorId == null || operatorId == 0L) {
       return null;
     }
-    return rs.getString("operator_name");
+    return operatorName;
   }
 
-  private static String actorRole(ResultSet rs) throws SQLException {
-    if (rs.getLong("operator_id") == 0) {
+  private static String actorRole(Long operatorId, String operatorRole) {
+    if (operatorId == null || operatorId == 0L) {
       return "SYSTEM";
     }
-    String role = rs.getString("operator_role");
-    return role == null ? "HISTORICAL" : role;
+    return operatorRole == null ? "HISTORICAL" : operatorRole;
   }
 
-  private static void requireDetailPermission(AccountDTO user) {
-    if (!hasFinanceAccess(user)
-        && !user.permissions().contains("commission:view")
-        && !user.permissions().contains("prepay:apply")) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
-  }
-
-  private void insertOutbox(long tenantId, long id, String type, String prepayNo, Instant now) {
+  private void insertOutbox(long id, String type, String prepayNo, Instant now) {
     String escaped = prepayNo.replace("\\", "\\\\").replace("\"", "\\\"");
-    jdbc.update(
-        "INSERT INTO crm_prepay_outbox (id, tenant_id, prepay_id, event_type, payload, attempts, next_attempt_at, create_time) VALUES (?, ?, ?, ?, CAST(? AS jsonb), 0, ?, ?)",
-        IdWorker.getId(),
-        tenantId,
-        id,
-        type,
-        "{\"prepayNo\":\"" + escaped + "\"}",
-        Timestamp.from(now),
-        Timestamp.from(now));
+    prepays.insertOutbox(
+        new PrepayWrite.Outbox(
+            IdWorker.getId(), id, type, "{\"prepayNo\":\"" + escaped + "\"}", now, now));
   }
 
   private Instant now() {
     return clock.instant().truncatedTo(ChronoUnit.MILLIS);
   }
 
-  private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
-    Date date = rs.getDate(column);
-    return date == null ? null : date.toLocalDate();
+  private static long nz(Long value) {
+    return value == null ? 0L : value;
   }
 
-  private static String money(BigDecimal value) {
-    return value.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
+  private static BigDecimal nz(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
   }
-
-  private record AppValues(
-      String reason,
-      LocalDate expectedPayDate,
-      Boolean deductFromCommission,
-      Long payoutAccountId,
-      PayoutOption payoutAccountSnapshot,
-      List<BizFileService.FileMeta> attachments) {}
 }

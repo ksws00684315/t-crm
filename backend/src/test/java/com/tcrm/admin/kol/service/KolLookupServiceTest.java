@@ -3,6 +3,8 @@ package com.tcrm.admin.kol.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
@@ -50,6 +52,26 @@ class KolLookupServiceTest {
     KolRefDTO dto = new KolLookupService(kols, templates).getByCode("kol0001");
     assertThat(dto.enabled()).isTrue();
     assertThat(dto.kolCode()).isEqualTo("KOL0001");
+  }
+
+  @Test
+  void shouldKeepDeletedKols_whenListingForDisplay() {
+    KolMapper kols = mock(KolMapper.class);
+    LinkTemplateMapper templates = mock(LinkTemplateMapper.class);
+    KolDO deleted = new KolDO();
+    deleted.setId(9L);
+    deleted.setKolCode("KOL0009");
+    deleted.setName("Gone");
+    deleted.setStatus(0);
+    deleted.setBdUserId(4L);
+    when(kols.listByIdsIncludingDeleted(List.of(9L))).thenReturn(List.of(deleted));
+
+    assertThat(new KolLookupService(kols, templates).listByIdsIncludingDeleted(List.of(9L)))
+        .containsExactly(new KolRefDTO(9L, "KOL0009", "Gone", false, 4L));
+    verify(templates, never()).selectBatchIds(any());
+    assertThat(new KolLookupService(kols, templates).listByIdsIncludingDeleted(List.of()))
+        .isEmpty();
+    verify(kols, never()).listByIdsIncludingDeleted(List.of());
   }
 
   @Test
