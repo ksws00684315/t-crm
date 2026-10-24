@@ -148,7 +148,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<R<?>> unknown(Exception e) {
-    LOG.error("Unhandled request failure: {}", e.getClass().getSimpleName());
+    LOG.error("Unhandled request failure: {}", e.getClass().getSimpleName(), e);
     return response(ErrorCode.COMMON_INTERNAL_ERROR);
   }
 

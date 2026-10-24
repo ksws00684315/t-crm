@@ -2,6 +2,7 @@ package com.tcrm.admin.product.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.product.api.ProductAccessApi;
+import com.tcrm.admin.product.api.ProductRateDTO;
 import com.tcrm.admin.product.mapper.ProductMapper;
 import com.tcrm.admin.product.model.ProductDO;
 import java.util.Collection;
@@ -40,6 +41,22 @@ public class ProductAccessService implements ProductAccessApi {
         .selectList(new LambdaQueryWrapper<ProductDO>().in(ProductDO::getId, productIds))
         .stream()
         .map(ProductAccessService::toDto)
+        .toList();
+  }
+
+  @Override
+  public List<ProductRateDTO> listRates(Collection<Long> productIds) {
+    if (productIds == null || productIds.isEmpty()) {
+      return List.of();
+    }
+    return products
+        .selectList(
+            new LambdaQueryWrapper<ProductDO>()
+                .select(ProductDO::getId, ProductDO::getRate)
+                .in(ProductDO::getId, productIds)
+                .isNotNull(ProductDO::getRate))
+        .stream()
+        .map(row -> new ProductRateDTO(row.getId(), row.getRate()))
         .toList();
   }
 

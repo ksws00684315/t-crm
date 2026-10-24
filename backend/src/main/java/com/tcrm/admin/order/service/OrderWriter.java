@@ -24,16 +24,19 @@ public class OrderWriter {
   private final OrderItemMapper items;
   private final RefundMapper refunds;
   private final OrderAttribution attribution;
+  private final OrderCommissionSync commissionSync;
 
   public OrderWriter(
       OrderMapper orders,
       OrderItemMapper items,
       RefundMapper refunds,
-      OrderAttribution attribution) {
+      OrderAttribution attribution,
+      OrderCommissionSync commissionSync) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
     this.attribution = attribution;
+    this.commissionSync = commissionSync;
   }
 
   public OrderDO find(long shopId, String remoteId) {
@@ -101,6 +104,7 @@ public class OrderWriter {
     attribution.apply(next, all, false);
     orders.updateById(next);
     all.forEach(items::updateById);
+    commissionSync.sync(next, all);
   }
 
   private void detachRefundsFromItem(Long orderItemId) {
@@ -247,5 +251,6 @@ public class OrderWriter {
     }
     order.setLastSyncTime(Instant.now());
     orders.updateById(order);
+    commissionSync.sync(order, all);
   }
 }
