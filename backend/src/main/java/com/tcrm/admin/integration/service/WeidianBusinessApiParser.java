@@ -17,6 +17,7 @@ public class WeidianBusinessApiParser {
   private static final ZoneId WEIDIAN_ZONE = ZoneId.of("Asia/Shanghai");
   private static final DateTimeFormatter WEIDIAN_TIME =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+  private static final List<String> ADD_ITEM_ID_FIELDS = List.of("itemid", "item_id", "itemId");
 
   public WeidianBusinessApi.OrderListResponse orderList(JsonNode result) {
     List<WeidianBusinessApi.OrderListItem> orders = new ArrayList<>();
@@ -132,8 +133,8 @@ public class WeidianBusinessApiParser {
         result);
   }
 
-  public WeidianBusinessApi.ItemDetailResponse itemDetail(JsonNode envelopeResult) {
-    JsonNode result = envelopeResult.path("result");
+  public WeidianBusinessApi.ItemDetailResponse itemDetail(JsonNode raw) {
+    JsonNode result = innerResult(raw, "detail_content");
     JsonNode blocks = result.get("detail_content");
     List<WeidianBusinessApi.ItemDetailResponseBlock> details = new ArrayList<>();
     if (blocks != null && blocks.isArray()) {
@@ -149,7 +150,7 @@ public class WeidianBusinessApiParser {
                       text(block, "video_type"),
                       block)));
     }
-    return new WeidianBusinessApi.ItemDetailResponse(details, envelopeResult);
+    return new WeidianBusinessApi.ItemDetailResponse(details, raw);
   }
 
   public WeidianBusinessApi.CategoryListResponse categoryList(JsonNode result) {
@@ -168,21 +169,76 @@ public class WeidianBusinessApiParser {
     return new WeidianBusinessApi.CategoryListResponse(categories, result);
   }
 
-  public WeidianBusinessApi.AddItemResponse addItem(JsonNode envelopeResult) {
-    JsonNode result = envelopeResult.path("result");
+  /**
+   * Parses vdian.item.add. The {@code result} node may be the business object (the field names in
+   * {@link #ADD_ITEM_ID_FIELDS}), a business object nested one level deeper, or, for some
+   * interfaces, the bare item id itself (integer or numeric string) possibly nested one level
+   * deeper.
+   */
+  public WeidianBusinessApi.AddItemResponse addItem(JsonNode raw) {
+    JsonNode result = innerResult(raw, "add_sku_ids", "itemid", "item_id", "itemId");
     List<Long> skuIds = new ArrayList<>();
     JsonNode ids = result.get("add_sku_ids");
     if (ids != null && ids.isArray()) {
       ids.forEach(id -> skuIds.add(id.longValue()));
     }
-    return new WeidianBusinessApi.AddItemResponse(
-        longValue(result, "item_id"), skuIds, envelopeResult);
+    Long itemId = result.isValueNode() ? numericValue(result) : addItemId(result);
+    return new WeidianBusinessApi.AddItemResponse(itemId, skuIds, raw);
   }
 
-  public WeidianBusinessApi.SaveItemDetailResponse saveItemDetail(JsonNode envelopeResult) {
-    JsonNode result = envelopeResult.path("result");
-    return new WeidianBusinessApi.SaveItemDetailResponse(
-        text(result, "tmp_detail_id"), envelopeResult);
+  /**
+   * Unwraps at most one level: when {@code node} is an object that holds none of the expected
+   * business fields but has a {@code result} child, that child is the business value. Otherwise the
+   * node is returned unchanged.
+   */
+  private static JsonNode innerResult(JsonNode node, String... businessFields) {
+    if (node == null || !node.isObject()) {
+      return node;
+    }
+    for (String field : businessFields) {
+      if (node.get(field) != null) {
+        return node;
+      }
+    }
+    JsonNode inner = node.get("result");
+    return inner == null ? node : inner;
+  }
+
+  /**
+   * Weidian's returned item id field name is not consistent across docs and live responses (task
+   * 65), so the known variants are tried in order.
+   */
+  private static Long addItemId(JsonNode result) {
+    for (String field : ADD_ITEM_ID_FIELDS) {
+      Long id = numericValue(result.get(field));
+      if (id != null) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  /** Reads an integral number or a numeric string; any other value yields {@code null}. */
+  private static Long numericValue(JsonNode value) {
+    if (value == null || value.isNull()) {
+      return null;
+    }
+    if (value.isIntegralNumber()) {
+      return value.longValue();
+    }
+    if (value.isTextual()) {
+      try {
+        return Long.valueOf(value.asString().strip());
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  public WeidianBusinessApi.SaveItemDetailResponse saveItemDetail(JsonNode raw) {
+    JsonNode result = innerResult(raw, "tmp_detail_id");
+    return new WeidianBusinessApi.SaveItemDetailResponse(text(result, "tmp_detail_id"), raw);
   }
 
   public WeidianBusinessApi.ItemOperationResponse itemOperation(JsonNode result) {

@@ -127,6 +127,20 @@ body {
   min-width: 0;
 }
 
+/* Filter control widths (review R-21): the shared stopgaps for list search controls, so pages stop
+   inlining pixel widths. sm fits short selects, md remote-search selects, lg range pickers. */
+.filter-w-sm {
+  width: 140px;
+}
+
+.filter-w-md {
+  width: 220px;
+}
+
+.filter-w-lg {
+  width: 360px;
+}
+
 @media (max-width: 767px) {
   #app .el-pagination {
     flex-wrap: wrap;

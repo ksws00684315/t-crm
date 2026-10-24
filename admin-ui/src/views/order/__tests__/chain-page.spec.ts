@@ -191,6 +191,37 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("jumps to the refund list and the creator item list with filter params (task 59)", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    const { wrapper, router } = await mountPage();
+    // el-table renders a hidden calc copy of each row; take the link that actually has the text.
+    const refundLink = [
+      ...document.body.querySelectorAll<HTMLButtonElement>('[data-test="chain-refund-link"]')
+    ].find(item => item.textContent?.includes("R20261021001"));
+    expect(refundLink).toBeTruthy();
+    refundLink?.click();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/order/refunds"));
+    expect(router.currentRoute.value.query.refundNo).toBe("R20261021001");
+
+    const itemLink = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="chain-kol-item-link"]'
+    );
+    itemLink?.click();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/kol/kol-items"));
+    expect(router.currentRoute.value.query.linkCode).toBe("LC001");
+    wrapper.unmount();
+  });
+
+  it("labels the product line title with a field label (R-18)", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    const { wrapper } = await mountPage();
+    const title = wrapper.get('[data-test="chain-line"] .chain-line__title');
+    expect(title.text()).toContain("商品");
+    expect(title.text()).toContain("t40 Item");
+    expect(title.text()).toContain("Blue / L");
+    wrapper.unmount();
+  });
+
   it("shows a dash for missing links, no-refund lines, and developing blocks", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const { wrapper } = await mountPage();

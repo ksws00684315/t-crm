@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
+import { createPinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as tenantApi from "@/api/platform/tenant";
 import { i18n } from "@/locales";
@@ -29,7 +30,9 @@ const admin: tenantApi.TenantAdminVO = {
   createTime: "2026-10-05T01:02:03Z"
 };
 
-const mountOptions = { global: { plugins: [ElementPlus, i18n], stubs: { teleport: true } } };
+const mountOptions = {
+  global: { plugins: [ElementPlus, i18n, createPinia()], stubs: { teleport: true } }
+};
 
 describe("platform tenant management", () => {
   beforeEach(() => {
