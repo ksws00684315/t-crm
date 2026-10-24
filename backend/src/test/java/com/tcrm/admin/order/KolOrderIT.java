@@ -272,7 +272,7 @@ class KolOrderIT {
         "INSERT INTO crm_order_item(id,order_id,tenant_id,kol_id,sub_order_id,weidian_item_id,"
             + "sku_id,item_name,sku_name,quantity,pay_amount,refund_amount,attribution_type,"
             + "create_time,update_time,is_deleted)"
-            + " VALUES(?,?,?,?,?,?,?,'General','Red',1,?,0,1,now(),now(),false)",
+            + " VALUES(?,?,?,?,?,?,?,?,?,'General',1,?,0,1,now(),now(),false)",
         id,
         orderId,
         tenantId,

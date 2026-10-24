@@ -84,7 +84,10 @@ public class KolPortalProfileService {
             .eq(KolDO::getId, account.id())
             .eq(KolDO::getTenantId, account.tenantId())
             .set(KolDO::getName, name.strip())
-            .set(KolDO::getSocialAccounts, SocialAccountsJson.write(socialAccounts))
+            .set(
+                KolDO::getSocialAccounts,
+                SocialAccountsJson.write(socialAccounts),
+                "typeHandler=com.tcrm.admin.kol.model.JsonbStringTypeHandler")
             .set(KolDO::getUpdateTime, Instant.now());
     if (kols.update(null, update) != 1) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
