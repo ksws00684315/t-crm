@@ -189,7 +189,7 @@ onMounted(loadBdUsers);
           filterable
           :loading="optionsLoading"
           :placeholder="t('bdTransfer.bdAllLabel')"
-          style="width: 360px"
+          class="filter-w-lg"
         >
           <el-option
             v-for="bd in bdOptions"
@@ -225,7 +225,7 @@ onMounted(loadBdUsers);
           filterable
           :loading="optionsLoading"
           :placeholder="t('bdTransfer.targetBdPlaceholder')"
-          style="width: 360px"
+          class="filter-w-lg"
           data-test="transfer-target-bd"
         >
           <el-option

@@ -78,8 +78,25 @@ class KolOrderControllerTest {
                 Instant.parse("2026-10-01T00:00:00Z"),
                 Instant.parse("2026-11-01T00:00:00Z"),
                 "PAID",
+                null,
+                null,
                 1,
                 20));
+  }
+
+  @Test
+  void shouldForwardOrderNumberAndProductNameFilters() throws Exception {
+    when(orders.page(any())).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
+
+    mvc.perform(
+            get("/kol-api/orders")
+                .param("orderNo", "1234")
+                .param("productName", "Widget")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+
+    verify(orders).page(new KolOrderFilterDTO(null, null, null, "1234", "Widget", 1, 20));
   }
 
   @Test

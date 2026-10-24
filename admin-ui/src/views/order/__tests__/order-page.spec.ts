@@ -1,7 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as orderApi from "@/api/order/order";
 import type { OrderDetailVO, OrderVO, Role } from "@/api/types";
@@ -124,8 +124,12 @@ async function mountPage() {
     attachTo: document.body
   });
   await flushPromises();
+  mountedRouter = router;
   return wrapper;
 }
+
+/** The router of the most recent mount, for tests that follow a navigation (R-17). */
+let mountedRouter: Router | undefined;
 
 function element(testId: string): DOMWrapper<Element> {
   const matches = [...document.body.querySelectorAll(`[data-test="${testId}"]`)];
@@ -172,6 +176,8 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
+    // Owner decision 2026-10-24 (task 59 review): every 09.04 column shows by default; the list
+    // scrolls horizontally inside the card at 1440 instead of hiding columns.
     for (const header of [
       "订单号",
       "渠道",
@@ -227,7 +233,7 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("disables the chain action for unattributed orders and opens a tab otherwise", async () => {
+  it("disables the chain action for unattributed orders and opens the chain tab otherwise (R-17)", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     const wrapper = await mountPage();
@@ -235,9 +241,11 @@ describe("order list page (task 40)", () => {
     expect(buttons[1].disabled).toBe(true);
     expect(buttons[0].disabled).toBe(false);
     buttons[0].click();
-    await flushPromises();
-    expect(open).toHaveBeenCalledTimes(1);
-    expect(open.mock.calls[0][0]).toContain("/order/orders/101/chain");
+    // R-17: the chain opens inside the tab system (router.push), never a new browser tab.
+    await vi.waitFor(() =>
+      expect(mountedRouter?.currentRoute.value.path).toBe("/order/orders/101/chain")
+    );
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
     wrapper.unmount();
   });

@@ -1,6 +1,7 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
+import { createPinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as templateApi from "@/api/link/template";
 import type { LinkTemplateVO } from "@/api/types";
@@ -29,7 +30,7 @@ function field(testId: string): DOMWrapper<HTMLInputElement> {
 async function mountPage(items: LinkTemplateVO[] = [row]) {
   vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(items);
   const wrapper = mount(LinkTemplatePage, {
-    global: { plugins: [ElementPlus, i18n] },
+    global: { plugins: [ElementPlus, i18n, createPinia()] },
     attachTo: document.body
   });
   await flushPromises();

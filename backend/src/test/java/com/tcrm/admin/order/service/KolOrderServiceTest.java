@@ -54,7 +54,7 @@ class KolOrderServiceTest {
     Page<OrderDO> page = page(order);
     when(orders.selectPage(any(), any())).thenReturn(page);
 
-    var result = service.page(new KolOrderFilterDTO(null, null, null, 1, 20));
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, 1, 20));
 
     assertThat(result.total()).isEqualTo(1);
     assertThat(result.items())
@@ -84,7 +84,8 @@ class KolOrderServiceTest {
 
   @Test
   void shouldRejectSizeAboveFifty() {
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 1, 51)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, 1, 51)))
         .isInstanceOf(BusinessException.class);
   }
 
@@ -97,6 +98,8 @@ class KolOrderServiceTest {
                         Instant.parse("2026-10-02T00:00:00Z"),
                         Instant.parse("2026-10-01T00:00:00Z"),
                         null,
+                        null,
+                        null,
                         1,
                         20)))
         .isInstanceOf(BusinessException.class);
@@ -104,12 +107,67 @@ class KolOrderServiceTest {
 
   @Test
   void shouldRejectUnknownStatusAndOutOfRangePage() {
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, "SETTLED", 1, 20)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, "SETTLED", null, null, 1, 20)))
         .isInstanceOf(BusinessException.class);
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 0, 20)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, 0, 20)))
         .isInstanceOf(BusinessException.class);
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 1, 0)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, 1, 0)))
         .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldFilterByOrderNumberAndOwnProductName() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+
+    service.page(new KolOrderFilterDTO(null, null, null, "  1234  ", "Widget", 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    String sql = query.getValue().getSqlSegment();
+    assertThat(sql).contains("weidian_order_id ILIKE");
+    assertThat(sql).contains("crm_order_item");
+    assertThat(sql).contains("oi.kol_id");
+    assertThat(sql).contains("oi.item_name ILIKE");
+    assertThat(params(query.getValue()).values()).contains("%1234%", "%Widget%", 700L);
+  }
+
+  @Test
+  void shouldIgnoreBlankKeywordFilters() {
+    when(orders.selectPage(any(), any())).thenReturn(page());
+
+    service.page(new KolOrderFilterDTO(null, null, null, "   ", "", 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).doesNotContain("ILIKE");
+  }
+
+  @Test
+  void shouldRejectKeywordsLongerThanOneHundredTwentyEight() {
+    String keyword = "x".repeat(129);
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, keyword, null, 1, 20)))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, keyword, 1, 20)))
+        .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldEscapeLikeWildcards_inKeywordFilters() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+
+    service.page(new KolOrderFilterDTO(null, null, null, "50%_1\\", null, 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("ESCAPE");
+    assertThat(params(query.getValue()).values()).contains("%50\\%\\_1\\\\%");
   }
 
   @Test
@@ -122,6 +180,8 @@ class KolOrderServiceTest {
                 Instant.parse("2026-10-01T00:00:00Z"),
                 Instant.parse("2026-10-02T00:00:00Z"),
                 "PAID",
+                null,
+                null,
                 2,
                 10));
 
@@ -140,7 +200,8 @@ class KolOrderServiceTest {
     line.setRefundAmount(null);
     when(items.selectList(any())).thenReturn(List.of(line));
 
-    var row = service.page(new KolOrderFilterDTO(null, null, null, 1, 20)).items().getFirst();
+    var row =
+        service.page(new KolOrderFilterDTO(null, null, null, null, null, 1, 20)).items().getFirst();
 
     assertThat(row.payAmount()).isEqualByComparingTo("0.00");
     assertThat(row.refundAmount()).isEqualByComparingTo("0.00");
@@ -200,5 +261,12 @@ class KolOrderServiceTest {
     page.setRecords(List.of(rows));
     page.setTotal(rows.length);
     return page;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static java.util.Map<String, Object> params(Wrapper<OrderDO> wrapper) {
+    return ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<Object, Object, ?>)
+            (Object) wrapper)
+        .getParamNameValuePairs();
   }
 }

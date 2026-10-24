@@ -169,6 +169,8 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header th .cell")
       .map(item => item.text())
       .filter(Boolean);
+    // Owner decision 2026-10-24 (task 59 review): every requirement column shows by default and
+    // the table scrolls horizontally inside the card when it overflows.
     expect(headers).toEqual([
       "达人ID",
       "达人名称",

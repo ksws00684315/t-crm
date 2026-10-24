@@ -213,18 +213,29 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     return code == 10003 || code == 20003 || code == 21001;
   }
 
-  /** Logs only the field names of Weidian's result object; values may contain shop data. */
+  /**
+   * Logs only the field names of Weidian's result object (plus the JSON type of a nested {@code
+   * result} child), or only the JSON type when the result is not an object; values may contain shop
+   * data.
+   */
   private static void logItemIdMissing(long targetShopId, AddItemResponse created) {
-    List<String> fields = new ArrayList<>();
-    JsonNode result = created == null || created.raw() == null ? null : created.raw().get("result");
+    JsonNode result = created == null ? null : created.raw();
+    String shape;
     if (result != null && result.isObject()) {
+      List<String> fields = new ArrayList<>();
       fields.addAll(result.propertyNames());
+      shape = "result fields=" + fields;
+      JsonNode inner = result.get("result");
+      if (inner != null) {
+        shape += ", inner result type=" + inner.getNodeType();
+      }
+    } else {
+      shape = "result type=" + (result == null ? "null" : result.getNodeType());
     }
     LOG.warn(
-        "Weidian vdian.item.add returned success without a recognised item id in shop {};"
-            + " result fields={}",
+        "Weidian vdian.item.add returned success without a recognised item id in shop {}; {}",
         targetShopId,
-        fields);
+        shape);
   }
 
   private static String safeReason(Throwable e) {
