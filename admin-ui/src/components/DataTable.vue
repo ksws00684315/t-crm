@@ -626,7 +626,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
   background: var(--tcrm-color-muted);
 }
 .data-table :deep(.el-table th.el-table__cell) {
-  height: 40px;
+  height: var(--tcrm-table-header-height);
   padding-block: 0;
 }
 /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps

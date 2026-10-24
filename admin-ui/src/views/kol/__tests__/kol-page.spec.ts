@@ -165,18 +165,9 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header th .cell")
       .map(item => item.text())
       .filter(Boolean);
-    // R-07: contact, platform, prepay and inviter start hidden; the visible order is unchanged.
-    expect(headers).toEqual([
-      "达人ID",
-      "达人名称",
-      "邮箱",
-      "佣金比例",
-      "邀请时间",
-      "审核状态",
-      "登录状态",
-      "关系状态",
-      "操作"
-    ]);
+    // R-07: contact, platform, prepay, inviter, email, login and relation start hidden; the
+    // visible order is unchanged.
+    expect(headers).toEqual(["达人ID", "达人名称", "佣金比例", "邀请时间", "审核状态", "操作"]);
     const columns = wrapper.findComponent({ name: "DataTable" }).props("columns") as {
       key: string;
       label: string;
@@ -186,7 +177,10 @@ describe("creator list page (task 32 §2.2)", () => {
       ["contact", "Phone/WhatsApp"],
       ["platform", "社媒平台/ID"],
       ["prepay", "预付金额"],
-      ["inviter", "邀请人"]
+      ["inviter", "邀请人"],
+      ["email", "邮箱"],
+      ["login", "登录状态"],
+      ["relation", "关系状态"]
     ]) {
       const column = columns.find(item => item.key === key);
       expect(column?.label).toBe(label);
@@ -201,8 +195,8 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
-    expect(fixed.length).toBe(9);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(900);
+    expect(fixed.length).toBe(6);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(800);
     wrapper.unmount();
   });
 
@@ -269,6 +263,15 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", displayRelationStatus: "PROMOTING", relationStatus: "PROMOTING" },
       { ...row, id: "3", displayRelationStatus: "PENDING_UPDATE" }
     ]);
+    // The relation column starts hidden (R-07): show it through the column settings first.
+    await element("column-settings").trigger("click");
+    await flushPromises();
+    const checkbox = [...document.body.querySelectorAll(".el-checkbox")]
+      .find(item => item.textContent?.includes("关系状态"))
+      ?.querySelector("input");
+    expect(checkbox).toBeTruthy();
+    await new DOMWrapper(checkbox!).setValue(true);
+    await flushPromises();
     expect(relationTags()).toHaveLength(3);
     expect(document.body.querySelectorAll(".relation--clickable")).toHaveLength(0);
     wrapper.unmount();

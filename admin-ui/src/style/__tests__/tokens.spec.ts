@@ -63,6 +63,7 @@ describe("shared frontend visual tokens", () => {
       "tcrm-space-6",
       "tcrm-control-height",
       "tcrm-control-height-mobile",
+      "tcrm-table-header-height",
       "tcrm-font-sans",
       "tcrm-font-size-body",
       "tcrm-line-height-body",

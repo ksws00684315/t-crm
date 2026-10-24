@@ -96,7 +96,7 @@ describe("import task page (task 32 §2.3)", () => {
     routeQuery.taskId = "9007199254740999";
     const info = vi.spyOn(ElMessage, "info").mockImplementation(() => undefined as never);
     const wrapper = await mountPage();
-    expect(info).toHaveBeenCalledWith("该任务不在当前页，已按其类型与状态筛选");
+    expect(info).toHaveBeenCalledWith("该任务不在当前页，已按其类型与状态筛选。");
     info.mockRestore();
     wrapper.unmount();
   });

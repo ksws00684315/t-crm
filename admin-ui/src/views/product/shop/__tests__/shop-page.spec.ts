@@ -7,6 +7,7 @@ import * as orderApi from "@/api/order/order";
 import * as weidianApi from "@/api/integration/weidian";
 import type { Role, ShopVO } from "@/api/types";
 import { i18n } from "@/locales";
+import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import * as notify from "@/utils/notify";
 import { formatInstantToMinute } from "@/utils/format";
@@ -220,6 +221,27 @@ describe("shop list buttons", () => {
     expect(notify.notifyError).toHaveBeenCalledWith(failure);
     expect(wrapper.find('[data-test="weidian-app-save"]').attributes("disabled")).toBeUndefined();
     wrapper.unmount();
+  });
+
+  it("declares an action column wide enough for the measured scrollWidth (R-04/L-001)", async () => {
+    // L-001 method: column width = max actions .cell scrollWidth + 24px, measured in the browser
+    // (assets/task-59/measurements-zh.md: 485, measurements-en.md: 675). jsdom cannot compute
+    // scrollWidth, so the recorded measurements are the lower bound this assertion guards.
+    const measured: Record<string, number> = { "zh-CN": 509, "en-US": 699 };
+    for (const locale of ["zh-CN", "en-US"] as const) {
+      i18n.global.locale.value = locale;
+      useLocaleStore().locale = locale;
+      signIn("SUPER_ADMIN", []);
+      const wrapper = await mountPage();
+      const actions = (
+        wrapper.findComponent({ name: "DataTable" }).props("columns") as {
+          key: string;
+          width?: number;
+        }[]
+      ).find(column => column.key === "actions");
+      expect(actions?.width).toBe(measured[locale]);
+      wrapper.unmount();
+    }
   });
 
   it("closes the persistent app-not-configured notice when the config dialog opens (L-005)", async () => {

@@ -102,11 +102,13 @@ const columns = computed<DataColumn[]>(() => [
   { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
   // L-002: channel, freight and create time are secondary — hidden by default so pay time and the
   // core columns stay clear of the pinned action column at 1440 (column settings can show them).
+  // The en minWidths of shop/creator/statuses sit at the measured header minimums so the visible
+  // set (1148px) fits the 1158px card (task 59 browser measurement).
   { key: "channel", label: t("order.channel"), width: 80, defaultHidden: true },
-  { key: "shopName", label: t("order.shop"), minWidth: 170 },
-  { key: "kol", label: t("order.kol"), minWidth: 170 },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 120) },
-  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 140) },
+  { key: "shopName", label: t("order.shop"), minWidth: px(170, 162) },
+  { key: "kol", label: t("order.kol"), minWidth: px(170, 160) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 116) },
+  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 132) },
   { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
   {
     key: "freight",

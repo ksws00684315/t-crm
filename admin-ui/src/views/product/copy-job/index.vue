@@ -94,7 +94,7 @@ const columns = computed<DataColumn[]>(() => [
   // R-01 (browser-measured, assets/task-59/measurements-{zh,en}.md): three nowrap tags need
   // ~232px (zh, 1-digit counts) to ~292px (en, 3-digit counts) including cell padding.
   { key: "result", label: t("copyJob.result"), minWidth: px(240, 300) },
-  { key: "errorMessage", label: t("copyJob.error"), minWidth: 160 },
+  { key: "errorMessage", label: t("copyJob.error"), minWidth: 160, tooltip: true },
   { key: "createTime", label: t("copyJob.createTime"), width: 170 },
   { key: "finishTime", label: t("copyJob.finishTime"), width: 170 },
   { key: "kolId", label: t("copyJob.kolId"), width: 140, defaultHidden: true },

@@ -1589,7 +1589,7 @@ const zhCN = {
     fileName: "文件名",
     type: "类型",
     status: "状态",
-    notOnPage: "该任务不在当前页，已按其类型与状态筛选",
+    notOnPage: "该任务不在当前页，已按其类型与状态筛选。",
     totalRows: "总行数",
     successRows: "成功",
     failedRows: "失败",
