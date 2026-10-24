@@ -214,8 +214,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
   }
 
   /**
-   * Logs only the field names of Weidian's result object, or only its JSON type when the result is
-   * not an object; values may contain shop data.
+   * Logs only the field names of Weidian's result object (plus the JSON type of a nested {@code
+   * result} child), or only the JSON type when the result is not an object; values may contain shop
+   * data.
    */
   private static void logItemIdMissing(long targetShopId, AddItemResponse created) {
     JsonNode result = created == null ? null : created.raw();
@@ -224,6 +225,10 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       List<String> fields = new ArrayList<>();
       fields.addAll(result.propertyNames());
       shape = "result fields=" + fields;
+      JsonNode inner = result.get("result");
+      if (inner != null) {
+        shape += ", inner result type=" + inner.getNodeType();
+      }
     } else {
       shape = "result type=" + (result == null ? "null" : result.getNodeType());
     }

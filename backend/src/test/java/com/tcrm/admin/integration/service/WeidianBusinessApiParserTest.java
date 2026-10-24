@@ -84,7 +84,7 @@ class WeidianBusinessApiParserTest {
 
   @Test
   void shouldParseItemDetailOfficialExample_174_v1_0() throws IOException {
-    var parsed = parser.itemDetail(officialBusinessResult("item-detail-174-v1.0.json"));
+    var parsed = parser.itemDetail(result("item-detail-174-v1.0.json"));
 
     assertThat(parsed.detailContent()).hasSize(1);
     assertThat(parsed.detailContent().getFirst().position()).isEqualTo(1);
@@ -114,7 +114,7 @@ class WeidianBusinessApiParserTest {
 
   @Test
   void shouldParseAddItemOfficialExample_231_v1_5() throws IOException {
-    var parsed = parser.addItem(officialBusinessResult("add-item-231-v1.5.json"));
+    var parsed = parser.addItem(result("add-item-231-v1.5.json"));
 
     assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
     assertThat(parsed.addSkuIds()).isEmpty();
@@ -150,6 +150,28 @@ class WeidianBusinessApiParserTest {
   }
 
   @Test
+  void shouldParseAddItemId_whenInnerResultIsNumber() throws IOException {
+    var parsed = parser.addItem(json.readTree("{\"result\":2234677858}"));
+
+    assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
+    assertThat(parsed.addSkuIds()).isEmpty();
+  }
+
+  @Test
+  void shouldParseAddItemId_whenInnerResultIsNumericString() throws IOException {
+    var parsed = parser.addItem(json.readTree("{\"result\":\"2234677858\"}"));
+
+    assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
+  }
+
+  @Test
+  void shouldParseAddItemId_whenInnerResultIsBusinessObject() throws IOException {
+    var parsed = parser.addItem(json.readTree("{\"result\":{\"itemid\":2234677858}}"));
+
+    assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
+  }
+
+  @Test
   void shouldReturnNullItemId_whenNoKnownIdFieldPresent() throws IOException {
     var parsed = parser.addItem(json.readTree("{\"add_sku_ids\":[],\"other_id\":1}"));
 
@@ -158,7 +180,7 @@ class WeidianBusinessApiParserTest {
 
   @Test
   void shouldParseSaveItemDetailOfficialExample_175_v1_0() throws IOException {
-    var parsed = parser.saveItemDetail(officialBusinessResult("save-item-detail-175-v1.0.json"));
+    var parsed = parser.saveItemDetail(result("save-item-detail-175-v1.0.json"));
 
     assertThat(parsed.temporaryDetailId()).isEqualTo("id9232848421522315062671");
   }
@@ -187,16 +209,5 @@ class WeidianBusinessApiParserTest {
   private JsonNode result(String filename) throws IOException {
     JsonNode root = json.readTree(getClass().getResourceAsStream("/weidian/" + filename));
     return root.get("result");
-  }
-
-  /**
-   * The official examples for vdian.item.add, vdian.item.getItemDetail and
-   * vdian.item.saveItemDetail nest the business object one level deeper ({@code result.result}).
-   * Production never hands that wrapper to the parser: WeidianClient returns the envelope's {@code
-   * result} node, which is already the business object. Therefore the test takes the inner business
-   * object here.
-   */
-  private JsonNode officialBusinessResult(String filename) throws IOException {
-    return result(filename).get("result");
   }
 }

@@ -227,6 +227,29 @@ class WeidianItemCopyServiceTest {
   }
 
   @Test
+  void shouldLogInnerResultTypeOnly_whenAddResultNestsScalar() throws Exception {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    JsonNode raw = json.readTree("{\"result\":12345}");
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(null, List.of(), raw));
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L)).isInstanceOf(BusinessException.class);
+
+    assertThat(logs.list)
+        .anySatisfy(
+            event -> {
+              assertThat(event.getLevel()).isEqualTo(Level.WARN);
+              assertThat(event.getFormattedMessage())
+                  .isEqualTo(
+                      "Weidian vdian.item.add returned success without a recognised item id"
+                          + " in shop 2; result fields=[result], inner result type=NUMBER");
+            });
+    assertThat(logs.list)
+        .allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain("12345"));
+  }
+
+  @Test
   void shouldLogJsonTypeOnly_whenAddResultIsNotAnObject() throws Exception {
     when(weidian.item(anyLong(), any()))
         .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));

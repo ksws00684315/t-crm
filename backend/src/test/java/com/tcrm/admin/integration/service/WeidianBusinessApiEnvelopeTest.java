@@ -190,6 +190,15 @@ class WeidianBusinessApiEnvelopeTest {
   }
 
   @Test
+  void shouldParseNewItemId_whenWeidianNestsScalarIdInResult() {
+    respond("vdian.item.add", "1.5", "{\"result\":12345}");
+
+    var parsed = api.addItem(SHOP_ID, null);
+
+    assertThat(parsed.itemId()).isEqualTo(12_345L);
+  }
+
+  @Test
   void shouldParseTemporaryDetailId_whenWeidianReturnsEnvelope() {
     respond("vdian.item.saveItemDetail", "1.0", "{\"tmp_detail_id\":\"id9232848421522315062671\"}");
 
