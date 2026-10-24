@@ -36,6 +36,10 @@ const page = ref(1);
 const size = 20;
 
 const icons: Record<NotificationType, typeof Wallet> = {
+  PREPAY_SUBMITTED: Wallet,
+  PREPAY_APPROVED: Wallet,
+  PREPAY_REJECTED: Wallet,
+  PREPAY_PAID: Wallet,
   PAYOUT_ACCOUNT_SUBMITTED: Wallet,
   ORDER_SYNC_FAILED: Warning,
   BD_TRANSFER_CANCELLED: Switch,

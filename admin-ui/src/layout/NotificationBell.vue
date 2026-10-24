@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Avatar, Bell, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-import { computed, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import {
@@ -36,6 +36,10 @@ const open = ref(false);
 const badge = computed(() => unreadBadge(count.value));
 
 const icons: Record<NotificationType, typeof Wallet> = {
+  PREPAY_SUBMITTED: Wallet,
+  PREPAY_APPROVED: Wallet,
+  PREPAY_REJECTED: Wallet,
+  PREPAY_PAID: Wallet,
   PAYOUT_ACCOUNT_SUBMITTED: Wallet,
   ORDER_SYNC_FAILED: Warning,
   BD_TRANSFER_CANCELLED: Switch,
@@ -58,6 +62,11 @@ async function refresh() {
 }
 
 useVisibilityPolling(() => refresh().catch(() => undefined));
+function refreshAfterPrepay() {
+  void refresh().catch(() => undefined);
+}
+onMounted(() => window.addEventListener("prepay-updated", refreshAfterPrepay));
+onBeforeUnmount(() => window.removeEventListener("prepay-updated", refreshAfterPrepay));
 
 async function onOpen() {
   open.value = true;

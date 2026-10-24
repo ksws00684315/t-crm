@@ -1,4 +1,4 @@
-import { Goods, HomeFilled, List, Wallet } from "@element-plus/icons-vue";
+import { Coin, Goods, HomeFilled, List, Wallet } from "@element-plus/icons-vue";
 import type { Component } from "vue";
 
 /**
@@ -17,5 +17,6 @@ export const NAV_ITEMS: NavItem[] = [
   { name: "Home", path: "/", title: "nav.home", icon: HomeFilled },
   { name: "PayoutAccounts", path: "/payout-accounts", title: "nav.payoutAccounts", icon: Wallet }, // 15b
   { name: "Orders", path: "/orders", title: "nav.orders", icon: List }, // 19b
-  { name: "Items", path: "/items", title: "nav.items", icon: Goods } // 26
+  { name: "Items", path: "/items", title: "nav.items", icon: Goods }, // 26
+  { name: "PrepayResults", path: "/income/prepays", title: "prepay.title", icon: Coin }
 ];
