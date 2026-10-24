@@ -18,6 +18,7 @@ import com.tcrm.admin.kol.service.KolPortalProfileDTO;
 import com.tcrm.admin.kol.service.KolPortalProfileService;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
+import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.shared.ClientIpResolver;
 import java.time.Instant;
 import java.util.List;
@@ -28,12 +29,16 @@ import org.springframework.test.web.servlet.MockMvc;
 class KolAuthControllerTest {
   private final KolAuthService auth = mock(KolAuthService.class);
   private final KolPortalProfileService profiles = mock(KolPortalProfileService.class);
+  private final KolAccountStore accounts = mock(KolAccountStore.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final MockMvc mvc =
       KolMvcSupport.build(
           current,
           new KolAuthController(
-              auth, profiles, new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
+              auth,
+              profiles,
+              accounts,
+              new ClientIpResolver("", "CF-Connecting-IP,X-Forwarded-For")));
 
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
@@ -204,9 +209,28 @@ class KolAuthControllerTest {
   }
 
   @Test
-  void shouldUpdateOwnProfile_withWhitelistedFieldsOnly() throws Exception {
+  void shouldUpdateOwnProfile_andAnswerWithTheFreshAccount() throws Exception {
     when(auth.me()).thenReturn(kol());
     when(profiles.get()).thenReturn(profile());
+    when(accounts.getById(9007199254740993L))
+        .thenReturn(
+            new KolAccountDTO(
+                9007199254740993L,
+                "KOL0001",
+                "Alice Kim",
+                "alice@example.com",
+                "US",
+                "hash",
+                1,
+                1,
+                0,
+                Instant.EPOCH,
+                2L,
+                "Acme",
+                true,
+                "+15550002222",
+                "+15550001111",
+                "https://docs.google.com/spreadsheets/d/abc"));
     String token = KolMvcSupport.actAs(current, kol());
     mvc.perform(
             put("/kol-api/me")
@@ -216,7 +240,7 @@ class KolAuthControllerTest {
                     "{\"name\":\"Alice Kim\",\"primaryPlatform\":\"Instagram\","
                         + "\"primaryHandle\":\"@alice.kim\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.name").value("Alice"))
+        .andExpect(jsonPath("$.data.name").value("Alice Kim"))
         .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"));
     verify(profiles).update("Alice Kim", "Instagram", "@alice.kim", "127.0.0.1");
   }

@@ -5,6 +5,7 @@ import com.tcrm.admin.kol.service.KolAuthService;
 import com.tcrm.admin.kol.service.KolPortalProfileDTO;
 import com.tcrm.admin.kol.service.KolPortalProfileService;
 import com.tcrm.admin.security.api.KolAccountDTO;
+import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.ClientIpResolver;
 import com.tcrm.admin.shared.PublicEndpoint;
@@ -29,12 +30,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class KolAuthController {
   private final KolAuthService auth;
   private final KolPortalProfileService profiles;
+  private final KolAccountStore accounts;
   private final ClientIpResolver clientIps;
 
   public KolAuthController(
-      KolAuthService auth, KolPortalProfileService profiles, ClientIpResolver clientIps) {
+      KolAuthService auth,
+      KolPortalProfileService profiles,
+      KolAccountStore accounts,
+      ClientIpResolver clientIps) {
     this.auth = auth;
     this.profiles = profiles;
+    this.accounts = accounts;
     this.clientIps = clientIps;
   }
 
@@ -98,7 +104,8 @@ public class KolAuthController {
   @PutMapping("/kol-api/me")
   public R<KolMeVO> updateMe(@Valid @RequestBody KolMeUpdateRequest r, HttpServletRequest request) {
     profiles.update(r.name(), r.primaryPlatform(), r.primaryHandle(), clientIps.resolve(request));
-    return R.ok(KolMeVO.from(auth.me(), profiles.get()));
+    // Re-read the account so the answer carries the new name, not the session snapshot.
+    return R.ok(KolMeVO.from(accounts.getById(auth.me().id()), profiles.get()));
   }
 
   /** Returns a fresh login so the current session survives its own password change. */
