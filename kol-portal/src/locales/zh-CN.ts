@@ -43,6 +43,7 @@ const zhCN: MessageSchema = {
     account: "邮箱",
     password: "密码",
     submit: "登录",
+    demo: "进入演示预览",
     forgot: "忘记密码？",
     signUp: "注册账号",
     selectCompany: "选择公司",

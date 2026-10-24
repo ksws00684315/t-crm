@@ -43,6 +43,7 @@ const enUS = {
     account: "Email",
     password: "Password",
     submit: "Sign in",
+    demo: "Enter demo preview",
     forgot: "Forgot password?",
     signUp: "Sign up",
     selectCompany: "Choose your company",

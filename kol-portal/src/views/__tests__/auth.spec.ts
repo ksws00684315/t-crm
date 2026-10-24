@@ -20,6 +20,8 @@ import Layout from "@/layout/index.vue";
 
 vi.mock("@/api/auth", () => ({
   login: vi.fn(),
+  loginDemo: vi.fn(),
+  isDemoMode: true,
   selectCompany: vi.fn(),
   activate: vi.fn(),
   forgotPassword: vi.fn(),
@@ -91,6 +93,16 @@ afterEach(() => {
 });
 
 describe("sign in", () => {
+  it("offers demo access and opens the portal without real credentials", async () => {
+    vi.mocked(api.loginDemo).mockReturnValue(session);
+    const { wrapper, router, store } = await page(Login, "/login");
+    await wrapper.get(".demo-submit").trigger("click");
+    await flushPromises();
+    expect(api.loginDemo).toHaveBeenCalledOnce();
+    expect(api.login).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/"));
+    expect(store.kol).toEqual(kol);
+  });
   it("saves identity and expiration and follows redirect for a single company", async () => {
     vi.mocked(api.login).mockResolvedValue(session);
     const { wrapper, router, store } = await page(Login, "/login?redirect=/account");

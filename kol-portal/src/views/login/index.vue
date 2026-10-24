@@ -2,7 +2,14 @@
 import { ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { login, selectCompany, type CompanySelection, type AuthSession } from "@/api/auth";
+import {
+  isDemoMode,
+  login,
+  loginDemo,
+  selectCompany,
+  type CompanySelection,
+  type AuthSession
+} from "@/api/auth";
 import AuthShell from "@/components/AuthShell.vue";
 import { useSessionStore } from "@/stores/session";
 import { siteName } from "@/stores/site-config";
@@ -44,6 +51,9 @@ function signIn() {
       password.value = "";
     } else await finish(result);
   });
+}
+function enterDemo() {
+  return submit(async () => finish(loginDemo()));
 }
 function chooseCompany() {
   return submit(async () => {
@@ -105,6 +115,14 @@ function chooseCompany() {
         >{{ t("login.submit") }}</el-button
       >
     </el-form>
+    <el-button
+      v-if="isDemoMode"
+      class="auth-submit demo-submit"
+      :loading="busy"
+      :disabled="busy || !!selection"
+      @click="enterDemo"
+      >{{ t("login.demo") }}</el-button
+    >
     <div class="auth-links">
       <RouterLink to="/register">{{ t("login.signUp") }}</RouterLink>
       <RouterLink to="/forgot">{{ t("login.forgot") }}</RouterLink>

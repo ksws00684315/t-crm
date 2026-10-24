@@ -30,7 +30,7 @@ export interface CompanySelection {
   companies: { tenantId: string; tenantName: string }[];
 }
 
-const demoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
+export const isDemoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
 let demoProfile: KolProfile = {
   kolCode: "KOL-DEMO-0821",
   systemId: "KOL-DEMO-0821",
@@ -44,10 +44,19 @@ let demoProfile: KolProfile = {
 
 export const login = (data: { email: string; password: string }) =>
   http.request<AuthSession | CompanySelection>({ method: "POST", url: "/auth/login", data });
+export const loginDemo = (): AuthSession => {
+  if (!isDemoMode) throw new Error("Demo sign in is only available in demo mode");
+  return {
+    tokenName: "X-Kol-Token",
+    token: "demo-token",
+    expiresIn: 3600,
+    kol: demoProfile
+  };
+};
 export const selectCompany = (data: { selectionToken: string; tenantId: string }) =>
   http.request<AuthSession>({ method: "POST", url: "/auth/login/select", data });
 export const logout = () =>
-  demoMode ? Promise.resolve(null) : http.request<null>({ method: "POST", url: "/auth/logout" });
+  isDemoMode ? Promise.resolve(null) : http.request<null>({ method: "POST", url: "/auth/logout" });
 export const activate = (data: { token: string; password: string }) =>
   http.request<AuthSession>({ method: "POST", url: "/auth/activate", data });
 export const forgotPassword = (data: { email: string }) =>
@@ -55,20 +64,22 @@ export const forgotPassword = (data: { email: string }) =>
 export const resetPassword = (data: { token: string; password: string }) =>
   http.request<null>({ method: "POST", url: "/auth/reset", data });
 export const getMe = () =>
-  demoMode ? Promise.resolve(demoProfile) : http.request<KolProfile>({ method: "GET", url: "/me" });
+  isDemoMode
+    ? Promise.resolve(demoProfile)
+    : http.request<KolProfile>({ method: "GET", url: "/me" });
 export const updateMe = (data: {
   name: string;
   primaryPlatform: string | null;
   primaryHandle: string | null;
 }) => {
-  if (demoMode) {
+  if (isDemoMode) {
     demoProfile = { ...demoProfile, ...data };
     return Promise.resolve(demoProfile);
   }
   return http.request<KolProfile>({ method: "PUT", url: "/me", data });
 };
 export const changePassword = (data: { oldPassword: string; newPassword: string }) =>
-  demoMode
+  isDemoMode
     ? Promise.resolve({
         tokenName: "X-Kol-Token",
         token: "demo-token",
