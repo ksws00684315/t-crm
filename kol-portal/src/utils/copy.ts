@@ -23,3 +23,7 @@ export async function copyText(value: string): Promise<boolean> {
     return false;
   }
 }
+
+export function truncateCopy(value: string, max = 32): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}

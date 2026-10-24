@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --blue: #1a73e8; --pale: #edf4ff; --ink: #202124; --muted: #5f6368; --line: #dadce0; --paper: #fff; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    button, select, input { font: inherit; }
+    button, select, summary { cursor: pointer; }
+    button:disabled, select:disabled, input:disabled { cursor: default; }
+    button:disabled { opacity: .5; }
+    button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid #9fc3f5; outline-offset: 3px; }
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    main { padding: 18px 22px; flex: 1; }
+    h1 { margin: 0 0 4px; font-size: 18px; font-weight: 650; letter-spacing: .2px; }
+    p { margin: 0; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .section { margin-top: 16px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 7px; }
+    .label { font-weight: 600; }
+    .text-button { border: 0; padding: 3px 0; background: transparent; color: var(--blue); font-size: 12px; white-space: nowrap; }
+    .scope { padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: #f8f9fa; }
+    .scope-title { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+    .workbook-name { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+    .scope-count { flex-shrink: 0; color: var(--muted); font-size: 12px; }
+    .scope .hint { margin-top: 4px; }
+    summary { color: var(--muted); font-size: 12px; }
+    .template-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0 0; padding: 0; list-style: none; }
+    .template-list li { padding: 3px 8px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; overflow-wrap: anywhere; max-width: 100%; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field label { display: block; margin-bottom: 7px; }
+    select, input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; color: var(--ink); background: var(--paper); }
+    select:disabled, input:disabled { background: #f8f9fa; color: var(--muted); }
+    .field-hint { margin-top: 5px; }
+    .preview { display: flex; align-items: baseline; gap: 9px; padding: 9px 11px; margin-top: 11px; border-radius: 6px; background: var(--pale); font-size: 12px; }
+    .preview a { color: var(--blue); font: 600 13px/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    .notice { padding: 8px 10px; margin-top: 10px; border-left: 3px solid #d99500; background: #fff8e6; color: #745010; font-size: 12px; overflow-wrap: anywhere; }
+    .notice.error { border-color: #c5221f; background: #fce8e6; color: #a50e0e; }
+    .results { border-top: 1px solid var(--line); padding-top: 14px; scroll-margin-bottom: 86px; }
+    .progress-label { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .progress-label .hint { text-align: right; }
+    progress { display: block; appearance: none; width: 100%; height: 6px; border: 0; border-radius: 4px; overflow: hidden; background: #e8eaed; accent-color: var(--blue); }
+    progress::-webkit-progress-bar { background: #e8eaed; }
+    progress::-webkit-progress-value { background: var(--blue); }
+    progress::-moz-progress-bar { background: var(--blue); }
+    .counts { display: flex; flex-wrap: wrap; gap: 20px; margin: 10px 0 4px; }
+    .count { font-size: 12px; color: var(--muted); }
+    .count strong { color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+    .table-scroll { max-height: 155px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+    th { position: sticky; top: 0; background: #f8f9fa; color: var(--muted); font-weight: 500; }
+    td, th { padding: 7px 9px; vertical-align: top; border-bottom: 1px solid #edf0f2; }
+    td { overflow-wrap: anywhere; }
+    tr:last-child td { border-bottom: 0; }
+    .number { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sheet-name { min-width: 105px; }
+    .sheet-state { display: block; font-size: 11px; color: var(--muted); }
+    .detail-heading { margin-top: 13px; }
+    .cell-address { font: 12px/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    .status-success { color: #137333; white-space: nowrap; }
+    .status-skipped { color: #8a5700; white-space: nowrap; }
+    .status-failed { color: #c5221f; white-space: nowrap; }
+    .footer { position: sticky; bottom: 0; padding: 12px 22px; display: flex; justify-content: space-between; gap: 12px; align-items: center; border-top: 1px solid var(--line); background: var(--paper); }
+    .footer-status { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+    .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .primary, .secondary { border: 1px solid var(--blue); border-radius: 6px; padding: 9px 16px; font-weight: 600; }
+    .primary { background: var(--blue); color: var(--paper); }
+    .primary:hover:enabled { background: #155fc0; }
+    .secondary { border-color: var(--line); background: var(--paper); color: var(--ink); }
+    .secondary:hover:enabled { background: #f8f9fa; }
+    @media (max-width: 460px) {
+      main { padding: 15px; }
+      .fields { grid-template-columns: 1fr; gap: 12px; }
+      .footer { padding: 12px 15px; align-items: flex-start; }
+      .actions { flex-direction: column-reverse; }
+      .counts { gap: 13px; }
+      td, th { padding: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main>
+      <h1>buy 链接互转</h1>
+      <p class="hint">只处理当前选择区域，在原单元格更新匹配的超链接。</p>
+
+      <section class="section" aria-labelledby="scopeHeading">
+        <div class="section-heading">
+          <span class="label" id="scopeHeading">当前选择区域</span>
+          <button class="text-button" id="reloadSelection" type="button" data-config disabled>读取当前选区</button>
+        </div>
+        <div class="scope">
+          <div class="scope-title"><span class="workbook-name" id="selectionName">正在读取选区…</span><span class="scope-count" id="selectionCount"></span></div>
+          <p class="cell-address" id="selectionRanges"></p>
+          <p class="hint">点击开始时读取当前选区；开始后范围固定。只处理文字含 LINK（不区分大小写）且链接匹配 buy 模板的格子，保留文字和样式。</p>
+        </div>
+        <p class="notice" id="selectionNotice" role="status" hidden></p>
+      </section>
+
+      <section class="section" aria-labelledby="templatesHeading">
+        <div class="section-heading">
+          <span class="label" id="templatesHeading">现有链接模板</span>
+          <button class="text-button" id="reloadTemplates" type="button" data-config disabled>重新加载模板</button>
+        </div>
+        <p class="hint">复用已有目标模板中的 buy 模板，自动识别原链接；下方目标 buy 也从同一份模板中选择。</p>
+        <details>
+          <summary id="templateSummary">正在加载链接模板…</summary>
+          <ul class="template-list" id="templateList"></ul>
+        </details>
+        <p class="notice" id="templateNotice" role="status" hidden></p>
+      </section>
+
+      <section class="section" aria-label="目标链接设置">
+        <div class="fields">
+          <div class="field">
+            <label class="label" for="targetTemplate">目标 buy</label>
+            <select id="targetTemplate" data-config disabled><option value="">正在加载…</option></select>
+          </div>
+          <div class="field">
+            <label class="label" for="invitationCode">新邀请码</label>
+            <input id="invitationCode" type="text" placeholder="留空则不带邀请码" autocomplete="off" spellcheck="false" data-config disabled>
+          </div>
+        </div>
+        <p class="hint field-hint">同平台也会更新邀请码；微店原始链接和未匹配 buy 模板的链接会跳过。</p>
+        <div class="preview" aria-live="polite">
+          <span id="previewLabel">正在准备目标链接预览…</span>
+          <a id="previewLink" target="_blank" rel="noopener noreferrer" hidden>LINK</a>
+        </div>
+      </section>
+
+      <p class="notice error" id="errorNotice" role="alert" hidden></p>
+
+      <section class="section results" id="results" aria-labelledby="resultHeading" hidden>
+        <div class="progress-label"><span class="label" id="resultHeading">转换进度</span><span class="hint" id="scanProgress">0 / 0 个格子</span></div>
+        <progress id="progress" value="0" max="100" aria-label="选区扫描进度"></progress>
+        <div class="counts" aria-live="polite">
+          <span class="count"><strong id="successCount">0</strong>成功</span>
+          <span class="count"><strong id="skippedCount">0</strong>跳过</span>
+          <span class="count"><strong id="failedCount">0</strong>失败</span>
+        </div>
+        <p class="hint" id="resultMessage"></p>
+        <p class="hint field-hint">暂停会等待当前批次完成。关闭窗口会停止后续批次，已完成的修改保留。</p>
+        <div class="table-scroll">
+          <table aria-label="各选区处理统计">
+            <thead><tr><th scope="col">选区</th><th scope="col" class="number">已扫描</th><th scope="col" class="number">成功</th><th scope="col" class="number">跳过</th><th scope="col" class="number">失败</th></tr></thead>
+            <tbody id="rangeRows"></tbody>
+          </table>
+        </div>
+        <div class="detail-heading" id="detailSection" hidden>
+          <span class="label">处理明细</span>
+          <span class="hint"> · 失败和跳过优先显示</span>
+          <div class="table-scroll">
+            <table aria-label="转换处理明细">
+              <thead><tr><th scope="col">位置</th><th scope="col">状态</th><th scope="col">说明</th></tr></thead>
+              <tbody id="detailRows"></tbody>
+            </table>
+          </div>
+          <p class="hint field-hint" id="truncatedNotice" hidden>最多显示 200 条明细，同类优先保留最近记录；统计包含全部结果。</p>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <span class="footer-status" id="footerStatus" role="status">正在加载…</span>
+      <div class="actions">
+        <button class="secondary" id="pauseButton" type="button" hidden>暂停</button>
+        <button class="primary" id="convertButton" type="button" disabled>转换所选区域</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var state = {
+        bootstrap: null, templates: [], loading: false, selectionLoading: false, previewOk: false,
+        previewVersion: 0, previewTimer: null, run: null, inFlight: false,
+        paused: false, pauseRequested: false, details: [], detailCount: 0
+      };
+      function el(id) { return document.getElementById(id); }
+      function text(id, value) { el(id).textContent = value == null ? '' : String(value); }
+      function number(value) { return (Number(value) || 0).toLocaleString('zh-CN'); }
+      function errorMessage(error) { return error && error.message ? error.message : String(error || '操作失败，请重试。'); }
+      function showError(message) { text('errorNotice', message); el('errorNotice').hidden = !message; }
+      function activeRun() { return !!(state.run && !state.run.done); }
+      function templateIndex() { return el('targetTemplate').value === '' ? null : Number(el('targetTemplate').value); }
+      function templateKey(template) { return template ? [template.templateCode, template.templateUrl].join('|') : ''; }
+
+      function updateControls() {
+        var locked = state.loading || state.selectionLoading || state.inFlight || activeRun();
+        document.querySelectorAll('[data-config]').forEach(function (control) { control.disabled = locked; });
+        var canResume = activeRun() && state.paused && !state.inFlight;
+        var hasSelection = !!(state.bootstrap && state.bootstrap.selection && state.bootstrap.selection.cellCount);
+        el('convertButton').disabled = state.loading || state.selectionLoading || state.inFlight || (activeRun() ? !canResume : !state.previewOk || !hasSelection);
+        text('convertButton', canResume ? '继续转换' : activeRun() ? '正在转换…' : '转换所选区域');
+        el('pauseButton').hidden = !activeRun() || state.paused;
+        el('pauseButton').disabled = state.pauseRequested;
+        text('pauseButton', state.pauseRequested ? '正在暂停…' : '暂停');
+      }
+
+      function renderSelection(selection, error) {
+        if (state.bootstrap) state.bootstrap.selection = selection || null;
+        text('selectionName', selection ? [selection.spreadsheetName, selection.sheetName].filter(Boolean).join(' · ') : '尚未读取到选区');
+        text('selectionCount', selection ? number(selection.cellCount) + ' 个格子' : '');
+        text('selectionRanges', selection ? (selection.ranges || []).join('、') : '');
+        var notice = error || (!selection ? '请在表格中选择需要转换的格子，然后点击“读取当前选区”。' : '');
+        text('selectionNotice', notice);
+        el('selectionNotice').hidden = !notice;
+      }
+
+      function renderBootstrap(data) {
+        var oldKey = templateKey(state.templates[templateIndex()]);
+        state.bootstrap = data;
+        state.templates = Array.isArray(data.templates) ? data.templates : [];
+        renderSelection(data.selection, data.selectionError);
+        text('templateSummary', state.templates.length ? '已加载 ' + number(state.templates.length) + ' 个现有模板，点击查看' : '暂无可用链接模板');
+        el('templateList').textContent = '';
+        state.templates.forEach(function (template, index) {
+          var li = document.createElement('li');
+          li.textContent = template.templateName || template.templateCode || ('模板 ' + (index + 1));
+          el('templateList').appendChild(li);
+        });
+        var select = el('targetTemplate');
+        select.textContent = '';
+        var options = Array.isArray(data.targetOptions) ? data.targetOptions : [];
+        if (options.length) {
+          var placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = '请选择目标 buy';
+          select.appendChild(placeholder);
+        }
+        options.forEach(function (target) {
+          var option = document.createElement('option');
+          option.value = String(target.index);
+          option.textContent = target.name || '模板 ' + (Number(target.index) + 1);
+          select.appendChild(option);
+          if (oldKey && oldKey === templateKey(state.templates[target.index])) select.value = option.value;
+        });
+        if (!options.length) {
+          var empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = '暂无可用目标模板';
+          select.appendChild(empty);
+        }
+        var notice = data.templateError || (!state.templates.length ? '没有读取到链接模板，请配置模板后重新加载。' : !options.length ? '已加载的模板没有可用的目标 buy，请检查模板配置后重新加载。' : '');
+        text('templateNotice', notice);
+        el('templateNotice').hidden = !notice;
+      }
+
+      function loadBootstrap() {
+        if (state.inFlight || activeRun() || state.loading || state.selectionLoading) return;
+        state.loading = true;
+        state.previewOk = false;
+        state.previewVersion++;
+        clearTimeout(state.previewTimer);
+        showError('');
+        el('previewLink').hidden = true;
+        text('previewLabel', '正在加载模板…');
+        text('footerStatus', '正在读取选区和模板…');
+        updateControls();
+        google.script.run.withSuccessHandler(function (data) {
+          state.loading = false;
+          if (!data || !data.spreadsheetId) {
+            showError('未能读取当前工作簿，请重新加载。');
+            text('footerStatus', '加载失败，可重新加载');
+            text('previewLabel', '加载完成后显示目标链接预览');
+            updateControls();
+            return;
+          }
+          renderBootstrap(data);
+          updateControls();
+          requestPreview();
+        }).withFailureHandler(function (error) {
+          state.loading = false;
+          showError(errorMessage(error));
+          text('footerStatus', '加载失败，可重新加载');
+          text('previewLabel', '加载完成后显示目标链接预览');
+          updateControls();
+        }).getBuyLinkConvertBootstrap();
+      }
+
+      function loadSelection() {
+        if (state.inFlight || activeRun() || state.loading || state.selectionLoading) return;
+        state.selectionLoading = true;
+        showError('');
+        text('footerStatus', '正在读取当前选区…');
+        updateControls();
+        google.script.run.withSuccessHandler(function (selection) {
+          state.selectionLoading = false;
+          if (!selection || !selection.spreadsheetId || !selection.cellCount) {
+            renderSelection(null, '未能读取当前选区，请重新选择格子后再试。');
+            text('footerStatus', '请先读取有效选区');
+          } else if (!state.bootstrap || selection.spreadsheetId !== state.bootstrap.spreadsheetId) {
+            renderSelection(null, '当前工作簿已变化，请重新加载模板和选区。');
+            text('footerStatus', '请重新加载');
+          } else {
+            renderSelection(selection);
+            text('footerStatus', state.previewOk ? '将在开始时选中的区域原位置更新链接' : '请选择并检查目标 buy');
+          }
+          updateControls();
+        }).withFailureHandler(function (error) {
+          state.selectionLoading = false;
+          renderSelection(null, errorMessage(error));
+          text('footerStatus', '读取失败，请重新选择格子后再试');
+          updateControls();
+        }).getBuyLinkSelection();
+      }
+
+      function requestPreview() {
+        clearTimeout(state.previewTimer);
+        var version = ++state.previewVersion;
+        state.previewOk = false;
+        el('previewLink').hidden = true;
+        el('previewLink').removeAttribute('href');
+        updateControls();
+        if (templateIndex() === null || !state.templates.length) {
+          var hasTargets = state.bootstrap && state.bootstrap.targetOptions && state.bootstrap.targetOptions.length;
+          text('previewLabel', hasTargets ? '选择目标 buy 后显示链接预览' : '加载可用目标模板后显示预览');
+          text('footerStatus', hasTargets ? '请选择目标 buy' : '请先加载可用模板');
+          return;
+        }
+        text('previewLabel', '正在生成目标链接预览…');
+        text('footerStatus', '正在检查目标链接…');
+        state.previewTimer = setTimeout(function () {
+          google.script.run.withSuccessHandler(function (result) {
+            if (version !== state.previewVersion) return;
+            state.previewOk = !!(result && result.ok && /^https?:\/\//i.test(result.url || ''));
+            if (state.previewOk) {
+              el('previewLink').href = result.url;
+              el('previewLink').hidden = false;
+              text('previewLabel', '目标链接示例（商品 7847984949）');
+              text('footerStatus', state.bootstrap && state.bootstrap.selection ? '将在开始时选中的区域原位置更新链接' : '请先读取有效选区');
+            } else {
+              text('previewLabel', result && result.reason || '无法生成目标链接，请检查模板和邀请码。');
+              text('footerStatus', '请检查目标链接设置');
+            }
+            updateControls();
+          }).withFailureHandler(function (error) {
+            if (version !== state.previewVersion) return;
+            state.previewOk = false;
+            text('previewLabel', '预览失败：' + errorMessage(error));
+            text('footerStatus', '可调整配置或重新加载后重试');
+            updateControls();
+          }).previewBuyTargetLink({ templates: state.templates, targetTemplateIndex: templateIndex(), invitationCode: el('invitationCode').value.trim() });
+        }, 250);
+      }
+
+      function appendCell(row, value, className) {
+        var cell = document.createElement('td');
+        cell.textContent = value == null ? '' : String(value);
+        if (className) cell.className = className;
+        row.appendChild(cell);
+        return cell;
+      }
+
+      function addDetails(items) {
+        var priority = { failed: 0, skipped: 1, success: 2 };
+        (Array.isArray(items) ? items : []).forEach(function (item) {
+          state.detailCount++;
+          state.details.push({ item: item, sequence: state.detailCount });
+        });
+        state.details.sort(function (a, b) {
+          var difference = (priority[a.item.status] === undefined ? 1 : priority[a.item.status]) - (priority[b.item.status] === undefined ? 1 : priority[b.item.status]);
+          return difference || b.sequence - a.sequence;
+        });
+        state.details = state.details.slice(0, 200);
+        el('detailRows').textContent = '';
+        state.details.forEach(function (entry) {
+          var item = entry.item;
+          var row = document.createElement('tr');
+          var location = appendCell(row, item.sheetName || '未知 Sheet');
+          var address = document.createElement('div');
+          address.className = 'cell-address';
+          address.textContent = item.cell || '—';
+          location.appendChild(address);
+          var status = Object.prototype.hasOwnProperty.call(priority, item.status) ? item.status : 'skipped';
+          appendCell(row, { success: '成功', skipped: '跳过', failed: '失败' }[status], 'status-' + status);
+          appendCell(row, item.message || '');
+          el('detailRows').appendChild(row);
+        });
+        el('detailSection').hidden = !state.details.length;
+        el('truncatedNotice').hidden = state.detailCount <= 200;
+      }
+
+      function renderRun(message) {
+        var run = state.run;
+        if (!run) return;
+        var totals = run.totals || {};
+        var scanned = Number(totals.scannedCount) || 0;
+        var total = Number(run.totalCells) || 0;
+        el('results').hidden = false;
+        el('progress').value = run.done ? 100 : total ? Math.min(100, scanned / total * 100) : 0;
+        text('scanProgress', number(scanned) + ' / ' + number(total) + ' 个格子');
+        text('successCount', number(totals.successCount));
+        text('skippedCount', number(totals.skippedCount));
+        text('failedCount', number(totals.failedCount));
+        text('resultHeading', run.done ? '转换完成' : state.paused ? '转换已暂停' : '转换进度');
+        text('resultMessage', '已检查 ' + number(totals.matchedCount) + ' 个含 LINK 的格子，更新 ' + number(totals.changedLinkCount) + ' 条超链接。' + (message ? ' ' + message : ''));
+        el('rangeRows').textContent = '';
+        (run.ranges || []).forEach(function (range, index) {
+          var row = document.createElement('tr');
+          var name = appendCell(row, range.a1, 'cell-address');
+          var status = document.createElement('span');
+          status.className = 'sheet-state';
+          status.textContent = range.done ? '已完成' : index === run.rangeIndex ? state.paused ? '已暂停' : '正在扫描' : '等待扫描';
+          name.appendChild(status);
+          ['scannedCount', 'successCount', 'skippedCount', 'failedCount'].forEach(function (key) { appendCell(row, number(range[key]), 'number'); });
+          el('rangeRows').appendChild(row);
+        });
+      }
+
+      function pauseAfterBatch() {
+        state.paused = true;
+        state.pauseRequested = false;
+        text('footerStatus', '已暂停，可继续处理剩余格子');
+        renderRun();
+        updateControls();
+      }
+
+      function batchFailed(error) {
+        state.inFlight = false;
+        state.paused = true;
+        state.pauseRequested = false;
+        showError(errorMessage(error) + ' 当前进度已保留，点击“继续转换”重试本批。若上一批已写入但响应丢失，重试会跳过已更新链接，成功计数可能少于实际更新数量。');
+        text('footerStatus', '本批未确认完成，可继续重试');
+        renderRun();
+        updateControls();
+      }
+
+      function processNextBatch() {
+        if (!activeRun() || state.inFlight || state.paused) return;
+        if (state.pauseRequested) { pauseAfterBatch(); return; }
+        state.inFlight = true;
+        updateControls();
+        google.script.run.withSuccessHandler(function (result) {
+          state.inFlight = false;
+          if (!result || !result.run) { batchFailed('没有收到有效的处理结果。'); return; }
+          state.run = result.run;
+          addDetails(result.items);
+          if (state.run.done) {
+            state.paused = false;
+            state.pauseRequested = false;
+            renderRun(result.message);
+            text('footerStatus', '所选区域已处理完成');
+            updateControls();
+            return;
+          }
+          if (state.pauseRequested) { pauseAfterBatch(); return; }
+          renderRun(result.message);
+          text('footerStatus', '正在分批扫描，请保持此窗口打开');
+          updateControls();
+          setTimeout(processNextBatch, 0);
+        }).withFailureHandler(batchFailed).processBuyLinkConversionBatch({ run: state.run });
+      }
+
+      function startOrResume() {
+        if (state.loading || state.selectionLoading || state.inFlight) return;
+        if (activeRun()) {
+          if (!state.paused) return;
+          state.paused = false;
+          state.pauseRequested = false;
+          showError('');
+          text('footerStatus', '正在继续转换…');
+          renderRun();
+          processNextBatch();
+          return;
+        }
+        if (!state.previewOk || !state.bootstrap || !state.bootstrap.selection || templateIndex() === null) return;
+        state.inFlight = true;
+        state.paused = false;
+        state.pauseRequested = false;
+        state.run = null;
+        state.details = [];
+        state.detailCount = 0;
+        el('results').hidden = true;
+        addDetails([]);
+        showError('');
+        text('footerStatus', '正在读取当前选区并准备转换…');
+        updateControls();
+        google.script.run.withSuccessHandler(function (run) {
+          state.inFlight = false;
+          if (!run || !run.spreadsheetId || !run.selection || !Array.isArray(run.ranges) || !run.totals) {
+            showError('未能建立转换任务，请重新开始。');
+            text('footerStatus', '启动失败，可重新开始');
+            updateControls();
+            return;
+          }
+          state.run = run;
+          renderSelection(run.selection);
+          renderRun();
+          if (run.done) {
+            text('footerStatus', '所选区域已处理完成');
+            updateControls();
+          } else {
+            text('footerStatus', '正在分批扫描，请保持此窗口打开');
+            processNextBatch();
+          }
+        }).withFailureHandler(function (error) {
+          state.inFlight = false;
+          showError(errorMessage(error));
+          text('footerStatus', '启动失败，可重新开始');
+          updateControls();
+        }).startBuyLinkConversion({
+          spreadsheetId: state.bootstrap.spreadsheetId,
+          templates: state.templates,
+          targetTemplateIndex: templateIndex(),
+          invitationCode: el('invitationCode').value.trim()
+        });
+      }
+
+      el('reloadTemplates').addEventListener('click', loadBootstrap);
+      el('reloadSelection').addEventListener('click', loadSelection);
+      el('targetTemplate').addEventListener('change', function () { showError(''); requestPreview(); });
+      el('invitationCode').addEventListener('input', function () { showError(''); requestPreview(); });
+      el('convertButton').addEventListener('click', startOrResume);
+      el('pauseButton').addEventListener('click', function () {
+        if (!activeRun() || state.paused) return;
+        state.pauseRequested = true;
+        text('footerStatus', '当前批次完成后暂停…');
+        updateControls();
+        if (!state.inFlight) pauseAfterBatch();
+      });
+      loadBootstrap();
+    })();
+  </script>
+</body>
+</html>

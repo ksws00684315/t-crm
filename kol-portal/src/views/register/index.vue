@@ -285,18 +285,18 @@ watch(code, () => {
 
 <style scoped>
 .register-subtitle {
-  margin: -8px 0 20px;
+  margin: calc(var(--tcrm-space-2) * -1) 0 var(--tcrm-space-4);
   text-align: center;
   color: var(--el-text-color-secondary);
 }
 .register-join,
 .register-invalid {
-  margin: -8px 0 20px;
+  margin: calc(var(--tcrm-space-2) * -1) 0 var(--tcrm-space-4);
   text-align: center;
 }
 .register-code-note {
   width: 100%;
-  margin-top: 4px;
+  margin-top: var(--tcrm-space-1);
   font-size: var(--tcrm-font-size-help);
   color: var(--el-text-color-secondary);
 }

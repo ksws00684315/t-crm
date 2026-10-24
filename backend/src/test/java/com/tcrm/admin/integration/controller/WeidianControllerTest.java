@@ -29,7 +29,8 @@ class WeidianControllerTest {
 
   @Test
   void shouldReturnAppViewWithoutAnySecret() throws Exception {
-    when(integration.app()).thenReturn(new WeidianAppView("public-key", true, Instant.EPOCH));
+    when(integration.app())
+        .thenReturn(new WeidianAppView("public-key", true, Instant.EPOCH, "https://admin.test/cb"));
 
     var response =
         mvc.perform(get("/admin-api/integration/weidian/app"))
@@ -37,8 +38,10 @@ class WeidianControllerTest {
             .andReturn()
             .getResponse();
 
-    assertThat(response.getContentAsString()).contains("public-key", "secretConfigured");
-    assertThat(response.getContentAsString()).doesNotContain("private-secret");
+    assertThat(response.getContentAsString())
+        .contains("public-key", "secretConfigured", "callbackUrl", "https://admin.test/cb");
+    assertThat(response.getContentAsString())
+        .doesNotContain("private-secret", "appSecret", "appSecretCipher");
   }
 
   @Test

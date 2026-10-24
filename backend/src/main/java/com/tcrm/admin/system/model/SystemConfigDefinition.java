@@ -13,6 +13,18 @@ public enum SystemConfigDefinition {
   UPLOAD_URL("url.upload", "url", "url", "crm.upload.base-url", "", null, null),
   REDIRECT_FALLBACK_URL(
       "url.redirect-fallback", "url", "url", "crm.redirect.fallback-url", "", null, null),
+  SHORT_URL_ALLOWED_HOSTS(
+      "link.short-url.allowed-hosts",
+      "url",
+      "string",
+      null,
+      "cnfans.com,kakobuy.com,oopbuy.com,acbuy.com,hoobuy.com,joyagoo.com,mulebuy.com,"
+          + "weidian.com,allchinabuy.com,usfans.com,itaobuy.com,hippoobuy.com,hipobuy.com,"
+          + "fishgoo.com,litbuy.com,gtbuy.com,niuniubox.com,hubbuycn.com,fansbuy.com,"
+          + "lovegobuy.com,superbuy.com,vigorbuy.com,bbdbuy.com,orientdig.com,cnshopper.com,"
+          + "sugargoo.com,cssbuy.com,bbdbuyeu.com,wheebuy.com,vdian.com,youshop10.com,koudai.com",
+      1,
+      2048),
   COPY_TOKEN_DEFAULT_QUOTA(
       "copy-token.default-quota",
       "business",

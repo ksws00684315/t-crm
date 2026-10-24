@@ -95,7 +95,7 @@ describe("document title", () => {
 
   it("translates the route title key into English", async () => {
     await navigate(false, "/login");
-    expect(document.title).toBe("Sign in | SparkTrack Creator Portal");
+    expect(document.title).toBe("Sign in | SparkTrack Creator");
   });
 
   it("translates the route title key into Chinese", async () => {
@@ -106,6 +106,6 @@ describe("document title", () => {
 
   it("uses the app name alone when a route has no title key", () => {
     applyDocumentTitle({});
-    expect(document.title).toBe("SparkTrack Creator Portal");
+    expect(document.title).toBe("SparkTrack Creator");
   });
 });

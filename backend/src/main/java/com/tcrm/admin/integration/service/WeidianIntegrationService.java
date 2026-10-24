@@ -93,9 +93,12 @@ public class WeidianIntegrationService implements ShopIntegrationApi {
   public WeidianAppView app() {
     WeidianAppDO app = findApp();
     return app == null
-        ? new WeidianAppView(null, false, null)
+        ? new WeidianAppView(null, false, null, adminBaseUrl.callbackUrl())
         : new WeidianAppView(
-            app.getAppKey(), app.getAppSecretCipher() != null, app.getUpdateTime());
+            app.getAppKey(),
+            app.getAppSecretCipher() != null,
+            app.getUpdateTime(),
+            adminBaseUrl.callbackUrl());
   }
 
   public void saveApp(WeidianAppRequest request) {

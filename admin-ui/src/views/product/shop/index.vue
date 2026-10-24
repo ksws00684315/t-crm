@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Refresh, WarningFilled } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { ElButton, ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { computed, h, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   checkShopApis,
@@ -16,7 +16,12 @@ import {
   updateShopStatus
 } from "@/api/product/shop";
 import type { CopyIneligibleReason, ShopVO } from "@/api/types";
-import { startWeidianAuthorization } from "@/api/integration/weidian";
+import {
+  getWeidianApp,
+  saveWeidianApp,
+  startWeidianAuthorization,
+  type WeidianAppVO
+} from "@/api/integration/weidian";
 import { triggerOrderSync } from "@/api/order/order";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -26,6 +31,7 @@ import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { ApiError } from "@/utils/http/error";
 import { accessOf } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
 
@@ -66,6 +72,12 @@ const form = reactive({
 });
 const saving = ref(false);
 const refreshingId = ref<string | null>(null);
+const appDialogVisible = ref(false);
+const appLoading = ref(false);
+const appSaving = ref(false);
+const appStatus = ref<WeidianAppVO | null>(null);
+const appFormRef = ref<FormInstance>();
+const appForm = reactive({ appKey: "", appSecret: "" });
 
 const rules = computed<FormRules>(() => ({
   shopName: [{ required: true, message: t("shop.nameRequired"), trigger: "blur" }],
@@ -81,6 +93,24 @@ const rules = computed<FormRules>(() => ({
     }
   ]
 }));
+
+const appRules = computed<FormRules>(() => ({
+  appKey: [
+    { required: true, message: t("shop.weidianApp.appKeyRequired"), trigger: "blur" },
+    { max: 64, message: t("shop.weidianApp.appKeyTooLong"), trigger: "blur" }
+  ],
+  appSecret: [{ required: true, message: t("shop.weidianApp.appSecretRequired"), trigger: "blur" }]
+}));
+
+const callbackUrlInvalid = computed(() => {
+  const callbackUrl = appStatus.value?.callbackUrl ?? "";
+  if (!callbackUrl.startsWith("https://")) return true;
+  try {
+    return new URL(callbackUrl).hostname.toLowerCase().endsWith(".invalid");
+  } catch {
+    return true;
+  }
+});
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
@@ -224,7 +254,64 @@ async function authorize(row: ShopVO) {
     else window.location.assign(result.authorizeUrl);
   } catch (error) {
     authWindow?.close();
+    if (
+      canManage.value &&
+      error instanceof ApiError &&
+      error.errorCode === "WEIDIAN_APP_NOT_CONFIGURED"
+    ) {
+      ElMessage({
+        type: "error",
+        duration: 0,
+        showClose: true,
+        message: h("span", [
+          `${t("errors.WEIDIAN_APP_NOT_CONFIGURED")} `,
+          h(
+            ElButton,
+            {
+              type: "primary",
+              link: true,
+              "data-test": "weidian-go-config",
+              onClick: () => void openAppConfig()
+            },
+            () => t("shop.weidianApp.goConfigure")
+          )
+        ])
+      });
+    } else {
+      notifyError(error);
+    }
+  }
+}
+
+async function openAppConfig() {
+  appForm.appKey = "";
+  appForm.appSecret = "";
+  appFormRef.value?.clearValidate();
+  appDialogVisible.value = true;
+  appLoading.value = true;
+  try {
+    appStatus.value = await getWeidianApp();
+    appForm.appKey = appStatus.value.appKey ?? "";
+  } catch (error) {
     notifyError(error);
+  } finally {
+    appLoading.value = false;
+  }
+}
+
+async function saveAppConfig() {
+  if (!appFormRef.value || !(await appFormRef.value.validate().catch(() => false))) return;
+  appSaving.value = true;
+  try {
+    await saveWeidianApp({ appKey: appForm.appKey.trim(), appSecret: appForm.appSecret });
+    appForm.appSecret = "";
+    ElMessage.success(t("shop.weidianApp.saved"));
+    appDialogVisible.value = false;
+    await load();
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    appSaving.value = false;
   }
 }
 
@@ -440,6 +527,9 @@ onMounted(() => {
         </el-form-item>
       </template>
       <template #actions>
+        <el-button v-if="canManage" data-test="weidian-app-config" @click="openAppConfig">
+          {{ t("shop.weidianApp.configure") }}
+        </el-button>
         <el-button v-if="canManage" type="primary" data-test="create" @click="openCreate">
           {{ t("shop.create") }}
         </el-button>
@@ -620,6 +710,85 @@ onMounted(() => {
         }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="appDialogVisible"
+      :title="t('shop.weidianApp.title')"
+      width="min(560px, calc(100vw - 24px))"
+      :close-on-click-modal="false"
+      data-test="weidian-app-dialog"
+    >
+      <el-skeleton v-if="appLoading" :rows="5" animated />
+      <el-form
+        v-else
+        ref="appFormRef"
+        :model="appForm"
+        :rules="appRules"
+        label-position="top"
+        data-test="weidian-app-form"
+      >
+        <el-form-item :label="t('shop.weidianApp.callbackUrl')">
+          <CopyText :value="appStatus?.callbackUrl" />
+        </el-form-item>
+        <p class="callback-hint">{{ t("shop.weidianApp.callbackHint") }}</p>
+        <el-alert
+          v-if="callbackUrlInvalid"
+          :title="t('shop.weidianApp.callbackInvalid')"
+          type="warning"
+          :closable="false"
+          show-icon
+          data-test="callback-invalid"
+        />
+        <el-form-item prop="appKey" :label="t('shop.weidianApp.appKey')" required>
+          <el-input
+            v-model="appForm.appKey"
+            maxlength="64"
+            show-word-limit
+            autocomplete="off"
+            data-test="weidian-app-key"
+          />
+        </el-form-item>
+        <el-form-item prop="appSecret" :label="t('shop.weidianApp.appSecret')" required>
+          <el-input
+            v-model="appForm.appSecret"
+            type="password"
+            show-password
+            autocomplete="new-password"
+            :placeholder="
+              appStatus?.secretConfigured ? t('shop.weidianApp.secretConfiguredHint') : ''
+            "
+            data-test="weidian-app-secret"
+          />
+        </el-form-item>
+        <div class="app-status" data-test="weidian-app-status">
+          <el-tag :type="appStatus?.secretConfigured ? 'success' : 'info'">
+            {{
+              appStatus?.secretConfigured
+                ? t("shop.weidianApp.configured")
+                : t("shop.weidianApp.notConfigured")
+            }}
+          </el-tag>
+          <span
+            >{{ t("shop.weidianApp.lastUpdated") }}:
+            {{ formatInstantToMinute(appStatus?.updateTime) }}</span
+          >
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button data-test="weidian-app-cancel" @click="appDialogVisible = false">
+          {{ t("common.cancel") }}
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="appSaving"
+          :disabled="appLoading"
+          data-test="weidian-app-save"
+          @click="saveAppConfig"
+        >
+          {{ t("common.save") }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -637,6 +806,17 @@ onMounted(() => {
 .api-status-item--failed,
 .capacity-cell--full {
   color: var(--tcrm-color-danger);
+}
+.callback-hint {
+  margin: 0 0 var(--tcrm-space-4);
+  color: var(--tcrm-color-text-secondary);
+}
+.app-status {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+  margin-bottom: var(--tcrm-space-4);
+  color: var(--tcrm-color-text-secondary);
 }
 .reason-icon {
   color: var(--tcrm-color-text-secondary);
