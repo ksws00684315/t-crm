@@ -326,6 +326,19 @@ const enUS: MessageSchema = {
     PAYOUT_ACCOUNT_NOT_PENDING:
       "The account was changed or already reviewed. Refresh and try again.",
     PAYOUT_ACCOUNT_NOT_APPROVED: "Only approved accounts can be the default.",
+    PAYOUT_ACCOUNT_IN_USE: "This payout account is still referenced by a withdrawal in flight.",
+    WITHDRAWAL_REQUEST_CONFLICT:
+      "The withdrawal request id was reused with different data. Refresh and retry.",
+    WITHDRAWAL_STATE_CONFLICT: "The withdrawal has changed. Refresh before continuing.",
+    WITHDRAWAL_BELOW_MINIMUM: "The withdrawal amount is below the configured minimum.",
+    WITHDRAWAL_INSUFFICIENT_AVAILABLE: "The withdrawal amount exceeds the available balance.",
+    WITHDRAWAL_KOL_FROZEN: "This creator is frozen from new withdrawal applications.",
+    WITHDRAWAL_PREVIOUS_INVALID:
+      "The linked previous application is not a rejected withdrawal of this creator.",
+    WITHDRAWAL_PAYMENT_CONFLICT:
+      "A successful payment already exists or the request" + "id conflicts.",
+    WITHDRAWAL_FROZEN_ALREADY: "This creator is already frozen from withdrawals.",
+    WITHDRAWAL_NOT_FROZEN: "This creator is not frozen from withdrawals.",
     FILE_INVALID: "The file must be a PNG or JPEG image.",
     FILE_TOO_LARGE: "The file is larger than 2 MB.",
     FILE_IN_USE: "The file is already used by another record.",
