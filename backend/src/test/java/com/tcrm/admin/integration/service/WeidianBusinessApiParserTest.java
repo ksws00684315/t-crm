@@ -108,6 +108,38 @@ class WeidianBusinessApiParserTest {
   }
 
   @Test
+  void shouldParseAddItemWithItemidField_whenWeidianReturnsItemidNumber() throws IOException {
+    var parsed =
+        parser.addItem(
+            json.readTree(
+                "{\"result\":{\"add_sku_ids\":[],\"itemid\":2234677858},"
+                    + "\"status\":{\"status_code\":0}}"));
+
+    assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
+  }
+
+  @Test
+  void shouldParseAddItemWithItemidField_whenWeidianReturnsNumericString() throws IOException {
+    var parsed =
+        parser.addItem(
+            json.readTree(
+                "{\"result\":{\"add_sku_ids\":[],\"itemid\":\"2234677858\"},"
+                    + "\"status\":{\"status_code\":0}}"));
+
+    assertThat(parsed.itemId()).isEqualTo(2_234_677_858L);
+  }
+
+  @Test
+  void shouldReturnNullItemId_whenNoKnownIdFieldPresent() throws IOException {
+    var parsed =
+        parser.addItem(
+            json.readTree(
+                "{\"result\":{\"add_sku_ids\":[],\"other_id\":1},\"status\":{\"status_code\":0}}"));
+
+    assertThat(parsed.itemId()).isNull();
+  }
+
+  @Test
   void shouldParseSaveItemDetailOfficialExample_175_v1_0() throws IOException {
     var parsed = parser.saveItemDetail(result("save-item-detail-175-v1.0.json"));
 

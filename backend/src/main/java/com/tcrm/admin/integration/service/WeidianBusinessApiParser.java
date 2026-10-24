@@ -17,6 +17,7 @@ public class WeidianBusinessApiParser {
   private static final ZoneId WEIDIAN_ZONE = ZoneId.of("Asia/Shanghai");
   private static final DateTimeFormatter WEIDIAN_TIME =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+  private static final List<String> ADD_ITEM_ID_FIELDS = List.of("itemid", "item_id", "itemId");
 
   public WeidianBusinessApi.OrderListResponse orderList(JsonNode result) {
     List<WeidianBusinessApi.OrderListItem> orders = new ArrayList<>();
@@ -175,8 +176,39 @@ public class WeidianBusinessApiParser {
     if (ids != null && ids.isArray()) {
       ids.forEach(id -> skuIds.add(id.longValue()));
     }
-    return new WeidianBusinessApi.AddItemResponse(
-        longValue(result, "item_id"), skuIds, envelopeResult);
+    return new WeidianBusinessApi.AddItemResponse(addItemId(result), skuIds, envelopeResult);
+  }
+
+  /**
+   * Weidian's returned item id field name is not consistent across docs and live responses (task
+   * 65), so the known variants are tried in order.
+   */
+  private static Long addItemId(JsonNode result) {
+    for (String field : ADD_ITEM_ID_FIELDS) {
+      Long id = numericId(result, field);
+      if (id != null) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  private static Long numericId(JsonNode node, String field) {
+    JsonNode value = node == null ? null : node.get(field);
+    if (value == null || value.isNull()) {
+      return null;
+    }
+    if (value.isIntegralNumber()) {
+      return value.longValue();
+    }
+    if (value.isTextual()) {
+      try {
+        return Long.valueOf(value.asString().strip());
+      } catch (NumberFormatException ignored) {
+        return null;
+      }
+    }
+    return null;
   }
 
   public WeidianBusinessApi.SaveItemDetailResponse saveItemDetail(JsonNode envelopeResult) {
