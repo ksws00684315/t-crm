@@ -76,7 +76,8 @@ const columns = computed<DataColumn[]>(() => [
   // Five actions on a BD row need room for Chinese text, 8px gaps and cell padding; the count and
   // scope columns only show a short value, so their slack pays for it and the row keeps one line.
   // English labels are about a third longer, so that locale gets a wider column and scrolls.
-  { key: "actions", label: t("common.actions"), width: px(340, 444) }
+  // Browser-measured max .cell scrollWidth zh 395 / en 550 + 24px (task 59 R-11 measurements).
+  { key: "actions", label: t("common.actions"), width: px(420, 576) }
 ]);
 
 const applied = ref({

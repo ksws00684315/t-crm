@@ -111,7 +111,9 @@ function onEnter(event: KeyboardEvent): void {
 .list-search__form :deep(.el-form-item__content) {
   width: 100%;
   min-width: 0;
-  margin-left: 0 !important;
+  /* Element Plus never emits an inline margin here on this form (labels sit on top, no
+     label-width): a plain declaration is enough (review R-22). */
+  margin-left: 0;
 }
 .list-search__row,
 .list-search__actions,

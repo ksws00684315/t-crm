@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Refresh, WarningFilled } from "@element-plus/icons-vue";
-import { ElButton, ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import {
+  ElButton,
+  ElMessage,
+  ElMessageBox,
+  type FormInstance,
+  type FormRules,
+  type MessageHandler
+} from "element-plus";
 import { computed, h, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -127,7 +134,9 @@ const columns = computed<DataColumn[]>(() => {
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
-    list.push({ key: "actions", label: t("common.actions"), width: px(470, 663) });
+    // Action column per L-001: browser-measured max .cell scrollWidth (zh 485 / en 675,
+    // assets/task-59/measurements-{zh,en}.md) + 24px headroom. Re-measure when actions change.
+    list.push({ key: "actions", label: t("common.actions"), width: px(509, 699) });
   }
   return list;
 });
@@ -245,6 +254,14 @@ async function save() {
   }
 }
 
+/** The "app not configured" notice (L-005) stays until its config dialog opens or a save succeeds. */
+let appConfigNotice: MessageHandler | null = null;
+
+function closeAppConfigNotice(): void {
+  appConfigNotice?.close();
+  appConfigNotice = null;
+}
+
 async function authorize(row: ShopVO) {
   const authWindow = window.open("about:blank", "_blank");
   if (authWindow) authWindow.opener = null;
@@ -259,7 +276,7 @@ async function authorize(row: ShopVO) {
       error instanceof ApiError &&
       error.errorCode === "WEIDIAN_APP_NOT_CONFIGURED"
     ) {
-      ElMessage({
+      appConfigNotice = ElMessage({
         type: "error",
         duration: 0,
         showClose: true,
@@ -284,6 +301,7 @@ async function authorize(row: ShopVO) {
 }
 
 async function openAppConfig() {
+  closeAppConfigNotice();
   appForm.appKey = "";
   appForm.appSecret = "";
   appFormRef.value?.clearValidate();
@@ -305,6 +323,7 @@ async function saveAppConfig() {
   try {
     await saveWeidianApp({ appKey: appForm.appKey.trim(), appSecret: appForm.appSecret });
     appForm.appSecret = "";
+    closeAppConfigNotice();
     ElMessage.success(t("shop.weidianApp.saved"));
     appDialogVisible.value = false;
     await load();

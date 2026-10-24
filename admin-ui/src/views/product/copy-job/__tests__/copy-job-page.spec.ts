@@ -1,6 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { nextTick, reactive } from "vue";
 import ElementPlus, { ElMessage, ElSelect } from "element-plus";
+import { createPinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as copyJobApi from "@/api/product/copy-job";
 import type { CopyJobItemVO, CopyJobVO } from "@/api/product/copy-job";
@@ -13,7 +16,8 @@ vi.mock("@/api/product/copy-job");
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: routeQuery })
 }));
-const routeQuery: Record<string, string | undefined> = {};
+/** Reactive so that mutating it drives the page's route.query watcher (R-03). */
+const routeQuery = reactive<Record<string, string | undefined>>({});
 
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 vi.mock("@/utils/copy", () => ({
@@ -71,7 +75,7 @@ async function open(
     size: 20
   });
   const wrapper = mount(CopyJobPage, {
-    global: { plugins: [ElementPlus, i18n] },
+    global: { plugins: [ElementPlus, i18n, createPinia()] },
     attachTo: document.body
   });
   await flushPromises();
@@ -209,7 +213,7 @@ describe("Copy job page", () => {
   it("reports a failed load and clears the loading state", async () => {
     vi.mocked(copyJobApi.listCopyJobs).mockRejectedValue(new Error("down"));
     const wrapper = mount(CopyJobPage, {
-      global: { plugins: [ElementPlus, i18n] },
+      global: { plugins: [ElementPlus, i18n, createPinia()] },
       attachTo: document.body
     });
     await flushPromises();
@@ -228,5 +232,31 @@ describe("Copy job page", () => {
       expect.objectContaining({ jobCode: "from-route" })
     );
     wrapper.unmount();
+  });
+
+  it("re-filters when the jobCode query changes while the page is open (R-03)", async () => {
+    const wrapper = await open();
+    expect(copyJobApi.listCopyJobs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ jobCode: undefined })
+    );
+
+    routeQuery.jobCode = " second-push ";
+    await flushPromises();
+    await nextTick();
+    expect((wrapper.get('[data-test="job-code"]').element as HTMLInputElement).value).toBe(
+      "second-push"
+    );
+    expect(copyJobApi.listCopyJobs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, jobCode: "second-push" })
+    );
+    wrapper.unmount();
+  });
+
+  it("freezes the result tags against flex shrinking and gives the hint its own line (R-01)", () => {
+    // jsdom applies no CSS; assert the protective rules in the component source instead.
+    const source = readFileSync(resolve(__dirname, "../index.vue"), "utf8");
+    expect(source).toContain(".copy-job__result :deep(.el-tag) {\n  flex: none;");
+    expect(source).toContain("white-space: nowrap");
+    expect(source).toContain(".copy-job__hint {\n  flex-basis: 100%;");
   });
 });
