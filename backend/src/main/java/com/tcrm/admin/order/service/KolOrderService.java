@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 public class KolOrderService {
   private static final int MAX_PAGE = PageResult.MAX_PAGE;
   private static final int MAX_SIZE = 50;
+  private static final int MAX_KEYWORD = 128;
   private static final List<String> STATUSES =
       List.of("UNPAID", "PAID", "SHIPPED", "RECEIVED", "COMPLETED", "CLOSED", "UNKNOWN");
 
@@ -39,6 +40,8 @@ public class KolOrderService {
             && filter.payTo() != null
             && !filter.payFrom().isBefore(filter.payTo()))
         || (filter.orderStatus() != null && !STATUSES.contains(filter.orderStatus()))
+        || (filter.orderNo() != null && filter.orderNo().length() > MAX_KEYWORD)
+        || (filter.productName() != null && filter.productName().length() > MAX_KEYWORD)
         || filter.page() < 1
         || filter.page() > MAX_PAGE
         || filter.size() < 1
@@ -54,6 +57,17 @@ public class KolOrderService {
             .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
             .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
             .orderByDesc(OrderDO::getPayTime, OrderDO::getId);
+    if (notBlank(filter.orderNo())) {
+      query.apply(
+          "weidian_order_id ILIKE {0} ESCAPE '\\'", "%" + likeLiteral(filter.orderNo()) + "%");
+    }
+    if (notBlank(filter.productName())) {
+      // Only the creator's own lines count; other items of the same order stay invisible.
+      query.exists(
+          "SELECT 1 FROM crm_order_item oi WHERE oi.order_id = crm_order.id"
+              + " AND oi.kol_id = {0} AND oi.item_name ILIKE {1} ESCAPE '\\'",
+          kol.id(), "%" + likeLiteral(filter.productName()) + "%");
+    }
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);
     if (result.getRecords().isEmpty()) {
       return new PageResult<KolOrderDTO>(
@@ -114,6 +128,15 @@ public class KolOrderService {
         .map(item -> pay ? item.getPayAmount() : item.getRefundAmount())
         .filter(value -> value != null)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private static boolean notBlank(String value) {
+    return value != null && !value.isBlank();
+  }
+
+  /** Escapes LIKE wildcards so the keyword matches itself, with backslash as the escape char. */
+  private static String likeLiteral(String value) {
+    return value.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 
   private static BigDecimal money(BigDecimal value) {
