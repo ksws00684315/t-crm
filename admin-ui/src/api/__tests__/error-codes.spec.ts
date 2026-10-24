@@ -10,8 +10,8 @@ import { messageForErrorCode } from "../error-codes";
 function backendErrorCodes(): string[] {
   // `pnpm test` runs with admin-ui as the working directory.
   const file = resolve(
-    process.cwd(),
-    "../backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java"
+    process.env.TCRM_BACKEND_SOURCE_ROOT ?? resolve(process.cwd(), "../backend"),
+    "src/main/java/com/tcrm/admin/shared/ErrorCode.java"
   );
   const source = readFileSync(file, "utf8");
   const start = source.indexOf("enum ErrorCode");
@@ -66,7 +66,14 @@ describe("error code messages", () => {
       "KOL_PROMOTION_CONFIG_INCOMPLETE",
       "KOL_ALREADY_CLAIMED",
       "KOL_REVIEW_REQUIRED",
-      "SYSTEM_CONFIG_INVALID"
+      "SYSTEM_CONFIG_INVALID",
+      // Task 47 backend ships in its own PR. The cross-PR run reads its actual enum above.
+      "PREPAY_REQUEST_CONFLICT",
+      "PREPAY_STATE_CONFLICT",
+      "PREPAY_DETAILS_REQUIRED",
+      "PREPAY_PAYMENT_CONFLICT",
+      "PREPAY_FILE_INVALID",
+      "PREPAY_FILE_TOO_LARGE"
     ].filter(code => !backend.includes(code));
     expect(extra.sort()).toEqual(pending.sort());
   });

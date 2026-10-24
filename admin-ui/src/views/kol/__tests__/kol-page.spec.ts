@@ -12,6 +12,10 @@ import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
+vi.mock("@/api/commission/prepay", () => ({
+  prepayAccounts: vi.fn().mockResolvedValue([]),
+  getPrepayKolSummaries: vi.fn().mockResolvedValue([])
+}));
 vi.mock("@/api/kol/promotion");
 vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");
@@ -158,34 +162,31 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("renders the 04.01 columns in order with the 05.01 placeholder", async () => {
+  it("renders the creator columns in order and the paid prepay total", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage();
     const headers = wrapper
       .findAll(".el-table__header th .cell")
       .map(item => item.text())
       .filter(Boolean);
-    // R-07: contact, platform, prepay, inviter, email, login and relation start hidden; the
-    // visible order is unchanged.
-    expect(headers).toEqual(["达人ID", "达人名称", "佣金比例", "邀请时间", "审核状态", "操作"]);
-    const columns = wrapper.findComponent({ name: "DataTable" }).props("columns") as {
-      key: string;
-      label: string;
-      defaultHidden?: boolean;
-    }[];
-    for (const [key, label] of [
-      ["contact", "Phone/WhatsApp"],
-      ["platform", "社媒平台/ID"],
-      ["prepay", "预付金额"],
-      ["inviter", "邀请人"],
-      ["email", "邮箱"],
-      ["login", "登录状态"],
-      ["relation", "关系状态"]
-    ]) {
-      const column = columns.find(item => item.key === key);
-      expect(column?.label).toBe(label);
-      expect(column?.defaultHidden).toBe(true);
-    }
+    // Owner decision 2026-10-24 (task 59 review): every requirement column shows by default and
+    // the table scrolls horizontally inside the card when it overflows.
+    expect(headers).toEqual([
+      "达人ID",
+      "达人名称",
+      "Phone/WhatsApp",
+      "邮箱",
+      "社媒平台/ID",
+      "佣金比例",
+      "预付金额",
+      "邀请时间",
+      "邀请人",
+      "审核状态",
+      "登录状态",
+      "关系状态",
+      "操作"
+    ]);
+    expect(element("kol-prepay-total").text()).toBe("0.00");
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
@@ -195,8 +196,8 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
-    expect(fixed.length).toBe(6);
-    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(800);
+    expect(fixed.length).toBe(13);
+    expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1160);
     wrapper.unmount();
   });
 
@@ -207,15 +208,6 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", phone: null, whatsapp: "+8613900000000" },
       { ...row, id: "3", phone: null, whatsapp: null }
     ]);
-    // The contact column starts hidden (R-07): show it through the column settings first.
-    await element("column-settings").trigger("click");
-    await flushPromises();
-    const checkbox = [...document.body.querySelectorAll(".el-checkbox")]
-      .find(item => item.textContent?.includes("Phone/WhatsApp"))
-      ?.querySelector("input");
-    expect(checkbox).toBeTruthy();
-    await new DOMWrapper(checkbox!).setValue(true);
-    await flushPromises();
     const contacts = new Set(
       [...document.body.querySelectorAll("tr td")]
         .map(td => td.textContent ?? "")
@@ -229,7 +221,7 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("moves review into its status and keeps prepay disabled", async () => {
+  it("moves review into its status and opens authorized prepay applications", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
       { ...row, reviewStatus: "PENDING", id: "1" },
@@ -244,15 +236,12 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    // Prepay is under development: shown inline but disabled on every row, with the hint as its
-    // tooltip.
     const prepay = ["1", "2", "3"].map(id => rowButtons(`action-prepay-${id}`)[0]);
-    expect(prepay.every(item => item?.classList.contains("is-disabled"))).toBe(true);
-    expect(
-      wrapper
-        .findAllComponents({ name: "ElTooltip" })
-        .filter(tip => tip.props("content") === "开发中").length
-    ).toBeGreaterThanOrEqual(3);
+    expect(prepay.every(item => !item?.classList.contains("is-disabled"))).toBe(true);
+    await element("action-prepay-2").trigger("click");
+    await flushPromises();
+    expect(document.querySelector('[data-test="prepay-apply"]')).not.toBeNull();
+    expect(wrapper.getComponent({ name: "ApplyDialog" }).props("kol")).toMatchObject({ id: "2" });
     wrapper.unmount();
   });
 
@@ -263,15 +252,6 @@ describe("creator list page (task 32 §2.2)", () => {
       { ...row, id: "2", displayRelationStatus: "PROMOTING", relationStatus: "PROMOTING" },
       { ...row, id: "3", displayRelationStatus: "PENDING_UPDATE" }
     ]);
-    // The relation column starts hidden (R-07): show it through the column settings first.
-    await element("column-settings").trigger("click");
-    await flushPromises();
-    const checkbox = [...document.body.querySelectorAll(".el-checkbox")]
-      .find(item => item.textContent?.includes("关系状态"))
-      ?.querySelector("input");
-    expect(checkbox).toBeTruthy();
-    await new DOMWrapper(checkbox!).setValue(true);
-    await flushPromises();
     expect(relationTags()).toHaveLength(3);
     expect(document.body.querySelectorAll(".relation--clickable")).toHaveLength(0);
     wrapper.unmount();

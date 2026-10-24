@@ -13,6 +13,9 @@ const { t } = useI18n();
       {{ t("home.body") }}
     </p>
     <div class="home-entries">
+      <RouterLink class="home-entry" to="/income/prepays" data-test="home-prepay-entry"
+        >{{ t("prepay.title") }} →</RouterLink
+      >
       <RouterLink class="home-entry" to="/payout-accounts" data-test="home-payout-entry">
         {{ t("home.payoutEntry") }} →
       </RouterLink>

@@ -91,3 +91,24 @@ describe("notification text", () => {
     expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(superAdmin))).toBe(true);
   });
 });
+
+describe("prepay notifications", () => {
+  it.each(["PREPAY_SUBMITTED", "PREPAY_APPROVED", "PREPAY_REJECTED", "PREPAY_PAID"])(
+    "opens %s only with prepay read authority",
+    type => {
+      expect(notificationHref({ type, params: {}, bizId: "9007199254740993" })).toBe(
+        "/fund/prepays?id=9007199254740993"
+      );
+      expect(canOpenNotification(type, accessOf({ ...staff, permissions: ["prepay:pay"] }))).toBe(
+        true
+      );
+      expect(
+        canOpenNotification(type, accessOf({ ...staff, permissions: ["prepay:review"] }))
+      ).toBe(true);
+      expect(canOpenNotification(type, accessOf(staff))).toBe(false);
+      expect(canOpenNotification(type, accessOf({ ...superAdmin, role: "PLATFORM_ADMIN" }))).toBe(
+        false
+      );
+    }
+  );
+});

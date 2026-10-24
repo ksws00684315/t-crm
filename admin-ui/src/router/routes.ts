@@ -255,6 +255,22 @@ export const routes: RouteRecordRaw[] = [
             }
           },
           {
+            path: "prepays",
+            name: "PrepayTasks",
+            component: () => import("@/views/fund/prepay/index.vue"),
+            meta: {
+              title: "prepay.title",
+              permission: [
+                "commission:view",
+                "prepay:review",
+                "prepay:finance-review",
+                "prepay:pay"
+              ],
+              companyAccount: true,
+              componentName: "PrepayTasksPage"
+            }
+          },
+          {
             path: "settlement-details",
             name: "FundSettlementDetails",
             component: () => import("@/views/common/ComingSoon.vue"),

@@ -6,7 +6,12 @@ import java.time.Instant;
 import java.util.List;
 import tools.jackson.databind.JsonNode;
 
-/** Typed definitions for the Weidian business APIs used by later order and product tasks. */
+/**
+ * Typed definitions for the Weidian business APIs used by later order and product tasks.
+ *
+ * <p>Every response's {@code raw} node is the envelope's {@code result} node (the business object,
+ * with the {@code status} envelope already removed), never the full HTTP envelope.
+ */
 public interface WeidianBusinessApi {
   OrderListResponse orderList(long shopId, OrderListRequest request);
 

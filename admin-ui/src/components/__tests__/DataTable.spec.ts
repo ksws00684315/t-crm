@@ -12,6 +12,21 @@ const columns = [
 ];
 
 describe("DataTable", () => {
+  it("places custom tabs in the toolbar while keeping refresh and pagination", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "toolbar-tabs", rows: [], columns, total: 0 },
+      slots: { toolbar: '<nav data-test="list-tabs">t47_tabs</nav>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(wrapper.get(".data-table__toolbar [data-test=list-tabs]").text()).toBe("t47_tabs");
+    await wrapper
+      .get('button[aria-label="' + i18n.global.t("table.refresh") + '"]')
+      .trigger("click");
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    expect(wrapper.findComponent({ name: "ElPagination" }).exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("keeps the action column fixed while data columns can fill a wide card", async () => {
     const wrapper = mount(DataTable, {
       props: {

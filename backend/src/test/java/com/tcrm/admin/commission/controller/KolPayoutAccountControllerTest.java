@@ -20,6 +20,7 @@ import com.tcrm.admin.commission.model.PayoutAccountType;
 import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.commission.service.BizFileService;
 import com.tcrm.admin.commission.service.PayoutAccountService;
+import com.tcrm.admin.commission.service.PrepayService;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.ClientIpResolver;
@@ -39,11 +40,12 @@ class KolPayoutAccountControllerTest {
   private final PayoutAccountService accounts = mock(PayoutAccountService.class);
   private final BizFileService files = mock(BizFileService.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
+  private final PrepayService prepays = mock(PrepayService.class);
   private final MockMvc mvc =
       KolMvcSupport.build(
           current,
           new KolPayoutAccountController(
-              accounts, files, current, new ClientIpResolver("", "X-Forwarded-For")));
+              accounts, files, current, new ClientIpResolver("", "X-Forwarded-For"), prepays));
 
   private String token() {
     return KolMvcSupport.actAs(current, kol());
@@ -179,6 +181,10 @@ class KolPayoutAccountControllerTest {
 
   @Test
   void shouldDownloadOwnFileAsAttachment() throws Exception {
+    when(files.attachedFile(66L))
+        .thenReturn(
+            new BizFileService.AttachedFile(
+                com.tcrm.admin.commission.model.FileBizType.PAYOUT_QR, 77L, null));
     when(files.kolFile(9007199254740993L, 66L))
         .thenReturn(new BizFileService.FileDTO(66L, "二维码.png", "image/png", 8L, new byte[] {1, 2}));
     mvc.perform(get("/kol-api/files/66").header(KolMvcSupport.TOKEN_HEADER, token()))

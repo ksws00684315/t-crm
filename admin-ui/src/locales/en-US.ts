@@ -1,7 +1,9 @@
 import type { MessageSchema } from "./zh-CN";
 
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
+import prepay from "./prepay-en-US";
 const enUS: MessageSchema = {
+  prepay,
   app: {
     title: "SparkTrack Admin",
     titleSuffix: " Admin"
@@ -70,6 +72,18 @@ const enUS: MessageSchema = {
     OTHER: "Other"
   },
   permission: {
+    "prepay:review": {
+      name: "Review prepays",
+      desc: "Perform the operations review stage for prepay applications; finance review and payment registration are separate"
+    },
+    "prepay:finance-review": {
+      name: "Review prepays (finance)",
+      desc: "Review applications approved by operations; payment registration is separate"
+    },
+    "prepay:pay": {
+      name: "Register prepay payments",
+      desc: "View all company prepay tasks, reveal audited recipient snapshots and register offline payments"
+    },
     "kol:view": {
       name: "View creators",
       desc: "View the creator list, details, and BD history"
@@ -194,6 +208,15 @@ const enUS: MessageSchema = {
     resignation: "Resignation"
   },
   errors: {
+    PREPAY_REQUEST_CONFLICT:
+      "This request ID was used for different data. Check the application list before retrying.",
+    PREPAY_STATE_CONFLICT: "The prepay task has changed. Refresh before continuing.",
+    PREPAY_DETAILS_REQUIRED:
+      "Complete the application details in the pending finance task before approval.",
+    PREPAY_PAYMENT_CONFLICT:
+      "Payment is already recorded or this payment ID has different data. Check the payment result.",
+    PREPAY_FILE_INVALID: "Prepay attachments and vouchers must be valid PNG, JPEG or PDF files.",
+    PREPAY_FILE_TOO_LARGE: "Prepay attachments and vouchers must not exceed 10 MB.",
     SYSTEM_CONFIG_INVALID: "This system configuration value is invalid.",
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
     COMMON_NOT_FOUND: "The requested item does not exist.",
@@ -564,7 +587,7 @@ const enUS: MessageSchema = {
     resetTemplate: "Reset from template",
     exclusiveTitle: "Super Admin only. These cannot be granted.",
     exclusiveItems:
-      "Users and permissions, system settings, the audit log, prepay approval, marking a withdrawal as paid, and transferring creators.",
+      "Users and permissions, system settings, the audit log, marking a withdrawal as paid, and transferring creators. Prepay review and payment permissions may be granted separately.",
     permissionDependencies:
       "Checking an action permission also checks the view permission it needs; clearing a view permission also clears the action permissions that need it.",
     templateRequired: "Choose a post template",
@@ -1658,6 +1681,10 @@ const enUS: MessageSchema = {
     hours: "{n} hours ago",
     days: "{n} days ago",
     type: {
+      PREPAY_SUBMITTED: "Creator prepay application awaits review",
+      PREPAY_APPROVED: "Creator prepay approved, awaiting payment registration",
+      PREPAY_REJECTED: "Creator prepay application rejected",
+      PREPAY_PAID: "Creator prepay payment registered",
       PAYOUT_ACCOUNT_SUBMITTED:
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",

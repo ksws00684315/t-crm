@@ -2,7 +2,6 @@ package com.tcrm.admin.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tcrm.admin.security.api.PostTemplate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +32,8 @@ class ConfigurablePermissionsMigrationIT {
 
   /**
    * Codes that {@code V202610171000} wrote for legacy OPERATOR/ALL rows. Kept as a fixed list so
-   * later changes to {@link PostTemplate#OPERATOR} (for example adding {@code kol:edit}) do not
-   * rewrite history.
+   * later changes to the OPERATOR template (for example adding {@code kol:edit}) do not rewrite
+   * history.
    */
   private static final List<String> OPERATOR_ALL =
       List.of(
@@ -45,6 +44,27 @@ class ConfigurablePermissionsMigrationIT {
           "order:view",
           "order:manage",
           "dashboard:shop",
+          "dashboard:kol",
+          "data:export");
+
+  /**
+   * Codes that {@code V202610171000} wrote for legacy OPERATOR/OWN rows, which became the BD
+   * template. Kept fixed because later template defaults (for example {@code prepay:review}) must
+   * not rewrite that migration.
+   */
+  private static final List<String> LEGACY_BD =
+      List.of(
+          "kol:view",
+          "kol:edit",
+          "kol:register-link",
+          "kol:copy-token",
+          "product:view",
+          "order:view",
+          "commission:view",
+          "payout-account:review",
+          "withdrawal:review",
+          "prepay:apply",
+          "dashboard:team",
           "dashboard:kol",
           "data:export");
 
@@ -102,13 +122,11 @@ class ConfigurablePermissionsMigrationIT {
     assertThat(flag(db, 9106)).isTrue();
 
     assertThat(codes(db, 9101)).containsExactlyInAnyOrderElementsOf(OPERATOR_ALL);
-    assertThat(codes(db, 9102))
-        .containsExactlyInAnyOrderElementsOf(PostTemplate.BD.permissionCodes());
+    assertThat(codes(db, 9102)).containsExactlyInAnyOrderElementsOf(LEGACY_BD);
     assertThat(codes(db, 9103)).containsExactlyInAnyOrderElementsOf(FINANCE);
     assertThat(codes(db, 9104)).isEmpty();
     assertThat(codes(db, 9105)).isEmpty();
-    assertThat(codes(db, 9106))
-        .containsExactlyInAnyOrderElementsOf(PostTemplate.BD.permissionCodes());
+    assertThat(codes(db, 9106)).containsExactlyInAnyOrderElementsOf(LEGACY_BD);
 
     Map<String, Object> ids =
         db.queryForMap(

@@ -392,7 +392,12 @@ function canMove(index: number, delta: -1 | 1): boolean {
           t("table.clearSelection")
         }}</el-button>
       </div>
-      <span v-else class="data-table__total">{{ t("table.total", { total }) }}</span>
+      <template v-else>
+        <!-- Page-specific controls such as result tabs; the default toolbar stays unchanged. -->
+        <slot name="toolbar">
+          <span class="data-table__total">{{ t("table.total", { total }) }}</span>
+        </slot>
+      </template>
       <div class="data-table__tools">
         <el-segmented
           :model-value="prefs.density"

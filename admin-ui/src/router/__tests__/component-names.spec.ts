@@ -28,6 +28,7 @@ describe("cacheable route component names", () => {
         "AccountPasswordPage",
         "AccountResignationPage",
         // One shared stateless placeholder backs every coming-soon route (task 32 §2.1).
+        "PrepayTasksPage",
         "ComingSoonPage",
         "ComingSoonPage",
         "ComingSoonPage",

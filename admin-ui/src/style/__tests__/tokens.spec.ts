@@ -24,7 +24,10 @@ function sourceFiles(appDir: string, allowed: string[] = []): string[] {
       const full = join(dir, name);
       if (statSync(full).isDirectory()) {
         walk(full);
-      } else if (/\.(vue|css)$/.test(name) && !allowed.includes(relative(repoRoot, full))) {
+      } else if (
+        /\.(vue|css)$/.test(name) &&
+        !allowed.includes(relative(repoRoot, full).replaceAll("\\", "/"))
+      ) {
         out.push(full);
       }
     }
