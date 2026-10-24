@@ -220,7 +220,9 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     revision.setCreateTime(now);
     revisions.insert(revision);
     LOG.info(
-        "commission item revised: itemState={} orderItem={} verified={} accrued={} delta={}",
+        "commission item revised: order={} itemState={} orderItem={} verified={} accrued={}"
+            + " delta={}",
+        order.orderId(),
         row.getId(),
         item.orderItemId(),
         result.verified(),

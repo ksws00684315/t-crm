@@ -36,9 +36,21 @@ class CommissionSettlementMigrationIT {
 
       jdbc.update(
           "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,bd_user_id,status,"
-              + "default_rate,create_time,update_time) VALUES"
-              + "(101,1,'KOL-TGA0620001','t62 kol a','a@t62.test','US',NULL,1,0.1500,now(),now()),"
-              + "(102,1,'KOL-TGB0620002','t62 kol b','b@t62.test','US',NULL,1,NULL,now(),now())");
+              + "default_rate,config_version,create_time,update_time) VALUES"
+              + "(101,1,'KOL-TGA0620001','t62 kol a','a@t62.test','US',NULL,1,0.1500,NULL,now(),now()),"
+              + "(102,1,'KOL-TGB0620002','t62 kol b','b@t62.test','US',NULL,1,NULL,NULL,now(),now()),"
+              + "(103,1,'KOL-TGC0620003','t62 kol c','c@t62.test','US',NULL,1,0.2000,3,now(),now())");
+      // Real promotion history carries snowflake ids far above the reserved 62200... segment.
+      jdbc.update(
+          "INSERT INTO crm_kol_promotion_record(id,tenant_id,kol_id,change_type,before_json,"
+              + "after_json,version_no,effective_time,create_time) VALUES"
+              + "(2112216032000000001,1,103,'CONFIG','{}'::jsonb,"
+              + "'{\"defaultRate\":\"0.2000\",\"configVersion\":3}'::jsonb,3,now() - interval '10 days',now())");
+      jdbc.update(
+          "INSERT INTO crm_kol_promotion_record(id,tenant_id,kol_id,change_type,before_json,"
+              + "after_json,version_no,effective_time,create_time) VALUES"
+              + "(2112216032000000002,1,103,'CONFIG','{}'::jsonb,"
+              + "'{\"defaultRate\":\"0.2000\",\"configVersion\":2}'::jsonb,2,now() - interval '20 days',now())");
       jdbc.update(
           "INSERT INTO crm_order(id,shop_id,weidian_order_id,kol_id,attribution_status,order_status,"
               + "raw_status,order_time,pay_time,total_amount,pay_amount,freight,discount,source,"
@@ -86,6 +98,19 @@ class CommissionSettlementMigrationIT {
                       + " AND change_type = 'CONFIG'",
                   Integer.class))
           .isZero();
+
+      // A KOL with real snowflake-id CONFIG history (version 3) gets no baseline record and keeps
+      // config_version = 3; forcing it to 1 would collide with existing version numbers.
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT config_version FROM crm_kol WHERE id = 103", Integer.class))
+          .isEqualTo(3);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM crm_kol_promotion_record WHERE kol_id = 103"
+                      + " AND change_type = 'CONFIG'",
+                  Integer.class))
+          .isEqualTo(2);
       String baselineRate =
           jdbc.queryForObject(
               "SELECT after_json->>'defaultRate' FROM crm_kol_promotion_record WHERE kol_id = 101",

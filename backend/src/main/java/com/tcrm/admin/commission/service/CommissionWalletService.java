@@ -182,6 +182,35 @@ public class CommissionWalletService {
         });
   }
 
+  /** Read-only ledger lookup by idempotency source key; null when nothing was posted yet. */
+  @Transactional(readOnly = true)
+  public LedgerEntry findEntry(long tenantId, String sourceKey) {
+    if (sourceKey == null || sourceKey.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          LedgerSourceRow row = wallets.findBySourceKey(sourceKey);
+          return row == null
+              ? null
+              : new LedgerEntry(
+                  row.kolId(),
+                  row.sourceType(),
+                  row.sourceId(),
+                  row.amountCny(),
+                  row.balanceAfterCny());
+        });
+  }
+
+  /** Posted ledger entry of one source key. */
+  public record LedgerEntry(
+      long kolId,
+      String sourceType,
+      long sourceId,
+      BigDecimal amountCny,
+      BigDecimal balanceAfterCny) {}
+
   private BigDecimal postCredit(CreditCommand command) {
     ensureWallet(command.kolId());
     BigDecimal balance = lockBalance(command.kolId());

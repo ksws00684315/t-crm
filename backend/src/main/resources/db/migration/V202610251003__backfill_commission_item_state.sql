@@ -1,5 +1,7 @@
 -- Task 62 / ADR-032 §2: register existing order item lines as unverified snapshots (design §5.2).
 -- Rows keep source_version NULL: the settlement engine writes the first revision on the next sync.
+-- Reserved primary-key segment for this script (far below snowflake ids; do not reuse): item
+-- state rows use 62100000000 + row_number().
 
 INSERT INTO crm_commission_item_state (
   id, tenant_id, order_id, order_item_id, kol_id, source_key, source_version,
