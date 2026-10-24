@@ -5,7 +5,7 @@ import { useRoute } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { getKol, listKols } from "@/api/kol/kol";
+import { listKols } from "@/api/kol/kol";
 import { rebuildLinkIndex } from "@/api/link/link";
 import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
@@ -22,21 +22,16 @@ import { notifyError } from "@/utils/notify";
 import { canExport, kolAbilities, linkAbilities, productAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
-import CommissionDialog from "@/views/kol/CommissionDialog.vue";
-import KolLinksDrawer from "@/views/kol/KolLinksDrawer.vue";
 import PromoSheetUploadDialog from "@/views/kol/PromoSheetUploadDialog.vue";
 import KolItemDetailDrawer from "./KolItemDetailDrawer.vue";
 
 defineOptions({ name: "KolItemListPage" });
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const route = useRoute();
-/** Action column: View + Commission + Links (norm 11 / ADR-029). */
-const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const me = useUserStore();
 const abilities = computed(() => productAbilities(me.user));
 const links = computed(() => linkAbilities(me.user));
-/** 04.03: creator products also expose the current commission and its change history. */
 const kolTools = computed(() => kolAbilities(me.user));
 const exportAllowed = computed(() => canExport(me.user));
 const rebuilding = ref(false);
@@ -98,8 +93,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("mapping.status"), width: 90 },
   { key: "cleanupStatus", label: t("mapping.cleanupStatus"), minWidth: 120 },
   { key: "createTime", label: t("mapping.createTime"), width: 170 },
-  // View + Commission + Links: 6 CJK / 19 Latin glyphs + 2×8px gaps + 20px cell pad.
-  { key: "actions", label: t("common.actions"), width: px(168, 208) }
+  { key: "actions", label: t("common.actions"), width: 88 }
 ]);
 
 const applied = ref({
@@ -140,12 +134,8 @@ const chips = computed<SearchChip[]>(() => {
 const importVisible = ref(false);
 const importTitle = computed(() => t("mapping.importTitle"));
 const importLimitHint = computed(() => t("mapping.limitHint"));
-const linksVisible = ref(false);
-const linksKol = ref<{ kolCode: string; kolName: string } | null>(null);
 const promoSheetVisible = ref(false);
 const promoSheetKol = ref<{ id: string; label: string; name: string; code: string } | null>(null);
-const commissionVisible = ref(false);
-const commissionKol = ref<KolVO | null>(null);
 const kolPickerVisible = ref(false);
 const kolSearchKeyword = ref("");
 const kolSearching = ref(false);
@@ -156,24 +146,9 @@ const filterSearching = ref(false);
 const detailVisible = ref(false);
 const detailId = ref<string | null>(null);
 
-function openLinks(row: KolItemVO) {
-  linksKol.value = { kolCode: row.kolCode ?? "", kolName: row.kolName ?? "" };
-  linksVisible.value = true;
-}
-
 function openDetail(row: KolItemVO) {
   detailId.value = row.id;
   detailVisible.value = true;
-}
-
-/** Fetches the creator on demand, so the dialog shows the live rate and review state. */
-async function openCommission(row: KolItemVO) {
-  try {
-    commissionKol.value = await getKol(row.kolId);
-    commissionVisible.value = true;
-  } catch (error) {
-    notifyError(error);
-  }
 }
 
 function rowActions(row: KolItemVO): RowAction[] {
@@ -183,20 +158,6 @@ function rowActions(row: KolItemVO): RowAction[] {
       label: t("mapping.view"),
       testId: "view",
       onClick: () => openDetail(row)
-    },
-    {
-      key: "commission",
-      label: t("kol.actionCommission"),
-      testId: "commission",
-      hidden: !kolTools.value.canWrite,
-      onClick: () => void openCommission(row)
-    },
-    {
-      key: "links",
-      label: t("kol.links"),
-      testId: "links",
-      hidden: !links.value.canViewLinks,
-      onClick: () => openLinks(row)
     }
   ];
 }
@@ -577,12 +538,6 @@ onMounted(() => {
       :download-template="downloadKolItemTemplate"
       :upload="uploadKolItemImport"
       @finished="search"
-    />
-    <CommissionDialog v-model="commissionVisible" :kol="commissionKol" @saved="load" />
-    <KolLinksDrawer
-      v-model="linksVisible"
-      :kol-code="linksKol?.kolCode ?? null"
-      :kol-name="linksKol?.kolName ?? undefined"
     />
     <el-dialog v-model="kolPickerVisible" :title="t('promoSheet.open')" width="480px">
       <el-select

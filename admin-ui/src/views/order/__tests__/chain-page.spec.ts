@@ -227,7 +227,7 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("shows a dash for missing links, no-refund lines, and developing blocks", async () => {
+  it("shows missing-link states and separates incomplete financial blocks", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const { wrapper } = await mountPage();
     const lines = wrapper.findAll('[data-test="chain-line"]');
@@ -238,10 +238,10 @@ describe("order chain page (task 40)", () => {
     expect(copyJobBlock).not.toContain("JOB-");
     expect(second.querySelector('[data-test="chain-kol-item"]')?.textContent).toContain("-");
     expect(second.querySelector('[data-test="chain-refunds"]')?.textContent).toContain("无退款");
-    const first = lines[0].element as HTMLElement;
-    for (const testId of ["chain-ledger", "chain-withdrawals"]) {
-      expect(first.querySelector(`[data-test="${testId}"]`)?.textContent).toContain("开发中");
-    }
+    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("180.00");
+    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("开发中");
+    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("开发中");
+    expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

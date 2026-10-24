@@ -11,7 +11,7 @@ vi.mock("@/api/system/post-template");
 vi.mock("@/api/system/user");
 
 /**
- * 权限设置 (task 32 §2.3, contract 33 §3.4): the post-template cards, the "only future
+ * 权限设置 (task 32 §2.3, contract 33 §3.4): template tabs and module table, the "only future
  * accounts" hint, save and reset.
  */
 const catalog: userApi.PermissionCatalogVO = {
@@ -68,15 +68,20 @@ describe("post template page (task 32 §2.3)", () => {
     setActivePinia(createPinia());
   });
 
-  it("shows the hint and one card per post with the default state", async () => {
+  it("shows role tabs, the active template state, and the only-future-accounts hint", async () => {
     const wrapper = await mountPage();
     const text = wrapper.text();
     expect(text).toContain("只影响之后新建的账号，不会修改已有账号的权限");
     expect(text).toContain("商务岗位模板");
-    expect(text).toContain("运营岗位模板");
-    expect(text).toContain("财务岗位模板");
+    expect(text).toContain("运营");
+    expect(text).toContain("财务");
     expect(text).toContain("默认");
-    expect(text).toContain("已自定义");
+    expect(wrapper.find('[data-test="permission-matrix"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="template-tabs"]').exists()).toBe(true);
+    await wrapper.get("#tab-OPERATOR").trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).toContain("运营岗位模板");
+    expect(wrapper.text()).toContain("已自定义");
     wrapper.unmount();
   });
 
@@ -84,7 +89,7 @@ describe("post template page (task 32 §2.3)", () => {
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     vi.mocked(postTemplateApi.savePostTemplate).mockResolvedValue(null);
     const wrapper = await mountPage();
-    await wrapper.get('[data-test="perm-kol\\:view"] input').setValue(true);
+    expect(wrapper.get('[data-test="template-permission-kol:view"] input').element).toBeTruthy();
     await wrapper.get('[data-test="template-save-BD"]').trigger("click");
     await flushPromises();
     expect(postTemplateApi.savePostTemplate).toHaveBeenCalledWith(
@@ -103,9 +108,9 @@ describe("post template page (task 32 §2.3)", () => {
     vi.mocked(postTemplateApi.listPostTemplates).mockResolvedValue(templates());
     const success = vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
     const wrapper = await mountPage();
-    // The second card is OPERATOR; the first reset button belongs to BD.
-    const resetButtons = [...document.body.querySelectorAll('[data-test="template-reset"]')];
-    resetButtons[1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await wrapper.get("#tab-OPERATOR").trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-test="template-reset"]').trigger("click");
     await flushPromises();
     expect(postTemplateApi.resetPostTemplate).toHaveBeenCalledWith("OPERATOR");
     expect(success).toHaveBeenCalledWith("已恢复默认");

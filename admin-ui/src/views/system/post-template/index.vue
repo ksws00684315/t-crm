@@ -6,7 +6,12 @@ import { listPostTemplates, resetPostTemplate, savePostTemplate } from "@/api/sy
 import { getPermissionCatalog, type PermissionItemVO } from "@/api/system/user";
 import type { DataScope, PostTemplate } from "@/api/types";
 import { notifyError } from "@/utils/notify";
-import PermissionPicker from "@/views/system/user/PermissionPicker.vue";
+import {
+  groupPermissions,
+  permissionGroupLabel,
+  permissionText,
+  togglePermission
+} from "@/utils/permission";
 
 defineOptions({ name: "SystemPostTemplatePage" });
 
@@ -14,7 +19,7 @@ defineOptions({ name: "SystemPostTemplatePage" });
  * Permissions (task 32 §2.3, contract 33 §3.4): the post templates of this company. Saving
  * only changes what newly created accounts start with; existing accounts keep their grants.
  */
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const TEMPLATES: PostTemplate[] = ["BD", "OPERATOR", "FINANCE"];
 
@@ -24,6 +29,30 @@ const catalog = ref<PermissionItemVO[]>([]);
 const drafts = reactive<Record<string, { dataScope: DataScope; permissions: string[] }>>({});
 const savingFor = ref<PostTemplate | null>(null);
 const isDefault = reactive<Record<string, boolean>>({});
+const activeTemplate = ref<PostTemplate>("BD");
+
+const activeDraft = computed(() => drafts[activeTemplate.value]);
+const permissionModules = computed(() => {
+  void locale.value;
+  const selected = new Set(activeDraft.value?.permissions ?? []);
+  return groupPermissions(catalog.value).map(group => {
+    const codes = group.items.map(item => item.code);
+    const picked = codes.filter(code => selected.has(code)).length;
+    return {
+      group: group.group,
+      label: permissionGroupLabel(group.group),
+      codes,
+      allChecked: codes.length > 0 && picked === codes.length,
+      partial: picked > 0 && picked < codes.length,
+      items: group.items.map(item => ({
+        code: item.code,
+        name: permissionText(item.code, "name"),
+        desc: permissionText(item.code, "desc"),
+        checked: selected.has(item.code)
+      }))
+    };
+  });
+});
 
 const scopeOptions = computed(() => [
   { label: t("postTemplate.scopeAll"), value: "ALL" },
@@ -54,6 +83,24 @@ async function load() {
 
 function postName(post: PostTemplate): string {
   return t(`post.${post}`);
+}
+
+function isChecked(value: unknown): boolean {
+  return value === true;
+}
+
+function toggleOne(code: string, checked: boolean): void {
+  const draft = activeDraft.value;
+  if (!draft) return;
+  draft.permissions = togglePermission(draft.permissions, code, checked);
+}
+
+function toggleGroup(codes: readonly string[], checked: boolean): void {
+  const draft = activeDraft.value;
+  if (!draft) return;
+  let next = [...draft.permissions];
+  for (const code of codes) next = togglePermission(next, code, checked);
+  draft.permissions = next;
 }
 
 async function save(post: PostTemplate) {
@@ -104,52 +151,85 @@ onMounted(load);
       :title="t('postTemplate.hint')"
       data-test="post-template-hint"
     />
-    <div class="post-template-page__cards">
-      <template v-for="post in TEMPLATES" :key="post">
-        <el-card v-if="drafts[post]" class="post-template-page__card" shadow="never">
-          <template #header>
-            <div class="post-template-page__head">
-              <span>{{ t("postTemplate.cardTitle", { post: postName(post) }) }}</span>
-              <el-tag :type="isDefault[post] ? 'info' : 'warning'" data-test="template-state">
-                {{ isDefault[post] ? t("postTemplate.isDefault") : t("postTemplate.customized") }}
-              </el-tag>
-            </div>
-          </template>
-          <el-form label-width="110px" @submit.prevent>
-            <el-form-item :label="t('postTemplate.dataScope')">
-              <el-radio-group v-model="drafts[post]!.dataScope" :data-test="`scope-${post}`">
-                <el-radio-button
-                  v-for="option in scopeOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </el-radio-button>
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item :label="t('postTemplate.permissions')">
-              <PermissionPicker
-                :items="catalog"
-                :model-value="drafts[post]!.permissions"
-                @update:model-value="drafts[post]!.permissions = $event"
-              />
-            </el-form-item>
-          </el-form>
-          <div class="post-template-page__actions">
-            <el-button @click="reset(post)" data-test="template-reset">{{
-              t("postTemplate.reset")
-            }}</el-button>
-            <el-button
-              type="primary"
-              :loading="savingFor === post"
-              :data-test="`template-save-${post}`"
-              @click="save(post)"
-              >{{ t("postTemplate.save") }}</el-button
-            >
-          </div>
-        </el-card>
+    <el-tabs v-model="activeTemplate" class="post-template-tabs" data-test="template-tabs">
+      <el-tab-pane v-for="post in TEMPLATES" :key="post" :name="post" :label="postName(post)" />
+    </el-tabs>
+    <el-card v-if="activeDraft" class="post-template-page__card" shadow="never">
+      <template #header>
+        <div class="post-template-page__head">
+          <span>{{ t("postTemplate.cardTitle", { post: postName(activeTemplate) }) }}</span>
+          <el-tag :type="isDefault[activeTemplate] ? 'info' : 'warning'" data-test="template-state">
+            {{
+              isDefault[activeTemplate] ? t("postTemplate.isDefault") : t("postTemplate.customized")
+            }}
+          </el-tag>
+        </div>
       </template>
-    </div>
+      <el-form label-position="top" @submit.prevent>
+        <el-form-item :label="t('postTemplate.dataScope')">
+          <el-radio-group v-model="activeDraft.dataScope" :data-test="`scope-${activeTemplate}`">
+            <el-radio-button
+              v-for="option in scopeOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item :label="t('postTemplate.permissions')">
+          <el-table :data="permissionModules" border size="small" data-test="permission-matrix">
+            <el-table-column :label="t('postTemplate.module')" width="190">
+              <template #default="{ row }">
+                <div class="post-template-page__module">
+                  <strong>{{ row.label }}</strong>
+                  <el-checkbox
+                    :model-value="row.allChecked"
+                    :indeterminate="row.partial"
+                    :data-test="`template-module-all-${row.group}`"
+                    @change="toggleGroup(row.codes, isChecked($event))"
+                  >
+                    {{ t("user.selectAll") }}
+                  </el-checkbox>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="t('postTemplate.permissions')">
+              <template #default="{ row }">
+                <div class="post-template-page__permission-list">
+                  <el-checkbox
+                    v-for="item in row.items"
+                    :key="item.code"
+                    :model-value="item.checked"
+                    :data-test="`template-permission-${item.code}`"
+                    @change="toggleOne(item.code, isChecked($event))"
+                  >
+                    <span class="permission-name">{{ item.name }}</span>
+                    <span v-if="item.desc" class="permission-description">{{ item.desc }}</span>
+                  </el-checkbox>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <p class="permission-note">{{ t("user.permissionDependencies") }}</p>
+          <p class="permission-note">
+            <strong>{{ t("user.exclusiveTitle") }}</strong> {{ t("user.exclusiveItems") }}
+          </p>
+        </el-form-item>
+      </el-form>
+      <div class="post-template-page__actions">
+        <el-button @click="reset(activeTemplate)" data-test="template-reset">{{
+          t("postTemplate.reset")
+        }}</el-button>
+        <el-button
+          type="primary"
+          :loading="savingFor === activeTemplate"
+          :data-test="`template-save-${activeTemplate}`"
+          @click="save(activeTemplate)"
+          >{{ t("postTemplate.save") }}</el-button
+        >
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -157,11 +237,8 @@ onMounted(load);
 .post-template-page__hint {
   margin-bottom: var(--tcrm-space-3);
 }
-.post-template-page__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: var(--tcrm-space-3);
-  align-items: start;
+.post-template-tabs {
+  margin-bottom: var(--tcrm-space-3);
 }
 .post-template-page__card {
   min-width: 0;
@@ -175,5 +252,33 @@ onMounted(load);
   display: flex;
   justify-content: flex-end;
   gap: var(--tcrm-space-2);
+}
+.post-template-page__module {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tcrm-space-2);
+}
+.post-template-page__permission-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2) var(--tcrm-space-4);
+}
+.post-template-page__permission-list :deep(.el-checkbox) {
+  height: auto;
+  margin-right: 0;
+}
+.permission-name {
+  font-weight: 500;
+}
+.permission-description {
+  display: block;
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+}
+.permission-note {
+  margin: 8px 0 0;
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
 }
 </style>

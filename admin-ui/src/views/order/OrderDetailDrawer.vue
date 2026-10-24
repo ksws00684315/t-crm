@@ -17,7 +17,7 @@ import {
 } from "@/utils/order";
 import { i18n, translate } from "@/locales";
 
-defineOptions({ name: "OrderDetailDrawer" });
+defineOptions({ name: "OrderDetailDialog" });
 
 const props = defineProps<{ modelValue: boolean; orderId: string | null }>();
 const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
@@ -81,10 +81,11 @@ const columns = computed<DataColumn[]>(() => [
 </script>
 
 <template>
-  <el-drawer
+  <el-dialog
+    class="order-detail-dialog"
     :model-value="modelValue"
     :title="t('order.detail.title')"
-    size="72%"
+    width="94vw"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div v-loading="loading">
@@ -179,10 +180,29 @@ const columns = computed<DataColumn[]>(() => [
         </DataTable>
       </template>
     </div>
-  </el-drawer>
+  </el-dialog>
 </template>
 
-<style scoped>
+<style>
+.order-detail-dialog {
+  max-width: 1440px;
+}
+
+.order-detail-dialog .el-dialog__body {
+  max-height: calc(90vh - 112px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.order-detail-dialog .el-table__body-wrapper,
+.order-detail-dialog .el-table__header-wrapper {
+  overflow-x: hidden;
+}
+
+.order-detail-dialog .el-table {
+  width: 100%;
+}
+
 .title {
   margin: 20px 0 8px;
 }

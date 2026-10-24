@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@element-plus/icons-vue";
-import type { TableInstance } from "element-plus";
+import type { TableInstance, TableProps } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -62,6 +62,14 @@ const props = withDefaults(
      * every row or a per-row function, handed straight to el-table.
      */
     rowClassName?: string | ((scope: { row: object; rowIndex: number }) => string);
+    /** Optional page-scoped merged cells (used by grouped order rows). */
+    spanMethod?: (
+      data: Parameters<NonNullable<TableProps<object>["spanMethod"]>>[0] & {
+        visibleColumnCount: number;
+      }
+    ) => ReturnType<NonNullable<TableProps<object>["spanMethod"]>>;
+    /** Grouped rows cannot merge correctly across Element Plus fixed-column clones. */
+    fixedColumns?: boolean;
   }>(),
   {
     loading: false,
@@ -76,7 +84,8 @@ const props = withDefaults(
     selectable: false,
     selectableRow: undefined,
     expandable: false,
-    defaultExpandAll: false
+    defaultExpandAll: false,
+    fixedColumns: true
   }
 );
 
@@ -91,6 +100,12 @@ const emit = defineEmits<{
 
 const tableRef = ref<TableInstance>();
 const selected = ref<object[]>([]);
+
+function resolveSpanMethod(
+  scope: Parameters<NonNullable<TableProps<object>["spanMethod"]>>[0]
+): ReturnType<NonNullable<TableProps<object>["spanMethod"]>> {
+  return props.spanMethod?.({ ...scope, visibleColumnCount: visibleColumns.value.length });
+}
 
 function onSelection(rows: object[]): void {
   selected.value = rows;
@@ -472,6 +487,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :data="rows"
         :row-key="rowKey"
         :row-class-name="rowClassName"
+        :span-method="spanMethod ? resolveSpanMethod : undefined"
         size="default"
         :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
@@ -500,11 +516,18 @@ function canMove(index: number, delta: -1 | 1): boolean {
           v-for="column in visibleColumns"
           :key="column.key"
           :prop="column.key === 'actions' ? undefined : (column.prop ?? column.key)"
+          :column-key="column.key"
           :label="column.label"
           :width="columnWidth(column)"
           :min-width="columnMinWidth(column)"
           :fixed="
-            column.key === 'actions' ? 'right' : column.key === columns[0]?.key ? 'left' : undefined
+            fixedColumns
+              ? column.key === 'actions'
+                ? 'right'
+                : column.key === columns[0]?.key
+                  ? 'left'
+                  : undefined
+              : undefined
           "
           :align="column.amount ? 'right' : undefined"
           :show-overflow-tooltip="column.tooltip"

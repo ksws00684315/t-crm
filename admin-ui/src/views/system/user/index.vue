@@ -2,9 +2,7 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, defineAsyncComponent, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { TransferTarget } from "@/api/kol/bd-transfer";
 import { listKols } from "@/api/kol/kol";
-import { cancelDeparturePlan } from "@/api/system/departure-plan";
 import { listUsers, updateUserStatus } from "@/api/system/user";
 import type { CompanyRole, DeparturePlanType, UserVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -26,8 +24,6 @@ import {
   SELECTABLE_ROLES
 } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
-import BdTransferDialog from "@/views/kol/BdTransferDialog.vue";
-import PermissionsDialog from "./PermissionsDialog.vue";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
 
@@ -73,11 +69,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
   { key: "createdAt", label: t("common.createdAt"), width: 170 },
-  // Five actions on a BD row need room for Chinese text, 8px gaps and cell padding; the count and
-  // scope columns only show a short value, so their slack pays for it and the row keeps one line.
-  // English labels are about a third longer, so that locale gets a wider column and scrolls.
-  // Browser-measured max .cell scrollWidth zh 395 / en 550 + 24px (task 59 R-11 measurements).
-  { key: "actions", label: t("common.actions"), width: px(420, 576) }
+  { key: "actions", label: t("common.actions"), width: px(300, 400) }
 ]);
 
 const applied = ref({
@@ -107,17 +99,17 @@ const formVisible = ref(false);
 const editingUser = ref<UserVO | null>(null);
 const resetVisible = ref(false);
 const resetUser = ref<UserVO | null>(null);
-const permissionsVisible = ref(false);
-const permissionsUser = ref<UserVO | null>(null);
 /** KOLs per BD row (task 16b): drives the transfer button and the disable confirmation. */
 const kolCounts = ref<Record<string, number>>({});
-const transferVisible = ref(false);
-const transferTarget = ref<TransferTarget | null>(null);
 const departureVisible = ref(false);
 const departureUser = ref<UserVO | null>(null);
 
 function isBdRow(row: UserVO): boolean {
   return isStaff(row) && row.dataScope === "OWN";
+}
+
+function canMarkDeparture(row: UserVO): boolean {
+  return isStaff(row) && row.postTemplate === "BD";
 }
 
 function bdCount(row: UserVO): number | undefined {
@@ -137,15 +129,6 @@ async function loadKolCounts(rows: UserVO[]) {
       }
     })
   );
-}
-
-function openTransfer(row: UserVO) {
-  transferTarget.value = {
-    fromBdUserId: row.id,
-    fromBdName: row.nickname || row.username,
-    count: bdCount(row) ?? 0
-  };
-  transferVisible.value = true;
 }
 
 /** Type label of a plan: resignation or plain disable. */
@@ -185,25 +168,6 @@ function planTooltip(row: UserVO): string {
 function openDeparture(row: UserVO) {
   departureUser.value = row;
   departureVisible.value = true;
-}
-
-async function cancelPlan(row: UserVO) {
-  try {
-    await ElMessageBox.confirm(
-      t("departure.cancelConfirm", { username: row.username }),
-      t("departure.cancelTitle"),
-      { type: "warning" }
-    );
-  } catch {
-    return; // cancelled
-  }
-  try {
-    await cancelDeparturePlan(row.id);
-    ElMessage.success(t("departure.cancelled"));
-    await load();
-  } catch (error) {
-    notifyError(error);
-  }
 }
 
 function permissionEntries(row: UserVO): { code: string; name: string }[] {
@@ -341,35 +305,13 @@ function openReset(row: UserVO) {
   resetVisible.value = true;
 }
 
-function openPermissions(row: UserVO) {
-  permissionsUser.value = row;
-  permissionsVisible.value = true;
-}
-
-/** Row actions in their original order, all inline (ADR-029). */
+/** Permissions and plan cancellation are reached from their corresponding dialogs. */
 function rowActions(row: UserVO): RowAction[] {
   return [
     {
       key: "edit",
       label: t("common.edit"),
       onClick: () => openEdit(row)
-    },
-    {
-      key: "permissions",
-      label: t("user.permissionsTitle"),
-      testId: `permissions-${row.id}`,
-      hidden: !isStaff(row),
-      onClick: () => openPermissions(row)
-    },
-    {
-      key: "transfer",
-      label: t("bdTransfer.transferKols"),
-      type: "warning",
-      testId: `transfer-kols-${row.id}`,
-      hidden: !isBdRow(row),
-      disabled: bdCount(row) === 0,
-      tooltip: t("bdTransfer.noKols"),
-      onClick: () => openTransfer(row)
     },
     {
       key: "status",
@@ -385,15 +327,8 @@ function rowActions(row: UserVO): RowAction[] {
         row.departurePlan?.status === "SCHEDULED" ? t("departure.editPlan") : t("departure.mark"),
       type: "warning",
       testId: `departure-${row.id}`,
-      hidden: !isBdRow(row),
+      hidden: !canMarkDeparture(row),
       onClick: () => openDeparture(row)
-    },
-    {
-      key: "departure-cancel",
-      label: t("departure.cancelPlan"),
-      testId: `departure-cancel-${row.id}`,
-      hidden: !isBdRow(row) || row.departurePlan?.status !== "SCHEDULED",
-      onClick: () => void cancelPlan(row)
     },
     {
       key: "reset",
@@ -587,9 +522,7 @@ onMounted(load);
     </DataTable>
 
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
-    <PermissionsDialog v-model="permissionsVisible" :user="permissionsUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
-    <BdTransferDialog v-model="transferVisible" :target="transferTarget" @saved="load" />
     <DeparturePlanDialog v-model="departureVisible" :user="departureUser" @saved="load" />
   </div>
 </template>
