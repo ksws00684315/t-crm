@@ -147,21 +147,16 @@ describe("refund query page (task 40)", () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    // R-06: channel, type and finish time start hidden; status stays visible.
-    expect(labels).not.toContain("退款类型");
+    // Owner decision 2026-10-24 (task 59 review): the 08.02 columns all show by default.
+    expect(labels).toContain("退款类型");
     expect(labels).toContain("退款状态");
     expect(labels).not.toContain("退款类型/状态");
     const tags = statusTags();
     expect(tags[0].textContent).toBe("退款中");
     expect(tags[0].className).not.toContain("el-tag--success");
     expect(tags[1].textContent).toBe("退款成功");
-    // The type column exists but starts hidden (R-06); its values stay in the column settings.
-    const typeColumn = wrapper
-      .findComponent({ name: "DataTable" })
-      .props("columns")
-      .find((column: { key: string }) => column.key === "refundType");
-    expect(typeColumn).toBeTruthy();
-    expect((typeColumn as { defaultHidden?: boolean }).defaultHidden).toBe(true);
+    expect(wrapper.text()).toContain("退货退款");
+    expect(wrapper.text()).toContain("仅退款");
     expect(wrapper.text()).toContain("t40 Shop（S001）");
     expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
     wrapper.unmount();

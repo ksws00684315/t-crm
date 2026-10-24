@@ -144,10 +144,10 @@ function rowOwned(row: KolVO): boolean {
 /**
  * Widths are measured against the rendered 14px text; emails, phone numbers and social handles
  * ellipsize with a tooltip either way (the visual guide allows that as long as the tooltip shows
- * the rest). R-07 (task 59): at 1440 the roster slid under the pinned action column — zh showed
- * 1558px and en 1492px of columns against ~1158px of card — so the seven secondary columns listed
- * below start hidden; the defaults leave zh at 834px and en at 946px, and the column settings
- * restore the rest. The ADR-029 action column widths (344/476) are unchanged.
+ * the rest). Every 04.01 column shows by default (owner decision 2026-10-24, task 59 review); at
+ * 1440 the roster overflows the card (zh 1558px, en 1492px measured against ~1158px) and scrolls
+ * horizontally inside it — pinned first and action columns cast the DataTable fixed-column shadow.
+ * The ADR-029 action column widths (344/476) are unchanged.
  */
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
@@ -156,41 +156,20 @@ const columns = computed<DataColumn[]>(() => [
   { key: "kolCode", label: t("kol.kolId"), width: px(108, 124), tooltip: true },
   { key: "name", label: t("kol.kolName"), prop: "name", width: px(76, 132), tooltip: true },
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
-  // 10px cell padding; the header itself was ellipsized at the old 112px.
-  // R-07 (task 59, browser-measured): contact, platform, prepay, inviter, email, login and relation
-  // are secondary — hidden by default so the core columns fit a 1440 viewport in both languages
-  // without sliding under the pinned action column (column settings can show them; en measured
-  // 1492px of columns against 1158px of card). zh shows 834px, en 946px of columns with this set.
-  {
-    key: "contact",
-    label: t("kol.phoneWhatsapp"),
-    width: px(140, 146),
-    tooltip: true,
-    defaultHidden: true
-  },
-  { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true, defaultHidden: true },
-  {
-    key: "platform",
-    label: t("kol.primaryPlatform"),
-    width: px(160, 176),
-    tooltip: true,
-    defaultHidden: true
-  },
+  // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
+  // those pixels: its values ellipsize with a tooltip either way.
+  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(140, 146), tooltip: true },
+  { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true },
+  { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
   { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
-  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true, defaultHidden: true },
-  // en datetime "10/20/2026, 00:15" measured 138px of content; 136 clipped it.
+  { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
+  // en datetime "10/20/2026, 00:15" measured 138px of content; 136 clipped it (task 59).
   { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 142), tooltip: true },
-  {
-    key: "inviter",
-    label: t("kol.inviter"),
-    width: px(80, 104),
-    tooltip: true,
-    defaultHidden: true
-  },
+  { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
-  { key: "login", label: t("kol.loginStatus"), width: px(80, 112), defaultHidden: true },
+  { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   // en status tag measured 164px of content; 124 clipped it (task 59 measurement).
-  { key: "relation", label: t("kol.relationStatus"), width: px(80, 168), defaultHidden: true },
+  { key: "relation", label: t("kol.relationStatus"), width: px(80, 168) },
   { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 

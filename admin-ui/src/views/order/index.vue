@@ -100,11 +100,10 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
   { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
-  // L-002: channel, freight and create time are secondary — hidden by default so pay time and the
-  // core columns stay clear of the pinned action column at 1440 (column settings can show them).
-  // The en minWidths of shop/creator/statuses sit at the measured header minimums so the visible
-  // set (1148px) fits the 1158px card (task 59 browser measurement).
-  { key: "channel", label: t("order.channel"), width: 80, defaultHidden: true },
+  // Owner decision 2026-10-24 (task 59 review): the 09.04 columns all show by default; the table
+  // scrolls horizontally inside the card when it overflows (pinned action column, scrollbar on).
+  // The en minWidths of shop/creator/statuses sit at the measured header minimums (task 59).
+  { key: "channel", label: t("order.channel"), width: 80 },
   { key: "shopName", label: t("order.shop"), minWidth: px(170, 162) },
   { key: "kol", label: t("order.kol"), minWidth: px(170, 160) },
   { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 116) },
@@ -114,11 +113,10 @@ const columns = computed<DataColumn[]>(() => [
     key: "freight",
     label: t("order.freight"),
     width: px(80, 90),
-    amount: true,
-    defaultHidden: true
+    amount: true
   },
   { key: "payTime", label: t("order.payTime"), width: px(170, 166) },
-  { key: "createTime", label: t("order.createTime"), width: 170, defaultHidden: true },
+  { key: "createTime", label: t("order.createTime"), width: 170 },
   { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
 

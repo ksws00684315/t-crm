@@ -72,21 +72,16 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   { key: "refundNo", label: t("order.refund.no"), width: 150 },
   { key: "orderNo", label: t("order.refund.orderNo"), width: 150 },
-  // R-06: channel, type and finish time are secondary; hidden by default so the core columns fit
-  // a 1440 viewport without sliding under the pinned action column (column settings can show them).
-  { key: "channel", label: t("order.channel"), width: 80, defaultHidden: true },
+  // Owner decision 2026-10-24 (task 59 review): the 08.02 columns all show by default; the table
+  // scrolls horizontally inside the card when it overflows (pinned action column, scrollbar on).
+  { key: "channel", label: t("order.channel"), width: 80 },
   { key: "shop", label: t("order.shop"), minWidth: 170 },
   { key: "kol", label: t("order.kol"), minWidth: 170 },
-  {
-    key: "refundType",
-    label: t("order.refund.typeColumn"),
-    width: px(100, 130),
-    defaultHidden: true
-  },
+  { key: "refundType", label: t("order.refund.typeColumn"), width: px(100, 130) },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: px(90, 110) },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
   { key: "applyTime", label: t("order.refund.applyTime"), width: 170 },
-  { key: "finishTime", label: t("order.refund.finishTime"), width: 170, defaultHidden: true },
+  { key: "finishTime", label: t("order.refund.finishTime"), width: 170 },
   // View: zh canvas 28px / en 57px + 24px headroom (task 59 R-11 measurements).
   { key: "actions", label: t("common.actions"), width: px(70, 84) }
 ]);

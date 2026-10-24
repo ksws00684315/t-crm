@@ -176,20 +176,21 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
+    // Owner decision 2026-10-24 (task 59 review): every 09.04 column shows by default; the list
+    // scrolls horizontally inside the card at 1440 instead of hiding columns.
     for (const header of [
       "订单号",
+      "渠道",
       "店铺",
       "达人",
       "订单状态",
       "退款状态",
       "支付金额",
-      "支付时间"
+      "运费",
+      "支付时间",
+      "创建时间"
     ]) {
       expect(labels).toContain(header);
-    }
-    // L-002: channel, freight and create time start hidden (column settings can show them).
-    for (const hidden of ["渠道", "运费", "创建时间"]) {
-      expect(labels).not.toContain(hidden);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功", "无退款"]);
     // Shop and creator follow the "name (code)" form; unattributed shows "-".
