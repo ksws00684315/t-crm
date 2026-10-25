@@ -54,6 +54,50 @@ public class CommissionWalletService {
       Instant occurredAt) {}
 
   /**
+   * Posts a negative commission adjustment (design §8.3 / ADR-032 §1): released commission that a
+   * refund or attribution correction clawed back. The balance may go negative; later credits refill
+   * it through the FIFO recovery of {@link #postCommissionCredit}.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public BigDecimal postCommissionAdjustment(
+      long tenantId,
+      long kolId,
+      long sourceId,
+      String sourceKey,
+      BigDecimal negativeAmount,
+      Instant occurredAt) {
+    if (negativeAmount == null || negativeAmount.signum() >= 0 || negativeAmount.scale() > 2) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          ensureWallet(kolId);
+          BigDecimal balance = lockBalance(kolId);
+          BigDecimal existing =
+              existingEntry(kolId, "COMMISSION", sourceId, sourceKey, negativeAmount);
+          if (existing != null) {
+            return existing;
+          }
+          BigDecimal next = balance.add(negativeAmount).setScale(2, RoundingMode.UNNECESSARY);
+          wallets.insertLedger(
+              IdWorker.getId(),
+              kolId,
+              "COMMISSION_ADJUSTMENT",
+              negativeAmount,
+              "COMMISSION",
+              sourceId,
+              sourceKey,
+              truncate(occurredAt),
+              next,
+              null,
+              now());
+          wallets.updateBalance(kolId, next, now());
+          return next;
+        });
+  }
+
+  /**
    * Posts an actual commission credit and assigns it to outstanding prepay deductions in stable
    * FIFO order. Commission settlement code must use this method instead of writing wallet rows.
    */
@@ -189,6 +233,35 @@ public class CommissionWalletService {
         });
   }
 
+  /** Read-only ledger lookup by idempotency source key; null when nothing was posted yet. */
+  @Transactional(readOnly = true)
+  public LedgerEntry findEntry(long tenantId, String sourceKey) {
+    if (sourceKey == null || sourceKey.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          LedgerSourceRow row = wallets.findBySourceKey(sourceKey);
+          return row == null
+              ? null
+              : new LedgerEntry(
+                  row.kolId(),
+                  row.sourceType(),
+                  row.sourceId(),
+                  row.amountCny(),
+                  row.balanceAfterCny());
+        });
+  }
+
+  /** Posted ledger entry of one source key. */
+  public record LedgerEntry(
+      long kolId,
+      String sourceType,
+      long sourceId,
+      BigDecimal amountCny,
+      BigDecimal balanceAfterCny) {}
+
   private BigDecimal postCredit(CreditCommand command) {
     ensureWallet(command.kolId());
     BigDecimal balance = lockBalance(command.kolId());
@@ -267,7 +340,7 @@ public class CommissionWalletService {
         || command.sourceId() <= 0
         || command.sourceKey() == null
         || command.sourceKey().isBlank()
-        || command.sourceKey().length() > 120
+        || command.sourceKey().length() > 160
         || command.amountCny() == null
         || command.amountCny().signum() <= 0
         || command.amountCny().scale() > 2

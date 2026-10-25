@@ -90,6 +90,7 @@ public enum ErrorCode {
   PREPAY_PAYMENT_CONFLICT(409, "Prepay payment request id was reused or already paid"),
   PREPAY_FILE_INVALID(400, "Prepay file must be PNG, JPEG, or PDF"),
   PREPAY_FILE_TOO_LARGE(400, "Prepay file exceeds 10 MB"),
+  COMMISSION_CONFIG_VERSION_CONFLICT(409, "Settlement config version mismatch; reload and retry"),
   FILE_INVALID(400, "File must be a PNG or JPEG image"),
   FILE_TOO_LARGE(400, "File exceeds 2 MB"),
   FILE_IN_USE(422, "File is already used by another business record"),

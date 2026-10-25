@@ -10,6 +10,7 @@ import com.tcrm.admin.shared.R;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,8 +37,16 @@ public class KolOrderController {
       @RequestParam(required = false)
           @Pattern(regexp = "UNPAID|PAID|SHIPPED|RECEIVED|COMPLETED|CLOSED|UNKNOWN")
           String orderStatus,
+      @RequestParam(required = false) @Size(max = 128) String orderNo,
+      @RequestParam(required = false) @Size(max = 128) String productName,
+      @RequestParam(required = false)
+          @Pattern(regexp = "WITHDRAWING|WITHDRAWABLE|FROZEN|WITHDRAWN|INVALID")
+          String settlementStatus,
       @RequestParam(defaultValue = "1") @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(50) Integer size) {
-    return R.ok(orders.page(new KolOrderFilterDTO(payFrom, payTo, orderStatus, page, size)));
+    return R.ok(
+        orders.page(
+            new KolOrderFilterDTO(
+                payFrom, payTo, orderStatus, orderNo, productName, settlementStatus, page, size)));
   }
 }

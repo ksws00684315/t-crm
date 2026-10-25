@@ -74,4 +74,11 @@ public interface KolApi {
    * rateText}.
    */
   List<KolRateDTO> listRatesByIds(Collection<Long> ids);
+
+  /**
+   * Promotion-config default rate effective at {@code payTime} (task 62 / ADR-032 §3): the latest
+   * CONFIG record with {@code effective_time <= payTime}. Rates saved after the order was paid
+   * never apply retroactively (design §8.3 [D9]). A null pay time or an unknown KOL returns null.
+   */
+  KolPayTimeRateDTO rateEffectiveAt(long kolId, java.time.Instant payTime);
 }

@@ -22,6 +22,15 @@ public interface ProductAccessApi {
   List<ProductRefDTO> listProducts(Collection<Long> productIds);
 
   /**
+   * Returns the product-level commission rates among {@code productIds} (task 62, design §8.3
+   * [D7]); products without a rate are skipped. An empty collection returns an empty list without
+   * querying.
+   *
+   * @param productIds {@code crm_product.id} values
+   */
+  List<ProductRateDTO> listRates(Collection<Long> productIds);
+
+  /**
    * Identity, display fields and main image of an original product.
    *
    * @param id {@code crm_product.id}

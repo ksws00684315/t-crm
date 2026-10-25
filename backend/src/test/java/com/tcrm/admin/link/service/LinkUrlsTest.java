@@ -17,7 +17,7 @@ class LinkUrlsTest {
 
   /** KOL with an enabled template and an invite code. */
   private static KolRefDTO kol(String template, boolean enabled, String inviteCode) {
-    return new KolRefDTO(10L, "KOL0001", "Alice", true, null, inviteCode, template, enabled);
+    return new KolRefDTO(10L, "KOL0001", "Alice", true, null, null, inviteCode, template, enabled);
   }
 
   @Test
