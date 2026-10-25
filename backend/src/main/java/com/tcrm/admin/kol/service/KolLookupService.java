@@ -2,12 +2,16 @@ package com.tcrm.admin.kol.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolPayTimeRateDTO;
 import com.tcrm.admin.kol.api.KolRateDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.LinkTemplateDO;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,10 +28,13 @@ import org.springframework.stereotype.Service;
 public class KolLookupService implements KolApi {
   private final KolMapper kols;
   private final LinkTemplateMapper templates;
+  private final KolPromotionRecordMapper promotionRecords;
 
-  public KolLookupService(KolMapper kols, LinkTemplateMapper templates) {
+  public KolLookupService(
+      KolMapper kols, LinkTemplateMapper templates, KolPromotionRecordMapper promotionRecords) {
     this.kols = kols;
     this.templates = templates;
+    this.promotionRecords = promotionRecords;
   }
 
   @Override
@@ -139,6 +146,27 @@ public class KolLookupService implements KolApi {
         .toList();
   }
 
+  @Override
+  public KolPayTimeRateDTO rateEffectiveAt(long kolId, Instant payTime) {
+    if (payTime == null) {
+      return null;
+    }
+    KolPromotionRecordMapper.PayTimeRateRow row =
+        promotionRecords.findRateEffectiveAt(kolId, payTime);
+    if (row == null) {
+      return null;
+    }
+    BigDecimal rate = null;
+    if (row.rateText() != null && !row.rateText().isBlank()) {
+      try {
+        rate = new BigDecimal(row.rateText().trim());
+      } catch (NumberFormatException e) {
+        rate = null;
+      }
+    }
+    return new KolPayTimeRateDTO(rate, row.versionNo());
+  }
+
   private List<KolRefDTO> toDto(List<KolDO> rows) {
     Map<Long, LinkTemplateDO> byId = templatesByIds(rows.stream().map(KolDO::getLinkTemplateId));
     return rows.stream()
@@ -152,6 +180,7 @@ public class KolLookupService implements KolApi {
                   kol.getName(),
                   enabled(kol),
                   kol.getBdUserId(),
+                  kol.getEmail(),
                   kol.getInviteCode(),
                   template == null ? null : template.getTemplateUrl(),
                   template != null && Integer.valueOf(1).equals(template.getStatus()));

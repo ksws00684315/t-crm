@@ -50,13 +50,17 @@ class KolOrderControllerTest {
             "PAID",
             new java.math.BigDecimal("25.00"),
             new java.math.BigDecimal("5.00"),
+            "WITHDRAWABLE",
             List.of(
                 new KolOrderDTO.Line(
                     "Widget",
                     "Blue",
                     2,
                     new java.math.BigDecimal("25.00"),
-                    new java.math.BigDecimal("5.00"))));
+                    new java.math.BigDecimal("5.00"),
+                    "WITHDRAWABLE",
+                    new java.math.BigDecimal("0.1000"),
+                    new java.math.BigDecimal("2.50"))));
     when(orders.page(any())).thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
 
     mvc.perform(
@@ -78,8 +82,69 @@ class KolOrderControllerTest {
                 Instant.parse("2026-10-01T00:00:00Z"),
                 Instant.parse("2026-11-01T00:00:00Z"),
                 "PAID",
+                null,
+                null,
+                null,
                 1,
                 20));
+  }
+
+  @Test
+  void shouldForwardOrderNumberAndProductNameFilters() throws Exception {
+    when(orders.page(any())).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
+
+    mvc.perform(
+            get("/kol-api/orders")
+                .param("orderNo", "1234")
+                .param("productName", "Widget")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+
+    verify(orders).page(new KolOrderFilterDTO(null, null, null, "1234", "Widget", null, 1, 20));
+  }
+
+  @Test
+  void shouldForwardSettlementStatusFilterAndCommissionFields() throws Exception {
+    var order =
+        new KolOrderDTO(
+            "78",
+            Instant.parse("2026-10-15T12:00:00Z"),
+            "PAID",
+            new java.math.BigDecimal("25.00"),
+            new java.math.BigDecimal("5.00"),
+            "WITHDRAWABLE",
+            List.of(
+                new KolOrderDTO.Line(
+                    "Widget",
+                    "Blue",
+                    2,
+                    new java.math.BigDecimal("25.00"),
+                    new java.math.BigDecimal("5.00"),
+                    "WITHDRAWABLE",
+                    new java.math.BigDecimal("0.1000"),
+                    new java.math.BigDecimal("2.50"))));
+    when(orders.page(any())).thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
+
+    mvc.perform(
+            get("/kol-api/orders")
+                .param("settlementStatus", "WITHDRAWABLE")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].settlementStatus").value("WITHDRAWABLE"))
+        .andExpect(jsonPath("$.data.items[0].items[0].rateSnapshot").value("0.1000"))
+        .andExpect(jsonPath("$.data.items[0].items[0].commissionAmount").value("2.50"));
+
+    verify(orders).page(new KolOrderFilterDTO(null, null, null, null, null, "WITHDRAWABLE", 1, 20));
+  }
+
+  @Test
+  void shouldRejectUnknownSettlementStatus() throws Exception {
+    mvc.perform(
+            get("/kol-api/orders")
+                .param("settlementStatus", "MYSTERY")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

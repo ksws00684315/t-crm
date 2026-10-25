@@ -25,6 +25,7 @@ public enum Permission {
   COMMISSION_FREEZE("commission:freeze", Group.FUNDS),
   PAYOUT_ACCOUNT_REVIEW("payout-account:review", Group.FUNDS),
   WITHDRAWAL_REVIEW("withdrawal:review", Group.FUNDS),
+  WITHDRAWAL_PAY("withdrawal:pay", Group.FUNDS),
   PREPAY_APPLY("prepay:apply", Group.FUNDS),
   PREPAY_REVIEW("prepay:review", Group.FUNDS),
   PREPAY_FINANCE_REVIEW("prepay:finance-review", Group.FUNDS),

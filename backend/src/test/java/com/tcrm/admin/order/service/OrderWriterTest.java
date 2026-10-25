@@ -19,6 +19,7 @@ import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.shared.TestTransactions;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +34,11 @@ class OrderWriterTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderAttribution attribution = mock(OrderAttribution.class);
-  private final OrderWriter writer = new OrderWriter(orders, items, refunds, attribution);
+  private final OrderCommissionSync commissionSync =
+      new OrderCommissionSync(
+          mock(org.springframework.context.ApplicationEventPublisher.class), refunds);
+  private final OrderWriter writer =
+      new OrderWriter(orders, items, refunds, attribution, commissionSync);
 
   @BeforeAll
   static void metadata() {
@@ -78,7 +83,11 @@ class OrderWriterTest {
     var o = order();
     var i = item(20, "sub", "sku");
     when(items.selectList(any())).thenReturn(List.of(), List.of(i));
-    writer.save(new OrderPayloadDTO(o, List.of(i)));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(o, List.of(i)));
+            });
     verify(orders).insert(o);
     verify(items).insert(i);
     verify(attribution).apply(o, List.of(i), false);
@@ -105,7 +114,11 @@ class OrderWriterTest {
     when(orders.selectOne(any())).thenReturn(existing);
     when(items.selectList(any())).thenReturn(List.of(old));
 
-    writer.save(new OrderPayloadDTO(next, List.of(line)));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(next, List.of(line)));
+            });
 
     assertThat(next.getId()).isEqualTo(10L);
     assertThat(next.getTenantId()).isEqualTo(1L);
@@ -162,9 +175,14 @@ class OrderWriterTest {
     unlinked.setAmount(new BigDecimal("10.00"));
     when(refunds.selectList(any())).thenReturn(List.of(first, second, unlinked));
 
-    writer.saveRefund(
-        5,
-        refund("{\"refundBasicInfo\":{\"status\":10,\"itemList\":[{\"orderDescId\":\"sub\"}]}}"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.saveRefund(
+                  5,
+                  refund(
+                      "{\"refundBasicInfo\":{\"status\":10,\"itemList\":[{\"orderDescId\":\"sub\"}]}}"));
+            });
 
     var saved = ArgumentCaptor.forClass(RefundDO.class);
     verify(refunds).insert(saved.capture());
@@ -182,11 +200,15 @@ class OrderWriterTest {
     when(items.selectList(any())).thenReturn(List.of(item(20, "sub", "s")));
     when(refunds.selectList(any())).thenReturn(List.of());
 
-    writer.saveRefund(
-        5,
-        refund(
-            "{\"refundBasicInfo\":{\"status\":10,\"refund_type\":\"2\","
-                + "\"itemList\":[{\"orderDescId\":\"sub\"}]}}"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.saveRefund(
+                  5,
+                  refund(
+                      "{\"refundBasicInfo\":{\"status\":10,\"refund_type\":\"2\","
+                          + "\"itemList\":[{\"orderDescId\":\"sub\"}]}}"));
+            });
 
     var saved = ArgumentCaptor.forClass(RefundDO.class);
     verify(refunds).insert(saved.capture());
@@ -200,7 +222,11 @@ class OrderWriterTest {
     when(items.selectList(any())).thenReturn(List.of());
     when(refunds.selectList(any())).thenReturn(List.of());
 
-    writer.saveRefund(5, refund("{\"refundBasicInfo\":{\"status\":\"weird\"}}"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.saveRefund(5, refund("{\"refundBasicInfo\":{\"status\":\"weird\"}}"));
+            });
 
     var saved = ArgumentCaptor.forClass(RefundDO.class);
     verify(refunds).insert(saved.capture());
@@ -216,7 +242,10 @@ class OrderWriterTest {
     when(refunds.selectList(any())).thenReturn(List.of());
     var row = new RefundDO();
 
-    assertThat(writer.saveImportedRefund(5, "100", "sub", row)).isTrue();
+    Boolean saved =
+        TestTransactions.template()
+            .execute(txStatus -> writer.saveImportedRefund(5, "100", "sub", row));
+    assertThat(saved).isTrue();
 
     assertThat(row.getRefundStatus()).isEqualTo("SUCCESS");
     assertThat(row.getRefundType()).isEqualTo("UNKNOWN");
@@ -229,10 +258,14 @@ class OrderWriterTest {
     var second = item(21, "second", "b");
     when(items.selectList(any())).thenReturn(List.of(first, second));
     when(refunds.selectList(any())).thenReturn(List.of());
-    writer.saveRefund(
-        5,
-        refund(
-            "{\"refundBasicInfo\":{\"status\":10,\"itemList\":[{\"curShopItemId\":\"90\",\"curShopSkuId\":\"b\"}]}}"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.saveRefund(
+                  5,
+                  refund(
+                      "{\"refundBasicInfo\":{\"status\":10,\"itemList\":[{\"curShopItemId\":\"90\",\"curShopSkuId\":\"b\"}]}}"));
+            });
     var saved = ArgumentCaptor.forClass(RefundDO.class);
     verify(refunds).insert(saved.capture());
     assertThat(saved.getValue().getOrderItemId()).isEqualTo(21L);
@@ -250,8 +283,14 @@ class OrderWriterTest {
     var second = item(21, "second", "b");
     when(items.selectList(any())).thenReturn(List.of(first, second));
     when(refunds.selectList(any())).thenReturn(List.of());
-    writer.saveRefund(
-        5, refund("{\"refundBasicInfo\":{\"status\":9,\"itemList\":[{\"itemId\":\"90\"}]}}"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.saveRefund(
+                  5,
+                  refund(
+                      "{\"refundBasicInfo\":{\"status\":9,\"itemList\":[{\"itemId\":\"90\"}]}}"));
+            });
     verify(refunds).updateById(existing);
     assertThat(existing.getOrderItemId()).isNull();
     assertThat(existing.getRawStatus()).isEqualTo("9");
@@ -269,7 +308,11 @@ class OrderWriterTest {
             "{\"refundBasicInfo\":{\"status\":10}}",
             "{\"refundBasicInfo\":{\"status\":10,\"itemList\":[]}}",
             "{\"refundBasicInfo\":{\"status\":10,\"itemList\":[{},{}]}}")) {
-      writer.saveRefund(5, refund(raw));
+      TestTransactions.template()
+          .executeWithoutResult(
+              txStatus -> {
+                writer.saveRefund(5, refund(raw));
+              });
     }
     var saved = ArgumentCaptor.forClass(RefundDO.class);
     verify(refunds, org.mockito.Mockito.times(3)).insert(saved.capture());
@@ -297,7 +340,10 @@ class OrderWriterTest {
     row.setAmount(new BigDecimal("1.25"));
     row.setRefundTime(Instant.parse("2026-10-16T01:00:00Z"));
     row.setFinishTime(Instant.parse("2026-10-16T02:00:00Z"));
-    assertThat(writer.saveImportedRefund(5L, "100", "sub", row)).isTrue();
+    Boolean savedAgain =
+        TestTransactions.template()
+            .execute(txStatus -> writer.saveImportedRefund(5L, "100", "sub", row));
+    assertThat(savedAgain).isTrue();
     assertThat(row.getRawStatus()).isEqualTo("10");
     assertThat(row.getOrderId()).isEqualTo(10L);
     assertThat(row.getOrderItemId()).isEqualTo(20L);
@@ -338,7 +384,11 @@ class OrderWriterTest {
     linkedRefund.setOrderItemId(20L);
     when(refunds.selectList(any())).thenReturn(List.of(linkedRefund));
 
-    writer.save(new OrderPayloadDTO(next, List.of(apiLine)));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(next, List.of(apiLine)));
+            });
 
     verify(items).insert(apiLine);
     verify(items).deleteById(20L);
@@ -365,7 +415,11 @@ class OrderWriterTest {
     when(orders.selectOne(any())).thenReturn(existing);
     when(items.selectList(any())).thenReturn(List.of(old), List.of(old, nextLine));
 
-    writer.save(new OrderPayloadDTO(next, List.of(nextLine)));
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(next, List.of(nextLine)));
+            });
 
     verify(items).insert(nextLine);
     verify(items, never()).deleteById(anyLong());

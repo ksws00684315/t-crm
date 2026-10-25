@@ -11,6 +11,8 @@ import com.tcrm.admin.kol.api.KolsUnassignedEvent;
 import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.notification.api.PrepayNotification;
 import com.tcrm.admin.notification.api.PrepayNotificationApi;
+import com.tcrm.admin.notification.api.WithdrawalNotification;
+import com.tcrm.admin.notification.api.WithdrawalNotificationApi;
 import com.tcrm.admin.notification.mapper.NotificationMapper;
 import com.tcrm.admin.notification.model.NotificationDO;
 import com.tcrm.admin.notification.model.NotificationType;
@@ -42,12 +44,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * user's own messages. Recipients are resolved here, not by the publisher.
  */
 @Service
-public class NotificationService implements PrepayNotificationApi {
+public class NotificationService implements PrepayNotificationApi, WithdrawalNotificationApi {
   static final String BIZ_PAYOUT_ACCOUNT = "PAYOUT_ACCOUNT";
   static final String BIZ_SHOP = "SHOP";
   static final String BIZ_BD_TRANSFER = "BD_TRANSFER";
   static final String BIZ_STAFF = "STAFF";
   static final String BIZ_DEPARTURE = "DEPARTURE_PLAN";
+  static final String BIZ_WITHDRAWAL = "WITHDRAWAL";
 
   private final NotificationMapper notifications;
   private final KolApi kols;
@@ -149,6 +152,65 @@ public class NotificationService implements PrepayNotificationApi {
                     row.setBizId(event.prepayId());
                     row.setCreateTime(created);
                     notifications.insertPrepayEvent(row);
+                  }
+                }));
+  }
+
+  /**
+   * Withdrawal workflow messages (task 63): submission goes to the creator's current BD and the
+   * enabled super administrators (the review queue, design §4.8); the later steps inform the
+   * current BD. Parameters carry only the KOL code and the application number.
+   */
+  @Override
+  public void deliver(WithdrawalNotification event) {
+    tx.executeWithoutResult(
+        status ->
+            TenantScope.runCompany(
+                event.tenantId(),
+                () -> {
+                  NotificationType type =
+                      NotificationType.valueOf("WITHDRAWAL_" + event.eventType());
+                  LinkedHashSet<Long> recipients = new LinkedHashSet<>();
+                  if ("SUBMITTED".equals(event.eventType())) {
+                    Long currentBd = currentBd(event.kolId());
+                    if (currentBd != null) {
+                      recipients.add(currentBd);
+                    }
+                    recipients.addAll(superAdmins.listEnabledIds());
+                  } else {
+                    Long currentBd = currentBd(event.kolId());
+                    if (currentBd != null) {
+                      recipients.add(currentBd);
+                    }
+                  }
+                  String params =
+                      NotificationParamsCodec.write(
+                          type,
+                          new NotificationParamsDTO(
+                              event.kolCode(),
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              null,
+                              event.applicationNo()));
+                  Instant created = now();
+                  for (Long userId : recipients) {
+                    NotificationDO row = new NotificationDO();
+                    row.setId(IdWorker.getId());
+                    row.setTenantId(event.tenantId());
+                    row.setUserId(userId);
+                    row.setType(type);
+                    row.setParams(params);
+                    row.setBizType(BIZ_WITHDRAWAL);
+                    row.setBizId(event.withdrawalId());
+                    row.setCreateTime(created);
+                    notifications.insertWithdrawalEvent(row);
                   }
                 }));
   }

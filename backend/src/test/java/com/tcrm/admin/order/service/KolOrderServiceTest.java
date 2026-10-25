@@ -3,7 +3,9 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,12 +42,16 @@ class KolOrderServiceTest {
   private final OrderMapper orders = mock(OrderMapper.class);
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
-  private final KolOrderService service = new KolOrderService(orders, items, current);
+  private final com.tcrm.admin.order.api.CommissionOrderStateApi commissionStates =
+      mock(com.tcrm.admin.order.api.CommissionOrderStateApi.class);
+  private final KolOrderService service =
+      new KolOrderService(orders, items, current, commissionStates);
 
   @BeforeEach
   void setUp() {
     when(current.kol()).thenReturn(kol());
     when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "25.00", "5.00")));
+    when(commissionStates.listByOrderItemIds(anyLong(), any())).thenReturn(List.of());
   }
 
   @Test
@@ -54,7 +60,7 @@ class KolOrderServiceTest {
     Page<OrderDO> page = page(order);
     when(orders.selectPage(any(), any())).thenReturn(page);
 
-    var result = service.page(new KolOrderFilterDTO(null, null, null, 1, 20));
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
 
     assertThat(result.total()).isEqualTo(1);
     assertThat(result.items())
@@ -65,9 +71,18 @@ class KolOrderServiceTest {
                 "PAID",
                 new BigDecimal("25.00"),
                 new BigDecimal("5.00"),
+                // No commission snapshot yet: the line and the order are INVALID.
+                com.tcrm.admin.order.api.CommissionOrderStateApi.STATUS_INVALID,
                 List.of(
                     new KolOrderDTO.Line(
-                        "Widget", "Blue", 2, new BigDecimal("25.00"), new BigDecimal("5.00")))));
+                        "Widget",
+                        "Blue",
+                        2,
+                        new BigDecimal("25.00"),
+                        new BigDecimal("5.00"),
+                        com.tcrm.admin.order.api.CommissionOrderStateApi.STATUS_INVALID,
+                        null,
+                        null))));
     var query = ArgumentCaptor.forClass(Wrapper.class);
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -84,7 +99,8 @@ class KolOrderServiceTest {
 
   @Test
   void shouldRejectSizeAboveFifty() {
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 1, 51)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 51)))
         .isInstanceOf(BusinessException.class);
   }
 
@@ -97,6 +113,9 @@ class KolOrderServiceTest {
                         Instant.parse("2026-10-02T00:00:00Z"),
                         Instant.parse("2026-10-01T00:00:00Z"),
                         null,
+                        null,
+                        null,
+                        null,
                         1,
                         20)))
         .isInstanceOf(BusinessException.class);
@@ -104,12 +123,68 @@ class KolOrderServiceTest {
 
   @Test
   void shouldRejectUnknownStatusAndOutOfRangePage() {
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, "SETTLED", 1, 20)))
+    assertThatThrownBy(
+            () ->
+                service.page(new KolOrderFilterDTO(null, null, "SETTLED", null, null, null, 1, 20)))
         .isInstanceOf(BusinessException.class);
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 0, 20)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 0, 20)))
         .isInstanceOf(BusinessException.class);
-    assertThatThrownBy(() -> service.page(new KolOrderFilterDTO(null, null, null, 1, 0)))
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 0)))
         .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldFilterByOrderNumberAndOwnProductName() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+
+    service.page(new KolOrderFilterDTO(null, null, null, "  1234  ", "Widget", null, 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    String sql = query.getValue().getSqlSegment();
+    assertThat(sql).contains("weidian_order_id ILIKE");
+    assertThat(sql).contains("crm_order_item");
+    assertThat(sql).contains("oi.kol_id");
+    assertThat(sql).contains("oi.item_name ILIKE");
+    assertThat(params(query.getValue()).values()).contains("%1234%", "%Widget%", 700L);
+  }
+
+  @Test
+  void shouldIgnoreBlankKeywordFilters() {
+    when(orders.selectPage(any(), any())).thenReturn(page());
+
+    service.page(new KolOrderFilterDTO(null, null, null, "   ", "", null, 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).doesNotContain("ILIKE");
+  }
+
+  @Test
+  void shouldRejectKeywordsLongerThanOneHundredTwentyEight() {
+    String keyword = "x".repeat(129);
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, keyword, null, null, 1, 20)))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () -> service.page(new KolOrderFilterDTO(null, null, null, null, keyword, null, 1, 20)))
+        .isInstanceOf(BusinessException.class);
+  }
+
+  @Test
+  void shouldEscapeLikeWildcards_inKeywordFilters() {
+    when(orders.selectPage(any(), any()))
+        .thenReturn(page(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+
+    service.page(new KolOrderFilterDTO(null, null, null, "50%_1\\", null, null, 1, 20));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment()).contains("ESCAPE");
+    assertThat(params(query.getValue()).values()).contains("%50\\%\\_1\\\\%");
   }
 
   @Test
@@ -122,6 +197,9 @@ class KolOrderServiceTest {
                 Instant.parse("2026-10-01T00:00:00Z"),
                 Instant.parse("2026-10-02T00:00:00Z"),
                 "PAID",
+                null,
+                null,
+                null,
                 2,
                 10));
 
@@ -140,7 +218,11 @@ class KolOrderServiceTest {
     line.setRefundAmount(null);
     when(items.selectList(any())).thenReturn(List.of(line));
 
-    var row = service.page(new KolOrderFilterDTO(null, null, null, 1, 20)).items().getFirst();
+    var row =
+        service
+            .page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20))
+            .items()
+            .getFirst();
 
     assertThat(row.payAmount()).isEqualByComparingTo("0.00");
     assertThat(row.refundAmount()).isEqualByComparingTo("0.00");
@@ -152,6 +234,242 @@ class KolOrderServiceTest {
     assertThat(KolOrderService.maskOrderNo(null)).isEmpty();
     assertThat(KolOrderService.maskOrderNo(" ")).isEmpty();
     assertThat(KolOrderService.maskOrderNo("1")).isEqualTo("1");
+  }
+
+  @Test
+  void shouldEnrichLinesWithCommissionStateAndLadder() {
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    // The item fixture has id 21 (item(21L, kolId, ...)); the port keys by order item id.
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("2.50"),
+                    new BigDecimal("2.50"))));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
+
+    assertThat(result.items().getFirst().settlementStatus()).isEqualTo("WITHDRAWABLE");
+    var line = result.items().getFirst().items().getFirst();
+    assertThat(line.settlementStatus()).isEqualTo("WITHDRAWABLE");
+    assertThat(line.rateSnapshot()).isEqualByComparingTo("0.1000");
+    assertThat(line.commissionAmount()).isEqualByComparingTo("2.50");
+  }
+
+  @Test
+  void shouldTakeMostActiveLineAsOrderStatus() {
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                // A frozen line outranks nothing; WITHDRAWABLE outranks FROZEN in the ladder.
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    22L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(items.selectList(any()))
+        .thenReturn(List.of(item(21L, 700L, "25.00", "5.00"), item(22L, 700L, "10.00", "0.00")));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
+
+    assertThat(result.items().getFirst().settlementStatus()).isEqualTo("FROZEN");
+  }
+
+  @Test
+  void shouldFilterBySettlementStatusViaCandidateResolution() {
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    when(orders.selectList(any())).thenReturn(List.of(order));
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    // The enriched page stage resolves the same line through the item-id port.
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, "FROZEN", 1, 20));
+
+    assertThat(result.total()).isEqualTo(1);
+    assertThat(result.items().getFirst().settlementStatus()).isEqualTo("FROZEN");
+    // Filter path resolves candidates (selectList) then pages the matched ids (selectList again).
+    verify(orders, org.mockito.Mockito.times(2)).selectList(any());
+  }
+
+  @Test
+  void shouldCombineSettlementStatusWithOrderNumberFilter() {
+    OrderDO matching = order(21L, "123432597890", "ATTRIBUTED", "PAID");
+    OrderDO other = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    // Candidates resolve through the port; the orderNo filter must apply to the candidate query.
+    when(orders.selectList(any())).thenReturn(List.of(matching), List.of(matching));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    31L,
+                    31L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+
+    var result =
+        service.page(new KolOrderFilterDTO(null, null, null, "3259", null, "FROZEN", 1, 20));
+
+    // Both orders are FROZEN, but only the one matching orderNo=3259 is returned.
+    assertThat(result.total()).isEqualTo(1);
+    assertThat(result.items().getFirst().orderNo()).isEqualTo("1234****7890");
+    var candidateQuery = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders, org.mockito.Mockito.times(2)).selectList(candidateQuery.capture());
+    assertThat(candidateQuery.getAllValues().get(0).getSqlSegment()).contains("weidian_order_id");
+  }
+
+  @Test
+  void shouldCombineSettlementStatusWithProductNameFilter() {
+    OrderDO matching = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    OrderDO other = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    when(orders.selectList(any())).thenReturn(List.of(matching), List.of(matching));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    31L,
+                    31L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00"))));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00"))));
+    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+
+    var result =
+        service.page(
+            new KolOrderFilterDTO(null, null, null, null, "Widget", "WITHDRAWABLE", 1, 20));
+
+    assertThat(result.total()).isEqualTo(1);
+    var candidateQuery = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders, org.mockito.Mockito.times(2)).selectList(candidateQuery.capture());
+    assertThat(candidateQuery.getAllValues().get(0).getSqlSegment()).contains("crm_order_item");
+  }
+
+  @Test
+  void shouldReturnEmptyPage_whenNoOrderMatchesTheSettlementStatus() {
+    when(orders.selectList(any()))
+        .thenReturn(List.of(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+
+    // Asking for WITHDRAWABLE when the only line is FROZEN: an empty page, no item queries.
+    var result =
+        service.page(new KolOrderFilterDTO(null, null, null, null, null, "WITHDRAWABLE", 1, 20));
+
+    assertThat(result.total()).isZero();
+    assertThat(result.items()).isEmpty();
+    verify(items, never()).selectList(any());
+    verify(commissionStates, never()).listByOrderItemIds(anyLong(), any());
+  }
+
+  @Test
+  void shouldTakeWithdrawableOverFrozenInTheLadder() {
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                // Line 21 released (WITHDRAWABLE outranks FROZEN of line 22)…
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("2.00"),
+                    new BigDecimal("2.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    22L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(items.selectList(any()))
+        .thenReturn(List.of(item(21L, 700L, "25.00", "5.00"), item(22L, 700L, "10.00", "0.00")));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
+
+    assertThat(result.items().getFirst().settlementStatus()).isEqualTo("WITHDRAWABLE");
+  }
+
+  @Test
+  void shouldRejectUnknownSettlementStatus() {
+    assertThatThrownBy(
+            () ->
+                service.page(new KolOrderFilterDTO(null, null, null, null, null, "MYSTERY", 1, 20)))
+        .isInstanceOf(BusinessException.class);
   }
 
   private static KolAccountDTO kol() {
@@ -200,5 +518,12 @@ class KolOrderServiceTest {
     page.setRecords(List.of(rows));
     page.setTotal(rows.length);
     return page;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static java.util.Map<String, Object> params(Wrapper<OrderDO> wrapper) {
+    return ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<Object, Object, ?>)
+            (Object) wrapper)
+        .getParamNameValuePairs();
   }
 }

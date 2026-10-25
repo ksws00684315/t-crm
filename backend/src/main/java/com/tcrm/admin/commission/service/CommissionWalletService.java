@@ -54,6 +54,50 @@ public class CommissionWalletService {
       Instant occurredAt) {}
 
   /**
+   * Posts a negative commission adjustment (design §8.3 / ADR-032 §1): released commission that a
+   * refund or attribution correction clawed back. The balance may go negative; later credits refill
+   * it through the FIFO recovery of {@link #postCommissionCredit}.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public BigDecimal postCommissionAdjustment(
+      long tenantId,
+      long kolId,
+      long sourceId,
+      String sourceKey,
+      BigDecimal negativeAmount,
+      Instant occurredAt) {
+    if (negativeAmount == null || negativeAmount.signum() >= 0 || negativeAmount.scale() > 2) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          ensureWallet(kolId);
+          BigDecimal balance = lockBalance(kolId);
+          BigDecimal existing =
+              existingEntry(kolId, "COMMISSION", sourceId, sourceKey, negativeAmount);
+          if (existing != null) {
+            return existing;
+          }
+          BigDecimal next = balance.add(negativeAmount).setScale(2, RoundingMode.UNNECESSARY);
+          wallets.insertLedger(
+              IdWorker.getId(),
+              kolId,
+              "COMMISSION_ADJUSTMENT",
+              negativeAmount,
+              "COMMISSION",
+              sourceId,
+              sourceKey,
+              truncate(occurredAt),
+              next,
+              null,
+              now());
+          wallets.updateBalance(kolId, next, now());
+          return next;
+        });
+  }
+
+  /**
    * Posts an actual commission credit and assigns it to outstanding prepay deductions in stable
    * FIFO order. Commission settlement code must use this method instead of writing wallet rows.
    */
@@ -111,6 +155,57 @@ public class CommissionWalletService {
         });
   }
 
+  /**
+   * Money a paid withdrawal takes out of the wallet (task 63): one negative COMMISSION_WITHDRAWAL
+   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. The balance may
+   * go negative only if a prepay deduction raced in between approval and payment; that state is
+   * recovered by later commission credits like any other deduction.
+   */
+  @Transactional(rollbackFor = Exception.class)
+  public BigDecimal postWithdrawalDebit(
+      long tenantId,
+      long kolId,
+      long withdrawalId,
+      BigDecimal amount,
+      Instant occurredAt,
+      long operatorId) {
+    if (amount == null || amount.signum() <= 0 || amount.scale() > 2) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          ensureWallet(kolId);
+          BigDecimal balance = lockBalance(kolId);
+          String sourceKey = "WITHDRAWAL:" + withdrawalId;
+          BigDecimal existing =
+              existingEntry(
+                  kolId,
+                  "WITHDRAWAL",
+                  withdrawalId,
+                  sourceKey,
+                  amount.negate().setScale(2, RoundingMode.UNNECESSARY));
+          if (existing != null) {
+            return existing;
+          }
+          BigDecimal next = balance.subtract(amount).setScale(2, RoundingMode.UNNECESSARY);
+          wallets.insertLedger(
+              IdWorker.getId(),
+              kolId,
+              "COMMISSION_WITHDRAWAL",
+              amount.negate().setScale(2, RoundingMode.UNNECESSARY),
+              "WITHDRAWAL",
+              withdrawalId,
+              sourceKey,
+              truncate(occurredAt),
+              next,
+              operatorId,
+              now());
+          wallets.updateBalance(kolId, next, now());
+          return next;
+        });
+  }
+
   @Transactional(readOnly = true)
   public Balance balance(long tenantId, long kolId, BigDecimal minimumWithdrawalCny) {
     BigDecimal available = currentBalance(tenantId, kolId);
@@ -137,6 +232,35 @@ public class CommissionWalletService {
           return balance == null ? BigDecimal.ZERO.setScale(2) : balance;
         });
   }
+
+  /** Read-only ledger lookup by idempotency source key; null when nothing was posted yet. */
+  @Transactional(readOnly = true)
+  public LedgerEntry findEntry(long tenantId, String sourceKey) {
+    if (sourceKey == null || sourceKey.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          LedgerSourceRow row = wallets.findBySourceKey(sourceKey);
+          return row == null
+              ? null
+              : new LedgerEntry(
+                  row.kolId(),
+                  row.sourceType(),
+                  row.sourceId(),
+                  row.amountCny(),
+                  row.balanceAfterCny());
+        });
+  }
+
+  /** Posted ledger entry of one source key. */
+  public record LedgerEntry(
+      long kolId,
+      String sourceType,
+      long sourceId,
+      BigDecimal amountCny,
+      BigDecimal balanceAfterCny) {}
 
   private BigDecimal postCredit(CreditCommand command) {
     ensureWallet(command.kolId());
@@ -216,7 +340,7 @@ public class CommissionWalletService {
         || command.sourceId() <= 0
         || command.sourceKey() == null
         || command.sourceKey().isBlank()
-        || command.sourceKey().length() > 120
+        || command.sourceKey().length() > 160
         || command.amountCny() == null
         || command.amountCny().signum() <= 0
         || command.amountCny().scale() > 2

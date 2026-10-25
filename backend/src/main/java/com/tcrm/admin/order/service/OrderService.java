@@ -70,6 +70,7 @@ public class OrderService {
   private final CopyJobLookupApi copyJobs;
   private final ExternalAuditApi audit;
   private final AuditSanitizer sanitizer;
+  private final OrderCommissionSync commissionSync;
 
   public OrderService(
       OrderMapper orders,
@@ -87,7 +88,8 @@ public class OrderService {
       ProductAccessApi products,
       CopyJobLookupApi copyJobs,
       ExternalAuditApi audit,
-      AuditSanitizer sanitizer) {
+      AuditSanitizer sanitizer,
+      OrderCommissionSync commissionSync) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
@@ -104,6 +106,7 @@ public class OrderService {
     this.copyJobs = copyJobs;
     this.audit = audit;
     this.sanitizer = sanitizer;
+    this.commissionSync = commissionSync;
   }
 
   public PageResult<OrderDTO> page(OrderFilterDTO filter, boolean unmatched) {
@@ -735,6 +738,7 @@ public class OrderService {
   private void persist(OrderDO order, List<OrderItemDO> lines) {
     orders.updateById(order);
     lines.forEach(items::updateById);
+    commissionSync.sync(order, lines);
   }
 
   private Map<Long, KolRefDTO> kolById(java.util.Collection<Long> kolIds) {
