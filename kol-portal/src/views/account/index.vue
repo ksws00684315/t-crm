@@ -93,15 +93,22 @@ function selectAccount(id: string) {
 }
 function saveProfile() {
   profileSaved.value = false;
-  if (Boolean(profile.primaryPlatform) !== Boolean(profile.primaryHandle)) {
+  const name = profile.name.trim();
+  const primaryPlatform = profile.primaryPlatform.trim();
+  const primaryHandle = profile.primaryHandle.trim();
+  if (!name || name.length > 64 || primaryPlatform.length > 32 || primaryHandle.length > 128) {
+    profileRequest.validation.value = "errors.field";
+    return;
+  }
+  if (Boolean(primaryPlatform) !== Boolean(primaryHandle)) {
     profileRequest.validation.value = "register.socialPairRequired";
     return;
   }
   return profileRequest.submit(async () => {
     const updated = await updateMe({
-      name: profile.name.trim(),
-      primaryPlatform: profile.primaryPlatform || null,
-      primaryHandle: profile.primaryHandle.trim() || null
+      name,
+      primaryPlatform: primaryPlatform || null,
+      primaryHandle: primaryHandle || null
     });
     session.updateProfile(updated);
     profileSaved.value = true;
@@ -207,11 +214,16 @@ function savePassword() {
               ><el-input :model-value="systemId" readonly disabled
             /></el-form-item>
             <el-form-item :label="t('account.nickname')"
-              ><el-input v-model="profile.name" maxlength="64" show-word-limit
+              ><el-input
+                v-model="profile.name"
+                maxlength="64"
+                show-word-limit
+                data-test="profile-name"
             /></el-form-item>
             <el-form-item :label="t('account.primaryPlatform')"
               ><el-select
                 v-model="profile.primaryPlatform"
+                data-test="profile-platform"
                 clearable
                 :placeholder="t('register.platformPlaceholder')"
                 ><el-option
@@ -221,12 +233,16 @@ function savePassword() {
                   :value="platform" /></el-select
             ></el-form-item>
             <el-form-item :label="t('account.primaryHandle')"
-              ><el-input v-model="profile.primaryHandle" maxlength="255"
+              ><el-input v-model="profile.primaryHandle" maxlength="128" data-test="profile-handle"
             /></el-form-item>
           </div>
-          <el-button type="primary" :loading="profileBusy" @click="saveProfile">{{
-            t("common.save")
-          }}</el-button>
+          <el-button
+            type="primary"
+            :loading="profileBusy"
+            data-test="profile-save"
+            @click="saveProfile"
+            >{{ t("common.save") }}</el-button
+          >
         </el-form>
       </el-card>
 

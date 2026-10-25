@@ -17,6 +17,10 @@ import {
   type WithdrawalRecord
 } from "@/api/creator";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import CopyText from "@/components/CopyText.vue";
+import { uploadQrFile } from "@/api/payout-account";
+import { ApiError } from "@/utils/http/error";
+import { checkQrFile } from "@/utils/payout-account";
 import { formatMoney } from "@/utils/orders";
 
 defineOptions({ name: "FundsPage" });
@@ -33,7 +37,11 @@ const size = ref(20);
 const total = ref(0);
 const applyVisible = ref(false);
 const submitting = ref(false);
+const limitsLoading = ref(false);
+const qrUploading = ref(false);
 const applyError = ref("");
+let submittedPayload = "";
+let idempotencyKey = "";
 const form = reactive({
   amount: "",
   previousId: "",
@@ -43,7 +51,8 @@ const form = reactive({
   account: "",
   holder: "",
   currency: "USD",
-  network: "TRC20"
+  network: "TRC20",
+  qrFileId: ""
 });
 const manualAccount = computed(() => form.payoutAccountId === "manual");
 const money = (value: string) => formatMoney(value, locale.value);
@@ -66,10 +75,13 @@ const commissionParts = computed(() =>
     : []
 );
 function summaryMoney(value: string) {
+  return amountLabel(value, "CNY");
+}
+function amountLabel(value: string, currency: string) {
   return `${Number(value).toLocaleString(locale.value, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  })} CNY`;
+  })} ${currency}`;
 }
 function cents(value: string) {
   const [whole, fraction = ""] = value.split(".");
@@ -104,7 +116,26 @@ async function load() {
   }
 }
 async function openApply(previousId = "") {
+  if (limitsLoading.value || submitting.value || qrUploading.value) return;
   applyError.value = "";
+  conditions.value = null;
+  accounts.value = [];
+  applyVisible.value = true;
+  limitsLoading.value = true;
+  submittedPayload = "";
+  idempotencyKey = "";
+  Object.assign(form, {
+    amount: "",
+    previousId,
+    payoutAccountId: "",
+    note: "",
+    type: "PAYPAL",
+    account: "",
+    holder: "",
+    currency: "USD",
+    network: "TRC20",
+    qrFileId: ""
+  });
   try {
     const [limits, options] = await Promise.all([
       getWithdrawalConditions(),
@@ -116,12 +147,38 @@ async function openApply(previousId = "") {
     const rejected = withdrawals.value.find(item => item.id === previousId);
     form.previousId = previousId;
     form.amount = rejected?.amount ?? "";
-    applyVisible.value = true;
-  } catch {
-    applyError.value = t("funds.loadFailed");
+  } catch (error) {
+    applyError.value = errorMessage(error, "funds.loadFailed");
+  } finally {
+    limitsLoading.value = false;
+  }
+}
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? (error.handled ? "" : error.displayMessage) : t(fallback);
+}
+async function pickQr(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const check = checkQrFile(file);
+  if (check !== "ok") {
+    applyError.value = t(check === "type" ? "errors.FILE_INVALID" : "errors.FILE_TOO_LARGE");
+    input.value = "";
+    return;
+  }
+  qrUploading.value = true;
+  applyError.value = "";
+  try {
+    form.qrFileId = (await uploadQrFile(file)).fileId;
+  } catch (error) {
+    applyError.value = errorMessage(error, "errors.generic");
+  } finally {
+    qrUploading.value = false;
+    input.value = "";
   }
 }
 async function submit() {
+  if (submitting.value || qrUploading.value || limitsLoading.value || !conditions.value) return;
   applyError.value = "";
   const normalized = form.amount.trim();
   const validAmount = /^\d+(\.\d{1,2})?$/.test(normalized);
@@ -155,7 +212,7 @@ async function submit() {
   }
   submitting.value = true;
   try {
-    await submitWithdrawal({
+    const payload = {
       amount: `${cents / 100n}.${(cents % 100n).toString().padStart(2, "0")}`,
       ...(manualAccount.value
         ? {
@@ -163,14 +220,21 @@ async function submit() {
               type: form.type,
               account: form.account.trim(),
               holder: form.holder.trim(),
-              ...(form.type === "PAYPAL" ? { currency: form.currency } : { network: form.network })
+              ...(form.type === "PAYPAL"
+                ? { currency: form.currency }
+                : { network: form.network, ...(form.qrFileId ? { qrFileId: form.qrFileId } : {}) })
             }
           }
         : { payoutAccountId: form.payoutAccountId }),
       note: form.note,
-      ...(form.previousId ? { previousId: form.previousId } : {}),
-      idempotencyKey: crypto.randomUUID()
-    });
+      ...(form.previousId ? { previousId: form.previousId } : {})
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (submittedPayload !== fingerprint) {
+      submittedPayload = fingerprint;
+      idempotencyKey = crypto.randomUUID();
+    }
+    await submitWithdrawal({ ...payload, idempotencyKey });
     applyVisible.value = false;
     form.amount = "";
     form.previousId = "";
@@ -178,8 +242,8 @@ async function submit() {
     form.account = "";
     form.holder = "";
     await load();
-  } catch {
-    applyError.value = t("funds.submitFailed");
+  } catch (error) {
+    applyError.value = errorMessage(error, "funds.submitFailed");
   } finally {
     submitting.value = false;
   }
@@ -193,7 +257,10 @@ async function cancelWithdrawal(item: WithdrawalRecord) {
     ElMessage.success(t("funds.withdrawSuccess"));
     await load();
   } catch (error) {
-    if (error !== "cancel" && error !== "close") ElMessage.error(t("funds.submitFailed"));
+    if (error !== "cancel" && error !== "close") {
+      const message = errorMessage(error, "funds.submitFailed");
+      if (message) ElMessage.error(message);
+    }
   }
 }
 function dateLabel(value: string | null) {
@@ -204,6 +271,11 @@ function dateLabel(value: string | null) {
 function pageChanged(value: number) {
   page.value = value;
   void load();
+}
+function sizeChanged(value: number) {
+  size.value = value;
+  page.value = 1;
+  // DataTable follows this event with update:page(1), which performs the single refresh.
 }
 function recordType(value: FundRecord["type"]) {
   return value === "PREPAY" ? t("funds.prepay") : t("funds.withdrawal");
@@ -224,7 +296,9 @@ onMounted(load);
         <h1>{{ t("funds.title") }}</h1>
         <p>{{ t("funds.summaryHint") }}</p>
       </div>
-      <el-button type="primary" @click="openApply">{{ t("funds.apply") }}</el-button>
+      <el-button type="primary" data-test="apply-withdrawal" @click="openApply()">{{
+        t("funds.apply")
+      }}</el-button>
     </header>
     <el-alert
       v-if="failure"
@@ -301,6 +375,7 @@ onMounted(load);
         </div>
         <DataTable
           table-id="fund-records"
+          class="records-table"
           :rows="records"
           :columns="columns"
           :loading="loading"
@@ -308,6 +383,7 @@ onMounted(load);
           :page="page"
           :size="size"
           @update:page="pageChanged"
+          @update:size="sizeChanged"
           @refresh="load"
         >
           <template #cell-appliedAt="{ row }">{{ dateLabel(row.appliedAt) }}</template>
@@ -319,13 +395,53 @@ onMounted(load);
               recordType(row.type)
             }}</el-tag></template
           >
-          <template #cell-amount="{ row }">{{ money(row.amount) }} {{ row.currency }}</template>
+          <template #cell-amount="{ row }"
+            ><span data-test="fund-record-amount">{{
+              amountLabel(row.amount, row.currency)
+            }}</span></template
+          >
           <template #cell-recipient="{ row }">{{ row.maskedRecipient || "—" }}</template>
           <template #cell-receivedAt="{ row }">{{ dateLabel(row.receivedAt) }}</template>
           <template #empty
             ><div class="empty-state">{{ t("funds.empty") }}</div></template
           >
         </DataTable>
+        <div class="fund-record-cards" :aria-busy="loading">
+          <article
+            v-for="record in records"
+            :key="record.id"
+            class="fund-record-card"
+            data-test="fund-record-card"
+          >
+            <dl>
+              <dt>{{ t("funds.applicationNo") }}</dt>
+              <dd><CopyText :value="record.applicationNo" /></dd>
+              <dt>{{ t("funds.type") }}</dt>
+              <dd>
+                <el-tag :type="record.type === 'PREPAY' ? 'warning' : 'primary'">{{
+                  recordType(record.type)
+                }}</el-tag>
+              </dd>
+              <dt>{{ t("funds.appliedAt") }}</dt>
+              <dd>{{ dateLabel(record.appliedAt) }}</dd>
+              <dt>{{ t("funds.amount") }}</dt>
+              <dd class="fund-record-amount">{{ amountLabel(record.amount, record.currency) }}</dd>
+              <dt>{{ t("funds.recipient") }}</dt>
+              <dd>{{ record.maskedRecipient || "—" }}</dd>
+              <dt>{{ t("funds.receivedAt") }}</dt>
+              <dd>{{ dateLabel(record.receivedAt) }}</dd>
+            </dl>
+          </article>
+          <el-empty v-if="!records.length && !loading" :description="t('funds.empty')" />
+        </div>
+        <el-pagination
+          class="fund-records-pager"
+          :current-page="page"
+          :page-size="size"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="pageChanged"
+        />
       </el-card>
       <el-card shadow="never" class="withdrawals-card">
         <div class="section-heading">
@@ -335,7 +451,7 @@ onMounted(load);
         <div v-if="withdrawals.length" class="withdrawal-list">
           <div v-for="item in withdrawals" :key="item.id" class="withdrawal-row">
             <span>{{ item.applicationNo }}</span
-            ><strong>{{ money(item.amount) }} {{ item.currency }}</strong
+            ><strong>{{ amountLabel(item.amount, item.currency) }}</strong
             ><el-tag>{{ t(`funds.status.${item.status}`, item.status) }}</el-tag
             ><span>{{ dateLabel(item.createdAt) }}</span>
             <el-button
@@ -350,6 +466,7 @@ onMounted(load);
               v-if="item.status === 'REJECTED'"
               link
               type="primary"
+              data-test="resubmit-withdrawal"
               @click="openApply(item.id)"
             >
               {{ t("funds.resubmit") }}
@@ -359,9 +476,22 @@ onMounted(load);
         <el-empty v-else :description="t('funds.noWithdrawals')" />
       </el-card>
     </template>
-    <el-dialog v-model="applyVisible" :title="t('funds.applyTitle')" width="520px" destroy-on-close>
+    <el-dialog
+      v-model="applyVisible"
+      :title="t('funds.applyTitle')"
+      width="min(520px, calc(100vw - 24px))"
+      destroy-on-close
+      :close-on-click-modal="false"
+      :close-on-press-escape="!submitting && !qrUploading"
+      :show-close="!submitting && !qrUploading"
+    >
       <el-alert v-if="applyError" type="error" :closable="false" :title="applyError" />
-      <el-form label-position="top" @submit.prevent="submit">
+      <el-form
+        v-loading="limitsLoading"
+        :disabled="limitsLoading || submitting"
+        label-position="top"
+        @submit.prevent="submit"
+      >
         <div v-if="conditions" class="conditions-summary" data-test="withdrawal-conditions">
           <p>{{ t("funds.availableBalance", { amount: money(conditions.available) }) }}</p>
           <p>{{ t("funds.occupiedBalance", { amount: money(conditions.occupied) }) }}</p>
@@ -387,15 +517,18 @@ onMounted(load);
           />
         </div>
         <el-form-item :label="t('funds.amount')"
-          ><el-input v-model="form.amount" inputmode="decimal"
+          ><el-input v-model="form.amount" inputmode="decimal" data-test="withdrawal-amount"
             ><template #append>{{ conditions?.currency ?? "CNY" }}</template></el-input
           ><small>{{
             t("funds.minimum", { amount: conditions?.minimum ?? "—" })
           }}</small></el-form-item
         >
         <el-form-item :label="t('funds.recipient')"
-          ><el-select v-model="form.payoutAccountId" :placeholder="t('funds.chooseAccount')"
-            ><el-option :value="'manual'" :label="t('funds.manualAccount')" /> ><el-option
+          ><el-select
+            v-model="form.payoutAccountId"
+            :placeholder="t('funds.chooseAccount')"
+            data-test="withdrawal-recipient"
+            ><el-option :value="'manual'" :label="t('funds.manualAccount')" /><el-option
               v-for="account in accounts"
               :key="account.id"
               :value="account.id"
@@ -406,7 +539,7 @@ onMounted(load);
         >
         <template v-if="manualAccount">
           <el-form-item :label="t('funds.accountType')">
-            <el-select v-model="form.type">
+            <el-select v-model="form.type" data-test="withdrawal-account-type">
               <el-option value="PAYPAL" label="PayPal" />
               <el-option value="USDT" label="USDT" />
             </el-select>
@@ -414,9 +547,16 @@ onMounted(load);
           <el-form-item
             :label="form.type === 'PAYPAL' ? t('funds.paypalEmail') : t('funds.usdtAddress')"
           >
-            <el-input v-model="form.account" autocomplete="off" />
+            <el-input
+              v-model="form.account"
+              autocomplete="off"
+              maxlength="128"
+              data-test="withdrawal-account"
+            />
           </el-form-item>
-          <el-form-item :label="t('funds.holder')"><el-input v-model="form.holder" /></el-form-item>
+          <el-form-item :label="t('funds.holder')"
+            ><el-input v-model="form.holder" maxlength="64" data-test="withdrawal-holder"
+          /></el-form-item>
           <el-form-item v-if="form.type === 'PAYPAL'" :label="t('funds.currency')">
             <el-select v-model="form.currency">
               <el-option
@@ -437,17 +577,31 @@ onMounted(load);
               />
             </el-select>
           </el-form-item>
+          <el-form-item v-if="form.type === 'USDT'" :label="t('payoutAccounts.form.qr')">
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              :disabled="qrUploading || submitting"
+              data-test="withdrawal-qr"
+              @change="pickQr"
+            />
+            <small>{{ t("payoutAccounts.form.qrHint") }}</small>
+            <el-tag v-if="form.qrFileId" type="success">{{ t("account.qrUploaded") }}</el-tag>
+          </el-form-item>
         </template>
         <el-form-item :label="t('funds.note')"
           ><el-input v-model="form.note" type="textarea" maxlength="500" show-word-limit
         /></el-form-item>
       </el-form>
       <template #footer
-        ><el-button @click="applyVisible = false">{{ t("common.cancel") }}</el-button
+        ><el-button :disabled="submitting || qrUploading" @click="applyVisible = false">{{
+          t("common.cancel")
+        }}</el-button
         ><el-button
           type="primary"
           :loading="submitting"
-          :disabled="conditions?.canApply === false"
+          :disabled="!conditions || !conditions.canApply || limitsLoading || qrUploading"
+          data-test="submit-withdrawal"
           @click="submit"
           >{{ t("funds.submit") }}</el-button
         ></template
@@ -575,6 +729,34 @@ h1 {
 .application-no {
   overflow-wrap: anywhere;
 }
+.fund-record-cards,
+.fund-records-pager {
+  display: none;
+}
+.fund-record-card {
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  padding: var(--tcrm-space-3);
+}
+.fund-record-card dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: start;
+  gap: var(--tcrm-space-2);
+  margin: 0;
+}
+.fund-record-card dt {
+  color: var(--tcrm-color-text-secondary);
+}
+.fund-record-card dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.fund-record-amount {
+  font-variant-numeric: tabular-nums;
+}
 .empty-state {
   padding: var(--tcrm-space-6);
   text-align: center;
@@ -630,6 +812,18 @@ small {
   }
 }
 @media (max-width: 767px) {
+  .records-table {
+    display: none;
+  }
+  .fund-record-cards {
+    display: grid;
+    gap: var(--tcrm-space-3);
+  }
+  .fund-records-pager {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--tcrm-space-3);
+  }
   .withdrawal-row {
     grid-template-columns: 1fr auto;
   }

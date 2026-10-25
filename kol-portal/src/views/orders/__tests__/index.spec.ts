@@ -54,6 +54,22 @@ beforeEach(() => {
 });
 
 describe("creator order details", () => {
+  it("shows all distinct commission rates in an order with multiple SKUs", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({
+      items: [
+        {
+          ...order,
+          items: [...order.items, { ...order.items[0], skuName: "Red", rateSnapshot: "0.10" }]
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.get('[data-test="order-rates"]').text()).toBe("15.00% / 10.00%");
+    wrapper.unmount();
+  });
   it("requests the latest 30 local dates and shows the empty state", async () => {
     const wrapper = await mountPage();
     expect(getCreatorOrders).toHaveBeenCalledWith(

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getFundSummary, getWithdrawalConditions, submitWithdrawal } from "../creator";
+import {
+  getCreatorAnalytics,
+  getFundSummary,
+  getWithdrawalConditions,
+  getWithdrawals,
+  submitWithdrawal
+} from "../creator";
 import { http } from "../http";
 
 vi.mock("../http", () => ({ http: { request: vi.fn() } }));
@@ -14,7 +20,7 @@ describe("fund summary presentation contract", () => {
         commissionPaid: "300.10",
         prepayPaid: "50.00",
         estimated: "900.30",
-        cumulativePaid: "300.10",
+        cumulativePaid: "350.10",
         occupied: "200.10",
         frozen: "100.10",
         available: "250.00",
@@ -30,6 +36,7 @@ describe("fund summary presentation contract", () => {
       receivedPrepayCny: "50.00",
       estimatedCommissionCny: "900.30",
       totalCommissionCny: "600.30",
+      withdrawnCny: "300.10",
       withdrawingCny: "200.10",
       availableCny: "250.00",
       prepayDeductionCny: "50.00",
@@ -65,18 +72,18 @@ describe("fund summary presentation contract", () => {
     const conditions = {
       currency: "CNY",
       minimum: "200.00",
-      version: 3,
+      version: "3",
       available: "900.00",
       occupied: "100.00",
       frozen: "50.00",
       estimated: "1050.00",
       withdrawalFrozen: false,
       canApply: false,
-      unverifiedCount: 2
+      unverifiedCount: "2"
     };
     vi.mocked(http.request).mockResolvedValue(conditions);
 
-    await expect(getWithdrawalConditions()).resolves.toEqual(conditions);
+    await expect(getWithdrawalConditions()).resolves.toEqual({ ...conditions, unverifiedCount: 2 });
     expect(http.request).toHaveBeenCalledWith({
       method: "GET",
       url: "/withdrawals/conditions"
@@ -94,12 +101,12 @@ describe("fund summary presentation contract", () => {
     vi.mocked(http.request).mockResolvedValue({
       id: "withdrawal-new",
       applicationNo: "W20261024000001",
-      amount: data.amount,
+      amountCny: data.amount,
       currency: "CNY",
       status: "PENDING_REVIEW",
       createdAt: "2026-10-24T00:00:00Z",
       account: {
-        id: data.payoutAccountId,
+        accountId: data.payoutAccountId,
         type: "PAYPAL",
         account: "p***@mail.com",
         holder: "Creator",
@@ -108,8 +115,44 @@ describe("fund summary presentation contract", () => {
       }
     });
 
-    await submitWithdrawal(data);
+    const result = await submitWithdrawal(data);
 
     expect(http.request).toHaveBeenCalledWith({ method: "POST", url: "/withdrawals", data });
+    expect(result.amount).toBe("250.00");
+    expect(result.account).toMatchObject({
+      id: data.payoutAccountId,
+      accountType: "PAYPAL",
+      holderName: "Creator"
+    });
+  });
+
+  it("maps real withdrawal list amounts and tolerates an absent account snapshot", async () => {
+    vi.mocked(http.request).mockResolvedValue({
+      items: [
+        {
+          id: "42",
+          applicationNo: "WD42",
+          amountCny: "825.35",
+          currency: "CNY",
+          status: "REJECTED",
+          createdAt: "2026-10-25T00:00:00Z",
+          account: null
+        }
+      ],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const result = await getWithdrawals({ page: 1, size: 20 });
+    expect(result.items[0]).toMatchObject({ amount: "825.35", account: null });
+  });
+
+  it("normalizes the analytics order count serialized as a string", async () => {
+    vi.mocked(http.request).mockResolvedValue({ paidOrderCount: "12", daily: [] });
+    const result = await getCreatorAnalytics({
+      from: "2026-10-19T00:00:00+08:00",
+      to: "2026-10-26T00:00:00+08:00"
+    });
+    expect(result.paidOrderCount).toBe(12);
   });
 });

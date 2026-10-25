@@ -103,6 +103,7 @@ const zhCN: MessageSchema = {
     currency: "币种",
     usdtAddress: "USDT收款地址",
     qrCode: "收款二维码",
+    qrUploaded: "收款二维码已上传",
     payoutSaved: "收款信息已提交。",
     managePayoutAccounts: "管理收款账户",
     kolCode: "达人编号",

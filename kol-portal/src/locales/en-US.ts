@@ -103,6 +103,7 @@ const enUS = {
     currency: "Currency",
     usdtAddress: "USDT address",
     qrCode: "QR code",
+    qrUploaded: "QR code uploaded",
     payoutSaved: "Your payout information has been submitted.",
     managePayoutAccounts: "Manage payout accounts",
     kolCode: "Creator code",

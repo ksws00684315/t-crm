@@ -289,9 +289,16 @@ async function signOut() {
     min-width: 0;
     min-height: 52px;
     margin: 0;
-    padding: var(--tcrm-space-1) var(--tcrm-space-2);
+    padding: var(--tcrm-space-1) 0;
     font-size: var(--tcrm-font-size-help);
     line-height: var(--tcrm-line-height-help);
+    height: auto;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .shell__nav-link:last-child {
+    flex-grow: 1.25;
   }
   .shell__body {
     flex: none;
@@ -307,7 +314,7 @@ async function signOut() {
     display: none;
   }
   .shell__main {
-    --kol-mobile-nav-height: 68px;
+    --kol-mobile-nav-height: 88px;
     overflow: visible;
     padding: var(--tcrm-space-3) var(--tcrm-space-3)
       calc(var(--kol-mobile-nav-height) + env(safe-area-inset-bottom));

@@ -41,13 +41,15 @@ async function load() {
   const today = new Date();
   const from = new Date(today);
   from.setDate(today.getDate() - 6);
+  const through = new Date(today);
+  through.setDate(today.getDate() + 1);
   const fmt = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   try {
     const [stats, summary] = await Promise.all([
       getCreatorAnalytics({
         from: `${fmt(from)}T00:00:00+08:00`,
-        to: `${fmt(today)}T00:00:00+08:00`
+        to: `${fmt(through)}T00:00:00+08:00`
       }),
       getFundSummary()
     ]);

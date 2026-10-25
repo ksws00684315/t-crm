@@ -64,11 +64,20 @@ function commission(row: CreatorOrder) {
   return values.length ? values.reduce((sum, value) => sum + Number(value), 0).toFixed(2) : null;
 }
 function rate(row: CreatorOrder) {
-  const value = row.items.find(item => item.rateSnapshot != null)?.rateSnapshot;
-  if (value == null) return "—";
-  if (value.includes("%")) return value;
-  const number = Number(value);
-  return Number.isFinite(number) ? `${(number * 100).toFixed(2)}%` : value;
+  const values = [
+    ...new Set(
+      row.items.map(item => item.rateSnapshot).filter((value): value is string => value != null)
+    )
+  ];
+  return (
+    values
+      .map(value => {
+        if (value.includes("%")) return value;
+        const number = Number(value);
+        return Number.isFinite(number) ? `${(number * 100).toFixed(2)}%` : value;
+      })
+      .join(" / ") || "—"
+  );
 }
 function statusType(value?: SettlementStatus | null): "success" | "warning" | "info" | "primary" {
   return (
@@ -217,7 +226,9 @@ onMounted(load);
       >
       <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
       <template #cell-payTime="{ row }">{{ dateLabel(row.payTime) }}</template>
-      <template #cell-rate="{ row }">{{ rate(row) }}</template>
+      <template #cell-rate="{ row }"
+        ><span data-test="order-rates">{{ rate(row) }}</span></template
+      >
       <template #cell-commission="{ row }">{{
         commission(row) == null ? "—" : money(commission(row)!)
       }}</template>

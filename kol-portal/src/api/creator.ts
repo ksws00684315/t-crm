@@ -264,11 +264,15 @@ export function getCreatorAnalytics(params: { from: string; to: string }) {
       frozenCny: demoFunds.frozenCny,
       daily: demoDaily
     });
-  return http.request<CreatorAnalyticsOverview>({
-    method: "GET",
-    url: "/analytics/overview",
-    params
-  });
+  return http
+    .request<
+      Omit<CreatorAnalyticsOverview, "paidOrderCount"> & { paidOrderCount: string | number }
+    >({
+      method: "GET",
+      url: "/analytics/overview",
+      params
+    })
+    .then(overview => ({ ...overview, paidOrderCount: Number(overview.paidOrderCount) }));
 }
 
 export function getFundSummary() {
@@ -295,11 +299,12 @@ export function getFundSummary() {
         commissionIncomeCny: income.commissionPaid,
         estimatedCommissionCny: income.estimated,
         totalCommissionCny: centsMoney(
-          moneyCents(income.cumulativePaid) +
+          moneyCents(income.commissionPaid) +
             moneyCents(income.occupied) +
             moneyCents(income.frozen)
         ),
-        withdrawnCny: income.cumulativePaid,
+        // Owner decision 2026-10-26: commission withdrawals exclude received advances.
+        withdrawnCny: income.commissionPaid,
         withdrawingCny: income.occupied,
         frozenCny: income.frozen,
         receivedPrepayCny: income.prepayPaid,
@@ -332,13 +337,47 @@ export interface WithdrawalRecord {
   currency: string;
   status: string;
   createdAt: string;
-  account: WithdrawalAccountOption;
+  account: WithdrawalAccountOption | null;
+}
+
+/** Task 63 wire fields differ from the portal presentation model. */
+interface WithdrawalResponse extends Omit<WithdrawalRecord, "amount" | "account"> {
+  amountCny: string;
+  account: {
+    accountId: string | null;
+    type: "PAYPAL" | "USDT";
+    account: string;
+    holder: string | null;
+    currency: string | null;
+    network: string | null;
+  } | null;
+}
+
+function withdrawalRecord(item: WithdrawalResponse): WithdrawalRecord {
+  return {
+    id: item.id,
+    applicationNo: item.applicationNo,
+    amount: item.amountCny,
+    currency: item.currency,
+    status: item.status,
+    createdAt: item.createdAt,
+    account: item.account
+      ? {
+          id: item.account.accountId ?? "",
+          accountType: item.account.type,
+          account: item.account.account,
+          holderName: item.account.holder,
+          currency: item.account.currency,
+          network: item.account.network
+        }
+      : null
+  };
 }
 
 export interface WithdrawalConditions {
   currency: string;
   minimum: string;
-  version: number;
+  version: string;
   available: string;
   occupied: string;
   frozen: string;
@@ -353,7 +392,7 @@ export function getWithdrawalConditions(): Promise<WithdrawalConditions> {
     return Promise.resolve({
       currency: "CNY",
       minimum: "200.00",
-      version: 1,
+      version: "1",
       available: demoFunds.availableCny,
       occupied: demoFunds.withdrawingCny,
       frozen: demoFunds.frozenCny,
@@ -362,10 +401,12 @@ export function getWithdrawalConditions(): Promise<WithdrawalConditions> {
       canApply: true,
       unverifiedCount: 0
     });
-  return http.request<WithdrawalConditions>({
-    method: "GET",
-    url: "/withdrawals/conditions"
-  });
+  return http
+    .request<Omit<WithdrawalConditions, "unverifiedCount"> & { unverifiedCount: string | number }>({
+      method: "GET",
+      url: "/withdrawals/conditions"
+    })
+    .then(conditions => ({ ...conditions, unverifiedCount: Number(conditions.unverifiedCount) }));
 }
 
 export function getWithdrawalAccounts() {
@@ -411,20 +452,14 @@ export function getWithdrawals(params: { page: number; size: number }) {
     return Promise.resolve({ ...demoWithdrawalPage, page: params.page, size: params.size });
   return http
     .request<{
-      items: WithdrawalRecord[];
+      items: WithdrawalResponse[];
       total: number | string;
       page: number;
       size: number;
     }>({ method: "GET", url: "/withdrawals", params })
     .then(page => ({
       ...page,
-      items: page.items.map(item => ({
-        ...item,
-        account: {
-          ...item.account,
-          accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type
-        }
-      }))
+      items: page.items.map(withdrawalRecord)
     }));
 }
 
@@ -437,7 +472,7 @@ export function submitWithdrawal(data: {
     currency?: string;
     network?: string;
     holder: string;
-    qrFileId?: number;
+    qrFileId?: string;
   };
   note: string;
   previousId?: string;
@@ -468,14 +503,8 @@ export function submitWithdrawal(data: {
     return Promise.resolve(record);
   }
   return http
-    .request<WithdrawalRecord>({ method: "POST", url: "/withdrawals", data })
-    .then(item => ({
-      ...item,
-      account: {
-        ...item.account,
-        accountType: (item.account as unknown as { type: "PAYPAL" | "USDT" }).type
-      }
-    }));
+    .request<WithdrawalResponse>({ method: "POST", url: "/withdrawals", data })
+    .then(withdrawalRecord);
 }
 
 export function withdrawWithdrawal(id: string) {
