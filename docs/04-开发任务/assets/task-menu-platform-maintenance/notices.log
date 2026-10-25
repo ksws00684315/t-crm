@@ -1,3 +1,0 @@
-generate-license-file exit=0
-Generated THIRD-PARTY-NOTICES.check matches tracked THIRD-PARTY-NOTICES exactly (LF content).
-Temporary local pnpm shim points to installed pnpm 10.33.4; no dependency or lockfile change.

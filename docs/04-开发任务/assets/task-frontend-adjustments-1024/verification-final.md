@@ -1,4 +1,4 @@
-# 前端调整1024验证结果
+# 前端调整1024：D3–D9基线验证结果
 
 - 管理端：lint、typecheck、production build 全部通过；95个测试文件、677项通过。
 - 达人端：lint、typecheck、production build 全部通过；31个测试文件、232项通过。
@@ -13,4 +13,4 @@
 - [商品任务明细十列](copyjob-details-1440-zh-CN.png)
 - [达人端账号身份](portal-account-long-name-390-zh-CN.png)
 
-逐请求记录见 `admin-browser-results.json` 与 `portal-browser-results.json`。
+按 PR #122 审查要求，机器生成的逐请求 JSON 报告已删除；检查范围、请求数量和结论保留在本文，截图继续保留。订单列表、详情弹窗和链路的后续验收另见[2026-10-26 订单浏览器验收记录](order-browser-verification-1026.md)。

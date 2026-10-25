@@ -1487,6 +1487,7 @@ const enUS: MessageSchema = {
       fundsSection: "Funds",
       orderInfoSection: "Order information",
       financeLedgerSection: "Financial ledger",
+      loadFailed: "Unable to load the order chain. Please try again.",
       kolCommission: "Net creator commission",
       shopProfit: "Shop profit",
       shopProfitFormula:

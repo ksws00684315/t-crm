@@ -1,6 +1,0 @@
-
-> tcrm-admin-ui@0.1.0 lint D:\1-达人分销CRM\代码核对\t-crm\.worktrees\menu-platform-maintenance\admin-ui
-> eslint --max-warnings 0 . && prettier --check .
-
-Checking formatting...
-All matched files use Prettier code style!

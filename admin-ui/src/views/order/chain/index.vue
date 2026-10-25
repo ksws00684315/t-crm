@@ -85,10 +85,12 @@ function openKolItem(linkCode: string): void {
   void router.push({ path: "/kol/kol-items", query: { linkCode } });
 }
 
-onMounted(async () => {
+async function load(): Promise<void> {
   const id = String(route.params.id ?? "");
   if (!id) return;
   loading.value = true;
+  chain.value = null;
+  detail.value = null;
   try {
     const [chainResult, detailResult] = await Promise.allSettled([getOrderChain(id), getOrder(id)]);
     if (chainResult.status === "fulfilled") {
@@ -102,7 +104,9 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>
 
 <template>
@@ -290,6 +294,18 @@ onMounted(async () => {
         <div class="chain-ledger-empty">{{ t("common.developing") }}</div>
       </section>
     </template>
+    <el-result
+      v-else-if="!loading"
+      icon="error"
+      :title="t('order.chain.loadFailed')"
+      data-test="chain-load-failed"
+    >
+      <template #extra>
+        <el-button type="primary" data-test="chain-retry" @click="load">
+          {{ t("table.refresh") }}
+        </el-button>
+      </template>
+    </el-result>
   </div>
 </template>
 

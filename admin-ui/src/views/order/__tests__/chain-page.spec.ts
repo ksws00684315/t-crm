@@ -141,8 +141,6 @@ function signIn(role: Role, permissions: string[]) {
 }
 
 async function mountPage() {
-  vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
-  vi.mocked(orderApi.getOrder).mockResolvedValue(orderDetail);
   const router = createRouter({ history: createMemoryHistory(), routes });
   await router.push("/order/orders/101/chain");
   const wrapper = mount(OrderChainPage, {
@@ -160,6 +158,8 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockReset();
     vi.mocked(orderApi.getOrder).mockReset();
     vi.mocked(notifyError).mockClear();
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue(orderDetail);
     setActivePinia(createPinia());
   });
 
@@ -242,6 +242,22 @@ describe("order chain page (task 40)", () => {
     expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("开发中");
     expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("开发中");
     expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("shows an actionable error state when the chain fails and retries successfully", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    vi.mocked(orderApi.getOrderChain).mockRejectedValueOnce(new Error("chain failed"));
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="chain-load-failed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-funds"]').exists()).toBe(false);
+    expect(vi.mocked(notifyError)).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('[data-test="chain-retry"]').trigger("click");
+    await flushPromises();
+    expect(vi.mocked(orderApi.getOrderChain)).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-test="chain-load-failed"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
     wrapper.unmount();
   });
 });

@@ -1457,6 +1457,7 @@ const zhCN = {
       fundsSection: "资金信息",
       orderInfoSection: "订单信息",
       financeLedgerSection: "财务流水",
+      loadFailed: "订单链路加载失败，请重试",
       kolCommission: "净达人佣金",
       shopProfit: "店铺获利",
       shopProfitFormula: "微店结算净额－净达人佣金，不扣商品成本。",

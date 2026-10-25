@@ -325,4 +325,27 @@ describe("order list page (task 40)", () => {
     expect(wrapper.text()).not.toContain("部分退款成功");
     wrapper.unmount();
   });
+
+  it("clears stale order rows and totals when refresh fails, then recovers on retry", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const table = wrapper.findComponent({ name: "DataTable" });
+    expect(table.props("total")).toBe(2);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
+
+    vi.mocked(orderApi.listOrders).mockRejectedValueOnce(new Error("refresh failed"));
+    table.vm.$emit("refresh");
+    await flushPromises();
+    expect(table.props("rows")).toEqual([]);
+    expect(table.props("total")).toBe(0);
+    expect(table.props("loading")).toBe(false);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(0);
+    expect(vi.mocked(notifyError)).toHaveBeenCalledTimes(1);
+
+    table.vm.$emit("refresh");
+    await flushPromises();
+    expect(table.props("total")).toBe(2);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
+    wrapper.unmount();
+  });
 });

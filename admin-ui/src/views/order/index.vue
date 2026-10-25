@@ -238,6 +238,8 @@ async function load() {
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    rows.value = [];
+    total.value = 0;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -585,17 +587,19 @@ onMounted(() => {
 
 .order-image-placeholder {
   display: flex;
-  flex: 0 0 48px;
+  flex: 0 0 80px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  height: 64px;
   overflow: hidden;
   border-radius: var(--tcrm-radius-tag);
   background: var(--el-fill-color-light);
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+  text-align: center;
 }
 
 .order-image-placeholder__icon {
