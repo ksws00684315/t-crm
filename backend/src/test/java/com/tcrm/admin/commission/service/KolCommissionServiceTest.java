@@ -3,6 +3,7 @@ package com.tcrm.admin.commission.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -14,6 +15,7 @@ import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaidR
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaymentRow;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper.KolAccrualRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
@@ -29,7 +31,9 @@ class KolCommissionServiceTest {
 
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionFinanceQueryMapper finance = mock(CommissionFinanceQueryMapper.class);
-  private final KolCommissionService service = new KolCommissionService(states, finance);
+  private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
+  private final KolCommissionService service =
+      new KolCommissionService(states, finance, withdrawals);
 
   @BeforeEach
   void prepare() {
@@ -40,6 +44,8 @@ class KolCommissionServiceTest {
     lenient().when(finance.withdrawalPaidSums(anyCollection())).thenReturn(List.of());
     lenient().when(finance.prepayPaidSums(anyCollection(), any(), any())).thenReturn(List.of());
     lenient().when(finance.prepayPayments(anyCollection(), any(), any())).thenReturn(List.of());
+    lenient().when(withdrawals.sumActiveOccupied(anyLong())).thenReturn(BigDecimal.ZERO);
+    lenient().when(withdrawals.listKolPaidWithdrawals(anyLong())).thenReturn(List.of());
   }
 
   @Test

@@ -37,8 +37,11 @@ class AdminPayoutAccountControllerTest {
   private final PayoutAccountService accounts = mock(PayoutAccountService.class);
   private final CurrentUserContext current = mock(CurrentUserContext.class);
   private final PrepayService prepays = mock(PrepayService.class);
+  private final com.tcrm.admin.commission.service.WithdrawalService withdrawals =
+      mock(com.tcrm.admin.commission.service.WithdrawalService.class);
   private final MockMvc mvc =
-      AdminMvcSupport.build(current, new AdminPayoutAccountController(accounts, current, prepays));
+      AdminMvcSupport.build(
+          current, new AdminPayoutAccountController(withdrawals, accounts, current, prepays));
 
   private String reviewer() {
     return AdminMvcSupport.actAs(

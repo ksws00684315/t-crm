@@ -66,11 +66,69 @@ public class BizFileService {
     if (bizType != FileBizType.PREPAY_ATTACHMENT && bizType != FileBizType.PREPAY_VOUCHER) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
+    return insertAttached(tenantId, adminId, prepayId, bizType, fileName, content);
+  }
+
+  /**
+   * Stores a withdrawal payment voucher before its registration (task 63, contract §6.2 POST
+   * /admin-api/files): unattached ({@code bizId} null) until the payment claims it; PNG/JPEG/PDF up
+   * to 10MB by the crm_file rule.
+   */
+  public Long uploadWithdrawalVoucher(
+      long tenantId, long adminId, String fileName, byte[] content) {
+    String contentType = PrepayFileRules.contentType(content);
+    BizFileDO file = new BizFileDO();
+    file.setTenantId(tenantId);
+    file.setBizType(FileBizType.WITHDRAWAL_VOUCHER);
+    file.setBizId(null);
+    file.setFileName(fileName(fileName));
+    file.setContentType(contentType);
+    file.setSizeBytes((long) content.length);
+    file.setContent(content);
+    file.setCreateBy(adminId);
+    file.setCreateByType("ADMIN");
+    file.setCreateTime(Instant.now());
+    files.insert(file);
+    return file.getId();
+  }
+
+  /** Claims an uploaded voucher for one payment task; a file binds to exactly one task. */
+  public void claimVoucherFile(long tenantId, long adminId, long fileId, long withdrawalId) {
+    BizFileDO file = files.selectById(fileId);
+    if (file == null
+        || file.getTenantId() == null
+        || file.getTenantId() != tenantId
+        || file.getBizType() != FileBizType.WITHDRAWAL_VOUCHER) {
+      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (file.getBizId() != null) {
+      throw new BusinessException(ErrorCode.FILE_IN_USE);
+    }
+    // The IS NULL guard keeps the claim atomic: a second payment racing for the file loses.
+    int updated =
+        files.update(
+            null,
+            new LambdaUpdateWrapper<BizFileDO>()
+                .eq(BizFileDO::getId, fileId)
+                .isNull(BizFileDO::getBizId)
+                .set(BizFileDO::getBizId, withdrawalId));
+    if (updated == 0) {
+      throw new BusinessException(ErrorCode.FILE_IN_USE);
+    }
+  }
+
+  private Long insertAttached(
+      long tenantId,
+      long adminId,
+      long bizId,
+      FileBizType bizType,
+      String fileName,
+      byte[] content) {
     String contentType = PrepayFileRules.contentType(content);
     BizFileDO file = new BizFileDO();
     file.setTenantId(tenantId);
     file.setBizType(bizType);
-    file.setBizId(prepayId);
+    file.setBizId(bizId);
     file.setFileName(fileName(fileName));
     file.setContentType(contentType);
     file.setSizeBytes((long) content.length);

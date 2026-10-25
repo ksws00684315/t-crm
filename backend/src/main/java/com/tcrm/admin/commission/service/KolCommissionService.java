@@ -4,11 +4,14 @@ import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper;
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.KolMoneyRow;
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaymentRow;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,18 +28,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class KolCommissionService {
   private final CommissionItemStateMapper states;
   private final CommissionFinanceQueryMapper finance;
+  private final WithdrawalMapper withdrawals;
   private final Clock clock;
 
   @Autowired
   public KolCommissionService(
-      CommissionItemStateMapper states, CommissionFinanceQueryMapper finance) {
-    this(states, finance, Clock.systemUTC());
+      CommissionItemStateMapper states,
+      CommissionFinanceQueryMapper finance,
+      WithdrawalMapper withdrawals) {
+    this(states, finance, withdrawals, Clock.systemUTC());
   }
 
   KolCommissionService(
-      CommissionItemStateMapper states, CommissionFinanceQueryMapper finance, Clock clock) {
+      CommissionItemStateMapper states,
+      CommissionFinanceQueryMapper finance,
+      WithdrawalMapper withdrawals,
+      Clock clock) {
     this.states = states;
     this.finance = finance;
+    this.withdrawals = withdrawals;
     this.clock = clock;
   }
 
@@ -99,8 +109,8 @@ public class KolCommissionService {
           Map<Long, BigDecimal> pending = moneyMap(finance.pendingDeductions(ids));
           Map<Long, BigDecimal> commissionPaid = moneyMap(finance.withdrawalPaidSums(ids));
           Map<Long, BigDecimal> prepayPaid = prepayMap(finance.prepayPaidSums(ids, null, null));
-          BigDecimal occupied =
-              BigDecimal.ZERO.setScale(2); // withdrawal applications land in task 63
+          // In-flight withdrawals hold the occupied money (task 63)
+          BigDecimal occupied = nz(withdrawals.sumActiveOccupied(kolId));
           BigDecimal balance = balances.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
           BigDecimal commission = commissionPaid.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
           BigDecimal prepay = prepayPaid.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
@@ -137,17 +147,39 @@ public class KolCommissionService {
     return TenantScope.callCompany(
         tenantId,
         () -> {
-          List<PrepayPaymentRow> rows = finance.prepayPayments(List.of(kolId), null, null);
-          long total = rows.size();
+          // Commission withdrawals (task 63) and prepay payments on one page, newest first.
+          List<FundRecord> all = new ArrayList<>();
+          for (var row : withdrawals.listKolPaidWithdrawals(kolId)) {
+            all.add(toWithdrawalRecord(row));
+          }
+          for (PrepayPaymentRow row : finance.prepayPayments(List.of(kolId), null, null)) {
+            all.add(toRecord(row));
+          }
+          all.sort(
+              Comparator.comparing(
+                      FundRecord::appliedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                  .thenComparing(FundRecord::sourceId, Comparator.reverseOrder()));
+          long total = all.size();
           int from = (page - 1) * size;
           List<FundRecord> items =
-              rows.isEmpty() || from >= rows.size()
-                  ? List.of()
-                  : rows.subList(from, Math.min(from + size, rows.size())).stream()
-                      .map(KolCommissionService::toRecord)
-                      .toList();
+              from >= all.size() ? List.of() : all.subList(from, Math.min(from + size, all.size()));
           return new PageResult<>(items, total, page, size);
         });
+  }
+
+  /** One paid withdrawal as the creator sees it (masked recipient, public status). */
+  private static FundRecord toWithdrawalRecord(WithdrawalMapper.KolPaidWithdrawalRow row) {
+    return new FundRecord(
+        row.withdrawalId(),
+        "COMMISSION",
+        row.submittedAt(),
+        row.applicationNo(),
+        row.amountCny().toPlainString(),
+        "CNY",
+        row.accountMasked(),
+        row.paidAt(),
+        "PAID",
+        row.withdrawalId());
   }
 
   private static FundRecord toRecord(PrepayPaymentRow row) {
@@ -162,6 +194,10 @@ public class KolCommissionService {
         row.paidAt(),
         publicStatus(row.sourceStatus()),
         row.sourceId());
+  }
+
+  private static BigDecimal nz(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO.setScale(2) : value;
   }
 
   /** Creators see paid results only; the status maps to the public wording of §6.3. */
