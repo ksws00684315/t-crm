@@ -19,6 +19,7 @@ import com.tcrm.admin.commission.model.WithdrawalRow;
 import com.tcrm.admin.commission.model.WithdrawalRows;
 import com.tcrm.admin.commission.model.WithdrawalWrite;
 import com.tcrm.admin.commission.service.WithdrawalFundingSource.FundingRow;
+import com.tcrm.admin.commission.service.WithdrawalService.AccountInput;
 import com.tcrm.admin.commission.service.WithdrawalService.ApplyCommand;
 import com.tcrm.admin.commission.service.WithdrawalService.Filter;
 import com.tcrm.admin.commission.service.WithdrawalService.FinanceFilter;
@@ -122,7 +123,7 @@ class WithdrawalServiceScopeTest {
     when(withdrawals.nextSequence(anyLong(), any(), any())).thenReturn(9);
     when(withdrawals.insert(any())).thenReturn(1);
     when(withdrawals.findRow(anyLong())).thenReturn(row("PENDING_REVIEW"));
-    when(withdrawals.findHead(anyLong())).thenReturn(head());
+    when(withdrawals.findHead(anyLong())).thenReturn(head("PENDING_REVIEW"));
     when(withdrawals.findIdByRequest(anyLong(), any(UUID.class))).thenReturn(null);
     when(withdrawals.count(any())).thenReturn(0L);
     when(withdrawals.page(any())).thenReturn(List.of());
@@ -401,6 +402,409 @@ class WithdrawalServiceScopeTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
   }
 
+  // ------------------------------------------------------------------ list page full row
+
+  @Test
+  void shouldSurfaceEveryListTernary_forThePayerOnAPaidRow() {
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
+    when(withdrawals.count(any())).thenReturn(1L);
+    when(withdrawals.page(any())).thenReturn(List.of(head("PAID")));
+    when(withdrawals.findRow(anyLong()))
+        .thenReturn(
+            new WithdrawalRow(
+                ID,
+                KOL,
+                "W1",
+                UUID.fromString(UUID_TEXT),
+                "f".repeat(64),
+                55L,
+                new BigDecimal("400.00"),
+                "PAID",
+                false,
+                null,
+                44L,
+                "USDT",
+                cipherText(),
+                "cr***@example.com",
+                null,
+                "TRC20",
+                "Creator Name",
+                null,
+                "creator note",
+                "review note",
+                "finance note",
+                6L,
+                NOW,
+                KOL,
+                NOW));
+    var page = service.page(payer, new Filter(null, null, null, null, null, 1, 20));
+    var row = page.items().getFirst();
+    // payer sees the finance note; every ternary takes its populated branch
+    assertThat(row.financeNote()).isEqualTo("finance note");
+    assertThat(row.previousId()).isEqualTo(55L);
+    assertThat(row.accountType()).isEqualTo("USDT");
+    assertThat(row.accountMasked()).isEqualTo("cr***@example.com");
+  }
+
+  @Test
+  void shouldExportAPaidRow_withItsPaymentColumns() throws Exception {
+    var viewer = staff(6L, DataScope.ALL, Set.of("data:export", "withdrawal:review"));
+    when(withdrawals.count(any())).thenReturn(1L);
+    when(withdrawals.page(any())).thenReturn(List.of(head("PAID")));
+    when(withdrawals.findRow(anyLong())).thenReturn(row("PAID", false));
+    when(withdrawals.findPayment(anyLong()))
+        .thenReturn(
+            new WithdrawalRows.PaymentRow(
+                new BigDecimal("400.00"),
+                new BigDecimal("56.00"),
+                "USD",
+                NOW,
+                "paypal",
+                "rate",
+                "7.14",
+                88L,
+                7L,
+                "Payer",
+                "PAYMENT"));
+    var csv = service.export(viewer, new Filter(null, null, null, null, null, 1, 20));
+    var text = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
+    // the CSV carries the account type, the actual amount and its currency
+    assertThat(text).contains("PAYPAL").contains("56.00").contains("USD");
+  }
+
+  // ------------------------------------------------------------------ occupations scoping
+
+  @Test
+  void shouldSkipOrderLinesWithoutKol_orOwnedByAnotherCreator() {
+    var viewer = staff(6L, DataScope.ALL, Set.of("order:view"));
+    // kol_id null on the line → skipped; another creator's line under OWN scope → skipped
+    when(orderItems.listByIds(anyList()))
+        .thenReturn(
+            List.of(
+                new OrderItemInfoDTO(201L, 21L, "WD2001", "w1", "s1", "A", "Red", 7L, null),
+                new OrderItemInfoDTO(202L, 21L, "WD2002", "w2", "s2", "B", "Blue", 8L, 777L)));
+    assertThat(service.occupations(viewer, List.of(201L, 202L))).isEmpty();
+    // unowned items disappear entirely → nothing to query
+    when(orderItems.listByIds(anyList())).thenReturn(List.of());
+    assertThat(service.occupations(viewer, List.of(201L, 202L))).isEmpty();
+  }
+
+  @Test
+  void shouldReturnOccupations_forTheOwnScopedViewerOnOwnLines() {
+    var own = staff(5L, DataScope.OWN, Set.of("order:view"));
+    when(orderItems.listByIds(anyList()))
+        .thenReturn(
+            List.of(new OrderItemInfoDTO(101L, 11L, "WD1001", "w1", "s1", "Hat", "Red", 7L, KOL)));
+    when(withdrawals.listOccupationsByOrderItems(anyList()))
+        .thenReturn(
+            List.of(
+                new WithdrawalMapper.OccupationRow(
+                    101L,
+                    ID,
+                    "W1",
+                    "PENDING_PAYMENT",
+                    new BigDecimal("250.00"),
+                    new BigDecimal("400.00"),
+                    new BigDecimal("150.00"),
+                    NOW,
+                    null)));
+    var rows = service.occupations(own, List.of(101L));
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().status()).isEqualTo("PENDING_PAYMENT");
+    assertThat(rows.getFirst().paidAt()).isNull();
+  }
+
+  // ------------------------------------------------------------------ resolveAccount errors
+
+  @Test
+  void shouldRejectReferencedAccounts_ofOtherCreators_orDisabledOnes() {
+    var foreign = approvedAccount(44L);
+    foreign.setKolId(999L);
+    when(payoutAccounts.selectById(44L)).thenReturn(foreign);
+    assertThatThrownBy(
+            () ->
+                service.apply(kol(), new ApplyCommand(UUID_TEXT, "250.00", null, 44L, null, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+    var disabled = approvedAccount(44L);
+    disabled.setStatus(PayoutAccountStatus.DISABLED);
+    when(payoutAccounts.selectById(44L)).thenReturn(disabled);
+    assertThatThrownBy(
+            () ->
+                service.apply(
+                    kol(),
+                    new ApplyCommand(
+                        UUID.randomUUID().toString(), "250.00", null, 44L, null, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+  }
+
+  @Test
+  void shouldRejectInlineAccounts_withCrossTypeFields() {
+    // USDT must not carry a currency; PAYPAL must not carry a network or QR file
+    assertThatThrownBy(
+            () ->
+                service.apply(
+                    kol(),
+                    new ApplyCommand(
+                        UUID.randomUUID().toString(),
+                        "250.00",
+                        null,
+                        null,
+                        new AccountInput(
+                            "USDT", "TQ5xnPW9tZ3kA7qL9aZ", "Creator", "USD", "TRC20", null),
+                        null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    assertThatThrownBy(
+            () ->
+                service.apply(
+                    kol(),
+                    new ApplyCommand(
+                        UUID.randomUUID().toString(),
+                        "250.00",
+                        null,
+                        null,
+                        new AccountInput(
+                            "PAYPAL", "p@example.com", "Creator", "USD", "TRC20", null),
+                        null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    assertThatThrownBy(
+            () ->
+                service.apply(
+                    kol(),
+                    new ApplyCommand(
+                        UUID.randomUUID().toString(),
+                        "250.00",
+                        null,
+                        null,
+                        new AccountInput("PAYPAL", "p@example.com", "Creator", "USD", null, 9L),
+                        null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+  }
+
+  // ------------------------------------------------------------------ finance merge scope
+
+  @Test
+  void shouldResolveKolAndBdNames_onMergedFinanceRows() {
+    var viewer = staff(6L, DataScope.ALL, Set.of("commission:view"));
+    when(kols.listByIdsIncludingDeleted(anyList())).thenReturn(List.of(kol(5L)));
+    when(accountNames.listByIds(anyList()))
+        .thenReturn(List.of(new com.tcrm.admin.system.api.AccountNameDTO(5L, "BD Five")));
+    when(withdrawals.countWithdrawalTasks(any())).thenReturn(1L);
+    when(withdrawals.pageWithdrawalTasks(any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.commission.model.FinanceTaskRow(
+                    1L, KOL, "W1", "COMMISSION", "PENDING_REVIEW", new BigDecimal("100.00"), NOW)));
+    var page = service.financeTasks(viewer, new FinanceFilter(null, null, null, null, 1, 20));
+    assertThat(page.items().getFirst().kolCode()).isEqualTo("KOL-test");
+    assertThat(page.items().getFirst().bdName()).isEqualTo("BD Five");
+    // WITHDRAWN is a valid withdrawal raw filter and passes validation
+    assertThat(
+            service
+                .financeTasks(viewer, new FinanceFilter(null, null, null, "WITHDRAWN", 1, 20))
+                .total())
+        .isEqualTo(1L);
+  }
+
+  // ------------------------------------------------------------------ final branch batch
+
+  @Test
+  void shouldRenderRowsWithoutBdOrFinance_forTheRightViewers() {
+    // creator without a BD: bdId/bdName stay null; the payer still sees the finance note
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
+    when(kols.listByIdsIncludingDeleted(anyList())).thenReturn(List.of(kol(null)));
+    when(withdrawals.count(any())).thenReturn(1L);
+    when(withdrawals.page(any())).thenReturn(List.of(head("PAID")));
+    WithdrawalRow paid =
+        new WithdrawalRow(
+            ID,
+            KOL,
+            "W1",
+            UUID.fromString(UUID_TEXT),
+            "f".repeat(64),
+            null,
+            new BigDecimal("400.00"),
+            "PAID",
+            false,
+            null,
+            null,
+            "PAYPAL",
+            cipherText(),
+            "cr***@example.com",
+            "USD",
+            null,
+            "Creator Name",
+            null,
+            "note",
+            null,
+            "finance note",
+            null,
+            null,
+            KOL,
+            NOW);
+    when(withdrawals.findRow(anyLong())).thenReturn(paid);
+    var page = service.page(payer, new Filter(null, null, null, null, null, 1, 20));
+    assertThat(page.items().getFirst().bdId()).isNull();
+    assertThat(page.items().getFirst().bdName()).isNull();
+    assertThat(page.items().getFirst().financeNote()).isEqualTo("finance note");
+    // a commission:view viewer on a paused row: finance note hidden, paused flag visible
+    var paused = row("PENDING_PAYMENT", true);
+    when(withdrawals.findRow(anyLong())).thenReturn(paused);
+    var hidden =
+        service.page(
+            staff(8L, DataScope.ALL, Set.of("commission:view")),
+            new Filter(null, null, null, null, null, 1, 20));
+    assertThat(hidden.items().getFirst().financeNote()).isNull();
+    assertThat(hidden.items().getFirst().paused()).isTrue();
+  }
+
+  @Test
+  void shouldAdmitEachFinanceTaskPermission_alone() {
+    for (String code :
+        List.of(
+            "withdrawal:review",
+            "withdrawal:pay",
+            "prepay:review",
+            "prepay:finance-review",
+            "prepay:pay")) {
+      var viewer = staff(6L, DataScope.ALL, Set.of(code));
+      assertThat(
+              service
+                  .financeTasks(viewer, new FinanceFilter(null, null, null, null, 1, 20))
+                  .total())
+          .isZero();
+    }
+    // platform admins and permission-less staff are refused
+    assertThatThrownBy(
+            () ->
+                service.financeTasks(
+                    staff(8L, DataScope.ALL, Set.of("order:view")),
+                    new FinanceFilter(null, null, null, null, 1, 20)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
+  }
+
+  @Test
+  void shouldResolveTheConcurrentInsert_viaTheUniqueKey() {
+    // insert loses the race (created == 0) and the request id now resolves to the winner
+    when(withdrawals.insert(any())).thenReturn(0);
+    when(withdrawals.findIdByRequest(anyLong(), any(UUID.class))).thenReturn(ID);
+    var winner =
+        new WithdrawalRow(
+            ID,
+            KOL,
+            "W1",
+            UUID.fromString(UUID_TEXT),
+            applyFingerprint("250.00", "p@example.com"),
+            null,
+            new BigDecimal("250.00"),
+            "PENDING_REVIEW",
+            false,
+            null,
+            null,
+            "PAYPAL",
+            cipherText(),
+            "p***@example.com",
+            "USD",
+            null,
+            "Creator Name",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            KOL,
+            NOW);
+    when(withdrawals.findRow(anyLong())).thenReturn(winner);
+    var detail =
+        service.apply(
+            kol(),
+            new ApplyCommand(
+                UUID_TEXT,
+                "250.00",
+                null,
+                null,
+                new AccountInput("PAYPAL", "p@example.com", "Creator Name", "USD", null, null),
+                null));
+    assertThat(detail.id()).isEqualTo(ID);
+  }
+
+  @Test
+  void shouldValidateActualAmountShapes_beyondTheHappyPath() {
+    when(withdrawals.findRow(anyLong())).thenReturn(row("PENDING_PAYMENT", KOL));
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
+    // leading zero beyond "0", 7 fraction digits, over the ceiling, and empty
+    for (String bad : List.of("01.00", "0.1234567", "1000000000000.00", "")) {
+      assertThatThrownBy(
+              () ->
+                  service.pay(
+                      payer,
+                      ID,
+                      new WithdrawalService.PaymentCommand(
+                          UUID_TEXT,
+                          "400.00",
+                          bad,
+                          "CNY",
+                          "2026-10-25T12:00:00+08:00",
+                          "bank",
+                          null,
+                          null,
+                          901L)))
+          .isInstanceOfSatisfying(
+              BusinessException.class,
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    }
+  }
+
+  @Test
+  void shouldRequirePaypalCurrency_andRejectEmptyValues() {
+    // missing PayPal currency fails validation
+    assertThatThrownBy(
+            () ->
+                service.apply(
+                    kol(),
+                    new ApplyCommand(
+                        UUID.randomUUID().toString(),
+                        "250.00",
+                        null,
+                        null,
+                        new AccountInput("PAYPAL", "p@example.com", "Creator", null, null, null),
+                        null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+  }
+
+  private static String applyFingerprint(String amount, String email) {
+    String canonical =
+        UUID_TEXT
+            + "|"
+            + new BigDecimal(amount).toPlainString()
+            + "|||PAYPAL|"
+            + email
+            + "|"
+            + "Creator Name|USD|||";
+    try {
+      return java.util.HexFormat.of()
+          .formatHex(
+              java.security.MessageDigest.getInstance("SHA-256")
+                  .digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    } catch (java.security.NoSuchAlgorithmException exception) {
+      throw new IllegalStateException(exception);
+    }
+  }
+
   // ------------------------------------------------------------------ helpers
 
   private static WithdrawalService.PaymentCommand payment() {
@@ -469,9 +873,8 @@ class WithdrawalServiceScopeTest {
     return row(status, false);
   }
 
-  private static WithdrawalRow.Head head() {
-    return new WithdrawalRow.Head(
-        ID, KOL, "W1", new BigDecimal("400.00"), "PENDING_REVIEW", KOL, NOW);
+  private static WithdrawalRow.Head head(String status) {
+    return new WithdrawalRow.Head(ID, KOL, "W1", new BigDecimal("400.00"), status, KOL, NOW);
   }
 
   private static WithdrawalRow row(String status, long kolId) {
@@ -531,6 +934,19 @@ class WithdrawalServiceScopeTest {
         null, // reviewedAt
         KOL, // actorId
         NOW);
+  }
+
+  private static PayoutAccountDO approvedAccount(long id) {
+    var account = new PayoutAccountDO();
+    account.setId(id);
+    account.setTenantId(COMPANY);
+    account.setKolId(KOL);
+    account.setAccountType(PayoutAccountType.USDT);
+    account.setAccountCipher(cipherText());
+    account.setAccountMasked("m***d");
+    account.setHolderName("Creator Name");
+    account.setStatus(PayoutAccountStatus.APPROVED);
+    return account;
   }
 
   private static String cipherText() {

@@ -23,11 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ItemStateWithdrawalFundingSource implements WithdrawalFundingSource {
   private final CommissionItemStateMapper states;
   private final WithdrawalMapper withdrawals;
+  private final CommissionRuleConfigService ruleConfig;
 
   public ItemStateWithdrawalFundingSource(
-      CommissionItemStateMapper states, WithdrawalMapper withdrawals) {
+      CommissionItemStateMapper states,
+      WithdrawalMapper withdrawals,
+      CommissionRuleConfigService ruleConfig) {
     this.states = states;
     this.withdrawals = withdrawals;
+    this.ruleConfig = ruleConfig;
   }
 
   @Override
@@ -81,8 +85,8 @@ public class ItemStateWithdrawalFundingSource implements WithdrawalFundingSource
   @Override
   @Transactional(readOnly = true)
   public String configVersion(long kolId) {
-    return Integer.toString(
-        states.aggregateByKol(List.of(kolId)).stream().findFirst().map(row -> 0).orElse(0));
+    // The version the conditions' minimum came from; 0 while only the defaults apply (ADR-032 §4).
+    return Integer.toString(ruleConfig.current().version());
   }
 
   private record KolAccrual(BigDecimal estimated, BigDecimal frozen) {}

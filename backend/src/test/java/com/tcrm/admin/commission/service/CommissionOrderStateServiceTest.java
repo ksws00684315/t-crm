@@ -14,6 +14,7 @@ import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.order.api.CommissionOrderStateApi;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,6 +109,59 @@ class CommissionOrderStateServiceTest {
             .map(line -> line.commissionAmount().subtract(line.releasedAmount()))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     assertThat(frozen).isEqualByComparingTo("10.00");
+  }
+
+  @Test
+  void shouldMapActivelyOccupiedRow_toWithdrawing_overTheReleaseLadder() {
+    // released > 0 would read WITHDRAWABLE, but an in-flight application occupies the line
+    CommissionItemStateDO row = state(9003L, 5003L, KOL, "10.00", "10.00", true);
+    when(states.listByOrderItemIds(List.of(9003L))).thenReturn(List.of(row));
+    when(withdrawals.listOccupationsByKol(KOL))
+        .thenReturn(List.of(occupation(9003L, "PENDING_PAYMENT")));
+    var result = service.listByOrderItemIds(KOL, List.of(9003L));
+    assertThat(result.getFirst().settlementStatus()).isEqualTo("WITHDRAWING");
+  }
+
+  @Test
+  void shouldMapPaidOccupiedRow_toWithdrawn_evenWhenFrozen() {
+    CommissionItemStateDO row = state(9004L, 5004L, KOL, "10.00", "0.00", true);
+    when(states.listByOrderItemIds(List.of(9004L))).thenReturn(List.of(row));
+    when(withdrawals.listOccupationsByKol(KOL)).thenReturn(List.of(occupation(9004L, "PAID")));
+    var result = service.listByOrderItemIds(KOL, List.of(9004L));
+    assertThat(result.getFirst().settlementStatus()).isEqualTo("WITHDRAWN");
+  }
+
+  @Test
+  void shouldPreferWithdrawn_overWithdrawing_whenBothApplicationsTouchTheLine() {
+    CommissionItemStateDO row = state(9005L, 5005L, KOL, "10.00", "10.00", true);
+    when(states.listByOrderItemIds(List.of(9005L))).thenReturn(List.of(row));
+    when(withdrawals.listOccupationsByKol(KOL))
+        .thenReturn(List.of(occupation(9005L, "PENDING_REVIEW"), occupation(9005L, "PAID")));
+    var result = service.listByOrderItemIds(KOL, List.of(9005L));
+    assertThat(result.getFirst().settlementStatus()).isEqualTo("WITHDRAWN");
+  }
+
+  @Test
+  void shouldIgnoreForeignOccupations_andKeepTheLadderForUnoccupiedLines() {
+    CommissionItemStateDO row = state(9006L, 5006L, KOL, "10.00", "10.00", true);
+    when(states.listByOrderItemIds(List.of(9006L))).thenReturn(List.of(row));
+    // occupations belong to the same mapper query but a different item line
+    when(withdrawals.listOccupationsByKol(KOL)).thenReturn(List.of(occupation(9999L, "PAID")));
+    var result = service.listByOrderItemIds(KOL, List.of(9006L));
+    assertThat(result.getFirst().settlementStatus()).isEqualTo("WITHDRAWABLE");
+  }
+
+  private static WithdrawalMapper.OccupationRow occupation(long orderItemId, String status) {
+    return new WithdrawalMapper.OccupationRow(
+        orderItemId,
+        77L,
+        "W1",
+        status,
+        new BigDecimal("1.00"),
+        new BigDecimal("1.00"),
+        BigDecimal.ZERO,
+        Instant.EPOCH,
+        null);
   }
 
   private static CommissionItemStateDO state(
