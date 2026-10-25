@@ -219,6 +219,8 @@ const enUS: MessageSchema = {
       "Payment is already recorded or this payment ID has different data. Check the payment result.",
     PREPAY_FILE_INVALID: "Prepay attachments and vouchers must be valid PNG, JPEG or PDF files.",
     PREPAY_FILE_TOO_LARGE: "Prepay attachments and vouchers must not exceed 10 MB.",
+    COMMISSION_CONFIG_VERSION_CONFLICT:
+      "The settlement config was changed by someone else. Reload and retry.",
     SYSTEM_CONFIG_INVALID: "This system configuration value is invalid.",
     COMMON_VALIDATION_FAILED: "Some of the information is not valid. Please check and try again.",
     COMMON_NOT_FOUND: "The requested item does not exist.",

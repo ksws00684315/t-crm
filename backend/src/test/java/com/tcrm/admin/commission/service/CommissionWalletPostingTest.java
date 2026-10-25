@@ -141,9 +141,10 @@ class CommissionWalletPostingTest {
             new CommissionWalletService.CreditCommand(11, 22, 33, null, new BigDecimal("1"), TIME)),
         Arguments.of(
             new CommissionWalletService.CreditCommand(11, 22, 33, " ", new BigDecimal("1"), TIME)),
+        // Ledger source_key was widened to VARCHAR(160) by task 62; 161 is the boundary.
         Arguments.of(
             new CommissionWalletService.CreditCommand(
-                11, 22, 33, "x".repeat(121), new BigDecimal("1"), TIME)),
+                11, 22, 33, "x".repeat(161), new BigDecimal("1"), TIME)),
         Arguments.of(new CommissionWalletService.CreditCommand(11, 22, 33, "key", null, TIME)),
         Arguments.of(command("0")),
         Arguments.of(command("-1")),

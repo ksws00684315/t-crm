@@ -172,8 +172,11 @@ class SystemIT {
         .extracting(row -> row.get("table_name") + ":" + row.get("is_nullable"))
         .containsExactlyInAnyOrder(
             "crm_click_log:NO",
+            "crm_commission_item_revision:NO",
+            "crm_commission_item_state:NO",
             "crm_commission_ledger:NO",
             "crm_commission_recovery:NO",
+            "crm_commission_rule_version:NO",
             "crm_commission_wallet:NO",
             "crm_copy_job:NO",
             "crm_copy_job_item:NO",

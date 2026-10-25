@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.tcrm.admin.order.api.CommissionOrderStateApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.model.OrderDO;
@@ -35,12 +36,17 @@ public class KolAnalyticsService {
   private final OrderMapper orders;
   private final OrderItemMapper orderItems;
   private final CurrentKolContext current;
+  private final CommissionOrderStateApi commissionStates;
 
   public KolAnalyticsService(
-      OrderMapper orders, OrderItemMapper orderItems, CurrentKolContext current) {
+      OrderMapper orders,
+      OrderItemMapper orderItems,
+      CurrentKolContext current,
+      CommissionOrderStateApi commissionStates) {
     this.orders = orders;
     this.orderItems = orderItems;
     this.current = current;
+    this.commissionStates = commissionStates;
   }
 
   public KolAnalyticsOverviewDTO overview(String fromText, String toText) {
@@ -63,6 +69,7 @@ public class KolAnalyticsService {
                 .lt(OrderDO::getPayTime, to.toInstant()));
     BigDecimal sales = BigDecimal.ZERO;
     Map<String, BigDecimal> byDay = new TreeMap<>();
+    ZoneOffset bucket = from.getOffset();
     if (!range.isEmpty()) {
       List<Long> orderIds = range.stream().map(OrderDO::getId).toList();
       Map<Long, BigDecimal> perOrder = new HashMap<>();
@@ -70,7 +77,6 @@ public class KolAnalyticsService {
         BigDecimal amount = line.getPayAmount() == null ? BigDecimal.ZERO : line.getPayAmount();
         perOrder.merge(line.getOrderId(), amount, BigDecimal::add);
       }
-      ZoneOffset bucket = from.getOffset();
       for (OrderDO order : range) {
         BigDecimal amount = money(perOrder.getOrDefault(order.getId(), BigDecimal.ZERO));
         sales = sales.add(amount);
@@ -78,12 +84,60 @@ public class KolAnalyticsService {
             order.getPayTime().atZone(bucket).toLocalDate().toString(), amount, BigDecimal::add);
       }
     }
+    // Commission accrual of the creator's lines, grouped by the order's pay date (task 62 via the
+    // commission port). Withdrawn/withdrawing stay zero until task 63 stores allocations.
+    Map<Long, BigDecimal> commissionByOrder = new HashMap<>();
+    BigDecimal commission = BigDecimal.ZERO;
+    Map<String, BigDecimal> commissionByDay = new TreeMap<>();
+    List<CommissionOrderStateApi.ItemCommissionStateDTO> commissionLines =
+        commissionStates.listByKolAndOrderIds(
+            kol.id(), range.stream().map(OrderDO::getId).toList());
+    for (CommissionOrderStateApi.ItemCommissionStateDTO line : commissionLines) {
+      BigDecimal amount =
+          line.commissionAmount() == null ? BigDecimal.ZERO : line.commissionAmount();
+      commission = commission.add(amount);
+      commissionByOrder.merge(line.orderId(), amount, BigDecimal::add);
+    }
+    for (OrderDO order : range) {
+      BigDecimal amount = commissionByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+      if (amount.signum() == 0) {
+        continue;
+      }
+      commissionByDay.merge(
+          order.getPayTime().atZone(bucket).toLocalDate().toString(), amount, BigDecimal::add);
+    }
     List<KolAnalyticsOverviewDTO.Day> daily = new ArrayList<>();
     for (Map.Entry<String, BigDecimal> day : byDay.entrySet()) {
-      daily.add(new KolAnalyticsOverviewDTO.Day(day.getKey(), money(day.getValue()), zero()));
+      daily.add(
+          new KolAnalyticsOverviewDTO.Day(
+              day.getKey(),
+              money(day.getValue()),
+              money(commissionByDay.getOrDefault(day.getKey(), BigDecimal.ZERO))));
     }
     return new KolAnalyticsOverviewDTO(
-        Instant.now(), money(sales), range.size(), zero(), zero(), zero(), zero(), daily);
+        Instant.now(),
+        money(sales),
+        range.size(),
+        money(commission),
+        zero(),
+        zero(),
+        money(currentFrozen(kol.id())),
+        daily);
+  }
+
+  /** Current frozen commission: accrued but not yet released, over all live rows (as of now). */
+  /**
+   * Current frozen commission over all live rows (as of now): accrued minus released, including the
+   * still-frozen part of partially released lines.
+   */
+  private BigDecimal currentFrozen(long kolId) {
+    BigDecimal frozen = BigDecimal.ZERO;
+    for (CommissionOrderStateApi.ItemCommissionStateDTO line : commissionStates.listByKol(kolId)) {
+      if (line.commissionAmount() != null && line.releasedAmount() != null) {
+        frozen = frozen.add(line.commissionAmount().subtract(line.releasedAmount()));
+      }
+    }
+    return frozen;
   }
 
   private List<OrderItemDO> ownLines(List<Long> orderIds, KolAccountDTO kol) {
