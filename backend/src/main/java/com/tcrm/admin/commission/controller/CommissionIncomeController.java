@@ -108,21 +108,20 @@ public class CommissionIncomeController {
     }
   }
 
-  /** List envelope: page plus summary (11.02). */
-  public record IncomeResultVO(PageVO page, SummaryVO summary) {
+  /**
+   * Flat list envelope (ADR-032 appendix A {@code IncomeResult}): page fields sit beside {@code
+   * summary}. Counts are JSON numbers; ids and amounts stay strings.
+   */
+  public record IncomeResultVO(
+      List<IncomeVO> items, int total, int page, int size, SummaryVO summary) {
     static IncomeResultVO from(IncomePage result) {
-      return new IncomeResultVO(PageVO.from(result.page()), SummaryVO.from(result.summary()));
-    }
-  }
-
-  /** Page of income rows (flat page shape plus the summary outside). */
-  public record PageVO(List<IncomeVO> items, long total, int page, int size) {
-    static PageVO from(PageResult<IncomeRow> result) {
-      return new PageVO(
-          result.items().stream().map(IncomeVO::from).toList(),
-          result.total(),
-          result.page(),
-          result.size());
+      PageResult<IncomeRow> page = result.page();
+      return new IncomeResultVO(
+          page.items().stream().map(IncomeVO::from).toList(),
+          count(page.total()),
+          page.page(),
+          page.size(),
+          SummaryVO.from(result.summary()));
     }
   }
 
@@ -134,8 +133,8 @@ public class CommissionIncomeController {
       String email,
       String bdId,
       String bd,
-      String orderCount,
-      String quantity,
+      int orderCount,
+      int quantity,
       String estimated,
       String frozen,
       String available,
@@ -147,7 +146,7 @@ public class CommissionIncomeController {
       String commissionPaid,
       String prepayPaid,
       String lastPaidAt,
-      long unverified) {
+      int unverified) {
     static IncomeVO from(IncomeRow row) {
       return new IncomeVO(
           String.valueOf(row.kolId()),
@@ -156,8 +155,8 @@ public class CommissionIncomeController {
           row.email(),
           row.bdId() == null ? null : String.valueOf(row.bdId()),
           row.bd(),
-          String.valueOf(row.orderCount()),
-          String.valueOf(row.quantity()),
+          count(row.orderCount()),
+          count(row.quantity()),
           money(row.money().estimated()),
           money(row.money().frozen()),
           money(row.money().available()),
@@ -169,19 +168,28 @@ public class CommissionIncomeController {
           money(row.money().commissionPaid()),
           money(row.money().prepayPaid()),
           row.money().lastPaidAt() == null ? null : row.money().lastPaidAt().toString(),
-          row.unverified());
+          count(row.unverified()));
     }
   }
 
-  /** Summary row of the list (11.02). */
-  public record SummaryVO(String paid, long creators, long orders, long quantity, long unverified) {
+  /** Summary row of the list (11.02). {@code paid} is commission plus prepay. */
+  public record SummaryVO(
+      String paid,
+      String commissionPaid,
+      String prepayPaid,
+      int creators,
+      int orders,
+      int quantity,
+      int unverified) {
     static SummaryVO from(Summary summary) {
       return new SummaryVO(
           money(summary.paid()),
-          summary.creators(),
-          summary.orders(),
-          summary.quantity(),
-          summary.unverified());
+          money(summary.commissionPaid()),
+          money(summary.prepayPaid()),
+          count(summary.creators()),
+          count(summary.orders()),
+          count(summary.quantity()),
+          count(summary.unverified()));
     }
   }
 
@@ -201,6 +209,8 @@ public class CommissionIncomeController {
       String id,
       String orderNo,
       String itemId,
+      String product,
+      String sku,
       String image,
       String base,
       String rate,
@@ -219,6 +229,8 @@ public class CommissionIncomeController {
           String.valueOf(line.id()),
           line.orderNo(),
           String.valueOf(line.itemId()),
+          line.product(),
+          line.sku(),
           line.image(),
           line.base(),
           line.rate(),
@@ -272,5 +284,12 @@ public class CommissionIncomeController {
     return (value == null ? BigDecimal.ZERO : value)
         .setScale(2, java.math.RoundingMode.HALF_UP)
         .toPlainString();
+  }
+
+  /**
+   * Counts are JSON numbers. {@code long} would be written as a string by the shared serializer.
+   */
+  private static int count(long value) {
+    return Math.toIntExact(value);
   }
 }

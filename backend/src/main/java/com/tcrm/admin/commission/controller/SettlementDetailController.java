@@ -36,7 +36,7 @@ public class SettlementDetailController {
 
   @SaCheckPermission("commission:view")
   @GetMapping("/admin-api/commission/settlement-details")
-  public R<PageResult<SettlementVO>> list(@Valid @ModelAttribute Query query) {
+  public R<SettlementPageVO> list(@Valid @ModelAttribute Query query) {
     AccountDTO user = current.user();
     PageResult<SettlementRow> page =
         details.page(
@@ -47,7 +47,7 @@ public class SettlementDetailController {
                 query.shopId(),
                 query.pageNumber(),
                 query.pageSize()));
-    return R.ok(page.map(SettlementVO::from));
+    return R.ok(SettlementPageVO.from(page));
   }
 
   /** Query of the settlement detail list; {@code channel} currently accepts WEIDIAN only. */
@@ -63,6 +63,20 @@ public class SettlementDetailController {
 
     public int pageSize() {
       return size == null ? 20 : size;
+    }
+  }
+
+  /**
+   * Page of clearing rows. {@code total} is a JSON number (ADR-032); {@code int} keeps it out of
+   * the shared long-to-string serializer.
+   */
+  public record SettlementPageVO(List<SettlementVO> items, int total, int page, int size) {
+    static SettlementPageVO from(PageResult<SettlementRow> page) {
+      return new SettlementPageVO(
+          page.items().stream().map(SettlementVO::from).toList(),
+          Math.toIntExact(page.total()),
+          page.page(),
+          page.size());
     }
   }
 
@@ -108,6 +122,8 @@ public class SettlementDetailController {
       String id,
       String orderNo,
       String itemId,
+      String product,
+      String sku,
       String image,
       String base,
       String rate,
@@ -126,6 +142,8 @@ public class SettlementDetailController {
           String.valueOf(line.id()),
           line.orderNo(),
           String.valueOf(line.itemId()),
+          line.product(),
+          line.sku(),
           line.image(),
           line.base(),
           line.rate(),

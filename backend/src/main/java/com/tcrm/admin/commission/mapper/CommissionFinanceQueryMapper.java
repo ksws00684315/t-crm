@@ -51,7 +51,11 @@ public interface CommissionFinanceQueryMapper {
           + " GROUP BY l.kol_id</script>")
   List<KolMoneyRow> pendingDeductions(@Param("kolIds") Collection<Long> kolIds);
 
-  /** Commission withdrawals already paid out per KOL (zero until task 63 registers payments). */
+  /**
+   * Cumulative commission already posted to the ledger ({@code COMMISSION_WITHDRAWAL}). Period
+   * windows read {@code crm_commission_withdrawal_payment} instead; this sum is only the cumulative
+   * paid figure.
+   */
   @Select(
       "<script>SELECT kol_id, COALESCE(-SUM(amount_cny), 0) AS amount_cny FROM crm_commission_ledger"
           + " WHERE entry_type = 'COMMISSION_WITHDRAWAL' AND kol_id IN "
@@ -75,8 +79,8 @@ public interface CommissionFinanceQueryMapper {
       @Param("end") Instant end);
 
   /**
-   * Unified payment rows for income details and KOL fund records: prepay payments (commission
-   * withdrawal payments join in task 63), newest first.
+   * Prepay payment rows for income details and KOL fund records, newest first. Commission
+   * withdrawal payments are read from {@code WithdrawalMapper}.
    */
   @Select(
       "<script>SELECT pp.id AS payment_id, pr.id AS source_id, pr.prepay_no AS source_no,"
