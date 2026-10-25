@@ -103,6 +103,21 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
       """)
   List<CommissionItemStateDO> listByKol(@Param("kolId") long kolId);
 
+  /**
+   * Rows whose commission has been released into the wallet, in FIFO withdrawal order (release
+   * time, then order item id). Verified, live, not blocked by after-sales, release actually due.
+   */
+  @Select(
+      """
+      SELECT * FROM crm_commission_item_state
+      WHERE is_deleted = FALSE AND kol_id = #{kolId} AND verified = TRUE
+        AND after_sales = FALSE AND release_basis IN ('CONFIRMED', 'FALLBACK')
+        AND release_at <= #{now} AND released_commission_cny > 0
+      ORDER BY release_at, order_item_id
+      """)
+  List<CommissionItemStateDO> listReleasedForWithdrawal(
+      @Param("kolId") long kolId, @Param("now") Instant now);
+
   /** Logically deletes snapshots whose order item lines disappeared from a later full sync. */
   @Update(
       "<script>UPDATE crm_commission_item_state SET is_deleted = TRUE, update_time = #{now}"

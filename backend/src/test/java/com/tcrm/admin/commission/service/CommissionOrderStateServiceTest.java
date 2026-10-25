@@ -2,12 +2,14 @@ package com.tcrm.admin.commission.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.order.api.CommissionOrderStateApi;
@@ -22,12 +24,14 @@ class CommissionOrderStateServiceTest {
 
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
+  private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final CommissionOrderStateService service =
-      new CommissionOrderStateService(states, revisions);
+      new CommissionOrderStateService(states, revisions, withdrawals);
 
   @BeforeEach
   void prepare() {
     lenient().when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of());
+    lenient().when(withdrawals.listOccupationsByKol(anyLong())).thenReturn(List.of());
   }
 
   @Test

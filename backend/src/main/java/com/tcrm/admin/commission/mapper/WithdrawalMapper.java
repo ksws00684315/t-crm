@@ -452,6 +452,52 @@ public interface WithdrawalMapper {
       """)
   Long countPrepayTasks(@Param("q") FinanceTaskQuery query);
 
+  /** Paid withdrawals of one creator for the fund records page (11.02, task 63). */
+  @Select(
+      """
+      SELECT w.id AS withdrawal_id, w.application_no, w.amount_cny, w.account_masked,
+             w.create_time AS submitted_at, p.paid_at
+      FROM crm_commission_withdrawal w
+      JOIN crm_commission_withdrawal_payment p ON p.withdrawal_id = w.id
+      WHERE w.kol_id = #{kolId} AND w.status = 'PAID'
+      ORDER BY w.create_time DESC, w.id DESC
+      """)
+  List<KolPaidWithdrawalRow> listKolPaidWithdrawals(@Param("kolId") long kolId);
+
+  /** One paid withdrawal row of the creator's fund records. */
+  record KolPaidWithdrawalRow(
+      long withdrawalId,
+      String applicationNo,
+      BigDecimal amountCny,
+      String accountMasked,
+      java.time.Instant submittedAt,
+      java.time.Instant paidAt) {}
+
+  /** Funding occupation of one creator: pending + paid applications hold this money. */
+  @Select(
+      """
+      SELECT COALESCE(SUM(amount_cny), 0)
+      FROM crm_commission_withdrawal
+      WHERE kol_id = #{kolId} AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+      """)
+  BigDecimal sumFundingOccupied(@Param("kolId") long kolId);
+
+  /** All funding-status occupations of one creator (order-chain states, task 64 workbench). */
+  @Select(
+      """
+      SELECT a.order_item_id AS order_item_id, w.id AS withdrawal_id,
+             w.application_no AS application_no, w.status AS status,
+             a.occupied_cny AS occupied_cny, a.source_released_cny AS source_released_cny,
+             a.remaining_snapshot_cny AS remaining_snapshot_cny,
+             w.create_time AS submitted_at, p.paid_at AS paid_at
+      FROM crm_commission_withdrawal_allocation a
+      JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id
+      LEFT JOIN crm_commission_withdrawal_payment p ON p.withdrawal_id = w.id
+      WHERE w.kol_id = #{kolId}
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+      """)
+  List<OccupationRow> listOccupationsByKol(@Param("kolId") long kolId);
+
   /** One persisted order-level snapshot row (13.04: 每单一行). */
   record OrderSnapshotRow(
       long id,

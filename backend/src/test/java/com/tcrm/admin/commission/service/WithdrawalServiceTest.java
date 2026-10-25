@@ -83,6 +83,7 @@ class WithdrawalServiceTest {
   private final SecretCipher cipher = new SecretCipher(KEY);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final SystemConfigApi configs = mock(SystemConfigApi.class);
+  private final CommissionRuleConfigService ruleConfig = mock(CommissionRuleConfigService.class);
   private WithdrawalService service;
 
   @BeforeEach
@@ -103,9 +104,14 @@ class WithdrawalServiceTest {
                 products,
                 cipher,
                 audit,
+                ruleConfig,
                 configs,
                 Clock.fixed(NOW, ZoneOffset.UTC)));
     when(configs.getInt("commission.minimum-withdrawal-cny")).thenReturn(200);
+    when(ruleConfig.current())
+        .thenReturn(
+            new CommissionRuleConfigService.CurrentConfig(
+                0, new BigDecimal("200.00"), "SETTLE_TIME", 7, null));
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(5L)));
     when(kols.lockKol(KOL)).thenReturn(true);
     when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("500.00"));
@@ -187,16 +193,20 @@ class WithdrawalServiceTest {
   }
 
   @Test
-  void shouldSubtractExistingOccupations_whenAllocatingFifo() {
-    // item1 released 350.00 with 100.00 already occupied → 250.00 left; item2 150.00;
-    // application 300.00 takes 250.00 from item1 (remaining snapshot 0.00) and 50.00 from item2
-    // (remaining snapshot 100.00).
-    when(withdrawals.sumOccupiedByItem(eq(KOL), anyList()))
-        .thenReturn(List.of(new WithdrawalMapper.ItemOccupation(ITEM_1, new BigDecimal("100.00"))));
+  void shouldAllocateOnlyTheLeftover_theFundingSourceReports() {
+    // The funding source already nets occupations out: item1 leftover 250.00 (350.00 released
+    // minus 100.00 occupied), item2 150.00. Application 300.00 takes 250.00 from item1 (remaining
+    // snapshot 0.00) and 50.00 from item2 (remaining snapshot 100.00).
+    when(funding.listReleasedRows(KOL))
+        .thenReturn(
+            List.of(
+                new FundingRow(ITEM_1, 0L, new BigDecimal("250.00")),
+                new FundingRow(ITEM_2, 0L, new BigDecimal("150.00"))));
     service.apply(kol(), apply("300.00", null));
     List<WithdrawalWrite.Allocation> allocations = allocations();
     assertThat(allocations.get(0).occupied()).isEqualByComparingTo("250.00");
     assertThat(allocations.get(0).remainingSnapshot()).isEqualByComparingTo("0.00");
+    assertThat(allocations.get(0).sourceReleased()).isEqualByComparingTo("250.00");
     assertThat(allocations.get(1).occupied()).isEqualByComparingTo("50.00");
     assertThat(allocations.get(1).remainingSnapshot()).isEqualByComparingTo("100.00");
   }

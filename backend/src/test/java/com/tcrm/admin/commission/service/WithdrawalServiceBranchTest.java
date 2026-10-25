@@ -69,6 +69,7 @@ class WithdrawalServiceBranchTest {
       new SecretCipher(java.util.Base64.getEncoder().encodeToString(new byte[32]));
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final SystemConfigApi configs = mock(SystemConfigApi.class);
+  private final CommissionRuleConfigService ruleConfig = mock(CommissionRuleConfigService.class);
   private WithdrawalService service;
 
   @BeforeEach
@@ -88,9 +89,14 @@ class WithdrawalServiceBranchTest {
             products,
             cipher,
             audit,
+            ruleConfig,
             configs,
             Clock.fixed(NOW, ZoneOffset.UTC));
     when(configs.getInt(any())).thenReturn(200);
+    when(ruleConfig.current())
+        .thenReturn(
+            new CommissionRuleConfigService.CurrentConfig(
+                0, new BigDecimal("200.00"), "SETTLE_TIME", 7, null));
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(5L)));
     when(kols.lockKol(KOL)).thenReturn(true);
     when(kols.listByIdsIncludingDeleted(anyList())).thenReturn(List.of(kol(5L)));

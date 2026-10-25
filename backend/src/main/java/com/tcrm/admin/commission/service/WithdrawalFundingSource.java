@@ -4,16 +4,14 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Settlement side of the withdrawal contract (ADR-032 §6): released order items for the FIFO
- * allocation plus the numbers the withdrawal conditions show. Task 62's settlement engine
- * implements this against commission item state; until that merges, {@link
- * UnsettledWithdrawalFundingSource} keeps the bean available and tests stub it with fixed rows.
+ * Settlement side of the withdrawal contract (ADR-032 §6), implemented by {@link
+ * ItemStateWithdrawalFundingSource} over task 62's commission item state.
  */
 public interface WithdrawalFundingSource {
   /**
-   * Order items of this creator whose commission has been released to the wallet, in stable FIFO
-   * order (release time, then order item id). Each row carries the item's total released amount and
-   * its commission item state id; the withdrawal side subtracts its own allocations.
+   * Order items of this creator whose commission has been released to the wallet and is not yet
+   * occupied, in stable FIFO order (release time, then order item id). Each row carries the item's
+   * leftover released amount and its commission item state id.
    */
   List<FundingRow> listReleasedRows(long kolId);
 
@@ -29,6 +27,6 @@ public interface WithdrawalFundingSource {
   /** Current settlement config version ("0" before task 62's rule versions exist). */
   String configVersion(long kolId);
 
-  /** One released order item. */
+  /** One released order item with its leftover. */
   record FundingRow(long orderItemId, long itemStateId, BigDecimal releasedCny) {}
 }

@@ -102,6 +102,7 @@ public class WithdrawalService {
   private final ProductAccessApi products;
   private final SecretCipher cipher;
   private final ExternalAuditApi audit;
+  private final CommissionRuleConfigService ruleConfig;
   private final SystemConfigApi configs;
   private final Clock clock;
 
@@ -120,6 +121,7 @@ public class WithdrawalService {
       ProductAccessApi products,
       SecretCipher cipher,
       ExternalAuditApi audit,
+      CommissionRuleConfigService ruleConfig,
       SystemConfigApi configs) {
     this(
         withdrawals,
@@ -135,6 +137,7 @@ public class WithdrawalService {
         products,
         cipher,
         audit,
+        ruleConfig,
         configs,
         Clock.systemUTC());
   }
@@ -153,6 +156,7 @@ public class WithdrawalService {
       ProductAccessApi products,
       SecretCipher cipher,
       ExternalAuditApi audit,
+      CommissionRuleConfigService ruleConfig,
       SystemConfigApi configs,
       Clock clock) {
     this.withdrawals = withdrawals;
@@ -168,6 +172,7 @@ public class WithdrawalService {
     this.products = products;
     this.cipher = cipher;
     this.audit = audit;
+    this.ruleConfig = ruleConfig;
     this.configs = configs;
     this.clock = clock;
   }
@@ -1481,15 +1486,10 @@ public class WithdrawalService {
    * and the order-level snapshots are persisted here and never recomputed on reads.
    */
   private void allocate(long withdrawalId, long kolId, BigDecimal amount, Instant now) {
+    // The funding source already subtracts existing occupations: each row's amount is the
+    // leftover released money of that order item.
     List<FundingRow> rows = funding.listReleasedRows(kolId);
     List<Long> itemIds = rows.stream().map(FundingRow::orderItemId).toList();
-    Map<Long, BigDecimal> occupiedByItem = new HashMap<>();
-    if (!itemIds.isEmpty()) {
-      for (WithdrawalMapper.ItemOccupation occupation :
-          withdrawals.sumOccupiedByItem(kolId, itemIds)) {
-        occupiedByItem.put(occupation.orderItemId(), occupation.occupiedCny());
-      }
-    }
     Map<Long, OrderItemInfoDTO> itemById = new HashMap<>();
     for (OrderItemInfoDTO item : orderItems.listByIds(itemIds)) {
       itemById.put(item.id(), item);
@@ -1517,8 +1517,7 @@ public class WithdrawalService {
         // in the wallet and can be withdrawn once the settlement side reconciles it (task 62).
         continue;
       }
-      BigDecimal itemRemaining =
-          row.releasedCny().subtract(nz(occupiedByItem.get(row.orderItemId())));
+      BigDecimal itemRemaining = row.releasedCny();
       BigDecimal afterAllocation = itemRemaining;
       if (remaining.signum() > 0 && itemRemaining.signum() > 0) {
         BigDecimal take = remaining.min(itemRemaining);
@@ -1776,7 +1775,12 @@ public class WithdrawalService {
   }
 
   private BigDecimal minimum() {
-    return BigDecimal.valueOf(configs.getInt(MINIMUM_KEY)).setScale(2, RoundingMode.UNNECESSARY);
+    // The settlement config version wins once saved; the sys-config fallback keeps the original
+    // default (200) before task 62's rule versions exist (ADR-032 §4).
+    BigDecimal saved = ruleConfig.current().minimumCny();
+    return saved == null
+        ? BigDecimal.valueOf(configs.getInt(MINIMUM_KEY)).setScale(2, RoundingMode.UNNECESSARY)
+        : saved;
   }
 
   private static BigDecimal requireBalance(BigDecimal balance) {

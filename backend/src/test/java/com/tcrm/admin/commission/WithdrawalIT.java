@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.commission.service.CommissionWalletService;
-import com.tcrm.admin.commission.service.WithdrawalFundingSource;
-import com.tcrm.admin.commission.service.WithdrawalFundingSource.FundingRow;
 import com.tcrm.admin.commission.service.WithdrawalOutboxDelivery;
 import com.tcrm.admin.commission.service.WithdrawalService;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -25,15 +23,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -85,57 +79,11 @@ class WithdrawalIT {
     WeidianTestProperties.register(registry);
   }
 
-  /** Contract stub of the settlement side: fixed released rows per creator, per test. */
-  @TestConfiguration
-  static class FundingStubConfiguration {
-    @Bean
-    @Primary
-    StubFundingSource testFundingSource() {
-      return new StubFundingSource();
-    }
-  }
-
-  static final class StubFundingSource implements WithdrawalFundingSource {
-    final Map<Long, List<FundingRow>> rowsByKol = new ConcurrentHashMap<>();
-
-    void release(long kolId, FundingRow... rows) {
-      rowsByKol.put(kolId, List.of(rows));
-    }
-
-    @Override
-    public List<FundingRow> listReleasedRows(long kolId) {
-      return rowsByKol.getOrDefault(kolId, List.of());
-    }
-
-    @Override
-    public BigDecimal frozenCny(long kolId) {
-      return new BigDecimal("0.00");
-    }
-
-    @Override
-    public BigDecimal estimatedCny(long kolId) {
-      return rowsByKol.getOrDefault(kolId, List.of()).stream()
-          .map(FundingRow::releasedCny)
-          .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    @Override
-    public long unverifiedCount(long kolId) {
-      return 0L;
-    }
-
-    @Override
-    public String configVersion(long kolId) {
-      return "0";
-    }
-  }
-
   @Autowired private JdbcTemplate jdbc;
   @Autowired private WithdrawalService withdrawals;
   @Autowired private CommissionWalletService walletService;
   @Autowired private WithdrawalOutboxDelivery outbox;
   @Autowired private SecretCipher cipher;
-  @Autowired private StubFundingSource funding;
   private Long kolId;
 
   @AfterEach
@@ -150,6 +98,8 @@ class WithdrawalIT {
   }
 
   private void cleanupKol(long tenantId, long kol) {
+    jdbc.update(
+        "DELETE FROM crm_commission_item_state WHERE tenant_id = ? AND kol_id = ?", tenantId, kol);
     jdbc.update(
         "DELETE FROM crm_commission_withdrawal_outbox WHERE tenant_id = ? AND withdrawal_id IN"
             + " (SELECT id FROM crm_commission_withdrawal WHERE tenant_id = ? AND kol_id = ?)",
@@ -197,10 +147,7 @@ class WithdrawalIT {
       long reviewerId = IdWorker.getId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "350.00", "150.00");
-      funding.release(
-          kolId,
-          new FundingRow(items[0], 0L, new BigDecimal("350.00")),
-          new FundingRow(items[1], 0L, new BigDecimal("150.00")));
+      releaseItems(kolId, new long[] {items[0], items[1]}, new String[] {"350.00", "150.00"});
       // wallet 500.00 (credit 500.00 hand set through the production credit service)
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
@@ -356,7 +303,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "500.00");
-      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("500.00")));
+      releaseItems(kolId, new long[] {items[0]}, new String[] {"500.00"});
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -420,7 +367,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "500.00");
-      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("500.00")));
+      releaseItems(kolId, new long[] {items[0]}, new String[] {"500.00"});
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -457,7 +404,7 @@ class WithdrawalIT {
     kolId = createKol(bdA);
     try {
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
+      releaseItems(kolId, new long[] {items[0]}, new String[] {"300.00"});
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -517,7 +464,7 @@ class WithdrawalIT {
       long operator = operatorId();
       kolId = createKol(operator);
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
+      releaseItems(kolId, new long[] {items[0]}, new String[] {"300.00"});
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               TENANT_ID,
@@ -531,7 +478,7 @@ class WithdrawalIT {
       long otherKol = IdWorker.getId();
       createKolInTenant(2L, otherKol);
       long otherItem = createReleasedItemsInTenant(2L, otherKol);
-      funding.release(otherKol, new FundingRow(otherItem, 0L, new BigDecimal("300.00")));
+      releaseItems(2L, otherKol, new long[] {otherItem}, new String[] {"300.00"});
       walletService.postCommissionCredit(
           new CommissionWalletService.CreditCommand(
               2L,
@@ -540,6 +487,13 @@ class WithdrawalIT {
               "t63:credit6:" + otherKol,
               new BigDecimal("300.00"),
               Instant.now()));
+      // the other company's released rows exist on its own tenant (isolation of the funding read)
+      Integer otherStates =
+          jdbc.queryForObject(
+              "SELECT count(*) FROM crm_commission_item_state WHERE tenant_id = 2 AND kol_id = ?",
+              Integer.class,
+              otherKol);
+      assertThat(otherStates).as("tenant-2 item state seeded").isEqualTo(1);
       var other =
           withdrawals.apply(
               new KolAccountDTO(
@@ -595,7 +549,7 @@ class WithdrawalIT {
     kolId = createKol(operator);
     try {
       long[] items = createReleasedItems(kolId, "300.00");
-      funding.release(kolId, new FundingRow(items[0], 0L, new BigDecimal("300.00")));
+      releaseItems(kolId, new long[] {items[0]}, new String[] {"300.00"});
       TenantScope.runCompany(
           TENANT_ID,
           () ->
@@ -727,6 +681,39 @@ class WithdrawalIT {
 
   private void createKolInTenant(long tenantId, long id) {
     createKolRow(tenantId, id, null);
+  }
+
+  /**
+   * Inserts verified, released commission item states for the creator so the real funding source
+   * (ItemStateWithdrawalFundingSource over crm_commission_item_state) serves them in FIFO order.
+   */
+  private void releaseItems(long kol, long[] itemIds, String[] released) {
+    releaseItems(TENANT_ID, kol, itemIds, released);
+  }
+
+  private void releaseItems(long tenantId, long kol, long[] itemIds, String[] released) {
+    Instant now = Instant.now();
+    for (int index = 0; index < itemIds.length; index++) {
+      jdbc.update(
+          "INSERT INTO crm_commission_item_state (id, tenant_id, order_id, order_item_id, kol_id,"
+              + " source_key, settlement_state, settlement_time, after_sales, verified,"
+              + " accrued_commission_cny, released_commission_cny, release_basis, release_at,"
+              + " create_time, update_time)"
+              + " VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, FALSE, TRUE, ?, ?, 'CONFIRMED', ?, ?,"
+              + " ?)",
+          IdWorker.getId(),
+          tenantId,
+          11L,
+          itemIds[index],
+          kol,
+          "t63:item:" + itemIds[index],
+          Timestamp.from(now),
+          new BigDecimal(released[index]),
+          new BigDecimal(released[index]),
+          Timestamp.from(now),
+          Timestamp.from(now),
+          Timestamp.from(now));
+    }
   }
 
   private void createKolRow(long tenantId, long id, Long bdUserId) {
