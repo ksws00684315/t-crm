@@ -39,10 +39,14 @@ public class KolOrderController {
           String orderStatus,
       @RequestParam(required = false) @Size(max = 128) String orderNo,
       @RequestParam(required = false) @Size(max = 128) String productName,
+      @RequestParam(required = false)
+          @Pattern(regexp = "WITHDRAWING|WITHDRAWABLE|FROZEN|WITHDRAWN|INVALID")
+          String settlementStatus,
       @RequestParam(defaultValue = "1") @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(50) Integer size) {
     return R.ok(
         orders.page(
-            new KolOrderFilterDTO(payFrom, payTo, orderStatus, orderNo, productName, page, size)));
+            new KolOrderFilterDTO(
+                payFrom, payTo, orderStatus, orderNo, productName, settlementStatus, page, size)));
   }
 }

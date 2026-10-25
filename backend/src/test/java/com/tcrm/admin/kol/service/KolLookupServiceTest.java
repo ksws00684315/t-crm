@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.mapper.KolMapper;
+import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.LinkTemplateDO;
@@ -21,6 +22,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class KolLookupServiceTest {
+  private final KolPromotionRecordMapper records = mock(KolPromotionRecordMapper.class);
+
   @BeforeAll
   static void tableInfo() {
     TableInfoHelper.initTableInfo(
@@ -49,7 +52,7 @@ class KolLookupServiceTest {
     enabled.setName("A");
     enabled.setStatus(1);
     when(kols.selectOne(any())).thenReturn(enabled);
-    KolRefDTO dto = new KolLookupService(kols, templates).getByCode("kol0001");
+    KolRefDTO dto = new KolLookupService(kols, templates, records).getByCode("kol0001");
     assertThat(dto.enabled()).isTrue();
     assertThat(dto.kolCode()).isEqualTo("KOL0001");
   }
@@ -66,10 +69,11 @@ class KolLookupServiceTest {
     deleted.setBdUserId(4L);
     when(kols.listByIdsIncludingDeleted(List.of(9L))).thenReturn(List.of(deleted));
 
-    assertThat(new KolLookupService(kols, templates).listByIdsIncludingDeleted(List.of(9L)))
+    assertThat(
+            new KolLookupService(kols, templates, records).listByIdsIncludingDeleted(List.of(9L)))
         .containsExactly(new KolRefDTO(9L, "KOL0009", "Gone", false, 4L));
     verify(templates, never()).selectBatchIds(any());
-    assertThat(new KolLookupService(kols, templates).listByIdsIncludingDeleted(List.of()))
+    assertThat(new KolLookupService(kols, templates, records).listByIdsIncludingDeleted(List.of()))
         .isEmpty();
     verify(kols, never()).listByIdsIncludingDeleted(List.of());
   }
@@ -79,7 +83,7 @@ class KolLookupServiceTest {
     KolMapper kols = mock(KolMapper.class);
     LinkTemplateMapper templates = mock(LinkTemplateMapper.class);
     when(kols.selectList(any())).thenReturn(List.of());
-    assertThat(new KolLookupService(kols, templates).listByIds(List.of(1L, 2L))).isEmpty();
+    assertThat(new KolLookupService(kols, templates, records).listByIds(List.of(1L, 2L))).isEmpty();
   }
 
   @Test
@@ -93,7 +97,7 @@ class KolLookupServiceTest {
     kol.setStatus(0);
     kol.setBdUserId(5L);
     when(kols.selectList(any())).thenReturn(List.of(kol));
-    List<KolRefDTO> all = new KolLookupService(kols, templates).listAll();
+    List<KolRefDTO> all = new KolLookupService(kols, templates, records).listAll();
     assertThat(all).containsExactly(new KolRefDTO(1L, "KOL0001", "A", false, 5L));
   }
 
@@ -116,7 +120,7 @@ class KolLookupServiceTest {
     when(kols.selectList(any())).thenReturn(List.of(withTemplate, withoutTemplate));
     when(templates.selectBatchIds(any(Collection.class))).thenReturn(List.of(template(77L, 1)));
 
-    List<KolRefDTO> all = new KolLookupService(kols, templates).listAll();
+    List<KolRefDTO> all = new KolLookupService(kols, templates, records).listAll();
 
     assertThat(all.get(0).inviteCode()).isEqualTo("aff-01");
     assertThat(all.get(0).linkTemplateUrl()).contains("{PRODUCT_ID}");
@@ -135,7 +139,8 @@ class KolLookupServiceTest {
     second.setId(2L);
     when(kols.selectList(any())).thenReturn(List.of(first, second));
 
-    List<Long> ids = new KolLookupService(kols, templates).pageKolIdsWithTemplate(77L, null, 200);
+    List<Long> ids =
+        new KolLookupService(kols, templates, records).pageKolIdsWithTemplate(77L, null, 200);
 
     assertThat(ids).containsExactly(1L, 2L);
   }

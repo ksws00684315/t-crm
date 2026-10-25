@@ -43,6 +43,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TestTransactions;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
@@ -100,7 +101,9 @@ class OrderServiceTest {
           products,
           copyJobs,
           audit,
-          sanitizer);
+          sanitizer,
+          new OrderCommissionSync(
+              mock(org.springframework.context.ApplicationEventPublisher.class), refunds));
 
   @BeforeAll
   static void metadata() {
@@ -326,7 +329,8 @@ class OrderServiceTest {
         .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 99L)));
     when(ownership.bdAt(100L, PAID)).thenReturn(8L);
 
-    service.assign(10L, 100L, false, "confirmed");
+    TestTransactions.template()
+        .executeWithoutResult(txStatus -> service.assign(10L, 100L, false, "confirmed"));
 
     assertThat(o.getKolId()).isEqualTo(100L);
     assertThat(o.getBdUserId()).isEqualTo(8L);
@@ -345,7 +349,8 @@ class OrderServiceTest {
     var i = item();
     when(orders.selectOne(any())).thenReturn(o);
     when(items.selectList(any())).thenReturn(List.of(i));
-    service.assign(10L, null, true, "direct sale");
+    TestTransactions.template()
+        .executeWithoutResult(txStatus -> service.assign(10L, null, true, "direct sale"));
     assertThat(o.getKolId()).isNull();
     assertThat(o.getBdUserId()).isNull();
     assertThat(o.getAttributionStatus()).isEqualTo("NON_KOL");
@@ -365,7 +370,7 @@ class OrderServiceTest {
     when(mappings.findAt(5L, "90", PAID))
         .thenReturn(List.of(new KolItemRefDTO(300L, 100L, 200L, 1L)));
     when(ownership.bdAt(100L, PAID)).thenReturn(null);
-    service.reattribute(10L);
+    TestTransactions.template().executeWithoutResult(txStatus -> service.reattribute(10L));
     assertThat(o.getKolId()).isEqualTo(100L);
     assertThat(o.getBdUserId()).isNull();
     assertThat(i.getAttributionType()).isEqualTo(1);

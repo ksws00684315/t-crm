@@ -6,6 +6,7 @@ package com.tcrm.admin.kol.api;
  * inputs (task 11 §4.4) carry the resolved template so the link module never reads the template
  * table itself.
  *
+ * @param email login email; null when the KOL has none (task 62 income rows)
  * @param inviteCode invite code on the agent platform; null when not set
  * @param linkTemplateUrl URL template with {@code {PRODUCT_ID}} (and maybe {@code {INVITE_CODE}});
  *     null when the KOL has no template
@@ -18,11 +19,12 @@ public record KolRefDTO(
     String name,
     boolean enabled,
     Long bdUserId,
+    String email,
     String inviteCode,
     String linkTemplateUrl,
     boolean linkTemplateEnabled) {
   /** KOL without link target inputs (callers that only need identity, scope or status). */
   public KolRefDTO(Long id, String kolCode, String name, boolean enabled, Long bdUserId) {
-    this(id, kolCode, name, enabled, bdUserId, null, null, false);
+    this(id, kolCode, name, enabled, bdUserId, null, null, null, false);
   }
 }
