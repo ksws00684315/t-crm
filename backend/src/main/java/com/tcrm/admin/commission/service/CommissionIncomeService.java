@@ -6,6 +6,10 @@ import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaidR
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPaymentRow;
 import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.KolAmountRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.PaidPaymentRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.PaidWindowRow;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.kol.api.KolApi;
@@ -23,8 +27,10 @@ import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.api.AccountNameApi;
 import com.tcrm.admin.system.api.AccountNameDTO;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,14 +41,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Creator income list and detail (task 62, requirement 11.02, design §6.2): per-KOL five-layer
- * money plus period payments. Occupied stays zero until task 63 stores withdrawal applications.
+ * Creator income list and detail (task 62, requirement 11.02, design §6.2): per-KOL money plus
+ * period payments. Occupied is the in-flight withdrawal total. Period paid amounts follow the
+ * payment window and {@code paymentType} on both the row and the summary.
  */
 @Service
 public class CommissionIncomeService {
+  private static final Comparator<PaymentLine> NEWEST_PAYMENT =
+      Comparator.comparing(
+              PaymentLine::paidAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
+          .thenComparingLong(PaymentLine::id)
+          .reversed();
+
   private final CommissionItemStateMapper states;
   private final CommissionItemRevisionMapper revisions;
   private final CommissionFinanceQueryMapper finance;
+  private final WithdrawalMapper withdrawals;
   private final KolApi kols;
   private final OrderSettlementApi orderSettlement;
   private final ProductAccessApi products;
@@ -52,6 +66,7 @@ public class CommissionIncomeService {
       CommissionItemStateMapper states,
       CommissionItemRevisionMapper revisions,
       CommissionFinanceQueryMapper finance,
+      WithdrawalMapper withdrawals,
       KolApi kols,
       OrderSettlementApi orderSettlement,
       ProductAccessApi products,
@@ -59,6 +74,7 @@ public class CommissionIncomeService {
     this.states = states;
     this.revisions = revisions;
     this.finance = finance;
+    this.withdrawals = withdrawals;
     this.kols = kols;
     this.orderSettlement = orderSettlement;
     this.products = products;
@@ -135,7 +151,7 @@ public class CommissionIncomeService {
       Long kolId,
       String kol) {}
 
-  /** Payment row of the income detail (prepay now; withdrawals join in task 63). */
+  /** Payment row of the income detail: a paid withdrawal or a prepay payment. */
   public record PaymentLine(
       long id,
       String sourceNo,
@@ -256,16 +272,12 @@ public class CommissionIncomeService {
     Map<Long, BigDecimal> balances = moneyMap(finance.walletBalances(kolIds));
     Map<Long, BigDecimal> deducted = moneyMap(finance.recoverySums(kolIds));
     Map<Long, BigDecimal> pending = moneyMap(finance.pendingDeductions(kolIds));
-    Map<Long, BigDecimal> commissionPaid = moneyMap(finance.withdrawalPaidSums(kolIds));
-    Map<Long, BigDecimal> prepayPaidPeriod =
-        prepayMoneyMap(finance.prepayPaidSums(kolIds, filter.start(), filter.end()));
+    // Ledger sum is cumulative only. The period figure is the payment window below.
+    Map<Long, BigDecimal> commissionPaidAll = moneyMap(finance.withdrawalPaidSums(kolIds));
     Map<Long, BigDecimal> prepayPaidAll =
         prepayMoneyMap(finance.prepayPaidSums(kolIds, null, null));
-    // lastPaidAt covers the prepay side now; withdrawal payments join in task 63.
-    Map<Long, Instant> lastPaid = new HashMap<>();
-    for (PrepayPaidRow row : finance.prepayPaidSums(kolIds, filter.start(), filter.end())) {
-      lastPaid.put(row.kolId(), row.lastTime());
-    }
+    Map<Long, BigDecimal> occupied = occupiedMap(kolIds);
+    PeriodPaid period = periodPaid(kolIds, filter);
 
     Map<Long, Long> orderCounts = new HashMap<>();
     Map<Long, Long> quantities = new HashMap<>();
@@ -286,25 +298,25 @@ public class CommissionIncomeService {
 
     Map<Long, KolMoney> money = new HashMap<>();
     for (Long id : kolIds) {
-      BigDecimal occupied = BigDecimal.ZERO.setScale(2); // withdrawal applications land in task 63
-      BigDecimal balance = balances.getOrDefault(id, BigDecimal.ZERO.setScale(2));
-      BigDecimal commission = commissionPaid.getOrDefault(id, BigDecimal.ZERO.setScale(2));
-      BigDecimal prepayAll = prepayPaidAll.getOrDefault(id, BigDecimal.ZERO.setScale(2));
-      BigDecimal prepayWindow = prepayPaidPeriod.getOrDefault(id, BigDecimal.ZERO.setScale(2));
+      BigDecimal held = occupied.getOrDefault(id, zero());
+      BigDecimal balance = balances.getOrDefault(id, zero());
+      BigDecimal commission = period.commission().getOrDefault(id, zero());
+      BigDecimal prepayWindow = period.prepay().getOrDefault(id, zero());
+      BigDecimal prepayAll = prepayPaidAll.getOrDefault(id, zero());
       money.put(
           id,
           new KolMoney(
-              estimated.getOrDefault(id, BigDecimal.ZERO.setScale(2)),
-              frozen.getOrDefault(id, BigDecimal.ZERO.setScale(2)),
-              balance.subtract(occupied),
-              occupied,
-              commission.add(prepayAll),
-              deducted.getOrDefault(id, BigDecimal.ZERO.setScale(2)),
-              pending.getOrDefault(id, BigDecimal.ZERO.setScale(2)),
+              estimated.getOrDefault(id, zero()),
+              frozen.getOrDefault(id, zero()),
+              balance.subtract(held),
+              held,
+              commissionPaidAll.getOrDefault(id, zero()).add(prepayAll),
+              deducted.getOrDefault(id, zero()),
+              pending.getOrDefault(id, zero()),
               commission.add(prepayWindow),
               commission,
               prepayWindow,
-              lastPaid.get(id)));
+              period.lastPaid().get(id)));
     }
     return new Aggregates(money, orderCounts, quantities, unverified, bdNames);
   }
@@ -314,21 +326,9 @@ public class CommissionIncomeService {
     if (kolIds.isEmpty()) {
       return new Summary(zero, zero, zero, 0, 0, 0, 0);
     }
-    PaymentScope scope = PaymentScope.of(filter.paymentType());
-    BigDecimal prepayPaid = zero;
-    BigDecimal commissionPaid = zero;
-    if (scope.includesPrepay()) {
-      for (PrepayPaidRow row : finance.prepayPaidSums(kolIds, filter.start(), filter.end())) {
-        prepayPaid = prepayPaid.add(row.amountCny() == null ? BigDecimal.ZERO : row.amountCny());
-      }
-    }
-    // Same ledger sum as each income row. A pay-time window on withdrawals lands with task 63.
-    if (scope.includesCommission()) {
-      for (KolMoneyRow row : finance.withdrawalPaidSums(kolIds)) {
-        commissionPaid =
-            commissionPaid.add(row.amountCny() == null ? BigDecimal.ZERO : row.amountCny());
-      }
-    }
+    PeriodPaid period = periodPaid(kolIds, filter);
+    BigDecimal prepayPaid = sum(period.prepay());
+    BigDecimal commissionPaid = sum(period.commission());
     long orders = 0;
     long quantity = 0;
     long unverified = 0;
@@ -427,35 +427,96 @@ public class CommissionIncomeService {
 
   private List<PaymentLine> payments(long kolId, IncomeFilter filter) {
     PaymentScope scope = PaymentScope.of(filter.paymentType());
-    if (!scope.includesPrepay()) {
-      // Commission withdrawal payments arrive with task 63; nothing to show for COMMISSION yet.
-      return List.of();
-    }
-    Map<Long, BigDecimal> deducted = moneyMap(finance.recoverySums(List.of(kolId)));
-    Map<Long, BigDecimal> pending = moneyMap(finance.pendingDeductions(List.of(kolId)));
+    List<Long> ids = List.of(kolId);
     List<PaymentLine> rows = new ArrayList<>();
-    for (PrepayPaymentRow row :
-        finance.prepayPayments(List.of(kolId), filter.start(), filter.end())) {
-      rows.add(
-          new PaymentLine(
-              row.paymentId(),
-              row.sourceNo(),
-              "PREPAY",
-              kolId,
-              row.amountCny().toPlainString(),
-              row.paidAt(),
-              row.deduct() == null
-                  ? BigDecimal.ZERO
-                  : row.deduct() ? BigDecimal.ONE : BigDecimal.ZERO,
-              deducted.getOrDefault(kolId, BigDecimal.ZERO.setScale(2)),
-              pending.getOrDefault(kolId, BigDecimal.ZERO.setScale(2)),
-              row.amountCny().toPlainString(),
-              "CNY",
-              row.voucherFileId(),
-              null));
+    if (scope.includesCommission()) {
+      for (PaidPaymentRow row : withdrawals.listPaidPayments(ids, filter.start(), filter.end())) {
+        rows.add(
+            new PaymentLine(
+                row.paymentId(),
+                row.applicationNo(),
+                "COMMISSION",
+                kolId,
+                cnyText(row.amountCny()),
+                row.paidAt(),
+                BigDecimal.ZERO,
+                zero(),
+                zero(),
+                actualText(row.actualAmount()),
+                row.actualCurrency(),
+                row.voucherFileId(),
+                row.withdrawalId()));
+      }
     }
+    if (scope.includesPrepay()) {
+      Map<Long, BigDecimal> deducted = moneyMap(finance.recoverySums(ids));
+      Map<Long, BigDecimal> pending = moneyMap(finance.pendingDeductions(ids));
+      for (PrepayPaymentRow row : finance.prepayPayments(ids, filter.start(), filter.end())) {
+        rows.add(
+            new PaymentLine(
+                row.paymentId(),
+                row.sourceNo(),
+                "PREPAY",
+                kolId,
+                row.amountCny().toPlainString(),
+                row.paidAt(),
+                row.deduct() == null
+                    ? BigDecimal.ZERO
+                    : row.deduct() ? BigDecimal.ONE : BigDecimal.ZERO,
+                deducted.getOrDefault(kolId, zero()),
+                pending.getOrDefault(kolId, zero()),
+                row.amountCny().toPlainString(),
+                "CNY",
+                row.voucherFileId(),
+                null));
+      }
+    }
+    rows.sort(NEWEST_PAYMENT);
     return rows;
   }
+
+  /**
+   * Period commission and prepay inside the payment window. {@code paymentType} drops the side it
+   * does not name. {@code lastPaidAt} is the later payment time of the sides that remain.
+   */
+  private PeriodPaid periodPaid(List<Long> kolIds, IncomeFilter filter) {
+    Map<Long, BigDecimal> commission = new HashMap<>();
+    Map<Long, BigDecimal> prepay = new HashMap<>();
+    Map<Long, Instant> lastPaid = new HashMap<>();
+    if (kolIds.isEmpty()) {
+      return new PeriodPaid(commission, prepay, lastPaid);
+    }
+    PaymentScope scope = PaymentScope.of(filter.paymentType());
+    if (scope.includesCommission()) {
+      for (PaidWindowRow row : withdrawals.sumPaidInWindow(kolIds, filter.start(), filter.end())) {
+        commission.put(row.kolId(), nz(row.amountCny()));
+        lastPaid.put(row.kolId(), row.lastTime());
+      }
+    }
+    if (scope.includesPrepay()) {
+      for (PrepayPaidRow row : finance.prepayPaidSums(kolIds, filter.start(), filter.end())) {
+        prepay.put(row.kolId(), nz(row.amountCny()));
+        lastPaid.put(row.kolId(), later(lastPaid.get(row.kolId()), row.lastTime()));
+      }
+    }
+    return new PeriodPaid(commission, prepay, lastPaid);
+  }
+
+  private Map<Long, BigDecimal> occupiedMap(List<Long> kolIds) {
+    Map<Long, BigDecimal> map = new HashMap<>();
+    if (kolIds.isEmpty()) {
+      return map;
+    }
+    for (KolAmountRow row : withdrawals.sumActiveOccupiedByKol(kolIds)) {
+      map.put(row.kolId(), nz(row.amountCny()));
+    }
+    return map;
+  }
+
+  private record PeriodPaid(
+      Map<Long, BigDecimal> commission,
+      Map<Long, BigDecimal> prepay,
+      Map<Long, Instant> lastPaid) {}
 
   private KolRefDTO requireVisibleKol(AccountDTO user, long kolId) {
     List<KolRefDTO> found = kols.listByIds(List.of(kolId));
@@ -479,9 +540,55 @@ public class CommissionIncomeService {
   private static Map<Long, BigDecimal> moneyMap(List<KolMoneyRow> rows) {
     Map<Long, BigDecimal> map = new HashMap<>();
     for (KolMoneyRow row : rows) {
-      map.put(row.kolId(), row.amountCny() == null ? BigDecimal.ZERO.setScale(2) : row.amountCny());
+      map.put(row.kolId(), nz(row.amountCny()));
     }
     return map;
+  }
+
+  private static BigDecimal sum(Map<Long, BigDecimal> amounts) {
+    BigDecimal total = zero();
+    for (BigDecimal amount : amounts.values()) {
+      total = total.add(nz(amount));
+    }
+    return total;
+  }
+
+  private static BigDecimal zero() {
+    return BigDecimal.ZERO.setScale(2);
+  }
+
+  private static BigDecimal nz(BigDecimal value) {
+    return value == null ? zero() : value;
+  }
+
+  private static Instant later(Instant left, Instant right) {
+    if (left == null) {
+      return right;
+    }
+    if (right == null || !right.isAfter(left)) {
+      return left;
+    }
+    return right;
+  }
+
+  /** CNY payment amounts are NUMERIC(14,2). */
+  private static String cnyText(BigDecimal value) {
+    return nz(value).setScale(2, RoundingMode.UNNECESSARY).toPlainString();
+  }
+
+  /**
+   * Actual paid amount keeps up to 6 decimal places (NUMERIC(20,6)). Trailing zeros collapse, and a
+   * whole number still shows two decimal places.
+   */
+  private static String actualText(BigDecimal value) {
+    if (value == null) {
+      return null;
+    }
+    BigDecimal stripped = value.stripTrailingZeros();
+    if (stripped.scale() < 2) {
+      stripped = stripped.setScale(2);
+    }
+    return stripped.toPlainString();
   }
 
   /** Blank order-line names (a line with no SKU) stay null so the client can tell them apart. */
@@ -492,7 +599,7 @@ public class CommissionIncomeService {
   private static Map<Long, BigDecimal> prepayMoneyMap(List<PrepayPaidRow> rows) {
     Map<Long, BigDecimal> map = new HashMap<>();
     for (PrepayPaidRow row : rows) {
-      map.put(row.kolId(), row.amountCny() == null ? BigDecimal.ZERO.setScale(2) : row.amountCny());
+      map.put(row.kolId(), nz(row.amountCny()));
     }
     return map;
   }

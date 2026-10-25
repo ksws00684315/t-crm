@@ -9,6 +9,7 @@ import com.tcrm.admin.commission.model.WithdrawalWrite;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Insert;
@@ -173,6 +174,70 @@ public interface WithdrawalMapper {
       WHERE kol_id = #{kolId} AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
       """)
   BigDecimal sumActiveOccupied(@Param("kolId") long kolId);
+
+  /**
+   * In-flight occupation per KOL ({@code PENDING_REVIEW} and {@code PENDING_PAYMENT} only). Paid
+   * applications are not occupied.
+   */
+  @Select(
+      """
+      <script>
+      SELECT kol_id, COALESCE(SUM(amount_cny), 0) AS amount_cny
+      FROM crm_commission_withdrawal
+      WHERE status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND kol_id IN
+      <foreach collection="kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      GROUP BY kol_id
+      </script>
+      """)
+  List<KolAmountRow> sumActiveOccupiedByKol(@Param("kolIds") Collection<Long> kolIds);
+
+  /**
+   * Commission paid inside the payment window (inclusive start, exclusive end; null bound is open).
+   * {@code PAID} only. This is the period figure; the ledger sum stays cumulative.
+   */
+  @Select(
+      """
+      <script>
+      SELECT w.kol_id AS kol_id, COALESCE(SUM(p.amount_cny), 0) AS amount_cny,
+             MAX(p.paid_at) AS last_time
+      FROM crm_commission_withdrawal_payment p
+      JOIN crm_commission_withdrawal w ON w.id = p.withdrawal_id
+      WHERE w.status = 'PAID'
+        AND w.kol_id IN
+      <foreach collection="kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      <if test="start != null">AND p.paid_at &gt;= #{start}</if>
+      <if test="end != null">AND p.paid_at &lt; #{end}</if>
+      GROUP BY w.kol_id
+      </script>
+      """)
+  List<PaidWindowRow> sumPaidInWindow(
+      @Param("kolIds") Collection<Long> kolIds,
+      @Param("start") Instant start,
+      @Param("end") Instant end);
+
+  /** Paid withdrawal payments in the same window, newest payment first. */
+  @Select(
+      """
+      <script>
+      SELECT p.id AS payment_id, w.id AS withdrawal_id, w.application_no AS application_no,
+             w.kol_id AS kol_id, p.amount_cny AS amount_cny, p.actual_amount AS actual_amount,
+             p.actual_currency AS actual_currency, p.paid_at AS paid_at,
+             p.voucher_file_id AS voucher_file_id
+      FROM crm_commission_withdrawal_payment p
+      JOIN crm_commission_withdrawal w ON w.id = p.withdrawal_id
+      WHERE w.status = 'PAID'
+        AND w.kol_id IN
+      <foreach collection="kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      <if test="start != null">AND p.paid_at &gt;= #{start}</if>
+      <if test="end != null">AND p.paid_at &lt; #{end}</if>
+      ORDER BY p.paid_at DESC, p.id DESC
+      </script>
+      """)
+  List<PaidPaymentRow> listPaidPayments(
+      @Param("kolIds") Collection<Long> kolIds,
+      @Param("start") Instant start,
+      @Param("end") Instant end);
 
   /** Sum paid = wallet money that left through withdrawals. */
   @Select(
@@ -520,4 +585,22 @@ public interface WithdrawalMapper {
 
   /** Funding already taken per order item. */
   record ItemOccupation(long orderItemId, BigDecimal occupiedCny) {}
+
+  /** In-flight withdrawal occupation of one KOL. */
+  record KolAmountRow(Long kolId, BigDecimal amountCny) {}
+
+  /** Paid commission of one KOL inside a payment window, with the latest payment time. */
+  record PaidWindowRow(Long kolId, BigDecimal amountCny, Instant lastTime) {}
+
+  /** One paid withdrawal payment joined to its application. */
+  record PaidPaymentRow(
+      Long paymentId,
+      Long withdrawalId,
+      String applicationNo,
+      Long kolId,
+      BigDecimal amountCny,
+      BigDecimal actualAmount,
+      String actualCurrency,
+      Instant paidAt,
+      Long voucherFileId) {}
 }

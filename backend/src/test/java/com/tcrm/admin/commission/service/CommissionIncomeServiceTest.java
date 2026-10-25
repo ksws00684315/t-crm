@@ -7,6 +7,8 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -18,12 +20,17 @@ import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper.PrepayPayme
 import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper.KolAccrualRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.KolAmountRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.PaidPaymentRow;
+import com.tcrm.admin.commission.mapper.WithdrawalMapper.PaidWindowRow;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.commission.service.CommissionIncomeService.CommissionLine;
 import com.tcrm.admin.commission.service.CommissionIncomeService.IncomeDetail;
 import com.tcrm.admin.commission.service.CommissionIncomeService.IncomeFilter;
 import com.tcrm.admin.commission.service.CommissionIncomeService.IncomePage;
+import com.tcrm.admin.commission.service.CommissionIncomeService.PaymentLine;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderSettlementApi;
@@ -52,13 +59,14 @@ class CommissionIncomeServiceTest {
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionFinanceQueryMapper finance = mock(CommissionFinanceQueryMapper.class);
+  private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final KolApi kols = mock(KolApi.class);
   private final OrderSettlementApi orderSettlement = mock(OrderSettlementApi.class);
   private final ProductAccessApi products = mock(ProductAccessApi.class);
   private final AccountNameApi accountNames = mock(AccountNameApi.class);
   private final CommissionIncomeService service =
       new CommissionIncomeService(
-          states, revisions, finance, kols, orderSettlement, products, accountNames);
+          states, revisions, finance, withdrawals, kols, orderSettlement, products, accountNames);
 
   @BeforeEach
   void prepare() {
@@ -70,8 +78,27 @@ class CommissionIncomeServiceTest {
     lenient().when(finance.recoverySums(anyCollection())).thenReturn(List.of());
     lenient().when(finance.pendingDeductions(anyCollection())).thenReturn(List.of());
     lenient().when(finance.withdrawalPaidSums(anyCollection())).thenReturn(List.of());
-    lenient().when(finance.prepayPaidSums(anyCollection(), any(), any())).thenReturn(List.of());
-    lenient().when(finance.prepayPayments(anyCollection(), any(), any())).thenReturn(List.of());
+    lenient()
+        .when(
+            finance.prepayPaidSums(
+                anyCollection(), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(List.of());
+    lenient()
+        .when(
+            finance.prepayPayments(
+                anyCollection(), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(List.of());
+    lenient().when(withdrawals.sumActiveOccupiedByKol(anyCollection())).thenReturn(List.of());
+    lenient()
+        .when(
+            withdrawals.sumPaidInWindow(
+                anyCollection(), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(List.of());
+    lenient()
+        .when(
+            withdrawals.listPaidPayments(
+                anyCollection(), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(List.of());
     lenient()
         .when(orderSettlement.aggregateKolOrders(anyCollection(), any(), any()))
         .thenReturn(List.of());
@@ -126,7 +153,10 @@ class CommissionIncomeServiceTest {
         .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("150.00"))));
     when(finance.withdrawalPaidSums(List.of(KOL)))
         .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("20.00"))));
-    when(finance.prepayPaidSums(eq(List.of(KOL)), any(), any()))
+    when(withdrawals.sumPaidInWindow(
+            eq(List.of(KOL)), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(List.of(new PaidWindowRow(KOL, new BigDecimal("20.00"), PAY)));
+    when(finance.prepayPaidSums(eq(List.of(KOL)), nullable(Instant.class), nullable(Instant.class)))
         .thenReturn(
             List.of(new PrepayPaidRow(KOL, new BigDecimal("300.00"), PAY.plusSeconds(3600))));
     when(orderSettlement.aggregateKolOrders(eq(List.of(KOL)), any(), any()))
@@ -137,15 +167,18 @@ class CommissionIncomeServiceTest {
     IncomePage page =
         TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), filter(null, null)));
     var row = page.page().items().getFirst();
-    // Hand calc: estimated 500, frozen 200, available 120 − 0 occupied, cumulative 20 + 300 = 320.
+    // Hand calc: estimated 500, frozen 200, balance 120 − occupied 0, cumulative ledger 20 + prepay
+    // 300 = 320. The window stub equals the ledger here; the window test covers a smaller window.
     assertThat(row.money().estimated()).isEqualByComparingTo("500.00");
     assertThat(row.money().frozen()).isEqualByComparingTo("200.00");
     assertThat(row.money().available()).isEqualByComparingTo("120.00");
+    assertThat(row.money().occupied()).isEqualByComparingTo("0.00");
     assertThat(row.money().cumulativePaid()).isEqualByComparingTo("320.00");
     assertThat(row.money().deducted()).isEqualByComparingTo("50.00");
     assertThat(row.money().pendingDeduction()).isEqualByComparingTo("150.00");
     assertThat(row.money().prepayPaid()).isEqualByComparingTo("300.00");
     assertThat(row.money().commissionPaid()).isEqualByComparingTo("20.00");
+    assertThat(row.money().lastPaidAt()).isEqualTo(PAY.plusSeconds(3600));
     assertThat(row.orderCount()).isEqualTo(4);
     assertThat(row.quantity()).isEqualTo(9);
     assertThat(row.bd()).isEqualTo("BD One");
@@ -159,25 +192,140 @@ class CommissionIncomeServiceTest {
     IncomePage commissionOnly =
         TenantScope.callCompany(
             TENANT, () -> service.list(superAdmin(), filter(null, "COMMISSION")));
+    var commissionRow = commissionOnly.page().items().getFirst().money();
+    assertThat(commissionRow.commissionPaid()).isEqualByComparingTo("20.00");
+    assertThat(commissionRow.prepayPaid()).isEqualByComparingTo("0.00");
+    assertThat(commissionRow.periodPaid()).isEqualByComparingTo("20.00");
+    assertThat(commissionRow.lastPaidAt()).isEqualTo(PAY);
+    assertThat(commissionRow.cumulativePaid()).isEqualByComparingTo("320.00");
     assertThat(commissionOnly.summary().commissionPaid()).isEqualByComparingTo("20.00");
     assertThat(commissionOnly.summary().prepayPaid()).isEqualByComparingTo("0.00");
     assertThat(commissionOnly.summary().paid()).isEqualByComparingTo("20.00");
 
     IncomePage prepayOnly =
         TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), filter(null, "PREPAY")));
+    var prepayRow = prepayOnly.page().items().getFirst().money();
+    assertThat(prepayRow.commissionPaid()).isEqualByComparingTo("0.00");
+    assertThat(prepayRow.prepayPaid()).isEqualByComparingTo("300.00");
+    assertThat(prepayRow.periodPaid()).isEqualByComparingTo("300.00");
+    assertThat(prepayRow.lastPaidAt()).isEqualTo(PAY.plusSeconds(3600));
+    assertThat(prepayRow.cumulativePaid()).isEqualByComparingTo("320.00");
     assertThat(prepayOnly.summary().commissionPaid()).isEqualByComparingTo("0.00");
     assertThat(prepayOnly.summary().prepayPaid()).isEqualByComparingTo("300.00");
     assertThat(prepayOnly.summary().paid()).isEqualByComparingTo("300.00");
   }
 
   @Test
-  void shouldHidePaymentsWhenPaymentTypeIsCommissionOnly() {
-    when(finance.prepayPayments(anyCollection(), any(), any()))
+  void shouldKeepCumulativeOutsideThePayWindowAndAllowNegativeAvailable() {
+    Instant start = Instant.parse("2026-10-01T00:00:00Z");
+    Instant end = Instant.parse("2026-11-01T00:00:00Z");
+    Instant paidAt = Instant.parse("2026-10-10T08:00:00Z");
+    Instant prepayAt = Instant.parse("2026-10-09T00:00:00Z");
+    when(finance.walletBalances(List.of(KOL)))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("20.00"))));
+    when(withdrawals.sumActiveOccupiedByKol(List.of(KOL)))
+        .thenReturn(List.of(new KolAmountRow(KOL, new BigDecimal("30.00"))));
+    when(finance.withdrawalPaidSums(List.of(KOL)))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("40.00"))));
+    when(finance.prepayPaidSums(eq(List.of(KOL)), isNull(), isNull()))
+        .thenReturn(
+            List.of(
+                new PrepayPaidRow(
+                    KOL, new BigDecimal("30.00"), Instant.parse("2026-09-01T00:00:00Z"))));
+    when(finance.prepayPaidSums(eq(List.of(KOL)), eq(start), eq(end)))
+        .thenReturn(List.of(new PrepayPaidRow(KOL, new BigDecimal("10.00"), prepayAt)));
+    when(withdrawals.sumPaidInWindow(eq(List.of(KOL)), eq(start), eq(end)))
+        .thenReturn(List.of(new PaidWindowRow(KOL, new BigDecimal("15.00"), paidAt)));
+
+    IncomeFilter window = new IncomeFilter(null, null, start, end, 1, 20);
+    IncomePage page = TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), window));
+    var money = page.page().items().getFirst().money();
+    // Hand calc: balance 20 − occupied 30 = −10. Cumulative is the ledger 40 plus all prepay 30.
+    // The window keeps 15 of commission and 10 of prepay.
+    assertThat(money.occupied()).isEqualByComparingTo("30.00");
+    assertThat(money.available()).isEqualByComparingTo("-10.00");
+    assertThat(money.cumulativePaid()).isEqualByComparingTo("70.00");
+    assertThat(money.commissionPaid()).isEqualByComparingTo("15.00");
+    assertThat(money.prepayPaid()).isEqualByComparingTo("10.00");
+    assertThat(money.periodPaid()).isEqualByComparingTo("25.00");
+    assertThat(money.lastPaidAt()).isEqualTo(paidAt);
+    assertThat(page.summary().paid()).isEqualByComparingTo("25.00");
+    assertThat(page.summary().commissionPaid()).isEqualByComparingTo("15.00");
+    assertThat(page.summary().prepayPaid()).isEqualByComparingTo("10.00");
+
+    IncomeFilter commission = new IncomeFilter(null, "COMMISSION", start, end, 1, 20);
+    IncomePage commissionPage =
+        TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), commission));
+    var commissionMoney = commissionPage.page().items().getFirst().money();
+    assertThat(commissionMoney.commissionPaid()).isEqualByComparingTo("15.00");
+    assertThat(commissionMoney.prepayPaid()).isEqualByComparingTo("0.00");
+    assertThat(commissionMoney.periodPaid()).isEqualByComparingTo("15.00");
+    assertThat(commissionMoney.lastPaidAt()).isEqualTo(paidAt);
+    assertThat(commissionMoney.cumulativePaid()).isEqualByComparingTo("70.00");
+    assertThat(commissionPage.summary().paid()).isEqualByComparingTo("15.00");
+    assertThat(commissionPage.summary().prepayPaid()).isEqualByComparingTo("0.00");
+
+    IncomeFilter prepay = new IncomeFilter(null, "PREPAY", start, end, 1, 20);
+    IncomePage prepayPage =
+        TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), prepay));
+    var prepayMoney = prepayPage.page().items().getFirst().money();
+    assertThat(prepayMoney.commissionPaid()).isEqualByComparingTo("0.00");
+    assertThat(prepayMoney.prepayPaid()).isEqualByComparingTo("10.00");
+    assertThat(prepayMoney.periodPaid()).isEqualByComparingTo("10.00");
+    assertThat(prepayMoney.lastPaidAt()).isEqualTo(prepayAt);
+    assertThat(prepayMoney.cumulativePaid()).isEqualByComparingTo("70.00");
+    assertThat(prepayPage.summary().paid()).isEqualByComparingTo("10.00");
+    assertThat(prepayPage.summary().commissionPaid()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldMergePaidWithdrawalsIntoPaymentsAndFilterByType() {
+    when(finance.prepayPayments(anyCollection(), nullable(Instant.class), nullable(Instant.class)))
         .thenReturn(List.of(prepayPayment()));
-    IncomeDetail detail =
+    when(finance.recoverySums(anyCollection()))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("4.00"))));
+    when(finance.pendingDeductions(anyCollection()))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("6.00"))));
+    when(withdrawals.listPaidPayments(
+            eq(List.of(KOL)), nullable(Instant.class), nullable(Instant.class)))
+        .thenReturn(
+            List.of(
+                withdrawalPayment(200L, new BigDecimal("15.000000")),
+                withdrawalPayment(100L, new BigDecimal("15.123456"))));
+
+    IncomeDetail both =
+        TenantScope.callCompany(
+            TENANT, () -> service.detail(superAdmin(), KOL, filter(null, null)));
+    assertThat(both.payments()).extracting(PaymentLine::id).containsExactly(8001L, 200L, 100L);
+    PaymentLine whole = both.payments().get(1);
+    assertThat(whole.type()).isEqualTo("COMMISSION");
+    assertThat(whole.sourceNo()).isEqualTo("W20261010000015");
+    assertThat(whole.withdrawalId()).isEqualTo(9100L);
+    assertThat(whole.amountCny()).isEqualTo("15.00");
+    assertThat(whole.actualAmount()).isEqualTo("15.00");
+    assertThat(whole.actualCurrency()).isEqualTo("USD");
+    assertThat(whole.voucher()).isEqualTo(8801L);
+    assertThat(whole.deduct()).isEqualByComparingTo("0");
+    assertThat(whole.deducted()).isEqualByComparingTo("0.00");
+    assertThat(whole.pending()).isEqualByComparingTo("0.00");
+    PaymentLine precise = both.payments().get(2);
+    assertThat(precise.actualAmount()).isEqualTo("15.123456");
+    PaymentLine prepay = both.payments().getFirst();
+    assertThat(prepay.type()).isEqualTo("PREPAY");
+    assertThat(prepay.deducted()).isEqualByComparingTo("4.00");
+    assertThat(prepay.pending()).isEqualByComparingTo("6.00");
+
+    IncomeDetail commissionOnly =
         TenantScope.callCompany(
             TENANT, () -> service.detail(superAdmin(), KOL, filter(null, "COMMISSION")));
-    assertThat(detail.payments()).isEmpty();
+    assertThat(commissionOnly.payments())
+        .extracting(PaymentLine::type)
+        .containsExactly("COMMISSION", "COMMISSION");
+
+    IncomeDetail prepayOnly =
+        TenantScope.callCompany(
+            TENANT, () -> service.detail(superAdmin(), KOL, filter(null, "PREPAY")));
+    assertThat(prepayOnly.payments()).extracting(PaymentLine::type).containsExactly("PREPAY");
   }
 
   @Test
@@ -287,6 +435,19 @@ class CommissionIncomeServiceTest {
     assertThat(detail.lines().get(1).sku()).isNull();
     assertThat(detail.lines().get(2).product()).isNull();
     assertThat(detail.lines().get(2).sku()).isNull();
+  }
+
+  private static PaidPaymentRow withdrawalPayment(long paymentId, BigDecimal actual) {
+    return new PaidPaymentRow(
+        paymentId,
+        9100L,
+        "W20261010000015",
+        KOL,
+        new BigDecimal("15.00"),
+        actual,
+        "USD",
+        PAY,
+        8801L);
   }
 
   private static PrepayPaymentRow prepayPayment() {
