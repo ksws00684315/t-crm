@@ -97,6 +97,9 @@ class CommissionIncomeServiceTest {
     assertThat(page.page().total()).isZero();
     assertThat(page.page().items()).isEmpty();
     assertThat(page.summary().creators()).isZero();
+    assertThat(page.summary().commissionPaid()).isEqualByComparingTo("0.00");
+    assertThat(page.summary().prepayPaid()).isEqualByComparingTo("0.00");
+    assertThat(page.summary().paid()).isEqualByComparingTo("0.00");
   }
 
   @Test
@@ -147,8 +150,24 @@ class CommissionIncomeServiceTest {
     assertThat(row.quantity()).isEqualTo(9);
     assertThat(row.bd()).isEqualTo("BD One");
     assertThat(row.unverified()).isEqualTo(3);
-    assertThat(page.summary().paid()).isEqualByComparingTo("300.00");
+    // Hand calc: summary paid = commission 20 + windowed prepay 300.
+    assertThat(page.summary().commissionPaid()).isEqualByComparingTo("20.00");
+    assertThat(page.summary().prepayPaid()).isEqualByComparingTo("300.00");
+    assertThat(page.summary().paid()).isEqualByComparingTo("320.00");
     assertThat(page.summary().unverified()).isEqualTo(3);
+
+    IncomePage commissionOnly =
+        TenantScope.callCompany(
+            TENANT, () -> service.list(superAdmin(), filter(null, "COMMISSION")));
+    assertThat(commissionOnly.summary().commissionPaid()).isEqualByComparingTo("20.00");
+    assertThat(commissionOnly.summary().prepayPaid()).isEqualByComparingTo("0.00");
+    assertThat(commissionOnly.summary().paid()).isEqualByComparingTo("20.00");
+
+    IncomePage prepayOnly =
+        TenantScope.callCompany(TENANT, () -> service.list(superAdmin(), filter(null, "PREPAY")));
+    assertThat(prepayOnly.summary().commissionPaid()).isEqualByComparingTo("0.00");
+    assertThat(prepayOnly.summary().prepayPaid()).isEqualByComparingTo("300.00");
+    assertThat(prepayOnly.summary().paid()).isEqualByComparingTo("300.00");
   }
 
   @Test
@@ -213,10 +232,61 @@ class CommissionIncomeServiceTest {
     assertThat(line.direction()).isEqualTo("DEBIT");
     assertThat(line.adjustment()).isEqualTo("-5.00");
     assertThat(line.commission()).isEqualTo("10.00");
+    assertThat(line.product()).isEqualTo("item");
+    assertThat(line.sku()).isEqualTo("sku");
     assertThat(line.image()).isEqualTo("https://img");
     assertThat(line.rateVersion()).isEqualTo(3);
     assertThat(detail.income().kolId()).isEqualTo(KOL);
     assertThat(detail.income().name()).isEqualTo("Kol A");
+  }
+
+  @Test
+  void shouldTakeNamesFromTheOrderLineAndLeaveSkuNullWhenAbsent() {
+    CommissionItemStateDO named = stateRow();
+    CommissionItemStateDO blankSku = stateRow();
+    blankSku.setId(7002L);
+    blankSku.setOrderItemId(9002L);
+    CommissionItemStateDO missing = stateRow();
+    missing.setId(7003L);
+    missing.setOrderItemId(9003L);
+    when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of());
+    when(states.listByKol(KOL)).thenReturn(List.of(named, blankSku, missing));
+    when(orderSettlement.listOrdersByIds(anyCollection()))
+        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID")));
+    when(orderSettlement.listItemsByOrderIds(anyCollection()))
+        .thenReturn(
+            List.of(
+                new ItemRefDTO(
+                    9001L,
+                    5001L,
+                    "Tee",
+                    "Red / M",
+                    1,
+                    new BigDecimal("100.00"),
+                    BigDecimal.ZERO,
+                    KOL,
+                    null),
+                new ItemRefDTO(
+                    9002L,
+                    5001L,
+                    "Hat",
+                    "  ",
+                    1,
+                    new BigDecimal("40.00"),
+                    BigDecimal.ZERO,
+                    KOL,
+                    null)));
+
+    IncomeDetail detail =
+        TenantScope.callCompany(
+            TENANT, () -> service.detail(superAdmin(), KOL, filter(null, null)));
+    assertThat(detail.lines()).hasSize(3);
+    assertThat(detail.lines().get(0).product()).isEqualTo("Tee");
+    assertThat(detail.lines().get(0).sku()).isEqualTo("Red / M");
+    assertThat(detail.lines().get(1).product()).isEqualTo("Hat");
+    assertThat(detail.lines().get(1).sku()).isNull();
+    assertThat(detail.lines().get(2).product()).isNull();
+    assertThat(detail.lines().get(2).sku()).isNull();
   }
 
   private static PrepayPaymentRow prepayPayment() {

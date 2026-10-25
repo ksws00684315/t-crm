@@ -150,6 +150,8 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.retained()).isEqualTo("162.00");
     assertThat(settlement.status()).isEqualTo("POSTED");
     assertThat(settlement.kolNames()).containsExactly("Kol A");
+    assertThat(settlement.lines().getFirst().product()).isEqualTo("item");
+    assertThat(settlement.lines().getFirst().sku()).isEqualTo("sku");
     assertThat(settlement.lines().getFirst().rate()).isEqualTo("0.1000");
     assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
     assertThat(settlement.lines().getFirst().subject()).isEqualTo("KOL");
@@ -167,8 +169,8 @@ class CommissionSettlementDetailServiceTest {
                 new ItemRefDTO(
                     9002L,
                     5002L,
-                    "item",
-                    "sku",
+                    "Solo",
+                    null,
                     1,
                     new BigDecimal("100.00"),
                     BigDecimal.ZERO,
@@ -185,6 +187,8 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.kolNames()).isEmpty();
     assertThat(settlement.shop()).isNull();
     assertThat(settlement.lines().getFirst().subject()).isEqualTo("COMPANY");
+    assertThat(settlement.lines().getFirst().product()).isEqualTo("Solo");
+    assertThat(settlement.lines().getFirst().sku()).isNull();
   }
 
   private static AccountDTO superAdmin() {

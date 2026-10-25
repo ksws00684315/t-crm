@@ -215,16 +215,26 @@ class CommissionSettlementIT {
     // 7. Admin endpoints read the same data; the config optimistic lock behaves per contract.
     mvc.perform(get("/admin-api/commission/incomes").header("X-Admin-Token", adminToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.page.total").value(2))
+        .andExpect(jsonPath("$.data.page.items").doesNotExist())
+        .andExpect(jsonPath("$.data.total").isNumber())
+        .andExpect(jsonPath("$.data.total").value(2))
+        .andExpect(jsonPath("$.data.summary.paid").exists())
+        .andExpect(jsonPath("$.data.summary.commissionPaid").value("0.00"))
+        .andExpect(jsonPath("$.data.summary.prepayPaid").value("0.00"))
+        .andExpect(jsonPath("$.data.summary.unverified").isNumber())
         .andExpect(jsonPath("$.data.summary.unverified").value(0));
     mvc.perform(
             get("/admin-api/commission/settlement-details")
                 .param("orderNo", ORDER_NO)
                 .header("X-Admin-Token", adminToken))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").isNumber())
         .andExpect(jsonPath("$.data.items[0].orderNo").value(ORDER_NO))
         .andExpect(jsonPath("$.data.items[0].status").value("POSTED"))
-        .andExpect(jsonPath("$.data.items[0].commission").value("40.00"));
+        .andExpect(jsonPath("$.data.items[0].commission").value("40.00"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].product").value("t62 item"))
+        .andExpect(
+            jsonPath("$.data.items[0].lines[0].sku").value(org.hamcrest.Matchers.nullValue()));
 
     mvc.perform(
             get("/admin-api/commission/settlement-configs/current")
@@ -266,9 +276,10 @@ class CommissionSettlementIT {
 
       mvc.perform(get("/admin-api/commission/incomes").header("X-Admin-Token", bdToken))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.page.total").value(1))
-          .andExpect(jsonPath("$.data.page.items[0].id").value(String.valueOf(kolA)))
-          .andExpect(jsonPath("$.data.page.items[0].estimated").value("10.00"));
+          .andExpect(jsonPath("$.data.total").isNumber())
+          .andExpect(jsonPath("$.data.total").value(1))
+          .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(kolA)))
+          .andExpect(jsonPath("$.data.items[0].estimated").value("10.00"));
       // Mixed-attribution aggregate hides from OWN: kolB's order stays invisible by filter.
       mvc.perform(
               get("/admin-api/commission/settlement-details")

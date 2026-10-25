@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,14 +42,57 @@ class CommissionIncomeControllerTest {
         .thenReturn(
             new IncomePage(
                 new PageResult<>(List.of(row()), 1, 1, 20),
-                new Summary(new BigDecimal("300.00"), 1, 2, 3, 4)));
+                new Summary(
+                    new BigDecimal("300.00"),
+                    new BigDecimal("20.00"),
+                    new BigDecimal("280.00"),
+                    1,
+                    2,
+                    3,
+                    4)));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.page.items[0].id").value("77"))
-        .andExpect(jsonPath("$.data.page.items[0].estimated").value("500.00"))
-        .andExpect(jsonPath("$.data.page.items[0].unverified").value(2))
+        .andExpect(jsonPath("$.data.page.items").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].id").isString())
+        .andExpect(jsonPath("$.data.items[0].id").value("77"))
+        .andExpect(jsonPath("$.data.items[0].name").value("Kol A"))
+        .andExpect(jsonPath("$.data.items[0].code").value("KOL-T62"))
+        .andExpect(jsonPath("$.data.items[0].email").value("kol@example.test"))
+        .andExpect(jsonPath("$.data.items[0].bdId").value("5"))
+        .andExpect(jsonPath("$.data.items[0].bd").value("BD One"))
+        .andExpect(jsonPath("$.data.items[0].orderCount").isNumber())
+        .andExpect(jsonPath("$.data.items[0].orderCount").value(2))
+        .andExpect(jsonPath("$.data.items[0].quantity").isNumber())
+        .andExpect(jsonPath("$.data.items[0].quantity").value(3))
+        .andExpect(jsonPath("$.data.items[0].estimated").value("500.00"))
+        .andExpect(jsonPath("$.data.items[0].frozen").value("200.00"))
+        .andExpect(jsonPath("$.data.items[0].available").value("100.00"))
+        .andExpect(jsonPath("$.data.items[0].occupied").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].cumulativePaid").value("300.00"))
+        .andExpect(jsonPath("$.data.items[0].deducted").value("50.00"))
+        .andExpect(jsonPath("$.data.items[0].pendingDeduction").value("150.00"))
+        .andExpect(jsonPath("$.data.items[0].paid").value("300.00"))
+        .andExpect(jsonPath("$.data.items[0].commissionPaid").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].prepayPaid").value("300.00"))
+        .andExpect(jsonPath("$.data.items[0].lastPaidAt").value("2026-10-22T08:00:00Z"))
+        .andExpect(jsonPath("$.data.items[0].unverified").isNumber())
+        .andExpect(jsonPath("$.data.items[0].unverified").value(2))
+        .andExpect(jsonPath("$.data.total").isNumber())
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.page").isNumber())
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(20))
         .andExpect(jsonPath("$.data.summary.paid").value("300.00"))
-        .andExpect(jsonPath("$.data.summary.creators").value(1));
+        .andExpect(jsonPath("$.data.summary.commissionPaid").value("20.00"))
+        .andExpect(jsonPath("$.data.summary.prepayPaid").value("280.00"))
+        .andExpect(jsonPath("$.data.summary.creators").isNumber())
+        .andExpect(jsonPath("$.data.summary.creators").value(1))
+        .andExpect(jsonPath("$.data.summary.orders").isNumber())
+        .andExpect(jsonPath("$.data.summary.orders").value(2))
+        .andExpect(jsonPath("$.data.summary.quantity").isNumber())
+        .andExpect(jsonPath("$.data.summary.quantity").value(3))
+        .andExpect(jsonPath("$.data.summary.unverified").isNumber())
+        .andExpect(jsonPath("$.data.summary.unverified").value(4));
   }
 
   @Test
@@ -56,7 +100,8 @@ class CommissionIncomeControllerTest {
     when(service.list(any(), any()))
         .thenReturn(
             new IncomePage(
-                new PageResult<>(List.of(), 0, 1, 20), new Summary(BigDecimal.ZERO, 0, 0, 0, 0)));
+                new PageResult<>(List.of(), 0, 1, 20),
+                new Summary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, 0, 0)));
     mvc.perform(
             get(BASE)
                 .param("paymentType", "PREPAY")
@@ -97,6 +142,8 @@ class CommissionIncomeControllerTest {
                         7001L,
                         "WD123",
                         9001L,
+                        "Tee",
+                        "Red / M",
                         "https://img",
                         "100.00",
                         "0.1000",
@@ -109,7 +156,26 @@ class CommissionIncomeControllerTest {
                         "DEBIT",
                         "KOL",
                         77L,
-                        "Kol A")),
+                        "Kol A"),
+                    new CommissionLine(
+                        7002L,
+                        "WD124",
+                        9002L,
+                        "Hat",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "0.00",
+                        "UNVERIFIED",
+                        null,
+                        "CREDIT",
+                        "COMPANY",
+                        null,
+                        null)),
                 List.of(
                     new PaymentLine(
                         8001L,
@@ -128,10 +194,40 @@ class CommissionIncomeControllerTest {
     mvc.perform(get(BASE + "/77").header(AdminMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.income.id").value("77"))
+        .andExpect(jsonPath("$.data.lines[0].id").value("7001"))
+        .andExpect(jsonPath("$.data.lines[0].orderNo").value("WD123"))
+        .andExpect(jsonPath("$.data.lines[0].itemId").value("9001"))
+        .andExpect(jsonPath("$.data.lines[0].product").value("Tee"))
+        .andExpect(jsonPath("$.data.lines[0].sku").value("Red / M"))
+        .andExpect(jsonPath("$.data.lines[0].image").value("https://img"))
+        .andExpect(jsonPath("$.data.lines[0].base").value("100.00"))
         .andExpect(jsonPath("$.data.lines[0].rate").value("0.1000"))
+        .andExpect(jsonPath("$.data.lines[0].rateVersion").value(3))
+        .andExpect(jsonPath("$.data.lines[0].ruleVersion").value("900"))
+        .andExpect(jsonPath("$.data.lines[0].commission").value("10.00"))
+        .andExpect(jsonPath("$.data.lines[0].adjustment").value("-2.00"))
+        .andExpect(jsonPath("$.data.lines[0].releaseBasis").value("CONFIRMED"))
+        .andExpect(jsonPath("$.data.lines[0].businessAt").value("2026-10-10T08:00:00Z"))
         .andExpect(jsonPath("$.data.lines[0].direction").value("DEBIT"))
+        .andExpect(jsonPath("$.data.lines[0].subject").value("KOL"))
+        .andExpect(jsonPath("$.data.lines[0].kol").value("Kol A"))
+        .andExpect(jsonPath("$.data.lines[1].product").value("Hat"))
+        .andExpect(jsonPath("$.data.lines[1].sku").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("\"sku\":null")))
+        .andExpect(jsonPath("$.data.payments[0].id").value("8001"))
         .andExpect(jsonPath("$.data.payments[0].sourceNo").value("PP-1"))
-        .andExpect(jsonPath("$.data.payments[0].deducted").value("100.00"));
+        .andExpect(jsonPath("$.data.payments[0].type").value("PREPAY"))
+        .andExpect(jsonPath("$.data.payments[0].kolId").value("77"))
+        .andExpect(jsonPath("$.data.payments[0].amountCny").value("300.00"))
+        .andExpect(jsonPath("$.data.payments[0].paidAt").value("2026-10-22T08:00:00Z"))
+        .andExpect(jsonPath("$.data.payments[0].deduct").value(true))
+        .andExpect(jsonPath("$.data.payments[0].deducted").value("100.00"))
+        .andExpect(jsonPath("$.data.payments[0].pending").value("200.00"))
+        .andExpect(jsonPath("$.data.payments[0].actualAmount").value("300.00"))
+        .andExpect(jsonPath("$.data.payments[0].actualCurrency").value("CNY"))
+        .andExpect(jsonPath("$.data.payments[0].voucher").value("55"))
+        .andExpect(
+            jsonPath("$.data.payments[0].withdrawalId").value(org.hamcrest.Matchers.nullValue()));
   }
 
   @Test

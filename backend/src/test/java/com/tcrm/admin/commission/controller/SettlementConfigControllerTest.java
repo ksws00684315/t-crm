@@ -41,9 +41,14 @@ class SettlementConfigControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, viewerToken()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.currency").value("CNY"))
+        .andExpect(jsonPath("$.data.minimum").isString())
         .andExpect(jsonPath("$.data.minimum").value("150.00"))
+        .andExpect(jsonPath("$.data.version").isNumber())
         .andExpect(jsonPath("$.data.version").value(3))
+        .andExpect(jsonPath("$.data.channels[0].code").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data.channels[0].name").value("WEIDIAN"))
         .andExpect(jsonPath("$.data.channels[0].basis").value("COMPLETED_PLUS_DAYS"))
+        .andExpect(jsonPath("$.data.channels[0].days").isNumber())
         .andExpect(jsonPath("$.data.channels[0].days").value(14));
   }
 
@@ -65,7 +70,14 @@ class SettlementConfigControllerTest {
                     AdminMvcSupport.TOKEN_HEADER,
                     AdminMvcSupport.actAs(current, 5L, Role.SUPER_ADMIN, null)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.version").value(4));
+        .andExpect(jsonPath("$.data.currency").value("CNY"))
+        .andExpect(jsonPath("$.data.minimum").value("180.00"))
+        .andExpect(jsonPath("$.data.version").isNumber())
+        .andExpect(jsonPath("$.data.version").value(4))
+        .andExpect(jsonPath("$.data.channels[0].code").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data.channels[0].name").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data.channels[0].basis").value("SETTLE_TIME"))
+        .andExpect(jsonPath("$.data.channels[0].days").value(10));
   }
 
   @Test

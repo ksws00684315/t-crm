@@ -99,15 +99,28 @@ public class CommissionIncomeService {
   /** List page plus the summary row (11.02). */
   public record IncomePage(PageResult<IncomeRow> page, Summary summary) {}
 
-  /** Summary over the filtered set, not only the current page. */
+  /**
+   * Summary over the filtered set, not only the current page. {@code paid} is {@code commissionPaid
+   * + prepayPaid}.
+   */
   public record Summary(
-      BigDecimal paid, long creators, long orders, long quantity, long unverified) {}
+      BigDecimal paid,
+      BigDecimal commissionPaid,
+      BigDecimal prepayPaid,
+      long creators,
+      long orders,
+      long quantity,
+      long unverified) {}
 
-  /** Commission line of the income detail. */
+  /**
+   * Commission line of the income detail. {@code product} and {@code sku} come from the order line.
+   */
   public record CommissionLine(
       long id,
       String orderNo,
       long itemId,
+      String product,
+      String sku,
       String image,
       String base,
       String rate,
@@ -297,20 +310,28 @@ public class CommissionIncomeService {
   }
 
   private Summary summary(List<Long> kolIds, IncomeFilter filter) {
+    BigDecimal zero = BigDecimal.ZERO.setScale(2);
     if (kolIds.isEmpty()) {
-      return new Summary(BigDecimal.ZERO.setScale(2), 0, 0, 0, 0);
+      return new Summary(zero, zero, zero, 0, 0, 0, 0);
     }
     PaymentScope scope = PaymentScope.of(filter.paymentType());
-    BigDecimal paid = BigDecimal.ZERO.setScale(2);
+    BigDecimal prepayPaid = zero;
+    BigDecimal commissionPaid = zero;
+    if (scope.includesPrepay()) {
+      for (PrepayPaidRow row : finance.prepayPaidSums(kolIds, filter.start(), filter.end())) {
+        prepayPaid = prepayPaid.add(row.amountCny() == null ? BigDecimal.ZERO : row.amountCny());
+      }
+    }
+    // Same ledger sum as each income row. A pay-time window on withdrawals lands with task 63.
+    if (scope.includesCommission()) {
+      for (KolMoneyRow row : finance.withdrawalPaidSums(kolIds)) {
+        commissionPaid =
+            commissionPaid.add(row.amountCny() == null ? BigDecimal.ZERO : row.amountCny());
+      }
+    }
     long orders = 0;
     long quantity = 0;
     long unverified = 0;
-    if (scope.includesPrepay()) {
-      for (PrepayPaidRow row : finance.prepayPaidSums(kolIds, filter.start(), filter.end())) {
-        paid = paid.add(row.amountCny() == null ? BigDecimal.ZERO : row.amountCny());
-      }
-    }
-    // Commission withdrawal payments join the period sum in task 63; they are zero today.
     for (var row : orderSettlement.aggregateKolOrders(kolIds, filter.start(), filter.end())) {
       orders += row.orderCount();
       quantity += row.quantity();
@@ -318,7 +339,14 @@ public class CommissionIncomeService {
     for (var row : states.aggregateByKol(kolIds)) {
       unverified += row.unverifiedCount() == null ? 0 : row.unverifiedCount();
     }
-    return new Summary(paid, kolIds.size(), orders, quantity, unverified);
+    return new Summary(
+        commissionPaid.add(prepayPaid),
+        commissionPaid,
+        prepayPaid,
+        kolIds.size(),
+        orders,
+        quantity,
+        unverified);
   }
 
   private record PaymentScope(boolean includesPrepay, boolean includesCommission) {
@@ -378,6 +406,8 @@ public class CommissionIncomeService {
               row.getId(),
               order == null ? null : order.orderNo(),
               row.getOrderItemId(),
+              item == null ? null : textOrNull(item.itemName()),
+              item == null ? null : textOrNull(item.skuName()),
               item == null || item.productId() == null ? null : images.get(item.productId()),
               row.getBasisCny() == null ? null : row.getBasisCny().toPlainString(),
               rate == null ? null : rate.toPlainString(),
@@ -452,6 +482,11 @@ public class CommissionIncomeService {
       map.put(row.kolId(), row.amountCny() == null ? BigDecimal.ZERO.setScale(2) : row.amountCny());
     }
     return map;
+  }
+
+  /** Blank order-line names (a line with no SKU) stay null so the client can tell them apart. */
+  private static String textOrNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
   private static Map<Long, BigDecimal> prepayMoneyMap(List<PrepayPaidRow> rows) {

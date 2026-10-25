@@ -79,11 +79,13 @@ public class CommissionSettlementDetailService {
       java.time.Instant businessAt,
       List<Line> lines) {}
 
-  /** Per-item commission line inside a settlement row. */
+  /** Per-item commission line inside a settlement row. Names come from the order line. */
   public record Line(
       long id,
       String orderNo,
       long itemId,
+      String product,
+      String sku,
       String image,
       String base,
       String rate,
@@ -232,6 +234,8 @@ public class CommissionSettlementDetailService {
               row.getId(),
               order.orderNo(),
               row.getOrderItemId(),
+              item == null ? null : textOrNull(item.itemName()),
+              item == null ? null : textOrNull(item.skuName()),
               item == null || item.productId() == null ? null : images.get(item.productId()),
               row.getBasisCny() == null ? null : row.getBasisCny().toPlainString(),
               rate == null ? null : rate.toPlainString(),
@@ -271,5 +275,10 @@ public class CommissionSettlementDetailService {
         unverified ? "UNVERIFIED" : "POSTED",
         order.payTime(),
         lines);
+  }
+
+  /** Blank order-line names (a line with no SKU) stay null so the client can tell them apart. */
+  private static String textOrNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 }
