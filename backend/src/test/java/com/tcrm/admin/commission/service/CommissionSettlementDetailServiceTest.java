@@ -108,7 +108,7 @@ class CommissionSettlementDetailServiceTest {
   }
 
   @Test
-  void shouldBuildPostedRowWithRetainedAndLineDetails() {
+  void shouldBuildPostedRowWithNullRetainedAndLineDetails() {
     when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(5001L), 1, 1, 20));
     when(orderSettlement.listOrdersByIds(List.of(5001L)))
@@ -142,12 +142,13 @@ class CommissionSettlementDetailServiceTest {
             TENANT,
             () -> service.page(superAdmin(), new DetailFilter("WD-1", "WEIDIAN", 30L, 1, 20)));
     SettlementRow settlement = page.items().getFirst();
-    // Hand calc: payment 200 − refund 20 = 180 net; commission 18; retained 180 − 18 = 162.
+    // Hand calc: payment 200 − refund 20 = 180 net; commission 18. Retained = Weidian
+    // settlement net − commission, pending M0 (Q-1017-1/2): null even for a fully posted order.
     assertThat(settlement.payment()).isEqualTo("200.00");
     assertThat(settlement.refund()).isEqualTo("20.00");
     assertThat(settlement.net()).isEqualTo("180.00");
     assertThat(settlement.commission()).isEqualTo("18.00");
-    assertThat(settlement.retained()).isEqualTo("162.00");
+    assertThat(settlement.retained()).isNull();
     assertThat(settlement.status()).isEqualTo("POSTED");
     assertThat(settlement.kolNames()).containsExactly("Kol A");
     assertThat(settlement.lines().getFirst().product()).isEqualTo("item");
