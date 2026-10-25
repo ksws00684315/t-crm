@@ -85,9 +85,12 @@ public class KolAnalyticsService {
       }
     }
     // Commission accrual of the creator's lines, grouped by the order's pay date (task 62 via the
-    // commission port). Withdrawn/withdrawing stay zero until task 63 stores allocations.
+    // commission port). The withdrawal occupation (task 63) splits the lines into withdrawing and
+    // withdrawn.
     Map<Long, BigDecimal> commissionByOrder = new HashMap<>();
     BigDecimal commission = BigDecimal.ZERO;
+    BigDecimal withdrawing = BigDecimal.ZERO;
+    BigDecimal withdrawn = BigDecimal.ZERO;
     Map<String, BigDecimal> commissionByDay = new TreeMap<>();
     List<CommissionOrderStateApi.ItemCommissionStateDTO> commissionLines =
         commissionStates.listByKolAndOrderIds(
@@ -97,6 +100,11 @@ public class KolAnalyticsService {
           line.commissionAmount() == null ? BigDecimal.ZERO : line.commissionAmount();
       commission = commission.add(amount);
       commissionByOrder.merge(line.orderId(), amount, BigDecimal::add);
+      if (CommissionOrderStateApi.STATUS_WITHDRAWING.equals(line.settlementStatus())) {
+        withdrawing = withdrawing.add(amount);
+      } else if (CommissionOrderStateApi.STATUS_WITHDRAWN.equals(line.settlementStatus())) {
+        withdrawn = withdrawn.add(amount);
+      }
     }
     for (OrderDO order : range) {
       BigDecimal amount = commissionByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
@@ -119,8 +127,8 @@ public class KolAnalyticsService {
         money(sales),
         range.size(),
         money(commission),
-        zero(),
-        zero(),
+        money(withdrawn),
+        money(withdrawing),
         money(currentFrozen(kol.id())),
         daily);
   }

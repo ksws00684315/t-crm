@@ -51,6 +51,7 @@ public enum PostTemplate {
       Permission.COMMISSION_VIEW,
       Permission.PAYOUT_ACCOUNT_REVIEW,
       Permission.WITHDRAWAL_REVIEW,
+      Permission.WITHDRAWAL_PAY,
       Permission.DASHBOARD_SHOP,
       Permission.DASHBOARD_TEAM,
       Permission.DASHBOARD_KOL,
