@@ -20,8 +20,6 @@ import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolPayTimeRateDTO;
-import com.tcrm.admin.product.api.ProductAccessApi;
-import com.tcrm.admin.product.api.ProductRateDTO;
 import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -46,17 +44,15 @@ class CommissionItemSnapshotServiceTest {
   private final CommissionRuleVersionMapper ruleVersions = mock(CommissionRuleVersionMapper.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
   private final KolApi kols = mock(KolApi.class);
-  private final ProductAccessApi products = mock(ProductAccessApi.class);
   private final com.tcrm.admin.shared.CurrentTenantResolver tenantResolver = () -> TENANT;
   private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
   private final CommissionItemSnapshotService service =
       new CommissionItemSnapshotService(
-          states, revisions, ruleVersions, wallet, kols, products, tenantResolver, clock);
+          states, revisions, ruleVersions, wallet, kols, tenantResolver, clock);
 
   @BeforeEach
   void prepare() {
     when(ruleVersions.findEffectiveAt(any())).thenReturn(null);
-    when(products.listRates(anyCollection())).thenReturn(List.of());
     when(kols.rateEffectiveAt(anyLong(), any())).thenReturn(null);
     when(states.deleteStaleByOrder(anyLong(), anyCollection(), any())).thenReturn(0);
   }
@@ -123,10 +119,8 @@ class CommissionItemSnapshotServiceTest {
   }
 
   @Test
-  void shouldPreferProductRateOverPromotionConfig() {
+  void shouldUsePromotionConfigRateEvenForProductLine() {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
-    when(products.listRates(anyCollection()))
-        .thenReturn(List.of(new ProductRateDTO(PRODUCT, new BigDecimal("0.2500"))));
     whenRateAtPayTime(KOL_A, "0.1500", 4);
     TenantScope.runCompany(
         TENANT,
@@ -136,9 +130,11 @@ class CommissionItemSnapshotServiceTest {
     ArgumentCaptor<CommissionItemStateDO> row =
         ArgumentCaptor.forClass(CommissionItemStateDO.class);
     verify(states).insert(row.capture());
-    // Product rate wins (D7): 100 × 0.25 = 25.00, config version stays empty.
-    assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("25.00");
-    assertThat(row.getValue().getConfigVersion()).isNull();
+    // Unified KOL rate (2026-10-25, ADR-032 §3): a product-linked line resolves only from the
+    // pay-time promotion config; product-level rates no longer exist in the resolution.
+    // Hand calc: 100 × 0.15 = 15.00, config version 4 recorded.
+    assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("15.00");
+    assertThat(row.getValue().getConfigVersion()).isEqualTo(4);
   }
 
   @Test
