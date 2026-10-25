@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /** Read-only KOL order listing. Identity and company scope are taken from the KOL session. */
@@ -60,41 +62,17 @@ public class KolOrderService {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     KolAccountDTO kol = current.kol();
-    var query =
-        new LambdaQueryWrapper<OrderDO>()
-            .eq(OrderDO::getKolId, kol.id())
-            .eq(OrderDO::getAttributionStatus, "ATTRIBUTED")
-            .ge(filter.payFrom() != null, OrderDO::getPayTime, filter.payFrom())
-            .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
-            .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
-            .orderByDesc(OrderDO::getPayTime, OrderDO::getId);
-    if (notBlank(filter.orderNo())) {
-      query.apply(
-          "weidian_order_id ILIKE {0} ESCAPE '\\'", "%" + likeLiteral(filter.orderNo()) + "%");
-    }
-    if (notBlank(filter.productName())) {
-      // Only the creator's own lines count; other items of the same order stay invisible.
-      query.exists(
-          "SELECT 1 FROM crm_order_item oi WHERE oi.order_id = crm_order.id"
-              + " AND oi.kol_id = {0} AND oi.item_name ILIKE {1} ESCAPE '\\'",
-          kol.id(), "%" + likeLiteral(filter.productName()) + "%");
-    }
+    var query = baseQuery(filter, kol.id());
     List<OrderDO> pageOrders;
     long total;
     if (notBlank(filter.settlementStatus())) {
       // The order-level status is the most active own line, computed in the commission port; the
-      // filter therefore resolves matching order ids first and pages them in memory.
+      // filter therefore resolves matching order ids first and pages them in memory. The
+      // candidates reuse the exact same conditions as the plain paged query (orderNo and
+      // productName included), so combined filters keep their meaning.
       List<OrderDO> candidates =
           orders.selectList(
-              new LambdaQueryWrapper<OrderDO>()
-                  .select(OrderDO::getId)
-                  .eq(OrderDO::getKolId, kol.id())
-                  .eq(OrderDO::getAttributionStatus, "ATTRIBUTED")
-                  .isNotNull(OrderDO::getPayTime)
-                  .ge(filter.payFrom() != null, OrderDO::getPayTime, filter.payFrom())
-                  .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
-                  .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
-                  .orderByDesc(OrderDO::getPayTime, OrderDO::getId));
+              baseQuery(filter, kol.id()).select(OrderDO::getId).isNotNull(OrderDO::getPayTime));
       Map<String, List<Long>> byStatus = groupOrderIdsByStatus(kol.id(), candidates);
       List<Long> matched = byStatus.getOrDefault(filter.settlementStatus(), List.of());
       total = matched.size();
@@ -129,7 +107,7 @@ public class KolOrderService {
             .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
             .stream()
             .collect(
-                java.util.stream.Collectors.toMap(
+                Collectors.toMap(
                     CommissionOrderStateApi.ItemCommissionStateDTO::orderItemId, s -> s));
     return new PageResult<>(
         pageOrders.stream()
@@ -144,7 +122,7 @@ public class KolOrderService {
                   List<CommissionOrderStateApi.ItemCommissionStateDTO> ownStates =
                       ownItems.stream()
                           .map(item -> statesByItem.get(item.getId()))
-                          .filter(java.util.Objects::nonNull)
+                          .filter(Objects::nonNull)
                           .toList();
                   List<KolOrderDTO.Line> itemRows =
                       ownItems.stream()
@@ -196,6 +174,34 @@ public class KolOrderService {
       }
     }
     return CommissionOrderStateApi.STATUS_INVALID;
+  }
+
+  /**
+   * Shared conditions of the plain paged query and the settlement-status candidate resolution: the
+   * creator's attributed orders with the pay window, order status, order-number and product name
+   * filters applied.
+   */
+  private LambdaQueryWrapper<OrderDO> baseQuery(KolOrderFilterDTO filter, long kolId) {
+    var query =
+        new LambdaQueryWrapper<OrderDO>()
+            .eq(OrderDO::getKolId, kolId)
+            .eq(OrderDO::getAttributionStatus, "ATTRIBUTED")
+            .ge(filter.payFrom() != null, OrderDO::getPayTime, filter.payFrom())
+            .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
+            .eq(filter.orderStatus() != null, OrderDO::getOrderStatus, filter.orderStatus())
+            .orderByDesc(OrderDO::getPayTime, OrderDO::getId);
+    if (notBlank(filter.orderNo())) {
+      query.apply(
+          "weidian_order_id ILIKE {0} ESCAPE '\\'", "%" + likeLiteral(filter.orderNo()) + "%");
+    }
+    if (notBlank(filter.productName())) {
+      // Only the creator's own lines count; other items of the same order stay invisible.
+      query.exists(
+          "SELECT 1 FROM crm_order_item oi WHERE oi.order_id = crm_order.id"
+              + " AND oi.kol_id = {0} AND oi.item_name ILIKE {1} ESCAPE '\\'",
+          kolId, "%" + likeLiteral(filter.productName()) + "%");
+    }
+    return query;
   }
 
   private Map<String, List<Long>> groupOrderIdsByStatus(long kolId, List<OrderDO> candidates) {

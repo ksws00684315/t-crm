@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -316,6 +317,151 @@ class KolOrderServiceTest {
     assertThat(result.items().getFirst().settlementStatus()).isEqualTo("FROZEN");
     // Filter path resolves candidates (selectList) then pages the matched ids (selectList again).
     verify(orders, org.mockito.Mockito.times(2)).selectList(any());
+  }
+
+  @Test
+  void shouldCombineSettlementStatusWithOrderNumberFilter() {
+    OrderDO matching = order(21L, "123432597890", "ATTRIBUTED", "PAID");
+    OrderDO other = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    // Candidates resolve through the port; the orderNo filter must apply to the candidate query.
+    when(orders.selectList(any())).thenReturn(List.of(matching), List.of(matching));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    31L,
+                    31L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+
+    var result =
+        service.page(new KolOrderFilterDTO(null, null, null, "3259", null, "FROZEN", 1, 20));
+
+    // Both orders are FROZEN, but only the one matching orderNo=3259 is returned.
+    assertThat(result.total()).isEqualTo(1);
+    assertThat(result.items().getFirst().orderNo()).isEqualTo("1234****7890");
+    var candidateQuery = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders, org.mockito.Mockito.times(2)).selectList(candidateQuery.capture());
+    assertThat(candidateQuery.getAllValues().get(0).getSqlSegment()).contains("weidian_order_id");
+  }
+
+  @Test
+  void shouldCombineSettlementStatusWithProductNameFilter() {
+    OrderDO matching = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    OrderDO other = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    when(orders.selectList(any())).thenReturn(List.of(matching), List.of(matching));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    31L,
+                    31L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00"))));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("3.00"),
+                    new BigDecimal("3.00"))));
+    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+
+    var result =
+        service.page(
+            new KolOrderFilterDTO(null, null, null, null, "Widget", "WITHDRAWABLE", 1, 20));
+
+    assertThat(result.total()).isEqualTo(1);
+    var candidateQuery = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders, org.mockito.Mockito.times(2)).selectList(candidateQuery.capture());
+    assertThat(candidateQuery.getAllValues().get(0).getSqlSegment()).contains("crm_order_item");
+  }
+
+  @Test
+  void shouldReturnEmptyPage_whenNoOrderMatchesTheSettlementStatus() {
+    when(orders.selectList(any()))
+        .thenReturn(List.of(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+
+    // Asking for WITHDRAWABLE when the only line is FROZEN: an empty page, no item queries.
+    var result =
+        service.page(new KolOrderFilterDTO(null, null, null, null, null, "WITHDRAWABLE", 1, 20));
+
+    assertThat(result.total()).isZero();
+    assertThat(result.items()).isEmpty();
+    verify(items, never()).selectList(any());
+    verify(commissionStates, never()).listByOrderItemIds(anyLong(), any());
+  }
+
+  @Test
+  void shouldTakeWithdrawableOverFrozenInTheLadder() {
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                // Line 21 released (WITHDRAWABLE outranks FROZEN of line 22)…
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    "WITHDRAWABLE",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("2.00"),
+                    new BigDecimal("2.00")),
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    22L,
+                    "FROZEN",
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("1.00"),
+                    BigDecimal.ZERO)));
+    when(items.selectList(any()))
+        .thenReturn(List.of(item(21L, 700L, "25.00", "5.00"), item(22L, 700L, "10.00", "0.00")));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
+
+    assertThat(result.items().getFirst().settlementStatus()).isEqualTo("WITHDRAWABLE");
   }
 
   @Test

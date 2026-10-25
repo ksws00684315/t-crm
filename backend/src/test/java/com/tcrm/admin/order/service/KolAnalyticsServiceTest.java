@@ -177,6 +177,25 @@ class KolAnalyticsServiceTest {
     assertThat(overview.daily().get(1).commissionCny()).isEqualByComparingTo("2.00");
   }
 
+  @Test
+  void shouldSkipZeroCommissionOrders_whenBuildingTheDailyAxis() {
+    // The order is in range but its line has no accrual yet (unverified): the commission day map
+    // skips it, so the daily row keeps "0.00" without adding a day of its own.
+    when(orders.selectList(any())).thenReturn(List.of(order(21L, "2026-09-30T17:00:00Z")));
+    when(items.selectList(any())).thenReturn(List.of(line(21L, 700L, "100.50")));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any())).thenReturn(List.of());
+    when(commissionStates.listByKol(anyLong())).thenReturn(List.of());
+
+    var overview = service.overview("2026-10-01T00:00:00+08:00", "2026-10-02T00:00:00+08:00");
+
+    assertThat(overview.commissionCny()).isEqualByComparingTo("0.00");
+    assertThat(overview.frozenCny()).isEqualByComparingTo("0.00");
+    assertThat(overview.daily())
+        .containsExactly(
+            new KolAnalyticsOverviewDTO.Day(
+                "2026-10-01", new BigDecimal("100.50"), new BigDecimal("0.00")));
+  }
+
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
         700L,
