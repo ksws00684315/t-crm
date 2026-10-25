@@ -37,9 +37,16 @@ class KolCommissionControllerTest {
     mvc.perform(get("/kol-api/commissions/overview").header(KolMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.income.estimated").value("500.00"))
+        .andExpect(jsonPath("$.data.income.frozen").value("200.00"))
         .andExpect(jsonPath("$.data.income.available").value("100.00"))
+        .andExpect(jsonPath("$.data.income.occupied").value("0"))
+        .andExpect(jsonPath("$.data.income.cumulativePaid").value("300.00"))
+        .andExpect(jsonPath("$.data.income.deducted").value("50.00"))
+        .andExpect(jsonPath("$.data.income.pendingDeduction").value("150.00"))
+        .andExpect(jsonPath("$.data.income.prepayPaid").value("300.00"))
         .andExpect(jsonPath("$.data.income.paid").value("300.00"))
-        .andExpect(jsonPath("$.data.asOf").exists());
+        .andExpect(jsonPath("$.data.income.commissionPaid").value("0.00"))
+        .andExpect(jsonPath("$.data.asOf").value("2026-10-24T08:00:00Z"));
   }
 
   @Test
@@ -64,8 +71,18 @@ class KolCommissionControllerTest {
                 20));
     mvc.perform(get("/kol-api/fund-records").header(KolMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").isNumber())
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.items[0].id").value("8001"))
         .andExpect(jsonPath("$.data.items[0].type").value("PREPAY"))
+        .andExpect(jsonPath("$.data.items[0].appliedAt").value("2026-10-21T08:00:00Z"))
+        .andExpect(jsonPath("$.data.items[0].applicationNo").value("PP20261021000001"))
         .andExpect(jsonPath("$.data.items[0].amount").value("300.00"))
+        .andExpect(jsonPath("$.data.items[0].currency").value("CNY"))
+        .andExpect(jsonPath("$.data.items[0].maskedRecipient").value("ab***@example.test"))
+        .andExpect(jsonPath("$.data.items[0].receivedAt").value("2026-10-22T08:00:00Z"))
         .andExpect(jsonPath("$.data.items[0].publicStatus").value("PAID"))
         .andExpect(jsonPath("$.data.items[0].sourceId").value("7001"));
   }

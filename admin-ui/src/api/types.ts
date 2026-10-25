@@ -50,6 +50,7 @@ export type PermissionCode =
   | "commission:freeze"
   | "payout-account:review"
   | "withdrawal:review"
+  | "withdrawal:pay"
   | "prepay:apply"
   | "prepay:review"
   | "prepay:finance-review"

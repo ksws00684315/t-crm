@@ -142,6 +142,10 @@ const zhCN = {
       name: "审核提现",
       desc: "审核或驳回达人提现申请"
     },
+    "withdrawal:pay": {
+      name: "提现付款登记",
+      desc: "登记线下付款、打款前驳回与读取完整收款快照"
+    },
     "prepay:apply": {
       name: "申请预付",
       desc: "为达人提交或撤回预付申请"
@@ -319,6 +323,17 @@ const zhCN = {
     PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个",
     PAYOUT_ACCOUNT_NOT_PENDING: "账户已被修改或已审核，请刷新后重试",
     PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认",
+    PAYOUT_ACCOUNT_IN_USE: "该收款账户仍有处理中的提现申请，暂不能停用。",
+    WITHDRAWAL_REQUEST_CONFLICT: "提现申请 UUID 已被不同内容使用，请刷新后重试。",
+    WITHDRAWAL_STATE_CONFLICT: "提现申请状态已变化，请刷新后再操作。",
+    WITHDRAWAL_BELOW_MINIMUM: "提现金额低于最低提现金额。",
+    WITHDRAWAL_INSUFFICIENT_AVAILABLE: "提现金额超过可用余额。",
+    WITHDRAWAL_KOL_FROZEN: "该达人已被冻结提现，暂不能提交新申请。",
+    WITHDRAWAL_NOT_RESUBMITTABLE: "关联的原申请不是本人已驳回的提现申请。",
+    WITHDRAWAL_PAUSED: "该提现的来源核实未解除，暂不能付款。",
+    WITHDRAWAL_PAYMENT_CONFLICT: "该提现的付款登记已存在或请求 UUID 冲突。",
+    WITHDRAWAL_FROZEN_ALREADY: "该达人已处于提现冻结状态。",
+    WITHDRAWAL_NOT_FROZEN: "该达人未处于提现冻结状态。",
     FILE_INVALID: "文件必须是 PNG 或 JPEG 图片",
     FILE_TOO_LARGE: "文件超过 2MB",
     FILE_IN_USE: "文件已被其他记录使用",

@@ -31,13 +31,18 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class AdminPayoutAccountController {
+  private final com.tcrm.admin.commission.service.WithdrawalService withdrawals;
   private final PayoutAccountService accounts;
   private final CurrentUserContext current;
   private final PrepayService prepays;
 
   public AdminPayoutAccountController(
-      PayoutAccountService accounts, CurrentUserContext current, PrepayService prepays) {
+      com.tcrm.admin.commission.service.WithdrawalService withdrawals,
+      PayoutAccountService accounts,
+      CurrentUserContext current,
+      PrepayService prepays) {
     this.accounts = accounts;
+    this.withdrawals = withdrawals;
     this.current = current;
     this.prepays = prepays;
   }
@@ -89,7 +94,8 @@ public class AdminPayoutAccountController {
         "prepay:review",
         "prepay:finance-review",
         "prepay:pay",
-        "commission:view"
+        "commission:view",
+        "withdrawal:pay"
       },
       mode = SaMode.OR)
   @AuditLog(module = "PayoutAccount", action = "Download file")
@@ -99,7 +105,9 @@ public class AdminPayoutAccountController {
     BizFileService.FileDTO file =
         attached.bizType() == com.tcrm.admin.commission.model.FileBizType.PAYOUT_QR
             ? payoutQrFile(user, id)
-            : prepays.adminFile(user, id);
+            : attached.bizType() == com.tcrm.admin.commission.model.FileBizType.WITHDRAWAL_VOUCHER
+                ? withdrawals.voucherFile(user, id)
+                : prepays.adminFile(user, id);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,

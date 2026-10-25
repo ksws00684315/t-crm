@@ -34,6 +34,18 @@ public interface CommissionWalletMapper {
   @Select("SELECT balance_cny FROM crm_commission_wallet WHERE kol_id = #{kolId}")
   BigDecimal findBalance(@Param("kolId") long kolId);
 
+  /** Ledger sum of one creator: the wallet balance must equal it after every completed run. */
+  @Select(
+      """
+      SELECT COALESCE(SUM(amount_cny), 0) FROM crm_commission_ledger
+      WHERE kol_id = #{kolId}
+      """)
+  BigDecimal sumLedgerCny(@Param("kolId") long kolId);
+
+  /** Creator ids whose stored wallet row exists (reconciliation iterates these). */
+  @Select("SELECT kol_id FROM crm_commission_wallet")
+  List<Long> listWalletKolIds();
+
   @Select(
       """
       SELECT amount_cny, balance_after_cny, kol_id, source_type, source_id

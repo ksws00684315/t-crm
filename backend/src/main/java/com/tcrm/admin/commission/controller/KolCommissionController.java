@@ -13,6 +13,7 @@ import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,11 +41,16 @@ public class KolCommissionController {
 
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @GetMapping("/kol-api/fund-records")
-  public R<PageResult<FundRecordVO>> fundRecords(@Valid @ModelAttribute PageQuery query) {
+  public R<FundPageVO> fundRecords(@Valid @ModelAttribute PageQuery query) {
     KolAccountDTO kol = current.kol();
     PageResult<FundRecord> page =
         commissions.fundRecords(kol.tenantId(), kol.id(), query.pageNumber(), query.pageSize());
-    return R.ok(page.map(FundRecordVO::from));
+    return R.ok(
+        new FundPageVO(
+            page.items().stream().map(FundRecordVO::from).toList(),
+            Math.toIntExact(page.total()),
+            page.page(),
+            page.size()));
   }
 
   /** Standard page params. */
@@ -64,6 +70,9 @@ public class KolCommissionController {
       return new OverviewVO(overview.income(), overview.asOf().toString());
     }
   }
+
+  /** Paged fund records. {@code total} is a JSON number (ADR-032 appendix A). */
+  public record FundPageVO(List<FundRecordVO> items, int total, int page, int size) {}
 
   /** One unified payment record. */
   public record FundRecordVO(

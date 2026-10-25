@@ -52,7 +52,9 @@ class SettlementDetailControllerTest {
                                 7001L,
                                 "WD-1001",
                                 9001L,
+                                "Tee",
                                 null,
+                                "https://img",
                                 "200.00",
                                 "0.1000",
                                 3,
@@ -72,10 +74,41 @@ class SettlementDetailControllerTest {
             get("/admin-api/commission/settlement-details")
                 .header(AdminMvcSupport.TOKEN_HEADER, viewerToken()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").isNumber())
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.items[0].id").value("5001"))
         .andExpect(jsonPath("$.data.items[0].orderNo").value("WD-1001"))
+        .andExpect(jsonPath("$.data.items[0].channel").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data.items[0].shop").value("Shop A"))
+        .andExpect(jsonPath("$.data.items[0].kolNames[0]").value("Kol A"))
+        .andExpect(jsonPath("$.data.items[0].payment").value("200.00"))
+        .andExpect(jsonPath("$.data.items[0].refund").value("20.00"))
+        .andExpect(jsonPath("$.data.items[0].net").value("180.00"))
+        .andExpect(jsonPath("$.data.items[0].commission").value("18.00"))
+        .andExpect(jsonPath("$.data.items[0].rates[0]").value("0.1000"))
         .andExpect(jsonPath("$.data.items[0].retained").value("162.00"))
         .andExpect(jsonPath("$.data.items[0].status").value("POSTED"))
-        .andExpect(jsonPath("$.data.items[0].lines[0].commission").value("18.00"));
+        .andExpect(jsonPath("$.data.items[0].businessAt").value("2026-10-10T08:00:00Z"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].id").value("7001"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].orderNo").value("WD-1001"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].itemId").value("9001"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].product").value("Tee"))
+        .andExpect(
+            jsonPath("$.data.items[0].lines[0].sku").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.items[0].lines[0].image").value("https://img"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].base").value("200.00"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].rate").value("0.1000"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].rateVersion").value(3))
+        .andExpect(jsonPath("$.data.items[0].lines[0].ruleVersion").value("900"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].commission").value("18.00"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].adjustment").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].releaseBasis").value("CONFIRMED"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].businessAt").value("2026-10-10T08:00:00Z"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].direction").value("CREDIT"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].subject").value("KOL"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].kol").value("Kol A"));
   }
 
   @Test
