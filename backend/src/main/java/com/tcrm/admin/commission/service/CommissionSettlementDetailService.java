@@ -257,8 +257,12 @@ public class CommissionSettlementDetailService {
     }
     ShopAccessDTO shop = shopsById.get(order.shopId());
     BigDecimal net = payment.subtract(refund);
-    // Shop retained amount hides while any line is unverified (ADR-032 appendix A).
-    String retained = unverified ? null : net.subtract(commission).toPlainString();
+    // Shop retained = Weidian settlement net − net KOL commission, without product cost
+    // (2026-10-25 decision, ADR-032 appendix A); it no longer equals payment − refund −
+    // commission. The Weidian settlement-net field is pending M0 verification (Q-1017-1/2), so
+    // retained stays null for verified and unverified rows alike instead of a look-alike value.
+    // TODO(M0 Q-1017-1/2): read the Weidian settlement net and compute retained here.
+    String retained = null;
     return new SettlementRow(
         order.id(),
         order.orderNo(),

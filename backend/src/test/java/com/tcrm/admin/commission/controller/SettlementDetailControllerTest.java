@@ -44,7 +44,7 @@ class SettlementDetailControllerTest {
                         "180.00",
                         "18.00",
                         List.of("0.1000"),
-                        "162.00",
+                        null,
                         "POSTED",
                         Instant.parse("2026-10-10T08:00:00Z"),
                         List.of(
@@ -88,7 +88,7 @@ class SettlementDetailControllerTest {
         .andExpect(jsonPath("$.data.items[0].net").value("180.00"))
         .andExpect(jsonPath("$.data.items[0].commission").value("18.00"))
         .andExpect(jsonPath("$.data.items[0].rates[0]").value("0.1000"))
-        .andExpect(jsonPath("$.data.items[0].retained").value("162.00"))
+        .andExpect(jsonPath("$.data.items[0].retained").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.items[0].status").value("POSTED"))
         .andExpect(jsonPath("$.data.items[0].businessAt").value("2026-10-10T08:00:00Z"))
         .andExpect(jsonPath("$.data.items[0].lines[0].id").value("7001"))
