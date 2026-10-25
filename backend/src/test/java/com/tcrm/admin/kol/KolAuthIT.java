@@ -552,6 +552,60 @@ class KolAuthIT {
     }
   }
 
+  @Test
+  void shouldUpdateOwnProfile_withWhitelistedFieldsAndAudit() throws Exception {
+    long kolId = activatedKol(1L, "profile@example.com", "some-password-1");
+    String code =
+        jdbc.queryForObject("SELECT kol_code FROM crm_kol WHERE id = ?", String.class, kolId);
+    jdbc.update(
+        "UPDATE crm_kol SET social_accounts = ?::jsonb WHERE id = ?",
+        "[{\"platform\":\"TikTok\",\"handle\":\"@seeded\",\"url\":null,\"followers\":null,"
+            + "\"primary\":true},{\"platform\":\"Instagram\",\"handle\":\"@second\","
+            + "\"url\":null,\"followers\":10,\"primary\":false}]",
+        kolId);
+    String token = kolLogin("profile@example.com", "some-password-1").at("/data/token").asString();
+
+    mvc.perform(get("/kol-api/me").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.systemId").value(code))
+        .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"))
+        .andExpect(jsonPath("$.data.primaryHandle").value("@seeded"))
+        .andExpect(jsonPath("$.data.loginStatus").value("NORMAL"))
+        .andExpect(jsonPath("$.data.commissionRate").doesNotExist());
+
+    // The whitelist ignores read-only fields sent along; the pairing rule guards the social slot.
+    mvc.perform(
+            json(
+                put("/kol-api/me").header(KOL_TOKEN, token),
+                "{\"name\":\"Renamed Creator\",\"email\":\"hacker@example.com\","
+                    + "\"primaryPlatform\":\"YouTube\",\"primaryHandle\":\"@new\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.name").value("Renamed Creator"))
+        .andExpect(jsonPath("$.data.primaryPlatform").value("YouTube"))
+        .andExpect(jsonPath("$.data.email").value("profile@example.com"));
+
+    assertThat(jdbc.queryForObject("SELECT name FROM crm_kol WHERE id = ?", String.class, kolId))
+        .isEqualTo("Renamed Creator");
+    assertThat(jdbc.queryForObject("SELECT email FROM crm_kol WHERE id = ?", String.class, kolId))
+        .isEqualTo("profile@example.com");
+    String socials =
+        jdbc.queryForObject(
+            "SELECT social_accounts FROM crm_kol WHERE id = ?", String.class, kolId);
+    assertThat(socials).contains("\"YouTube\"").contains("@new").contains("@second");
+    assertThat(socials).doesNotContain("@seeded");
+    assertThat(
+            jdbc.queryForList(
+                "SELECT action FROM sys_oper_log WHERE module = 'KolProfile'", String.class))
+        .containsExactly("Update profile");
+
+    mvc.perform(
+            json(
+                put("/kol-api/me").header(KOL_TOKEN, token),
+                "{\"name\":\"X Creator\",\"primaryHandle\":\"@only\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+  }
+
   private static KolDO baseKol(String email) {
     KolDO kol = new KolDO();
     kol.setName("Kol");

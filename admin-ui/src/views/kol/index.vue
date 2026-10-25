@@ -142,12 +142,12 @@ function rowOwned(row: KolVO): boolean {
 }
 
 /**
- * Widths are measured against the rendered 14px text. Chinese fits a 1844px desktop exactly
- * (1558px of columns in a 1562px card), which is the size of the preview the owner reviewed on
- * 2026-10-20: no header wraps and the six row actions keep one line. English labels are longer, so
- * that locale gets wider columns and, as before, scrolls inside the card. Emails, phone numbers and
- * social handles are the only values that ellipsize either way; the visual guide allows that as long
- * as the tooltip shows the rest.
+ * Widths are measured against the rendered 14px text; emails, phone numbers and social handles
+ * ellipsize with a tooltip either way (the visual guide allows that as long as the tooltip shows
+ * the rest). Every 04.01 column shows by default (owner decision 2026-10-24, task 59 review); at
+ * 1440 the roster overflows the card (zh 1558px, en 1492px measured against ~1158px) and scrolls
+ * horizontally inside it — pinned first and action columns cast the DataTable fixed-column shadow.
+ * The ADR-029 action column widths (344/476) are unchanged.
  */
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
@@ -163,11 +163,13 @@ const columns = computed<DataColumn[]>(() => [
   { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
   { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
   { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
-  { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 136), tooltip: true },
+  // en datetime "10/20/2026, 00:15" measured 138px of content; 136 clipped it (task 59).
+  { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 142), tooltip: true },
   { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
-  { key: "relation", label: t("kol.relationStatus"), width: px(80, 124) },
+  // en status tag measured 164px of content; 124 clipped it (task 59 measurement).
+  { key: "relation", label: t("kol.relationStatus"), width: px(80, 168) },
   { key: "actions", label: t("common.actions"), width: px(344, 476) }
 ]);
 

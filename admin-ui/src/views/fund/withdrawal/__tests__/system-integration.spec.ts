@@ -20,7 +20,7 @@ vi.mock("@/api/commission/finance", () => ({
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
   listSettlements: vi.fn(),
-  listWithdrawals: vi.fn(),
+  listFinanceTasks: vi.fn(),
   getWithdrawal: vi.fn(),
   reviewWithdrawal: vi.fn(),
   payWithdrawal: vi.fn(),
@@ -58,7 +58,15 @@ beforeEach(() => {
   vi.mocked(api.listIncome).mockResolvedValue(demo.listIncome("SUPER_ADMIN", "data", {}));
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
   vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
-  vi.mocked(api.listWithdrawals).mockResolvedValue(demo.listWithdrawals("SUPER_ADMIN", "data", {}));
+  vi.mocked(api.listFinanceTasks).mockResolvedValue(
+    (() => {
+      const result = demo.listWithdrawals("SUPER_ADMIN", "data", {});
+      return {
+        ...result,
+        items: result.items.map(row => ({ ...row, type: "COMMISSION" as const }))
+      };
+    })()
+  );
 });
 
 const global = {
@@ -84,7 +92,7 @@ describe("commission pages inside the existing application", () => {
       expect(wrapper.findComponent(DataTable).exists()).toBe(true);
       wrapper.unmount();
     }
-    expect(api.listWithdrawals).toHaveBeenCalled();
+    expect(api.listFinanceTasks).toHaveBeenCalled();
     expect(api.listSettlements).toHaveBeenCalled();
     expect(api.getConfig).toHaveBeenCalled();
   });

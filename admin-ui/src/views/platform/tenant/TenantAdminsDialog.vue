@@ -12,6 +12,8 @@ import {
 } from "@/api/platform/tenant";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
+import { useLocaleStore } from "@/stores/locale";
 import { formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import JoinMemberDialog from "./JoinMemberDialog.vue";
@@ -39,13 +41,18 @@ function asAdmin(row: object): TenantAdminVO {
   return row as TenantAdminVO;
 }
 
+const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
+/** One width per language: the action labels differ in length (norm 10 §3). */
+const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
+
 const columns = computed<DataColumn[]>(() => [
   { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
   { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
   { key: "email", label: t("common.email"), minWidth: 180 },
   { key: "status", label: t("common.status"), width: 90 },
   { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180 },
-  { key: "actions", label: t("common.actions"), width: 110 }
+  // Reset password via RowActions (R-10): zh canvas 56 / en 107 + 24px (task 59 measurements).
+  { key: "actions", label: t("common.actions"), width: px(80, 136) }
 ]);
 const createVisible = ref(false);
 const joinVisible = ref(false);
@@ -131,6 +138,20 @@ async function submitCreate() {
   }
 }
 
+/** Row actions via RowActions (norm 11 §2, R-10); the reset button only exists on saved admins. */
+function adminRowActions(row: TenantAdminVO): RowAction[] {
+  if (!row.id) return [];
+  return [
+    {
+      key: "reset",
+      label: t("tenantAdmin.resetPassword"),
+      testId: "admin-reset",
+      type: "warning",
+      onClick: () => openReset(row)
+    }
+  ];
+}
+
 function openReset(row: TenantAdminVO) {
   resettingAdmin.value = row;
   resetForm.password = "";
@@ -192,9 +213,7 @@ async function submitReset() {
       </template>
       <template #cell-lastLogin="{ row }">{{ formatInstant(asAdmin(row).lastLoginTime) }}</template>
       <template #actions="{ row }">
-        <el-button v-if="asAdmin(row).id" link type="warning" @click="openReset(asAdmin(row))">
-          {{ t("tenantAdmin.resetPassword") }}
-        </el-button>
+        <RowActions :actions="adminRowActions(asAdmin(row))" />
       </template>
     </DataTable>
     <template #footer>

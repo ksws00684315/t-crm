@@ -65,7 +65,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "kol", label: t("order.kol"), minWidth: 160 },
   { key: "bdUserName", label: t("order.bd"), minWidth: 110 },
   { key: "attributionStatus", label: t("order.attributionStatus"), width: 100 },
-  { key: "actions", label: t("common.actions"), width: px(290, 330) }
+  // Browser-measured max .cell scrollWidth zh 333 / en 395 + 24px (task 59 R-11 measurements).
+  { key: "actions", label: t("common.actions"), width: px(360, 420) }
 ]);
 
 const applied = ref(snapshot());

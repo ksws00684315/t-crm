@@ -19,10 +19,10 @@ import {
 defineOptions({ name: "OrderChainPage" });
 
 /**
- * Order chain (requirement 09.04, task 40 §4): opens in its own browser tab from the order
- * list. The chain endpoint only carries the per-line wiring, so the page also loads the order
- * detail for the header and the line names. Every product line walks copy job → creator item
- * link → order line → refunds; the settlement blocks (ledger, withdrawals) are out of this
+ * Order chain (requirement 09.04, task 40 §4): opens as a system tab from the order list since
+ * task 59 (R-17). The chain endpoint only carries the per-line wiring, so the page also loads the
+ * order detail for the header and the line names. Every product line walks copy job → creator
+ * item link → order line → refunds; the settlement blocks (ledger, withdrawals) are out of this
  * task's scope and say "developing".
  */
 const { t } = useI18n();
@@ -65,6 +65,15 @@ const refundColumns = computed<DataColumn[]>(() => [
 /** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */
 function openCopyJob(jobCode: string): void {
   void router.push({ path: "/product/tasks", query: { jobCode } });
+}
+
+/** Task 59: the refund list and the creator item list read these as pre-filled filters. */
+function openRefund(refundNo: string): void {
+  void router.push({ path: "/order/refunds", query: { refundNo } });
+}
+
+function openKolItem(linkCode: string): void {
+  void router.push({ path: "/kol/kol-items", query: { linkCode } });
 }
 
 onMounted(async () => {
@@ -119,6 +128,8 @@ onMounted(async () => {
         data-test="chain-line"
       >
         <h4 class="chain-line__title">
+          <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
+          <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
           {{ lineName(line) }}
           <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
         </h4>
@@ -146,7 +157,18 @@ onMounted(async () => {
             <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
             <template v-if="line.link">
               <div class="chain-block__text">
-                {{ t("order.chain.linkCode") }}: {{ line.link.linkCode ?? "-" }}
+                {{ t("order.chain.linkCode") }}:
+                <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
+                     lands on the creator item list pre-filtered by this code (task 59). -->
+                <el-button
+                  link
+                  type="primary"
+                  class="chain-block__code"
+                  data-test="chain-kol-item-link"
+                  @click="openKolItem(line.link.linkCode ?? '')"
+                >
+                  {{ line.link.linkCode ?? "-" }}
+                </el-button>
               </div>
               <div class="chain-block__text">
                 {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
@@ -186,7 +208,17 @@ onMounted(async () => {
               :total="line.refunds.length"
               :paged="false"
             >
-              <template #cell-refundNo="{ row }">{{ row.refundNo }}</template>
+              <template #cell-refundNo="{ row }">
+                <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
+                <el-button
+                  link
+                  type="primary"
+                  data-test="chain-refund-link"
+                  @click="openRefund(row.refundNo)"
+                >
+                  {{ row.refundNo }}
+                </el-button>
+              </template>
               <template #cell-refundType="{ row }">{{ refundTypeText(row.refundType) }}</template>
               <template #cell-refundStatus="{ row }">
                 <el-tag :type="refundTagType(row.refundStatus)">
@@ -272,7 +304,8 @@ onMounted(async () => {
   border-radius: var(--tcrm-radius-card);
 }
 .chain-block--wide {
-  grid-column: span 2;
+  /* L-003: the refund table needs the whole row so amounts and finish times stop truncating. */
+  grid-column: 1 / -1;
 }
 .chain-block__title {
   margin-bottom: var(--tcrm-space-2);
@@ -281,6 +314,23 @@ onMounted(async () => {
 .chain-block__text {
   line-height: var(--tcrm-line-height-body);
   word-break: break-all;
+}
+/* R-05: a code stays on one line and ellipsizes; the other block texts keep breaking freely. */
+.chain-block__code {
+  max-width: 100%;
+  height: auto;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: baseline;
+  line-height: var(--tcrm-line-height-body);
+}
+.chain-line__product-label {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+  font-weight: 400;
 }
 .chain-block__developing {
   color: var(--tcrm-color-text-secondary);

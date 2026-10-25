@@ -6,6 +6,7 @@ import { listPayoutAccounts, type PayoutAccountRowVO } from "@/api/commission/pa
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { usePayoutPendingStore } from "@/stores/payout-pending";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
@@ -54,7 +55,16 @@ const columns = computed<DataColumn[]>(() => [
   { key: "defaultAccount", label: t("payout.defaultColumn"), width: 80 },
   { key: "lastSubmittedAt", label: t("payout.submittedAt"), width: 170 },
   { key: "reviewedTime", label: t("payout.reviewedAt"), width: 170 },
-  ...(canReview.value ? [{ key: "actions", label: t("common.actions"), width: 90 }] : [])
+  ...(canReview.value
+    ? [
+        {
+          key: "actions",
+          label: t("common.actions"),
+          // Single Detail action via RowActions (R-11): en canvas 63px + 24px headroom.
+          width: 90
+        }
+      ]
+    : [])
 ]);
 
 const applied = ref<{
@@ -143,6 +153,18 @@ function onPage(page: number): void {
 
 function onSize(size: number): void {
   query.size = size;
+}
+
+/** Row actions via RowActions (norm 11 §2); the column only renders with the review permission. */
+function rowActions(row: PayoutAccountRowVO): RowAction[] {
+  return [
+    {
+      key: "detail",
+      label: t("common.detail"),
+      testId: "detail",
+      onClick: () => openDetail(row)
+    }
+  ];
 }
 
 function openDetail(row: PayoutAccountRowVO) {
@@ -261,9 +283,7 @@ watch(
       <template #cell-reviewedTime="{ row }">{{ formatInstant(asRow(row).reviewedTime) }}</template>
       <!-- The actions column itself only exists with the review permission. -->
       <template #actions="{ row }">
-        <el-button link type="primary" data-test="detail" @click="openDetail(asRow(row))">
-          {{ t("common.detail") }}
-        </el-button>
+        <RowActions :actions="rowActions(asRow(row))" />
       </template>
     </DataTable>
 

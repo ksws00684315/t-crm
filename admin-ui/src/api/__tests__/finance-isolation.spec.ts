@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as FinanceUtils from "@/utils/finance";
 import { http } from "../http";
 import * as api from "../commission/finance";
+vi.mock("@/utils/finance", async importOriginal => ({
+  ...(await importOriginal<typeof FinanceUtils>()),
+  financePreview: true,
+  financeApiReady: true
+}));
 vi.mock("../../../preview/commission/finance-preview-sync", () => ({
   loadPreviewState: vi.fn(async () => undefined),
   savePreviewState: vi.fn(async () => undefined),

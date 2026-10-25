@@ -105,17 +105,13 @@ describe("finance permissions and state transitions", () => {
     ).toHaveLength(1);
     expect(() => api.withdrawalOrders("PLATFORM_ADMIN", "data", application.id, {})).toThrow();
   });
-  it("requires separate identities for operations and finance review", () => {
+  it("completes commission review in one operations step and blocks self-review", () => {
     const api = createFinanceDemo();
     const operations = { id: "t1023_operator_1", name: "t1023_Operations" };
-    const finance = { id: "t1023_finance_2", name: "t1023_Finance" };
     expect(api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", operations).status).toBe(
-      "PENDING_FINANCE_REVIEW"
-    );
-    expect(() => api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", operations)).toThrow();
-    expect(api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", finance).status).toBe(
       "PENDING_PAYMENT"
     );
+    expect(() => api.review("SUPER_ADMIN", "data", "102371", "APPROVE", "", operations)).toThrow();
   });
 
   it("returns legacy pending-payment preview rows to operations review", () => {

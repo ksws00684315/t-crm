@@ -102,7 +102,7 @@ onMounted(loadItems);
   <section class="items-page">
     <ListSearch @search="search" @reset="reset">
       <template #primary>
-        <el-form-item>
+        <el-form-item :label="t('items.searchLabel')">
           <el-input
             v-model="keyword"
             type="search"

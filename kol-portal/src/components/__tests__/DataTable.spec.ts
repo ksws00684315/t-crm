@@ -280,4 +280,24 @@ describe("DataTable expand rows", () => {
     });
     expect(wrapper.find(".el-table__expand-column").exists()).toBe(false);
   });
+
+  it("applies rowClassName to body rows so a navigation can mark its record (task 59 R-02)", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "row-class",
+        rows,
+        columns,
+        total: 2,
+        rowClassName: ({ row }: { row: object; rowIndex: number }) =>
+          (row as { id: string }).id === "1" ? "row--located" : ""
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await nextTick();
+    const located = wrapper.findAll("tr.row--located");
+    expect(located).toHaveLength(1);
+    expect(located[0].text()).toContain("KOL0001");
+    wrapper.unmount();
+  });
 });

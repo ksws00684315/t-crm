@@ -263,20 +263,13 @@ export function createFinanceDemo() {
     guard(role, scenario, true);
     if (!["BD", "SUPER_ADMIN", "FINANCE"].includes(role)) financeError(403, "AUTH_FORBIDDEN");
     const row = withdrawal(role, scenario, id);
-    if (!["PENDING_REVIEW", "PENDING_FINANCE_REVIEW"].includes(row.status))
-      financeError(409, "COMMON_CONFLICT");
-    const operationsReview = row.history.find(event => event.action === "PENDING_FINANCE_REVIEW");
-    if (
-      row.status === "PENDING_FINANCE_REVIEW" &&
-      operationsReview?.actorId &&
-      operationsReview.actorId === actor.id
-    )
-      financeError(409, "COMMON_CONFLICT");
+    if (row.status !== "PENDING_REVIEW") financeError(409, "COMMON_CONFLICT");
+    const submitted = row.history.find(event => event.action === "SUBMITTED");
+    if (submitted?.actorId && submitted.actorId === actor.id) financeError(409, "COMMON_CONFLICT");
     if (decision === "REJECT" && !note.trim()) financeError(400);
     if (decision === "REJECT") release(row.amount);
     if (decision === "REJECT") row.status = "REJECTED";
-    else
-      row.status = row.status === "PENDING_REVIEW" ? "PENDING_FINANCE_REVIEW" : "PENDING_PAYMENT";
+    else row.status = "PENDING_PAYMENT";
     row.reviewNote = note;
     row.history.push({
       action: row.status,
@@ -454,7 +447,7 @@ export function createFinanceDemo() {
       for (const row of withdrawals) {
         if (
           row.status === "PENDING_PAYMENT" &&
-          !row.history.some(event => event.action === "PENDING_FINANCE_REVIEW")
+          !row.history.some(event => event.action === "PENDING_PAYMENT")
         ) {
           row.status = "PENDING_REVIEW";
           row.history.push({

@@ -1,12 +1,7 @@
 export type FinanceRole = "SUPER_ADMIN" | "OPERATOR" | "BD" | "FINANCE" | "PLATFORM_ADMIN" | "KOL";
 export type Scenario = "data" | "empty" | "error" | "long";
 export type WithdrawalStatus =
-  | "PENDING_REVIEW"
-  | "PENDING_FINANCE_REVIEW"
-  | "PENDING_PAYMENT"
-  | "PAID"
-  | "REJECTED"
-  | "WITHDRAWN";
+  "PENDING_REVIEW" | "PENDING_PAYMENT" | "PAID" | "REJECTED" | "WITHDRAWN";
 export interface Page<T> {
   items: T[];
   total: string;
@@ -156,6 +151,20 @@ export interface WithdrawalQuery {
   status?: string;
   page?: number;
   size?: number;
+}
+export interface FinanceTask {
+  id: string;
+  type: "COMMISSION" | "PREPAY";
+  applicationNo: string;
+  kolId: string;
+  kolCode: string;
+  kolName: string;
+  amount: string;
+  currency: "CNY";
+  status: string;
+  createdAt: string;
+  paused?: boolean;
+  history?: Withdrawal["history"];
 }
 export interface PaymentRegistration {
   actualAmount: string;

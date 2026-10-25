@@ -100,16 +100,24 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
   { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
+  // Owner decision 2026-10-24 (task 59 review): the 09.04 columns all show by default; the table
+  // scrolls horizontally inside the card when it overflows (pinned action column, scrollbar on).
+  // The en minWidths of shop/creator/statuses sit at the measured header minimums (task 59).
   { key: "channel", label: t("order.channel"), width: 80 },
-  { key: "shopName", label: t("order.shop"), minWidth: 170 },
-  { key: "kol", label: t("order.kol"), minWidth: 170 },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 120) },
-  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 140) },
+  { key: "shopName", label: t("order.shop"), minWidth: px(170, 162) },
+  { key: "kol", label: t("order.kol"), minWidth: px(170, 160) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 116) },
+  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 126) },
   { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
-  { key: "freight", label: t("order.freight"), width: px(80, 90), amount: true },
-  { key: "payTime", label: t("order.payTime"), width: 170 },
+  {
+    key: "freight",
+    label: t("order.freight"),
+    width: px(80, 90),
+    amount: true
+  },
+  { key: "payTime", label: t("order.payTime"), width: px(170, 166) },
   { key: "createTime", label: t("order.createTime"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: px(100, 120) }
+  { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
 
 const applied = ref(snapshot());
@@ -274,7 +282,9 @@ function chainClickable(order: OrderVO): boolean {
 
 function openChain(order: OrderVO) {
   if (!chainClickable(order)) return;
-  window.open(router.resolve({ path: `/order/orders/${order.id}/chain` }).href, "_blank");
+  // R-17: open inside the tab system like every other cross-page jump — window.open left the
+  // chain page outside the tabs, so the user could not tab back to the order list.
+  void router.push({ path: `/order/orders/${order.id}/chain` });
 }
 
 function rowActions(order: OrderVO): RowAction[] {
@@ -348,7 +358,7 @@ onMounted(() => {
             type="datetimerange"
             :start-placeholder="t('order.payRange')"
             :end-placeholder="t('order.payRange')"
-            style="width: 360px"
+            class="filter-w-lg"
           />
         </el-form-item>
         <el-form-item :label="t('order.kolCode')">
@@ -359,7 +369,7 @@ onMounted(() => {
             v-model="query.orderStatus"
             clearable
             :placeholder="t('common.all')"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="status in ORDER_STATUSES"
@@ -374,7 +384,7 @@ onMounted(() => {
             v-model="query.attributionStatus"
             clearable
             :placeholder="t('common.all')"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="status in ATTRIBUTION_STATUSES"

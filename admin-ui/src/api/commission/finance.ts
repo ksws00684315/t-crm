@@ -1,6 +1,7 @@
 import { translate } from "@/locales";
 import { http } from "../http";
 import {
+  financePreview,
   financeApiReady,
   previewContext,
   currentFinanceRole,
@@ -20,12 +21,12 @@ import type {
   SettlementQuery,
   Withdrawal,
   WithdrawalQuery,
-  WithdrawalOrder
+  WithdrawalOrder,
+  FinanceTask
 } from "./finance-types";
 
 type Demo = FinanceDemo;
-const previewBuild =
-  import.meta.env.MODE === "commission-preview" && import.meta.env.VITE_COMMISSION_DEMO === "true";
+const previewBuild = financePreview;
 let demo: Demo | undefined;
 function financeError(status: number, errorCode = "COMMON_INTERNAL_ERROR"): never {
   throw new ApiError({ status, errorCode, traceId: "finance-api-unavailable" });
@@ -77,10 +78,14 @@ export const getIncome = (id: string, query: IncomeQuery) =>
   call<IncomeDetail>("get", `/commission/incomes/${id}`, query, preview =>
     preview.incomeDetail(role(), scenario(), id, query)
   );
-export const listWithdrawals = (query: WithdrawalQuery) => {
-  return call<Page<Withdrawal>>("get", "/commission/withdrawals", query, preview =>
-    preview.listWithdrawals(role(), scenario(), query)
-  );
+export const listFinanceTasks = (query: WithdrawalQuery) => {
+  return call<Page<FinanceTask>>("get", "/commission/finance-tasks", query, preview => {
+    const result = preview.listWithdrawals(role(), scenario(), query);
+    return {
+      ...result,
+      items: result.items.map(row => ({ ...row, type: "COMMISSION" as const }))
+    } as Page<FinanceTask>;
+  });
 };
 export const getWithdrawal = (id: string) =>
   call<Withdrawal>("get", `/commission/withdrawals/${id}`, {}, preview =>

@@ -20,7 +20,7 @@ vi.mock("@/api/commission/finance", () => ({
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
   listSettlements: vi.fn(),
-  listWithdrawals: vi.fn(),
+  listFinanceTasks: vi.fn(),
   getWithdrawal: vi.fn(),
   reviewWithdrawal: vi.fn(),
   payWithdrawal: vi.fn(),
@@ -56,7 +56,15 @@ beforeEach(() => {
   vi.mocked(api.listIncome).mockResolvedValue(demo.listIncome("SUPER_ADMIN", "data", {}));
   vi.mocked(api.getConfig).mockResolvedValue(demo.getConfig("SUPER_ADMIN", "data"));
   vi.mocked(api.listSettlements).mockResolvedValue(demo.settlements("SUPER_ADMIN", "data", {}));
-  vi.mocked(api.listWithdrawals).mockResolvedValue(demo.listWithdrawals("SUPER_ADMIN", "data", {}));
+  vi.mocked(api.listFinanceTasks).mockResolvedValue(
+    (() => {
+      const result = demo.listWithdrawals("SUPER_ADMIN", "data", {});
+      return {
+        ...result,
+        items: result.items.map(row => ({ ...row, type: "COMMISSION" as const }))
+      };
+    })()
+  );
 });
 const global = {
   plugins: [ElementPlus, i18n],
@@ -115,7 +123,7 @@ describe("finance admin pages", () => {
         .getComponent(DataTable)
         .props("columns")
         .map((column: { label: string }) => column.label)
-    ).toEqual(["申请编号", "达人名称及ID", "金额", "状态", "申请时间", "操作"]);
+    ).toEqual(["申请编号", "达人名称及ID", "申请类型", "金额", "状态", "申请时间", "操作"]);
     expect(wrapper.find('[data-test="withdrawal-kol-id"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(true);
     expect(wrapper.findAll('[data-test="withdrawal-progress-action"]')).toHaveLength(4);
@@ -123,7 +131,7 @@ describe("finance admin pages", () => {
       wrapper.findAll('[data-test="withdrawal-progress-action"]')[3].attributes("disabled")
     ).toBeDefined();
     expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("运营审核");
-    expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("财务审核");
+    expect(wrapper.get('[data-test="withdrawal-page"]').text()).not.toContain("财务审核");
     expect(wrapper.get('[data-test="withdrawal-page"]').text()).toContain("财务支付");
     useUserStore().user = {
       ...useUserStore().user!,
@@ -164,7 +172,7 @@ describe("finance admin pages", () => {
     async component => {
       vi.mocked(api.getConfig).mockRejectedValue(new Error("network"));
       vi.mocked(api.listSettlements).mockRejectedValue(new Error("network"));
-      vi.mocked(api.listWithdrawals).mockRejectedValue(new Error("network"));
+      vi.mocked(api.listFinanceTasks).mockRejectedValue(new Error("network"));
       const wrapper = mount(component, { global });
       await flushPromises();
       expect(notifyError).toHaveBeenCalled();

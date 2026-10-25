@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Picture } from "@element-plus/icons-vue";
+import { useRoute } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getKol, listKols } from "@/api/kol/kol";
 import { rebuildLinkIndex } from "@/api/link/link";
@@ -28,6 +29,7 @@ import KolItemDetailDrawer from "./KolItemDetailDrawer.vue";
 defineOptions({ name: "KolItemListPage" });
 
 const { t, locale } = useI18n();
+const route = useRoute();
 /** Action column: View + Commission + Links (norm 11 / ADR-029). */
 const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const me = useUserStore();
@@ -120,7 +122,7 @@ const chips = computed<SearchChip[]>(() => {
     list.push({
       key: "kol",
       label: t("mapping.kol"),
-      text: kol ? `${kol.name}（${kol.kolCode}）` : applied.value.kolKeyword
+      text: kol ? formatNameWithCode(kol.name, kol.kolCode) : applied.value.kolKeyword
     });
   }
   if (applied.value.shopId) {
@@ -239,7 +241,7 @@ async function searchKolList(
 function pickKol(kolId: string) {
   const kol = kolOptions.value.find(item => item.id === kolId);
   if (!kol) return;
-  promoSheetKol.value = { id: kol.id, label: `${kol.name} (${kol.kolCode})` };
+  promoSheetKol.value = { id: kol.id, label: formatNameWithCode(kol.name, kol.kolCode) };
   kolPickerVisible.value = false;
   promoSheetVisible.value = true;
 }
@@ -383,9 +385,25 @@ async function rebuildIndex() {
   }
 }
 
+/**
+ * The order chain pushes ?linkCode=… here (task 59); the tab may already be open and kept alive,
+ * so watch the route instead of reading it once on mount.
+ */
+watch(
+  () => route.query.linkCode,
+  linkCode => {
+    const wanted = typeof linkCode === "string" ? linkCode.trim() : "";
+    if (!wanted || wanted === query.linkCode) return;
+    query.linkCode = wanted;
+    search();
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   void loadShops();
-  void load();
+  // The immediate route watch above already searched when a linkCode came with the URL.
+  if (!query.linkCode) void load();
 });
 </script>
 
@@ -412,7 +430,7 @@ onMounted(() => {
             <el-option
               v-for="kol in filterKolOptions"
               :key="kol.id"
-              :label="`${kol.name}（${kol.kolCode}）`"
+              :label="formatNameWithCode(kol.name, kol.kolCode)"
               :value="kol.id"
             />
           </el-select>
@@ -573,7 +591,7 @@ onMounted(() => {
         <el-option
           v-for="kol in kolOptions"
           :key="kol.id"
-          :label="`${kol.name} (${kol.kolCode})`"
+          :label="formatNameWithCode(kol.name, kol.kolCode)"
           :value="kol.id"
         />
       </el-select>

@@ -309,7 +309,7 @@ export const sales = [
 ];
 export const seedWithdrawals: Withdrawal[] = [
   "PENDING_REVIEW",
-  "PENDING_FINANCE_REVIEW",
+  "PENDING_REVIEW",
   "PENDING_PAYMENT",
   "PENDING_PAYMENT",
   "PAID",
@@ -364,7 +364,7 @@ export const seedWithdrawals: Withdrawal[] = [
           }
         ],
   history:
-    status === "PENDING_FINANCE_REVIEW"
+    status === "PENDING_PAYMENT" || status === "PAID"
       ? [
           {
             action: "SUBMITTED",
@@ -374,46 +374,22 @@ export const seedWithdrawals: Withdrawal[] = [
             note: ""
           },
           {
-            action: "PENDING_FINANCE_REVIEW",
+            action: "PENDING_PAYMENT",
             at: "2026-10-19T08:00:00Z",
             actor: "t1023_Operations Demo",
             actorId: "t1023_operations",
             note: ""
           }
         ]
-      : status === "PENDING_PAYMENT" || status === "PAID"
-        ? [
-            {
-              action: "SUBMITTED",
-              at: "2026-10-18T08:00:00Z",
-              actor: "t1023_Alex",
-              actorId: "102301",
-              note: ""
-            },
-            {
-              action: "PENDING_FINANCE_REVIEW",
-              at: "2026-10-19T08:00:00Z",
-              actor: "t1023_Operations Demo",
-              actorId: "t1023_operations",
-              note: ""
-            },
-            {
-              action: "PENDING_PAYMENT",
-              at: "2026-10-20T08:00:00Z",
-              actor: "t1023_Finance Demo",
-              actorId: "t1023_finance",
-              note: ""
-            }
-          ]
-        : [
-            {
-              action: "SUBMITTED",
-              at: "2026-10-18T08:00:00Z",
-              actor: "t1023_Alex",
-              actorId: "102301",
-              note: ""
-            }
-          ],
+      : [
+          {
+            action: "SUBMITTED",
+            at: "2026-10-18T08:00:00Z",
+            actor: "t1023_Alex",
+            actorId: "102301",
+            note: ""
+          }
+        ],
   payment:
     index === 4
       ? {
@@ -554,17 +530,10 @@ seedWithdrawals.push({
       note: ""
     },
     {
-      action: "PENDING_FINANCE_REVIEW",
+      action: "PENDING_PAYMENT",
       at: "2026-09-16T08:00:00Z",
       actor: "t1023_Operations Demo",
       actorId: "t1023_operations",
-      note: ""
-    },
-    {
-      action: "PENDING_PAYMENT",
-      at: "2026-09-17T08:00:00Z",
-      actor: "t1023_Finance Demo",
-      actorId: "t1023_finance",
       note: ""
     }
   ],

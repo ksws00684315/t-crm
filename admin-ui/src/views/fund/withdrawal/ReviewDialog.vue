@@ -15,10 +15,7 @@ const busy = ref(false);
 const decision = ref<"APPROVE" | "REJECT">("APPROVE");
 const form = reactive({ note: "" });
 const errors = reactive({ note: "" });
-const stage = computed(() =>
-  props.withdrawal?.status === "PENDING_FINANCE_REVIEW" ? "financeReview" : "operationsReview"
-);
-const stageIndex = computed(() => (stage.value === "financeReview" ? 2 : 1));
+const stage = computed(() => "operationsReview");
 function amountCurrency(amount: string, currency: string) {
   return `${amount} ${currency}`;
 }
@@ -84,13 +81,8 @@ async function submit(next: "APPROVE" | "REJECT") {
     <div v-if="withdrawal" class="review-content" data-test="withdrawal-review-dialog">
       <ol class="review-steps" :aria-label="t('finance.reviewProcess')">
         <li class="complete"><span>1</span>{{ t("finance.creatorApplied") }}</li>
-        <li :class="{ complete: stageIndex > 1, current: stageIndex === 1 }">
-          <span>2</span>{{ t("finance.operationsReview") }}
-        </li>
-        <li :class="{ current: stageIndex === 2 }">
-          <span>3</span>{{ t("finance.financeReview") }}
-        </li>
-        <li><span>4</span>{{ t("finance.financePay") }}</li>
+        <li class="current"><span>2</span>{{ t("finance.operationsReview") }}</li>
+        <li><span>3</span>{{ t("finance.financePay") }}</li>
       </ol>
       <el-descriptions :column="2" border class="application-info">
         <el-descriptions-item :label="t('finance.creator')">
