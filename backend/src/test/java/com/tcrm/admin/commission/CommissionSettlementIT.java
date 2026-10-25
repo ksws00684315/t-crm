@@ -233,6 +233,9 @@ class CommissionSettlementIT {
         .andExpect(jsonPath("$.data.items[0].orderNo").value(ORDER_NO))
         .andExpect(jsonPath("$.data.items[0].status").value("POSTED"))
         .andExpect(jsonPath("$.data.items[0].commission").value("40.00"))
+        // Retained = Weidian settlement net − commission, pending M0 (Q-1017-1/2): null even
+        // for this fully posted order (2026-10-25 decision, ADR-032 appendix A).
+        .andExpect(jsonPath("$.data.items[0].retained").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.items[0].lines[0].product").value("t62 item"))
         .andExpect(
             jsonPath("$.data.items[0].lines[0].sku").value(org.hamcrest.Matchers.nullValue()));

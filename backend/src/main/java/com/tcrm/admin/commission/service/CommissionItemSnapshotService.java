@@ -10,8 +10,6 @@ import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.commission.model.CommissionRuleVersionDO;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolPayTimeRateDTO;
-import com.tcrm.admin.product.api.ProductAccessApi;
-import com.tcrm.admin.product.api.ProductRateDTO;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -49,7 +47,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private final CommissionRuleVersionMapper ruleVersions;
   private final CommissionWalletService wallet;
   private final KolApi kols;
-  private final ProductAccessApi products;
   private final com.tcrm.admin.shared.CurrentTenantResolver currentTenant;
   private final Clock clock;
 
@@ -60,9 +57,8 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
       KolApi kols,
-      ProductAccessApi products,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant) {
-    this(states, revisions, ruleVersions, wallet, kols, products, currentTenant, Clock.systemUTC());
+    this(states, revisions, ruleVersions, wallet, kols, currentTenant, Clock.systemUTC());
   }
 
   CommissionItemSnapshotService(
@@ -71,7 +67,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
       KolApi kols,
-      ProductAccessApi products,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant,
       Clock clock) {
     this.states = states;
@@ -79,7 +74,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     this.ruleVersions = ruleVersions;
     this.wallet = wallet;
     this.kols = kols;
-    this.products = products;
     this.currentTenant = currentTenant;
     this.clock = clock;
   }
@@ -91,7 +85,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       return;
     }
     Instant now = clock.instant();
-    Map<Long, BigDecimal> productRates = loadProductRates(items);
     Map<Long, PayTimeRule> kolRates = new HashMap<>();
     RuleSnapshot rule = ruleEffectiveAt(order.payTime());
     for (ItemSourceDTO item : items) {
@@ -101,7 +94,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       if (!exists) {
         row = newRow(item, order, now);
       }
-      ResolvedRate rate = resolveRate(order, item, productRates, kolRates);
+      ResolvedRate rate = resolveRate(order, item, kolRates);
       String version = fingerprint(order, item, rate, rule);
       if (exists && version.equals(row.getSourceVersion())) {
         continue;
@@ -245,25 +238,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     return row;
   }
 
-  private Map<Long, BigDecimal> loadProductRates(List<ItemSourceDTO> items) {
-    List<Long> productIds =
-        items.stream().map(ItemSourceDTO::productId).filter(Objects::nonNull).distinct().toList();
-    Map<Long, BigDecimal> rates = new HashMap<>();
-    for (ProductRateDTO row : products.listRates(productIds)) {
-      rates.put(row.productId(), row.rate());
-    }
-    return rates;
-  }
-
   private ResolvedRate resolveRate(
-      OrderSourceDTO order,
-      ItemSourceDTO item,
-      Map<Long, BigDecimal> productRates,
-      Map<Long, PayTimeRule> kolRates) {
-    // Product rate wins over the promotion config rate (design §8.3 [D7]).
-    if (item.productId() != null && productRates.containsKey(item.productId())) {
-      return new ResolvedRate(productRates.get(item.productId()), null);
-    }
+      OrderSourceDTO order, ItemSourceDTO item, Map<Long, PayTimeRule> kolRates) {
+    // One unified rate per KOL from the promotion config effective at pay time; no product-level
+    // override (2026-10-25 decision, ADR-032 §3, design §8.3).
     if (item.kolId() == null || order.payTime() == null) {
       return new ResolvedRate(null, null);
     }
@@ -338,8 +316,8 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       }
       return "Unverified: no pay-time rate";
     }
-    String source =
-        rate.configVersion() == null ? "product rate" : "promotion config v" + rate.configVersion();
+    // Verified rows always accrue from the pay-time promotion config (2026-10-25 decision).
+    String source = "promotion config v" + rate.configVersion();
     return "Accrued from " + source + ", release " + result.releaseBasis();
   }
 

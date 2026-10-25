@@ -105,7 +105,6 @@ class CommissionIncomeServiceTest {
     lenient().when(orderSettlement.listOrdersByIds(anyCollection())).thenReturn(List.of());
     lenient().when(orderSettlement.listItemsByOrderIds(anyCollection())).thenReturn(List.of());
     lenient().when(products.listProducts(anyCollection())).thenReturn(List.of());
-    lenient().when(products.listRates(anyCollection())).thenReturn(List.of());
     lenient().when(accountNames.listByIds(anyCollection())).thenReturn(List.of());
     lenient()
         .when(kols.listByIds(anyList()))
