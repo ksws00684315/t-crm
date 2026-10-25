@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-26",
+  "frontendCommit": "f5d400c",
+  "fullBrowserBackendBase": "0a472a1",
+  "normalMatrixCount": 46,
+  "maximumSkeletons": 0,
+  "checks": 21,
+  "passed": 21,
+  "failed": 0,
+  "javascriptErrors": 0,
+  "horizontalOverflow": 0,
+  "screenshots": 62,
+  "runtimeUpgradeTask68": {
+    "date": "2026-10-26",
+    "backendMain": "4be1bcd",
+    "status": "passed",
+    "checks": [
+      {
+        "name": "Latest backend health",
+        "status": "PASS"
+      },
+      {
+        "name": "Real login and reload retain creator session after task68 runtime upgrade",
+        "status": "PASS"
+      },
+      {
+        "name": "Overview still separates commission200 prepay100 total300",
+        "status": "PASS"
+      },
+      {
+        "name": "Conditions retain available2000 frozen200 and real canApply",
+        "status": "PASS"
+      },
+      {
+        "name": "Items real own list",
+        "status": "PASS"
+      },
+      {
+        "name": "Orders real own list with merged contract fields",
+        "status": "PASS"
+      },
+      {
+        "name": "Analytics real endpoint after task68 merge",
+        "status": "PASS"
+      },
+      {
+        "name": "Me real profile after task68 merge",
+        "status": "PASS"
+      },
+      {
+        "name": "Task68 runtime accepts real creator withdrawal",
+        "status": "PASS"
+      },
+      {
+        "name": "Task68 runtime real withdraw releases occupation",
+        "status": "PASS"
+      }
+    ],
+    "errors": [],
+    "screenshots": [
+      "real-task68-smoke-funds-1440-en-US.png"
+    ]
+  }
+}

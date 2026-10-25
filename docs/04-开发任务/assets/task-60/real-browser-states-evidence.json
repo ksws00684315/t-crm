@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "name": "Real API rejects unauthenticated and another creator withdrawal access",
+      "status": "PASS"
+    },
+    {
+      "name": "Real accepted withdrawal survives lost response and UI retry reuses idempotency key",
+      "status": "PASS"
+    },
+    {
+      "name": "Injected frozen condition visibly blocks the application",
+      "status": "PASS"
+    },
+    {
+      "name": "Real history size change requests once and phone history uses six-field cards",
+      "status": "PASS"
+    },
+    {
+      "name": "Injected long email and name remain within the phone layout",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    "real-withdrawal-real-lost-response.png",
+    "real-withdrawal-injected-frozen.png",
+    "real-375x812-history-real-pagination.png",
+    "real-375x812-account-injected-long.png"
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "checks": [
+    {
+      "name": "PayPal account real maintenance",
+      "status": "PASS"
+    },
+    {
+      "name": "USDT account and QR real upload/save",
+      "status": "PASS"
+    },
+    {
+      "name": "USDT withdrawal rejects invalid QR and submits real uploaded string file id",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile USDT popup no horizontal page overflow",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    "real-account-paypal-saved.png",
+    "real-account-usdt-saved.png",
+    "real-withdrawal-usdt-qr-invalid.png",
+    "real-withdrawal-usdt-ready.png",
+    "real-375x812-withdrawal-usdt.png"
+  ],
+  "api": [
+    {
+      "path": "/kol-api/public/site-config",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/commissions/overview",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/analytics/overview",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/public/site-config",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/payout-accounts",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/me",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/payout-accounts/2114409310222274562",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/payout-accounts",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/files",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/payout-accounts/2114408934836260865",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/payout-accounts",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/public/site-config",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/fund-records",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/commissions/overview",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals/recipient-options",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals/conditions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/files",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/public/site-config",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/fund-records",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/commissions/overview",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals/recipient-options",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/kol-api/withdrawals/conditions",
+      "method": "GET",
+      "status": 200
+    }
+  ]
+}

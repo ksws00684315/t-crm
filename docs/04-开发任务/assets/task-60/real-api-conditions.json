@@ -1,0 +1,12 @@
+{
+  "currency": "CNY",
+  "minimum": "200.00",
+  "version": "0",
+  "available": "2000.00",
+  "occupied": "0.00",
+  "frozen": "200.00",
+  "estimated": "2400.00",
+  "withdrawalFrozen": false,
+  "unverifiedCount": "0",
+  "canApply": true
+}
