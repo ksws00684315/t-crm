@@ -8,6 +8,7 @@ import { createFinanceDemo } from "../../../../../preview/commission/finance-eng
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import DataTable from "@/components/DataTable.vue";
+import CommissionTable from "@/components/CommissionTable.vue";
 import IncomePage from "@/views/kol/income/index.vue";
 import ConfigPage from "@/views/fund/settlement-config/index.vue";
 import SettlementPage from "@/views/fund/settlement-details/index.vue";
@@ -125,7 +126,7 @@ describe("finance admin pages", () => {
         .map((column: { label: string }) => column.label)
     ).toEqual(["申请编号", "达人名称及ID", "申请类型", "金额", "状态", "申请时间", "操作"]);
     expect(wrapper.find('[data-test="withdrawal-kol-id"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="withdrawal-progress-action"]')).toHaveLength(4);
     expect(
       wrapper.findAll('[data-test="withdrawal-progress-action"]')[3].attributes("disabled")
@@ -158,6 +159,30 @@ describe("finance admin pages", () => {
     expect(wrapper.get('[data-test="config-minimum"]').attributes("disabled")).toBeDefined();
     wrapper.unmount();
   });
+  it("renders channel and release-basis labels without exposing translation keys", async () => {
+    const config = createFinanceDemo().getConfig("SUPER_ADMIN", "data");
+    const channel = config.channels[0]!;
+    vi.mocked(api.getConfig).mockResolvedValue({
+      ...config,
+      channels: [
+        { ...channel, name: "WEIDIAN", basis: "SETTLE_TIME" },
+        { ...channel, name: "WEIDIAN", basis: "COMPLETED_PLUS_DAYS" }
+      ]
+    });
+    const wrapper = mount(ConfigPage, { global });
+    await flushPromises();
+    const panel = wrapper.get('[data-test="config-page"]');
+    expect(panel.text()).not.toContain("finance.");
+    expect(panel.text()).toContain("微店结算时间");
+    expect(panel.text()).toContain("交易完成后按天数兜底");
+    expect(panel.text()).toContain("微店");
+    i18n.global.locale.value = "en-US";
+    await flushPromises();
+    expect(panel.text()).toContain("Weidian settlement time");
+    expect(panel.text()).toContain("Days after trade completion");
+    expect(panel.text()).not.toContain("finance.");
+    wrapper.unmount();
+  });
   it("keeps all settlement columns, multiple creators and unknown amounts distinct", async () => {
     const wrapper = mount(SettlementPage, { global });
     await flushPromises();
@@ -165,6 +190,37 @@ describe("finance admin pages", () => {
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("多个");
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("待核实");
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("t1023_WD001");
+    wrapper.unmount();
+  });
+  it("sends the shop filter as shopId and omits the unsupported BD name filter", async () => {
+    const wrapper = mount(SettlementPage, { global });
+    await flushPromises();
+    await wrapper.get('[data-test="settlement-shop-id"]').setValue("1023001");
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    const query = vi.mocked(api.listSettlements).mock.lastCall?.[0];
+    expect(query).toMatchObject({ shopId: "1023001" });
+    expect(query).not.toHaveProperty("shop");
+    const taskPage = mount(TasksPage, { global });
+    await flushPromises();
+    expect(taskPage.find('[data-test="withdrawal-bd-name"]').exists()).toBe(false);
+    expect(vi.mocked(api.listFinanceTasks).mock.lastCall?.[0]).not.toHaveProperty("bdName");
+    wrapper.unmount();
+    taskPage.unmount();
+  });
+  it("shows an unverified refund adjustment when its commission line is unverified", async () => {
+    const demo = createFinanceDemo();
+    const incomeId = demo.listIncome("SUPER_ADMIN", "data", {}).items[0]!.id;
+    const demoLines = demo.incomeDetail("SUPER_ADMIN", "data", incomeId, {}).lines;
+    const wrapper = mount(CommissionTable, {
+      global,
+      props: {
+        rows: [{ ...demoLines[0], releaseBasis: "UNVERIFIED", adjustment: "0.00" }],
+        tableId: "unverified-adjustment"
+      }
+    });
+    await flushPromises();
+    expect(wrapper.get('[data-test="commission-adjustment"]').text()).toBe("待核实");
     wrapper.unmount();
   });
   it.each([ConfigPage, SettlementPage, TasksPage])(

@@ -25,7 +25,7 @@ defineOptions({ name: "WithdrawalTasksPage" });
 const { t, locale } = useI18n();
 const user = useUserStore();
 const abilities = computed(() => financeAbilities(user.user));
-const filters = reactive({ applicationNo: "", kolId: "", bdName: "", status: "" });
+const filters = reactive({ applicationNo: "", kolId: "", status: "" });
 const rows = ref<FinanceTask[]>([]);
 const appliedFilters = ref<WithdrawalQuery>({ ...filters });
 const total = ref(0);
@@ -99,7 +99,7 @@ function search() {
   void load();
 }
 function reset() {
-  Object.assign(filters, { applicationNo: "", kolId: "", bdName: "", status: "" });
+  Object.assign(filters, { applicationNo: "", kolId: "", status: "" });
   search();
 }
 function remove(key: string) {
@@ -248,9 +248,6 @@ onMounted(load);
           </el-form-item>
           <el-form-item :label="t('finance.kolId')">
             <el-input v-model="filters.kolId" clearable data-test="withdrawal-kol-id" />
-          </el-form-item>
-          <el-form-item :label="t('finance.bdName')">
-            <el-input v-model="filters.bdName" clearable data-test="withdrawal-bd-name" />
           </el-form-item>
           <el-form-item :label="t('finance.status')">
             <el-select v-model="filters.status" clearable data-test="withdrawal-status">

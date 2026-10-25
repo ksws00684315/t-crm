@@ -53,9 +53,13 @@ const columns = computed<DataColumn[]>(() =>
     <template #cell-commission="{ row }">{{
       row.commission === null ? t("finance.unverified") : formatPrice(row.commission, "CNY")
     }}</template>
-    <template #cell-adjustment="{ row }">{{
-      row.adjustment === null ? t("finance.unverified") : formatPrice(row.adjustment, "CNY")
-    }}</template>
+    <template #cell-adjustment="{ row }"
+      ><span data-test="commission-adjustment">{{
+        row.releaseBasis === "UNVERIFIED" || row.adjustment === null
+          ? t("finance.unverified")
+          : formatPrice(row.adjustment, "CNY")
+      }}</span></template
+    >
     <template #cell-releaseBasis="{ row }"
       ><el-tag :type="row.releaseBasis === 'CONFIRMED' ? 'success' : 'warning'">{{
         t(`finance.${row.releaseBasis ?? "UNVERIFIED"}`)

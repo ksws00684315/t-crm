@@ -147,7 +147,7 @@ export interface Withdrawal {
 export interface WithdrawalQuery {
   applicationNo?: string;
   kolId?: string;
-  bdName?: string;
+  type?: "COMMISSION" | "PREPAY";
   status?: string;
   page?: number;
   size?: number;
@@ -190,6 +190,7 @@ export interface Settlement {
   orderNo: string;
   channel: string;
   shop: string;
+  shopId?: string;
   kolNames: string[];
   payment: string | null;
   refund: string | null;
@@ -204,7 +205,7 @@ export interface Settlement {
 export interface SettlementQuery {
   orderNo?: string;
   channel?: string;
-  shop?: string;
+  shopId?: string;
   page?: number;
   size?: number;
 }

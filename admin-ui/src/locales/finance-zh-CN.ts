@@ -123,6 +123,8 @@ export default {
   freezeBasis: "优先微店结算确认；缺少结算信息时按交易完成时间兜底",
   freezeDays: "冻结天数",
   weidian: "微店",
+  SETTLE_TIME: "微店结算时间",
+  COMPLETED_PLUS_DAYS: "交易完成后按天数兜底",
   configNote:
     "微店明确未结算时不能按天数提前解冻；售后处理中、缺少基数或归属待核实均不能进入可提现。缺少交易完成时间也不能使用支付时间替代。",
   versionNote: "修改仅适用于新付款订单，历史订单保留原比例及冻结规则快照。",
@@ -186,6 +188,7 @@ export default {
   rejectReason: "驳回原因",
   reviewConfirm: "确认本次审核操作？",
   shop: "店铺",
+  shopId: "店铺 ID",
   channel: "渠道",
   payment: "支付金额",
   refund: "退款金额",
@@ -195,7 +198,7 @@ export default {
   POSTED: "已入账",
   multiple: "多个",
   retainedNote:
-    "店铺获利为计佣基数净额减达人佣金，是分佣后留存，未扣商品成本及税费。已入账为账务状态，与申请已支付不同。",
+    "店铺获利 = 微店结算净额 − 净达人佣金，不扣商品成本及税费。微店结算净额未核实前，店铺获利显示待核实。已入账是账务状态，与申请已支付不同。",
   settlementDetail: "订单清算详情",
   amountType: "金额类型",
   direction: "增减方向",

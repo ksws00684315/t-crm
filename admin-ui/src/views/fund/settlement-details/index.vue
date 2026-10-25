@@ -23,7 +23,7 @@ onMounted(() => {
   unsubscribe = subscribeNarrow(value => (narrow.value = value));
 });
 onBeforeUnmount(() => unsubscribe?.());
-const filters = reactive({ orderNo: "", channel: "", shop: "" });
+const filters = reactive({ orderNo: "", channel: "", shopId: "" });
 const rows = ref<Settlement[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -96,7 +96,7 @@ function search() {
   void load();
 }
 function reset() {
-  Object.assign(filters, { orderNo: "", channel: "", shop: "" });
+  Object.assign(filters, { orderNo: "", channel: "", shopId: "" });
   search();
 }
 function remove(key: string) {
@@ -141,8 +141,8 @@ onMounted(load);
             ><el-select v-model="filters.channel" clearable
               ><el-option :label="t('finance.weidian')" value="WEIDIAN" /></el-select
           ></el-form-item>
-          <el-form-item :label="t('finance.shop')"
-            ><el-input v-model="filters.shop" clearable
+          <el-form-item :label="t('finance.shopId')"
+            ><el-input v-model="filters.shopId" clearable data-test="settlement-shop-id"
           /></el-form-item> </template
       ></ListSearch>
       <p>{{ t("finance.retainedNote") }}</p>

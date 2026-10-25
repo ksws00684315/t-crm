@@ -209,8 +209,6 @@ export function createFinanceDemo() {
             owned(role, row) &&
             (!query.applicationNo || row.applicationNo.includes(query.applicationNo)) &&
             (!query.kolId || row.kolCode.toLowerCase().includes(query.kolId.toLowerCase())) &&
-            (!query.bdName ||
-              (row.bdName ?? "").toLowerCase().includes(query.bdName.toLowerCase())) &&
             (!query.status || row.status === query.status)
         )
         .map(row => project(role, row)),
@@ -507,7 +505,7 @@ export function createFinanceDemo() {
           row =>
             (!query.orderNo || row.orderNo.includes(query.orderNo)) &&
             (!query.channel || row.channel === query.channel) &&
-            (!query.shop || row.shop.includes(query.shop))
+            (!query.shopId || row.shopId === query.shopId)
         )
         .flatMap(row => {
           if (role !== "BD") return [row];

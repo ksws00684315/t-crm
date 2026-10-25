@@ -117,7 +117,9 @@ onMounted(load);
         @refresh="load"
       >
         <template #cell-channelCode="{ row }">{{ row.code }}</template
-        ><template #cell-channelName="{ row }">{{ t(`finance.${row.name ?? "weidian"}`) }}</template
+        ><template #cell-channelName="{ row }">{{
+          row.code === "WEIDIAN" ? t("finance.weidian") : row.name
+        }}</template
         ><template #cell-releaseBasis="{ row }">{{
           t(`finance.${row.basis ?? "freezeBasis"}`)
         }}</template>

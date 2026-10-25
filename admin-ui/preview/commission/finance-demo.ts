@@ -411,6 +411,7 @@ export const seedSettlements: Settlement[] = [
     orderNo: "t1023_WD001",
     channel: "WEIDIAN",
     shop: "t1023_Studio",
+    shopId: "1023001",
     kolNames: ["t1023_Alex Morgan"],
     payment: "15000.00",
     refund: "2000.00",
@@ -427,6 +428,7 @@ export const seedSettlements: Settlement[] = [
     orderNo: "t1023_WD002",
     channel: "WEIDIAN",
     shop: "t1023_Studio",
+    shopId: "1023001",
     kolNames: ["t1023_Alex Morgan", "t1023_Emma Lee"],
     payment: "4000.00",
     refund: "0.00",
@@ -443,6 +445,7 @@ export const seedSettlements: Settlement[] = [
     orderNo: "t1023_WD003",
     channel: "WEIDIAN",
     shop: "t1023_Studio",
+    shopId: "1023001",
     kolNames: ["t1023_Alex Morgan"],
     payment: "1500.00",
     refund: "0.00",
@@ -461,6 +464,7 @@ seedSettlements.push(
     orderNo: "t1023_WD004",
     channel: "WEIDIAN",
     shop: "t1023_Studio",
+    shopId: "1023001",
     kolNames: ["t1023_Emma Lee"],
     payment: "3500.00",
     refund: "400.00",
@@ -477,6 +481,7 @@ seedSettlements.push(
     orderNo: "t1023_WD005",
     channel: "WEIDIAN",
     shop: "t1023_Studio",
+    shopId: "1023001",
     kolNames: ["t1023_Sam Rivera"],
     payment: "500.00",
     refund: "0.00",
@@ -583,5 +588,5 @@ export const seedConfig: SettlementConfig = {
   currency: "CNY",
   minimum: "200.00",
   version: "CFG-2026-10-V1",
-  channels: [{ code: "WEIDIAN", name: "weidian", basis: "freezeBasis", days: 7 }]
+  channels: [{ code: "WEIDIAN", name: "weidian", basis: "COMPLETED_PLUS_DAYS", days: 7 }]
 };

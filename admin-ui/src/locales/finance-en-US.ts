@@ -132,6 +132,8 @@ export default {
     "Prefer confirmed Weidian settlement; fallback from trade completion only when settlement data is absent",
   freezeDays: "Freeze days",
   weidian: "Weidian",
+  SETTLE_TIME: "Weidian settlement time",
+  COMPLETED_PLUS_DAYS: "Days after trade completion",
   configNote:
     "Explicitly unsettled orders never release by elapsed days. After-sales, missing basis or unresolved attribution block withdrawal. Missing completion time cannot be replaced by payment time.",
   versionNote:
@@ -198,6 +200,7 @@ export default {
   rejectReason: "Rejection reason",
   reviewConfirm: "Confirm this review decision?",
   shop: "Shop",
+  shopId: "Shop ID",
   channel: "Channel",
   payment: "Payment amount",
   refund: "Successful refunds",
@@ -207,7 +210,7 @@ export default {
   POSTED: "Posted",
   multiple: "Multiple",
   retainedNote:
-    "Shop retained amount is net commission basis minus creator commission, before product costs and taxes. Posted is a ledger state; paid is an application payment state.",
+    "Shop retained amount = Weidian net settlement − net creator commission, before product costs and taxes. Show it as unverified until the Weidian net settlement is confirmed. Posted is a ledger state; paid is an application payment state.",
   settlementDetail: "Order settlement detail",
   amountType: "Amount type",
   direction: "Direction",

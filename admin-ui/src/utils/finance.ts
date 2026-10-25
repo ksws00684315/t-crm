@@ -8,11 +8,8 @@ export const financePreview =
   import.meta.env.MODE === "commission-preview" &&
   import.meta.env.VITE_COMMISSION_DEMO === "true" &&
   ["localhost", "127.0.0.1", "::1"].includes(globalThis.location?.hostname ?? "");
-/** Financial pages stay in a clear development state until the authoritative API is deployed. */
-export const financeApiReady =
-  financePreview ||
-  import.meta.env.MODE === "test" ||
-  import.meta.env.VITE_COMMISSION_API_ENABLED === "true";
+/** Commission APIs are deployed; only demo transport selection is limited to preview builds. */
+export const financeApiReady = true;
 export const previewContext = reactive<{
   role: FinanceRole;
   scenario: Scenario;
