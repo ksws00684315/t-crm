@@ -200,7 +200,7 @@ class AdminWithdrawalControllerTest {
   }
 
   @Test
-  void shouldUploadVoucherThenRegisterPaymentByFileId() throws Exception {
+  void shouldRegisterPayment_withTheRealFrontendVoucherShape() throws Exception {
     when(withdrawals.uploadVoucher(any(), any(), any())).thenReturn(881L);
     when(withdrawals.pay(any(), eq(77L), any())).thenReturn(detail());
     mvc.perform(
@@ -214,6 +214,7 @@ class AdminWithdrawalControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsPayer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.fileId").value(881));
+    // the merged admin frontend submits PaymentRegistration with `voucher` (appendix A)
     mvc.perform(
             put(BASE + "/77/payment")
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsPayer())
@@ -222,12 +223,25 @@ class AdminWithdrawalControllerTest {
                     "{\"idempotencyKey\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
                         + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
                         + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
-                        + "\"method\":\"bank\",\"voucherFileId\":881}"))
+                        + "\"method\":\"bank\",\"financeNote\":\"wire done\",\"voucher\":881}"))
         .andExpect(status().isOk());
     ArgumentCaptor<WithdrawalService.PaymentCommand> command =
         ArgumentCaptor.forClass(WithdrawalService.PaymentCommand.class);
     verify(withdrawals).pay(any(), eq(77L), command.capture());
     assertThat(command.getValue().voucherFileId()).isEqualTo(881L);
+    assertThat(command.getValue().financeNote()).isEqualTo("wire done");
+    // a body without the voucher fails validation instead of registering a payment
+    mvc.perform(
+            put(BASE + "/77/payment")
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsPayer())
+                .contentType("application/json")
+                .content(
+                    "{\"idempotencyKey\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
+                        + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
+                        + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
+                        + "\"method\":\"bank\"}"))
+        .andExpect(status().isBadRequest());
+    verify(withdrawals).pay(any(), eq(77L), command.capture());
   }
 
   @Test
@@ -240,7 +254,7 @@ class AdminWithdrawalControllerTest {
                     "{\"idempotencyKey\":\"7565e681-dfd4-48bb-9f83-82e66cbb04ad\","
                         + "\"amountCny\":\"400.00\",\"actualAmount\":\"400.00\","
                         + "\"actualCurrency\":\"CNY\",\"paidAt\":\"2026-10-25T12:00:00+08:00\","
-                        + "\"method\":\"bank\",\"voucherFileId\":881}"))
+                        + "\"method\":\"bank\",\"voucher\":881}"))
         .andExpect(status().isForbidden());
     verify(withdrawals, never()).pay(any(), any(Long.class), any());
   }

@@ -189,7 +189,7 @@ public class AdminWithdrawalController {
                     request.method(),
                     request.financeNote(),
                     request.conversionNote(),
-                    request.voucherFileId()))));
+                    request.voucher()))));
   }
 
   /** Withdrawal occupations of order items for the order chain (09.04 提现占用). */
@@ -224,6 +224,11 @@ public class AdminWithdrawalController {
   public record ReviewRequest(
       @NotBlank @Pattern(regexp = "APPROVE|REJECT") String decision, String note) {}
 
+  /**
+   * Payment registration body (contract §6.2 / appendix A {@code PaymentRegistration} + {@code
+   * idempotencyKey}): the voucher is referenced as {@code voucher}, the shape the merged admin
+   * frontend submits.
+   */
   public record PaymentRequest(
       @NotBlank String idempotencyKey,
       @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String amountCny,
@@ -233,7 +238,7 @@ public class AdminWithdrawalController {
       @NotBlank String method,
       String financeNote,
       String conversionNote,
-      @NotNull @Min(1) Long voucherFileId) {}
+      @NotNull @Min(1) Long voucher) {}
 
   record FileUploadVO(Long fileId) {}
 

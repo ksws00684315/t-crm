@@ -901,7 +901,7 @@ public class WithdrawalService {
       boolean reviewVisible,
       boolean financeVisible) {
     WithdrawalRows.PaymentRow payment = withdrawals.findPayment(row.id());
-    List<HistoryItem> history = history(row.id(), kolViewer, reviewVisible);
+    List<HistoryItem> history = history(row.id(), kolViewer, reviewVisible, financeVisible);
     String bdName = null;
     Long bdId = null;
     if (kol != null) {
@@ -1584,11 +1584,19 @@ public class WithdrawalService {
         row.accountQrFileId());
   }
 
-  private List<HistoryItem> history(long id, boolean kolViewer, boolean reviewVisible) {
+  private List<HistoryItem> history(
+      long id, boolean kolViewer, boolean reviewVisible, boolean financeVisible) {
     List<HistoryItem> items = new ArrayList<>();
     for (WithdrawalRows.HistoryRow row : withdrawals.timeline(id)) {
-      // Contract §6.2: history notes are for the creator and withdrawal:review viewers.
-      String note = kolViewer || reviewVisible ? row.note() : null;
+      // Contract §6.2/§6.3: notes are for the creator and withdrawal:review viewers, but the PAID
+      // entry carries the payment registration's finance note — withdrawal:pay only.
+      boolean noteVisible;
+      if ("PAID".equals(row.action())) {
+        noteVisible = financeVisible;
+      } else {
+        noteVisible = kolViewer || reviewVisible;
+      }
+      String note = noteVisible ? row.note() : null;
       items.add(
           new HistoryItem(
               row.action(), row.actorId(), row.actorName(), row.actorRole(), note, row.at()));
