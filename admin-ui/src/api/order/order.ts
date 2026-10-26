@@ -11,6 +11,7 @@ import type {
   OrderVO,
   PageResult,
   RefundDetailVO,
+  RefundFilterState,
   RefundStatus,
   RefundType,
   RefundVO,
@@ -19,7 +20,10 @@ import type {
 
 /**
  * `OrderQuery`; omitted fields mean "no filter". `payFrom` is inclusive and `payTo` exclusive;
- * both are UTC ISO 8601 instants (the page converts from the browser time zone).
+ * both are UTC ISO 8601 instants (the page converts from the browser time zone). Task 70
+ * (1024 handoff B01-B04) adds the same-shaped `orderTimeFrom`/`orderTimeTo` window over the
+ * platform order time, `kolKeyword` (creator code exact or name contains), `refundState` and
+ * `abnormal`; they combine with the payment window and never replace it.
  */
 export interface OrderQuery {
   page?: number;
@@ -27,9 +31,14 @@ export interface OrderQuery {
   shopId?: string;
   payFrom?: string;
   payTo?: string;
+  orderTimeFrom?: string;
+  orderTimeTo?: string;
   kolCode?: string;
+  kolKeyword?: string;
   orderStatus?: OrderStatus;
   attributionStatus?: AttributionStatus;
+  refundState?: RefundFilterState;
+  abnormal?: boolean;
   /** Task 40 §3.2: exact Weidian order number. */
   orderNo?: string;
   channel?: Channel;

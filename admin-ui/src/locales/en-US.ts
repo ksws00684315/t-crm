@@ -1364,10 +1364,8 @@ const enUS: MessageSchema = {
     attributionStatus: "Attribution",
     payRange: "Payment time",
     kolCode: "Creator code",
-    kolNameFilterDeveloping:
-      "Filtering by creator code is available; name filtering awaits API support.",
-    createTimeFilterDeveloping: "Filtering by platform order creation time awaits API support.",
-    createTimeFilterLabel: "Order created (under development)",
+    kolKeyword: "Creator code or name",
+    orderTime: "Order time",
     itemImageDeveloping: "Order item image data awaits API support",
     listStatus: {
       UNPAID: "Awaiting payment",
