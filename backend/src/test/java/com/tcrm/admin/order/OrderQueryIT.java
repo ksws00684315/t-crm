@@ -317,8 +317,14 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].payAmount").value("10.00"))
         .andExpect(jsonPath("$.data.lines[0].refunds[0].refundNo").value("R1"))
         .andExpect(jsonPath("$.data.lines[0].refunds[0].refundStatus").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.lines[0].ledger").isEmpty())
-        .andExpect(jsonPath("$.data.lines[0].withdrawals").isEmpty());
+        // Task 72: the real write path registers unverified commission snapshots (no source
+        // basis yet), so the finance viewer sees null amounts, a known zero occupation, and the
+        // UNVERIFIED accounting status.
+        .andExpect(jsonPath("$.data.lines[0].commission.netCommission").isEmpty())
+        .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("0.00"))
+        .andExpect(jsonPath("$.data.lines[0].commission.withdrawals").isEmpty())
+        .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
+        .andExpect(jsonPath("$.data.financeFlows").isEmpty());
   }
 
   @Test
