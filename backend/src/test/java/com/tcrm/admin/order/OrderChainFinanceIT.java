@@ -370,6 +370,23 @@ class OrderChainFinanceIT {
   }
 
   @Test
+  void shouldKeepPayTimeRateSnapshot_afterTheCreatorRateChanges() throws Exception {
+    sync("500.00", "0.00");
+    releaseJob.releaseDue();
+    // A later promotion config (effective after the pay time) must not re-price the paid line:
+    // the snapshot keeps the pay-time revision, never the creator's current rate.
+    insertPromotionConfig(kolA, "0.5000", PAID_AT.plusSeconds(3600));
+    sync("500.00", "0.00");
+
+    mvc.perform(
+            get("/admin-api/order/orders/{id}/chain", orderId).header("X-Admin-Token", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.lines[0].commission.rateSnapshot").value("0.3000"))
+        .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("150.00"))
+        .andExpect(jsonPath("$.data.funds.kolCommission").value("150.00"));
+  }
+
+  @Test
   void shouldIsolateCompanies_onTheChain() throws Exception {
     var other =
         CompanySessions.openCompany(

@@ -432,6 +432,20 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("keeps shop profit needs-verification for an OWN viewer whose funds are visible", async () => {
+    // Mixed orders hide the whole funds block; fully covered orders show it, and the M0-pending
+    // shop profit then reads 待核实 exactly like the line-level block — not the scope note.
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥16.00");
+    expect(funds).toContain("待核实");
+    expect(funds).not.toContain("当前权限仅展示本人范围商品行");
+    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("shows an actionable error state when the chain fails and retries successfully", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     vi.mocked(orderApi.getOrderChain).mockRejectedValueOnce(new Error("chain failed"));

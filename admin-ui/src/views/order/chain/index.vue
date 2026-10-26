@@ -82,12 +82,15 @@ const flowsView = computed<"table" | "empty" | "noPermission" | "scopeLimited">(
 
 /**
  * Text for a gated fund value: the amount when known, otherwise the reason it is hidden — no
- * permission, OWN scope on a mixed order, or an unverified amount that must not pose as zero.
+ * permission, OWN scope on a mixed order — or the unverified placeholder when the funds block is
+ * visible but the amount itself waits for the M0 Weidian settlement net (never a fake zero).
  */
 function fundsText(value: string | null | undefined): string {
   if (value != null) return formatPrice(value, "CNY");
-  if (!canSeeCommission.value) return t("order.chain.noCommissionPermission");
-  if (userStore.isOwnScope) return t("finance.scopeLimited");
+  if (!chain.value?.funds) {
+    if (!canSeeCommission.value) return t("order.chain.noCommissionPermission");
+    if (userStore.isOwnScope) return t("finance.scopeLimited");
+  }
   return t("finance.unverified");
 }
 
@@ -610,8 +613,5 @@ onMounted(load);
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
   font-weight: 400;
-}
-.chain-block__developing {
-  color: var(--tcrm-color-text-secondary);
 }
 </style>

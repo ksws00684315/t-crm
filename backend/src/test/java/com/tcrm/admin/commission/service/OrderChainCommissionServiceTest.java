@@ -63,6 +63,16 @@ class OrderChainCommissionServiceTest {
                     "W20261023000003",
                     "REJECTED",
                     APPLIED.plusSeconds(120),
+                    null),
+                // Withdrawn by the creator: released exactly like a rejected application.
+                alloc(
+                    804L,
+                    20L,
+                    "0.50",
+                    34L,
+                    "W20261023000004",
+                    "WITHDRAWN",
+                    APPLIED.plusSeconds(180),
                     null)));
 
     var chain = service.chainOfOrder(10L, List.of(20L));
@@ -71,10 +81,11 @@ class OrderChainCommissionServiceTest {
     assertThat(line.rateSnapshot()).isEqualByComparingTo("0.3000");
     assertThat(line.netCommissionCny()).isEqualByComparingTo("10.00");
     assertThat(line.releaseBasis()).isEqualTo("CONFIRMED");
-    // 6.00 paid + 3.00 in flight; the rejected 1.00 is released.
+    // 6.00 paid + 3.00 in flight; the rejected 1.00 and withdrawn 0.50 are released.
     assertThat(line.occupiedCny()).isEqualByComparingTo("9.00");
-    assertThat(line.withdrawals()).hasSize(3);
+    assertThat(line.withdrawals()).hasSize(4);
     assertThat(line.withdrawals().get(2).status()).isEqualTo("REJECTED");
+    assertThat(line.withdrawals().get(3).status()).isEqualTo("WITHDRAWN");
     assertThat(chain.netCommissionCny()).isEqualByComparingTo("10.00");
     assertThat(chain.allVerified()).isTrue();
     assertThat(chain.flows()).hasSize(3);
@@ -129,6 +140,33 @@ class OrderChainCommissionServiceTest {
     assertThat(clawback.direction()).isEqualTo("DECREASE");
     assertThat(clawback.amountCny()).isEqualByComparingTo("4.00");
     assertThat(clawback.businessAt()).isEqualTo(SETTLED.plusSeconds(3600));
+  }
+
+  @Test
+  void shouldShowFullRefundAsRealZeroWithPairedFlows() {
+    // Full refund after release: the credit +10.00 and the clawback −10.00 pair up as flows and
+    // the verified line's net commission is a real 0.00, not the unverified null.
+    when(states.listByOrderIds(any())).thenReturn(List.of(state(50L, 20L, true, "0.00")));
+    when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
+    when(wallet.listByItemStates(any()))
+        .thenReturn(
+            List.of(
+                new ItemLedgerRow(900L, "COMMISSION_CREDIT", dec("10.00"), SETTLED, 50L),
+                new ItemLedgerRow(
+                    901L, "COMMISSION_ADJUSTMENT", dec("-10.00"), SETTLED.plusSeconds(3600), 50L)));
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L));
+
+    var line = chain.lines().getFirst();
+    assertThat(line.netCommissionCny()).isEqualByComparingTo("0.00");
+    assertThat(chain.netCommissionCny()).isEqualByComparingTo("0.00");
+    assertThat(chain.allVerified()).isTrue();
+    assertThat(chain.flows()).hasSize(2);
+    assertThat(chain.flows().get(0).direction()).isEqualTo("INCREASE");
+    assertThat(chain.flows().get(0).amountCny()).isEqualByComparingTo("10.00");
+    assertThat(chain.flows().get(1).direction()).isEqualTo("DECREASE");
+    assertThat(chain.flows().get(1).amountCny()).isEqualByComparingTo("10.00");
   }
 
   @Test
