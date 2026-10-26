@@ -61,14 +61,16 @@ describe("layout navigation", () => {
     const links = wrapper.findAll(".shell__nav-link");
     expect(links.map(link => link.text())).toEqual([
       "Home",
-      "Payout accounts",
-      "My orders",
       "My items",
-      "Creator prepays"
+      "My orders",
+      "Funds",
+      "My information"
     ]);
     expect(links[0].attributes("href")).toBe("/");
-    expect(links[1].attributes("href")).toBe("/payout-accounts");
+    expect(links[1].attributes("href")).toBe("/items");
     expect(links[2].attributes("href")).toBe("/orders");
+    expect(links[3].attributes("href")).toBe("/funds");
+    expect(links[4].attributes("href")).toBe("/account");
     expect(links[0].attributes("aria-current")).toBe("page");
     expect(links[1].attributes("aria-current")).toBeUndefined();
     expect(links[2].attributes("aria-current")).toBeUndefined();
@@ -83,26 +85,26 @@ describe("layout navigation", () => {
     }
   });
 
-  it("marks the payout entry current on its page and translates it", async () => {
-    const wrapper = await mountAt("/payout-accounts");
-    expect(wrapper.findAll(".shell__nav-link")[1].attributes("aria-current")).toBe("page");
+  it("marks the funds entry current on its page and translates it", async () => {
+    const wrapper = await mountAt("/funds");
+    expect(wrapper.findAll(".shell__nav-link")[3].attributes("aria-current")).toBe("page");
     expect(wrapper.findAll(".shell__nav-link")[0].attributes("aria-current")).toBeUndefined();
 
     useLocaleStore().setLocale("zh-CN");
     await nextTick();
     expect(wrapper.findAll(".shell__nav-link").map(link => link.text())).toEqual([
-      "首页",
-      "收款账户",
-      "我的订单",
+      "工作台",
       "我的商品",
-      "达人预付"
+      "订单明细",
+      "资金明细",
+      "我的信息"
     ]);
   });
-  it("marks the prepay entry current and translates it", async () => {
-    const wrapper = await mountAt("/income/prepays");
-    expect(wrapper.findAll(".shell__nav-link")[4].attributes("aria-current")).toBe("page");
-    useLocaleStore().setLocale("zh-CN");
-    await nextTick();
-    expect(wrapper.findAll(".shell__nav-link")[4].text()).toBe("达人预付");
+
+  it("marks the items entry current without highlighting home", async () => {
+    const wrapper = await mountAt("/items");
+    expect(wrapper.find('a[href="/items"]').attributes("aria-current")).toBe("page");
+    expect(wrapper.find('a[href="/"]').attributes("aria-current")).toBeUndefined();
+    wrapper.unmount();
   });
 });

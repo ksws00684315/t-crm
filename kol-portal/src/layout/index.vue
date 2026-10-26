@@ -9,6 +9,7 @@ import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { useSessionStore } from "@/stores/session";
 import { siteName } from "@/stores/site-config";
+import { isDemoMode } from "@/api/creator";
 import { NAV_ITEMS } from "./nav";
 
 defineOptions({ name: "AppLayout" });
@@ -69,6 +70,7 @@ async function signOut() {
         <el-breadcrumb class="shell__crumb" data-test="page-title">
           <el-breadcrumb-item>{{ pageTitle }}</el-breadcrumb-item>
         </el-breadcrumb>
+        <el-tag v-if="isDemoMode" type="warning" effect="plain">{{ t("common.demoData") }}</el-tag>
         <div class="shell__actions">
           <div v-if="session.kol" class="shell__identity">
             <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span>{{
@@ -278,21 +280,44 @@ async function signOut() {
     flex: none;
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--tcrm-color-border);
+    border-bottom: 0;
   }
   .shell__brand {
     height: 44px;
   }
   .shell__nav {
+    position: fixed;
+    z-index: 20;
+    right: 0;
+    bottom: 0;
+    left: 0;
     flex-direction: row;
-    gap: var(--tcrm-space-1);
-    padding: 0 var(--tcrm-space-3) var(--tcrm-space-2);
-    overflow-x: auto;
+    justify-content: space-around;
+    gap: 0;
+    padding: var(--tcrm-space-1) var(--tcrm-space-2)
+      max(var(--tcrm-space-1), env(safe-area-inset-bottom));
+    background: var(--tcrm-color-card);
+    border-top: 1px solid var(--tcrm-color-border);
+    box-shadow: var(--tcrm-shadow-overlay);
   }
   .shell__nav-link {
-    min-height: 44px;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--tcrm-space-1);
+    min-width: 0;
+    min-height: 52px;
     margin: 0;
-    padding: 0 var(--tcrm-space-3);
+    padding: var(--tcrm-space-1) 0;
+    font-size: var(--tcrm-font-size-help);
+    line-height: var(--tcrm-line-height-help);
+    height: auto;
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .shell__nav-link:last-child {
+    flex-grow: 1.25;
   }
   .shell__body {
     flex: none;
@@ -308,8 +333,10 @@ async function signOut() {
     display: none;
   }
   .shell__main {
+    --kol-mobile-nav-height: 88px;
     overflow: visible;
-    padding: var(--tcrm-space-3);
+    padding: var(--tcrm-space-3) var(--tcrm-space-3)
+      calc(var(--kol-mobile-nav-height) + env(safe-area-inset-bottom));
   }
 }
 </style>

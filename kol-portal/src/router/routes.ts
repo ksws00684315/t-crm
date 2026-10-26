@@ -37,6 +37,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: "route.account" }
       },
       {
+        path: "funds",
+        name: "Funds",
+        component: () => import("@/views/funds/index.vue"),
+        meta: { title: "route.funds" }
+      },
+      {
         path: "payout-accounts",
         name: "PayoutAccounts",
         component: () => import("@/views/payout-accounts/index.vue"),
