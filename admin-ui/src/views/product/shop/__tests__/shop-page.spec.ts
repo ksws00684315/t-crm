@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -92,10 +92,18 @@ describe("shop list buttons", () => {
     const admin = await mountPage();
     expect(admin.find('[data-test="create"]').exists()).toBe(true);
     expect(admin.find('[data-test="weidian-app-config"]').exists()).toBe(true);
-    expect(admin.find('[data-test="authorize-1"]').exists()).toBe(true);
+    expect(admin.find('[data-test="authorize-1"]').exists()).toBe(false);
+    expect(admin.find('[data-test="sync-order-1"]').exists()).toBe(true);
+    expect(admin.find('[data-test="sync-refund-1"]').exists()).toBe(true);
     expect(admin.find('[data-test="edit-1"]').exists()).toBe(true);
-    expect(admin.find('[data-test="status-1"]').exists()).toBe(true);
-    expect(admin.find('[data-test="more-actions"]').exists()).toBe(false);
+    expect(admin.find('[data-test="status-1"]').exists()).toBe(false);
+    await admin.get('[data-test="more-1"]').trigger("click");
+    await flushPromises();
+    const body = new DOMWrapper(document.body);
+    for (const action of ["authorize", "source", "copy-pool", "status", "api-check"]) {
+      expect(body.find(`[data-test="${action}-1"]`).exists()).toBe(true);
+    }
+    expect(body.find('[data-test="authorize-1"]').element.tagName).toBe("LI");
     admin.unmount();
   });
 
@@ -108,7 +116,7 @@ describe("shop list buttons", () => {
     expect(staff.find('[data-test="authorize-1"]').exists()).toBe(false);
     expect(staff.find('[data-test="edit-1"]').exists()).toBe(false);
     expect(staff.find('[data-test="status-1"]').exists()).toBe(false);
-    expect(staff.find('[data-test="more-actions"]').exists()).toBe(false);
+    expect(staff.find('[data-test="more-1"]').exists()).toBe(false);
     staff.unmount();
   });
 
@@ -223,11 +231,8 @@ describe("shop list buttons", () => {
     wrapper.unmount();
   });
 
-  it("declares an action column wide enough for the measured scrollWidth (R-04/L-001)", async () => {
-    // L-001 method: column width = max actions .cell scrollWidth + 24px, measured in the browser
-    // (assets/task-59/measurements-zh.md: 485, measurements-en.md: 675). jsdom cannot compute
-    // scrollWidth, so the recorded measurements are the lower bound this assertion guards.
-    const measured: Record<string, number> = { "zh-CN": 509, "en-US": 699 };
+  it("uses the compact action column after moving five operations into More", async () => {
+    const measured: Record<string, number> = { "zh-CN": 280, "en-US": 380 };
     for (const locale of ["zh-CN", "en-US"] as const) {
       i18n.global.locale.value = locale;
       useLocaleStore().locale = locale;
@@ -250,7 +255,9 @@ describe("shop list buttons", () => {
       new ApiError({ status: 409, errorCode: "WEIDIAN_APP_NOT_CONFIGURED", traceId: "t59" })
     );
     const wrapper = await mountPage();
-    await wrapper.get('[data-test="authorize-1"]').trigger("click");
+    await wrapper.get('[data-test="more-1"]').trigger("click");
+    await flushPromises();
+    await new DOMWrapper(document.body).get('[data-test="authorize-1"]').trigger("click");
     await flushPromises();
 
     // duration: 0 keeps the notice on screen; it must disappear once the config dialog opens.
@@ -317,7 +324,9 @@ describe("shop list buttons", () => {
       new ApiError({ status: 422, errorCode: "WEIDIAN_APP_NOT_CONFIGURED", traceId: "test" })
     );
     const wrapper = await mountPage();
-    await wrapper.get('[data-test="authorize-1"]').trigger("click");
+    await wrapper.get('[data-test="more-1"]').trigger("click");
+    await flushPromises();
+    await new DOMWrapper(document.body).get('[data-test="authorize-1"]').trigger("click");
     await flushPromises();
     expect(weidianApi.startWeidianAuthorization).toHaveBeenCalledWith("1");
     const configureButton = document.body.querySelector('[data-test="weidian-go-config"]');
@@ -380,9 +389,15 @@ describe("shop list buttons", () => {
       attachTo: document.body
     });
     await flushPromises();
-    const poolAction = wrapper.get('[data-test="copy-pool-1"]');
-    expect(poolAction.attributes("disabled")).toBeDefined();
-    expect(poolAction.classes()).toContain("is-disabled");
+    await wrapper.get('[data-test="more-1"]').trigger("click");
+    await flushPromises();
+    const poolAction = new DOMWrapper(document.body).get('[data-test="copy-pool-1"]');
+    expect(poolAction.attributes("aria-disabled")).toBe("true");
+    expect(poolAction.attributes("title")).toBe(i18n.global.t("shop.sourceCannotJoinPool"));
+    await poolAction.trigger("click");
+    await flushPromises();
+    expect(shopApi.joinCopyPool).not.toHaveBeenCalled();
+    expect(shopApi.exitCopyPool).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

@@ -72,7 +72,7 @@ describe("fund summary presentation contract", () => {
     const conditions = {
       currency: "CNY",
       minimum: "200.00",
-      version: "3",
+      version: 3,
       available: "900.00",
       occupied: "100.00",
       frozen: "50.00",
@@ -101,12 +101,12 @@ describe("fund summary presentation contract", () => {
     vi.mocked(http.request).mockResolvedValue({
       id: "withdrawal-new",
       applicationNo: "W20261024000001",
-      amountCny: data.amount,
+      amount: data.amount,
       currency: "CNY",
       status: "PENDING_REVIEW",
       createdAt: "2026-10-24T00:00:00Z",
       account: {
-        accountId: data.payoutAccountId,
+        id: data.payoutAccountId,
         type: "PAYPAL",
         account: "p***@mail.com",
         holder: "Creator",
@@ -132,7 +132,7 @@ describe("fund summary presentation contract", () => {
         {
           id: "42",
           applicationNo: "WD42",
-          amountCny: "825.35",
+          amount: "825.35",
           currency: "CNY",
           status: "REJECTED",
           createdAt: "2026-10-25T00:00:00Z",

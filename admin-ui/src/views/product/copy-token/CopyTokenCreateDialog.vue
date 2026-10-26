@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -17,6 +18,8 @@ const props = defineProps<{
   /** When set, the KOL field is prefilled and locked. */
   presetKolId?: string | null;
   presetKolLabel?: string | null;
+  presetKolName?: string | null;
+  presetKolCode?: string | null;
 }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
@@ -93,8 +96,8 @@ watch(
       kolOptions.value = [
         {
           id: props.presetKolId,
-          kolCode: props.presetKolLabel,
-          name: props.presetKolLabel,
+          kolCode: props.presetKolCode ?? "",
+          name: props.presetKolName ?? props.presetKolLabel,
           email: "",
           country: null,
           socialAccounts: [],
@@ -262,7 +265,8 @@ function close() {
               :key="kol.id"
               :label="kolLabel(kol)"
               :value="kol.id"
-            />
+              ><NameCode :name="kol.name" :code="kol.kolCode"
+            /></el-option>
           </el-select>
         </el-form-item>
         <el-form-item :label="t('copyToken.channel')" required>

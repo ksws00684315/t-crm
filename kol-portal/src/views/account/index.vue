@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { changePassword, getMe, updateMe } from "@/api/auth";
@@ -189,6 +190,7 @@ function savePassword() {
     }}</el-button>
     <el-skeleton v-if="profileLoading && !session.kol" :rows="4" animated />
     <template v-else-if="session.kol">
+      <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
       <el-card shadow="never" class="section-card">
         <template #header
           ><h2>{{ t("account.personalInfo") }}</h2></template

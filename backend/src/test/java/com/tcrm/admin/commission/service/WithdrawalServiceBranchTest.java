@@ -106,7 +106,7 @@ class WithdrawalServiceBranchTest {
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("0.00"));
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
-    when(funding.configVersion(KOL)).thenReturn("0");
+    when(funding.configVersion(KOL)).thenReturn(0);
     when(funding.listReleasedRows(KOL))
         .thenReturn(List.of(new FundingRow(ITEM_1, 0L, new BigDecimal("350.00"))));
     when(orderItems.listByIds(anyList()))

@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
+import ElementPlus, { ElMessage, ElMessageBox, ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as copyTokenApi from "@/api/kol/copy-token";
@@ -58,10 +58,10 @@ function signIn(role: Role, permissions: string[]) {
   };
 }
 
-async function open() {
+async function open(items: CopyTokenVO[] = [row()]) {
   vi.mocked(copyTokenApi.listCopyTokens).mockResolvedValue({
-    items: [row()],
-    total: "1",
+    items,
+    total: String(items.length),
     page: 1,
     size: 20
   });
@@ -118,6 +118,47 @@ describe("Copy token page", () => {
     await flushPromises();
     await nextTick();
     expect(copyTokenApi.revokeCopyToken).toHaveBeenCalledWith("1");
+    wrapper.unmount();
+  });
+
+  it("keeps Revoke visible for every status and only allows active tokens to be revoked", async () => {
+    const wrapper = await open([
+      row({ id: "1", displayStatus: "ACTIVE" }),
+      row({ id: "2", displayStatus: "REVOKED" }),
+      row({ id: "3", displayStatus: "EXHAUSTED" }),
+      row({ id: "4", displayStatus: "EXPIRED" })
+    ]);
+    const actions = wrapper.findAll('[data-test="revoke"]');
+    expect(actions).toHaveLength(4);
+    expect(actions[0].attributes("disabled")).toBeUndefined();
+    for (const button of actions.slice(1)) {
+      expect(button.attributes("disabled")).toBeDefined();
+      await button.trigger("click");
+    }
+    expect(copyTokenApi.revokeCopyToken).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="enable-token"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("renders the three primary filters and submits the selected creator and channel", async () => {
+    const wrapper = await open();
+    expect(wrapper.get('[data-test="filter-hint"]').isVisible()).toBe(true);
+    expect(wrapper.get('[data-test="filter-kol"]').isVisible()).toBe(true);
+    expect(wrapper.get('[data-test="filter-channel"]').isVisible()).toBe(true);
+    await wrapper.get('[data-test="filter-hint"]').setValue("TKN-test");
+    const selects = wrapper.findAllComponents(ElSelect);
+    await selects[0].vm.$emit("update:modelValue", "10");
+    await selects[1].vm.$emit("update:modelValue", "WEIDIAN");
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(copyTokenApi.listCopyTokens).toHaveBeenLastCalledWith({
+      page: 1,
+      size: 20,
+      hint: "TKN-test",
+      kolId: "10",
+      targetChannel: "WEIDIAN",
+      status: undefined
+    });
     wrapper.unmount();
   });
 

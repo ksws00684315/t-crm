@@ -63,12 +63,12 @@ public class KolWithdrawalController {
   /** The creator's own applications, newest first (13.02). */
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @GetMapping("/kol-api/withdrawals")
-  public R<PageResult<KolWithdrawalVO>> list(
+  public R<KolWithdrawalPageVO> list(
       @RequestParam(defaultValue = "1") @Min(1) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size) {
     KolAccountDTO kol = current.kol();
     return R.ok(
-        withdrawals.pageKol(kol.tenantId(), kol.id(), page, size).map(KolWithdrawalVO::from));
+        KolWithdrawalPageVO.from(withdrawals.pageKol(kol.tenantId(), kol.id(), page, size)));
   }
 
   /** One application of the signed-in creator. */
@@ -130,16 +130,21 @@ public class KolWithdrawalController {
       AccountRequest account,
       String note) {}
 
+  /**
+   * Withdrawal conditions (contract §6.3). {@code version} and {@code unverifiedCount} are JSON
+   * numbers: the version matches the settlement config's optimistic-lock version, the count is a
+   * counter; {@code int} keeps both out of the shared long-to-string serializer.
+   */
   record ConditionsVO(
       String currency,
       String minimum,
-      String version,
+      int version,
       String available,
       String occupied,
       String frozen,
       String estimated,
       boolean withdrawalFrozen,
-      String unverifiedCount,
+      int unverifiedCount,
       boolean canApply) {
     static ConditionsVO from(WithdrawalService.Conditions conditions) {
       return new ConditionsVO(
@@ -151,7 +156,7 @@ public class KolWithdrawalController {
           conditions.frozen(),
           conditions.estimated(),
           conditions.withdrawalFrozen(),
-          Long.toString(conditions.unverifiedCount()),
+          Math.toIntExact(conditions.unverifiedCount()),
           conditions.canApply());
     }
   }
@@ -169,8 +174,9 @@ public class KolWithdrawalController {
     }
   }
 
+  /** Masked payout snapshot on the creator's rows ({@code id} follows the contract naming). */
   record AccountVO(
-      String accountId,
+      String id,
       String type,
       String account,
       String holder,
@@ -191,13 +197,29 @@ public class KolWithdrawalController {
     }
   }
 
+  /** Page of the creator's applications; {@code total} is a JSON number (ADR-032). */
+  record KolWithdrawalPageVO(List<KolWithdrawalVO> items, int total, int page, int size) {
+    static KolWithdrawalPageVO from(PageResult<WithdrawalService.KolRow> page) {
+      return new KolWithdrawalPageVO(
+          page.items().stream().map(KolWithdrawalVO::from).toList(),
+          Math.toIntExact(page.total()),
+          page.page(),
+          page.size());
+    }
+  }
+
+  /**
+   * Own application row (contract §6.3 {@code WithdrawalRecord}): status, masked account snapshot,
+   * review note, reject reason and the payment result.
+   */
   record KolWithdrawalVO(
       String id,
       String applicationNo,
-      String amountCny,
+      String amount,
       String currency,
       String status,
       String createdAt,
+      String reviewNote,
       String rejectReason,
       String paidAt,
       String actualAmount,
@@ -211,6 +233,7 @@ public class KolWithdrawalController {
           row.currency(),
           row.status(),
           row.createdAt().toString(),
+          row.reviewNote(),
           row.rejectReason(),
           row.paidAt() == null ? null : row.paidAt().toString(),
           row.actualAmount(),
@@ -219,28 +242,23 @@ public class KolWithdrawalController {
     }
   }
 
-  record HistoryVO(
-      String action, String actorId, String actorName, String actorRole, String note, String at) {
+  /** Status history entry ({@code action,at,actor,note}; {@code actorRole} extra, no actorId). */
+  record HistoryVO(String action, String at, String actor, String note, String actorRole) {
     static HistoryVO from(WithdrawalService.HistoryItem item) {
       return new HistoryVO(
-          item.action(),
-          item.actorId() == null ? null : item.actorId().toString(),
-          item.actorName(),
-          item.actorRole(),
-          item.note(),
-          item.at().toString());
+          item.action(), item.at().toString(), item.actorName(), item.note(), item.actorRole());
     }
   }
 
+  /** Payment result (contract §6.3): finance notes never reach the creator. */
   record PaymentVO(
       String amountCny,
       String actualAmount,
       String actualCurrency,
       String paidAt,
       String method,
-      String financeNote,
       String conversionNote,
-      String voucherFileId,
+      String voucher,
       String operatorName,
       String operatorRole) {
     static PaymentVO from(WithdrawalService.PaymentView payment) {
@@ -252,7 +270,6 @@ public class KolWithdrawalController {
               payment.actualCurrency(),
               payment.paidAt().toString(),
               payment.method(),
-              payment.financeNote(),
               payment.conversionNote(),
               payment.voucherFileId() == null ? null : payment.voucherFileId().toString(),
               payment.operatorName(),
@@ -260,6 +277,10 @@ public class KolWithdrawalController {
     }
   }
 
+  /**
+   * Own application detail (contract §6.3): no finance note, masked account, history and the
+   * payment result; {@code bdId}/{@code bdName} etc. are extra fields.
+   */
   record WithdrawalDetailVO(
       String id,
       String applicationNo,
@@ -269,7 +290,7 @@ public class KolWithdrawalController {
       String bdId,
       String bdName,
       String type,
-      String amountCny,
+      String amount,
       String currency,
       String status,
       boolean paused,
@@ -277,7 +298,6 @@ public class KolWithdrawalController {
       String createdAt,
       String note,
       String reviewNote,
-      String financeNote,
       String previousId,
       AccountVO account,
       List<HistoryVO> history,
@@ -300,7 +320,6 @@ public class KolWithdrawalController {
           detail.createdAt().toString(),
           detail.note(),
           detail.reviewNote(),
-          detail.financeNote(),
           detail.previousId() == null ? null : detail.previousId().toString(),
           AccountVO.from(detail.account()),
           detail.history().stream().map(HistoryVO::from).toList(),

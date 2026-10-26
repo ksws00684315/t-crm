@@ -324,7 +324,9 @@ describe("account and logout", () => {
     const { wrapper, router, store } = await page(Layout, "/");
     store.acceptSession(session);
     await nextTick();
-    expect(wrapper.text()).toContain("Test Creator · Test Company");
+    expect(wrapper.find('[data-test="identity-name"]').text()).toBe("Test Creator");
+    expect(wrapper.find('[data-test="identity-code"]').text()).toBe("TEST001");
+    expect(wrapper.text()).toContain("Test Company");
     await wrapper.get("button").trigger("click");
     await flushPromises();
     expect(api.logout).toHaveBeenCalledOnce();

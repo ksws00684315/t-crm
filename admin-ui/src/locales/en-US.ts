@@ -2,8 +2,10 @@ import type { MessageSchema } from "./zh-CN";
 
 /** English pack. The type is the Chinese base pack, so a missing or extra key fails typecheck. */
 import prepay from "./prepay-en-US";
+import finance from "./finance-en-US";
 const enUS: MessageSchema = {
   prepay,
+  finance,
   app: {
     title: "SparkTrack Admin",
     titleSuffix: " Admin"
@@ -22,6 +24,7 @@ const enUS: MessageSchema = {
     copy: "Copy",
     detail: "Details",
     actions: "Actions",
+    more: "More",
     status: "Status",
     remark: "Remark",
     all: "All",
@@ -601,7 +604,8 @@ const enUS: MessageSchema = {
     allPermissionsShort: "All",
     permissionsTitle: "Permissions",
     permissionsSaved: "Permissions saved.",
-    permissionsSeparate: "Permissions are saved separately from Permissions in the list.",
+    permissionsSeparate:
+      "Open permission settings from this edit dialog to change this account's permissions and data scope.",
     currentPost: "Current post: {post}",
     selectAll: "Select all",
     resetTemplate: "Reset from template",
@@ -985,8 +989,8 @@ const enUS: MessageSchema = {
     title: "Copy tokens",
     hint: "Token",
     hintPlaceholder: "Search by masked value",
-    kol: "Creator",
-    kolPlaceholder: "Search by name, code, or email",
+    kol: "Creator name / ID",
+    kolPlaceholder: "Search creator ID or name",
     channel: "Target channel",
     shop: "Target shop",
     shopAuto: "A shop from this channel's automatic copy pool will be assigned",
@@ -1003,8 +1007,8 @@ const enUS: MessageSchema = {
     validMinutes: "Valid minutes",
     expiresAt: "Expires at",
     lastUsedAt: "Last used",
-    create: "Generate token",
-    createTitle: "Generate copy token",
+    create: "Generate Token",
+    createTitle: "Generate Token",
     resultTitle: "Token generated",
     resultHint: "Copy it now. You can reveal it again from the list later.",
     copyPlain: "Copy token",
@@ -1360,6 +1364,22 @@ const enUS: MessageSchema = {
     attributionStatus: "Attribution",
     payRange: "Payment time",
     kolCode: "Creator code",
+    kolNameFilterDeveloping:
+      "Filtering by creator code is available; name filtering awaits API support.",
+    createTimeFilterDeveloping: "Filtering by platform order creation time awaits API support.",
+    createTimeFilterLabel: "Order created (under development)",
+    itemImageDeveloping: "Order item image data awaits API support",
+    listStatus: {
+      UNPAID: "Awaiting payment",
+      PAID: "Awaiting shipment",
+      SHIPPED: "Awaiting receipt",
+      RECEIVED: "Received",
+      COMPLETED: "Transaction successful",
+      CLOSED: "Transaction closed",
+      REFUNDING: "Refunding",
+      REFUND_SUCCESS: "Refund successful",
+      ABNORMAL: "Abnormal order"
+    },
     freight: "Freight",
     createTime: "Created at",
     refundStatusColumn: "Refund status",
@@ -1486,6 +1506,21 @@ const enUS: MessageSchema = {
       lineRefund: "Refund"
     },
     chain: {
+      fundsSection: "Funds",
+      orderInfoSection: "Order information",
+      financeLedgerSection: "Financial ledger",
+      loadFailed: "Unable to load the order chain. Please try again.",
+      kolCommission: "Net creator commission",
+      shopProfit: "Shop profit",
+      shopProfitFormula:
+        "Weidian settlement net amount minus net creator commission; product cost is excluded.",
+      financeLedgerDeveloping:
+        "Commission snapshots, settlement net amounts, withdrawal holds, and payment-linked ledger entries are not available from the API yet. Missing amounts are not shown as zero.",
+      financeType: "Flow type",
+      financeAmount: "Amount",
+      financeTime: "Date",
+      settlementNo: "Settlement number",
+      withdrawalOccupation: "Withdrawal hold",
       copyJob: "Product copy job",
       copyJobTime: "Created at",
       kolItem: "Creator item link",
@@ -1649,6 +1684,7 @@ const enUS: MessageSchema = {
     hint: "Only affects accounts created afterwards; existing accounts are not changed.",
     cardTitle: "{post} post template",
     dataScope: "Default data scope",
+    module: "Permission module",
     permissions: "Permissions",
     isDefault: "Default",
     customized: "Customized",

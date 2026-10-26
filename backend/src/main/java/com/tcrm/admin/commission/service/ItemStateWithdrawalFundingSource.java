@@ -84,9 +84,9 @@ public class ItemStateWithdrawalFundingSource implements WithdrawalFundingSource
 
   @Override
   @Transactional(readOnly = true)
-  public String configVersion(long kolId) {
+  public int configVersion(long kolId) {
     // The version the conditions' minimum came from; 0 while only the defaults apply (ADR-032 §4).
-    return Integer.toString(ruleConfig.current().version());
+    return ruleConfig.current().version();
   }
 
   private record KolAccrual(BigDecimal estimated, BigDecimal frozen) {}

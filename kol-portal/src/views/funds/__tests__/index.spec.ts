@@ -23,7 +23,7 @@ let wrapper: VueWrapper;
 const conditions: api.WithdrawalConditions = {
   currency: "CNY",
   minimum: "200.00",
-  version: "3",
+  version: 3,
   available: "1000.00",
   occupied: "0.00",
   frozen: "0.00",

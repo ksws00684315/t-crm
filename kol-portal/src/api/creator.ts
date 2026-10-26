@@ -340,11 +340,11 @@ export interface WithdrawalRecord {
   account: WithdrawalAccountOption | null;
 }
 
-/** Task 63 wire fields differ from the portal presentation model. */
+/** Map the current withdrawal contract to the portal presentation model. */
 interface WithdrawalResponse extends Omit<WithdrawalRecord, "amount" | "account"> {
-  amountCny: string;
+  amount: string;
   account: {
-    accountId: string | null;
+    id: string | null;
     type: "PAYPAL" | "USDT";
     account: string;
     holder: string | null;
@@ -357,13 +357,13 @@ function withdrawalRecord(item: WithdrawalResponse): WithdrawalRecord {
   return {
     id: item.id,
     applicationNo: item.applicationNo,
-    amount: item.amountCny,
+    amount: item.amount,
     currency: item.currency,
     status: item.status,
     createdAt: item.createdAt,
     account: item.account
       ? {
-          id: item.account.accountId ?? "",
+          id: item.account.id ?? "",
           accountType: item.account.type,
           account: item.account.account,
           holderName: item.account.holder,
@@ -377,7 +377,7 @@ function withdrawalRecord(item: WithdrawalResponse): WithdrawalRecord {
 export interface WithdrawalConditions {
   currency: string;
   minimum: string;
-  version: string;
+  version: number;
   available: string;
   occupied: string;
   frozen: string;
@@ -392,7 +392,7 @@ export function getWithdrawalConditions(): Promise<WithdrawalConditions> {
     return Promise.resolve({
       currency: "CNY",
       minimum: "200.00",
-      version: "1",
+      version: 1,
       available: demoFunds.availableCny,
       occupied: demoFunds.withdrawingCny,
       frozen: demoFunds.frozenCny,

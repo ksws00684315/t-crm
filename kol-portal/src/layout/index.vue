@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -71,9 +72,11 @@ async function signOut() {
         </el-breadcrumb>
         <el-tag v-if="isDemoMode" type="warning" effect="plain">{{ t("common.demoData") }}</el-tag>
         <div class="shell__actions">
-          <span v-if="session.kol" class="shell__identity"
-            >{{ session.kol.name }} · {{ session.kol.tenantName }}</span
-          >
+          <div v-if="session.kol" class="shell__identity">
+            <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span>{{
+              session.kol.tenantName
+            }}</span>
+          </div>
           <LocaleSwitch />
           <details class="user-menu">
             <summary>
@@ -188,8 +191,24 @@ async function signOut() {
   gap: var(--tcrm-space-3);
 }
 .shell__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+  max-width: min(40vw, 400px);
   color: var(--tcrm-color-text-secondary);
   overflow-wrap: anywhere;
+}
+.shell__identity :deep(.name-code) {
+  min-width: 0;
+  max-width: 240px;
+}
+.shell__identity :deep(.name-code__name),
+.shell__identity :deep(.name-code__code) {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .user-menu {
   position: relative;

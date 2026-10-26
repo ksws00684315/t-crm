@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { cleanupKol, updateAutoCleanup } from "@/api/kol/promotion";
 import type { KolVO } from "@/api/types";
-import { formatCodeWithName } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 
 defineOptions({ name: "CleanupConfigDialog" });
@@ -108,7 +108,7 @@ async function immediate() {
   >
     <el-form label-width="110px" @submit.prevent>
       <el-form-item :label="t('kol.code')">
-        <span data-test="cleanup-kol-label">{{ formatCodeWithName(kol?.kolCode, kol?.name) }}</span>
+        <NameCode :name="kol?.name" :code="kol?.kolCode" data-test="cleanup-kol-label" />
       </el-form-item>
       <el-form-item :label="t('cleanup.autoCleanup')">
         <el-radio-group v-model="form.auto" data-test="cleanup-auto">

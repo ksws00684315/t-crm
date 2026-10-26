@@ -224,7 +224,8 @@ describe("installGuard with the real route table", () => {
     ).toEqual([
       ["shops", "product:view", false],
       ["copy-tokens", "kol:copy-token", false],
-      ["tasks", "product:view", false]
+      ["tasks", "product:view", false],
+      ["/system/link-templates", null, false]
     ]);
     const order = layout?.children?.find(route => route.path === "order");
     expect(

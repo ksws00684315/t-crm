@@ -141,6 +141,16 @@ body {
   width: 360px;
 }
 
+/* A creator option now has two real text lines; do not overlap adjacent options. */
+.el-select-dropdown__item:has(.name-code) {
+  height: auto;
+  min-height: calc(
+    var(--tcrm-line-height-body) + var(--tcrm-line-height-help) + var(--tcrm-space-3)
+  );
+  padding-top: var(--tcrm-space-1);
+  padding-bottom: var(--tcrm-space-1);
+}
+
 @media (max-width: 767px) {
   #app .el-pagination {
     flex-wrap: wrap;

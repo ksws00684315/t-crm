@@ -14,6 +14,7 @@ target/
 __pycache__/
 node_modules/
 dist/
+.cache/
 
 # Personal AI agent preferences (project rules live in AGENTS.md)
 CLAUDE.local.md

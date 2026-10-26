@@ -105,7 +105,7 @@ describe("Copy job page", () => {
     expect(header).toContain("创建时间");
     expect(header).toContain("完成时间");
     expect(header).not.toContain("达人编号");
-    expect(wrapper.text()).toContain("已隐藏 5 列");
+    expect(wrapper.text()).toContain("已隐藏 3 列");
     expect(wrapper.text()).toContain("查看明细");
     expect(wrapper.text()).toContain("微店");
     expect(wrapper.text()).toContain("已完成");
@@ -128,7 +128,7 @@ describe("Copy job page", () => {
     i18n.global.locale.value = "en-US";
     await nextTick();
     const header = wrapper.get(".el-table__header").text();
-    expect(wrapper.get("[data-test=column-settings]").text()).toContain("5 hidden");
+    expect(wrapper.get("[data-test=column-settings]").text()).toContain("3 hidden");
     expect(header).toContain("Job code");
     expect(header).toContain("Target channel");
     expect(header).toContain("Finished");
@@ -191,8 +191,20 @@ describe("Copy job page", () => {
     const dialog = document.body.querySelector(".el-dialog") as HTMLElement;
     expect(dialog.textContent).toContain("任务明细：jobcode38xxxxxxxxxxxx");
     expect(dialog.textContent).toContain("旧商品 ID");
-    expect(dialog.textContent).toContain("来源商户号");
-    expect(dialog.textContent).toContain("800");
+    expect(dialog.textContent).not.toContain("来源商户号");
+    expect(dialog.textContent).not.toContain("800");
+    expect(detail?.props("columns").map((column: { key: string }) => column.key)).toEqual([
+      "seq",
+      "sourceProductId",
+      "sourceChannel",
+      "sourceShop",
+      "targetChannel",
+      "targetShop",
+      "targetItemId",
+      "targetItemUrl",
+      "status",
+      "errorMessage"
+    ]);
     expect(dialog.textContent).toContain("Source shop");
     expect(dialog.textContent).toContain("8");
     expect(dialog.textContent).toContain("失败");

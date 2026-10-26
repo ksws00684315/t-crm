@@ -38,6 +38,13 @@ async function page() {
 }
 
 describe("creator profile validation", () => {
+  it("preserves the name above the creator code alongside editable profile fields", async () => {
+    await page();
+    const identity = wrapper.get('[data-test="name-code"]');
+    expect(identity.get('[data-test="identity-name"]').text()).toBe("Creator");
+    expect(identity.get('[data-test="identity-code"]').text()).toBe("t60_creator");
+    expect(wrapper.get('[data-test="profile-name"]').element).toBeInstanceOf(HTMLInputElement);
+  });
   it("enforces the backend handle length instead of allowing 255 characters", async () => {
     await page();
     expect(wrapper.get('[data-test="profile-handle"]').attributes("maxlength")).toBe("128");
