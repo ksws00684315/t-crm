@@ -162,7 +162,12 @@ describe("Kol item page", () => {
     expect(wrapper.text()).toContain("支付金额");
     expect(wrapper.text()).toContain("清理状态");
     expect(wrapper.text()).toContain("KPL-ABCDEF123456");
-    expect(wrapper.text()).toContain("Alice（KOL-TAA001）");
+    expect(
+      wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Alice")
+    ).toBe(true);
+    expect(
+      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-TAA001")
+    ).toBe(true);
     expect(wrapper.text()).toContain("14.00");
     expect(wrapper.text()).toContain("清理失败");
     expect(wrapper.find('[data-test="image-placeholder"]').exists()).toBe(true);
@@ -295,12 +300,12 @@ describe("Kol item page", () => {
     expect(wrapper.text()).toContain("旗舰店（S001）");
   });
 
-  it("keeps view for a BD and hides import, commission and rebuild", async () => {
+  it("keeps only view in the row and hides admin toolbar actions for a BD", async () => {
     signIn("STAFF", "OWN", ["product:view"]);
     const wrapper = await mountPage();
     expect(kolItemApi.listKolItems).toHaveBeenCalled();
     expect(wrapper.find('[data-test="view"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="links"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="links"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="commission"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="import"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="rebuild-index"]').exists()).toBe(false);
@@ -326,11 +331,12 @@ describe("Kol item page", () => {
     expect((await mountPage()).find('[data-test="export"]').exists()).toBe(false);
   });
 
-  it("shows the promo sheet upload for an account that can edit creators", async () => {
+  it("shows creator tools in the toolbar while row actions stay view-only", async () => {
     signIn("STAFF", "ALL", ["product:view", "kol:edit"]);
     const wrapper = await mountPage();
     expect(wrapper.find('[data-test="upload-promo-sheet"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="commission"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="commission"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="view"]').exists()).toBe(true);
   });
 
   it("starts a rebuild after confirmation", async () => {

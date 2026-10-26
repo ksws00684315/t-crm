@@ -2,7 +2,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as bdApi from "@/api/system/bd-user";
 import * as kolApi from "@/api/kol/kol";
 import * as userApi from "@/api/system/user";
 import type { UserVO } from "@/api/types";
@@ -13,7 +12,6 @@ import UserPage from "../index.vue";
 
 vi.mock("@/api/system/user");
 vi.mock("@/api/kol/kol");
-vi.mock("@/api/system/bd-user");
 
 const row: UserVO = {
   id: "9007199254740993",
@@ -91,7 +89,8 @@ describe("user management page", () => {
     expect(text).toContain("仅本人");
     expect(text).toContain("启用");
     expect(document.body.textContent).toContain("重置密码");
-    expect(text).toContain("权限设置");
+    expect(text).toContain("编辑");
+    expect(text).toContain("停用");
     wrapper.unmount();
   });
 
@@ -172,7 +171,7 @@ describe("user management page", () => {
     wrapper.unmount();
   });
 
-  it("shows the list before the creator counts arrive and updates the row once they do", async () => {
+  it("loads creator counts without adding a transfer action to account rows", async () => {
     type CountPage = { items: never[]; total: string; page: number; size: number };
     let resolveCount: (value: CountPage) => void = () => {};
     vi.mocked(kolApi.listKols).mockReturnValue(
@@ -181,17 +180,18 @@ describe("user management page", () => {
       })
     );
     const wrapper = await mountPage();
-    // The users request is done while the count request is still pending: no loading mask,
-    // the row is on screen and the transfer action is not yet disabled.
+    // The count still supports the disable confirmation, but transfer is managed from KOL tools.
     expect(wrapper.findComponent({ name: "DataTable" }).props("loading")).toBe(false);
     expect(wrapper.text()).toContain("alice");
-    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(
-      false
-    );
+    expect(document.body.querySelector('[data-test="transfer-kols-9007199254740993"]')).toBeNull();
 
     resolveCount({ items: [], total: "0", page: 1, size: 1 });
     await flushPromises();
-    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(true);
+    expect(kolApi.listKols).toHaveBeenCalledWith({
+      bdUserId: row.id,
+      page: 1,
+      size: 1
+    });
     wrapper.unmount();
   });
 
@@ -230,25 +230,12 @@ describe("user management page", () => {
     wrapper.unmount();
   });
 
-  it("opens the transfer dialog with the whole BD as the target", async () => {
-    vi.mocked(kolApi.listKols).mockResolvedValue({ items: [], total: "3", page: 1, size: 1 });
-    vi.mocked(bdApi.listBdUsers).mockResolvedValue([]);
-    const wrapper = await mountPage();
-    await clickBodyItem("transfer-kols-9007199254740993");
-    await flushPromises();
-    const dialog = wrapper.findComponent({ name: "BdTransferDialog" });
-    expect(dialog.props("modelValue")).toBe(true);
-    expect(dialog.props("target")).toEqual({
-      fromBdUserId: "9007199254740993",
-      fromBdName: "Alice",
-      count: 3
-    });
-    wrapper.unmount();
-  });
-
-  it("disables the transfer action when the BD owns no creators", async () => {
-    const wrapper = await mountPage();
-    expect(bodyItem("transfer-kols-9007199254740993").classList.contains("is-disabled")).toBe(true);
+  it("keeps the four row actions and removes permission and transfer actions from the list", async () => {
+    const wrapper = await mountPage([{ ...row, postTemplate: "BD" }]);
+    const rowActions = document.body.querySelector(".el-table__body tr .actions-cell");
+    expect(rowActions?.querySelectorAll("button")).toHaveLength(4);
+    expect(document.body.querySelector('[data-test="permissions-9007199254740993"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="transfer-kols-9007199254740993"]')).toBeNull();
     wrapper.unmount();
   });
 });

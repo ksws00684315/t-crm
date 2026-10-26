@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -153,8 +154,7 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("kol.kolId"), width: px(108, 124), tooltip: true },
-  { key: "name", label: t("kol.kolName"), prop: "name", width: px(76, 132), tooltip: true },
+  { key: "kol", label: t("copyToken.kol"), minWidth: 170 },
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
   // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
   // those pixels: its values ellipsize with a tooltip either way.
@@ -377,9 +377,10 @@ onBeforeUnmount(() => window.removeEventListener("prepay-updated", onPrepayUpdat
           @refresh="load"
           @clear-filters="reset"
         >
-          <template #cell-kolCode="{ row }">{{ asKol(row).kolCode }}</template>
-          <template #cell-name="{ row }"
-            ><span data-test="kol-name">{{ asKol(row).name }}</span></template
+          <template #cell-kol="{ row }"
+            ><NameCode :name="asKol(row).name" :code="asKol(row).kolCode"
+              ><span data-test="kol-name">{{ asKol(row).name }}</span></NameCode
+            ></template
           >
           <template #cell-contact="{ row }">{{ contactText(asKol(row)) }}</template>
           <template #cell-email="{ row }">{{ asKol(row).email }}</template>

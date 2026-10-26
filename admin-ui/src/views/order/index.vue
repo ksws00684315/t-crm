@@ -11,14 +11,7 @@ import {
   uploadRefundImport,
   type OrderQuery
 } from "@/api/order/order";
-import type {
-  AttributionStatus,
-  Channel,
-  OrderStatus,
-  OrderSyncStateVO,
-  OrderVO,
-  PageResult
-} from "@/api/types";
+import type { OrderItemVO, OrderStatus, OrderSyncStateVO, OrderVO, PageResult } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
@@ -29,21 +22,9 @@ import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { orderAbilities } from "@/utils/permission";
-import {
-  ATTRIBUTION_STATUSES,
-  CHANNELS,
-  ORDER_STATUSES,
-  attributionStatusText,
-  channelText,
-  orderRefundStatusText,
-  orderRefundTagType,
-  orderStatusText,
-  payRangeToQuery
-} from "@/utils/order";
+import { orderRefundStatusText, orderRefundTagType } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
-import KolDetailDrawer from "@/views/kol/KolDetailDrawer.vue";
 import OrderDetailDrawer from "./OrderDetailDrawer.vue";
-import OrderLines from "./OrderLines.vue";
 import SyncStatesDialog from "./SyncStatesDialog.vue";
 
 defineOptions({ name: "OrderListPage" });
@@ -53,6 +34,17 @@ const router = useRouter();
 const me = useUserStore();
 const abilities = computed(() => orderAbilities(me.user));
 
+type OrderFilterStatus = OrderStatus | "REFUNDING" | "REFUND_SUCCESS" | "ABNORMAL";
+
+interface GroupedOrderRow {
+  id: string;
+  kind: "header" | "item";
+  order: OrderVO;
+  item: OrderItemVO | null;
+  itemIndex: number;
+  itemCount: number;
+}
+
 const loading = ref(false);
 const rows = ref<OrderVO[]>([]);
 const total = ref(0);
@@ -61,23 +53,17 @@ const query = reactive<{
   page: number;
   size: number;
   orderNo: string;
-  channel?: Channel;
   shopId?: string;
-  payRange: [Date, Date] | null;
   kolCode: string;
-  orderStatus?: OrderStatus;
-  attributionStatus?: AttributionStatus;
+  status?: OrderFilterStatus;
+  createRange: [Date, Date] | null;
 }>({
   page: 1,
   size: readPageSize("orders", 20),
   orderNo: "",
-  payRange: null,
-  kolCode: ""
+  kolCode: "",
+  createRange: null
 });
-
-function asOrder(row: object): OrderVO {
-  return row as OrderVO;
-}
 
 /** Shop cell per 09.04: "name (code)"; the code comes with task 37's backend and may be null. */
 function shopText(order: OrderVO): string {
@@ -87,62 +73,125 @@ function shopText(order: OrderVO): string {
     : (order.shopName ?? "-");
 }
 
-/** Creator cell per 09.04: "name (code)"; "-" while the order is not attributed to a creator. */
-function kolText(order: OrderVO): string {
-  if (!order.kolId && !order.kolCode) return "-";
-  return order.kolCode
-    ? formatNameWithCode(order.kolName ?? order.kolCode, order.kolCode)
-    : (order.kolName ?? "-");
-}
-
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
-  // Owner decision 2026-10-24 (task 59 review): the 09.04 columns all show by default; the table
-  // scrolls horizontally inside the card when it overflows (pinned action column, scrollbar on).
-  // The en minWidths of shop/creator/statuses sit at the measured header minimums (task 59).
-  { key: "channel", label: t("order.channel"), width: 80 },
-  { key: "shopName", label: t("order.shop"), minWidth: px(170, 162) },
-  { key: "kol", label: t("order.kol"), minWidth: px(170, 160) },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(110, 116) },
-  { key: "refundStatus", label: t("order.refundStatusColumn"), width: px(120, 126) },
-  { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
-  {
-    key: "freight",
-    label: t("order.freight"),
-    width: px(80, 90),
-    amount: true
-  },
-  { key: "payTime", label: t("order.payTime"), width: px(170, 166) },
-  { key: "createTime", label: t("order.createTime"), width: 170 },
+  { key: "product", label: t("order.line.itemName"), minWidth: px(300, 320) },
+  { key: "quantity", label: t("order.line.quantity"), width: px(90, 100) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(180, 200) },
+  { key: "payAmount", label: t("order.payAmount"), width: px(140, 160), amount: true },
   { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
+
+const statusOptions = computed(() => [
+  { value: "UNPAID", label: t("order.listStatus.UNPAID"), developing: false },
+  { value: "PAID", label: t("order.listStatus.PAID"), developing: false },
+  { value: "SHIPPED", label: t("order.listStatus.SHIPPED"), developing: false },
+  { value: "RECEIVED", label: t("order.listStatus.RECEIVED"), developing: false },
+  { value: "COMPLETED", label: t("order.listStatus.COMPLETED"), developing: false },
+  { value: "CLOSED", label: t("order.listStatus.CLOSED"), developing: false },
+  { value: "REFUNDING", label: t("order.listStatus.REFUNDING"), developing: true },
+  { value: "REFUND_SUCCESS", label: t("order.listStatus.REFUND_SUCCESS"), developing: true },
+  { value: "ABNORMAL", label: t("order.listStatus.ABNORMAL"), developing: true }
+]);
+
+const tableRows = computed<GroupedOrderRow[]>(() =>
+  rows.value.flatMap(order => {
+    const items = order.items ?? [];
+    const itemCount = Math.max(items.length, 1);
+    return [
+      {
+        id: `header:${order.id}`,
+        kind: "header" as const,
+        order,
+        item: null,
+        itemIndex: -1,
+        itemCount
+      },
+      ...(items.length
+        ? items.map((item, itemIndex) => ({
+            id: `item:${order.id}:${item.id}`,
+            kind: "item" as const,
+            order,
+            item,
+            itemIndex,
+            itemCount
+          }))
+        : [
+            {
+              id: `item:${order.id}:empty`,
+              kind: "item" as const,
+              order,
+              item: null,
+              itemIndex: 0,
+              itemCount
+            }
+          ])
+    ];
+  })
+);
+
+function orderSpanMethod({
+  row,
+  column,
+  columnIndex,
+  visibleColumnCount
+}: {
+  row: object;
+  column: { columnKey?: string; property?: string };
+  columnIndex: number;
+  visibleColumnCount: number;
+}): number[] | undefined {
+  const grouped = row as GroupedOrderRow;
+  if (grouped.kind === "header") return columnIndex === 0 ? [1, visibleColumnCount] : [0, 0];
+  const key = column.columnKey ?? column.property;
+  if (!["orderStatus", "payAmount", "actions"].includes(key ?? "")) return undefined;
+  return grouped.itemIndex === 0 ? [grouped.itemCount, 1] : [0, 0];
+}
+
+function tableRowClass({ row }: { row: object }): string {
+  return (row as GroupedOrderRow).kind === "header" ? "order-group-header" : "order-group-item";
+}
+
+function orderFilterStatusText(status: OrderFilterStatus): string {
+  const option = statusOptions.value.find(item => item.value === status);
+  return option?.label ?? status;
+}
+
+function orderListStatus(order: OrderVO): string {
+  if (
+    order.orderStatus === "UNKNOWN" ||
+    order.attributionStatus === "UNMATCHED" ||
+    order.attributionStatus === "CONFLICT"
+  ) {
+    return t("order.listStatus.ABNORMAL");
+  }
+  return t(`order.listStatus.${order.orderStatus}`);
+}
 
 const applied = ref(snapshot());
 
 function snapshot() {
   return {
     orderNo: query.orderNo.trim(),
-    channel: query.channel,
     shopId: query.shopId,
-    payRange: query.payRange,
     kolCode: query.kolCode.trim(),
-    orderStatus: query.orderStatus,
-    attributionStatus: query.attributionStatus
+    status: query.status,
+    createRange: query.createRange
   };
 }
 
 function appliedQuery(): OrderQuery {
+  const status = applied.value.status;
   return {
     orderNo: applied.value.orderNo || undefined,
-    channel: applied.value.channel,
     shopId: applied.value.shopId || undefined,
-    ...payRangeToQuery(applied.value.payRange),
     kolCode: applied.value.kolCode || undefined,
-    orderStatus: applied.value.orderStatus,
-    attributionStatus: applied.value.attributionStatus
+    orderStatus:
+      status && ["UNPAID", "PAID", "SHIPPED", "RECEIVED", "COMPLETED", "CLOSED"].includes(status)
+        ? (status as OrderStatus)
+        : undefined
   };
 }
 
@@ -150,13 +199,6 @@ const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
   if (applied.value.orderNo) {
     list.push({ key: "orderNo", label: t("order.orderId"), text: applied.value.orderNo });
-  }
-  if (applied.value.channel) {
-    list.push({
-      key: "channel",
-      label: t("order.channel"),
-      text: channelText(applied.value.channel)
-    });
   }
   if (applied.value.shopId) {
     const shop = shops.value.find(item => item.shopId === applied.value.shopId);
@@ -166,29 +208,14 @@ const chips = computed<SearchChip[]>(() => {
       text: shop?.shopName ?? applied.value.shopId
     });
   }
-  if (applied.value.payRange) {
-    const [from, to] = applied.value.payRange;
-    list.push({
-      key: "payRange",
-      label: t("order.payRange"),
-      text: `${formatInstant(from.toISOString())} ~ ${formatInstant(to.toISOString())}`
-    });
-  }
   if (applied.value.kolCode) {
     list.push({ key: "kolCode", label: t("order.kolCode"), text: applied.value.kolCode });
   }
-  if (applied.value.orderStatus) {
+  if (applied.value.status) {
     list.push({
-      key: "orderStatus",
+      key: "status",
       label: t("order.orderStatus"),
-      text: orderStatusText(applied.value.orderStatus)
-    });
-  }
-  if (applied.value.attributionStatus) {
-    list.push({
-      key: "attributionStatus",
-      label: t("order.attributionStatus"),
-      text: attributionStatusText(applied.value.attributionStatus)
+      text: orderFilterStatusText(applied.value.status)
     });
   }
   return list;
@@ -199,8 +226,6 @@ const orderImportVisible = ref(false);
 const refundImportVisible = ref(false);
 const detailVisible = ref(false);
 const detailOrderId = ref<string | null>(null);
-const detailKolId = ref<string | null>(null);
-const kolVisible = ref(false);
 
 async function load() {
   loading.value = true;
@@ -213,6 +238,8 @@ async function load() {
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    rows.value = [];
+    total.value = 0;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -235,23 +262,18 @@ function search() {
 
 function reset() {
   query.orderNo = "";
-  query.channel = undefined;
   query.shopId = undefined;
-  query.payRange = null;
   query.kolCode = "";
-  query.orderStatus = undefined;
-  query.attributionStatus = undefined;
+  query.status = undefined;
+  query.createRange = null;
   search();
 }
 
 function removeChip(key: string): void {
   if (key === "orderNo") query.orderNo = "";
-  if (key === "channel") query.channel = undefined;
   if (key === "shop") query.shopId = undefined;
-  if (key === "payRange") query.payRange = null;
   if (key === "kolCode") query.kolCode = "";
-  if (key === "orderStatus") query.orderStatus = undefined;
-  if (key === "attributionStatus") query.attributionStatus = undefined;
+  if (key === "status") query.status = undefined;
   search();
 }
 
@@ -267,12 +289,6 @@ function onSize(size: number): void {
 function openDetail(order: OrderVO) {
   detailOrderId.value = order.id;
   detailVisible.value = true;
-}
-
-function openKol(order: OrderVO) {
-  if (!abilities.value.canViewKol || !order.kolId) return;
-  detailKolId.value = order.kolId;
-  kolVisible.value = true;
 }
 
 /** Unattributed orders have no chain: the whole path starts at the creator's item (09.04). */
@@ -325,21 +341,6 @@ onMounted(() => {
             data-test="filter-order-no"
           />
         </el-form-item>
-        <el-form-item :label="t('order.channel')">
-          <el-select
-            v-model="query.channel"
-            clearable
-            :placeholder="t('common.all')"
-            data-test="filter-channel"
-          >
-            <el-option
-              v-for="channel in CHANNELS"
-              :key="channel"
-              :label="channelText(channel)"
-              :value="channel"
-            />
-          </el-select>
-        </el-form-item>
         <el-form-item :label="t('order.shop')">
           <el-select
             v-model="query.shopId"
@@ -350,50 +351,54 @@ onMounted(() => {
             <el-option v-for="s in shops" :key="s.shopId" :label="s.shopName" :value="s.shopId" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="t('order.kolCode')">
+          <el-tooltip :content="t('order.kolNameFilterDeveloping')" placement="top">
+            <el-input
+              v-model="query.kolCode"
+              clearable
+              maxlength="16"
+              :placeholder="t('order.kolCode')"
+              data-test="filter-kol-code"
+            />
+          </el-tooltip>
+        </el-form-item>
       </template>
       <template #more>
-        <el-form-item :label="t('order.payRange')">
-          <el-date-picker
-            v-model="query.payRange"
-            type="datetimerange"
-            :start-placeholder="t('order.payRange')"
-            :end-placeholder="t('order.payRange')"
-            class="filter-w-lg"
-          />
-        </el-form-item>
-        <el-form-item :label="t('order.kolCode')">
-          <el-input v-model="query.kolCode" clearable maxlength="16" />
-        </el-form-item>
         <el-form-item :label="t('order.orderStatus')">
           <el-select
-            v-model="query.orderStatus"
+            v-model="query.status"
             clearable
             :placeholder="t('common.all')"
             class="filter-w-sm"
+            data-test="filter-order-status"
           >
             <el-option
-              v-for="status in ORDER_STATUSES"
-              :key="status"
-              :label="orderStatusText(status)"
-              :value="status"
-            />
+              v-for="status in statusOptions"
+              :key="status.value"
+              :label="status.label"
+              :value="status.value"
+              :disabled="status.developing"
+            >
+              <span>{{ status.label }}</span>
+              <span v-if="status.developing" class="order-filter-developing">{{
+                t("common.developing")
+              }}</span>
+            </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('order.attributionStatus')">
-          <el-select
-            v-model="query.attributionStatus"
-            clearable
-            :placeholder="t('common.all')"
-            class="filter-w-sm"
-          >
-            <el-option
-              v-for="status in ATTRIBUTION_STATUSES"
-              :key="status"
-              :label="attributionStatusText(status)"
-              :value="status"
+        <el-tooltip :content="t('order.createTimeFilterDeveloping')" placement="top">
+          <el-form-item :label="t('order.createTimeFilterLabel')">
+            <el-date-picker
+              v-model="query.createRange"
+              type="datetimerange"
+              disabled
+              :start-placeholder="t('order.detail.orderTime')"
+              :end-placeholder="t('order.detail.orderTime')"
+              class="filter-w-lg"
+              data-test="filter-create-time"
             />
-          </el-select>
-        </el-form-item>
+          </el-form-item>
+        </el-tooltip>
       </template>
       <template v-if="abilities.canManage" #actions>
         <el-button data-test="sync-states" @click="syncVisible = true">
@@ -410,53 +415,97 @@ onMounted(() => {
 
     <DataTable
       table-id="orders"
-      :rows="rows"
+      :rows="tableRows"
       :columns="columns"
       :loading="loading"
       :total="total"
       :page="query.page"
       :size="query.size"
       :filter-count="chips.length"
-      expandable
+      row-key="id"
+      :fixed-columns="false"
+      :span-method="orderSpanMethod"
+      :row-class-name="tableRowClass"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
       @clear-filters="reset"
     >
-      <template #cell-weidianOrderId="{ row }">
-        <CopyText :value="asOrder(row).weidianOrderId" />
+      <template #cell-product="{ row }">
+        <div v-if="(row as GroupedOrderRow).kind === 'header'" class="order-group-band">
+          <span class="order-group-band__field">
+            <strong>{{ t("order.orderId") }}</strong>
+            <CopyText :value="(row as GroupedOrderRow).order.weidianOrderId" />
+          </span>
+          <span class="order-group-band__field">
+            <strong>{{ t("order.detail.orderTime") }}</strong>
+            {{ formatInstant((row as GroupedOrderRow).order.orderTime) }}
+          </span>
+          <span class="order-group-band__field">
+            <strong>{{ t("order.shop") }}</strong>
+            {{ shopText((row as GroupedOrderRow).order) }}
+          </span>
+        </div>
+        <div v-else class="order-product-row">
+          <div class="order-image-placeholder" :aria-label="t('order.itemImageDeveloping')">
+            <span class="order-image-placeholder__icon" aria-hidden="true">▧</span>
+            <span>{{ t("common.developing") }}</span>
+          </div>
+          <div class="order-product-row__text">
+            <strong>{{ (row as GroupedOrderRow).item?.itemName ?? "-" }}</strong>
+            <span
+              >{{ t("order.line.itemId") }}:
+              {{ (row as GroupedOrderRow).item?.weidianItemId ?? "-" }}</span
+            >
+            <span v-if="(row as GroupedOrderRow).item?.skuName"
+              >{{ t("order.line.sku") }}: {{ (row as GroupedOrderRow).item?.skuName }}</span
+            >
+          </div>
+        </div>
       </template>
-      <template #cell-channel="{ row }">{{ channelText(asOrder(row).channel) }}</template>
-      <template #cell-shopName="{ row }">{{ shopText(asOrder(row)) }}</template>
-      <template #cell-kol="{ row }">
-        <el-button
-          v-if="asOrder(row).kolId && abilities.canViewKol"
-          link
-          type="primary"
-          data-test="order-kol"
-          @click="openKol(asOrder(row))"
-        >
-          {{ kolText(asOrder(row)) }}
-        </el-button>
-        <span v-else>{{ kolText(asOrder(row)) }}</span>
+      <template #cell-quantity="{ row }">
+        {{
+          (row as GroupedOrderRow).kind === "header"
+            ? ""
+            : ((row as GroupedOrderRow).item?.quantity ?? "-")
+        }}
       </template>
       <template #cell-orderStatus="{ row }">
-        {{ orderStatusText(asOrder(row).orderStatus) }}
+        <template v-if="(row as GroupedOrderRow).kind === 'item'">
+          <el-tag
+            :type="
+              (row as GroupedOrderRow).order.orderStatus === 'UNKNOWN' ||
+              ['UNMATCHED', 'CONFLICT'].includes((row as GroupedOrderRow).order.attributionStatus)
+                ? 'danger'
+                : 'info'
+            "
+          >
+            {{ orderListStatus((row as GroupedOrderRow).order) }}
+          </el-tag>
+          <el-tag
+            v-if="
+              (row as GroupedOrderRow).order.refundStatus &&
+              (row as GroupedOrderRow).order.refundStatus !== 'NONE'
+            "
+            :type="orderRefundTagType((row as GroupedOrderRow).order.refundStatus)"
+            data-test="refund-status"
+          >
+            {{ orderRefundStatusText((row as GroupedOrderRow).order.refundStatus) }}
+          </el-tag>
+        </template>
       </template>
-      <template #cell-refundStatus="{ row }">
-        <el-tag :type="orderRefundTagType(asOrder(row).refundStatus)" data-test="refund-status">
-          {{ orderRefundStatusText(asOrder(row).refundStatus) }}
-        </el-tag>
+      <template #cell-payAmount="{ row }">
+        {{
+          (row as GroupedOrderRow).kind === "header"
+            ? ""
+            : (row as GroupedOrderRow).order.payAmount || "-"
+        }}
       </template>
-      <template #cell-payAmount="{ row }">{{ asOrder(row).payAmount ?? "-" }}</template>
-      <template #cell-freight="{ row }">{{ asOrder(row).freight ?? "-" }}</template>
-      <template #cell-payTime="{ row }">{{ formatInstant(asOrder(row).payTime) }}</template>
-      <template #cell-createTime="{ row }">{{ formatInstant(asOrder(row).createTime) }}</template>
       <template #actions="{ row }">
-        <RowActions :actions="rowActions(asOrder(row))" />
-      </template>
-      <template #expand="{ row }">
-        <OrderLines :order="asOrder(row)" />
+        <RowActions
+          v-if="(row as GroupedOrderRow).kind === 'item'"
+          :actions="rowActions((row as GroupedOrderRow).order)"
+        />
       </template>
     </DataTable>
 
@@ -489,6 +538,93 @@ onMounted(() => {
     />
 
     <OrderDetailDrawer v-model="detailVisible" :order-id="detailOrderId" />
-    <KolDetailDrawer v-model="kolVisible" :kol-id="detailKolId" />
   </div>
 </template>
+
+<style scoped>
+.order-filter-developing {
+  margin-left: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+}
+
+:deep(.el-table .order-group-header > td) {
+  background: var(--el-color-primary-light-9) !important;
+}
+
+:deep(.el-table .order-group-header .cell) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.order-group-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-5);
+  align-items: center;
+  min-width: 0;
+}
+
+.order-group-band__field {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.order-group-band__field strong {
+  color: var(--tcrm-color-text-secondary);
+  font-weight: 500;
+}
+
+.order-product-row {
+  display: flex;
+  gap: var(--tcrm-space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+.order-image-placeholder {
+  display: flex;
+  flex: 0 0 80px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--tcrm-radius-tag);
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+  text-align: center;
+}
+
+.order-image-placeholder__icon {
+  font-size: var(--tcrm-font-size-title);
+  line-height: 20px;
+}
+
+.order-product-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.order-product-row__text strong {
+  font-weight: 500;
+}
+
+.order-product-row__text > span {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+}
+
+.order-group-item :deep(.el-tag) + :deep(.el-tag) {
+  margin-left: 6px;
+}
+</style>

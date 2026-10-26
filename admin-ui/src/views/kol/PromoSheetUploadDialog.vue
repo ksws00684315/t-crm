@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
@@ -19,6 +20,8 @@ const props = defineProps<{
   modelValue: boolean;
   kolId: string | null;
   kolLabel: string;
+  kolName?: string | null;
+  kolCode?: string | null;
 }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
@@ -174,7 +177,7 @@ const dialogVisible = computed({
 <template>
   <el-dialog v-model="dialogVisible" :title="t('promoSheet.title')" width="720px" @open="open">
     <div class="promo-sheet">
-      <p class="target" data-test="promo-target">{{ kolLabel }}</p>
+      <NameCode :name="kolName || kolLabel" :code="kolCode" data-test="promo-target" />
 
       <div v-if="phase === 'select'" class="select">
         <el-button type="primary" data-test="promo-choose" @click="choose">

@@ -175,6 +175,7 @@ describe("buildMenu", () => {
       "店铺管理",
       "Token管理",
       "商品任务",
+      "平台维护",
       "订单管理",
       "订单查询",
       "退款查询",
@@ -190,7 +191,6 @@ describe("buildMenu", () => {
       "系统管理",
       "账号管理",
       "权限设置",
-      "平台维护",
       "上传文件",
       "操作日志"
     ]);
@@ -207,6 +207,7 @@ describe("buildMenu", () => {
       "/product/shops",
       "/product/copy-tokens",
       "/product/tasks",
+      "/system/link-templates",
       "/order/orders",
       "/order/refunds",
       "/kol/kols",
@@ -218,7 +219,6 @@ describe("buildMenu", () => {
       "/fund/settlement-config",
       "/system/users",
       "/system/post-templates",
-      "/system/link-templates",
       "/system/tasks",
       "/system/oper-logs"
     ]);

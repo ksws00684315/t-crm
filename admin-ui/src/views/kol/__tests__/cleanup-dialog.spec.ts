@@ -73,14 +73,16 @@ describe("per-creator cleanup config dialog (task 32 §2.2)", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows code and name with locale-aware brackets", async () => {
+  it("shows creator name above the business code in both locales", async () => {
     i18n.global.locale.value = "zh-CN";
     await openDialog();
-    expect(element("cleanup-kol-label").text()).toBe("KOL-ASD001（Alice）");
+    expect(element("identity-name").text()).toBe("Alice");
+    expect(element("identity-code").text()).toBe("KOL-ASD001");
     document.body.innerHTML = "";
     i18n.global.locale.value = "en-US";
     await openDialog();
-    expect(element("cleanup-kol-label").text()).toBe("KOL-ASD001 (Alice)");
+    expect(element("identity-name").text()).toBe("Alice");
+    expect(element("identity-code").text()).toBe("KOL-ASD001");
     i18n.global.locale.value = "zh-CN";
   });
 

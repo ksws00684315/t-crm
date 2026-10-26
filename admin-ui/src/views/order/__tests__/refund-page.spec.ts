@@ -158,7 +158,12 @@ describe("refund query page (task 40)", () => {
     expect(wrapper.text()).toContain("退货退款");
     expect(wrapper.text()).toContain("仅退款");
     expect(wrapper.text()).toContain("t40 Shop（S001）");
-    expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
+    expect(wrapper.findAll('[data-test="identity-name"]').some(item => item.text() === "Zoe")).toBe(
+      true
+    );
+    expect(
+      wrapper.findAll('[data-test="identity-code"]').some(item => item.text() === "KOL-ZS01")
+    ).toBe(true);
     wrapper.unmount();
   });
 

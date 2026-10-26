@@ -159,7 +159,7 @@ describe("shared component styles (task 59 R-08)", () => {
     const source = readFileSync(resolve(repoRoot, path), "utf8");
     const match = source.match(/<style scoped>([\s\S]*?)<\/style>/);
     expect(match, `${path} has a scoped style block`).not.toBeNull();
-    return match![1];
+    return match![1].replace(/\r\n/g, "\n");
   }
 
   it("keeps the DataTable stylesheet identical across both apps", () => {

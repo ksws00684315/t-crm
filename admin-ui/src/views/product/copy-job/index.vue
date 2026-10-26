@@ -11,6 +11,7 @@ import {
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
+import NameCode from "@/components/NameCode.vue";
 import RowActions from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
@@ -97,9 +98,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "errorMessage", label: t("copyJob.error"), minWidth: 160, tooltip: true },
   { key: "createTime", label: t("copyJob.createTime"), width: 170 },
   { key: "finishTime", label: t("copyJob.finishTime"), width: 170 },
-  { key: "kolId", label: t("copyJob.kolId"), width: 140, defaultHidden: true },
-  { key: "kolCode", label: t("copyJob.kolCode"), width: 120, defaultHidden: true },
-  { key: "kolName", label: t("copyJob.kolName"), minWidth: 120, defaultHidden: true },
+  { key: "kol", label: t("copyToken.kol"), minWidth: 170, defaultHidden: true },
   { key: "targetShopCode", label: t("copyJob.targetShopCode"), width: 140, defaultHidden: true },
   { key: "targetShopName", label: t("copyJob.targetShopName"), minWidth: 140, defaultHidden: true },
   // View items: zh canvas 56px, en 98px, +24px headroom (task 59 R-11 measurements).
@@ -108,10 +107,9 @@ const columns = computed<DataColumn[]>(() => [
 
 const itemColumns = computed<DataColumn[]>(() => [
   { key: "seq", label: t("copyJob.seq"), width: 70 },
-  { key: "sourceChannel", label: t("copyJob.sourceChannel"), width: 110 },
   { key: "sourceProductId", label: t("copyJob.sourceProductId"), minWidth: 150 },
+  { key: "sourceChannel", label: t("copyJob.sourceChannel"), width: 110 },
   { key: "sourceShop", label: t("copyJob.sourceShop"), minWidth: 140 },
-  { key: "sourceMerchantNo", label: t("copyJob.sourceMerchantNo"), minWidth: 130 },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
   { key: "targetShop", label: t("copyJob.targetShop"), minWidth: 140 },
   { key: "targetItemId", label: t("copyJob.targetItemId"), minWidth: 140 },
@@ -123,6 +121,13 @@ const itemColumns = computed<DataColumn[]>(() => [
 const detailTitle = computed(() =>
   t("copyJob.detailTitle", { jobCode: detailJob.value?.jobCode ?? "" })
 );
+
+function jobStatusTag(status: string): "success" | "warning" | "danger" | "info" {
+  if (status === "completed") return "success";
+  if (status === "failed") return "danger";
+  if (status === "processing" || status === "partial_failed") return "warning";
+  return "info";
+}
 
 function listParams() {
   return {
@@ -249,7 +254,7 @@ onMounted(() => {
             clearable
             maxlength="64"
             data-test="job-code"
-            style="width: 200px"
+            class="copy-job__filter"
           />
         </el-form-item>
         <el-form-item :label="t('copyJob.targetChannel')">
@@ -257,8 +262,8 @@ onMounted(() => {
             v-model="query.targetChannel"
             clearable
             data-test="target-channel"
+            class="copy-job__filter"
             :placeholder="t('common.all')"
-            style="width: 140px"
           >
             <el-option
               v-for="channel in CHANNELS"
@@ -273,8 +278,8 @@ onMounted(() => {
             v-model="query.status"
             clearable
             data-test="job-status"
+            class="copy-job__filter"
             :placeholder="t('common.all')"
-            style="width: 140px"
           >
             <el-option
               v-for="status in JOB_STATUSES"
@@ -302,11 +307,16 @@ onMounted(() => {
       <template #cell-jobCode="{ row }">
         <CopyText :value="asJob(row).jobCode" />
       </template>
+      <template #cell-kol="{ row }"
+        ><NameCode :name="asJob(row).kolName" :code="asJob(row).kolCode"
+      /></template>
       <template #cell-targetChannel="{ row }">
         {{ channelText(asJob(row).targetChannel) }}
       </template>
       <template #cell-status="{ row }">
-        <span data-test="job-status-text">{{ jobStatusText(asJob(row).status) }}</span>
+        <el-tag :type="jobStatusTag(asJob(row).status)" data-test="job-status-text">{{
+          jobStatusText(asJob(row).status)
+        }}</el-tag>
       </template>
       <template #cell-result="{ row }">
         <span class="copy-job__result" data-test="job-result">
@@ -373,10 +383,11 @@ onMounted(() => {
           <CopyText :value="asItem(row).sourceProductId" />
         </template>
         <template #cell-sourceShop="{ row }">
-          <span data-test="source-shop">{{ asItem(row).sourceShopName || t("copyJob.none") }}</span>
-          <span v-if="asItem(row).sourceShopId" class="copy-job__shop-id">{{
-            asItem(row).sourceShopId
-          }}</span>
+          <NameCode
+            :name="asItem(row).sourceShopName"
+            :code="asItem(row).sourceShopId"
+            data-test="source-shop"
+          />
         </template>
         <template #cell-sourceMerchantNo="{ row }">
           {{ asItem(row).sourceMerchantNo || t("copyJob.none") }}
@@ -385,10 +396,11 @@ onMounted(() => {
           channelText(asItem(row).targetChannel)
         }}</template>
         <template #cell-targetShop="{ row }">
-          <span data-test="target-shop">{{ asItem(row).targetShopName || t("copyJob.none") }}</span>
-          <span v-if="asItem(row).targetShopId" class="copy-job__shop-id">{{
-            asItem(row).targetShopId
-          }}</span>
+          <NameCode
+            :name="asItem(row).targetShopName"
+            :code="asItem(row).targetShopId"
+            data-test="target-shop"
+          />
         </template>
         <template #cell-targetItemId="{ row }">
           <span data-test="target-item-id">{{
@@ -406,7 +418,18 @@ onMounted(() => {
           >
           <span v-else>{{ t("copyJob.none") }}</span>
         </template>
-        <template #cell-status="{ row }">{{ itemStatusText(asItem(row).status) }}</template>
+        <template #cell-status="{ row }"
+          ><el-tag
+            :type="
+              asItem(row).status === 'success'
+                ? 'success'
+                : asItem(row).status === 'failed'
+                  ? 'danger'
+                  : 'info'
+            "
+            >{{ itemStatusText(asItem(row).status) }}</el-tag
+          ></template
+        >
         <template #cell-errorMessage="{ row }">
           <span v-if="!asItem(row).errorMessage">{{ t("copyJob.none") }}</span>
           <el-tooltip v-else :content="asItem(row).errorMessage ?? ''" placement="top">
@@ -421,6 +444,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.copy-job__filter {
+  width: 100%;
+}
+
 .copy-job__result {
   display: flex;
   flex-wrap: wrap;

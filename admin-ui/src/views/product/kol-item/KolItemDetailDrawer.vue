@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { Picture } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -54,13 +55,6 @@ function shopText(row: KolItemDetailVO): string {
   return "-";
 }
 
-function kolText(row: KolItemDetailVO): string {
-  if (row.kolName || row.kolCode) {
-    return formatNameWithCode(row.kolName, row.kolCode);
-  }
-  return "-";
-}
-
 function label(group: "channels" | "statuses" | "cleanups", value: string | null): string {
   return value ? t(`mapping.${group}.${value}`) : "-";
 }
@@ -94,7 +88,9 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
             <span class="product-name">{{ text(detail.itemName) }}</span>
           </div>
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.kol')">{{ kolText(detail) }}</el-descriptions-item>
+        <el-descriptions-item :label="t('mapping.kol')"
+          ><NameCode :name="detail.kolName" :code="detail.kolCode"
+        /></el-descriptions-item>
         <el-descriptions-item :label="t('mapping.targetShop')">
           {{ shopText(detail) }}
         </el-descriptions-item>

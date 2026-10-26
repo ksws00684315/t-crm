@@ -73,9 +73,14 @@ function checked(code: string): boolean {
 describe("user form dialog", () => {
   beforeEach(() => {
     vi.mocked(userApi.getPermissionCatalog).mockClear();
+    vi.mocked(userApi.getUserPermissions).mockClear();
     vi.mocked(userApi.createUser).mockClear();
     vi.mocked(userApi.editUser).mockClear();
     vi.mocked(userApi.getPermissionCatalog).mockResolvedValue(catalog);
+    vi.mocked(userApi.getUserPermissions).mockResolvedValue({
+      permissions: ["kol:view"],
+      dataScope: "OWN"
+    });
     vi.mocked(userApi.createUser).mockResolvedValue(staff);
     vi.mocked(userApi.editUser).mockResolvedValue(null);
     vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
@@ -183,14 +188,25 @@ describe("user form dialog", () => {
     const wrapper = await open(staff);
     expect(document.body.querySelector('[data-test="permission-area"]')).toBeNull();
     expect(document.body.querySelector('[data-test="data-scope"]')).toBeNull();
-    expect(document.body.textContent).toContain("权限在列表的「权限设置」中单独保存。");
+    expect(document.body.textContent).toContain(
+      "在编辑信息弹窗中打开权限设置，可调整此账号的权限和数据范围。"
+    );
+    expect(userApi.getPermissionCatalog).not.toHaveBeenCalled();
+    await new DOMWrapper(
+      document.body.querySelector('[data-test="open-user-permissions"]')!
+    ).trigger("click");
+    await flushPromises();
+    expect(userApi.getUserPermissions).toHaveBeenCalledWith(staff.id);
+    expect(userApi.getPermissionCatalog).toHaveBeenCalledTimes(1);
+    expect(document.body.querySelector('[data-test="current-post"]')?.textContent).toContain(
+      "商务"
+    );
 
     byTest(wrapper, "ElSelect", "post-template").vm.$emit("update:modelValue", "OPERATOR");
     await flushPromises();
     await new DOMWrapper(document.body.querySelector('[data-test="save-user"]')!).trigger("click");
     await flushPromises();
 
-    expect(userApi.getPermissionCatalog).not.toHaveBeenCalled();
     expect(userApi.editUser).toHaveBeenCalledWith("9", {
       nickname: "Alice",
       email: "alice@example.com",

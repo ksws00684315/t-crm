@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -32,10 +33,6 @@ function shopLabel(name: string | null | undefined, code: string | null | undefi
   return code ? formatNameWithCode(name ?? "-", code) : (name ?? "-");
 }
 
-function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
-  if (!name && !code) return "-";
-  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
-}
 const route = useRoute();
 const router = useRouter();
 
@@ -43,6 +40,18 @@ const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
 /** Header context; degrades to the bare chain when the detail call fails. */
 const detail = ref<OrderDetailVO | null>(null);
+
+const completedRefundTotal = computed(() => {
+  const refunds = (chain.value?.lines ?? []).flatMap(line => line.refunds);
+  let cents = 0n;
+  for (const refund of refunds) {
+    if (refund.refundStatus !== "SUCCESS") continue;
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(refund.amount);
+    if (!match) return null;
+    cents += BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+  }
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
+});
 
 /** Line titles come from the detail items matched by order-item id. */
 function lineName(line: ChainLineVO): string {
@@ -76,10 +85,12 @@ function openKolItem(linkCode: string): void {
   void router.push({ path: "/kol/kol-items", query: { linkCode } });
 }
 
-onMounted(async () => {
+async function load(): Promise<void> {
   const id = String(route.params.id ?? "");
   if (!id) return;
   loading.value = true;
+  chain.value = null;
+  detail.value = null;
   try {
     const [chainResult, detailResult] = await Promise.allSettled([getOrderChain(id), getOrder(id)]);
     if (chainResult.status === "fulfilled") {
@@ -93,164 +104,208 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 </script>
 
 <template>
   <div v-loading="loading" class="chain-page">
     <template v-if="chain">
-      <div class="chain-page__card" data-test="chain-header">
-        <h3 class="chain-page__title">{{ t("route.orderChain") }}</h3>
-        <el-descriptions :column="4" border>
-          <el-descriptions-item :label="t('order.orderId')">
-            <CopyText :value="chain.orderNo" />
-          </el-descriptions-item>
-          <el-descriptions-item v-if="detail" :label="t('order.channel')">
-            {{ channelText(detail.channel) }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="detail" :label="t('order.shop')">
-            {{ shopLabel(detail.shopName, detail.shopCode) }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="detail" :label="t('order.kol')">
-            <span v-if="detail.kolCode">{{ kolLabel(detail.kolName, detail.kolCode) }}</span>
-            <span v-else>-</span>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
-            {{ orderStatusText(detail.orderStatus) }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
+      <section class="chain-page__card" data-test="chain-funds">
+        <h3 class="chain-page__title">{{ t("order.chain.fundsSection") }}</h3>
+        <div class="chain-fund-cards">
+          <article class="chain-fund-card">
+            <span>{{ t("order.payAmount") }}</span>
+            <strong>{{ detail?.payAmount ?? "-" }}</strong>
+          </article>
+          <article class="chain-fund-card">
+            <span>{{ t("order.refundTotal") }}</span>
+            <strong>{{ completedRefundTotal ?? t("common.developing") }}</strong>
+          </article>
+          <article class="chain-fund-card chain-fund-card--pending">
+            <span>{{ t("order.chain.kolCommission") }}</span>
+            <strong>{{ t("common.developing") }}</strong>
+          </article>
+          <article class="chain-fund-card chain-fund-card--pending">
+            <span>{{ t("order.chain.shopProfit") }}</span>
+            <strong>{{ t("common.developing") }}</strong>
+          </article>
+        </div>
+        <p class="chain-funds-note">{{ t("order.chain.shopProfitFormula") }}</p>
+      </section>
 
-      <section
-        v-for="line in chain.lines"
-        :key="line.orderItemId"
-        class="chain-page__card chain-line"
-        data-test="chain-line"
-      >
-        <h4 class="chain-line__title">
-          <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
-          <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
-          {{ lineName(line) }}
-          <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
-        </h4>
+      <section class="chain-page__card chain-order-info" data-test="chain-order-info">
+        <h3 class="chain-page__title">{{ t("order.chain.orderInfoSection") }}</h3>
+        <div class="chain-page__card chain-page__card--nested" data-test="chain-header">
+          <el-descriptions :column="4" border>
+            <el-descriptions-item :label="t('order.orderId')">
+              <CopyText :value="chain.orderNo" />
+            </el-descriptions-item>
+            <el-descriptions-item v-if="detail" :label="t('order.channel')">
+              {{ channelText(detail.channel) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="detail" :label="t('order.shop')">
+              {{ shopLabel(detail.shopName, detail.shopCode) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="detail" :label="t('order.kol')">
+              <span v-if="detail.kolCode"
+                ><NameCode :name="detail.kolName" :code="detail.kolCode"
+              /></span>
+              <span v-else>-</span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
+              {{ orderStatusText(detail.orderStatus) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="detail" :label="t('order.detail.orderTime')">
+              {{ formatInstant(detail.orderTime) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
 
-        <div class="chain-line__blocks">
-          <div class="chain-block" data-test="chain-copy-job">
-            <div class="chain-block__title">{{ t("order.chain.copyJob") }}</div>
-            <template v-if="line.copyJob">
-              <el-button
-                link
-                type="primary"
-                data-test="chain-copy-job-link"
-                @click="openCopyJob(line.copyJob.jobCode)"
-              >
-                {{ line.copyJob.jobCode }}
-              </el-button>
-              <div class="chain-block__text">
-                {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
-              </div>
-            </template>
-            <div v-else class="chain-block__text">-</div>
-          </div>
+        <section
+          v-for="line in chain.lines"
+          :key="line.orderItemId"
+          class="chain-page__card chain-line"
+          data-test="chain-line"
+        >
+          <h4 class="chain-line__title">
+            <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
+            <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
+            {{ lineName(line) }}
+            <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
+          </h4>
 
-          <div class="chain-block" data-test="chain-kol-item">
-            <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
-            <template v-if="line.link">
-              <div class="chain-block__text">
-                {{ t("order.chain.linkCode") }}:
-                <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
+          <div class="chain-line__blocks">
+            <div class="chain-block" data-test="chain-copy-job">
+              <div class="chain-block__title">{{ t("order.chain.copyJob") }}</div>
+              <template v-if="line.copyJob">
+                <el-button
+                  link
+                  type="primary"
+                  data-test="chain-copy-job-link"
+                  @click="openCopyJob(line.copyJob.jobCode)"
+                >
+                  {{ line.copyJob.jobCode }}
+                </el-button>
+                <div class="chain-block__text">
+                  {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
+                </div>
+              </template>
+              <div v-else class="chain-block__text">-</div>
+            </div>
+
+            <div class="chain-block" data-test="chain-kol-item">
+              <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
+              <template v-if="line.link">
+                <div class="chain-block__text">
+                  {{ t("order.chain.linkCode") }}:
+                  <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
                      lands on the creator item list pre-filtered by this code (task 59). -->
-                <el-button
-                  link
-                  type="primary"
-                  class="chain-block__code"
-                  data-test="chain-kol-item-link"
-                  @click="openKolItem(line.link.linkCode ?? '')"
-                >
-                  {{ line.link.linkCode ?? "-" }}
-                </el-button>
-              </div>
-              <div class="chain-block__text">
-                {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
-              </div>
-              <div class="chain-block__text">
-                {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
-              </div>
-              <div class="chain-block__text">
-                {{ t("order.kol") }}:
-                <span v-if="line.link.kolCode">{{
-                  kolLabel(line.link.kolName, line.link.kolCode)
-                }}</span>
-                <span v-else>-</span>
-              </div>
-            </template>
-            <div v-else class="chain-block__text">-</div>
-          </div>
-
-          <div class="chain-block" data-test="chain-order-line">
-            <div class="chain-block__title">{{ t("order.chain.orderLine") }}</div>
-            <div class="chain-block__text">
-              {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
-            </div>
-            <div class="chain-block__text">
-              {{ t("order.line.payAmount") }}: {{ line.payAmount ?? "-" }}
-            </div>
-          </div>
-
-          <div class="chain-block chain-block--wide" data-test="chain-refunds">
-            <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
-            <DataTable
-              v-if="line.refunds.length"
-              plain
-              :table-id="`chain-refunds-${line.orderItemId}`"
-              :rows="line.refunds"
-              :columns="refundColumns"
-              :total="line.refunds.length"
-              :paged="false"
-            >
-              <template #cell-refundNo="{ row }">
-                <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
-                <el-button
-                  link
-                  type="primary"
-                  data-test="chain-refund-link"
-                  @click="openRefund(row.refundNo)"
-                >
-                  {{ row.refundNo }}
-                </el-button>
+                  <el-button
+                    link
+                    type="primary"
+                    class="chain-block__code"
+                    data-test="chain-kol-item-link"
+                    @click="openKolItem(line.link.linkCode ?? '')"
+                  >
+                    {{ line.link.linkCode ?? "-" }}
+                  </el-button>
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.kol") }}:
+                  <span v-if="line.link.kolCode"
+                    ><NameCode :name="line.link.kolName" :code="line.link.kolCode"
+                  /></span>
+                  <span v-else>-</span>
+                </div>
               </template>
-              <template #cell-refundType="{ row }">{{ refundTypeText(row.refundType) }}</template>
-              <template #cell-refundStatus="{ row }">
-                <el-tag :type="refundTagType(row.refundStatus)">
-                  {{ refundStatusText(row.refundStatus) }}
-                </el-tag>
-              </template>
-              <template #cell-amount="{ row }">{{ row.amount }}</template>
-              <template #cell-finishTime="{ row }">{{ formatInstant(row.finishTime) }}</template>
-            </DataTable>
-            <div v-else class="chain-block__text">{{ t("order.chain.noRefund") }}</div>
-          </div>
+              <div v-else class="chain-block__text">-</div>
+            </div>
 
-          <div class="chain-block" data-test="chain-ledger">
-            <div class="chain-block__title">{{ t("order.chain.ledger") }}</div>
-            <div class="chain-block__text chain-block__developing">
-              {{ t("common.developing") }}
+            <div class="chain-block" data-test="chain-order-line">
+              <div class="chain-block__title">{{ t("order.chain.orderLine") }}</div>
+              <div class="chain-block__text">
+                {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
+              </div>
+              <div class="chain-block__text">
+                {{ t("order.line.payAmount") }}: {{ line.payAmount ?? "-" }}
+              </div>
+            </div>
+
+            <div class="chain-block chain-block--wide" data-test="chain-refunds">
+              <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
+              <DataTable
+                v-if="line.refunds.length"
+                plain
+                :table-id="`chain-refunds-${line.orderItemId}`"
+                :rows="line.refunds"
+                :columns="refundColumns"
+                :total="line.refunds.length"
+                :paged="false"
+              >
+                <template #cell-refundNo="{ row }">
+                  <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
+                  <el-button
+                    link
+                    type="primary"
+                    data-test="chain-refund-link"
+                    @click="openRefund(row.refundNo)"
+                  >
+                    {{ row.refundNo }}
+                  </el-button>
+                </template>
+                <template #cell-refundType="{ row }">{{ refundTypeText(row.refundType) }}</template>
+                <template #cell-refundStatus="{ row }">
+                  <el-tag :type="refundTagType(row.refundStatus)">
+                    {{ refundStatusText(row.refundStatus) }}
+                  </el-tag>
+                </template>
+                <template #cell-amount="{ row }">{{ row.amount }}</template>
+                <template #cell-finishTime="{ row }">{{ formatInstant(row.finishTime) }}</template>
+              </DataTable>
+              <div v-else class="chain-block__text">{{ t("order.chain.noRefund") }}</div>
             </div>
           </div>
+        </section>
 
-          <div class="chain-block" data-test="chain-withdrawals">
-            <div class="chain-block__title">{{ t("order.chain.withdrawals") }}</div>
-            <div class="chain-block__text chain-block__developing">
-              {{ t("common.developing") }}
-            </div>
-          </div>
+        <div v-if="!chain.lines.length" class="chain-page__card chain-page__empty">
+          {{ t("order.chain.noLines") }}
         </div>
       </section>
 
-      <div v-if="!chain.lines.length" class="chain-page__card chain-page__empty">
-        {{ t("order.chain.noLines") }}
-      </div>
+      <section class="chain-page__card" data-test="chain-finance-ledger">
+        <h3 class="chain-page__title">{{ t("order.chain.financeLedgerSection") }}</h3>
+        <el-alert type="info" :closable="false" :title="t('order.chain.financeLedgerDeveloping')" />
+        <div class="chain-ledger-fields">
+          <span>{{ t("order.chain.financeType") }}</span>
+          <span>{{ t("order.chain.product") }}</span>
+          <span>{{ t("order.chain.financeAmount") }}</span>
+          <span>{{ t("order.chain.financeTime") }}</span>
+          <span>{{ t("order.chain.settlementNo") }}</span>
+          <span>{{ t("order.chain.withdrawalOccupation") }}</span>
+        </div>
+        <div class="chain-ledger-empty">{{ t("common.developing") }}</div>
+      </section>
     </template>
+    <el-result
+      v-else-if="!loading"
+      icon="error"
+      :title="t('order.chain.loadFailed')"
+      data-test="chain-load-failed"
+    >
+      <template #extra>
+        <el-button type="primary" data-test="chain-retry" @click="load">
+          {{ t("table.refresh") }}
+        </el-button>
+      </template>
+    </el-result>
   </div>
 </template>
 
@@ -266,6 +321,62 @@ onMounted(async () => {
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.chain-page__card--nested {
+  margin-bottom: var(--tcrm-space-3);
+  padding: var(--tcrm-space-3);
+  background: var(--el-fill-color-lighter);
+}
+.chain-order-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-3);
+}
+.chain-fund-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
+}
+.chain-fund-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+  padding: var(--tcrm-space-3);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-card);
+}
+.chain-fund-card > span {
+  color: var(--tcrm-color-text-secondary);
+}
+.chain-fund-card > strong {
+  overflow-wrap: anywhere;
+  font-size: var(--tcrm-font-size-section);
+}
+.chain-fund-card--pending > strong {
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-body);
+  font-weight: 400;
+}
+.chain-ledger-fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
+  padding: var(--tcrm-space-3);
+  border-bottom: 1px solid var(--tcrm-color-border);
+  color: var(--tcrm-color-text-secondary);
+  font-weight: 600;
+}
+.chain-ledger-empty {
+  padding: var(--tcrm-space-5);
+  color: var(--tcrm-color-text-secondary);
+  text-align: center;
+}
+.chain-funds-note {
+  margin: var(--tcrm-space-3) 0 0;
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
 }
 .chain-page__title {
   margin: 0 0 var(--tcrm-space-3);
@@ -306,6 +417,14 @@ onMounted(async () => {
 .chain-block--wide {
   /* L-003: the refund table needs the whole row so amounts and finish times stop truncating. */
   grid-column: 1 / -1;
+}
+@media (max-width: 900px) {
+  .chain-fund-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .chain-ledger-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .chain-block__title {
   margin-bottom: var(--tcrm-space-2);

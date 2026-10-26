@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
@@ -359,12 +360,12 @@ async function submitPayment() {
     <template #header>
       <div v-if="detail" class="dialog-heading">
         <div class="identity">
-          <strong>{{ detail.kolName || detail.kolCode }}</strong
-          ><PrepayStatusTag :status="detail.status" />
+          <NameCode :name="detail.kolName" :code="detail.kolCode" /><PrepayStatusTag
+            :status="detail.status"
+          />
         </div>
         <div class="metadata">
-          <span>{{ t("prepay.kolId") }}：{{ detail.kolCode }}</span
-          ><span>{{ t("prepay.number") }}：<CopyText :value="detail.prepayNo" /></span>
+          <span>{{ t("prepay.number") }}：<CopyText :value="detail.prepayNo" /></span>
         </div>
         <div class="metadata">
           <span>{{ t("prepay.applicant") }}：{{ person(detail.applicantName, "BUSINESS") }}</span

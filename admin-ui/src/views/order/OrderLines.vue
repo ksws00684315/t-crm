@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { OrderItemVO, OrderVO } from "@/api/types";
@@ -48,7 +49,7 @@ const columns = computed<DataColumn[]>(() => [
       <template #cell-quantity="{ row }">{{ asLine(row).quantity ?? "-" }}</template>
       <template #cell-payAmount="{ row }">{{ asLine(row).payAmount ?? "-" }}</template>
       <template #cell-refund="{ row }">{{ asLine(row).refundAmount ?? "-" }}</template>
-      <template #cell-kolCode="{ row }">{{ asLine(row).kolCode ?? "-" }}</template>
+      <template #cell-kolCode="{ row }"><NameCode :code="asLine(row).kolCode" /></template>
       <template #cell-attribution="{ row }">
         {{ attributionTypeText(asLine(row).attributionType) }}
       </template>
