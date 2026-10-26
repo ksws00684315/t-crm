@@ -10,8 +10,8 @@ import java.time.Instant;
 public record FinanceTaskRow(
     long id,
     long kolId,
-    String taskNo,
-    String taskType,
+    String applicationNo,
+    String type,
     String status,
-    BigDecimal amountCny,
+    BigDecimal amount,
     Instant createdAt) {}

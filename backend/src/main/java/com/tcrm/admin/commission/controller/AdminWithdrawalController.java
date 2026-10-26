@@ -60,10 +60,10 @@ public class AdminWithdrawalController {
   @SaCheckPermission(
       value = {"commission:view", "withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
-  public R<PageResult<WithdrawalRowVO>> list(@Valid @ModelAttribute Query request) {
+  public R<WithdrawalPageVO> list(@Valid @ModelAttribute Query request) {
     return R.ok(
-        withdrawals
-            .page(
+        WithdrawalPageVO.from(
+            withdrawals.page(
                 current.user(),
                 new WithdrawalService.Filter(
                     request.applicationNo(),
@@ -72,8 +72,7 @@ public class AdminWithdrawalController {
                     request.bdUserId(),
                     request.status(),
                     request.pageNumber(),
-                    request.pageSize()))
-            .map(WithdrawalRowVO::from));
+                    request.pageSize()))));
   }
 
   /**
@@ -127,11 +126,11 @@ public class AdminWithdrawalController {
   @SaCheckPermission(
       value = {"commission:view", "withdrawal:review", "withdrawal:pay"},
       mode = SaMode.OR)
-  public R<PageResult<WithdrawalOrderVO>> orders(
+  public R<WithdrawalOrderPageVO> orders(
       @PathVariable @Min(1) long id,
       @RequestParam(defaultValue = "1") @Min(1) @Max(10000) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size) {
-    return R.ok(withdrawals.orders(current.user(), id, page, size).map(WithdrawalOrderVO::from));
+    return R.ok(WithdrawalOrderPageVO.from(withdrawals.orders(current.user(), id, page, size)));
   }
 
   /** Review decision (12.02): approve moves to PENDING_PAYMENT; reject needs a reason. */
@@ -190,7 +189,7 @@ public class AdminWithdrawalController {
                     request.method(),
                     request.financeNote(),
                     request.conversionNote(),
-                    request.voucherFileId()))));
+                    request.voucher()))));
   }
 
   /** Withdrawal occupations of order items for the order chain (09.04 提现占用). */
@@ -225,6 +224,11 @@ public class AdminWithdrawalController {
   public record ReviewRequest(
       @NotBlank @Pattern(regexp = "APPROVE|REJECT") String decision, String note) {}
 
+  /**
+   * Payment registration body (contract §6.2 / appendix A {@code PaymentRegistration} + {@code
+   * idempotencyKey}): the voucher is referenced as {@code voucher}, the shape the merged admin
+   * frontend submits.
+   */
   public record PaymentRequest(
       @NotBlank String idempotencyKey,
       @NotBlank @Pattern(regexp = "(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?") String amountCny,
@@ -234,10 +238,25 @@ public class AdminWithdrawalController {
       @NotBlank String method,
       String financeNote,
       String conversionNote,
-      @NotNull @Min(1) Long voucherFileId) {}
+      @NotNull @Min(1) Long voucher) {}
 
   record FileUploadVO(Long fileId) {}
 
+  /**
+   * Page of withdrawal rows. {@code total} is a JSON number (ADR-032); {@code int} keeps it out of
+   * the shared long-to-string serializer.
+   */
+  record WithdrawalPageVO(List<WithdrawalRowVO> items, int total, int page, int size) {
+    static WithdrawalPageVO from(PageResult<AdminRow> page) {
+      return new WithdrawalPageVO(
+          page.items().stream().map(WithdrawalRowVO::from).toList(),
+          Math.toIntExact(page.total()),
+          page.page(),
+          page.size());
+    }
+  }
+
+  /** List row (contract §6.2): same field names as the detail, masked {@code account} snapshot. */
   record WithdrawalRowVO(
       String id,
       String applicationNo,
@@ -247,7 +266,7 @@ public class AdminWithdrawalController {
       String bdId,
       String bdName,
       String type,
-      String amountCny,
+      String amount,
       String currency,
       String status,
       boolean paused,
@@ -256,8 +275,7 @@ public class AdminWithdrawalController {
       String reviewNote,
       String financeNote,
       String previousId,
-      String accountType,
-      String accountMasked,
+      AccountVO account,
       String createdAt) {
     static WithdrawalRowVO from(AdminRow row) {
       return new WithdrawalRowVO(
@@ -278,34 +296,43 @@ public class AdminWithdrawalController {
           row.reviewNote(),
           row.financeNote(),
           row.previousId() == null ? null : row.previousId().toString(),
-          row.accountType(),
-          row.accountMasked(),
+          AccountVO.from(row.account()),
           row.createdAt().toString());
     }
   }
 
-  record AccountVO(String type, String account, String holder, String currency, String network) {
+  /** Masked payout snapshot (contract §6.2 {@code AccountSnapshot}). */
+  record AccountVO(
+      String id,
+      String qrFileId,
+      String type,
+      String account,
+      String currency,
+      String network,
+      String holder) {
     static AccountVO from(AccountView view) {
       return view == null
           ? null
           : new AccountVO(
-              view.type(), view.account(), view.holder(), view.currency(), view.network());
+              view.accountId() == null ? null : view.accountId().toString(),
+              view.qrFileId() == null ? null : view.qrFileId().toString(),
+              view.type(),
+              view.account(),
+              view.currency(),
+              view.network(),
+              view.holder());
     }
   }
 
-  record HistoryVO(
-      String action, String actorId, String actorName, String actorRole, String note, String at) {
+  /** Status history entry (contract §6.2 {@code history.{action,at,actor,note}}; no actorId). */
+  record HistoryVO(String action, String at, String actor, String note, String actorRole) {
     static HistoryVO from(HistoryItem item) {
       return new HistoryVO(
-          item.action(),
-          item.actorId() == null ? null : item.actorId().toString(),
-          item.actorName(),
-          item.actorRole(),
-          item.note(),
-          item.at().toString());
+          item.action(), item.at().toString(), item.actorName(), item.note(), item.actorRole());
     }
   }
 
+  /** Payment fact (contract §6.2, {@code PaymentRegistration} shape; {@code voucher} file id). */
   record PaymentVO(
       String amountCny,
       String actualAmount,
@@ -314,7 +341,7 @@ public class AdminWithdrawalController {
       String method,
       String financeNote,
       String conversionNote,
-      String voucherFileId,
+      String voucher,
       String operatorName,
       String operatorRole) {
     static PaymentVO from(PaymentView payment) {
@@ -334,8 +361,9 @@ public class AdminWithdrawalController {
     }
   }
 
+  /** Row-level allocation (contract §6.2 {@code Allocation}); {@code id} is the order item id. */
   record AllocationVO(
-      String orderItemId,
+      String id,
       String orderNo,
       String image,
       String product,
@@ -354,6 +382,7 @@ public class AdminWithdrawalController {
     }
   }
 
+  /** Detail (contract §6.2 / appendix A {@code Withdrawal}; {@code bdId}/{@code bdName} extra). */
   record WithdrawalDetailVO(
       String id,
       String applicationNo,
@@ -363,7 +392,7 @@ public class AdminWithdrawalController {
       String bdId,
       String bdName,
       String type,
-      String amountCny,
+      String amount,
       String currency,
       String status,
       boolean paused,
@@ -404,15 +433,35 @@ public class AdminWithdrawalController {
     }
   }
 
+  /** Full payout snapshot (contract §6.2 {@code AccountSnapshot}, unmasked, payer only). */
   record WithdrawalRecipientVO(
-      String type, String account, String holder, String currency, String network) {
+      String id,
+      String qrFileId,
+      String type,
+      String account,
+      String currency,
+      String network,
+      String holder) {
     static WithdrawalRecipientVO from(WithdrawalService.Recipient recipient) {
       return new WithdrawalRecipientVO(
+          recipient.accountId() == null ? null : recipient.accountId().toString(),
+          recipient.qrFileId() == null ? null : recipient.qrFileId().toString(),
           recipient.type(),
           recipient.account(),
-          recipient.holder(),
           recipient.currency(),
-          recipient.network());
+          recipient.network(),
+          recipient.holder());
+    }
+  }
+
+  /** Page of order-level snapshots; {@code total} is a JSON number (ADR-032). */
+  record WithdrawalOrderPageVO(List<WithdrawalOrderVO> items, int total, int page, int size) {
+    static WithdrawalOrderPageVO from(PageResult<OrderView> page) {
+      return new WithdrawalOrderPageVO(
+          page.items().stream().map(WithdrawalOrderVO::from).toList(),
+          Math.toIntExact(page.total()),
+          page.page(),
+          page.size());
     }
   }
 

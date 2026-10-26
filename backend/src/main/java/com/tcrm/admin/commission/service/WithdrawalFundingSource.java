@@ -24,8 +24,8 @@ public interface WithdrawalFundingSource {
   /** Order item rows not verified yet (shown by the withdrawal conditions). */
   long unverifiedCount(long kolId);
 
-  /** Current settlement config version ("0" before task 62's rule versions exist). */
-  String configVersion(long kolId);
+  /** Current settlement config version (0 before task 62's rule versions exist). */
+  int configVersion(long kolId);
 
   /** One released order item with its leftover. */
   record FundingRow(long orderItemId, long itemStateId, BigDecimal releasedCny) {}

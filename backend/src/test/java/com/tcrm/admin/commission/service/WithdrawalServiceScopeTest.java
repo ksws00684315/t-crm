@@ -112,7 +112,7 @@ class WithdrawalServiceScopeTest {
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("40.00"));
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("600.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(2L);
-    when(funding.configVersion(KOL)).thenReturn("3");
+    when(funding.configVersion(KOL)).thenReturn(3);
     when(funding.listReleasedRows(KOL))
         .thenReturn(List.of(new FundingRow(101L, 700L, new BigDecimal("350.00"))));
     when(orderItems.listByIds(anyList()))
@@ -145,7 +145,7 @@ class WithdrawalServiceScopeTest {
     var frozen = service.conditions(COMPANY, KOL);
     assertThat(frozen.withdrawalFrozen()).isTrue();
     assertThat(frozen.canApply()).isFalse();
-    assertThat(frozen.version()).isEqualTo("3");
+    assertThat(frozen.version()).isEqualTo(3);
     assertThat(frozen.estimated()).isEqualTo("600.00");
     assertThat(frozen.unverifiedCount()).isEqualTo(2L);
 
@@ -442,8 +442,8 @@ class WithdrawalServiceScopeTest {
     // payer sees the finance note; every ternary takes its populated branch
     assertThat(row.financeNote()).isEqualTo("finance note");
     assertThat(row.previousId()).isEqualTo(55L);
-    assertThat(row.accountType()).isEqualTo("USDT");
-    assertThat(row.accountMasked()).isEqualTo("cr***@example.com");
+    assertThat(row.account().type()).isEqualTo("USDT");
+    assertThat(row.account().account()).isEqualTo("cr***@example.com");
   }
 
   @Test

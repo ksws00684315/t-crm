@@ -113,7 +113,7 @@ class WithdrawalServiceVisibilityTest {
     when(funding.frozenCny(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.estimatedCny(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
-    when(funding.configVersion(KOL)).thenReturn("5");
+    when(funding.configVersion(KOL)).thenReturn(5);
     when(funding.listReleasedRows(KOL))
         .thenReturn(List.of(new FundingRow(101L, 701L, new BigDecimal("400.00"))));
     when(orderItems.listByIds(anyList()))
@@ -148,7 +148,7 @@ class WithdrawalServiceVisibilityTest {
   // ------------------------------------------------------------------ history & note visibility
 
   @Test
-  void shouldShowHistoryNotes_toTheCreatorAndReviewers_only() {
+  void shouldShowHistoryNotes_toTheCreatorAndReviewers_butPaidNotesToThePayer_only() {
     when(withdrawals.timeline(ID))
         .thenReturn(
             List.of(
@@ -162,21 +162,22 @@ class WithdrawalServiceVisibilityTest {
     assertThat(viewerDetail.history())
         .extracting(WithdrawalService.HistoryItem::note)
         .containsOnlyNulls();
-    // the review permission sees every note
+    // the review permission sees submission and review notes; the PAID entry carries the
+    // registration's finance note, so its note stays hidden (contract §6.2/§6.3)
     var reviewerDetail = service.detail(staff(6L, DataScope.ALL, Set.of("withdrawal:review")), ID);
     assertThat(reviewerDetail.history())
         .extracting(WithdrawalService.HistoryItem::note)
-        .containsExactly("creator note", "review note", "paid note");
-    // the creator sees the notes on their own detail
+        .containsExactly("creator note", "review note", null);
+    // the creator never sees the finance note, not even through the PAID history entry
     var creatorDetail = service.kolDetail(COMPANY, KOL, ID);
     assertThat(creatorDetail.history())
         .extracting(WithdrawalService.HistoryItem::note)
-        .containsExactly("creator note", "review note", "paid note");
-    // the payer's finance visibility does not widen the history notes
+        .containsExactly("creator note", "review note", null);
+    // withdrawal:pay is the only viewer the PAID note is written for
     var payerDetail = service.detail(staff(9L, DataScope.ALL, Set.of("withdrawal:pay")), ID);
     assertThat(payerDetail.history())
         .extracting(WithdrawalService.HistoryItem::note)
-        .containsOnlyNulls();
+        .containsExactly(null, null, "paid note");
   }
 
   @Test
@@ -368,7 +369,7 @@ class WithdrawalServiceVisibilityTest {
     var page =
         service.financeTasks(viewer, new FinanceFilter(null, null, "COMMISSION", null, 1, 20));
     assertThat(page.total()).isEqualTo(1L);
-    assertThat(page.items().getFirst().taskType()).isEqualTo("COMMISSION");
+    assertThat(page.items().getFirst().type()).isEqualTo("COMMISSION");
   }
 
   // ------------------------------------------------------------------ orders page
@@ -554,7 +555,7 @@ class WithdrawalServiceVisibilityTest {
         "Test creator",
         null,
         null,
-        "COMMISSION_WITHDRAWAL",
+        "COMMISSION",
         "400.00",
         "CNY",
         status,

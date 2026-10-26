@@ -443,8 +443,8 @@ public interface WithdrawalMapper {
   @Select(
       """
       <script>
-      SELECT id, kol_id, application_no AS task_no, 'COMMISSION' AS task_type,
-             status, amount_cny, create_time AS created_at
+      SELECT id, kol_id, application_no, 'COMMISSION' AS type,
+             status, amount_cny AS amount, create_time AS created_at
       FROM crm_commission_withdrawal
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
@@ -482,8 +482,8 @@ public interface WithdrawalMapper {
   @Select(
       """
       <script>
-      SELECT id, kol_id, prepay_no AS task_no, 'PREPAY' AS task_type, status, amount_cny,
-             create_time AS created_at
+      SELECT id, kol_id, prepay_no AS application_no, 'PREPAY' AS type, status,
+             amount_cny AS amount, create_time AS created_at
       FROM crm_prepay
       <where>
         <if test="q.applicationNo != null">AND prepay_no = #{q.applicationNo}</if>
