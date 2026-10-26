@@ -38,7 +38,8 @@ beforeEach(() => {
   i18n.global.locale.value = "en-US";
   vi.mocked(api.getFundSummary).mockResolvedValue({
     fundSummary: {
-      totalIncomeCny: "0.00",
+      totalIncomeCny: "1000.00",
+      cumulativeWithdrawnCny: "0.00",
       commissionIncomeCny: "0.00",
       estimatedCommissionCny: "1000.00",
       totalCommissionCny: "0.00",
@@ -99,6 +100,37 @@ async function submit(amount = "250.00") {
 }
 
 describe("creator withdrawal application", () => {
+  it("shows projected total, cumulative payouts with advances and commission-only withdrawn cards", async () => {
+    vi.mocked(api.getFundSummary).mockResolvedValueOnce({
+      fundSummary: {
+        totalIncomeCny: "2500.00",
+        cumulativeWithdrawnCny: "300.00",
+        commissionIncomeCny: "200.00",
+        estimatedCommissionCny: "2400.00",
+        totalCommissionCny: "400.00",
+        withdrawnCny: "200.00",
+        withdrawingCny: "0.00",
+        frozenCny: "200.00",
+        receivedPrepayCny: "100.00",
+        availableCny: "2000.00",
+        prepayDeductionCny: "50.00",
+        prepayOutstandingCny: "0.00",
+        asOf: "2026-10-26T00:00:00Z"
+      }
+    });
+    await page();
+    expect(wrapper.get('[data-test="total-income"]').text()).toBe("2,500.00 CNY");
+    expect(wrapper.get('[data-test="cumulative-withdrawn"] dd').text()).toBe("300.00 CNY");
+    expect(wrapper.get('[data-test="current-available"] dd').text()).toBe("2,000.00 CNY");
+    expect(wrapper.get('[data-test="frozen-amount"] dd').text()).toBe("200.00 CNY");
+    expect(wrapper.get('.commission-metric[data-state="withdrawn"] dd').text()).toBe("200.00 CNY");
+    expect(wrapper.get(".commission-overview-formula").text()).toBe(
+      "Estimated commission = withdrawn + available to withdraw + frozen + withdrawing"
+    );
+    expect(wrapper.find(".funds-note").exists()).toBe(false);
+    expect(wrapper.get(".commission-deduction").text()).toContain("-50.00 CNY");
+  });
+
   it("renders foreign-currency history amounts without a CNY symbol", async () => {
     vi.mocked(api.getFundRecords).mockResolvedValue({
       items: [

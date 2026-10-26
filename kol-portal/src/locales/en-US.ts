@@ -208,13 +208,17 @@ const enUS = {
   funds: {
     title: "Funds",
     totalIncome: "Total income",
-    incomeComposition: "Income breakdown",
-    incomeReceived: "Received income",
+    incomeOverview: "Funds overview",
+    incomeTotalBreakdown: "Estimated commission {commission} + received advances {prepay}",
+    cumulativeWithdrawn: "Cumulative withdrawals",
+    currentAvailableAmount: "Available to withdraw",
+    frozenAmount: "Frozen amount",
+    receivedPrepayHint:
+      "Only received advances are included, and they count toward cumulative withdrawals.",
+    estimatedFormula:
+      "Estimated commission = withdrawn + available to withdraw + frozen + withdrawing",
     commissionOverview: "Commission overview",
     amountCurrency: "Currency: CNY",
-    availableBadge: "Available balance",
-    fundsNote: "About these funds",
-    commissionTotalParts: "Withdrawn + in progress + frozen",
     commissionIncome: "Commission income",
     prepayIncome: "Advance income",
     estimatedCommission: "Estimated commission",

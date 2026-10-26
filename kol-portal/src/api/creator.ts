@@ -3,12 +3,16 @@ import { http } from "./http";
 export const isDemoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
 const moneyCents = (value: string) => {
   const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * 100n + BigInt((fraction + "00").slice(0, 2));
+  const absolute = BigInt(whole.replace("-", "")) * 100n + BigInt((fraction + "00").slice(0, 2));
+  return value.startsWith("-") ? -absolute : absolute;
 };
-const centsMoney = (value: bigint) =>
-  `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
+const centsMoney = (value: bigint) => {
+  const absolute = value < 0n ? -value : value;
+  return `${value < 0n ? "-" : ""}${absolute / 100n}.${(absolute % 100n).toString().padStart(2, "0")}`;
+};
 const demoFunds: FundSummary = {
-  totalIncomeCny: "2400.00",
+  totalIncomeCny: "5960.00",
+  cumulativeWithdrawnCny: "2400.00",
   commissionIncomeCny: "2400.00",
   estimatedCommissionCny: "5960.00",
   totalCommissionCny: "4680.00",
@@ -190,6 +194,7 @@ export interface CreatorAnalyticsOverview {
 
 export interface FundSummary {
   totalIncomeCny: string;
+  cumulativeWithdrawnCny: string;
   commissionIncomeCny: string;
   estimatedCommissionCny: string;
   totalCommissionCny: string;
@@ -295,7 +300,9 @@ export function getFundSummary() {
     }>({ method: "GET", url: "/commissions/overview" })
     .then(({ income, asOf }) => ({
       fundSummary: {
-        totalIncomeCny: income.paid,
+        // Owner V3 decision: projected commission plus received advances; payouts stay separate.
+        totalIncomeCny: centsMoney(moneyCents(income.estimated) + moneyCents(income.prepayPaid)),
+        cumulativeWithdrawnCny: income.cumulativePaid,
         commissionIncomeCny: income.commissionPaid,
         estimatedCommissionCny: income.estimated,
         totalCommissionCny: centsMoney(
