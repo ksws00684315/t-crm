@@ -1,8 +1,15 @@
 package com.tcrm.admin.notification.service;
 
-/** Display parameters for account, prepay, withdrawal and departure notifications. */
+/**
+ * Display parameters for account, prepay, withdrawal and departure notifications.
+ *
+ * @param kolName KOL display name next to {@code kolCode} (task 71, handoff B06); null for messages
+ *     without KOL identity, for history written before the field existed, and when the KOL no
+ *     longer resolves at write time
+ */
 public record NotificationParamsDTO(
     String kolCode,
+    String kolName,
     String accountType,
     String shopName,
     String reason,
@@ -21,7 +28,20 @@ public record NotificationParamsDTO(
       String reason,
       String bdName,
       Integer count) {
-    this(kolCode, accountType, shopName, reason, bdName, count, null, null, null, null, null, null);
+    this(
+        kolCode,
+        null,
+        accountType,
+        shopName,
+        reason,
+        bdName,
+        count,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   public NotificationParamsDTO(
@@ -34,6 +54,33 @@ public record NotificationParamsDTO(
       String prepayNo) {
     this(
         kolCode,
+        null,
+        accountType,
+        shopName,
+        reason,
+        bdName,
+        count,
+        prepayNo,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  /** KOL-identity messages (task 71, handoff B06): code and name together. */
+  public NotificationParamsDTO(
+      String kolCode,
+      String kolName,
+      String accountType,
+      String shopName,
+      String reason,
+      String bdName,
+      Integer count,
+      String prepayNo) {
+    this(
+        kolCode,
+        kolName,
         accountType,
         shopName,
         reason,
@@ -60,6 +107,7 @@ public record NotificationParamsDTO(
       String planType) {
     this(
         kolCode,
+        null,
         accountType,
         shopName,
         reason,
@@ -87,6 +135,7 @@ public record NotificationParamsDTO(
       String planType) {
     this(
         kolCode,
+        null,
         accountType,
         shopName,
         reason,

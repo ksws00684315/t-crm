@@ -204,6 +204,13 @@ public class OrderService {
                     .collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(BdUserDTO::id, Function.identity()));
+    Map<Long, String> images =
+        productImagesById(
+            lines.values().stream()
+                .flatMap(List::stream)
+                .map(OrderItemDO::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
     return records.stream()
         .map(
             o -> {
@@ -233,7 +240,7 @@ public class OrderService {
                   o.getFreight(),
                   totals.getOrDefault(o.getId(), BigDecimal.ZERO.setScale(2)),
                   lines.getOrDefault(o.getId(), List.of()).stream()
-                      .map(line -> line(line, kolById))
+                      .map(line -> line(line, kolById, images))
                       .toList());
             })
         .toList();
@@ -757,11 +764,15 @@ public class OrderService {
 
   /** Main image per original-product id of the lines; missing products and images map to null. */
   private Map<Long, String> productImages(List<OrderItemDO> lines) {
-    Set<Long> productIds =
+    return productImagesById(
         lines.stream()
             .map(OrderItemDO::getProductId)
             .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+            .collect(Collectors.toSet()));
+  }
+
+  /** One batch lookup for a whole page (task 71 B05): no per-order or per-line queries. */
+  private Map<Long, String> productImagesById(Set<Long> productIds) {
     Map<Long, String> images = new HashMap<>();
     for (var product : products.listProducts(productIds)) {
       images.put(product.id(), product.imageUrl());
@@ -769,7 +780,12 @@ public class OrderService {
     return images;
   }
 
-  private static OrderItemDTO line(OrderItemDO i, Map<Long, KolRefDTO> kolById) {
+  /**
+   * Line identity comes from the line's own KOL (task 71 B05): the order-level KOL is never used as
+   * a fallback, and a deleted KOL leaves both code and name null.
+   */
+  private static OrderItemDTO line(
+      OrderItemDO i, Map<Long, KolRefDTO> kolById, Map<Long, String> images) {
     var kol = i.getKolId() == null ? null : kolById.get(i.getKolId());
     return new OrderItemDTO(
         i.getId(),
@@ -783,9 +799,11 @@ public class OrderService {
         i.getRefundAmount(),
         i.getKolId(),
         kol == null ? null : kol.kolCode(),
+        kol == null ? null : kol.name(),
         i.getProductId(),
         i.getKolItemId(),
         i.getAttributionType(),
-        i.getManualReason());
+        i.getManualReason(),
+        images.get(i.getProductId()));
   }
 }
