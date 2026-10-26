@@ -181,7 +181,7 @@ public class WithdrawalService {
   public record Conditions(
       String currency,
       String minimum,
-      String version,
+      int version,
       String available,
       String occupied,
       String frozen,
@@ -291,8 +291,7 @@ public class WithdrawalService {
       String reviewNote,
       String financeNote,
       Long previousId,
-      String accountType,
-      String accountMasked,
+      AccountView account,
       Instant createdAt) {}
 
   /** KOL list row: the owner sees their own full account snapshot. */
@@ -303,14 +302,22 @@ public class WithdrawalService {
       String currency,
       String status,
       Instant createdAt,
+      String reviewNote,
       String rejectReason,
       Instant paidAt,
       String actualAmount,
       String actualCurrency,
       AccountView account) {}
 
+  /** Full payout snapshot revealed to {@code withdrawal:pay} (contract §6.2 AccountSnapshot). */
   public record Recipient(
-      String type, String account, String holder, String currency, String network) {}
+      Long accountId,
+      String type,
+      String account,
+      String holder,
+      String currency,
+      String network,
+      Long qrFileId) {}
 
   public record Filter(
       String applicationNo,
@@ -327,15 +334,15 @@ public class WithdrawalService {
   /** One row of the unified finance task list enriched with creator and BD display names. */
   public record FinanceTask(
       long id,
-      String taskNo,
+      String applicationNo,
       long kolId,
       String kolCode,
       String kolName,
       Long bdId,
       String bdName,
-      String taskType,
+      String type,
       String status,
-      String amountCny,
+      String amount,
       String currency,
       Instant createdAt) {}
 
@@ -828,7 +835,7 @@ public class WithdrawalService {
                       kol == null ? null : kol.name(),
                       kol == null ? null : kol.bdUserId(),
                       kol == null || kol.bdUserId() == null ? null : bdNames.get(kol.bdUserId()),
-                      "COMMISSION_WITHDRAWAL",
+                      "COMMISSION",
                       money(head.amountCny()),
                       "CNY",
                       head.status(),
@@ -838,8 +845,7 @@ public class WithdrawalService {
                       full == null ? null : full.reviewNote(),
                       full == null || !financeVisible ? null : full.financeNote(),
                       full == null ? null : full.previousId(),
-                      full == null ? null : full.accountType(),
-                      full == null ? null : full.accountMasked(),
+                      full == null ? null : accountView(full, false),
                       head.createTime());
                 })
             .toList();
@@ -923,7 +929,7 @@ public class WithdrawalService {
         kol == null ? null : kol.name(),
         bdId,
         bdName,
-        "COMMISSION_WITHDRAWAL",
+        "COMMISSION",
         money(row.amountCny()),
         "CNY",
         row.status(),
@@ -960,11 +966,13 @@ public class WithdrawalService {
               "/admin-api/commission/withdrawals/" + id + "/recipient",
               "{\"applicationNo\":\"" + row.applicationNo() + "\"}");
           return new Recipient(
+              row.accountId(),
               row.accountType(),
               cipher.decrypt(row.accountCipher()),
               row.accountHolder(),
               row.accountCurrency(),
-              row.accountNetwork());
+              row.accountNetwork(),
+              row.accountQrFileId());
         });
   }
 
@@ -1324,15 +1332,15 @@ public class WithdrawalService {
               KolRefDTO kol = kolById.get(row.kolId());
               return new FinanceTask(
                   row.id(),
-                  row.taskNo(),
+                  row.applicationNo(),
                   row.kolId(),
                   kol == null ? null : kol.kolCode(),
                   kol == null ? null : kol.name(),
                   kol == null ? null : kol.bdUserId(),
                   kol == null || kol.bdUserId() == null ? null : bdNames.get(kol.bdUserId()),
-                  row.taskType(),
+                  row.type(),
                   row.status(),
-                  money(row.amountCny()),
+                  money(row.amount()),
                   "CNY",
                   row.createdAt());
             })
@@ -1612,6 +1620,7 @@ public class WithdrawalService {
         "CNY",
         head.status(),
         head.createTime(),
+        row == null ? null : row.reviewNote(),
         "REJECTED".equals(head.status()) && row != null ? row.reviewNote() : null,
         payment == null ? null : payment.paidAt(),
         payment == null ? null : money(payment.actualAmount()),

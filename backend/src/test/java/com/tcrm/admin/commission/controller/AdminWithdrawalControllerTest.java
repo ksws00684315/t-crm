@@ -78,7 +78,7 @@ class AdminWithdrawalControllerTest {
                         "Creator",
                         5L,
                         "BD",
-                        "COMMISSION_WITHDRAWAL",
+                        "COMMISSION",
                         "400.00",
                         "CNY",
                         "PENDING_REVIEW",
@@ -88,8 +88,8 @@ class AdminWithdrawalControllerTest {
                         "review note",
                         null,
                         null,
-                        "PAYPAL",
-                        "cr***@example.com",
+                        new WithdrawalService.AccountView(
+                            31L, "PAYPAL", "cr***@example.com", "Cr****", "USD", null, 41L),
                         NOW)),
                 1L,
                 1,
@@ -97,10 +97,21 @@ class AdminWithdrawalControllerTest {
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].applicationNo").value("W20261025000001"))
-        .andExpect(jsonPath("$.data.items[0].accountMasked").value("cr***@example.com"))
+        .andExpect(jsonPath("$.data.items[0].type").value("COMMISSION"))
+        .andExpect(jsonPath("$.data.items[0].amount").value("400.00"))
+        .andExpect(jsonPath("$.data.items[0].currency").value("CNY"))
+        .andExpect(jsonPath("$.data.items[0].status").value("PENDING_REVIEW"))
+        .andExpect(jsonPath("$.data.items[0].account.account").value("cr***@example.com"))
+        .andExpect(jsonPath("$.data.items[0].account.type").value("PAYPAL"))
+        .andExpect(jsonPath("$.data.items[0].account.id").value("31"))
+        .andExpect(jsonPath("$.data.items[0].account.qrFileId").value("41"))
         .andExpect(jsonPath("$.data.items[0].paused").value(false))
         .andExpect(jsonPath("$.data.items[0].reviewNote").value("review note"))
-        .andExpect(jsonPath("$.data.items[0].id").value("77"));
+        .andExpect(jsonPath("$.data.items[0].previousId").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].id").value("77"))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(20));
   }
 
   @Test
@@ -115,9 +126,22 @@ class AdminWithdrawalControllerTest {
     when(withdrawals.detail(any(), eq(77L))).thenReturn(detail());
     mvc.perform(get(BASE + "/77").header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.type").value("COMMISSION_WITHDRAWAL"))
+        .andExpect(jsonPath("$.data.type").value("COMMISSION"))
+        .andExpect(jsonPath("$.data.applicationNo").value("W20261025000001"))
+        .andExpect(jsonPath("$.data.amount").value("400.00"))
+        .andExpect(jsonPath("$.data.currency").value("CNY"))
         .andExpect(jsonPath("$.data.account.account").value("cr***@example.com"))
-        .andExpect(jsonPath("$.data.allocations[0].occupied").value("350.00"));
+        .andExpect(jsonPath("$.data.account.holder").value("Cr****"))
+        .andExpect(jsonPath("$.data.allocations[0].id").value("101"))
+        .andExpect(jsonPath("$.data.allocations[0].orderNo").value("WD1001"))
+        .andExpect(jsonPath("$.data.allocations[0].product").value("Hat"))
+        .andExpect(jsonPath("$.data.allocations[0].occupied").value("350.00"))
+        .andExpect(jsonPath("$.data.allocations[0].remainingSnapshot").value("0.00"))
+        .andExpect(jsonPath("$.data.allocations[0].orderRemainingSnapshot").doesNotExist())
+        .andExpect(jsonPath("$.data.history[0].action").value("SUBMITTED"))
+        .andExpect(jsonPath("$.data.history[0].actor").value("Creator"))
+        .andExpect(jsonPath("$.data.history[0].note").value("note"))
+        .andExpect(jsonPath("$.data.history[0].actorId").doesNotExist());
   }
 
   @Test
@@ -139,10 +163,29 @@ class AdminWithdrawalControllerTest {
             get(BASE + "/77/orders?page=1&size=10")
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].id").value("901"))
         .andExpect(jsonPath("$.data.items[0].orderNo").value("WD1001"))
         .andExpect(jsonPath("$.data.items[0].occupied").value("350.00"))
         .andExpect(jsonPath("$.data.items[0].remainingSnapshot").value("0.00"))
-        .andExpect(jsonPath("$.data.items[0].products[0].sku").value("Red"));
+        .andExpect(jsonPath("$.data.items[0].products[0].id").value("101"))
+        .andExpect(jsonPath("$.data.items[0].products[0].sku").value("Red"))
+        .andExpect(jsonPath("$.data.total").value(1));
+  }
+
+  @Test
+  void shouldRevealFullRecipient_withSnapshotIds_forPayer() throws Exception {
+    when(withdrawals.recipient(any(), eq(77L)))
+        .thenReturn(
+            new WithdrawalService.Recipient(
+                31L, "USDT", "TRX-ADDR", "Creator", "USDT", "TRC20", 41L));
+    mvc.perform(get(BASE + "/77/recipient").header(AdminMvcSupport.TOKEN_HEADER, actAsPayer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.id").value("31"))
+        .andExpect(jsonPath("$.data.qrFileId").value("41"))
+        .andExpect(jsonPath("$.data.type").value("USDT"))
+        .andExpect(jsonPath("$.data.account").value("TRX-ADDR"))
+        .andExpect(jsonPath("$.data.holder").value("Creator"))
+        .andExpect(jsonPath("$.data.network").value("TRC20"));
   }
 
   @Test
@@ -209,6 +252,48 @@ class AdminWithdrawalControllerTest {
   }
 
   @Test
+  void shouldReviewAndReturnDetailShape() throws Exception {
+    when(withdrawals.review(any(), eq(77L), eq("APPROVE"), eq("ok"))).thenReturn(detail());
+    mvc.perform(
+            put(BASE + "/77/review")
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer())
+                .contentType("application/json")
+                .content("{\"decision\":\"APPROVE\",\"note\":\"ok\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.applicationNo").value("W20261025000001"))
+        .andExpect(jsonPath("$.data.amount").value("400.00"))
+        .andExpect(jsonPath("$.data.type").value("COMMISSION"));
+    verify(withdrawals).review(any(), eq(77L), eq("APPROVE"), eq("ok"));
+  }
+
+  @Test
+  void shouldListOrderItemOccupations_withChainFieldNames() throws Exception {
+    when(withdrawals.occupations(any(), eq(List.of(101L))))
+        .thenReturn(
+            List.of(
+                new WithdrawalService.Occupation(
+                    101L, 77L, "W20261025000001", "PAID", "350.00", "350.00", "0.00", NOW, NOW)));
+    mvc.perform(
+            get("/admin-api/commission/withdrawal-occupations?orderItemIds=101")
+                .header(AdminMvcSupport.TOKEN_HEADER, actAsViewerWithCommissionView()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].orderItemId").value("101"))
+        .andExpect(jsonPath("$.data[0].withdrawalId").value("77"))
+        .andExpect(jsonPath("$.data[0].applicationNo").value("W20261025000001"))
+        .andExpect(jsonPath("$.data[0].status").value("PAID"))
+        .andExpect(jsonPath("$.data[0].occupiedCny").value("350.00"))
+        .andExpect(jsonPath("$.data[0].sourceReleasedCny").value("350.00"))
+        .andExpect(jsonPath("$.data[0].remainingSnapshotCny").value("0.00"))
+        .andExpect(jsonPath("$.data[0].submittedAt").exists())
+        .andExpect(jsonPath("$.data[0].paidAt").exists());
+  }
+
+  private String actAsViewerWithCommissionView() {
+    return AdminMvcSupport.actAs(
+        current, 10L, Role.STAFF, DataScope.ALL, Set.of("commission:view"));
+  }
+
+  @Test
   void shouldExportCsvWithAttachmentHeader() throws Exception {
     when(withdrawals.export(any(), any())).thenReturn("no,rows".getBytes(StandardCharsets.UTF_8));
     MockHttpServletResponse response =
@@ -246,9 +331,22 @@ class AdminWithdrawalControllerTest {
             get("/admin-api/commission/finance-tasks")
                 .header(AdminMvcSupport.TOKEN_HEADER, actAsReviewer()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].taskType").value("PREPAY"))
+        .andExpect(jsonPath("$.data.items[0].id").value("3"))
+        .andExpect(jsonPath("$.data.items[0].type").value("PREPAY"))
+        .andExpect(jsonPath("$.data.items[0].applicationNo").value("PP1"))
+        .andExpect(jsonPath("$.data.items[0].kolId").value("22"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL-test"))
+        .andExpect(jsonPath("$.data.items[0].kolName").value("Creator"))
+        .andExpect(jsonPath("$.data.items[0].amount").value("70.00"))
+        .andExpect(jsonPath("$.data.items[0].currency").value("CNY"))
         .andExpect(jsonPath("$.data.items[0].status").value("APPROVED"))
-        .andExpect(jsonPath("$.data.items[0].kolName").value("Creator"));
+        .andExpect(jsonPath("$.data.items[0].createdAt").exists())
+        .andExpect(jsonPath("$.data.items[0].taskNo").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].taskType").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].amountCny").doesNotExist())
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(20));
   }
 
   @Test
@@ -270,6 +368,26 @@ class AdminWithdrawalControllerTest {
     verify(withdrawals).freeze(any(), eq(22L), eq("dispute"));
   }
 
+  @Test
+  void shouldResumeFreeze_andPassOptionalReason() throws Exception {
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    "/admin-api/commission/withdrawal-freezes/22/resume")
+                .header(AdminMvcSupport.TOKEN_HEADER, freezeToken())
+                .contentType("application/json")
+                .content("{\"reason\":\"dispute resolved\"}"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                    "/admin-api/commission/withdrawal-freezes/22/resume")
+                .header(AdminMvcSupport.TOKEN_HEADER, freezeToken())
+                .contentType("application/json")
+                .content("{}"))
+        .andExpect(status().isOk());
+    verify(withdrawals).resume(any(), eq(22L), eq("dispute resolved"));
+    verify(withdrawals).resume(any(), eq(22L), eq(null));
+  }
+
   private String freezeToken() {
     return AdminMvcSupport.actAs(
         current, 9L, Role.STAFF, DataScope.ALL, Set.of("commission:freeze"));
@@ -284,7 +402,7 @@ class AdminWithdrawalControllerTest {
         "Creator",
         5L,
         "BD",
-        "COMMISSION_WITHDRAWAL",
+        "COMMISSION",
         "400.00",
         "CNY",
         "PENDING_REVIEW",

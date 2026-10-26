@@ -119,7 +119,7 @@ class WithdrawalServiceTest {
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("120.00"));
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
-    when(funding.configVersion(KOL)).thenReturn("0");
+    when(funding.configVersion(KOL)).thenReturn(0);
     when(funding.listReleasedRows(KOL))
         .thenReturn(
             List.of(
@@ -718,8 +718,8 @@ class WithdrawalServiceTest {
             new WithdrawalService.FinanceFilter(null, null, null, null, 1, 2));
     assertThat(page.total()).isEqualTo(3L);
     assertThat(page.items()).hasSize(2);
-    assertThat(page.items().get(0).taskNo()).isEqualTo("PP1");
-    assertThat(page.items().get(1).taskNo()).isEqualTo("W1");
+    assertThat(page.items().get(0).applicationNo()).isEqualTo("PP1");
+    assertThat(page.items().get(1).applicationNo()).isEqualTo("W1");
     // the raw status passes straight through to both branches
     ArgumentCaptor<FinanceTaskQuery> query = ArgumentCaptor.forClass(FinanceTaskQuery.class);
     verify(withdrawals).pageWithdrawalTasks(query.capture());
@@ -962,7 +962,7 @@ class WithdrawalServiceTest {
         "Test creator",
         null,
         null,
-        "COMMISSION_WITHDRAWAL",
+        "COMMISSION",
         "400.00",
         "CNY",
         status,

@@ -113,7 +113,7 @@ class WithdrawalServiceVisibilityTest {
     when(funding.frozenCny(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.estimatedCny(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
-    when(funding.configVersion(KOL)).thenReturn("5");
+    when(funding.configVersion(KOL)).thenReturn(5);
     when(funding.listReleasedRows(KOL))
         .thenReturn(List.of(new FundingRow(101L, 701L, new BigDecimal("400.00"))));
     when(orderItems.listByIds(anyList()))
@@ -368,7 +368,7 @@ class WithdrawalServiceVisibilityTest {
     var page =
         service.financeTasks(viewer, new FinanceFilter(null, null, "COMMISSION", null, 1, 20));
     assertThat(page.total()).isEqualTo(1L);
-    assertThat(page.items().getFirst().taskType()).isEqualTo("COMMISSION");
+    assertThat(page.items().getFirst().type()).isEqualTo("COMMISSION");
   }
 
   // ------------------------------------------------------------------ orders page
@@ -554,7 +554,7 @@ class WithdrawalServiceVisibilityTest {
         "Test creator",
         null,
         null,
-        "COMMISSION_WITHDRAWAL",
+        "COMMISSION",
         "400.00",
         "CNY",
         status,

@@ -11,6 +11,7 @@ import com.tcrm.admin.shared.R;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,10 +41,10 @@ public class FinanceTaskController {
         "commission:view"
       },
       mode = SaMode.OR)
-  public R<PageResult<FinanceTaskVO>> list(@Valid @ModelAttribute Query request) {
+  public R<FinanceTaskPageVO> list(@Valid @ModelAttribute Query request) {
     return R.ok(
-        withdrawals
-            .financeTasks(
+        FinanceTaskPageVO.from(
+            withdrawals.financeTasks(
                 current.user(),
                 new FinanceFilter(
                     request.applicationNo(),
@@ -51,8 +52,7 @@ public class FinanceTaskController {
                     request.type(),
                     request.status(),
                     request.pageNumber(),
-                    request.pageSize()))
-            .map(FinanceTaskVO::from));
+                    request.pageSize()))));
   }
 
   public record Query(
@@ -71,33 +71,50 @@ public class FinanceTaskController {
     }
   }
 
+  /**
+   * Page of the unified finance task list (13.03). {@code total} is a JSON number (ADR-032); {@code
+   * int} keeps it out of the shared long-to-string serializer.
+   */
+  record FinanceTaskPageVO(List<FinanceTaskVO> items, int total, int page, int size) {
+    static FinanceTaskPageVO from(PageResult<FinanceTask> page) {
+      return new FinanceTaskPageVO(
+          page.items().stream().map(FinanceTaskVO::from).toList(),
+          Math.toIntExact(page.total()),
+          page.page(),
+          page.size());
+    }
+  }
+
+  /**
+   * One row of the unified finance task list (contract §6.2; {@code bdId}/{@code bdName} extra).
+   */
   record FinanceTaskVO(
       String id,
-      String taskNo,
+      String type,
+      String applicationNo,
       String kolId,
       String kolCode,
       String kolName,
-      String bdId,
-      String bdName,
-      String taskType,
-      String status,
-      String amountCny,
+      String amount,
       String currency,
-      String createdAt) {
+      String status,
+      String createdAt,
+      String bdId,
+      String bdName) {
     static FinanceTaskVO from(FinanceTask row) {
       return new FinanceTaskVO(
           Long.toString(row.id()),
-          row.taskNo(),
+          row.type(),
+          row.applicationNo(),
           Long.toString(row.kolId()),
           row.kolCode(),
           row.kolName(),
-          row.bdId() == null ? null : row.bdId().toString(),
-          row.bdName(),
-          row.taskType(),
-          row.status(),
-          row.amountCny(),
+          row.amount(),
           row.currency(),
-          row.createdAt().toString());
+          row.status(),
+          row.createdAt().toString(),
+          row.bdId() == null ? null : row.bdId().toString(),
+          row.bdName());
     }
   }
 }

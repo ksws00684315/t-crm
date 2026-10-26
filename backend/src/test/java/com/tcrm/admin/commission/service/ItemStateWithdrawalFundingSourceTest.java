@@ -108,7 +108,7 @@ class ItemStateWithdrawalFundingSourceTest {
 
   @Test
   void shouldReportTheSettlementConfigVersion_fromTheRuleConfig() {
-    assertThat(source.configVersion(KOL)).isEqualTo("3");
+    assertThat(source.configVersion(KOL)).isEqualTo(3);
   }
 
   @Test
@@ -117,7 +117,7 @@ class ItemStateWithdrawalFundingSourceTest {
         .thenReturn(
             new CommissionRuleConfigService.CurrentConfig(
                 0, new BigDecimal("200.00"), "SETTLE_TIME", 7, null));
-    assertThat(source.configVersion(KOL)).isEqualTo("0");
+    assertThat(source.configVersion(KOL)).isZero();
   }
 
   private static CommissionItemStateDO state(long id, long orderItemId, String releasedCny) {
