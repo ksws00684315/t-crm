@@ -142,3 +142,14 @@ export function payRangeToQuery(range: [Date, Date] | null): Pick<OrderQuery, "p
   if (!range || range.length !== 2 || !range[0] || !range[1]) return {};
   return { payFrom: range[0].toISOString(), payTo: range[1].toISOString() };
 }
+
+/**
+ * Converts the locally picked platform-order interval into UTC query params (task 70 B01). The
+ * same inclusive/exclusive bounds as the payment window, but over `crm_order.order_time`.
+ */
+export function orderTimeRangeToQuery(
+  range: [Date, Date] | null
+): Pick<OrderQuery, "orderTimeFrom" | "orderTimeTo"> {
+  if (!range || range.length !== 2 || !range[0] || !range[1]) return {};
+  return { orderTimeFrom: range[0].toISOString(), orderTimeTo: range[1].toISOString() };
+}

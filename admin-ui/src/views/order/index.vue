@@ -23,7 +23,7 @@ import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { orderAbilities } from "@/utils/permission";
-import { orderRefundStatusText } from "@/utils/order";
+import { orderRefundStatusText, orderTimeRangeToQuery } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
 import OrderDetailDrawer from "./OrderDetailDrawer.vue";
 import SyncStatesDialog from "./SyncStatesDialog.vue";
@@ -55,15 +55,15 @@ const query = reactive<{
   size: number;
   orderNo: string;
   shopId?: string;
-  kolCode: string;
+  kolKeyword: string;
   status?: OrderFilterStatus;
-  createRange: [Date, Date] | null;
+  orderTimeRange: [Date, Date] | null;
 }>({
   page: 1,
   size: readPageSize("orders", 20),
   orderNo: "",
-  kolCode: "",
-  createRange: null
+  kolKeyword: "",
+  orderTimeRange: null
 });
 
 /** Shop cell per 09.04: "name (code)"; the code comes with task 37's backend and may be null. */
@@ -86,15 +86,15 @@ const columns = computed<DataColumn[]>(() => [
 ]);
 
 const statusOptions = computed(() => [
-  { value: "UNPAID", label: t("order.listStatus.UNPAID"), developing: false },
-  { value: "PAID", label: t("order.listStatus.PAID"), developing: false },
-  { value: "SHIPPED", label: t("order.listStatus.SHIPPED"), developing: false },
-  { value: "RECEIVED", label: t("order.listStatus.RECEIVED"), developing: false },
-  { value: "COMPLETED", label: t("order.listStatus.COMPLETED"), developing: false },
-  { value: "CLOSED", label: t("order.listStatus.CLOSED"), developing: false },
-  { value: "REFUNDING", label: t("order.listStatus.REFUNDING"), developing: true },
-  { value: "REFUND_SUCCESS", label: t("order.listStatus.REFUND_SUCCESS"), developing: true },
-  { value: "ABNORMAL", label: t("order.listStatus.ABNORMAL"), developing: true }
+  { value: "UNPAID", label: t("order.listStatus.UNPAID") },
+  { value: "PAID", label: t("order.listStatus.PAID") },
+  { value: "SHIPPED", label: t("order.listStatus.SHIPPED") },
+  { value: "RECEIVED", label: t("order.listStatus.RECEIVED") },
+  { value: "COMPLETED", label: t("order.listStatus.COMPLETED") },
+  { value: "CLOSED", label: t("order.listStatus.CLOSED") },
+  { value: "REFUNDING", label: t("order.listStatus.REFUNDING") },
+  { value: "REFUND_SUCCESS", label: t("order.listStatus.REFUND_SUCCESS") },
+  { value: "ABNORMAL", label: t("order.listStatus.ABNORMAL") }
 ]);
 
 const tableRows = computed<GroupedOrderRow[]>(() =>
@@ -190,23 +190,33 @@ function snapshot() {
   return {
     orderNo: query.orderNo.trim(),
     shopId: query.shopId,
-    kolCode: query.kolCode.trim(),
+    kolKeyword: query.kolKeyword.trim(),
     status: query.status,
-    createRange: query.createRange
+    orderTimeRange: query.orderTimeRange
   };
 }
 
+/**
+ * Task 70 (B01-B04): the six standard statuses stay on `orderStatus`; the refunding and
+ * refund-success options map onto `refundState` (REFUND_SUCCESS becomes REFUNDED and covers
+ * partial and whole refunds) and the abnormal option maps onto `abnormal=true`.
+ */
 function appliedQuery(): OrderQuery {
   const status = applied.value.status;
-  return {
+  const params: OrderQuery = {
     orderNo: applied.value.orderNo || undefined,
     shopId: applied.value.shopId || undefined,
-    kolCode: applied.value.kolCode || undefined,
-    orderStatus:
-      status && ["UNPAID", "PAID", "SHIPPED", "RECEIVED", "COMPLETED", "CLOSED"].includes(status)
-        ? (status as OrderStatus)
-        : undefined
+    kolKeyword: applied.value.kolKeyword || undefined,
+    ...orderTimeRangeToQuery(applied.value.orderTimeRange)
   };
+  if (status === "REFUNDING" || status === "REFUND_SUCCESS") {
+    params.refundState = status === "REFUNDING" ? "REFUNDING" : "REFUNDED";
+  } else if (status === "ABNORMAL") {
+    params.abnormal = true;
+  } else if (status) {
+    params.orderStatus = status;
+  }
+  return params;
 }
 
 const chips = computed<SearchChip[]>(() => {
@@ -222,14 +232,26 @@ const chips = computed<SearchChip[]>(() => {
       text: shop?.shopName ?? applied.value.shopId
     });
   }
-  if (applied.value.kolCode) {
-    list.push({ key: "kolCode", label: t("order.kolCode"), text: applied.value.kolCode });
+  if (applied.value.kolKeyword) {
+    list.push({
+      key: "kolKeyword",
+      label: t("order.kolKeyword"),
+      text: applied.value.kolKeyword
+    });
   }
   if (applied.value.status) {
     list.push({
       key: "status",
       label: t("order.orderStatus"),
       text: orderFilterStatusText(applied.value.status)
+    });
+  }
+  if (applied.value.orderTimeRange) {
+    const [from, to] = applied.value.orderTimeRange;
+    list.push({
+      key: "orderTimeRange",
+      label: t("order.orderTime"),
+      text: `${formatInstant(from.toISOString())} ~ ${formatInstant(to.toISOString())}`
     });
   }
   return list;
@@ -277,17 +299,18 @@ function search() {
 function reset() {
   query.orderNo = "";
   query.shopId = undefined;
-  query.kolCode = "";
+  query.kolKeyword = "";
   query.status = undefined;
-  query.createRange = null;
+  query.orderTimeRange = null;
   search();
 }
 
 function removeChip(key: string): void {
   if (key === "orderNo") query.orderNo = "";
   if (key === "shop") query.shopId = undefined;
-  if (key === "kolCode") query.kolCode = "";
+  if (key === "kolKeyword") query.kolKeyword = "";
   if (key === "status") query.status = undefined;
+  if (key === "orderTimeRange") query.orderTimeRange = null;
   search();
 }
 
@@ -365,16 +388,14 @@ onMounted(() => {
             <el-option v-for="s in shops" :key="s.shopId" :label="s.shopName" :value="s.shopId" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('order.kolCode')">
-          <el-tooltip :content="t('order.kolNameFilterDeveloping')" placement="top">
-            <el-input
-              v-model="query.kolCode"
-              clearable
-              maxlength="16"
-              :placeholder="t('order.kolCode')"
-              data-test="filter-kol-code"
-            />
-          </el-tooltip>
+        <el-form-item :label="t('order.kolKeyword')">
+          <el-input
+            v-model="query.kolKeyword"
+            clearable
+            maxlength="128"
+            :placeholder="t('order.kolKeyword')"
+            data-test="filter-kol-keyword"
+          />
         </el-form-item>
       </template>
       <template #more>
@@ -391,28 +412,19 @@ onMounted(() => {
               :key="status.value"
               :label="status.label"
               :value="status.value"
-              :disabled="status.developing"
-            >
-              <span>{{ status.label }}</span>
-              <span v-if="status.developing" class="order-filter-developing">{{
-                t("common.developing")
-              }}</span>
-            </el-option>
+            />
           </el-select>
         </el-form-item>
-        <el-tooltip :content="t('order.createTimeFilterDeveloping')" placement="top">
-          <el-form-item :label="t('order.createTimeFilterLabel')">
-            <el-date-picker
-              v-model="query.createRange"
-              type="datetimerange"
-              disabled
-              :start-placeholder="t('order.detail.orderTime')"
-              :end-placeholder="t('order.detail.orderTime')"
-              class="filter-w-lg"
-              data-test="filter-create-time"
-            />
-          </el-form-item>
-        </el-tooltip>
+        <el-form-item :label="t('order.orderTime')">
+          <el-date-picker
+            v-model="query.orderTimeRange"
+            type="datetimerange"
+            :start-placeholder="t('order.orderTime')"
+            :end-placeholder="t('order.orderTime')"
+            class="filter-w-lg"
+            data-test="filter-order-time"
+          />
+        </el-form-item>
       </template>
       <template v-if="abilities.canManage" #actions>
         <el-button data-test="sync-states" @click="syncVisible = true">
@@ -557,12 +569,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.order-filter-developing {
-  margin-left: var(--tcrm-space-2);
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-help);
-}
-
 :deep(.el-table .order-group-header > td) {
   /* The approved order groups replace shared stripe/hover fills on this page only. */
   background: color-mix(in srgb, var(--tcrm-color-primary) 2%, var(--tcrm-color-card)) !important;

@@ -482,6 +482,12 @@ export type RefundType = "REFUND_ONLY" | "RETURN_REFUND" | "UNKNOWN";
 /** Single-refund status (task 40 §3.1). Only SUCCESS counts as a completed refund. */
 export type RefundStatus = "PROCESSING" | "SUCCESS" | "CLOSED" | "UNKNOWN";
 
+/**
+ * Order-list refund filter (task 70 / 1024 handoff B03): refunding, or refunded covering both
+ * partial and whole refunds. Separate from `OrderStatus` on purpose.
+ */
+export type RefundFilterState = "REFUNDING" | "REFUNDED";
+
 /** Where the order data came from (task 40 §3.2): the Weidian API or a manual import. */
 export type OrderSource = "API" | "IMPORT";
 
