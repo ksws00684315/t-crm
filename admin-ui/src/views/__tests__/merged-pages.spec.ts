@@ -42,7 +42,8 @@ vi.mock("@/api/commission/payout-account", () => ({
  * construction.
  */
 function signIn() {
-  useUserStore().user = {
+  const store = useUserStore();
+  store.user = {
     id: "1",
     username: "me",
     nickname: "Me",
@@ -92,10 +93,11 @@ describe("merged tab pages (task 32 §2.1)", () => {
     wrapper.unmount();
   });
 
-  it("creator payouts shows the payout-account review tab", async () => {
+  it("creator payouts keeps account review alongside the commission withdrawal tab", async () => {
+    vi.spyOn(useUserStore(), "can").mockReturnValue(true);
     const wrapper = await mountPage(FundPayoutPage, "/fund/payouts");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["收款账户审核"]);
+    expect(labels).toEqual(["财务结算任务", "收款账户审核"]);
     wrapper.unmount();
   });
 

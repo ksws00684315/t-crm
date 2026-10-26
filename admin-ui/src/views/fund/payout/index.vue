@@ -1,22 +1,41 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import WithdrawalTasksPage from "@/views/fund/withdrawal/index.vue";
+import { useUserStore } from "@/stores/user";
+import { financeAbilities } from "@/utils/finance";
 import PayoutAccountReviewPage from "@/views/fund/payout-account/index.vue";
 
 defineOptions({ name: "FundPayoutPage" });
 
 /**
- * Finance > Creator Payouts (task 32 §2.1): the payout-account review is the first tab; the
- * withdrawal feature itself will be added here later.
+ * Finance tasks keep commission withdrawals and the existing payout-account review in separate tabs.
  */
 const { t } = useI18n();
-const activeTab = ref("payout-accounts");
+const user = useUserStore();
+const canViewWithdrawals = computed(() => financeAbilities(user.user).view);
+const canReviewAccounts = computed(() => user.can("payout-account:review"));
+const activeTab = ref(canViewWithdrawals.value ? "withdrawals" : "payout-accounts");
+watch([canViewWithdrawals, canReviewAccounts], () => {
+  if (activeTab.value === "withdrawals" && !canViewWithdrawals.value)
+    activeTab.value = "payout-accounts";
+  if (activeTab.value === "payout-accounts" && !canReviewAccounts.value)
+    activeTab.value = "withdrawals";
+});
 </script>
 
 <template>
   <div class="fund-payout">
     <el-tabs v-model="activeTab" class="fund-payout__tabs">
-      <el-tab-pane :label="t('route.payoutAccounts')" name="payout-accounts" lazy>
+      <el-tab-pane v-if="canViewWithdrawals" :label="t('finance.tasks')" name="withdrawals" lazy
+        ><WithdrawalTasksPage
+      /></el-tab-pane>
+      <el-tab-pane
+        v-if="canReviewAccounts"
+        :label="t('route.payoutAccounts')"
+        name="payout-accounts"
+        lazy
+      >
         <PayoutAccountReviewPage />
       </el-tab-pane>
     </el-tabs>

@@ -224,11 +224,11 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "income",
             name: "KolIncome",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/kol/income/index.vue"),
             meta: {
               title: "route.kolIncome",
               permission: "commission:view",
-              componentName: "ComingSoonPage"
+              componentName: "KolIncomePage"
             }
           }
         ]
@@ -273,21 +273,21 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "settlement-details",
             name: "FundSettlementDetails",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/fund/settlement-details/index.vue"),
             meta: {
               title: "route.settlementDetails",
               permission: "commission:view",
-              componentName: "ComingSoonPage"
+              componentName: "SettlementDetailsPage"
             }
           },
           {
             path: "settlement-config",
             name: "FundSettlementConfig",
-            component: () => import("@/views/common/ComingSoon.vue"),
+            component: () => import("@/views/fund/settlement-config/index.vue"),
             meta: {
               title: "route.settlementConfig",
               permission: "commission:view",
-              componentName: "ComingSoonPage"
+              componentName: "SettlementConfigPage"
             }
           }
         ]

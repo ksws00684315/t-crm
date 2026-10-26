@@ -5,8 +5,10 @@
  * and messages.spec.ts checks the same at runtime.
  */
 import prepay from "./prepay-zh-CN";
+import finance from "./finance-zh-CN";
 const zhCN = {
   prepay,
+  finance,
   app: {
     title: "SparkTrack 管理端",
     titleSuffix: " 管理端"
