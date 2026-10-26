@@ -55,6 +55,50 @@ class OrderControllerTest {
     assertThat(query.getValue().size()).isEqualTo(20);
   }
 
+  /** Task 70 (B01-B04): the new query fields bind, normalize and validate like the task 40 ones. */
+  @Test
+  void shouldBindTask70Filters_whenQueryingOrders() throws Exception {
+    when(orders.page(any(), eq(false))).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-16T00:00:00Z")
+                .param("orderTimeTo", "2026-10-17T00:00:00Z")
+                .param("kolKeyword", " Zoe ")
+                .param("refundState", "REFUNDING")
+                .param("abnormal", "true")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isOk());
+    var query = ArgumentCaptor.forClass(OrderFilterDTO.class);
+    verify(orders).page(query.capture(), eq(false));
+    assertThat(query.getValue().orderTimeFrom()).isEqualTo(Instant.parse("2026-10-16T00:00:00Z"));
+    assertThat(query.getValue().orderTimeTo()).isEqualTo(Instant.parse("2026-10-17T00:00:00Z"));
+    assertThat(query.getValue().kolKeyword()).isEqualTo("Zoe");
+    assertThat(query.getValue().refundState()).isEqualTo("REFUNDING");
+    assertThat(query.getValue().abnormal()).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"REFUNDED2", "PROCESSING"})
+  void shouldRejectUnknownRefundStates_whenQueryingOrders(String refundState) throws Exception {
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("refundState", refundState)
+                .header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(orders);
+  }
+
+  @Test
+  void shouldRejectInvertedOrderTimeWindow_whenQueryingOrders() throws Exception {
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-17T00:00:00Z")
+                .param("orderTimeTo", "2026-10-16T00:00:00Z")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin()))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(orders);
+  }
+
   @Test
   void shouldUsePoolCondition_whenQueryingUnmatchedOrders() throws Exception {
     when(orders.page(any(), eq(true))).thenReturn(new PageResult<>(List.of(), 0, 2, 5));
