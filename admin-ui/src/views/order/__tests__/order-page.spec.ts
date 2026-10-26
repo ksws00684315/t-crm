@@ -174,7 +174,7 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    for (const header of ["商品名称", "数量", "订单状态", "支付金额", "操作"]) {
+    for (const header of ["商品信息", "数量", "订单状态", "实付金额", "操作"]) {
       expect(labels).toContain(header);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);

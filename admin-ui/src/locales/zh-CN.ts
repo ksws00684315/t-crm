@@ -1336,6 +1336,8 @@ const zhCN = {
     createTimeFilterDeveloping: "平台订单创建时间筛选待接口支持。",
     createTimeFilterLabel: "下单时间（开发中）",
     itemImageDeveloping: "订单列表商品图片字段待接口支持",
+    productInfo: "商品信息",
+    actualPaidAmount: "实付金额",
     listStatus: {
       UNPAID: "待付款",
       PAID: "待发货",
