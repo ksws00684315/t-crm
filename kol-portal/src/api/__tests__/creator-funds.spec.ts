@@ -12,7 +12,7 @@ vi.mock("../http", () => ({ http: { request: vi.fn() } }));
 afterEach(() => vi.clearAllMocks());
 
 describe("fund summary presentation contract", () => {
-  it("uses received income and estimated commission as distinct authoritative totals", async () => {
+  it("includes estimated commission and received advances in total income, while separating commission payouts", async () => {
     vi.mocked(http.request).mockResolvedValue({
       asOf: "2026-10-24T00:00:00Z",
       income: {
@@ -31,7 +31,8 @@ describe("fund summary presentation contract", () => {
     const { fundSummary } = await getFundSummary();
     expect(http.request).toHaveBeenCalledWith({ method: "GET", url: "/commissions/overview" });
     expect(fundSummary).toMatchObject({
-      totalIncomeCny: "350.10",
+      totalIncomeCny: "950.30",
+      cumulativeWithdrawnCny: "350.10",
       commissionIncomeCny: "300.10",
       receivedPrepayCny: "50.00",
       estimatedCommissionCny: "900.30",
@@ -66,6 +67,28 @@ describe("fund summary presentation contract", () => {
     expect(fundSummary.receivedPrepayCny).toBe("0.00");
     expect(fundSummary.totalIncomeCny).toBe("0.00");
     expect(fundSummary.asOf).toBe("2026-10-24T00:00:00Z");
+  });
+
+  it("adds projected income exactly in cents without losing large decimal amounts", async () => {
+    vi.mocked(http.request).mockResolvedValue({
+      asOf: "2026-10-26T00:00:00Z",
+      income: {
+        paid: "0.02",
+        commissionPaid: "0.00",
+        prepayPaid: "0.02",
+        estimated: "90071992547409.91",
+        cumulativePaid: "0.02",
+        occupied: "0.00",
+        frozen: "0.00",
+        available: "0.00",
+        deducted: "0.00",
+        pendingDeduction: "0.00"
+      }
+    });
+    const { fundSummary } = await getFundSummary();
+    expect(fundSummary.totalIncomeCny).toBe("90071992547409.93");
+    expect(fundSummary.cumulativeWithdrawnCny).toBe("0.02");
+    expect(fundSummary.withdrawnCny).toBe("0.00");
   });
 
   it("uses all withdrawal-condition fields from the commission contract", async () => {
