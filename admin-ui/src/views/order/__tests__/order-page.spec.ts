@@ -174,7 +174,7 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    for (const header of ["商品名称", "数量", "订单状态", "支付金额", "操作"]) {
+    for (const header of ["商品名称", "达人", "数量", "订单状态", "支付金额", "操作"]) {
       expect(labels).toContain(header);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
@@ -233,6 +233,104 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("renders per-line creator identity and images from the list response (task 71)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const multi = {
+      ...attributed,
+      items: [
+        {
+          id: "301",
+          subOrderId: null,
+          weidianItemId: "9001",
+          skuId: null,
+          itemName: "First product",
+          skuName: null,
+          quantity: 1,
+          payAmount: "30.00",
+          refundAmount: null,
+          kolId: "201",
+          kolCode: "KOL-ZS01",
+          kolName: "Zoe",
+          productId: "401",
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null,
+          imageUrl: "https://img.example/first.png"
+        },
+        {
+          id: "302",
+          subOrderId: null,
+          weidianItemId: "9002",
+          skuId: null,
+          itemName: "Second product",
+          skuName: null,
+          quantity: 2,
+          payAmount: "90.00",
+          refundAmount: null,
+          kolId: "202",
+          kolCode: "KOL-XH02",
+          // A line whose creator has no stored name renders just the code, never a fake name.
+          kolName: null,
+          productId: "402",
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null,
+          imageUrl: null
+        },
+        {
+          id: "303",
+          subOrderId: null,
+          weidianItemId: "9003",
+          skuId: null,
+          itemName: "Third product",
+          skuName: null,
+          quantity: 1,
+          payAmount: "10.00",
+          refundAmount: null,
+          kolId: null,
+          kolCode: null,
+          kolName: null,
+          productId: "403",
+          kolItemId: null,
+          attributionType: 3,
+          manualReason: null,
+          imageUrl: null
+        }
+      ]
+    } satisfies OrderVO;
+    vi.mocked(orderApi.listOrders).mockResolvedValue({
+      items: [multi],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+
+    // el-table keeps one measurement copy of the cell in .hidden-columns; count only real rows.
+    const inRows = (selector: string) =>
+      [...document.body.querySelectorAll(selector)].filter(el => el.closest("tr") !== null);
+    const images = inRows('[data-test="order-item-image"]');
+    expect(images).toHaveLength(1);
+    expect(images[0]?.querySelector("img")?.getAttribute("src")).toBe(
+      "https://img.example/first.png"
+    );
+    // Lines without an image keep the shared placeholder, not a broken or fake one.
+    expect(inRows('[data-test="order-item-image-missing"]')).toHaveLength(2);
+    expect(wrapper.text()).toContain("暂无图片");
+
+    const names = inRows('[data-test="identity-name"]')
+      .map(el => el.textContent?.trim())
+      .filter(Boolean);
+    expect(names).toEqual(["Zoe", "-"]);
+    const codes = inRows('[data-test="identity-code"]')
+      .map(el => el.textContent?.trim())
+      .filter(Boolean);
+    expect(codes).toEqual(["KOL-ZS01", "KOL-XH02"]);
+    // The unattributed line shows the empty marker instead of an identity block.
+    expect(inRows('[data-test="order-item-kol-empty"]')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it("uses order pagination while rendering each product as its own row", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const multi = {
@@ -250,10 +348,12 @@ describe("order list page (task 40)", () => {
           refundAmount: null,
           kolId: "201",
           kolCode: "KOL-ZS01",
+          kolName: "Zoe",
           productId: null,
           kolItemId: null,
           attributionType: 1,
-          manualReason: null
+          manualReason: null,
+          imageUrl: null
         },
         {
           id: "302",
@@ -267,10 +367,12 @@ describe("order list page (task 40)", () => {
           refundAmount: null,
           kolId: "201",
           kolCode: "KOL-ZS01",
+          kolName: "Zoe",
           productId: null,
           kolItemId: null,
           attributionType: 1,
-          manualReason: null
+          manualReason: null,
+          imageUrl: null
         }
       ]
     } satisfies OrderVO;

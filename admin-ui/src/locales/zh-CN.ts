@@ -1335,7 +1335,7 @@ const zhCN = {
     kolNameFilterDeveloping: "目前支持按达人编号筛选，按姓名筛选待接口支持。",
     createTimeFilterDeveloping: "平台订单创建时间筛选待接口支持。",
     createTimeFilterLabel: "下单时间（开发中）",
-    itemImageDeveloping: "订单列表商品图片字段待接口支持",
+    itemImageMissing: "暂无图片",
     listStatus: {
       UNPAID: "待付款",
       PAID: "待发货",

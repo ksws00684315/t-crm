@@ -48,10 +48,12 @@ const order: OrderVO = {
       refundAmount: "0.00",
       kolId: null,
       kolCode: null,
+      kolName: null,
       productId: null,
       kolItemId: null,
       attributionType: 0,
-      manualReason: null
+      manualReason: null,
+      imageUrl: null
     }
   ]
 };

@@ -1368,7 +1368,7 @@ const enUS: MessageSchema = {
       "Filtering by creator code is available; name filtering awaits API support.",
     createTimeFilterDeveloping: "Filtering by platform order creation time awaits API support.",
     createTimeFilterLabel: "Order created (under development)",
-    itemImageDeveloping: "Order item image data awaits API support",
+    itemImageMissing: "No image",
     listStatus: {
       UNPAID: "Awaiting payment",
       PAID: "Awaiting shipment",
