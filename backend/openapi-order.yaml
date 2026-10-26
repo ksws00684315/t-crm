@@ -77,7 +77,8 @@ paths:
         Task 70 (B01-B04) filters: orderTimeFrom/orderTimeTo bound crm_order.order_time (the
         platform order time, never pay_time or the sync create_time), from inclusive and to
         exclusive, both combinable with payFrom/payTo. kolKeyword matches a creator's code
-        (case-insensitive exact) or name (case-insensitive contains, % and _ escaped) and is
+        (case-insensitive exact), name (case-insensitive contains, % and _ escaped) or email
+        (case-insensitive exact) — the same rule as the creator-item kolKeyword — and is
         resolved through kol.api to the main-order kol; no match yields an empty page.
         refundState is an EXISTS filter over crm_refund rows: REFUNDING means a PROCESSING row
         exists, REFUNDED means a SUCCESS row exists (partial or whole); multiple refund rows of one
