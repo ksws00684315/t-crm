@@ -7,7 +7,8 @@ import { getOrder, getOrderChain } from "@/api/order/order";
 import type { ChainLineVO, OrderChainVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { useUserStore } from "@/stores/user";
+import { formatInstant, formatNameWithCode, formatPrice } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
@@ -16,6 +17,7 @@ import {
   refundTagType,
   refundTypeText
 } from "@/utils/order";
+import { formatRate } from "@/utils/rate";
 
 defineOptions({ name: "OrderChainPage" });
 
@@ -23,8 +25,9 @@ defineOptions({ name: "OrderChainPage" });
  * Order chain (requirement 09.04, task 40 §4): opens as a system tab from the order list since
  * task 59 (R-17). The chain endpoint only carries the per-line wiring, so the page also loads the
  * order detail for the header and the line names. Every product line walks copy job → creator
- * item link → order line → refunds; the settlement blocks (ledger, withdrawals) are out of this
- * task's scope and say "developing".
+ * item link → order line → refunds; task 72 wires the real commission data into the funds cards,
+ * the per-line commission block and the finance ledger (funds, flows and line blocks stay null
+ * without commission:view or, for OWN scopes, on mixed attribution).
  */
 const { t } = useI18n();
 
@@ -35,11 +38,15 @@ function shopLabel(name: string | null | undefined, code: string | null | undefi
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 
 const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
 /** Header context; degrades to the bare chain when the detail call fails. */
 const detail = ref<OrderDetailVO | null>(null);
+
+/** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
+const canSeeCommission = computed(() => userStore.can("commission:view"));
 
 const completedRefundTotal = computed(() => {
   const refunds = (chain.value?.lines ?? []).flatMap(line => line.refunds);
@@ -53,6 +60,37 @@ const completedRefundTotal = computed(() => {
   return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
 });
 
+/** Refund total: the server deduplicates one refund across lines; fall back to the client sum. */
+const refundTotalText = computed(
+  () => chain.value?.funds?.refundTotal ?? completedRefundTotal.value ?? t("common.developing")
+);
+
+/** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
+const flows = computed(() => chain.value?.financeFlows ?? []);
+
+/**
+ * What the finance ledger section shows: the flow table, its empty state, or the reason the
+ * financial data is hidden (no commission:view, or an OWN scope on a mixed-attribution order).
+ */
+const flowsView = computed<"table" | "empty" | "noPermission" | "scopeLimited">(() => {
+  if (flows.value.length) return "table";
+  if (chain.value?.financeFlows) return "empty";
+  if (!canSeeCommission.value) return "noPermission";
+  if (userStore.isOwnScope) return "scopeLimited";
+  return "empty";
+});
+
+/**
+ * Text for a gated fund value: the amount when known, otherwise the reason it is hidden — no
+ * permission, OWN scope on a mixed order, or an unverified amount that must not pose as zero.
+ */
+function fundsText(value: string | null | undefined): string {
+  if (value != null) return formatPrice(value, "CNY");
+  if (!canSeeCommission.value) return t("order.chain.noCommissionPermission");
+  if (userStore.isOwnScope) return t("finance.scopeLimited");
+  return t("finance.unverified");
+}
+
 /** Line titles come from the detail items matched by order-item id. */
 function lineName(line: ChainLineVO): string {
   const item = detail.value?.items.find(candidate => candidate.id === line.orderItemId);
@@ -63,12 +101,37 @@ function lineSku(line: ChainLineVO): string | null {
   return detail.value?.items.find(candidate => candidate.id === line.orderItemId)?.skuName ?? null;
 }
 
+/** Product name of a finance flow, matched by its order-item id. */
+function flowProductName(orderItemId: string): string {
+  const item = detail.value?.items.find(candidate => candidate.id === orderItemId);
+  return item?.itemName ?? t("order.detail.itemName");
+}
+
 const refundColumns = computed<DataColumn[]>(() => [
   { key: "refundNo", label: t("order.refund.no"), width: 150 },
   { key: "refundType", label: t("order.refund.typeColumn"), width: 100 },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: 100 },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
   { key: "finishTime", label: t("order.refund.finishTime"), width: 170 }
+]);
+
+const withdrawalColumns = computed<DataColumn[]>(() => [
+  { key: "applicationNo", label: t("order.chain.applicationNo"), width: 170 },
+  { key: "occupiedCny", label: t("order.chain.withdrawalAmount"), width: 110, amount: true },
+  { key: "status", label: t("finance.status"), width: 100 },
+  { key: "paidAt", label: t("order.chain.paidAt"), width: 170 }
+]);
+
+const flowColumns = computed<DataColumn[]>(() => [
+  { key: "flowNo", label: t("order.chain.flowNo"), width: 130 },
+  { key: "shopName", label: t("order.chain.shopName"), width: 130 },
+  { key: "type", label: t("order.chain.financeType"), width: 110 },
+  { key: "direction", label: t("order.chain.direction"), width: 80 },
+  { key: "amount", label: t("order.chain.financeAmount"), width: 110, amount: true },
+  { key: "orderItemId", label: t("order.chain.product"), width: 160 },
+  { key: "businessAt", label: t("order.chain.businessTime"), width: 170 },
+  { key: "transferredAt", label: t("order.chain.transferTime"), width: 170 },
+  { key: "withdrawalNo", label: t("order.chain.linkedSettlementNo"), width: 170 }
 ]);
 
 /** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */
@@ -117,19 +180,22 @@ onMounted(load);
         <div class="chain-fund-cards">
           <article class="chain-fund-card">
             <span>{{ t("order.payAmount") }}</span>
-            <strong>{{ detail?.payAmount ?? "-" }}</strong>
+            <strong>{{ chain.funds?.payAmount ?? detail?.payAmount ?? "-" }}</strong>
           </article>
           <article class="chain-fund-card">
             <span>{{ t("order.refundTotal") }}</span>
-            <strong>{{ completedRefundTotal ?? t("common.developing") }}</strong>
+            <strong>{{ refundTotalText }}</strong>
           </article>
-          <article class="chain-fund-card chain-fund-card--pending">
+          <article
+            class="chain-fund-card"
+            :class="{ 'chain-fund-card--pending': chain.funds?.kolCommission == null }"
+          >
             <span>{{ t("order.chain.kolCommission") }}</span>
-            <strong>{{ t("common.developing") }}</strong>
+            <strong>{{ fundsText(chain.funds?.kolCommission) }}</strong>
           </article>
           <article class="chain-fund-card chain-fund-card--pending">
             <span>{{ t("order.chain.shopProfit") }}</span>
-            <strong>{{ t("common.developing") }}</strong>
+            <strong>{{ fundsText(chain.funds?.shopProfit) }}</strong>
           </article>
         </div>
         <p class="chain-funds-note">{{ t("order.chain.shopProfitFormula") }}</p>
@@ -239,6 +305,65 @@ onMounted(load);
               </div>
             </div>
 
+            <div
+              class="chain-block chain-block--wide"
+              data-test="chain-commission"
+              v-if="line.commission"
+            >
+              <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
+              <div class="chain-commission-fields">
+                <div class="chain-block__text">
+                  {{ t("order.chain.rateSnapshot") }}:
+                  {{
+                    line.commission.rateSnapshot == null
+                      ? t("finance.unverified")
+                      : formatRate(line.commission.rateSnapshot)
+                  }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.kolCommission") }}:
+                  {{
+                    line.commission.netCommission == null
+                      ? t("finance.unverified")
+                      : formatPrice(line.commission.netCommission, "CNY")
+                  }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.shopProfit") }}: {{ t("finance.unverified") }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.releaseBasis") }}:
+                  {{
+                    line.commission.releaseBasis == null
+                      ? "-"
+                      : t(`finance.${line.commission.releaseBasis}`)
+                  }}
+                </div>
+                <div class="chain-block__text">
+                  {{ t("order.chain.occupiedTotal") }}:
+                  {{ formatPrice(line.commission.occupiedTotal, "CNY") }}
+                </div>
+              </div>
+              <template v-if="line.commission.withdrawals.length">
+                <div class="chain-block__text chain-block__subtitle">
+                  {{ t("order.chain.withdrawalOccupation") }}
+                </div>
+                <DataTable
+                  plain
+                  :table-id="`chain-withdrawals-${line.orderItemId}`"
+                  :rows="line.commission.withdrawals"
+                  :columns="withdrawalColumns"
+                  :total="line.commission.withdrawals.length"
+                  :paged="false"
+                >
+                  <template #cell-status="{ row }">{{ t(`finance.${row.status}`) }}</template>
+                  <template #cell-occupiedCny="{ row }">{{ row.occupiedCny }}</template>
+                  <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
+                </DataTable>
+              </template>
+              <div v-else class="chain-block__text">{{ t("order.chain.noWithdrawal") }}</div>
+            </div>
+
             <div class="chain-block chain-block--wide" data-test="chain-refunds">
               <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
               <DataTable
@@ -282,16 +407,51 @@ onMounted(load);
 
       <section class="chain-page__card" data-test="chain-finance-ledger">
         <h3 class="chain-page__title">{{ t("order.chain.financeLedgerSection") }}</h3>
-        <el-alert type="info" :closable="false" :title="t('order.chain.financeLedgerDeveloping')" />
-        <div class="chain-ledger-fields">
-          <span>{{ t("order.chain.financeType") }}</span>
-          <span>{{ t("order.chain.product") }}</span>
-          <span>{{ t("order.chain.financeAmount") }}</span>
-          <span>{{ t("order.chain.financeTime") }}</span>
-          <span>{{ t("order.chain.settlementNo") }}</span>
-          <span>{{ t("order.chain.withdrawalOccupation") }}</span>
+        <!-- Shop receivable flows wait for the M0 Weidian settlement net; the type stays reserved. -->
+        <el-alert type="info" :closable="false" :title="t('order.chain.financeLedgerNote')" />
+        <DataTable
+          v-if="flowsView === 'table'"
+          data-test="chain-flows"
+          plain
+          table-id="chain-finance-flows"
+          :rows="flows"
+          :columns="flowColumns"
+          :total="flows.length"
+          :paged="false"
+        >
+          <template #cell-type="{ row }">{{ t(`order.chain.flowType.${row.type}`) }}</template>
+          <template #cell-direction="{ row }">
+            {{
+              t(
+                `order.chain.${
+                  row.direction === "INCREASE" ? "directionIncrease" : "directionDecrease"
+                }`
+              )
+            }}
+          </template>
+          <template #cell-amount="{ row }">{{ row.amount }}</template>
+          <template #cell-orderItemId="{ row }">{{ flowProductName(row.orderItemId) }}</template>
+          <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
+          <template #cell-transferredAt="{ row }">{{ formatInstant(row.transferredAt) }}</template>
+          <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "－" }}</template>
+        </DataTable>
+        <div v-else-if="flowsView === 'empty'" class="chain-ledger-empty">
+          {{ t("order.chain.noFlows") }}
         </div>
-        <div class="chain-ledger-empty">{{ t("common.developing") }}</div>
+        <el-alert
+          v-else-if="flowsView === 'noPermission'"
+          type="warning"
+          :closable="false"
+          :title="t('order.chain.noCommissionPermission')"
+          data-test="chain-flows-no-permission"
+        />
+        <el-alert
+          v-else
+          type="warning"
+          :closable="false"
+          :title="t('finance.scopeLimited')"
+          data-test="chain-flows-scope-limited"
+        />
       </section>
     </template>
     <el-result
@@ -359,15 +519,6 @@ onMounted(load);
   font-size: var(--tcrm-font-size-body);
   font-weight: 400;
 }
-.chain-ledger-fields {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--tcrm-space-3);
-  padding: var(--tcrm-space-3);
-  border-bottom: 1px solid var(--tcrm-color-border);
-  color: var(--tcrm-color-text-secondary);
-  font-weight: 600;
-}
 .chain-ledger-empty {
   padding: var(--tcrm-space-5);
   color: var(--tcrm-color-text-secondary);
@@ -422,13 +573,22 @@ onMounted(load);
   .chain-fund-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .chain-ledger-fields {
+  .chain-commission-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .chain-block__title {
   margin-bottom: var(--tcrm-space-2);
   font-weight: 600;
+}
+.chain-block__subtitle {
+  margin: var(--tcrm-space-2) 0 var(--tcrm-space-2);
+  font-weight: 600;
+}
+.chain-commission-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--tcrm-space-2) var(--tcrm-space-3);
 }
 .chain-block__text {
   line-height: var(--tcrm-line-height-body);
