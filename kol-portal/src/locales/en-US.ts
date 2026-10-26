@@ -208,6 +208,13 @@ const enUS = {
   funds: {
     title: "Funds",
     totalIncome: "Total income",
+    incomeComposition: "Income breakdown",
+    incomeReceived: "Received income",
+    commissionOverview: "Commission overview",
+    amountCurrency: "Currency: CNY",
+    availableBadge: "Available balance",
+    fundsNote: "About these funds",
+    commissionTotalParts: "Withdrawn + in progress + frozen",
     commissionIncome: "Commission income",
     prepayIncome: "Advance income",
     estimatedCommission: "Estimated commission",

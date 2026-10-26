@@ -208,6 +208,13 @@ const zhCN: MessageSchema = {
   funds: {
     title: "资金明细",
     totalIncome: "总收入",
+    incomeComposition: "收入构成",
+    incomeReceived: "已到账收入",
+    commissionOverview: "佣金概览",
+    amountCurrency: "金额单位：CNY",
+    availableBadge: "可用余额",
+    fundsNote: "资金说明",
+    commissionTotalParts: "已提现 + 提现中 + 冻结中",
     commissionIncome: "佣金收入",
     prepayIncome: "预付收入",
     estimatedCommission: "预计总佣金",

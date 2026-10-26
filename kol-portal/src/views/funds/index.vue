@@ -74,6 +74,26 @@ const commissionParts = computed(() =>
       ]
     : []
 );
+const incomeComposition = computed(() => {
+  if (!summary.value) return null;
+  const total = cents(summary.value.totalIncomeCny);
+  const commission = cents(summary.value.commissionIncomeCny);
+  const prepay = cents(summary.value.receivedPrepayCny);
+  if (total <= 0n || commission < 0n || prepay < 0n || commission + prepay !== total) return null;
+  const percent = (part: bigint) => Number((part * 1000n + total / 2n) / total) / 10;
+  return {
+    commissionWidth: `${percent(commission)}%`,
+    prepayWidth: `${percent(prepay)}%`,
+    commissionPercent: `${percent(commission).toLocaleString(locale.value, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })}%`,
+    prepayPercent: `${percent(prepay).toLocaleString(locale.value, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })}%`
+  };
+});
 function summaryMoney(value: string) {
   return amountLabel(value, "CNY");
 }
@@ -88,14 +108,6 @@ function cents(value: string) {
   const unsigned = BigInt(whole.replace("-", "")) * 100n + BigInt(fraction.padEnd(2, "0"));
   return value.startsWith("-") ? -unsigned : unsigned;
 }
-// Only draw an equality when the displayed states reconcile; deductions remain separate below.
-const commissionReconciles = computed(
-  () =>
-    summary.value &&
-    cents(summary.value.estimatedCommissionCny) ===
-      commissionParts.value.reduce((sum, part) => sum + cents(part.amount), 0n)
-);
-
 async function load() {
   loading.value = true;
   failure.value = false;
@@ -310,59 +322,109 @@ onMounted(load);
     <el-skeleton v-if="loading && !summary" :rows="4" animated />
     <template v-else-if="summary">
       <section class="summary-card">
-        <div class="income-banner" :aria-label="t('funds.incomeFormula')">
-          <dl class="income-metric">
-            <dt>{{ t("funds.totalIncome") }}</dt>
-            <dd>{{ summaryMoney(summary.totalIncomeCny) }}</dd>
-          </dl>
-          <span class="income-operator" aria-hidden="true">=</span>
-          <dl class="income-metric">
-            <dt>{{ t("funds.commissionIncome") }}</dt>
-            <dd>{{ summaryMoney(summary.commissionIncomeCny) }}</dd>
-          </dl>
-          <span class="income-operator" aria-hidden="true">+</span>
-          <dl class="income-metric">
-            <dt>{{ t("funds.prepayIncome") }}</dt>
-            <dd>{{ summaryMoney(summary.receivedPrepayCny) }}</dd>
-          </dl>
+        <section class="income-overview" :aria-label="t('funds.incomeComposition')">
+          <div class="income-total">
+            <span class="income-total__eyebrow">{{ t("funds.totalIncome") }}</span>
+            <strong class="income-total__amount">{{ summaryMoney(summary.totalIncomeCny) }}</strong>
+            <span class="income-total__caption">{{ t("funds.incomeReceived") }}</span>
+          </div>
+          <div class="income-sources">
+            <div class="income-source">
+              <span class="income-source__dot income-source__dot--commission" aria-hidden="true" />
+              <span class="income-source__label">{{ t("funds.commissionIncome") }}</span>
+              <strong>{{ summaryMoney(summary.commissionIncomeCny) }}</strong>
+              <span class="income-source__percent">{{
+                incomeComposition?.commissionPercent ?? "—"
+              }}</span>
+            </div>
+            <div class="income-source">
+              <span class="income-source__dot income-source__dot--prepay" aria-hidden="true" />
+              <span class="income-source__label">{{ t("funds.prepayIncome") }}</span>
+              <strong>{{ summaryMoney(summary.receivedPrepayCny) }}</strong>
+              <span class="income-source__percent">{{
+                incomeComposition?.prepayPercent ?? "—"
+              }}</span>
+            </div>
+            <div
+              v-if="incomeComposition"
+              class="income-composition-bar"
+              role="img"
+              :aria-label="t('funds.incomeFormula')"
+            >
+              <span
+                class="income-composition-bar__commission"
+                :style="{ width: incomeComposition.commissionWidth }"
+              />
+              <span
+                class="income-composition-bar__prepay"
+                :style="{ width: incomeComposition.prepayWidth }"
+              />
+            </div>
+            <p class="income-sources__caption">{{ t("funds.incomeFormula") }}</p>
+          </div>
+        </section>
+        <div class="commission-overview-heading">
+          <h2>{{ t("funds.commissionOverview") }}</h2>
+          <span>{{ t("funds.amountCurrency") }}</span>
         </div>
-        <div class="commission-breakdown" :aria-label="t('funds.commissionBreakdown')">
-          <dl class="commission-metric commission-metric--total">
+        <div class="commission-cards" :aria-label="t('funds.commissionBreakdown')">
+          <dl class="commission-metric">
             <dt>{{ t("funds.estimatedCommission") }}</dt>
             <dd>{{ summaryMoney(summary.estimatedCommissionCny) }}</dd>
           </dl>
-          <template v-for="(part, index) in commissionParts" :key="part.key">
-            <span class="commission-operator" aria-hidden="true">{{
-              commissionReconciles ? (index === 0 ? "=" : "+") : ""
-            }}</span>
-            <dl class="commission-metric" :data-state="part.key">
-              <dt>{{ t(`funds.${part.key}`) }}</dt>
-              <dd :class="{ negative: part.amount.startsWith('-') }">
-                {{ summaryMoney(part.amount) }}
-              </dd>
-            </dl>
-          </template>
+          <dl
+            v-for="part in commissionParts"
+            :key="part.key"
+            class="commission-metric"
+            :data-state="part.key"
+          >
+            <dt :data-state="part.key">
+              <span
+                v-if="part.key !== 'currentAvailable'"
+                class="commission-metric__dot"
+                :data-state="part.key"
+                aria-hidden="true"
+              />
+              <span class="commission-metric__label">{{ t(`funds.${part.key}`) }}</span>
+              <span v-if="part.key === 'currentAvailable'" class="available-badge">
+                {{ t("funds.availableBadge") }}
+              </span>
+            </dt>
+            <dd
+              :class="[
+                { negative: part.amount.startsWith('-') },
+                { 'commission-metric__amount--available': part.key === 'currentAvailable' }
+              ]"
+            >
+              {{ summaryMoney(part.amount) }}
+            </dd>
+          </dl>
         </div>
-        <div class="summary-notes">
-          <p>{{ t("funds.incomeHint") }}</p>
-          <div class="summary-reconciliation">
-            <span
-              >{{ t("funds.formula") }}：<strong>{{
-                summaryMoney(summary.totalCommissionCny)
-              }}</strong></span
-            >
-            <span
-              >{{ t("funds.prepayDeduction") }}：<strong
-                :class="{ negative: Number(summary.prepayDeductionCny) > 0 }"
-                >{{
-                  summaryMoney(
-                    Number(summary.prepayDeductionCny) > 0
-                      ? `-${summary.prepayDeductionCny}`
-                      : "0.00"
-                  )
-                }}</strong
-              ></span
-            >
+        <div class="funds-note">
+          <span class="funds-note__icon" aria-hidden="true">i</span>
+          <div class="funds-note__content">
+            <strong>{{ t("funds.fundsNote") }}</strong>
+            <p>{{ t("funds.incomeHint") }}</p>
+            <div class="funds-note__details">
+              <span>
+                {{ t("funds.totalCommission") }}：<strong>{{
+                  summaryMoney(summary.totalCommissionCny)
+                }}</strong>
+                <span class="funds-note__calculation">({{ t("funds.commissionTotalParts") }})</span>
+              </span>
+              <span>
+                {{ t("funds.prepayDeduction") }}：
+                <strong :class="{ negative: Number(summary.prepayDeductionCny) > 0 }">
+                  {{
+                    summaryMoney(
+                      Number(summary.prepayDeductionCny) > 0
+                        ? `-${summary.prepayDeductionCny}`
+                        : "0.00"
+                    )
+                  }}
+                </strong>
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -638,64 +700,240 @@ h1 {
   display: grid;
   gap: var(--tcrm-space-5);
 }
-.income-banner {
+.income-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   align-items: center;
-  gap: var(--tcrm-space-5);
+  gap: var(--tcrm-space-6);
   padding: var(--tcrm-space-6);
+  border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-primary);
-  color: var(--tcrm-color-on-primary);
+  background: var(--tcrm-color-card);
 }
-.income-metric,
-.commission-metric {
-  display: grid;
-  align-content: center;
-  gap: var(--tcrm-space-4);
-  min-width: 0;
-  margin: 0;
+.income-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--tcrm-space-2);
+  min-height: 144px;
+  padding: var(--tcrm-space-5);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-muted);
 }
-#app .income-metric dt,
-#app .commission-metric dt {
-  font-size: var(--tcrm-font-size-section) !important;
-  line-height: var(--tcrm-line-height-section) !important;
+.income-total__eyebrow {
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+  font-weight: 600;
 }
-#app .income-metric dd,
-#app .commission-metric dd {
-  margin: 0;
-  font-size: var(--tcrm-font-size-title) !important;
-  line-height: var(--tcrm-line-height-title) !important;
+.income-total__amount {
+  color: var(--tcrm-color-primary-text);
+  font-size: var(--tcrm-font-size-title);
+  line-height: var(--tcrm-line-height-title);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.income-operator,
-.commission-operator {
-  font-size: var(--tcrm-font-size-title);
-  line-height: var(--tcrm-line-height-title);
-  text-align: center;
-}
-.commission-breakdown {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, auto minmax(0, 1fr));
-  align-items: center;
-  gap: var(--tcrm-space-3);
-}
-.commission-metric {
-  align-content: space-between;
-  align-self: stretch;
-  padding: var(--tcrm-space-5) var(--tcrm-space-4);
-  border: 1px solid var(--tcrm-color-primary);
-  border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-card);
-}
-.summary-notes {
-  display: grid;
-  gap: var(--tcrm-space-2);
+.income-total__caption,
+.income-source__percent,
+.income-sources__caption {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-help);
+}
+.income-sources {
+  display: grid;
+  align-content: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.income-source {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+  min-width: 0;
+  padding: var(--tcrm-space-2) 0;
+}
+.income-source + .income-source {
+  border-top: 1px solid var(--tcrm-color-border);
+}
+.income-source__dot,
+.commission-metric__dot {
+  width: var(--tcrm-space-3);
+  height: var(--tcrm-space-3);
+  flex: 0 0 var(--tcrm-space-3);
+  border-radius: 50%;
+  background: var(--tcrm-color-primary);
+}
+.income-source__dot--prepay {
+  background: var(--tcrm-color-success);
+}
+.income-source__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.income-source strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.income-source__percent {
+  min-width: 4ch;
+  text-align: right;
+}
+.income-composition-bar {
+  display: flex;
+  width: 100%;
+  height: var(--tcrm-space-2);
+  overflow: hidden;
+  margin-top: var(--tcrm-space-2);
+  border-radius: var(--tcrm-radius-tag);
+  background: var(--tcrm-color-muted);
+}
+.income-composition-bar__commission {
+  min-width: 0;
+  background: var(--tcrm-color-primary);
+}
+.income-composition-bar__prepay {
+  min-width: 0;
+  background: var(--tcrm-color-success);
+}
+.income-sources__caption {
+  margin: var(--tcrm-space-1) 0 0;
+}
+.commission-overview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tcrm-space-3);
+}
+.commission-overview-heading h2 {
+  margin: 0;
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+  font-weight: 600;
+}
+.commission-overview-heading > span {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+}
+.commission-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
+}
+.commission-metric {
+  display: grid;
+  align-content: space-between;
+  gap: var(--tcrm-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-card);
+}
+.commission-metric[data-state="currentAvailable"] {
+  border-color: var(--tcrm-color-primary);
+  background: var(--tcrm-color-muted);
+}
+.commission-metric dt {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-height: var(--tcrm-line-height-body);
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+  overflow-wrap: anywhere;
+}
+.commission-metric__dot[data-state="withdrawn"] {
+  background: var(--tcrm-color-success);
+}
+.commission-metric__dot[data-state="frozen"] {
+  background: var(--tcrm-color-warning);
+}
+.commission-metric__dot[data-state="withdrawing"] {
+  background: var(--tcrm-color-primary);
+}
+.available-badge {
+  margin-left: auto;
+  padding: 0 var(--tcrm-space-2);
+  border: 1px solid var(--tcrm-color-primary);
+  border-radius: var(--tcrm-radius-tag);
+  color: var(--tcrm-color-primary-text);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+  white-space: nowrap;
+}
+.commission-metric dd {
+  margin: 0;
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.commission-metric__amount--available:not(.negative) {
+  color: var(--tcrm-color-primary-text);
+}
+.funds-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--tcrm-space-3);
+  padding: var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  background: var(--tcrm-color-card);
+}
+.funds-note__icon {
+  display: grid;
+  place-items: center;
+  width: var(--tcrm-space-6);
+  height: var(--tcrm-space-6);
+  border-radius: 50%;
+  background: var(--tcrm-color-muted);
+  color: var(--tcrm-color-primary-text);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+  font-weight: 600;
+}
+.funds-note__content {
+  display: grid;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.funds-note__content > strong {
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.funds-note__content p {
+  margin: 0;
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.funds-note__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-3) var(--tcrm-space-5);
+  padding-top: var(--tcrm-space-2);
+  border-top: 1px solid var(--tcrm-color-border);
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.funds-note__details strong {
+  color: var(--tcrm-color-text);
+  font-variant-numeric: tabular-nums;
+}
+.funds-note__calculation {
+  margin-left: var(--tcrm-space-1);
+  color: var(--tcrm-color-text-secondary);
 }
 .conditions-summary {
   display: grid;
@@ -709,14 +947,6 @@ h1 {
 .conditions-summary p {
   margin: 0;
   color: var(--tcrm-color-text-secondary);
-}
-.summary-notes p {
-  margin: 0;
-}
-.summary-reconciliation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-4);
 }
 .negative {
   color: var(--tcrm-color-danger);
@@ -789,29 +1019,50 @@ small {
   color: var(--tcrm-color-text-secondary);
 }
 @media (max-width: 1279px) {
-  .commission-operator {
-    display: none;
-  }
-  .commission-breakdown {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .commission-metric--total {
-    grid-column: 1 / -1;
+  .commission-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 1023px) {
-  .income-banner {
+  .income-overview {
     grid-template-columns: 1fr;
     padding: var(--tcrm-space-5);
   }
-  .income-metric {
-    gap: var(--tcrm-space-2);
-  }
-  .income-operator {
-    display: none;
+  .income-total {
+    min-height: auto;
   }
 }
 @media (max-width: 767px) {
+  .commission-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--tcrm-space-2);
+  }
+  .commission-metric {
+    padding: var(--tcrm-space-3);
+  }
+  .commission-metric dt {
+    align-items: flex-start;
+  }
+  .commission-metric__dot {
+    margin-top: var(--tcrm-space-1);
+  }
+  .commission-metric[data-state="currentAvailable"] dt {
+    display: grid;
+    justify-items: start;
+    gap: var(--tcrm-space-1);
+  }
+  .commission-metric[data-state="currentAvailable"] .available-badge {
+    margin-left: 0;
+  }
+  .income-source {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .income-source__percent {
+    display: none;
+  }
+  .funds-note {
+    padding: var(--tcrm-space-3);
+  }
   .records-table {
     display: none;
   }
