@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  cancelDeparturePlan,
   createDeparturePlan,
   listDepartureHeirs,
   updateDeparturePlan,
@@ -27,6 +28,7 @@ const NO_HEIR = "__none__";
 const heirs = ref<DepartureHeirVO[]>([]);
 const heirsLoading = ref(false);
 const saving = ref(false);
+const cancelling = ref(false);
 const type = ref<DeparturePlanType>("RESIGN");
 const scheduled = ref(false);
 const effectiveLocal = ref<Date | null>(null);
@@ -145,6 +147,31 @@ async function submit() {
     saving.value = false;
   }
 }
+
+async function cancelPlan() {
+  const user = props.user;
+  if (!user || cancelling.value) return;
+  try {
+    await ElMessageBox.confirm(
+      t("departure.cancelConfirm", { username: user.username }),
+      t("departure.cancelTitle"),
+      { type: "warning" }
+    );
+  } catch {
+    return;
+  }
+  cancelling.value = true;
+  try {
+    await cancelDeparturePlan(user.id);
+    ElMessage.success(t("departure.cancelled"));
+    emit("saved");
+    close();
+  } catch (failure) {
+    notifyError(failure);
+  } finally {
+    cancelling.value = false;
+  }
+}
 </script>
 
 <template>
@@ -223,6 +250,16 @@ async function submit() {
       :title="heir === NO_HEIR ? t('departure.noHeirHint') : t('departure.withHeirHint')"
     />
     <template #footer>
+      <el-button
+        v-if="editing"
+        type="danger"
+        plain
+        :loading="cancelling"
+        data-test="cancel-departure-plan"
+        @click="cancelPlan"
+      >
+        {{ t("departure.cancelPlan") }}
+      </el-button>
       <el-button @click="close">{{ t("common.cancel") }}</el-button>
       <el-button type="primary" :loading="saving" data-test="departure-submit" @click="submit">{{
         t("common.confirm")

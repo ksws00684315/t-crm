@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -40,8 +41,7 @@ const visible = ref(false);
 const initialAction = ref("");
 const columns = computed<DataColumn[]>(() => [
   { key: "prepayNo", label: t("prepay.number"), minWidth: 220 },
-  { key: "kolCode", label: t("prepay.kolId"), prop: "kolCode", minWidth: 160 },
-  { key: "kolName", label: t("prepay.kol"), prop: "kolName", minWidth: 160, tooltip: true },
+  { key: "kol", label: t("prepay.kol"), minWidth: 180 },
   { key: "amountCny", label: t("prepay.amount"), prop: "amountCny", minWidth: 160, amount: true },
   { key: "applicantName", label: t("prepay.applicant"), prop: "applicantName", minWidth: 140 },
   { key: "currency", label: t("prepay.currency"), prop: "currency", width: 100 },
@@ -230,6 +230,9 @@ onMounted(load);
         load();
       "
     >
+      <template #cell-kol="{ row }"
+        ><NameCode :name="asRow(row).kolName" :code="asRow(row).kolCode"
+      /></template>
       <template #cell-prepayNo="{ row }"><CopyText :value="asRow(row).prepayNo" /></template>
       <template #cell-applicantName="{ row }"
         >{{ asRow(row).applicantName || t("prepay.historicalPerson") }} ·

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRefund } from "@/api/order/order";
@@ -21,10 +22,6 @@ function shopLabel(name: string | null | undefined, code: string | null | undefi
   return code ? formatNameWithCode(name ?? "-", code) : (name ?? "-");
 }
 
-function kolLabel(name: string | null | undefined, code: string | null | undefined): string {
-  if (!name && !code) return "-";
-  return code ? formatNameWithCode(name ?? code, code) : (name ?? "-");
-}
 const loading = ref(false);
 const detail = ref<RefundDetailVO | null>(null);
 
@@ -89,7 +86,9 @@ const columns = computed<DataColumn[]>(() => [
             {{ shopLabel(detail.shopName, detail.shopCode) }}
           </el-descriptions-item>
           <el-descriptions-item :label="t('order.kol')">
-            <span v-if="detail.kolCode">{{ kolLabel(detail.kolName, detail.kolCode) }}</span>
+            <span v-if="detail.kolCode"
+              ><NameCode :name="detail.kolName" :code="detail.kolCode"
+            /></span>
             <span v-else>-</span>
           </el-descriptions-item>
           <el-descriptions-item :label="t('order.detail.merchantNo')">
@@ -138,9 +137,9 @@ const columns = computed<DataColumn[]>(() => [
           <template #cell-itemId="{ row }">{{ asLine(row).weidianItemId }}</template>
           <template #cell-skuName="{ row }">{{ asLine(row).skuName ?? "-" }}</template>
           <template #cell-kol="{ row }">
-            <span v-if="asLine(row).kolCode">{{
-              kolLabel(asLine(row).kolName, asLine(row).kolCode)
-            }}</span>
+            <span v-if="asLine(row).kolCode"
+              ><NameCode :name="asLine(row).kolName" :code="asLine(row).kolCode"
+            /></span>
             <span v-else>-</span>
           </template>
           <template #cell-quantity="{ row }">{{ asLine(row).quantity ?? "-" }}</template>

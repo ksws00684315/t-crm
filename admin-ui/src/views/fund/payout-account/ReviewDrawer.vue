@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -152,8 +153,9 @@ async function submitReject(): Promise<void> {
         <el-alert class="audit-note" type="info" :closable="false" :title="t('payout.auditNote')" />
         <el-descriptions :column="1" border>
           <el-descriptions-item :label="t('payout.kolCode')">
-            <CopyText :value="detail.kolCode" />
-            <span v-if="detail.kolName" class="kol-name">{{ detail.kolName }}</span>
+            <NameCode :name="detail.kolName" :code="detail.kolCode"
+              ><template #code><CopyText :value="detail.kolCode" /></template
+            ></NameCode>
           </el-descriptions-item>
           <el-descriptions-item :label="t('payout.type')">
             {{ t(`payout.typeOption.${detail.accountType}`) }}

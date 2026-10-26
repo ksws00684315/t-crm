@@ -258,8 +258,12 @@ describe("user list departure column (task 41)", () => {
     const text = wrapper.text();
     expect(text).toContain("离职计划");
     expect(text).toContain("待指定继承人");
-    // ADR-029: every row action is inline in the actions column (no "More" menu).
-    expect(bodyItem(`departure-cancel-${bd.id}`).textContent).toContain("撤销离职计划");
+    expect(document.body.querySelector(`[data-test="departure-cancel-${bd.id}"]`)).toBeNull();
+    bodyItem(`departure-${bd.id}`).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(
+      document.body.querySelector('[data-test="cancel-departure-plan"]')?.textContent
+    ).toContain("撤销离职计划");
     wrapper.unmount();
   });
 
@@ -292,11 +296,22 @@ describe("user list departure column (task 41)", () => {
     wrapper.unmount();
   });
 
+  it("shows mark departure only for a BD account while other staff can still be disabled", async () => {
+    const wrapper = await mountPage([{ ...bd, postTemplate: "OPERATOR", dataScope: "ALL" }]);
+    expect(document.body.querySelector(`[data-test="departure-${bd.id}"]`)).toBeNull();
+    expect(bodyItem(`status-${bd.id}`).textContent).toContain("停用");
+    wrapper.unmount();
+  });
+
   it("cancels a pending plan after the confirmation", async () => {
     const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
     vi.mocked(departureApi.cancelDeparturePlan).mockResolvedValue(null);
     const wrapper = await mountPage([{ ...bd, departurePlan: pendingPlan }]);
-    bodyItem(`departure-cancel-${bd.id}`).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    bodyItem(`departure-${bd.id}`).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    const cancelButton = document.body.querySelector('[data-test="cancel-departure-plan"]');
+    expect(cancelButton).not.toBeNull();
+    cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flushPromises();
     expect(confirm).toHaveBeenCalled();
     expect(departureApi.cancelDeparturePlan).toHaveBeenCalledWith(bd.id);

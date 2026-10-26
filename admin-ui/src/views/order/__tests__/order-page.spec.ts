@@ -1,5 +1,5 @@
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import ElementPlus, { ElSelect } from "element-plus";
+import ElementPlus, { ElDatePicker, ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,9 +15,7 @@ vi.mock("@/api/order/order");
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 /**
- * The order list after task 40 §2: the 09.04 filters (order number, channel, shop) on top of
- * the existing ones, the 09.04 columns including the order-level refund status, the detail
- * drawer, and the chain entry that unattributed orders cannot use.
+ * The order list uses order-level pagination with a shared order band and one line per product.
  */
 const attributed: OrderVO = {
   id: "101",
@@ -172,64 +170,125 @@ describe("order list page (task 40)", () => {
     ]);
   });
 
-  it("renders the 09.04 filters and columns including channel and refund status", async () => {
+  it("renders the five requested filters and grouped product table", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    // Owner decision 2026-10-24 (task 59 review): every 09.04 column shows by default; the list
-    // scrolls horizontally inside the card at 1440 instead of hiding columns.
-    for (const header of [
-      "订单号",
-      "渠道",
-      "店铺",
-      "达人",
-      "订单状态",
-      "退款状态",
-      "支付金额",
-      "运费",
-      "支付时间",
-      "创建时间"
-    ]) {
+    for (const header of ["商品名称", "数量", "订单状态", "支付金额", "操作"]) {
       expect(labels).toContain(header);
     }
-    expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功", "无退款"]);
-    // Shop and creator follow the "name (code)" form; unattributed shows "-".
+    expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
+    expect(wrapper.find('[data-test="filter-order-no"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="filter-shop"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="filter-kol-code"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="filter-order-status"]').exists()).toBe(true);
+    expect(wrapper.findComponent(ElDatePicker).props("disabled")).toBe(true);
+    // The order band keeps the order number, platform creation time, and shop together.
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
     expect(wrapper.text()).toContain("t40 Shop（S001）");
-    expect(wrapper.text()).toContain("Zoe（KOL-ZS01）");
     wrapper.unmount();
   });
 
-  it("sends the order number and channel filters to the query", async () => {
+  it("sends only supported order, shop, creator-code and status filters", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     await element("filter-order-no").setValue("2026102100001");
     const channelSelect = wrapper
       .findAllComponents(ElSelect)
-      .find(select => select.find('[data-test="filter-channel"]').exists());
-    channelSelect?.vm.$emit("update:modelValue", "WEIDIAN");
+      .find(select => select.attributes("data-test") === "filter-shop");
+    channelSelect?.vm.$emit("update:modelValue", "1");
+    await element("filter-kol-code").setValue("KOL-ZS01");
+    const statusSelect = wrapper
+      .findAllComponents(ElSelect)
+      .find(select => select.attributes("data-test") === "filter-order-status");
+    statusSelect?.vm.$emit("update:modelValue", "PAID");
     await flushPromises();
     element("search").trigger("click");
     await flushPromises();
     expect(vi.mocked(orderApi.listOrders).mock.lastCall?.[0]).toMatchObject({
       orderNo: "2026102100001",
-      channel: "WEIDIAN"
+      shopId: "1",
+      kolCode: "KOL-ZS01",
+      orderStatus: "PAID"
     });
     wrapper.unmount();
   });
 
-  it("shows the order detail drawer with merchant and item fields", async () => {
+  it("shows the wide order detail dialog with merchant and item fields", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     vi.mocked(orderApi.getOrder).mockResolvedValue(detail);
     const wrapper = await mountPage();
     rowButtons("action-view")[0].click();
     await flushPromises();
     expect(vi.mocked(orderApi.getOrder)).toHaveBeenCalledWith("101");
-    const drawer = document.body.querySelector(".el-drawer");
-    expect(drawer?.querySelector('[data-test="order-detail"]')).not.toBeNull();
-    const drawerText = drawer?.textContent ?? "";
+    const dialog = document.body.querySelector(".order-detail-dialog");
+    expect(dialog?.querySelector('[data-test="order-detail"]')).not.toBeNull();
+    const dialogText = dialog?.textContent ?? "";
     for (const expected of ["wd-merchant-1", "115.00", "60.00", "接口同步", "Blue / L"]) {
-      expect(drawerText).toContain(expected);
+      expect(dialogText).toContain(expected);
     }
+    expect(dialog?.querySelector(".el-dialog__body")?.getAttribute("style") ?? "").not.toContain(
+      "overflow-x: scroll"
+    );
+    wrapper.unmount();
+  });
+
+  it("uses order pagination while rendering each product as its own row", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const multi = {
+      ...attributed,
+      items: [
+        {
+          id: "301",
+          subOrderId: null,
+          weidianItemId: "9001",
+          skuId: null,
+          itemName: "First product",
+          skuName: null,
+          quantity: 1,
+          payAmount: "30.00",
+          refundAmount: null,
+          kolId: "201",
+          kolCode: "KOL-ZS01",
+          productId: null,
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null
+        },
+        {
+          id: "302",
+          subOrderId: null,
+          weidianItemId: "9002",
+          skuId: null,
+          itemName: "Second product",
+          skuName: null,
+          quantity: 2,
+          payAmount: "90.00",
+          refundAmount: null,
+          kolId: "201",
+          kolCode: "KOL-ZS01",
+          productId: null,
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null
+        }
+      ]
+    } satisfies OrderVO;
+    vi.mocked(orderApi.listOrders).mockResolvedValue({
+      items: [multi],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    const productRows = [...document.body.querySelectorAll(".order-group-item")];
+    expect(productRows).toHaveLength(2);
+    expect(wrapper.text()).toContain("First product");
+    expect(wrapper.text()).toContain("Second product");
+    expect(wrapper.findComponent({ name: "DataTable" }).props("total")).toBe(1);
+    expect(typeof wrapper.findComponent({ name: "DataTable" }).props("spanMethod")).toBe(
+      "function"
+    );
     wrapper.unmount();
   });
 
@@ -264,6 +323,29 @@ describe("order list page (task 40)", () => {
     const wrapper = await mountPage();
     expect(vi.mocked(notifyError)).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).not.toContain("部分退款成功");
+    wrapper.unmount();
+  });
+
+  it("clears stale order rows and totals when refresh fails, then recovers on retry", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const table = wrapper.findComponent({ name: "DataTable" });
+    expect(table.props("total")).toBe(2);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
+
+    vi.mocked(orderApi.listOrders).mockRejectedValueOnce(new Error("refresh failed"));
+    table.vm.$emit("refresh");
+    await flushPromises();
+    expect(table.props("rows")).toEqual([]);
+    expect(table.props("total")).toBe(0);
+    expect(table.props("loading")).toBe(false);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(0);
+    expect(vi.mocked(notifyError)).toHaveBeenCalledTimes(1);
+
+    table.vm.$emit("refresh");
+    await flushPromises();
+    expect(table.props("total")).toBe(2);
+    expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
     wrapper.unmount();
   });
 });

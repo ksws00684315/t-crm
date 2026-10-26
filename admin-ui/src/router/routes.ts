@@ -144,6 +144,17 @@ export const routes: RouteRecordRaw[] = [
               permission: "product:view",
               componentName: "CopyJobPage"
             }
+          },
+          {
+            // Keep the existing URL so saved tabs and bookmarks remain valid.
+            path: "/system/link-templates",
+            name: "SystemLinkTemplates",
+            component: () => import("@/views/system/link-template/index.vue"),
+            meta: {
+              title: "route.linkTemplates",
+              superAdmin: true,
+              componentName: "SystemLinkTemplatePage"
+            }
           }
         ]
       },
@@ -320,16 +331,6 @@ export const routes: RouteRecordRaw[] = [
               title: "route.postTemplates",
               superAdmin: true,
               componentName: "SystemPostTemplatePage"
-            }
-          },
-          {
-            path: "link-templates",
-            name: "SystemLinkTemplates",
-            component: () => import("@/views/system/link-template/index.vue"),
-            meta: {
-              title: "route.linkTemplates",
-              superAdmin: true,
-              componentName: "SystemLinkTemplatePage"
             }
           },
           {

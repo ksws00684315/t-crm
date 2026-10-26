@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -150,9 +151,10 @@ const historyColumns = computed<DataColumn[]>(() => [
         <PrepayApplyDialog v-model="prepayVisible" :kol="detail" />
         <el-descriptions :column="1" border>
           <el-descriptions-item :label="t('kol.code')">
-            <CopyText :value="detail.kolCode" />
+            <NameCode :name="detail.name" :code="detail.kolCode"
+              ><template #code><CopyText :value="detail.kolCode" /></template
+            ></NameCode>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('common.name')">{{ detail.name }}</el-descriptions-item>
           <el-descriptions-item :label="t('common.email')">
             <CopyText :value="detail.email" />
           </el-descriptions-item>
@@ -308,12 +310,16 @@ const historyColumns = computed<DataColumn[]>(() => [
       v-model="copyTokenVisible"
       :preset-kol-id="detail.id"
       :preset-kol-label="`${detail.name} (${detail.kolCode})`"
+      :preset-kol-name="detail.name"
+      :preset-kol-code="detail.kolCode"
     />
     <PromoSheetUploadDialog
       v-if="detail"
       v-model="promoSheetVisible"
       :kol-id="detail.id"
       :kol-label="`${detail.name} (${detail.kolCode})`"
+      :kol-name="detail.name"
+      :kol-code="detail.kolCode"
     />
   </el-drawer>
 </template>

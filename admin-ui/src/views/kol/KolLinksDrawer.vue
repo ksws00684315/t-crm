@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NameCode from "@/components/NameCode.vue";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listLinks } from "@/api/link/link";
@@ -108,6 +109,7 @@ function reasonText(row: LinkVO): string {
     size="960px"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <NameCode v-if="kolCode" :name="kolName" :code="kolCode" />
     <el-form :inline="true" :model="query" @submit.prevent="search">
       <el-form-item :label="t('link.productCode')">
         <el-input
