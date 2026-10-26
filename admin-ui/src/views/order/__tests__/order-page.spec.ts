@@ -180,9 +180,18 @@ describe("order list page (task 40)", () => {
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
     expect(wrapper.find('[data-test="filter-order-no"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="filter-shop"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="filter-kol-code"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="filter-kol-keyword"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="filter-order-status"]').exists()).toBe(true);
-    expect(wrapper.findComponent(ElDatePicker).props("disabled")).toBe(true);
+    // Task 70 B01-B04: the order-time picker and every status option are live.
+    const picker = wrapper.findComponent(ElDatePicker);
+    expect(picker.exists()).toBe(true);
+    expect(picker.props("disabled")).toBeFalsy();
+    const options = wrapper.findAllComponents({ name: "ElOption" });
+    for (const status of ["REFUNDING", "REFUND_SUCCESS", "ABNORMAL"]) {
+      const option = options.find(item => item.props("value") === status);
+      expect(option, `option ${status} rendered`).toBeTruthy();
+      expect(option?.props("disabled")).toBeFalsy();
+    }
     // The order band keeps the order number, platform creation time, and shop together.
     expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
     expect(wrapper.text()).toContain("t40 Shop（S001）");
@@ -197,7 +206,7 @@ describe("order list page (task 40)", () => {
       .findAllComponents(ElSelect)
       .find(select => select.attributes("data-test") === "filter-shop");
     channelSelect?.vm.$emit("update:modelValue", "1");
-    await element("filter-kol-code").setValue("KOL-ZS01");
+    await element("filter-kol-keyword").setValue("Zoe");
     const statusSelect = wrapper
       .findAllComponents(ElSelect)
       .find(select => select.attributes("data-test") === "filter-order-status");
@@ -208,8 +217,66 @@ describe("order list page (task 40)", () => {
     expect(vi.mocked(orderApi.listOrders).mock.lastCall?.[0]).toMatchObject({
       orderNo: "2026102100001",
       shopId: "1",
-      kolCode: "KOL-ZS01",
+      kolKeyword: "Zoe",
       orderStatus: "PAID"
+    });
+    wrapper.unmount();
+  });
+
+  it("maps refund and abnormal statuses onto their own query params (task 70)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const statusSelect = wrapper
+      .findAllComponents(ElSelect)
+      .find(select => select.attributes("data-test") === "filter-order-status");
+    const cases = [
+      ["REFUNDING", "REFUNDING"],
+      ["REFUND_SUCCESS", "REFUNDED"]
+    ] as const;
+    for (const [picked, refundState] of cases) {
+      statusSelect?.vm.$emit("update:modelValue", picked);
+      await flushPromises();
+      element("search").trigger("click");
+      await flushPromises();
+      const params = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+      expect(params?.refundState).toBe(refundState);
+      expect(params?.abnormal).toBeUndefined();
+      expect(params?.orderStatus).toBeUndefined();
+    }
+    statusSelect?.vm.$emit("update:modelValue", "ABNORMAL");
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    const abnormal = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+    expect(abnormal?.abnormal).toBe(true);
+    expect(abnormal?.refundState).toBeUndefined();
+    expect(abnormal?.orderStatus).toBeUndefined();
+    // A standard status keeps using orderStatus.
+    statusSelect?.vm.$emit("update:modelValue", "CLOSED");
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    const standard = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+    expect(standard?.orderStatus).toBe("CLOSED");
+    expect(standard?.refundState).toBeUndefined();
+    expect(standard?.abnormal).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("sends the picked platform order-time window as UTC bounds (task 70 B01)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const picker = wrapper.findComponent(ElDatePicker);
+    picker.vm.$emit("update:modelValue", [
+      new Date("2026-10-15T16:00:00.000Z"),
+      new Date("2026-10-16T16:00:00.000Z")
+    ]);
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    expect(vi.mocked(orderApi.listOrders).mock.lastCall?.[0]).toMatchObject({
+      orderTimeFrom: "2026-10-15T16:00:00.000Z",
+      orderTimeTo: "2026-10-16T16:00:00.000Z"
     });
     wrapper.unmount();
   });
