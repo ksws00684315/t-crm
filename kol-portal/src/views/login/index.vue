@@ -3,7 +3,7 @@ import { ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
-  isDemoMode,
+
   login,
   loginDemo,
   selectCompany,
@@ -11,6 +11,7 @@ import {
   type AuthSession
 } from "@/api/auth";
 import AuthShell from "@/components/AuthShell.vue";
+import { isDemoMode } from "@/utils/demo-mode";
 import { useSessionStore } from "@/stores/session";
 import { siteName } from "@/stores/site-config";
 import { safeRedirect, validEmail, validPassword } from "@/utils/auth";

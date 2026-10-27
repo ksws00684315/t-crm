@@ -3,13 +3,14 @@ import "element-plus/dist/index.css";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import App from "./App.vue";
-import { isDemoMode, loginDemo } from "./api/auth";
+import { loginDemo } from "./api/auth";
 import { setupHttp } from "./api/setup";
 import { i18n } from "./locales";
 import router from "./router";
 import { useLocaleStore } from "./stores/locale";
 import { useSessionStore } from "./stores/session";
 import { loadSiteConfig, startSiteConfigRefresh } from "./stores/site-config";
+import { isDemoMode } from "./utils/demo-mode";
 import "./style/tokens.css";
 import "./style/index.css";
 
