@@ -99,17 +99,18 @@ describe("withdrawal notifications", () => {
     "WITHDRAWAL_APPROVED",
     "WITHDRAWAL_REJECTED",
     "WITHDRAWAL_PAID"
-  ])("opens %s on the finance tab with its withdrawal drawer", type => {
+  ])("opens %s only with commission:view (the withdrawal tab's own gate)", type => {
     expect(notificationHref({ type, params: {}, bizId: "9007199254740993" })).toBe(
       "/fund/payouts?withdrawalId=9007199254740993"
     );
-    // The /fund/payouts route accepts either payout-account:review or commission:view.
     expect(
       canOpenNotification(type, accessOf({ ...staff, permissions: ["commission:view"] }))
     ).toBe(true);
+    // payout-account:review alone never opens it: the withdrawal tab and its drawer need
+    // commission:view, so the notification would land on a tab without the target.
     expect(
       canOpenNotification(type, accessOf({ ...staff, permissions: ["payout-account:review"] }))
-    ).toBe(true);
+    ).toBe(false);
     expect(canOpenNotification(type, accessOf(staff))).toBe(false);
     expect(canOpenNotification(type, accessOf({ ...superAdmin, role: "PLATFORM_ADMIN" }))).toBe(
       false

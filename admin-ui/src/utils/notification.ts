@@ -115,11 +115,10 @@ export function canOpenNotification(type: string, access: AccessProfile): boolea
     case "WITHDRAWAL_APPROVED":
     case "WITHDRAWAL_REJECTED":
     case "WITHDRAWAL_PAID":
-      // Same gate as the /fund/payouts route the jump lands on (any one of the codes).
-      return (
-        !access.isPlatformAdmin &&
-        (access.can("payout-account:review") || access.can("commission:view"))
-      );
+      // The withdrawal tab and its drawer require financeAbilities.view, i.e. commission:view;
+      // an account holding only payout-account:review would land on the payout tab where the
+      // jump has no target (PR #142 review).
+      return !access.isPlatformAdmin && access.can("commission:view");
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return access.can("payout-account:review") || access.can("commission:view");
     case "ORDER_SYNC_FAILED":
