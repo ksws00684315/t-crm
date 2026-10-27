@@ -1,3 +1,8 @@
+logging:
+  pattern:
+    # traceId from RequestTraceFilter's MDC on every request thread (#106); renders nothing on
+    # non-web threads (blank correlation is omitted, not printed as empty brackets).
+    correlation: "[%X{traceId:-}] "
 server:
   port: ${TCRM_ADMIN_PORT:8080}
 spring:
@@ -17,6 +22,11 @@ spring:
       database: 0
   flyway:
     locations: classpath:db/migration
+    # Lenient by default (a newer schema only logs a warning): local development and the preview
+    # share one database with branches of different ages (#106). The production template overrides
+    # this to strict (empty pattern) via TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS so a schema newer
+    # than the image fails startup instead of breaking pages at runtime.
+    ignore-migration-patterns: ${TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS:*:future}
   messages:
     # User-facing texts follow the request language (ADR-0.15); an unsupported locale never falls
     # back to the server default but to the base bundle, which equals the English one.
@@ -48,6 +58,9 @@ management:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    # Unknown stored enum values read as null + WARN instead of failing the whole query (#106);
+    # writes stay strict because the Java enum already restricts the stored values.
+    default-enum-type-handler: com.tcrm.admin.shared.LenientEnumTypeHandler
   global-config:
     db-config:
       id-type: assign_id

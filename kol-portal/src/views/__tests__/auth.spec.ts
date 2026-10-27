@@ -18,10 +18,10 @@ import Forgot from "@/views/forgot/index.vue";
 import Account from "@/views/account/index.vue";
 import Layout from "@/layout/index.vue";
 
+vi.mock("@/utils/demo-mode", () => ({ isDemoMode: true }));
 vi.mock("@/api/auth", () => ({
   login: vi.fn(),
   loginDemo: vi.fn(),
-  isDemoMode: true,
   selectCompany: vi.fn(),
   activate: vi.fn(),
   forgotPassword: vi.fn(),

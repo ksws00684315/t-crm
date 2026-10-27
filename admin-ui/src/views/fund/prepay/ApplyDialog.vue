@@ -16,6 +16,7 @@ import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
 import { ApiError } from "@/utils/http/error";
 import { prepayAbilities, validCny } from "@/utils/prepay";
+import { randomUuid } from "@/utils/uuid";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -91,7 +92,7 @@ async function save() {
     if (!(await formRef.value?.validate().catch(() => false))) return;
     if (!attempt)
       attempt = {
-        requestId: crypto.randomUUID(),
+        requestId: randomUuid(),
         kolId: props.kol.id,
         amountCny: form.amountCny
       };

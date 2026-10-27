@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
 import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { exportWithdrawals, getWithdrawal, listFinanceTasks } from "@/api/commission/finance";
@@ -23,6 +24,8 @@ import { prepayAbilities } from "@/utils/prepay";
 
 defineOptions({ name: "WithdrawalTasksPage" });
 const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const user = useUserStore();
 const abilities = computed(() => financeAbilities(user.user));
 const filters = reactive({ applicationNo: "", kolId: "", status: "" });
@@ -228,6 +231,27 @@ function statusLabel(status: string, type: FinanceTask["type"]) {
     ? t(`prepay.status.${status}`)
     : t(`finance.${status}`);
 }
+/**
+ * Withdrawal notifications (L-017) jump here with ?withdrawalId=…: open the task drawer. The
+ * param is stripped again when the drawer closes, like the prepay page does with its id.
+ */
+watch(
+  () => route.query.withdrawalId,
+  id => {
+    if (typeof id === "string" && id && abilities.value.view) {
+      detailId.value = id;
+      viewOpen.value = true;
+    }
+  },
+  { immediate: true }
+);
+watch(viewOpen, open => {
+  if (!open && route.query.withdrawalId) {
+    const query = { ...route.query };
+    delete query.withdrawalId;
+    void router.replace({ query });
+  }
+});
 watch([page, size], load);
 watch(
   () => [previewContext.role, previewContext.scenario],

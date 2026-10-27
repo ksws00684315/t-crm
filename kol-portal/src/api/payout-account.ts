@@ -1,6 +1,5 @@
 import { http } from "./http";
-
-const demoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
+import { isDemoMode as demoMode } from "@/utils/demo-mode";
 let demoAccounts: PayoutAccountVO[] = [
   {
     id: "1",

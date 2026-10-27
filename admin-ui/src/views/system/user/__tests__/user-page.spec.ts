@@ -94,6 +94,25 @@ describe("user management page", () => {
     wrapper.unmount();
   });
 
+  it("renders placeholders for enum values this build does not know (#106)", async () => {
+    const unknown: UserVO = {
+      ...row,
+      username: "mallory",
+      role: null,
+      postTemplate: null,
+      dataScope: null
+    };
+    const wrapper = await mountPage([row, unknown], "2");
+    const unknownRow = [...document.body.querySelectorAll("tr")].find(tr =>
+      tr.textContent?.includes("mallory")
+    );
+    // Unknown role, post and data scope show the dash placeholder — not blanks, and the scope
+    // must not silently read as OWN.
+    expect(unknownRow?.textContent?.match(/—/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(unknownRow?.textContent).not.toContain("仅本人");
+    wrapper.unmount();
+  });
+
   it("converts a string total from the API so el-pagination renders", async () => {
     // Spec 03 serializes long total as a string. Passing that string straight to
     // el-pagination leaves the pager unrendered (Element Plus deprecation warning).

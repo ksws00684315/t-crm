@@ -22,6 +22,7 @@ import { saveBlob } from "@/utils/download";
 import { notifyError } from "@/utils/notify";
 import { ApiError } from "@/utils/http/error";
 import { serverFieldErrors } from "@/utils/validation";
+import { randomUuid } from "@/utils/uuid";
 import {
   canCancelPrepay,
   prepayAbilities,
@@ -311,7 +312,7 @@ async function submitPayment() {
         ...form,
         payMethod: form.payMethod.trim(),
         payTime: new Date(form.payTime).toISOString(),
-        requestId: crypto.randomUUID()
+        requestId: randomUuid()
       },
       voucher: voucher.value
     };

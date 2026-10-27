@@ -55,6 +55,7 @@ export function notificationValues(item: NotificationView): Record<string, strin
     bdName: params.bdName ?? "",
     count: params.count ?? 0,
     prepayNo: params.prepayNo ?? "",
+    applicationNo: params.applicationNo ?? "",
     time: params.effectiveAt ? formatInstantToMinute(params.effectiveAt) : "",
     kind,
     result
@@ -74,6 +75,12 @@ export function notificationHref(item: NotificationView): string {
     case "PREPAY_REJECTED":
     case "PREPAY_PAID":
       return `/fund/prepays?id=${encodeURIComponent(item.bizId ?? "")}`;
+    case "WITHDRAWAL_SUBMITTED":
+    case "WITHDRAWAL_APPROVED":
+    case "WITHDRAWAL_REJECTED":
+    case "WITHDRAWAL_PAID":
+      // withdrawalId opens the task drawer; `id` stays the payout-account jump below.
+      return `/fund/payouts?withdrawalId=${encodeURIComponent(item.bizId ?? "")}`;
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return `/fund/payouts?id=${encodeURIComponent(item.bizId ?? "")}`;
     case "ORDER_SYNC_FAILED":
@@ -104,6 +111,14 @@ export function canOpenNotification(type: string, access: AccessProfile): boolea
         !access.isPlatformAdmin &&
         (access.can("commission:view") || access.can("prepay:review") || access.can("prepay:pay"))
       );
+    case "WITHDRAWAL_SUBMITTED":
+    case "WITHDRAWAL_APPROVED":
+    case "WITHDRAWAL_REJECTED":
+    case "WITHDRAWAL_PAID":
+      // The withdrawal tab and its drawer require financeAbilities.view, i.e. commission:view;
+      // an account holding only payout-account:review would land on the payout tab where the
+      // jump has no target (PR #142 review).
+      return !access.isPlatformAdmin && access.can("commission:view");
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return access.can("payout-account:review") || access.can("commission:view");
     case "ORDER_SYNC_FAILED":

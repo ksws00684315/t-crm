@@ -7,6 +7,7 @@ import type { PaymentRegistration, Withdrawal } from "@/api/commission/finance-t
 import { cents, validMoney } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
+import { randomUuid } from "@/utils/uuid";
 const props = defineProps<{ modelValue: boolean; withdrawal: Withdrawal | null }>();
 const emit = defineEmits<{ "update:modelValue": [value: boolean]; saved: [] }>();
 const { t } = useI18n();
@@ -41,7 +42,7 @@ watch(
       });
       file.value = undefined;
       errors.value = {};
-      key = crypto.randomUUID();
+      key = randomUuid();
       formRef.value?.clearValidate();
     }
   }

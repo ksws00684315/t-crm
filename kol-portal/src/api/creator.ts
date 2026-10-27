@@ -1,12 +1,6 @@
 import { http } from "./http";
-
-export const isDemoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
-const moneyCents = (value: string) => {
-  const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * 100n + BigInt((fraction + "00").slice(0, 2));
-};
-const centsMoney = (value: bigint) =>
-  `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
+import { isDemoMode } from "@/utils/demo-mode";
+import { centsMoney, moneyCents } from "@/utils/money";
 const demoFunds: FundSummary = {
   totalIncomeCny: "2400.00",
   commissionIncomeCny: "2400.00",

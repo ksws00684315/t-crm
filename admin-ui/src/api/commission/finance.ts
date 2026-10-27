@@ -162,11 +162,17 @@ export const downloadWithdrawalVoucher = (id: string) =>
 export async function exportWithdrawals(query: WithdrawalQuery) {
   if (!previewBuild) {
     if (!financeApiReady) financeError(503);
-    const { kolId, ...rest } = query;
+    // Keep the list filters (including kolId, #132): the export endpoint accepts the same query
+    // parameters as the list; type/page/size are list-only and not sent.
+    const { applicationNo, kolId, status } = query;
     return http.download({
       url: "/commission/withdrawals/export",
       method: "get",
-      params: { ...rest, ...(kolId?.trim() ? { kol: kolId.trim() } : {}) }
+      params: {
+        ...(applicationNo ? { applicationNo } : {}),
+        ...(kolId?.trim() ? { kolId: kolId.trim() } : {}),
+        ...(status ? { status } : {})
+      }
     });
   }
   if (!financePreviewAllows("export")) financeError(403, "AUTH_FORBIDDEN");

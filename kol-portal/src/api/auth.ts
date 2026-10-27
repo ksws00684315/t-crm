@@ -1,4 +1,5 @@
 import { http } from "./http";
+import { isDemoMode } from "@/utils/demo-mode";
 
 export interface KolProfile {
   kolCode: string;
@@ -30,7 +31,6 @@ export interface CompanySelection {
   companies: { tenantId: string; tenantName: string }[];
 }
 
-export const isDemoMode = import.meta.env.DEV && import.meta.env.MODE === "demo";
 let demoProfile: KolProfile = {
   kolCode: "KOL-DEMO-0821",
   systemId: "KOL-DEMO-0821",
