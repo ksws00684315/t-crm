@@ -296,6 +296,127 @@ class WithdrawalIT {
     }
   }
 
+  /**
+   * The export writes an audit row at the end; with no outer transaction (how production calls it)
+   * a readOnly service transaction rejects that INSERT with SQLState 25006 and the endpoint answers
+   * 500. Reproduced on a live stack during task 73's browser validation. The application row is
+   * seeded straight through SQL and the test runs without @Transactional so nothing masks the
+   * read-only flag.
+   */
+  @Test
+  void shouldAuditTheExport_withoutAReadOnlyTransaction() {
+    long operator = operatorId();
+    long kol = createKol(operator);
+    long withdrawalId = 7300000000000031L;
+    try (var ignored = TenantScope.openCompany(TENANT_ID)) {
+      jdbc.update(
+          "INSERT INTO crm_commission_withdrawal (id, tenant_id, kol_id, application_no,"
+              + " request_id, request_fingerprint, amount_cny, status, paused, account_type,"
+              + " account_cipher, account_masked, account_currency, account_holder, actor_id,"
+              + " create_time, update_time)"
+              + " VALUES (?, ?, ?, 'W20261073RO01', gen_random_uuid(), ?, 300.00,"
+              + " 'PENDING_REVIEW', FALSE, 'PAYPAL', 'v1:t73cipher', 'a***@example.test', 'USD',"
+              + " 'T73 RO', ?, now(), now())",
+          withdrawalId,
+          TENANT_ID,
+          kol,
+          "d".repeat(64),
+          operator);
+      byte[] csv =
+          withdrawals.export(
+              superAdmin(operator),
+              new WithdrawalService.Filter(null, kol, null, null, null, 1, 100));
+      assertThat(new String(csv, java.nio.charset.StandardCharsets.UTF_8))
+          .contains("W20261073RO01");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM sys_oper_log WHERE module = 'Withdrawal'"
+                      + " AND action = 'Export tasks' AND user_id = ?",
+                  Integer.class,
+                  operator))
+          .isEqualTo(1);
+    } finally {
+      jdbc.update(
+          "DELETE FROM crm_commission_withdrawal WHERE tenant_id = ? AND kol_id = ?",
+          TENANT_ID,
+          kol);
+      cleanupKol(TENANT_ID, kol);
+      jdbc.update(
+          "DELETE FROM sys_oper_log WHERE module = 'Withdrawal' AND action = 'Export tasks'"
+              + " AND user_id = ?",
+          operator);
+    }
+  }
+
+  @Test
+  @Transactional
+  void shouldExportOnlyTheRowsMatchingTheCreatorFilters() {
+    try (var ignored = TenantScope.openCompany(TENANT_ID)) {
+      long operator = operatorId();
+      long otherBd = IdWorker.getId();
+      kolId = createKol(operator);
+      long kolB = createKol(otherBd);
+      long[] itemsA = createReleasedItems(kolId, "500.00");
+      releaseItems(kolId, itemsA, new String[] {"500.00"});
+      walletService.postCommissionCredit(
+          new CommissionWalletService.CreditCommand(
+              TENANT_ID,
+              kolId,
+              itemsA[0],
+              "t73:credit:a",
+              new BigDecimal("500.00"),
+              Instant.now()));
+      long[] itemsB = createReleasedItems(kolB, "500.00");
+      releaseItems(kolB, itemsB, new String[] {"500.00"});
+      walletService.postCommissionCredit(
+          new CommissionWalletService.CreditCommand(
+              TENANT_ID, kolB, itemsB[0], "t73:credit:b", new BigDecimal("500.00"), Instant.now()));
+      var applicationA = applyFresh(kolId, "300.00");
+      var applicationB = applyFresh(kolB, "300.00");
+      String kolCodeA =
+          jdbc.queryForObject("SELECT kol_code FROM crm_kol WHERE id = ?", String.class, kolId);
+
+      var exporter = superAdmin(operator);
+      String unfiltered =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, null, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(unfiltered)
+          .contains(applicationA.applicationNo())
+          .contains(applicationB.applicationNo());
+
+      // #132: the export used to drop kolId, kolKeyword and bdUserId, so every filter below
+      // exported the whole list instead of the matching rows.
+      String byKolId =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, kolId, null, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byKolId)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+
+      String byKeyword =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, kolCodeA, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byKeyword)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+
+      String byBd =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, null, operator, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byBd)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+    }
+  }
+
   @Test
   @Transactional
   void shouldWithdrawRejectAndResubmit_withReasonFlow() {

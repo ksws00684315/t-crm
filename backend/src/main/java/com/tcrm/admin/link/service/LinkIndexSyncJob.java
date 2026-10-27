@@ -212,6 +212,11 @@ public class LinkIndexSyncJob {
    * @return how many KOL refreshes this row needs; zero means the row is already done
    */
   private int expand(LinkIndexOutboxDO row, Map<Long, KolWork> works) {
+    // An unknown stored scope reads back as null (#106): skip the row instead of crashing the
+    // sync loop; the lenient handler already logged the offending value.
+    if (row.getScope() == null) {
+      return 0;
+    }
     return switch (row.getScope()) {
       case KOL -> {
         addFull(works, row.getScopeId(), row.getId());

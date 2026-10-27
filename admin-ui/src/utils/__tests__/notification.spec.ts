@@ -5,6 +5,7 @@ import {
   canOpenNotification,
   notificationHref,
   notificationText,
+  notificationValues,
   relativeNotificationTime,
   unreadBadge
 } from "@/utils/notification";
@@ -89,6 +90,45 @@ describe("notification text", () => {
     expect(canOpenNotification("BD_TRANSFER_CANCELLED", accessOf(superAdmin))).toBe(true);
     expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(staff))).toBe(false);
     expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(superAdmin))).toBe(true);
+  });
+});
+
+describe("withdrawal notifications", () => {
+  it.each([
+    "WITHDRAWAL_SUBMITTED",
+    "WITHDRAWAL_APPROVED",
+    "WITHDRAWAL_REJECTED",
+    "WITHDRAWAL_PAID"
+  ])("opens %s only with commission:view (the withdrawal tab's own gate)", type => {
+    expect(notificationHref({ type, params: {}, bizId: "9007199254740993" })).toBe(
+      "/fund/payouts?withdrawalId=9007199254740993"
+    );
+    expect(
+      canOpenNotification(type, accessOf({ ...staff, permissions: ["commission:view"] }))
+    ).toBe(true);
+    // payout-account:review alone never opens it: the withdrawal tab and its drawer need
+    // commission:view, so the notification would land on a tab without the target.
+    expect(
+      canOpenNotification(type, accessOf({ ...staff, permissions: ["payout-account:review"] }))
+    ).toBe(false);
+    expect(canOpenNotification(type, accessOf(staff))).toBe(false);
+    expect(canOpenNotification(type, accessOf({ ...superAdmin, role: "PLATFORM_ADMIN" }))).toBe(
+      false
+    );
+  });
+
+  it("renders the sentence with the creator identity and application number", () => {
+    const item = {
+      type: "WITHDRAWAL_SUBMITTED" as const,
+      params: { kolCode: "KOL-73", kolName: "Ada", applicationNo: "W20261027001" },
+      bizId: "1"
+    };
+    i18n.global.locale.value = "zh-CN";
+    expect(notificationText(item)).toContain("W20261027001");
+    expect(notificationValues(item).applicationNo).toBe("W20261027001");
+    i18n.global.locale.value = "en-US";
+    expect(notificationText(item)).toContain("W20261027001");
+    i18n.global.locale.value = "zh-CN";
   });
 });
 

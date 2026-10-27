@@ -56,12 +56,15 @@ public class KolAccountStoreService implements KolAccountStore {
   public void updateLastLoginTime(Long id, Instant time) {
     TenantScope.runSystem(
         "record KOL last login time",
-        () -> {
-          KolDO change = new KolDO();
-          change.setId(id);
-          change.setLastLoginTime(time);
-          kols.updateById(change);
-        });
+        () ->
+            // Column-scoped on purpose: a partial entity with updateById would write NULL into
+            // every ALWAYS-strategy column (task 74 D1). A login is not a profile change, so
+            // update_time stays untouched as well.
+            kols.update(
+                null,
+                new LambdaUpdateWrapper<KolDO>()
+                    .eq(KolDO::getId, id)
+                    .set(KolDO::getLastLoginTime, time)));
   }
 
   @Override

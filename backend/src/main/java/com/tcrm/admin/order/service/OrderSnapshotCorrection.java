@@ -84,7 +84,7 @@ public class OrderSnapshotCorrection {
           });
       redis.opsForValue().set(CHECKPOINT, end.toString());
     } catch (RuntimeException error) {
-      LOG.error("Order BD snapshot correction failed; checkpoint retained");
+      LOG.error("Order BD snapshot correction failed; checkpoint retained", error);
       throw error;
     }
   }

@@ -6,6 +6,10 @@ export type NotificationType =
   | "PREPAY_APPROVED"
   | "PREPAY_REJECTED"
   | "PREPAY_PAID"
+  | "WITHDRAWAL_SUBMITTED"
+  | "WITHDRAWAL_APPROVED"
+  | "WITHDRAWAL_REJECTED"
+  | "WITHDRAWAL_PAID"
   | "PAYOUT_ACCOUNT_SUBMITTED"
   | "ORDER_SYNC_FAILED"
   | "BD_TRANSFER_CANCELLED"
@@ -27,6 +31,8 @@ export interface NotificationParams {
   bdName: string | null;
   count: number | null;
   prepayNo?: string | null;
+  /** Withdrawal messages (task 63): the application number, e.g. W20261027... */
+  applicationNo?: string | null;
   /** Departure messages: heir display name, ISO instant, result and plan type of the plan. */
   heirName: string | null;
   effectiveAt: string | null;

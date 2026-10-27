@@ -22,6 +22,7 @@ import { uploadQrFile } from "@/api/payout-account";
 import { ApiError } from "@/utils/http/error";
 import { checkQrFile } from "@/utils/payout-account";
 import { formatMoney } from "@/utils/orders";
+import { randomUuid } from "@/utils/uuid";
 
 defineOptions({ name: "FundsPage" });
 const { t, locale } = useI18n();
@@ -244,7 +245,7 @@ async function submit() {
     const fingerprint = JSON.stringify(payload);
     if (submittedPayload !== fingerprint) {
       submittedPayload = fingerprint;
-      idempotencyKey = crypto.randomUUID();
+      idempotencyKey = randomUuid();
     }
     await submitWithdrawal({ ...payload, idempotencyKey });
     applyVisible.value = false;

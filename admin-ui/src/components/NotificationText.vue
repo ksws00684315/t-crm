@@ -39,6 +39,7 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
     <template #bdName>{{ values.bdName }}</template>
     <template #count>{{ values.count }}</template>
     <template #prepayNo>{{ values.prepayNo }}</template>
+    <template #applicationNo>{{ values.applicationNo }}</template>
     <template #time>{{ values.time }}</template>
     <template #kind>{{ values.kind }}</template>
     <template #result>{{ values.result }}</template>

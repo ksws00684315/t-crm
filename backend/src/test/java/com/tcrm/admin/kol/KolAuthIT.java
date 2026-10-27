@@ -18,6 +18,7 @@ import com.tcrm.admin.shared.MailMessage;
 import com.tcrm.admin.shared.MailSender;
 import com.tcrm.admin.shared.TenantScope;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -604,6 +605,88 @@ class KolAuthIT {
                 "{\"name\":\"X Creator\",\"primaryHandle\":\"@only\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
+  }
+
+  // ------------------------------------------------------------------ D1: login must not wipe data
+
+  /**
+   * Recording a login is not a profile change: the nine nullable-and-clearable columns (task 11/29/
+   * 33) must survive every sign-in, and the sign-in must still land in last_login_time (task 74).
+   */
+  @Test
+  void shouldKeepProfileAndPromotionFields_whenKolLogsIn() throws Exception {
+    long kolId = fullyConfiguredKol("keep@example.com", "some-password-1");
+    Map<String, Object> before = profileOf(kolId);
+    assertThat(before.get("last_login_time")).isNull();
+
+    kolLogin("keep@example.com", "some-password-1");
+
+    Map<String, Object> after = profileOf(kolId);
+    assertProfileIntact(before, after);
+    assertThat(after.get("last_login_time")).isNotNull();
+  }
+
+  /** The password change re-signs the account in, which goes through the same login write. */
+  @Test
+  void shouldKeepProfileAndPromotionFields_whenKolChangesPassword() throws Exception {
+    long kolId = fullyConfiguredKol("keeppw@example.com", "old-password-1");
+    String token = kolLogin("keeppw@example.com", "old-password-1").at("/data/token").asString();
+    Map<String, Object> before = profileOf(kolId);
+    assertThat(before.get("last_login_time")).isNotNull();
+
+    mvc.perform(
+            json(
+                put("/kol-api/me/password").header(KOL_TOKEN, token),
+                "{\"oldPassword\":\"old-password-1\",\"newPassword\":\"next-password-1\"}"))
+        .andExpect(status().isOk());
+
+    Map<String, Object> after = profileOf(kolId);
+    assertThat(((java.sql.Timestamp) after.get("last_login_time")).toInstant())
+        .isAfter(((java.sql.Timestamp) before.get("last_login_time")).toInstant());
+    assertProfileIntact(before, after);
+  }
+
+  /** Every ALWAYS-written column, seeded with a non-null legal value (task 74 D1). */
+  private long fullyConfiguredKol(String email, String password) {
+    long kolId = activatedKol(1L, email, password);
+    jdbc.update("DELETE FROM crm_link_template WHERE id = 74001");
+    jdbc.update(
+        "INSERT INTO crm_link_template (id, tenant_id, template_code, template_name, template_url,"
+            + " channel_code, sort_order, status, create_time, update_time)"
+            + " VALUES (74001, 1, 't74-kakobuy', 'kakobuy',"
+            + " 'https://www.kakobuy.com/product/{PRODUCT_ID}?invite={INVITE_CODE}', 'WEIDIAN', 0,"
+            + " 1, now(), now())");
+    jdbc.update(
+        "UPDATE crm_kol SET default_rate = 0.1200, remark = 't74 remark',"
+            + " whatsapp = '+15550001028', link_template_id = 74001, invite_code = 't74invite',"
+            + " sheet_url = 'https://docs.google.com/spreadsheets/d/t74sheet/edit',"
+            + " phone = '+15550002028', promotion_remark = 't74 promotion', auto_cleanup_days = 30"
+            + " WHERE id = ?",
+        kolId);
+    return kolId;
+  }
+
+  private Map<String, Object> profileOf(long kolId) {
+    return jdbc.queryForMap(
+        "SELECT default_rate, remark, whatsapp, link_template_id, invite_code, sheet_url, phone,"
+            + " promotion_remark, auto_cleanup_days, last_login_time FROM crm_kol WHERE id = ?",
+        kolId);
+  }
+
+  private static void assertProfileIntact(Map<String, Object> before, Map<String, Object> after) {
+    for (String column :
+        List.of(
+            "default_rate",
+            "remark",
+            "whatsapp",
+            "link_template_id",
+            "invite_code",
+            "sheet_url",
+            "phone",
+            "promotion_remark",
+            "auto_cleanup_days")) {
+      assertThat(after.get(column)).as(column).isEqualTo(before.get(column));
+    }
   }
 
   private static KolDO baseKol(String email) {

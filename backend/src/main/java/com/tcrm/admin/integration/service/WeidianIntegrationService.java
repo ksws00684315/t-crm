@@ -283,7 +283,7 @@ public class WeidianIntegrationService implements ShopIntegrationApi {
             CALLBACK_PATH,
             "{\"shopId\":\"" + saved.shopId() + "\"}");
       } catch (RuntimeException e) {
-        LOG.error("Weidian authorization audit persistence failed for shop {}", saved.shopId());
+        LOG.error("Weidian authorization audit persistence failed for shop {}", saved.shopId(), e);
       }
       return CallbackResult.ok();
     } catch (WeidianShopMismatchException e) {

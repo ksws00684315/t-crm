@@ -20,7 +20,10 @@ services:
       - "127.0.0.1:${TCRM_PREVIEW_REDIRECT_PORT:-8892}:8892"
     volumes:
       # Static file, not the production templates: no certificates and no envsubst.
-      - ./nginx/preview/preview.conf:/etc/nginx/conf.d/default.conf:ro
+      # Directory mount, not the single file: git replaces preview.conf with a new inode, and a
+      # single-file bind mount keeps serving the deleted inode, which breaks nginx -s reload
+      # (L-012). The directory has only preview.conf, loaded by the image's conf.d/*.conf include.
+      - ./nginx/preview:/etc/nginx/conf.d:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
       - ./www-preview:/usr/share/nginx/sites:ro
     # service_started (not healthy): the redirect service must stay reachable even when the backend

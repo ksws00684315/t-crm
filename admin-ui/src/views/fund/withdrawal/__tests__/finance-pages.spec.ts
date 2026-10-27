@@ -1,6 +1,7 @@
 import type * as FinanceUtils from "@/utils/finance";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import { createMemoryHistory, createRouter } from "vue-router";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
@@ -67,8 +68,12 @@ beforeEach(() => {
     })()
   );
 });
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/", component: TasksPage }]
+});
 const global = {
-  plugins: [ElementPlus, i18n],
+  plugins: [ElementPlus, i18n, router],
   stubs: { IncomeDrawer: true, WithdrawalDrawer: true, PaymentDialog: true }
 };
 describe("finance admin pages", () => {
@@ -144,6 +149,30 @@ describe("finance admin pages", () => {
     expect(wrapper.find('[data-test="withdrawal-progress-action"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="withdrawal-view"]')).toHaveLength(8);
     expect(wrapper.find('[data-test="finance-scenario"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it("opens the task drawer for the withdrawalId notification jump (L-017)", async () => {
+    await router.push({ path: "/", query: { withdrawalId: "3001" } });
+    const wrapper = mount(TasksPage, {
+      global: {
+        ...global,
+        stubs: {
+          WithdrawalDrawer: {
+            name: "WithdrawalDrawer",
+            props: ["modelValue", "id"],
+            template: '<div data-test="withdrawal-drawer" />'
+          }
+        }
+      }
+    });
+    await flushPromises();
+    const drawer = wrapper.getComponent({ name: "WithdrawalDrawer" });
+    expect(drawer.props("modelValue")).toBe(true);
+    expect(drawer.props("id")).toBe("3001");
+    // Closing the drawer strips the param, like the prepay page with its id.
+    drawer.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(router.currentRoute.value.query.withdrawalId).toBeUndefined();
     wrapper.unmount();
   });
   it("keeps configuration read only without authorization and validates amounts", async () => {
