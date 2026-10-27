@@ -298,6 +298,75 @@ class WithdrawalIT {
 
   @Test
   @Transactional
+  void shouldExportOnlyTheRowsMatchingTheCreatorFilters() {
+    try (var ignored = TenantScope.openCompany(TENANT_ID)) {
+      long operator = operatorId();
+      long otherBd = IdWorker.getId();
+      kolId = createKol(operator);
+      long kolB = createKol(otherBd);
+      long[] itemsA = createReleasedItems(kolId, "500.00");
+      releaseItems(kolId, itemsA, new String[] {"500.00"});
+      walletService.postCommissionCredit(
+          new CommissionWalletService.CreditCommand(
+              TENANT_ID,
+              kolId,
+              itemsA[0],
+              "t73:credit:a",
+              new BigDecimal("500.00"),
+              Instant.now()));
+      long[] itemsB = createReleasedItems(kolB, "500.00");
+      releaseItems(kolB, itemsB, new String[] {"500.00"});
+      walletService.postCommissionCredit(
+          new CommissionWalletService.CreditCommand(
+              TENANT_ID, kolB, itemsB[0], "t73:credit:b", new BigDecimal("500.00"), Instant.now()));
+      var applicationA = applyFresh(kolId, "300.00");
+      var applicationB = applyFresh(kolB, "300.00");
+      String kolCodeA =
+          jdbc.queryForObject("SELECT kol_code FROM crm_kol WHERE id = ?", String.class, kolId);
+
+      var exporter = superAdmin(operator);
+      String unfiltered =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, null, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(unfiltered)
+          .contains(applicationA.applicationNo())
+          .contains(applicationB.applicationNo());
+
+      // #132: the export used to drop kolId, kolKeyword and bdUserId, so every filter below
+      // exported the whole list instead of the matching rows.
+      String byKolId =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, kolId, null, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byKolId)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+
+      String byKeyword =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, kolCodeA, null, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byKeyword)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+
+      String byBd =
+          new String(
+              withdrawals.export(
+                  exporter, new WithdrawalService.Filter(null, null, null, operator, null, 1, 100)),
+              java.nio.charset.StandardCharsets.UTF_8);
+      assertThat(byBd)
+          .contains(applicationA.applicationNo())
+          .doesNotContain(applicationB.applicationNo());
+    }
+  }
+
+  @Test
+  @Transactional
   void shouldWithdrawRejectAndResubmit_withReasonFlow() {
     try (var ignored = TenantScope.openCompany(TENANT_ID)) {
       long operator = operatorId();

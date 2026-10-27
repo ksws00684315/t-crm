@@ -1154,7 +1154,16 @@ public class WithdrawalService {
             "\uFEFF申请编号,达人编号,达人名称,金额(CNY),状态,收款方式,脱敏收款账户,申请时间,审核备注,"
                 + "付款金额(CNY),支付时间,实际支付金额,实际支付币种\r\n");
     PageResult<AdminRow> first =
-        page(user, new Filter(filter.applicationNo(), null, null, null, filter.status(), 1, 100));
+        page(
+            user,
+            new Filter(
+                filter.applicationNo(),
+                filter.kolId(),
+                filter.kolKeyword(),
+                filter.bdUserId(),
+                filter.status(),
+                1,
+                100));
     if (first.total() > 100000) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -1164,7 +1173,14 @@ public class WithdrawalService {
           csv,
           page(
                   user,
-                  new Filter(filter.applicationNo(), null, null, null, filter.status(), page, 100))
+                  new Filter(
+                      filter.applicationNo(),
+                      filter.kolId(),
+                      filter.kolKeyword(),
+                      filter.bdUserId(),
+                      filter.status(),
+                      page,
+                      100))
               .items());
     }
     audit.recordTenantOperation(
