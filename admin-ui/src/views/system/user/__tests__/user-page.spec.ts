@@ -103,8 +103,8 @@ describe("user management page", () => {
       dataScope: null
     };
     const wrapper = await mountPage([row, unknown], "2");
-    const unknownRow = [...document.body.querySelectorAll("tr")].find(
-      tr => tr.textContent?.includes("mallory")
+    const unknownRow = [...document.body.querySelectorAll("tr")].find(tr =>
+      tr.textContent?.includes("mallory")
     );
     // Unknown role, post and data scope show the dash placeholder — not blanks, and the scope
     // must not silently read as OWN.
