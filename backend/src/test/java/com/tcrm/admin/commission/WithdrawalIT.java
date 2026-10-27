@@ -296,6 +296,58 @@ class WithdrawalIT {
     }
   }
 
+  /**
+   * The export writes an audit row at the end; with no outer transaction (how production calls it)
+   * a readOnly service transaction rejects that INSERT with SQLState 25006 and the endpoint answers
+   * 500. Reproduced on a live stack during task 73's browser validation. The application row is
+   * seeded straight through SQL and the test runs without @Transactional so nothing masks the
+   * read-only flag.
+   */
+  @Test
+  void shouldAuditTheExport_withoutAReadOnlyTransaction() {
+    long operator = operatorId();
+    long kol = createKol(operator);
+    long withdrawalId = 7300000000000031L;
+    try (var ignored = TenantScope.openCompany(TENANT_ID)) {
+      jdbc.update(
+          "INSERT INTO crm_commission_withdrawal (id, tenant_id, kol_id, application_no,"
+              + " request_id, request_fingerprint, amount_cny, status, paused, account_type,"
+              + " account_cipher, account_masked, account_currency, account_holder, actor_id,"
+              + " create_time, update_time)"
+              + " VALUES (?, ?, ?, 'W20261073RO01', gen_random_uuid(), ?, 300.00,"
+              + " 'PENDING_REVIEW', FALSE, 'PAYPAL', 'v1:t73cipher', 'a***@example.test', 'USD',"
+              + " 'T73 RO', ?, now(), now())",
+          withdrawalId,
+          TENANT_ID,
+          kol,
+          "d".repeat(64),
+          operator);
+      byte[] csv =
+          withdrawals.export(
+              superAdmin(operator),
+              new WithdrawalService.Filter(null, kol, null, null, null, 1, 100));
+      assertThat(new String(csv, java.nio.charset.StandardCharsets.UTF_8))
+          .contains("W20261073RO01");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM sys_oper_log WHERE module = 'Withdrawal'"
+                      + " AND action = 'Export tasks' AND user_id = ?",
+                  Integer.class,
+                  operator))
+          .isEqualTo(1);
+    } finally {
+      jdbc.update(
+          "DELETE FROM crm_commission_withdrawal WHERE tenant_id = ? AND kol_id = ?",
+          TENANT_ID,
+          kol);
+      cleanupKol(TENANT_ID, kol);
+      jdbc.update(
+          "DELETE FROM sys_oper_log WHERE module = 'Withdrawal' AND action = 'Export tasks'"
+              + " AND user_id = ?",
+          operator);
+    }
+  }
+
   @Test
   @Transactional
   void shouldExportOnlyTheRowsMatchingTheCreatorFilters() {
