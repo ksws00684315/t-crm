@@ -7,15 +7,20 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Real transport for {@link ShortUrlResolver}: raw sockets pinned to a pre-validated address so the
@@ -23,6 +28,8 @@ import javax.net.ssl.SSLSocketFactory;
  * the body is never consumed. HEAD falls back to GET at the caller.
  */
 class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
+  private static final Logger LOG = LoggerFactory.getLogger(ShortUrlHttpFetcher.class);
+
   static final int CONNECT_TIMEOUT_MS = 3_000;
   static final int READ_TIMEOUT_MS = 5_000;
 
@@ -59,18 +66,52 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
     int port = uri.getPort() > 0 ? uri.getPort() : (tls ? 443 : 80);
     long deadline = System.nanoTime() + totalDeadlineMs * 1_000_000L;
     try (Socket socket = tls ? tlsFactory.createSocket() : new Socket()) {
-      socket.connect(new InetSocketAddress(address, port), CONNECT_TIMEOUT_MS);
-      // The connected peer must be the validated address; anything else means the DNS answer
-      // changed between validation and connection, so refuse to talk to it.
-      if (!address.equals(socket.getInetAddress())) {
-        throw new IOException("Connected address does not match the validated one");
+      // One watchdog covers every blocking phase of the fetch: connect, TLS handshake and header
+      // read (PR #142 review — the per-read timeout alone let a whitelisted server that trickles
+      // handshake bytes hold the request thread). Closing the socket unblocks whichever phase is
+      // waiting; the runner converts the resulting SocketException into the deadline error.
+      AtomicBoolean finished = new AtomicBoolean();
+      Thread watchdog =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    long remainingMs = (deadline - System.nanoTime()) / 1_000_000 + 1;
+                    try {
+                      Thread.sleep(Math.max(1, remainingMs));
+                    } catch (InterruptedException e) {
+                      return;
+                    }
+                    if (!finished.get()) {
+                      try {
+                        socket.close();
+                      } catch (IOException e) {
+                        // The deadline passed; the fetch aborts on its own socket error anyway.
+                        LOG.debug("short-url watchdog close failed after the deadline", e);
+                      }
+                    }
+                  });
+      try {
+        socket.connect(new InetSocketAddress(address, port), CONNECT_TIMEOUT_MS);
+        // The connected peer must be the validated address; anything else means the DNS answer
+        // changed between validation and connection, so refuse to talk to it.
+        if (!address.equals(socket.getInetAddress())) {
+          throw new IOException("Connected address does not match the validated one");
+        }
+        socket.setSoTimeout(READ_TIMEOUT_MS);
+        if (tls) {
+          startHandshake((SSLSocket) socket, uri.getHost());
+        }
+        writeRequest(socket.getOutputStream(), uri, head);
+        return readResponse(socket, deadline);
+      } catch (SocketException e) {
+        if (!finished.get() && System.nanoTime() >= deadline) {
+          throw new IOException("Request did not complete within " + totalDeadlineMs + " ms", e);
+        }
+        throw e;
+      } finally {
+        finished.set(true);
+        watchdog.interrupt();
       }
-      socket.setSoTimeout(READ_TIMEOUT_MS);
-      if (tls) {
-        startHandshake((SSLSocket) socket, uri.getHost());
-      }
-      writeRequest(socket.getOutputStream(), uri, head);
-      return readResponse(socket, deadline);
     }
   }
 
@@ -130,7 +171,7 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
       }
       try {
         read = in.read();
-      } catch (java.net.SocketTimeoutException e) {
+      } catch (SocketTimeoutException e) {
         throw new IOException(
             "Response header did not complete within " + totalDeadlineMs + " ms", e);
       }
