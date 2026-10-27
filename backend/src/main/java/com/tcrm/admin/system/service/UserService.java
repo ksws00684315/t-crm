@@ -375,6 +375,11 @@ public class UserService {
   }
 
   private static List<String> visible(MemberRow member, Map<Long, List<String>> stored) {
+    // An unknown stored role reads back as null (LenientEnumTypeHandler): treat it as no access
+    // instead of failing the account list (#106).
+    if (member.getRole() == null) {
+      return List.of();
+    }
     return switch (member.getRole()) {
       case SUPER_ADMIN -> Permission.codes();
       case STAFF -> stored.getOrDefault(member.getUserId(), List.of());

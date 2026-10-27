@@ -48,6 +48,9 @@ management:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    # Unknown stored enum values read as null + WARN instead of failing the whole query (#106);
+    # writes stay strict because the Java enum already restricts the stored values.
+    default-enum-type-handler: com.tcrm.admin.shared.LenientEnumTypeHandler
   global-config:
     db-config:
       id-type: assign_id

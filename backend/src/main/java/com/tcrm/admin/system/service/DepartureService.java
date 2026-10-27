@@ -314,10 +314,7 @@ public class DepartureService {
         execute(row.getId());
       } catch (RuntimeException e) {
         // The transaction rolled back, so the plan stays SCHEDULED and the next run retries it.
-        LOG.error(
-            "Departure plan {} failed; retained for retry ({})",
-            row.getId(),
-            e.getClass().getSimpleName());
+        LOG.error("Departure plan {} failed; retained for retry", row.getId(), e);
       }
     }
   }
@@ -393,7 +390,8 @@ public class DepartureService {
                   tenantId,
                   plan.getUserId(),
                   name,
-                  plan.getPlanType().name(),
+                  // Unknown stored plan type reads back as null (#106)
+                  plan.getPlanType() == null ? null : plan.getPlanType().name(),
                   plan.getEffectiveAt(),
                   heirName(plan.getHeirUserId()),
                   result.name()));
@@ -480,7 +478,8 @@ public class DepartureService {
             new ExecutionAuditDTO(
                 plan.getId(),
                 plan.getUserId(),
-                plan.getPlanType().name(),
+                // Unknown stored plan type reads back as null (#106)
+                plan.getPlanType() == null ? null : plan.getPlanType().name(),
                 plan.getEffectiveAt(),
                 plan.getResult() == null ? null : plan.getResult().name())));
   }

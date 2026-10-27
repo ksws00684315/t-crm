@@ -517,7 +517,10 @@ public class WithdrawalService {
                     account ->
                         new RecipientOption(
                             account.getId(),
-                            account.getAccountType().name(),
+                            // Unknown stored type reads back as null (#106)
+                            account.getAccountType() == null
+                                ? null
+                                : account.getAccountType().name(),
                             cipher.decrypt(account.getAccountCipher()),
                             account.getHolderName(),
                             account.getCurrency(),
@@ -1388,7 +1391,8 @@ public class WithdrawalService {
       }
       return new AccountSnapshot(
           account.getId(),
-          account.getAccountType().name(),
+          // Unknown stored type reads back as null (#106)
+          account.getAccountType() == null ? null : account.getAccountType().name(),
           account.getAccountCipher(),
           account.getAccountMasked(),
           account.getCurrency(),

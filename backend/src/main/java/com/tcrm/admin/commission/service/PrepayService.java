@@ -407,7 +407,8 @@ public class PrepayService {
                   account ->
                       new PayoutOption(
                           account.getId(),
-                          account.getAccountType().name(),
+                          // Unknown stored type reads back as null (#106)
+                          account.getAccountType() == null ? null : account.getAccountType().name(),
                           account.getCurrency(),
                           account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
                           account.getAccountMasked(),
@@ -1032,7 +1033,8 @@ public class PrepayService {
         details.expectedPayDate(),
         details.deductFromCommission(),
         manual ? null : account.getId(),
-        manual ? "MANUAL" : account.getAccountType().name(),
+        // Unknown stored type reads back as null instead of NPE (#106)
+        manual || account.getAccountType() == null ? null : account.getAccountType().name(),
         manual ? null : account.getCurrency(),
         manual || account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
         manual ? null : account.getHolderName(),

@@ -100,15 +100,17 @@ export interface UserVO {
   username: string;
   nickname: string;
   email: string | null;
-  role: Role;
-  /** Null for a super administrator and the platform administrator. */
+  /** Null when the stored value is one this build does not know yet (#106). */
+  role: Role | null;
+  /** Null for a super administrator, the platform administrator, or an unknown value (#106). */
   postTemplate: PostTemplate | null;
   /**
    * Granted codes. A super administrator still receives the field; `can()` does not consult it.
    * Typed as strings so a code this build does not know yet is shown as-is and does not throw.
    */
   permissions: string[];
-  dataScope: DataScope;
+  /** Null when the stored value is one this build does not know yet (#106). */
+  dataScope: DataScope | null;
   /** Null for the platform administrator; optional at runtime for older backend responses. */
   tenantId: string | null;
   /** Null for the platform administrator; optional at runtime for older backend responses. */
