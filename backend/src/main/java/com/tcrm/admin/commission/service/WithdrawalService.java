@@ -1139,8 +1139,8 @@ public class WithdrawalService {
 
   /**
    * CSV export of the withdrawal list: data:export AND the list permission. Not read-only: the
-   * audit row for the export is written in the same transaction, and a readOnly transaction
-   * rejects that INSERT when no outer transaction exists (production 500, task 73 browser run).
+   * audit row for the export is written in the same transaction, and a readOnly transaction rejects
+   * that INSERT when no outer transaction exists (production 500, task 73 browser run).
    */
   @Transactional(rollbackFor = Exception.class)
   public byte[] export(AccountDTO user, Filter filter) {
