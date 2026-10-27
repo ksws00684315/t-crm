@@ -17,6 +17,11 @@ spring:
       database: 0
   flyway:
     locations: classpath:db/migration
+    # Lenient by default (a newer schema only logs a warning): local development and the preview
+    # share one database with branches of different ages (#106). The production template overrides
+    # this to strict (empty pattern) via TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS so a schema newer
+    # than the image fails startup instead of breaking pages at runtime.
+    ignore-migration-patterns: ${TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS:*:future}
   messages:
     # User-facing texts follow the request language (ADR-0.15); an unsupported locale never falls
     # back to the server default but to the base bundle, which equals the English one.

@@ -141,6 +141,9 @@ deploy/scripts/local-infra.sh psql
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
 8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`TCRM_CERT_DIR` 的证书覆盖该子域名；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
 
+9. 版本一致性检查（#106）：生产模板为 `crm-admin` 固定设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS=""`（严格模式）。数据库结构版本比镜像新（典型场景：发布后回滚到旧镜像，或「先发库、后发镜像」顺序颠倒）时，后台**启动即失败**，日志中 Flyway 报「applied migration not resolved locally」，随后一条 ERROR 说明「数据库结构比镜像新，请部署包含全部已应用迁移的镜像」。本机开发与预览共用同一个数据库、且各分支迁移版本不同，**不要**在 `docker-compose.dev.yml` / `docker-compose.preview.yml` 中设置该变量（默认 `*:future`，仅告警）。
+   应急回滚方法：确认业务上确实要用旧镜像启动时，临时设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'` 后 `docker compose ... up -d crm-admin`；此时旧镜像不认识的枚举值在列表中显示为 `—`（任务 73 容错），仅新增功能不可用。事后恢复严格模式并尽快部署不低于库版本的镜像。
+
 ## 邮件服务（Resend）
 
 达人邀请与重置密码邮件经 Resend（`https://resend.com`）发送（设计说明书 §7.3）。免费额度 3,000 封/月、100 封/天，合同规模远低于上限。相关环境变量（见 `.env.example`）：
