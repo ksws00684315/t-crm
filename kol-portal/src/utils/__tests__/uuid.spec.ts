@@ -18,7 +18,9 @@ describe("randomUuid", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("delegates to crypto.randomUUID when the context is secure", () => {
-    const spy = vi.spyOn(crypto, "randomUUID").mockReturnValue("4b2f8a1e-2b3c-4d5e-8f90-a1b2c3d4e5f6");
+    const spy = vi
+      .spyOn(crypto, "randomUUID")
+      .mockReturnValue("4b2f8a1e-2b3c-4d5e-8f90-a1b2c3d4e5f6");
     expect(randomUuid()).toBe("4b2f8a1e-2b3c-4d5e-8f90-a1b2c3d4e5f6");
     expect(spy).toHaveBeenCalledOnce();
   });
