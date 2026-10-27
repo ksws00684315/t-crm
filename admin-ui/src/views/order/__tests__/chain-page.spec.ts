@@ -446,6 +446,38 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("deduplicates one refund across lines in the fallback total and formats every card", async () => {
+    // Without commission:view the funds block is null, so the refund total falls back to the
+    // client sum: the same refund attached to both lines must count once (B07 dedup rule), and
+    // all four cards share the formatPrice rendering (¥ prefix), not raw strings.
+    signIn("STAFF", ["order:view"]);
+    const duplicated: OrderChainVO = {
+      ...chain,
+      lines: chain.lines.map(line => ({
+        ...line,
+        refunds:
+          line.orderItemId === "302"
+            ? [
+                {
+                  id: "501",
+                  refundNo: "R20261021001",
+                  refundType: "RETURN_REFUND",
+                  refundStatus: "SUCCESS",
+                  amount: "20.00",
+                  finishTime: "2026-10-20T13:00:00Z"
+                }
+              ]
+            : line.refunds
+      }))
+    };
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥180.00");
+    expect(funds).toContain("¥20.00");
+    wrapper.unmount();
+  });
+
   it("shows an actionable error state when the chain fails and retries successfully", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     vi.mocked(orderApi.getOrderChain).mockRejectedValueOnce(new Error("chain failed"));

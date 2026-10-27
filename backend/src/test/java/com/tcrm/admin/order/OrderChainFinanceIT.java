@@ -235,11 +235,12 @@ class OrderChainFinanceIT {
             get("/admin-api/order/orders/{id}/chain", orderId).header("X-Admin-Token", adminToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.orderNo").value("t72-wd-order-1"))
-        // Order funds (B07): pay 200, deduplicated successful refund 100, net commission 120,
-        // shop profit pending M0, and the unattributed line keeps the order UNVERIFIED.
+        // Order funds (B07): pay 200, deduplicated successful refund 100, shop profit pending
+        // M0; the unattributed line keeps the order UNVERIFIED and hides the order commission
+        // total as null (unknown, never a fake zero) while line 1 keeps its own 120.00.
         .andExpect(jsonPath("$.data.funds.payAmount").value("200.00"))
         .andExpect(jsonPath("$.data.funds.refundTotal").value("100.00"))
-        .andExpect(jsonPath("$.data.funds.kolCommission").value("120.00"))
+        .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.funds.shopProfit").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
         // Line blocks (B07/B09): pay-time rate snapshot, occupation split by application state.
@@ -304,7 +305,7 @@ class OrderChainFinanceIT {
             get("/admin-api/order/orders/{id}/chain", orderId)
                 .header("X-Admin-Token", financeStaff))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.funds.kolCommission").value("120.00"))
+        .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("120.00"))
         .andExpect(jsonPath("$.data.financeFlows[2].withdrawalNo").value(first.applicationNo()));
 
@@ -362,7 +363,7 @@ class OrderChainFinanceIT {
     // Unattributed lines never block the coverage (same basis as the settlement details).
     mvc.perform(get("/admin-api/order/orders/{id}/chain", orderId).header("X-Admin-Token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.funds.kolCommission").value("150.00"))
+        .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("150.00"))
         .andExpect(jsonPath("$.data.lines[1].commission.netCommission").value(Matchers.nullValue()))
@@ -383,7 +384,7 @@ class OrderChainFinanceIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.lines[0].commission.rateSnapshot").value("0.3000"))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("150.00"))
-        .andExpect(jsonPath("$.data.funds.kolCommission").value("150.00"));
+        .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()));
   }
 
   @Test

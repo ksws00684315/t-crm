@@ -506,7 +506,9 @@ public class OrderService {
         new OrderChainDTO.FundsDTO(
             order.getPayAmount(),
             successfulRefundTotal(refunds),
-            commission.netCommissionCny(),
+            // Any unverified line hides the order total as unknown — a 0 would read as a real
+            // zero commission while the line-level blocks correctly say 待核实.
+            commission.allVerified() ? commission.netCommissionCny() : null,
             null,
             commission.allVerified() ? "POSTED" : "UNVERIFIED");
     return new ChainFinance(funds, Map.copyOf(byItem), flows);

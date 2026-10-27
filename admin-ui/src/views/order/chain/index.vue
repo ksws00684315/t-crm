@@ -48,21 +48,37 @@ const detail = ref<OrderDetailVO | null>(null);
 /** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
 const canSeeCommission = computed(() => userStore.can("commission:view"));
 
+/**
+ * Successful-refund total summed on the client, deduplicated by refund id so one refund spanning
+ * several lines counts once (B07; same rule as the server's dedup, for viewers without funds).
+ */
 const completedRefundTotal = computed(() => {
   const refunds = (chain.value?.lines ?? []).flatMap(line => line.refunds);
-  let cents = 0n;
+  const centsById = new Map<string, bigint>();
   for (const refund of refunds) {
     if (refund.refundStatus !== "SUCCESS") continue;
     const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(refund.amount);
     if (!match) return null;
-    cents += BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+    if (!centsById.has(refund.id)) {
+      centsById.set(
+        refund.id,
+        BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0")
+      );
+    }
   }
+  let cents = 0n;
+  for (const value of centsById.values()) cents += value;
   return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
 });
 
-/** Refund total: the server deduplicates one refund across lines; fall back to the client sum. */
-const refundTotalText = computed(
-  () => chain.value?.funds?.refundTotal ?? completedRefundTotal.value ?? t("common.developing")
+/** Refund total: the server value first, then the deduplicated client sum for viewers without it. */
+const refundTotalAmount = computed(
+  () => chain.value?.funds?.refundTotal ?? completedRefundTotal.value
+);
+
+/** Pay amount: the funds block first, then the order detail header value. */
+const payAmountText = computed(() =>
+  formatPrice(chain.value?.funds?.payAmount ?? detail.value?.payAmount ?? null, "CNY")
 );
 
 /** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
@@ -183,11 +199,13 @@ onMounted(load);
         <div class="chain-fund-cards">
           <article class="chain-fund-card">
             <span>{{ t("order.payAmount") }}</span>
-            <strong>{{ chain.funds?.payAmount ?? detail?.payAmount ?? "-" }}</strong>
+            <strong>{{ payAmountText }}</strong>
           </article>
           <article class="chain-fund-card">
             <span>{{ t("order.refundTotal") }}</span>
-            <strong>{{ refundTotalText }}</strong>
+            <strong>{{
+              refundTotalAmount ? formatPrice(refundTotalAmount, "CNY") : t("common.developing")
+            }}</strong>
           </article>
           <article
             class="chain-fund-card"

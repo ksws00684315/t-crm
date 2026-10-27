@@ -26,8 +26,8 @@ public record OrderChainDTO(
    *
    * @param refundTotal successful refunds deduplicated by refund id, so one refund spanning several
    *     lines never counts twice
-   * @param kolCommission Σ accumulated net commission of the order's live snapshots (unverified
-   *     rows contribute 0)
+   * @param kolCommission Σ accumulated net commission of the order's live snapshots; null while any
+   *     line is unverified (unknown, never a fake zero — same rule as the line blocks)
    * @param accountStatus POSTED when every snapshot row is verified, UNVERIFIED when any row is not
    */
   record FundsDTO(

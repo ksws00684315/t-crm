@@ -862,7 +862,9 @@ class OrderServiceTest {
 
     assertThat(chain.funds().payAmount()).isEqualByComparingTo("12.50");
     assertThat(chain.funds().refundTotal()).isEqualByComparingTo("2.00");
-    assertThat(chain.funds().kolCommission()).isEqualByComparingTo("3.75");
+    // Any unverified line hides the order total (review: unknown must not pose as zero); the
+    // verified line's own block still carries its 3.75.
+    assertThat(chain.funds().kolCommission()).isNull();
     assertThat(chain.funds().shopProfit()).isNull();
     assertThat(chain.funds().accountStatus()).isEqualTo("UNVERIFIED");
     var block = chain.lines().getFirst().commission();
@@ -926,6 +928,7 @@ class OrderServiceTest {
     var chain = service.chain(10L);
 
     assertThat(chain.funds()).isNotNull();
+    // Every line verified: the order total returns the real sum, zero included.
     assertThat(chain.funds().kolCommission()).isEqualByComparingTo("0.00");
     assertThat(chain.funds().accountStatus()).isEqualTo("POSTED");
   }
