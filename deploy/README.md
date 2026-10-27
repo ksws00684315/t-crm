@@ -98,7 +98,7 @@ deploy/scripts/local-infra.sh psql
 
 迁移会备份旧 PostgreSQL 与 Redis 数据，把 `.env.preview` 中的数据库凭证、加密主密钥、IP 哈希盐和管理员配置迁入 `.env.local`，停止旧预览容器，将旧数据卷复制到共享中间件卷并启动共享中间件。核对达人、用户数和主要页面无误前，保留旧卷；不要对旧预览执行 `down -v`。
 
-`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：上传地址由「系统配置」的 `url.upload` 运行时决定，默认空值走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。预览 Compose 挂载整个 `nginx/preview/` 目录（而非单文件）：git 更新该文件（换 inode）后 `preview.sh up` 结尾的 `nginx -s reload` 仍能读到新配置（L-012）。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：上传地址由「系统配置」的 `url.upload` 运行时决定，默认空值走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
@@ -114,7 +114,7 @@ deploy/scripts/local-infra.sh psql
 |---|---|---|
 | 站点 | `site.name`、`mail.from` | `SparkTrack`；`TCRM_MAIL_FROM` |
 | 地址 | `url.kol-portal`、`url.link`、`url.admin`、`url.upload`、`url.redirect-fallback` | 分别为 `TCRM_KOL_PORTAL_BASE_URL`、`TCRM_LINK_BASE_URL`、`TCRM_ADMIN_BASE_URL`、`TCRM_UPLOAD_BASE_URL`、`TCRM_REDIRECT_FALLBACK_URL`；上传地址默认空值 |
-| 业务默认值与上限 | `copy-token.default-quota`（1）、`copy-token.default-valid-minutes`（1440）、`copy-token.max-quota`（100000）、`copy-token.max-valid-minutes`（10080）、`shop.max-per-company`（3）、`payout-account.max-per-kol`（5）、`kol.invite-ttl-hours`（72，最大 72）、`oper-log.retention-days`（180）、`order.sync-failure.retention-days`（0，不自动清理） | 代码默认值；操作日志保留期按安全规范至少 180 天 |
+| 业务默认值与上限 | `copy-token.default-quota`（1）、`copy-token.default-valid-minutes`（1440）、`copy-token.max-quota`（100000）、`copy-token.max-valid-minutes`（10080）、`shop.max-per-company`（20）、`payout-account.max-per-kol`（5）、`kol.invite-ttl-hours`（72，最大 72）、`oper-log.retention-days`（180）、`order.sync-failure.retention-days`（0，不自动清理） | 代码默认值；操作日志保留期按安全规范至少 180 天 |
 | 限流与安全 | `login.fail.pair-limit`（5）、`login.fail.ip-limit`（20）、`login.fail.account-limit`（50）、`login.fail.window-minutes`（15）、`captcha.issue-per-minute`（120）、`kol.register.ip-per-hour`（20）、`kol.register-preview.ip-per-hour`（20）、`kol.forgot.email-limit`（3）、`kol.forgot.email-window-minutes`（10）、`kol.forgot.ip-limit`（20）、`kol.forgot.ip-window-minutes`（60）、`product-links.ip-per-minute`（120）、`product-links.convert-token-per-minute`（10）、`product-links.resolve-token-per-minute`（120）、`weidian.qps`（5） | 代码默认值；`captcha.issue-per-minute` 可由 `crm.auth.captcha.issue-per-minute` 覆盖默认值 |
 
 地址默认值与覆盖值必须为 HTTPS host-only URL（不带路径、查询、片段或尾斜杠）；本地允许 `http://localhost[:端口]` 与 `http://127.0.0.1[:端口]`。修改管理端地址后，须同步更新微店开放平台登记的回调域名。上传子域名应设置为 Cloudflare「仅 DNS」，并确认 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端来源。

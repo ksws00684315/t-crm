@@ -59,7 +59,9 @@ cmd_up() {
   wait_healthy crm-redirect
   # Compose may recreate the Java containers without recreating Nginx. Nginx resolves the static
   # proxy_pass hostnames when it loads its config, so it otherwise keeps the old container IP and
-  # serves 502 even though both Java health checks pass.
+  # serves 502 even though both Java health checks pass. The conf.d directory mount (L-012) keeps
+  # the current preview.conf visible inside the container across git updates, so the reload also
+  # picks up config changes; a single-file mount kept the deleted inode and made reload fail.
   compose exec -T nginx nginx -s reload
   curl --fail --silent --show-error --max-time 5 --retry 3 --retry-delay 1 --request POST \
     --output /dev/null "http://127.0.0.1:${TCRM_PREVIEW_ADMIN_PORT}/admin-api/auth/captchas"
