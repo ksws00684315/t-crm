@@ -1033,8 +1033,10 @@ public class PrepayService {
         details.expectedPayDate(),
         details.deductFromCommission(),
         manual ? null : account.getId(),
-        // Unknown stored type reads back as null instead of NPE (#106)
-        manual || account.getAccountType() == null ? null : account.getAccountType().name(),
+        manual
+            ? "MANUAL"
+            : // Unknown stored type reads back as null instead of NPE (#106)
+            account.getAccountType() == null ? null : account.getAccountType().name(),
         manual ? null : account.getCurrency(),
         manual || account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
         manual ? null : account.getHolderName(),
