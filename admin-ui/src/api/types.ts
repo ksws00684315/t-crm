@@ -482,6 +482,12 @@ export type RefundType = "REFUND_ONLY" | "RETURN_REFUND" | "UNKNOWN";
 /** Single-refund status (task 40 §3.1). Only SUCCESS counts as a completed refund. */
 export type RefundStatus = "PROCESSING" | "SUCCESS" | "CLOSED" | "UNKNOWN";
 
+/**
+ * Order-list refund filter (task 70 / 1024 handoff B03): refunding, or refunded covering both
+ * partial and whole refunds. Separate from `OrderStatus` on purpose.
+ */
+export type RefundFilterState = "REFUNDING" | "REFUNDED";
+
 /** Where the order data came from (task 40 §3.2): the Weidian API or a manual import. */
 export type OrderSource = "API" | "IMPORT";
 
@@ -491,7 +497,11 @@ export type AttributionStatus = "PENDING" | "ATTRIBUTED" | "NON_KOL" | "CONFLICT
 /** How one order line was attributed: 0 unmatched, 1 product id, 2 manual, 3 non-KOL, 4 conflict. */
 export type ItemAttributionType = 0 | 1 | 2 | 3 | 4;
 
-/** `OrderItemDTO`. Amounts are strings; display names are null when the reference is gone. */
+/**
+ * `OrderItemDTO`. Amounts are strings; display names are null when the reference is gone.
+ * `kolName` and `imageUrl` (task 71, B05) follow the detail endpoint's field names; both are null
+ * for unattributed lines, deleted creators and missing images.
+ */
 export interface OrderItemVO {
   id: string;
   subOrderId: string | null;
@@ -504,10 +514,12 @@ export interface OrderItemVO {
   refundAmount: string | null;
   kolId: string | null;
   kolCode: string | null;
+  kolName: string | null;
   productId: string | null;
   kolItemId: string | null;
   attributionType: ItemAttributionType | null;
   manualReason: string | null;
+  imageUrl: string | null;
 }
 
 /**

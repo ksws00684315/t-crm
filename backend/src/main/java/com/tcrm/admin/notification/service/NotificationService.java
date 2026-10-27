@@ -170,24 +170,23 @@ public class NotificationService implements PrepayNotificationApi, WithdrawalNot
                 () -> {
                   NotificationType type =
                       NotificationType.valueOf("WITHDRAWAL_" + event.eventType());
+                  KolRefDTO kol = kolRef(event.kolId());
+                  Long bd = kol == null ? null : kol.bdUserId();
                   LinkedHashSet<Long> recipients = new LinkedHashSet<>();
                   if ("SUBMITTED".equals(event.eventType())) {
-                    Long currentBd = currentBd(event.kolId());
-                    if (currentBd != null) {
-                      recipients.add(currentBd);
+                    if (bd != null) {
+                      recipients.add(bd);
                     }
                     recipients.addAll(superAdmins.listEnabledIds());
-                  } else {
-                    Long currentBd = currentBd(event.kolId());
-                    if (currentBd != null) {
-                      recipients.add(currentBd);
-                    }
+                  } else if (bd != null) {
+                    recipients.add(bd);
                   }
                   String params =
                       NotificationParamsCodec.write(
                           type,
                           new NotificationParamsDTO(
                               event.kolCode(),
+                              kol == null ? null : kol.name(),
                               null,
                               null,
                               null,
@@ -220,14 +219,23 @@ public class NotificationService implements PrepayNotificationApi, WithdrawalNot
         status ->
             TenantScope.runCompany(
                 event.tenantId(),
-                () ->
-                    write(
-                        currentBd(event.kolId()),
-                        NotificationType.PAYOUT_ACCOUNT_SUBMITTED,
-                        new NotificationParamsDTO(
-                            event.kolCode(), event.accountType(), null, null, null, null, null),
-                        BIZ_PAYOUT_ACCOUNT,
-                        event.accountId())));
+                () -> {
+                  KolRefDTO kol = kolRef(event.kolId());
+                  write(
+                      kol == null ? null : kol.bdUserId(),
+                      NotificationType.PAYOUT_ACCOUNT_SUBMITTED,
+                      new NotificationParamsDTO(
+                          event.kolCode(),
+                          kol == null ? null : kol.name(),
+                          event.accountType(),
+                          null,
+                          null,
+                          null,
+                          null,
+                          null),
+                      BIZ_PAYOUT_ACCOUNT,
+                      event.accountId());
+                }));
   }
 
   public void record(OrderSyncFailedEvent event) {
@@ -250,14 +258,23 @@ public class NotificationService implements PrepayNotificationApi, WithdrawalNot
         status ->
             TenantScope.runCompany(
                 event.tenantId(),
-                () ->
-                    write(
-                        null,
-                        NotificationType.BD_TRANSFER_CANCELLED,
-                        new NotificationParamsDTO(
-                            event.kolCode(), null, null, event.reasonCode(), null, null, null),
-                        BIZ_BD_TRANSFER,
-                        event.transferId())));
+                () -> {
+                  KolRefDTO kol = kolRef(event.kolId());
+                  write(
+                      null,
+                      NotificationType.BD_TRANSFER_CANCELLED,
+                      new NotificationParamsDTO(
+                          event.kolCode(),
+                          kol == null ? null : kol.name(),
+                          null,
+                          null,
+                          event.reasonCode(),
+                          null,
+                          null,
+                          null),
+                      BIZ_BD_TRANSFER,
+                      event.transferId());
+                }));
   }
 
   public void record(KolsUnassignedEvent event) {
@@ -420,11 +437,20 @@ public class NotificationService implements PrepayNotificationApi, WithdrawalNot
   }
 
   private Long currentBd(long kolId) {
+    KolRefDTO ref = kolRef(kolId);
+    return ref == null ? null : ref.bdUserId();
+  }
+
+  /**
+   * Identity and BD of the event's KOL at write time (task 71, handoff B06): the name goes into the
+   * message parameters; null when the KOL no longer resolves, leaving only the code.
+   */
+  private KolRefDTO kolRef(long kolId) {
     List<KolRefDTO> refs = kols.listByIds(List.of(kolId));
     if (refs == null || refs.isEmpty()) {
       return null;
     }
-    return refs.getFirst().bdUserId();
+    return refs.getFirst();
   }
 
   private AccountDTO requireCompanyUser() {

@@ -23,7 +23,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "quantity", label: t("order.line.quantity"), width: 70 },
   { key: "payAmount", label: t("order.line.payAmount"), width: 110, amount: true },
   { key: "refund", label: t("order.line.refund"), width: 90, amount: true },
-  { key: "kolCode", label: t("order.line.kolCode"), width: 130 },
+  { key: "kolCode", label: t("order.kol"), width: 140 },
   { key: "attribution", label: t("order.line.attribution"), width: 100 },
   {
     key: "manualReason",
@@ -49,7 +49,12 @@ const columns = computed<DataColumn[]>(() => [
       <template #cell-quantity="{ row }">{{ asLine(row).quantity ?? "-" }}</template>
       <template #cell-payAmount="{ row }">{{ asLine(row).payAmount ?? "-" }}</template>
       <template #cell-refund="{ row }">{{ asLine(row).refundAmount ?? "-" }}</template>
-      <template #cell-kolCode="{ row }"><NameCode :code="asLine(row).kolCode" /></template>
+      <template #cell-kolCode="{ row }">
+        <span v-if="asLine(row).kolCode">
+          <NameCode :name="asLine(row).kolName" :code="asLine(row).kolCode"
+        /></span>
+        <span v-else>-</span>
+      </template>
       <template #cell-attribution="{ row }">
         {{ attributionTypeText(asLine(row).attributionType) }}
       </template>
