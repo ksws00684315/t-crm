@@ -1366,7 +1366,7 @@ const enUS: MessageSchema = {
     kolCode: "Creator code",
     kolKeyword: "Creator code or name",
     orderTime: "Order time",
-    itemImageDeveloping: "Order item image data awaits API support",
+    itemImageMissing: "No image",
     listStatus: {
       UNPAID: "Awaiting payment",
       PAID: "Awaiting shipment",

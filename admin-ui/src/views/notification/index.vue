@@ -16,9 +16,9 @@ import { notifyError } from "@/utils/notify";
 import {
   canOpenNotification,
   notificationHref,
-  notificationText,
   relativeNotificationTime
 } from "@/utils/notification";
+import NotificationText from "@/components/NotificationText.vue";
 import { accessOf } from "@/utils/permission";
 
 defineOptions({ name: "NotificationPage" });
@@ -144,7 +144,7 @@ onMounted(load);
         @click="openItem(item)"
       >
         <el-icon><component :is="icons[item.type]" /></el-icon>
-        <span>{{ notificationText(item) }}</span>
+        <NotificationText :item="item" />
         <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
       </button>
       <el-pagination

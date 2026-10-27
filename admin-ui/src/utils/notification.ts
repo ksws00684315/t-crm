@@ -34,8 +34,11 @@ export function relativeNotificationTime(iso: string, now = Date.now()): string 
   return formatInstant(iso);
 }
 
-/** Message text in the current language. `accountType` stays the raw enum name. */
-export function notificationText(item: NotificationView): string {
+/**
+ * Named interpolation values of a message, shared by the plain-text renderer and the sentence
+ * component so both always agree. `accountType` stays the raw enum name.
+ */
+export function notificationValues(item: NotificationView): Record<string, string | number> {
   const params = item.params ?? {};
   const reason = params.reason ? translate(`notification.reason.${params.reason}`) : "";
   // Departure messages carry codes for the plan type and its outcome; both become words here so
@@ -44,7 +47,7 @@ export function notificationText(item: NotificationView): string {
   const result = params.result
     ? translate(`notification.result.${params.result}`, { heir: params.heirName ?? "" })
     : "";
-  return translate(`notification.type.${item.type}`, {
+  return {
     kolCode: params.kolCode ?? "",
     accountType: params.accountType ?? "",
     shopName: params.shopName ?? "",
@@ -55,7 +58,12 @@ export function notificationText(item: NotificationView): string {
     time: params.effectiveAt ? formatInstantToMinute(params.effectiveAt) : "",
     kind,
     result
-  });
+  };
+}
+
+/** Message text in the current language, with the creator code inline. */
+export function notificationText(item: NotificationView): string {
+  return translate(`notification.type.${item.type}`, notificationValues(item));
 }
 
 /** Target route. Missing pages render the existing 404. */

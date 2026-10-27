@@ -291,10 +291,12 @@ class OrderServiceTest {
                 new BigDecimal("2.00"),
                 100L,
                 "KOL0100",
+                "Creator",
                 200L,
                 300L,
                 2,
-                "confirmed"));
+                "confirmed",
+                null));
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -559,6 +561,66 @@ class OrderServiceTest {
     assertThat(result.items().get(2).bdUserName()).isEqualTo("username-only");
     verify(shops, times(1)).listShops();
     verify(kols, times(1)).listByIds(any());
+    verify(bdUsers, times(1)).listByIds(any());
+  }
+
+  @Test
+  void shouldDecorateEachLineWithItsOwnKolAndImage_whenPagingOrders() {
+    var attributed = order(10);
+    attributed.setKolId(100L);
+    var first = item();
+    first.setKolId(100L);
+    first.setProductId(300L);
+    var second = item();
+    second.setId(21L);
+    second.setWeidianItemId("91");
+    second.setKolId(101L);
+    second.setProductId(301L);
+    var deletedKolLine = item();
+    deletedKolLine.setId(22L);
+    deletedKolLine.setWeidianItemId("92");
+    deletedKolLine.setKolId(999L);
+    deletedKolLine.setProductId(302L);
+    var unattributed = item();
+    unattributed.setId(23L);
+    unattributed.setWeidianItemId("93");
+    unattributed.setProductId(303L);
+    when(orders.selectPage(any(), any()))
+        .thenAnswer(
+            call -> {
+              Page<OrderDO> page = call.getArgument(0);
+              page.setRecords(List.of(attributed));
+              page.setTotal(1);
+              return page;
+            });
+    when(items.selectList(any())).thenReturn(List.of(first, second, deletedKolLine, unattributed));
+    when(kols.listByIds(any()))
+        .thenReturn(
+            List.of(
+                new KolRefDTO(100L, "KOL0100", "Creator", true, 99L),
+                new KolRefDTO(101L, "KOL0101", "Other", true, 99L)));
+    when(products.listProducts(any()))
+        .thenReturn(
+            List.of(
+                new ProductRefDTO(300L, "P300", "Product A", "https://img.example/300.png", 1),
+                new ProductRefDTO(301L, "P301", "Product B", null, 1)));
+
+    var result = service.page(filter(null), false);
+
+    assertThat(result.total()).isEqualTo(1);
+    var lines = result.items().getFirst().items();
+    assertThat(lines)
+        .extracting(OrderItemDTO::kolCode)
+        .containsExactly("KOL0100", "KOL0101", null, null);
+    assertThat(lines)
+        .extracting(OrderItemDTO::kolName)
+        .containsExactly("Creator", "Other", null, null);
+    assertThat(lines)
+        .extracting(OrderItemDTO::imageUrl)
+        .containsExactly("https://img.example/300.png", null, null, null);
+    verify(kols, times(1)).listByIds(any());
+    verify(products, times(1)).listProducts(any());
+    verify(shops, times(1)).listShops();
     verify(bdUsers, times(1)).listByIds(any());
   }
 

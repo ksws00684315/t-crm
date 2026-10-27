@@ -1334,7 +1334,7 @@ const zhCN = {
     kolCode: "达人编号",
     kolKeyword: "达人编号/姓名",
     orderTime: "下单时间",
-    itemImageDeveloping: "订单列表商品图片字段待接口支持",
+    itemImageMissing: "暂无图片",
     listStatus: {
       UNPAID: "待付款",
       PAID: "待发货",
