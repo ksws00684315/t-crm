@@ -3,6 +3,8 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -17,6 +19,7 @@ import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
@@ -77,6 +80,7 @@ class OrderServiceTest {
   private final CopyJobLookupApi copyJobs = mock(CopyJobLookupApi.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final AuditSanitizer sanitizer = mock(AuditSanitizer.class);
+  private final OrderChainCommissionApi commissionChain = mock(OrderChainCommissionApi.class);
 
   {
     org.mockito.Mockito.when(sanitizer.sanitize(org.mockito.ArgumentMatchers.any()))
@@ -103,7 +107,8 @@ class OrderServiceTest {
           audit,
           sanitizer,
           new OrderCommissionSync(
-              mock(org.springframework.context.ApplicationEventPublisher.class), refunds));
+              mock(org.springframework.context.ApplicationEventPublisher.class), refunds),
+          commissionChain);
 
   @BeforeAll
   static void metadata() {
@@ -765,8 +770,167 @@ class OrderServiceTest {
     assertThat(line.link().linkCode()).isEqualTo("KPL-AAAAAAAAAAAA");
     assertThat(line.refunds()).hasSize(1);
     assertThat(line.refunds().getFirst().refundNo()).isEqualTo("R9");
-    assertThat(line.ledger()).isNull();
-    assertThat(line.withdrawals()).isNull();
+    // No commission:view in this test, so all financial blocks stay null (task 72).
+    assertThat(line.commission()).isNull();
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+  }
+
+  @Test
+  void shouldHideChainFinance_whenViewerLacksCommissionView() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(items.selectList(any())).thenReturn(List.of(item()));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view"));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+    assertThat(chain.lines().getFirst().commission()).isNull();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldAssembleChainFinance_whenViewerHoldsCommissionView() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
+    var i = item();
+    i.setKolId(100L);
+    i.setQuantity(1);
+    i.setPayAmount(new BigDecimal("12.50"));
+    when(items.selectList(any())).thenReturn(List.of(i));
+    // Same refund id twice (one refund spanning two lines) plus a processing one: 2.00 once.
+    var deduped = new RefundDO();
+    deduped.setId(9L);
+    deduped.setOrderItemId(20L);
+    deduped.setRefundStatus("SUCCESS");
+    deduped.setAmount(new BigDecimal("2.00"));
+    var duplicate = new RefundDO();
+    duplicate.setId(9L);
+    duplicate.setOrderItemId(21L);
+    duplicate.setRefundStatus("SUCCESS");
+    duplicate.setAmount(new BigDecimal("2.00"));
+    var processing = new RefundDO();
+    processing.setId(12L);
+    processing.setOrderItemId(20L);
+    processing.setRefundStatus("PROCESSING");
+    processing.setAmount(new BigDecimal("5.00"));
+    when(refunds.selectList(any())).thenReturn(List.of(deduped, duplicate, processing));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                new BigDecimal("3.75"),
+                false,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L,
+                        new BigDecimal("0.3000"),
+                        new BigDecimal("3.75"),
+                        "CONFIRMED",
+                        new BigDecimal("3.00"),
+                        List.of(
+                            new OrderChainCommissionApi.WithdrawalRefDTO(
+                                31L, "W20261016000001", new BigDecimal("3.00"), "PAID", PAID),
+                            new OrderChainCommissionApi.WithdrawalRefDTO(
+                                32L,
+                                "W20261016000002",
+                                new BigDecimal("1.00"),
+                                "REJECTED",
+                                null)))),
+                List.of(
+                    new OrderChainCommissionApi.FlowDTO(
+                        20L,
+                        "CL900",
+                        "KOL_COMMISSION",
+                        "INCREASE",
+                        new BigDecimal("5.00"),
+                        PAID,
+                        null,
+                        null),
+                    new OrderChainCommissionApi.FlowDTO(
+                        20L,
+                        "WA901",
+                        "KOL_COMMISSION",
+                        "DECREASE",
+                        new BigDecimal("3.00"),
+                        PAID.plusSeconds(1),
+                        PAID.plusSeconds(3600),
+                        "W20261016000001"))));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds().payAmount()).isEqualByComparingTo("12.50");
+    assertThat(chain.funds().refundTotal()).isEqualByComparingTo("2.00");
+    // Any unverified line hides the order total (review: unknown must not pose as zero); the
+    // verified line's own block still carries its 3.75.
+    assertThat(chain.funds().kolCommission()).isNull();
+    assertThat(chain.funds().shopProfit()).isNull();
+    assertThat(chain.funds().accountStatus()).isEqualTo("UNVERIFIED");
+    var block = chain.lines().getFirst().commission();
+    assertThat(block.rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(block.netCommission()).isEqualByComparingTo("3.75");
+    assertThat(block.shopProfit()).isNull();
+    assertThat(block.releaseBasis()).isEqualTo("CONFIRMED");
+    assertThat(block.occupiedTotal()).isEqualByComparingTo("3.00");
+    assertThat(block.withdrawals()).hasSize(2);
+    assertThat(block.withdrawals().getFirst().applicationNo()).isEqualTo("W20261016000001");
+    assertThat(block.withdrawals().getFirst().paidAt()).isEqualTo(PAID);
+    assertThat(chain.financeFlows()).hasSize(2);
+    assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("CL900");
+    assertThat(chain.financeFlows().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(chain.financeFlows().get(1).transferredAt()).isEqualTo(PAID.plusSeconds(3600));
+    assertThat(chain.financeFlows().get(1).withdrawalNo()).isEqualTo("W20261016000001");
+  }
+
+  @Test
+  void shouldHideChainFinance_fromOwnViewerOnMixedAttribution() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    var mine = item();
+    mine.setId(20L);
+    mine.setKolId(100L);
+    var other = item();
+    other.setId(21L);
+    other.setKolId(101L);
+    when(items.selectList(any())).thenReturn(List.of(mine, other));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 7L)));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+    assertThat(chain.lines()).extracting(l -> l.commission()).containsOnlyNulls();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldShowChainFinance_toOwnViewerCoveringEveryAttributedLine() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    var mine = item();
+    mine.setId(20L);
+    mine.setKolId(100L);
+    // Unattributed lines never block the OWN coverage (same basis as settlement details).
+    var unattributed = item();
+    unattributed.setId(21L);
+    when(items.selectList(any())).thenReturn(List.of(mine, unattributed));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 7L)));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                new BigDecimal("0.00"), true, List.of(), List.of()));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNotNull();
+    // Every line verified: the order total returns the real sum, zero included.
+    assertThat(chain.funds().kolCommission()).isEqualByComparingTo("0.00");
+    assertThat(chain.funds().accountStatus()).isEqualTo("POSTED");
   }
 
   @Test

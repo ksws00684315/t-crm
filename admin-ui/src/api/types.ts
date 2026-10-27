@@ -667,10 +667,59 @@ export interface ChainRefundVO {
   finishTime: string | null;
 }
 
+/** One withdrawal allocation shown on a chain line (task 72, B09); paidAt is null until paid. */
+export interface ChainWithdrawalVO {
+  withdrawalId: string;
+  applicationNo: string;
+  occupiedCny: string;
+  status: string;
+  paidAt: string | null;
+}
+
 /**
- * One product row of the order chain (task 40 §3.4): copy job → KOL item link → order line →
- * refunds. `ledger` and `withdrawals` stay null (developing) until the settlement scope lands;
- * line names come from the order detail loaded alongside.
+ * Commission block of a chain line (task 72, B07/B09). Null without `commission:view` or when an
+ * OWN-scoped viewer lacks coverage over every attributed line; unknown amounts stay null (shown
+ * as needs verification) and are never shown as zero — only the occupation total is a known value.
+ */
+export interface ChainLineCommissionVO {
+  rateSnapshot: string | null;
+  netCommission: string | null;
+  shopProfit: string | null;
+  releaseBasis: string | null;
+  occupiedTotal: string;
+  withdrawals: ChainWithdrawalVO[];
+}
+
+/** Order-level funds of the chain (task 72, B07); gated exactly like the line commission block. */
+export interface OrderChainFundsVO {
+  payAmount: string | null;
+  refundTotal: string;
+  kolCommission: string;
+  /** Weidian settlement net pending M0 (Q-1017-1/2): always null for now, shown as unverified. */
+  shopProfit: string | null;
+  accountStatus: "POSTED" | "UNVERIFIED";
+}
+
+/**
+ * One finance flow of the chain (task 72, B08). Amounts are always positive; `direction` carries
+ * the sign. Shop receivables wait for the M0 settlement net, so only KOL_COMMISSION rows exist.
+ */
+export interface ChainFinanceFlowVO {
+  flowNo: string;
+  orderItemId: string;
+  shopName: string | null;
+  type: "KOL_COMMISSION" | "SHOP_RECEIVABLE";
+  direction: "INCREASE" | "DECREASE";
+  amount: string;
+  businessAt: string | null;
+  transferredAt: string | null;
+  withdrawalNo: string | null;
+}
+
+/**
+ * One product row of the order chain (task 40 §3.4, funds by task 72): copy job → KOL item link →
+ * order line → refunds, plus the line commission block; line names come from the order detail
+ * loaded alongside.
  */
 export interface ChainLineVO {
   orderItemId: string;
@@ -680,15 +729,16 @@ export interface ChainLineVO {
   quantity: number | null;
   payAmount: string | null;
   refunds: ChainRefundVO[];
-  ledger: unknown;
-  withdrawals: unknown;
+  commission: ChainLineCommissionVO | null;
 }
 
-/** `GET /order/orders/{id}/chain` (task 40 §3.4). */
+/** `GET /order/orders/{id}/chain` (task 40 §3.4; funds and flows by task 72). */
 export interface OrderChainVO {
   orderId: string;
   orderNo: string;
+  funds: OrderChainFundsVO | null;
   lines: ChainLineVO[];
+  financeFlows: ChainFinanceFlowVO[] | null;
 }
 
 /** Which of the two sync streams a monitoring row describes. */
