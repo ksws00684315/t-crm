@@ -4,6 +4,7 @@ import com.tcrm.admin.commission.model.LedgerSourceRow;
 import com.tcrm.admin.commission.model.OutstandingDeduction;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -53,6 +54,23 @@ public interface CommissionWalletMapper {
       WHERE source_key = #{sourceKey}
       """)
   LedgerSourceRow findBySourceKey(@Param("sourceKey") String sourceKey);
+
+  /**
+   * Commission entries tied to item snapshots (order chain finance flows, task 72 B08): release
+   * credits and clawback adjustments, keyed by {@code source_id = item_state_id}. Company isolation
+   * is the tenant plugin's job.
+   */
+  @Select(
+      "<script>SELECT id, entry_type, amount_cny, occurred_at, source_id FROM crm_commission_ledger"
+          + " WHERE entry_type IN ('COMMISSION_CREDIT', 'COMMISSION_ADJUSTMENT')"
+          + " AND source_type = 'COMMISSION' AND source_id IN "
+          + "<foreach collection='itemStateIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+          + " ORDER BY occurred_at, id</script>")
+  List<ItemLedgerRow> listByItemStates(@Param("itemStateIds") Collection<Long> itemStateIds);
+
+  /** One wallet entry of an item snapshot, as shown by the order chain (task 72). */
+  record ItemLedgerRow(
+      long id, String entryType, BigDecimal amountCny, Instant occurredAt, long sourceId) {}
 
   @Insert(
       """

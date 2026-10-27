@@ -174,15 +174,24 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    for (const header of ["商品名称", "数量", "订单状态", "支付金额", "操作"]) {
+    for (const header of ["商品名称", "达人", "数量", "订单状态", "支付金额", "操作"]) {
       expect(labels).toContain(header);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
     expect(wrapper.find('[data-test="filter-order-no"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="filter-shop"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="filter-kol-code"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="filter-kol-keyword"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="filter-order-status"]').exists()).toBe(true);
-    expect(wrapper.findComponent(ElDatePicker).props("disabled")).toBe(true);
+    // Task 70 B01-B04: the order-time picker and every status option are live.
+    const picker = wrapper.findComponent(ElDatePicker);
+    expect(picker.exists()).toBe(true);
+    expect(picker.props("disabled")).toBeFalsy();
+    const options = wrapper.findAllComponents({ name: "ElOption" });
+    for (const status of ["REFUNDING", "REFUND_SUCCESS", "ABNORMAL"]) {
+      const option = options.find(item => item.props("value") === status);
+      expect(option, `option ${status} rendered`).toBeTruthy();
+      expect(option?.props("disabled")).toBeFalsy();
+    }
     // The order band keeps the order number, platform creation time, and shop together.
     expect(wrapper.findAll(".order-group-header")).toHaveLength(2);
     expect(wrapper.text()).toContain("t40 Shop（S001）");
@@ -197,7 +206,7 @@ describe("order list page (task 40)", () => {
       .findAllComponents(ElSelect)
       .find(select => select.attributes("data-test") === "filter-shop");
     channelSelect?.vm.$emit("update:modelValue", "1");
-    await element("filter-kol-code").setValue("KOL-ZS01");
+    await element("filter-kol-keyword").setValue("Zoe");
     const statusSelect = wrapper
       .findAllComponents(ElSelect)
       .find(select => select.attributes("data-test") === "filter-order-status");
@@ -208,8 +217,66 @@ describe("order list page (task 40)", () => {
     expect(vi.mocked(orderApi.listOrders).mock.lastCall?.[0]).toMatchObject({
       orderNo: "2026102100001",
       shopId: "1",
-      kolCode: "KOL-ZS01",
+      kolKeyword: "Zoe",
       orderStatus: "PAID"
+    });
+    wrapper.unmount();
+  });
+
+  it("maps refund and abnormal statuses onto their own query params (task 70)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const statusSelect = wrapper
+      .findAllComponents(ElSelect)
+      .find(select => select.attributes("data-test") === "filter-order-status");
+    const cases = [
+      ["REFUNDING", "REFUNDING"],
+      ["REFUND_SUCCESS", "REFUNDED"]
+    ] as const;
+    for (const [picked, refundState] of cases) {
+      statusSelect?.vm.$emit("update:modelValue", picked);
+      await flushPromises();
+      element("search").trigger("click");
+      await flushPromises();
+      const params = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+      expect(params?.refundState).toBe(refundState);
+      expect(params?.abnormal).toBeUndefined();
+      expect(params?.orderStatus).toBeUndefined();
+    }
+    statusSelect?.vm.$emit("update:modelValue", "ABNORMAL");
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    const abnormal = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+    expect(abnormal?.abnormal).toBe(true);
+    expect(abnormal?.refundState).toBeUndefined();
+    expect(abnormal?.orderStatus).toBeUndefined();
+    // A standard status keeps using orderStatus.
+    statusSelect?.vm.$emit("update:modelValue", "CLOSED");
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    const standard = vi.mocked(orderApi.listOrders).mock.lastCall?.[0];
+    expect(standard?.orderStatus).toBe("CLOSED");
+    expect(standard?.refundState).toBeUndefined();
+    expect(standard?.abnormal).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("sends the picked platform order-time window as UTC bounds (task 70 B01)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const wrapper = await mountPage();
+    const picker = wrapper.findComponent(ElDatePicker);
+    picker.vm.$emit("update:modelValue", [
+      new Date("2026-10-15T16:00:00.000Z"),
+      new Date("2026-10-16T16:00:00.000Z")
+    ]);
+    await flushPromises();
+    element("search").trigger("click");
+    await flushPromises();
+    expect(vi.mocked(orderApi.listOrders).mock.lastCall?.[0]).toMatchObject({
+      orderTimeFrom: "2026-10-15T16:00:00.000Z",
+      orderTimeTo: "2026-10-16T16:00:00.000Z"
     });
     wrapper.unmount();
   });
@@ -233,6 +300,104 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("renders per-line creator identity and images from the list response (task 71)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    const multi = {
+      ...attributed,
+      items: [
+        {
+          id: "301",
+          subOrderId: null,
+          weidianItemId: "9001",
+          skuId: null,
+          itemName: "First product",
+          skuName: null,
+          quantity: 1,
+          payAmount: "30.00",
+          refundAmount: null,
+          kolId: "201",
+          kolCode: "KOL-ZS01",
+          kolName: "Zoe",
+          productId: "401",
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null,
+          imageUrl: "https://img.example/first.png"
+        },
+        {
+          id: "302",
+          subOrderId: null,
+          weidianItemId: "9002",
+          skuId: null,
+          itemName: "Second product",
+          skuName: null,
+          quantity: 2,
+          payAmount: "90.00",
+          refundAmount: null,
+          kolId: "202",
+          kolCode: "KOL-XH02",
+          // A line whose creator has no stored name renders just the code, never a fake name.
+          kolName: null,
+          productId: "402",
+          kolItemId: null,
+          attributionType: 1,
+          manualReason: null,
+          imageUrl: null
+        },
+        {
+          id: "303",
+          subOrderId: null,
+          weidianItemId: "9003",
+          skuId: null,
+          itemName: "Third product",
+          skuName: null,
+          quantity: 1,
+          payAmount: "10.00",
+          refundAmount: null,
+          kolId: null,
+          kolCode: null,
+          kolName: null,
+          productId: "403",
+          kolItemId: null,
+          attributionType: 3,
+          manualReason: null,
+          imageUrl: null
+        }
+      ]
+    } satisfies OrderVO;
+    vi.mocked(orderApi.listOrders).mockResolvedValue({
+      items: [multi],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+
+    // el-table keeps one measurement copy of the cell in .hidden-columns; count only real rows.
+    const inRows = (selector: string) =>
+      [...document.body.querySelectorAll(selector)].filter(el => el.closest("tr") !== null);
+    const images = inRows('[data-test="order-item-image"]');
+    expect(images).toHaveLength(1);
+    expect(images[0]?.querySelector("img")?.getAttribute("src")).toBe(
+      "https://img.example/first.png"
+    );
+    // Lines without an image keep the shared placeholder, not a broken or fake one.
+    expect(inRows('[data-test="order-item-image-missing"]')).toHaveLength(2);
+    expect(wrapper.text()).toContain("暂无图片");
+
+    const names = inRows('[data-test="identity-name"]')
+      .map(el => el.textContent?.trim())
+      .filter(Boolean);
+    expect(names).toEqual(["Zoe", "-"]);
+    const codes = inRows('[data-test="identity-code"]')
+      .map(el => el.textContent?.trim())
+      .filter(Boolean);
+    expect(codes).toEqual(["KOL-ZS01", "KOL-XH02"]);
+    // The unattributed line shows the empty marker instead of an identity block.
+    expect(inRows('[data-test="order-item-kol-empty"]')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
   it("uses order pagination while rendering each product as its own row", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     const multi = {
@@ -250,10 +415,12 @@ describe("order list page (task 40)", () => {
           refundAmount: null,
           kolId: "201",
           kolCode: "KOL-ZS01",
+          kolName: "Zoe",
           productId: null,
           kolItemId: null,
           attributionType: 1,
-          manualReason: null
+          manualReason: null,
+          imageUrl: null
         },
         {
           id: "302",
@@ -267,10 +434,12 @@ describe("order list page (task 40)", () => {
           refundAmount: null,
           kolId: "201",
           kolCode: "KOL-ZS01",
+          kolName: "Zoe",
           productId: null,
           kolItemId: null,
           attributionType: 1,
-          manualReason: null
+          manualReason: null,
+          imageUrl: null
         }
       ]
     } satisfies OrderVO;

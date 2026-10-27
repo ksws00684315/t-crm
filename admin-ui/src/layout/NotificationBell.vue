@@ -18,10 +18,10 @@ import { notifyError } from "@/utils/notify";
 import {
   canOpenNotification,
   notificationHref,
-  notificationText,
   relativeNotificationTime,
   unreadBadge
 } from "@/utils/notification";
+import NotificationText from "@/components/NotificationText.vue";
 import { accessOf } from "@/utils/permission";
 
 const { t } = useI18n();
@@ -140,7 +140,7 @@ async function openItem(item: NotificationVO) {
         @click="openItem(item)"
       >
         <el-icon><component :is="icons[item.type]" /></el-icon>
-        <span class="notification-bell__text">{{ notificationText(item) }}</span>
+        <NotificationText :item="item" class="notification-bell__text" />
         <span class="notification-bell__time">{{ relativeNotificationTime(item.createTime) }}</span>
       </button>
       <div class="notification-bell__footer">

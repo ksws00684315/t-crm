@@ -359,6 +359,29 @@ public interface WithdrawalMapper {
       """)
   List<OccupationRow> listOccupationsByOrderItems(@Param("orderItemIds") List<Long> orderItemIds);
 
+  /**
+   * Every allocation touching the item lines, whatever the application state (order chain, task 72
+   * B09): rejected and withdrawn occupations come back too, so the chain can show them as released
+   * by status while excluding them from the occupation total.
+   */
+  @Select(
+      """
+      <script>
+      SELECT a.id AS allocation_id, a.order_item_id AS order_item_id,
+             a.occupied_cny AS occupied_cny, w.id AS withdrawal_id,
+             w.application_no AS application_no, w.status AS status,
+             w.create_time AS submitted_at, p.paid_at AS paid_at
+      FROM crm_commission_withdrawal_allocation a
+      JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id
+      LEFT JOIN crm_commission_withdrawal_payment p ON p.withdrawal_id = w.id
+      WHERE a.order_item_id IN
+      <foreach collection="orderItemIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      ORDER BY a.order_item_id, w.create_time, a.id
+      </script>
+      """)
+  List<AllocationOccupationRow> listAllocationsByOrderItems(
+      @Param("orderItemIds") List<Long> orderItemIds);
+
   @Insert(
       """
       INSERT INTO crm_commission_withdrawal_history (
@@ -580,6 +603,17 @@ public interface WithdrawalMapper {
       BigDecimal occupiedCny,
       BigDecimal sourceReleasedCny,
       BigDecimal remainingSnapshotCny,
+      Instant submittedAt,
+      Instant paidAt) {}
+
+  /** One allocation of one item line in any application state (order chain, task 72). */
+  record AllocationOccupationRow(
+      long allocationId,
+      long orderItemId,
+      BigDecimal occupiedCny,
+      long withdrawalId,
+      String applicationNo,
+      String status,
       Instant submittedAt,
       Instant paidAt) {}
 

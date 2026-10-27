@@ -9,6 +9,7 @@ import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useUserStore } from "@/stores/user";
 import { notifyError } from "@/utils/notify";
+import { saveSession } from "@/utils/session";
 import OrderChainPage from "../chain/index.vue";
 
 vi.mock("@/api/order/order");
@@ -16,12 +17,15 @@ vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 /**
  * The order chain (task 40 §4): every product line carries the copy job (with its jump to the
- * product task page), the creator item link, the order line and its refunds; ledger and
- * withdrawal blocks stay "developing" until the settlement scope lands.
+ * product task page), the creator item link, the order line and its refunds. Task 72 wires the
+ * commission data: funds cards, per-line commission blocks and the finance flows; the base fixture
+ * mirrors a backend answer without financial data (all blocks null).
  */
 const chain: OrderChainVO = {
   orderId: "101",
   orderNo: "2026102100001",
+  funds: null,
+  financeFlows: null,
   lines: [
     {
       orderItemId: "301",
@@ -48,8 +52,7 @@ const chain: OrderChainVO = {
           finishTime: "2026-10-20T13:00:00Z"
         }
       ],
-      ledger: null,
-      withdrawals: null
+      commission: null
     },
     {
       orderItemId: "302",
@@ -59,8 +62,111 @@ const chain: OrderChainVO = {
       quantity: 1,
       payAmount: "60.00",
       refunds: [],
-      ledger: null,
-      withdrawals: null
+      commission: null
+    }
+  ]
+};
+
+/** Same wiring with the financial blocks filled in, as commission:view viewers receive it. */
+const financedChain: OrderChainVO = {
+  ...chain,
+  funds: {
+    payAmount: "180.00",
+    refundTotal: "20.00",
+    kolCommission: "16.00",
+    shopProfit: null,
+    accountStatus: "UNVERIFIED"
+  },
+  financeFlows: [
+    {
+      flowNo: "CL9001",
+      orderItemId: "301",
+      shopName: "t40 Shop",
+      type: "KOL_COMMISSION",
+      direction: "INCREASE",
+      amount: "18.00",
+      businessAt: "2026-10-21T00:00:00Z",
+      transferredAt: null,
+      withdrawalNo: null
+    },
+    {
+      flowNo: "CL9002",
+      orderItemId: "301",
+      shopName: "t40 Shop",
+      type: "KOL_COMMISSION",
+      direction: "DECREASE",
+      amount: "2.00",
+      businessAt: "2026-10-22T00:00:00Z",
+      transferredAt: null,
+      withdrawalNo: null
+    },
+    {
+      flowNo: "WA7001",
+      orderItemId: "301",
+      shopName: "t40 Shop",
+      type: "KOL_COMMISSION",
+      direction: "DECREASE",
+      amount: "10.00",
+      businessAt: "2026-10-23T00:00:00Z",
+      transferredAt: "2026-10-24T00:00:00Z",
+      withdrawalNo: "W20261023000001"
+    },
+    {
+      flowNo: "WA7002",
+      orderItemId: "301",
+      shopName: "t40 Shop",
+      type: "KOL_COMMISSION",
+      direction: "DECREASE",
+      amount: "6.00",
+      businessAt: "2026-10-25T00:00:00Z",
+      transferredAt: null,
+      withdrawalNo: "W20261025000002"
+    }
+  ],
+  lines: [
+    {
+      ...chain.lines[0],
+      commission: {
+        rateSnapshot: "0.1000",
+        netCommission: "16.00",
+        shopProfit: null,
+        releaseBasis: "CONFIRMED",
+        occupiedTotal: "16.00",
+        withdrawals: [
+          {
+            withdrawalId: "601",
+            applicationNo: "W20261023000001",
+            occupiedCny: "10.00",
+            status: "PAID",
+            paidAt: "2026-10-24T00:00:00Z"
+          },
+          {
+            withdrawalId: "602",
+            applicationNo: "W20261025000002",
+            occupiedCny: "6.00",
+            status: "PENDING_PAYMENT",
+            paidAt: null
+          },
+          {
+            withdrawalId: "603",
+            applicationNo: "W20261025000003",
+            occupiedCny: "5.00",
+            status: "REJECTED",
+            paidAt: null
+          }
+        ]
+      }
+    },
+    {
+      ...chain.lines[1],
+      commission: {
+        rateSnapshot: null,
+        netCommission: null,
+        shopProfit: null,
+        releaseBasis: "UNVERIFIED",
+        occupiedTotal: "0.00",
+        withdrawals: []
+      }
     }
   ]
 };
@@ -122,22 +228,29 @@ const orderDetail: OrderDetailVO = {
   ]
 };
 
-function signIn(role: Role, permissions: string[]) {
-  useUserStore().user = {
-    id: "1",
-    username: "me",
-    nickname: "Me",
-    email: null,
-    role,
-    postTemplate: null,
-    permissions,
-    dataScope: "ALL",
-    tenantId: "1",
-    tenantName: "默认公司",
-    status: 1,
-    lastLoginTime: null,
-    createTime: "2026-10-01T00:00:00Z"
-  };
+function signIn(role: Role, permissions: string[], dataScope: "ALL" | "OWN" = "ALL") {
+  // Seed the stored session before the store instance is created: its access flags key on a
+  // live token, and expiresAt itself is not a writable store field (task 72 commission gating).
+  saveSession({
+    token: "test-token",
+    expiresAt: Date.now() + 3_600_000,
+    user: {
+      id: "1",
+      username: "me",
+      nickname: "Me",
+      email: null,
+      role,
+      postTemplate: null,
+      permissions,
+      dataScope,
+      tenantId: "1",
+      tenantName: "默认公司",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-01T00:00:00Z"
+    }
+  });
+  useUserStore();
 }
 
 async function mountPage() {
@@ -227,7 +340,7 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("shows missing-link states and separates incomplete financial blocks", async () => {
+  it("shows missing-link states and keeps unknown fund amounts distinct from zero", async () => {
     signIn("SUPER_ADMIN", ["order:view"]);
     const { wrapper } = await mountPage();
     const lines = wrapper.findAll('[data-test="chain-line"]');
@@ -239,9 +352,129 @@ describe("order chain page (task 40)", () => {
     expect(second.querySelector('[data-test="chain-kol-item"]')?.textContent).toContain("-");
     expect(second.querySelector('[data-test="chain-refunds"]')?.textContent).toContain("无退款");
     expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("180.00");
-    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("开发中");
-    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("开发中");
+    // Financial blocks absent (null fixture): a super admin falls back to 待核实, never to 0 or
+    // 开发中 — the refund total still sums from the line refunds.
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("20.00");
+    expect(funds).toContain("待核实");
+    expect(funds).not.toContain("开发中");
+    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("暂无财务流水");
     expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("renders commission funds, line blocks and finance flows (task 72)", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥16.00");
+    // Shop profit waits for the M0 Weidian settlement net: 待核实, never a number.
+    expect(funds).toContain("待核实");
+
+    // Line 1: rate snapshot, occupation split by application state machine, rejected released.
+    const blocks = wrapper.findAll('[data-test="chain-commission"]');
+    expect(blocks).toHaveLength(2);
+    const first = blocks[0].text();
+    expect(first).toContain("佣金与提现");
+    expect(first).toContain("10%");
+    expect(first).toContain("¥16.00");
+    expect(first).toContain("微店确认结算");
+    expect(first).toContain("W20261023000001");
+    expect(first).toContain("W20261025000002");
+    expect(first).toContain("W20261025000003");
+    expect(first).toContain("已支付");
+    expect(first).toContain("待支付");
+    expect(first).toContain("已驳回");
+    // Line 2 stays unverified: null amounts read 待核实, the known occupation zero reads ¥0.00.
+    const secondText = blocks[1].text();
+    expect(secondText).toContain("待核实");
+    expect(secondText).toContain("¥0.00");
+    expect(secondText).toContain("无提现占用");
+
+    // Finance flows: increase for the release credit, decrease for clawback and allocations,
+    // per-withdrawal numbers with payment times, "－" when no withdrawal is linked.
+    const flows = wrapper.find('[data-test="chain-flows"]').text();
+    expect(flows).toContain("CL9001");
+    expect(flows).toContain("CL9002");
+    expect(flows).toContain("WA7001");
+    expect(flows).toContain("WA7002");
+    expect(flows).toContain("达人佣金");
+    expect(flows).toContain("增加");
+    expect(flows).toContain("减少");
+    expect(flows).toContain("W20261023000001");
+    expect(flows).toContain("W20261025000002");
+    expect(flows).toContain("－");
+    expect(flows).toContain("t40 Shop");
+    expect(flows).toContain("t40 Item");
+    wrapper.unmount();
+  });
+
+  it("explains missing financial data without commission:view (task 72)", async () => {
+    signIn("STAFF", ["order:view"]);
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("当前账号无佣金查看权限");
+    // The order wiring itself stays visible; only the financial blocks disappear.
+    expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="chain-commission"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("treats null financial blocks of an OWN viewer as scope limited (task 72)", async () => {
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("当前权限仅展示本人范围商品行；整单金额不可见");
+    expect(wrapper.find('[data-test="chain-flows-scope-limited"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("keeps shop profit needs-verification for an OWN viewer whose funds are visible", async () => {
+    // Mixed orders hide the whole funds block; fully covered orders show it, and the M0-pending
+    // shop profit then reads 待核实 exactly like the line-level block — not the scope note.
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥16.00");
+    expect(funds).toContain("待核实");
+    expect(funds).not.toContain("当前权限仅展示本人范围商品行");
+    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("deduplicates one refund across lines in the fallback total and formats every card", async () => {
+    // Without commission:view the funds block is null, so the refund total falls back to the
+    // client sum: the same refund attached to both lines must count once (B07 dedup rule), and
+    // all four cards share the formatPrice rendering (¥ prefix), not raw strings.
+    signIn("STAFF", ["order:view"]);
+    const duplicated: OrderChainVO = {
+      ...chain,
+      lines: chain.lines.map(line => ({
+        ...line,
+        refunds:
+          line.orderItemId === "302"
+            ? [
+                {
+                  id: "501",
+                  refundNo: "R20261021001",
+                  refundType: "RETURN_REFUND",
+                  refundStatus: "SUCCESS",
+                  amount: "20.00",
+                  finishTime: "2026-10-20T13:00:00Z"
+                }
+              ]
+            : line.refunds
+      }))
+    };
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
+    const { wrapper } = await mountPage();
+    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥180.00");
+    expect(funds).toContain("¥20.00");
     wrapper.unmount();
   });
 

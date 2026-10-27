@@ -1,6 +1,7 @@
 package com.tcrm.admin.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.reset;
@@ -157,11 +158,15 @@ class OrderQueryIT {
   }
 
   private void kol(long id, String code) {
+    kol(id, code, "Creator " + code);
+  }
+
+  private void kol(long id, String code, String name) {
     jdbc.update(
         "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,create_time,update_time) VALUES(?,1,?,?,?,'US',now(),now())",
         id,
         code,
-        "Creator " + code,
+        name,
         code.toLowerCase() + "@example.test");
   }
 
@@ -196,18 +201,29 @@ class OrderQueryIT {
   }
 
   private long save(String id, Instant paid, WeidianBusinessApi.OrderLine... lines) {
+    return saveAt(id, "pay", PAID.minusSeconds(100), paid, lines);
+  }
+
+  /** Task 70 B01 fixture: the platform order time is set independently of the pay time. */
+  private long saveAt(
+      String id,
+      String status,
+      Instant ordered,
+      Instant paid,
+      WeidianBusinessApi.OrderLine... lines) {
     var detail =
         new WeidianBusinessApi.OrderDetailResponse(
             id,
-            "pay",
+            status,
             "",
             BigDecimal.TEN,
             BigDecimal.TEN,
-            PAID.minusSeconds(100),
+            ordered,
             paid,
             List.of(lines),
             json.readTree("{\"buyer_info\":{\"buyer_id\":\"b\"}}"));
-    TenantScope.runCompany(1, () -> writer.save(normalizer.normalize(10, detail, PAID)));
+    TenantScope.runCompany(
+        1, () -> writer.save(normalizer.normalize(10, detail, paid == null ? ordered : paid)));
     return jdbc.queryForObject("SELECT id FROM crm_order WHERE weidian_order_id=?", Long.class, id);
   }
 
@@ -317,8 +333,14 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.lines[0].payAmount").value("10.00"))
         .andExpect(jsonPath("$.data.lines[0].refunds[0].refundNo").value("R1"))
         .andExpect(jsonPath("$.data.lines[0].refunds[0].refundStatus").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.lines[0].ledger").isEmpty())
-        .andExpect(jsonPath("$.data.lines[0].withdrawals").isEmpty());
+        // Task 72: the real write path registers unverified commission snapshots (no source
+        // basis yet), so the finance viewer sees null amounts, a known zero occupation, and the
+        // UNVERIFIED accounting status.
+        .andExpect(jsonPath("$.data.lines[0].commission.netCommission").isEmpty())
+        .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("0.00"))
+        .andExpect(jsonPath("$.data.lines[0].commission.withdrawals").isEmpty())
+        .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
+        .andExpect(jsonPath("$.data.financeFlows").isEmpty());
   }
 
   @Test
@@ -488,6 +510,340 @@ class OrderQueryIT {
                 .header("X-Admin-Token", admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.unmatchedReason").value("CONFLICT"));
+  }
+
+  @Test
+  void shouldFilterByPlatformOrderTime_notPayOrSyncTime_withInclusiveFromExclusiveTo()
+      throws Exception {
+    mapping(1, 100, "90", null, Instant.parse("2026-10-01T00:00:00Z"), null);
+    // Ordered on the 10th but paid on the 16th; the second is ordered later but paid earlier.
+    saveAt("1000", "pay", Instant.parse("2026-10-10T00:00:00Z"), PAID, line("90", "1"));
+    saveAt(
+        "1001",
+        "pay",
+        Instant.parse("2026-10-20T00:00:00Z"),
+        PAID.minusSeconds(86_400),
+        line("90", "2"));
+
+    // The order-time window ignores both pay times; the lower bound includes an exact match.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-20T00:00:00Z")
+                .param("orderTimeTo", "2026-10-21T00:00:00Z")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1001"));
+    // The upper bound excludes an order placed exactly at that instant.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-09T00:00:00Z")
+                .param("orderTimeTo", "2026-10-10T00:00:00Z")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-10T00:00:00Z")
+                .param("orderTimeTo", "2026-10-11T00:00:00Z")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"));
+    // Both windows combine: only the first order lies in the order-time and pay-time ranges.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderTimeFrom", "2026-10-09T00:00:00Z")
+                .param("orderTimeTo", "2026-10-11T00:00:00Z")
+                .param("payFrom", PAID.minusSeconds(1).toString())
+                .param("payTo", PAID.plusSeconds(1).toString())
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"));
+  }
+
+  @Test
+  void shouldResolveKolKeywordOverExactCodeAndContainedName_includingDuplicateNames()
+      throws Exception {
+    jdbc.update("UPDATE crm_kol SET name='Alice' WHERE id=100");
+    jdbc.update("UPDATE crm_kol SET name='alice b' WHERE id=200");
+    kol(300, "KOL-CCC300", "Twin");
+    kol(400, "KOL-DDD400", "Twin");
+    // Every mapping is valid long before all pay times, so attribution never lapses.
+    Instant early = Instant.parse("2026-10-01T00:00:00Z");
+    mapping(1, 100, "90", null, early, null);
+    mapping(2, 200, "91", null, early, null);
+    mapping(3, 300, "92", null, early, null);
+    mapping(4, 400, "93", null, early, null);
+    saveAt("1000", "pay", PAID.minusSeconds(50), PAID, line("90", "1"));
+    saveAt("1001", "pay", PAID.minusSeconds(50), PAID.minusSeconds(10), line("91", "2"));
+    saveAt("1002", "pay", PAID.minusSeconds(50), PAID.minusSeconds(20), line("92", "3"));
+    saveAt("1003", "pay", PAID.minusSeconds(50), PAID.minusSeconds(30), line("93", "4"));
+
+    // Name match is case-insensitive and contains; several creators may share one name.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("kolKeyword", "alice")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1001"))
+        .andExpect(jsonPath("$.data.items[0].kolCode").value("KOL-AAA100"))
+        .andExpect(jsonPath("$.data.items[1].kolCode").value("KOL-AAA200"));
+    // The code still matches exactly and keeps the legacy kolCode hit scope.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("kolKeyword", "KOL-AAA100")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"));
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("kolKeyword", "Twin")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1002"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1003"));
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("kolKeyword", "KOL-ZZZ999")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("0"));
+  }
+
+  /**
+   * Task 71 B05 over the real database: the page counts orders, not product lines, and each line
+   * carries its own KOL's code, name and image. A second company holds the same order number and a
+   * KOL with the same name; neither may leak into the other company's response.
+   */
+  @Test
+  void shouldPageByOrderCount_andResolveEachLinesOwnKol_whenAnotherTenantSharesNames()
+      throws Exception {
+    Instant early = Instant.parse("2026-10-01T00:00:00Z");
+    mapping(1, 100, "90", "https://img.example/90.png", early, null);
+    mapping(2, 200, "91", "https://img.example/91.png", early, null);
+    // Three lines: one per mapped KOL plus one unattributed line; a second single-line order
+    // keeps the page from degenerating to one order.
+    saveAt(
+        "8000",
+        "pay",
+        PAID.minusSeconds(50),
+        PAID,
+        line("90", "1"),
+        line("91", "2"),
+        line("92", "3"));
+    saveAt("8001", "pay", PAID.minusSeconds(40), PAID, line("90", "4"));
+
+    mvc.perform(get("/admin-api/order/orders").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"));
+    mvc.perform(
+            get("/admin-api/order/orders").param("orderNo", "8000").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].items.length()").value(3))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL-AAA100"))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolName").value("Creator KOL-AAA100"))
+        .andExpect(
+            jsonPath("$.data.items[0].items[0].imageUrl").value("https://img.example/90.png"))
+        .andExpect(jsonPath("$.data.items[0].items[1].kolCode").value("KOL-AAA200"))
+        .andExpect(jsonPath("$.data.items[0].items[1].kolName").value("Creator KOL-AAA200"))
+        .andExpect(
+            jsonPath("$.data.items[0].items[1].imageUrl").value("https://img.example/91.png"))
+        .andExpect(jsonPath("$.data.items[0].items[2].kolCode").value(nullValue()))
+        .andExpect(jsonPath("$.data.items[0].items[2].kolName").value(nullValue()))
+        .andExpect(jsonPath("$.data.items[0].items[2].imageUrl").value(nullValue()));
+
+    // The other company reuses the order number and gives its own KOL the same display name.
+    var other = CompanySessions.openCompany(mvc, json, PASSWORD, "t71b", "t71b-admin");
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,create_time,update_time)"
+            + " VALUES(20,?,?, 'Other shop','71020020',now(),now())",
+        other.tenantId(),
+        "SHOP-000020");
+    jdbc.update(
+        "INSERT INTO crm_kol(id,tenant_id,kol_code,name,email,country,create_time,update_time)"
+            + " VALUES(900,?,'KOL-EEE900','Creator KOL-AAA100','t71b@example.test','US',now(),now())",
+        other.tenantId());
+    jdbc.update(
+        "INSERT INTO crm_product(id,tenant_id,product_code,shop_id,weidian_item_id,name,image_url,"
+            + "price,create_time,update_time) VALUES(5,?,'P5',20,'990','Other original',"
+            + "'https://img.example/other.png',10,now(),now())",
+        other.tenantId());
+    jdbc.update(
+        "INSERT INTO crm_kol_item(id,tenant_id,kol_id,product_id,shop_id,weidian_item_id,link_code,"
+            + "valid_from,valid_to,create_time,update_time) VALUES(5,?,900,5,20,'990',"
+            + "'KPL-000000000005',?,null,now(),now())",
+        other.tenantId(),
+        Timestamp.from(early));
+    var detail =
+        new WeidianBusinessApi.OrderDetailResponse(
+            "8000",
+            "pay",
+            "",
+            BigDecimal.TEN,
+            BigDecimal.TEN,
+            PAID.minusSeconds(30),
+            PAID,
+            List.of(line("990", "1")),
+            json.readTree("{\"buyer_info\":{\"buyer_id\":\"b\"}}"));
+    TenantScope.runCompany(
+        other.tenantId(), () -> writer.save(normalizer.normalize(20, detail, PAID)));
+
+    // Each company sees exactly its own order and its own KOL, despite the shared name and number.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("orderNo", "8000")
+                .header("X-Admin-Token", other.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL-EEE900"))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolName").value("Creator KOL-AAA100"))
+        .andExpect(
+            jsonPath("$.data.items[0].items[0].imageUrl").value("https://img.example/other.png"));
+    mvc.perform(
+            get("/admin-api/order/orders").param("orderNo", "8000").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].items.length()").value(3))
+        .andExpect(jsonPath("$.data.items[0].items[0].kolCode").value("KOL-AAA100"))
+        .andExpect(jsonPath("$.data.items[0].items[1].kolCode").value("KOL-AAA200"));
+  }
+
+  @Test
+  void shouldFilterRefundStates_oncePerOrder_acrossPartialAndFullRefunds() throws Exception {
+    mapping(1, 100, "90", null, Instant.parse("2026-10-01T00:00:00Z"), null);
+    // One order with three refund rows: two succeeded (partial, 8 of 10) plus one processing.
+    long mixed = saveAt("1000", "pay", PAID.minusSeconds(50), PAID, line("90", "1"));
+    long mixedItem =
+        jdbc.queryForObject("SELECT id FROM crm_order_item WHERE order_id=?", Long.class, mixed);
+    refund(1, mixed, mixedItem, "R1", "SUCCESS", "RETURN_REFUND", "5.00");
+    refund(2, mixed, mixedItem, "R2", "SUCCESS", "REFUND_ONLY", "3.00");
+    refund(3, mixed, null, "R3", "PROCESSING", "REFUND_ONLY", "2.00");
+    long fullyRefunded =
+        saveAt("1001", "pay", PAID.minusSeconds(50), PAID.minusSeconds(10), line("90", "2"));
+    refund(4, fullyRefunded, null, "R4", "SUCCESS", "REFUND_ONLY", "10.00");
+    long processingOnly =
+        saveAt("1002", "pay", PAID.minusSeconds(50), PAID.minusSeconds(20), line("90", "3"));
+    refund(5, processingOnly, null, "R5", "PROCESSING", "REFUND_ONLY", "1.00");
+    long closedOnly =
+        saveAt("1003", "pay", PAID.minusSeconds(50), PAID.minusSeconds(30), line("90", "4"));
+    refund(6, closedOnly, null, "R6", "CLOSED", "REFUND_ONLY", "1.00");
+    saveAt("1004", "pay", PAID.minusSeconds(50), PAID.minusSeconds(40), line("90", "5"));
+
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("refundState", "REFUNDING")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        // The mixed order counts once despite three rows; CLOSED never matches.
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1002"));
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("refundState", "REFUNDED")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        // Both partial and whole refunds match; the same order appears under both filters.
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1001"));
+  }
+
+  @Test
+  void shouldFilterAbnormalOrders_asOneUnion_intersectedWithOtherFiltersAndScopes()
+      throws Exception {
+    shop(11);
+    mapping(1, 100, "90", null, PAID.minusSeconds(1), null);
+    long unknownStatus =
+        saveAt("1000", "pay", Instant.parse("2026-10-10T00:00:00Z"), PAID, line("90", "1"));
+    jdbc.update("UPDATE crm_order SET order_status='UNKNOWN' WHERE id=?", unknownStatus);
+    long unmatched =
+        saveAt("1001", "pay", Instant.parse("2026-10-11T00:00:00Z"), PAID, line("91", "2"));
+    long conflict =
+        saveAt("1002", "pay", Instant.parse("2026-10-12T00:00:00Z"), PAID, line("92", "3"));
+    jdbc.update("UPDATE crm_order SET attribution_status='CONFLICT' WHERE id=?", conflict);
+    jdbc.update("UPDATE crm_order SET shop_id=11 WHERE id=?", conflict);
+    saveAt("1003", "pay", Instant.parse("2026-10-13T00:00:00Z"), PAID, line("90", "4"));
+    // Another company's order never leaks into the union.
+    jdbc.update(
+        "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,order_status,raw_status,attribution_status,source,order_time,pay_amount,total_amount,freight,discount,last_sync_time,create_time,update_time,is_deleted) "
+            + "VALUES(99999,2,10,'t70_foreign','UNKNOWN','pay','UNMATCHED',2,now(),10,10,0,0,now(),now(),now(),FALSE)");
+
+    mvc.perform(
+            get("/admin-api/order/orders").param("abnormal", "true").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("3"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1002"))
+        .andExpect(jsonPath("$.data.items[1].orderNo").value("1001"))
+        .andExpect(jsonPath("$.data.items[2].orderNo").value("1000"));
+    // Shop intersect: only the conflict order lives in shop 11.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("abnormal", "true")
+                .param("shopId", "11")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1002"));
+    // Order-time intersect: the window covers only the unmatched order.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("abnormal", "true")
+                .param("orderTimeFrom", "2026-10-11T00:00:00Z")
+                .param("orderTimeTo", "2026-10-12T00:00:00Z")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1001"));
+    // Creator intersect: only the unknown-status order is attributed to KOL-AAA100.
+    mvc.perform(
+            get("/admin-api/order/orders")
+                .param("abnormal", "true")
+                .param("kolKeyword", "KOL-AAA100")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1000"));
+
+    // OWN scope: the BD sees only the abnormal order their snapshot owns.
+    mvc.perform(
+            post("/admin-api/system/users")
+                .header("X-Admin-Token", admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "username",
+                            "t70_bd",
+                            "password",
+                            PASSWORD,
+                            "nickname",
+                            "Task 70 BD",
+                            "role",
+                            "STAFF",
+                            "dataScope",
+                            "OWN",
+                            "postTemplate",
+                            "BD",
+                            "permissions",
+                            List.of("order:view")))))
+        .andExpect(status().isOk());
+    long bd = jdbc.queryForObject("SELECT id FROM sys_user WHERE username='t70_bd'", Long.class);
+    jdbc.update("UPDATE crm_order SET bd_user_id=? WHERE id=?", bd, unmatched);
+    String token = CompanySessions.login(mvc, json, "t70_bd", PASSWORD);
+    mvc.perform(
+            get("/admin-api/order/orders").param("abnormal", "true").header("X-Admin-Token", token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("1"))
+        .andExpect(jsonPath("$.data.items[0].orderNo").value("1001"));
   }
 
   @Test

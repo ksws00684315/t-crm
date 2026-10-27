@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
@@ -22,6 +23,7 @@ import com.tcrm.admin.product.api.KolMappingEvidenceDTO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
@@ -71,6 +73,7 @@ public class OrderService {
   private final ExternalAuditApi audit;
   private final AuditSanitizer sanitizer;
   private final OrderCommissionSync commissionSync;
+  private final OrderChainCommissionApi commissionChain;
 
   public OrderService(
       OrderMapper orders,
@@ -89,7 +92,8 @@ public class OrderService {
       CopyJobLookupApi copyJobs,
       ExternalAuditApi audit,
       AuditSanitizer sanitizer,
-      OrderCommissionSync commissionSync) {
+      OrderCommissionSync commissionSync,
+      OrderChainCommissionApi commissionChain) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
@@ -107,6 +111,7 @@ public class OrderService {
     this.audit = audit;
     this.sanitizer = sanitizer;
     this.commissionSync = commissionSync;
+    this.commissionChain = commissionChain;
   }
 
   public PageResult<OrderDTO> page(OrderFilterDTO filter, boolean unmatched) {
@@ -123,6 +128,8 @@ public class OrderService {
                 filter.orderNo())
             .ge(filter.payFrom() != null, OrderDO::getPayTime, filter.payFrom())
             .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
+            .ge(filter.orderTimeFrom() != null, OrderDO::getOrderTime, filter.orderTimeFrom())
+            .lt(filter.orderTimeTo() != null, OrderDO::getOrderTime, filter.orderTimeTo())
             .eq(filter.status() != null, OrderDO::getOrderStatus, filter.status())
             .eq(filter.attribution() != null, OrderDO::getAttributionStatus, filter.attribution())
             .eq(user.ownScope(), OrderDO::getBdUserId, user.id());
@@ -135,6 +142,31 @@ public class OrderService {
         return new PageResult<>(List.of(), 0, filter.page(), filter.size());
       }
       query.eq(OrderDO::getKolId, kol.id());
+    }
+    if (filter.kolKeyword() != null && !filter.kolKeyword().isBlank()) {
+      // B02: one keyword over the creator's code (exact) and name (contains); the same main-order
+      // kol_id condition as kolCode, so the hit scope is unchanged.
+      var ids = kols.findIdsByKeyword(filter.kolKeyword());
+      if (ids.isEmpty()) {
+        return new PageResult<>(List.of(), 0, filter.page(), filter.size());
+      }
+      query.in(OrderDO::getKolId, ids);
+    }
+    if (filter.refundState() != null) {
+      // B03: EXISTS keeps one order with several refund rows counted once; the map onto the
+      // persisted refund_status values lives in the §6.2 contract.
+      query.exists(
+          "SELECT 1 FROM crm_refund r WHERE r.order_id = crm_order.id AND r.refund_status = {0}",
+          "REFUNDING".equals(filter.refundState()) ? "PROCESSING" : "SUCCESS");
+    }
+    if (filter.abnormal()) {
+      // B04: one union of the three abnormal markers, intersected with every other condition.
+      query.and(
+          union ->
+              union
+                  .eq(OrderDO::getOrderStatus, "UNKNOWN")
+                  .or()
+                  .in(OrderDO::getAttributionStatus, List.of("UNMATCHED", "CONFLICT")));
     }
     query.orderByDesc(OrderDO::getPayTime, OrderDO::getId);
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);
@@ -204,6 +236,13 @@ public class OrderService {
                     .collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(BdUserDTO::id, Function.identity()));
+    Map<Long, String> images =
+        productImagesById(
+            lines.values().stream()
+                .flatMap(List::stream)
+                .map(OrderItemDO::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
     return records.stream()
         .map(
             o -> {
@@ -233,7 +272,7 @@ public class OrderService {
                   o.getFreight(),
                   totals.getOrDefault(o.getId(), BigDecimal.ZERO.setScale(2)),
                   lines.getOrDefault(o.getId(), List.of()).stream()
-                      .map(line -> line(line, kolById))
+                      .map(line -> line(line, kolById, images))
                       .toList());
             })
         .toList();
@@ -331,7 +370,11 @@ public class OrderService {
     };
   }
 
-  /** Order chain (task 40 §3.4): per line the copy job, link, amounts and refunds. */
+  /**
+   * Order chain (task 40 §3.4; funds by task 72, handoff B07–B09): per line the copy job, link,
+   * amounts, refunds and the commission block, plus the order funds and finance flows — the three
+   * financial blocks only for viewers holding {@code commission:view} with OWN coverage.
+   */
   public OrderChainDTO chain(Long id) {
     var order = readable(id);
     var lines = lines(id);
@@ -359,6 +402,7 @@ public class OrderService {
       }
     }
     Map<Long, KolRefDTO> kolById = kolById(kolIds);
+    var finance = financeBlocks(current.user(), order, lines, refunds);
     var chainLines = new ArrayList<OrderChainDTO.ChainLineDTO>();
     for (var line : lines) {
       var mapping = line.getKolItemId() == null ? null : mappingById.get(line.getKolItemId());
@@ -402,11 +446,133 @@ public class OrderService {
                               r.getAmount(),
                               r.getFinishTime()))
                   .toList(),
-              null,
-              null));
+              finance.byItem().get(line.getId())));
     }
-    return new OrderChainDTO(order.getId(), order.getWeidianOrderId(), chainLines);
+    return new OrderChainDTO(
+        order.getId(), order.getWeidianOrderId(), finance.funds(), chainLines, finance.flows());
   }
+
+  /**
+   * The three financial blocks of the chain (task 72): null throughout unless the caller holds
+   * {@code commission:view} and, on OWN scope, every attributed line of the order belongs to their
+   * own creators — mixed orders hide the amounts, same basis as the settlement details.
+   */
+  private ChainFinance financeBlocks(
+      AccountDTO user, OrderDO order, List<OrderItemDO> lines, List<RefundDO> refunds) {
+    if (!user.effectivePermissions().contains("commission:view") || !ownCoverage(user, lines)) {
+      return new ChainFinance(null, Map.of(), null);
+    }
+    var commission =
+        commissionChain.chainOfOrder(
+            order.getId(), lines.stream().map(OrderItemDO::getId).toList());
+    Map<Long, OrderChainDTO.LineCommissionDTO> byItem = new HashMap<>();
+    for (var line : commission.lines()) {
+      byItem.put(
+          line.orderItemId(),
+          new OrderChainDTO.LineCommissionDTO(
+              line.rateSnapshot(),
+              line.netCommissionCny(),
+              null,
+              line.releaseBasis(),
+              line.occupiedCny(),
+              line.withdrawals().stream()
+                  .map(
+                      w ->
+                          new OrderChainDTO.LineWithdrawalDTO(
+                              w.withdrawalId(),
+                              w.applicationNo(),
+                              w.occupiedCny(),
+                              w.status(),
+                              w.paidAt()))
+                  .toList()));
+    }
+    String shopName = shopName(order);
+    var flows =
+        commission.flows().stream()
+            .map(
+                f ->
+                    new OrderChainDTO.FlowDTO(
+                        f.flowNo(),
+                        f.orderItemId(),
+                        shopName,
+                        f.type(),
+                        f.direction(),
+                        f.amountCny(),
+                        f.businessAt(),
+                        f.transferredAt(),
+                        f.withdrawalNo()))
+            .toList();
+    var funds =
+        new OrderChainDTO.FundsDTO(
+            order.getPayAmount(),
+            successfulRefundTotal(refunds),
+            // Any unverified line hides the order total as unknown — a 0 would read as a real
+            // zero commission while the line-level blocks correctly say 待核实.
+            commission.allVerified() ? commission.netCommissionCny() : null,
+            null,
+            commission.allVerified() ? "POSTED" : "UNVERIFIED");
+    return new ChainFinance(funds, Map.copyOf(byItem), flows);
+  }
+
+  /**
+   * OWN-scope finance coverage, same basis as the settlement details: at least one line attributed
+   * to the caller's own creators and none attributed to anyone else's; unattributed lines never
+   * block. Non-OWN callers always cover.
+   */
+  private boolean ownCoverage(AccountDTO user, List<OrderItemDO> lines) {
+    if (!user.ownScope()) {
+      return true;
+    }
+    Set<Long> ownKolIds =
+        kols.listByBdUserId(user.id()).stream()
+            .map(KolRefDTO::id)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    boolean anyOwn = false;
+    for (var line : lines) {
+      Long kolId = line.getKolId();
+      if (kolId == null) {
+        continue;
+      }
+      if (ownKolIds.contains(kolId)) {
+        anyOwn = true;
+      } else {
+        return false;
+      }
+    }
+    return anyOwn;
+  }
+
+  /**
+   * Successful refund total of the order deduplicated by refund id, so one refund associated with
+   * several lines never counts twice (task 72 B07).
+   */
+  private static BigDecimal successfulRefundTotal(List<RefundDO> refunds) {
+    Map<Long, BigDecimal> byRefund = new LinkedHashMap<>();
+    for (var refund : refunds) {
+      if (refund.getId() == null
+          || !"SUCCESS".equals(refund.getRefundStatus())
+          || refund.getAmount() == null) {
+        continue;
+      }
+      byRefund.putIfAbsent(refund.getId(), refund.getAmount());
+    }
+    return byRefund.values().stream().reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+  }
+
+  private String shopName(OrderDO order) {
+    if (order.getShopId() == null) {
+      return null;
+    }
+    var shop = shops.findShop(order.getShopId());
+    return shop == null ? null : shop.name();
+  }
+
+  /** Financial blocks of {@link #chain(Long)}: all null together, or all filled together. */
+  private record ChainFinance(
+      OrderChainDTO.FundsDTO funds,
+      Map<Long, OrderChainDTO.LineCommissionDTO> byItem,
+      List<OrderChainDTO.FlowDTO> flows) {}
 
   /** Match evidence of one order line in the manual pool (task 40 §3.6). */
   public UnmatchedEvidenceDTO evidence(Long orderItemId) {
@@ -757,11 +923,15 @@ public class OrderService {
 
   /** Main image per original-product id of the lines; missing products and images map to null. */
   private Map<Long, String> productImages(List<OrderItemDO> lines) {
-    Set<Long> productIds =
+    return productImagesById(
         lines.stream()
             .map(OrderItemDO::getProductId)
             .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+            .collect(Collectors.toSet()));
+  }
+
+  /** One batch lookup for a whole page (task 71 B05): no per-order or per-line queries. */
+  private Map<Long, String> productImagesById(Set<Long> productIds) {
     Map<Long, String> images = new HashMap<>();
     for (var product : products.listProducts(productIds)) {
       images.put(product.id(), product.imageUrl());
@@ -769,7 +939,12 @@ public class OrderService {
     return images;
   }
 
-  private static OrderItemDTO line(OrderItemDO i, Map<Long, KolRefDTO> kolById) {
+  /**
+   * Line identity comes from the line's own KOL (task 71 B05): the order-level KOL is never used as
+   * a fallback, and a deleted KOL leaves both code and name null.
+   */
+  private static OrderItemDTO line(
+      OrderItemDO i, Map<Long, KolRefDTO> kolById, Map<Long, String> images) {
     var kol = i.getKolId() == null ? null : kolById.get(i.getKolId());
     return new OrderItemDTO(
         i.getId(),
@@ -783,9 +958,11 @@ public class OrderService {
         i.getRefundAmount(),
         i.getKolId(),
         kol == null ? null : kol.kolCode(),
+        kol == null ? null : kol.name(),
         i.getProductId(),
         i.getKolItemId(),
         i.getAttributionType(),
-        i.getManualReason());
+        i.getManualReason(),
+        images.get(i.getProductId()));
   }
 }

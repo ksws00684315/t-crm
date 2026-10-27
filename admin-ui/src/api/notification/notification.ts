@@ -16,6 +16,11 @@ export type NotificationType =
 /** Render parameters. Only the fields for the message type are present. */
 export interface NotificationParams {
   kolCode: string | null;
+  /**
+   * Creator display name (task 71, B06): present on newly written messages, null on history that
+   * only carries the code and when the creator no longer resolved at write time.
+   */
+  kolName?: string | null;
   accountType: string | null;
   shopName: string | null;
   reason: string | null;

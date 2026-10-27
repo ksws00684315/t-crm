@@ -3,6 +3,8 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -17,6 +19,7 @@ import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
@@ -77,6 +80,7 @@ class OrderServiceTest {
   private final CopyJobLookupApi copyJobs = mock(CopyJobLookupApi.class);
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final AuditSanitizer sanitizer = mock(AuditSanitizer.class);
+  private final OrderChainCommissionApi commissionChain = mock(OrderChainCommissionApi.class);
 
   {
     org.mockito.Mockito.when(sanitizer.sanitize(org.mockito.ArgumentMatchers.any()))
@@ -103,7 +107,8 @@ class OrderServiceTest {
           audit,
           sanitizer,
           new OrderCommissionSync(
-              mock(org.springframework.context.ApplicationEventPublisher.class), refunds));
+              mock(org.springframework.context.ApplicationEventPublisher.class), refunds),
+          commissionChain);
 
   @BeforeAll
   static void metadata() {
@@ -159,7 +164,46 @@ class OrderServiceTest {
 
   private static OrderFilterDTO filter(String code) {
     return new OrderFilterDTO(
-        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, null, null, 1, 20);
+        5L,
+        PAID.minusSeconds(1),
+        PAID.plusSeconds(1),
+        null,
+        null,
+        code,
+        null,
+        "PAID",
+        null,
+        null,
+        false,
+        null,
+        null,
+        1,
+        20);
+  }
+
+  /** Task 70 filters only; every other condition stays absent. */
+  private static OrderFilterDTO task70Filter(
+      Instant orderTimeFrom,
+      Instant orderTimeTo,
+      String kolKeyword,
+      String refundState,
+      boolean abnormal) {
+    return new OrderFilterDTO(
+        null,
+        null,
+        null,
+        orderTimeFrom,
+        orderTimeTo,
+        null,
+        kolKeyword,
+        null,
+        null,
+        refundState,
+        abnormal,
+        null,
+        null,
+        1,
+        20);
   }
 
   private static void error(Runnable action, ErrorCode expected) {
@@ -252,10 +296,12 @@ class OrderServiceTest {
                 new BigDecimal("2.00"),
                 100L,
                 "KOL0100",
+                "Creator",
                 200L,
                 300L,
                 2,
-                "confirmed"));
+                "confirmed",
+                null));
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -382,7 +428,10 @@ class OrderServiceTest {
   @Test
   void shouldApplyOnlyRequestedFilters_whenOptionalQueryFieldsAreAbsent() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, null, null, null, 1, 20), false);
+    service.page(
+        new OrderFilterDTO(
+            null, null, null, null, null, null, null, null, null, null, false, null, null, 1, 20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -394,7 +443,23 @@ class OrderServiceTest {
   void shouldConstrainAttributionStatus_whenRequested() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
     service.page(
-        new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", null, null, 1, 20), false);
+        new OrderFilterDTO(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "ATTRIBUTED",
+            null,
+            false,
+            null,
+            null,
+            1,
+            20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("attribution_status");
@@ -405,7 +470,10 @@ class OrderServiceTest {
   void shouldMatchExactOrderNoAndIgnoreUnknownChannels_whenFiltering() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
     service.page(
-        new OrderFilterDTO(null, null, null, null, null, null, "12345", "WEIDIAN", 1, 20), false);
+        new OrderFilterDTO(
+            null, null, null, null, null, null, null, null, null, null, false, "12345", "WEIDIAN",
+            1, 20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("weidian_order_id");
@@ -414,11 +482,50 @@ class OrderServiceTest {
     assertThat(
             service
                 .page(
-                    new OrderFilterDTO(null, null, null, null, null, null, null, "TMALL", 1, 20),
+                    new OrderFilterDTO(
+                        null, null, null, null, null, null, null, null, null, null, false, null,
+                        "TMALL", 1, 20),
                     false)
                 .items())
         .isEmpty();
     verify(orders, times(1)).selectPage(any(), any());
+  }
+
+  @Test
+  void shouldReturnEmptyPage_whenKolKeywordMatchesNoCreator() {
+    when(kols.findIdsByKeyword("nobody")).thenReturn(List.of());
+    var result = service.page(task70Filter(null, null, "nobody", null, false), false);
+    assertThat(result.items()).isEmpty();
+    assertThat(result.total()).isZero();
+    verify(orders, never()).selectPage(any(), any());
+  }
+
+  @Test
+  void shouldApplyOrderTimeKolKeywordRefundAndAbnormalFilters_whenRequested() {
+    when(kols.findIdsByKeyword("zoe")).thenReturn(List.of(100L, 200L));
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(
+        task70Filter(PAID.minusSeconds(1), PAID.plusSeconds(1), "zoe", "REFUNDED", true), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment())
+        .contains("order_time", "kol_id IN", "crm_refund", "order_status", "attribution_status");
+    assertThat(query.getValue().getParamNameValuePairs().values())
+        .contains(PAID.minusSeconds(1), PAID.plusSeconds(1), 100L, 200L, "SUCCESS");
+  }
+
+  @Test
+  void shouldMapRefundStatesOntoPersistedRefundStatuses_whenFiltering() {
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(task70Filter(null, null, null, "REFUNDING", false), false);
+    service.page(task70Filter(null, null, null, "REFUNDED", false), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders, times(2)).selectPage(any(), query.capture());
+    // getSqlSegment() first: the EXISTS fragment fills paramNameValuePairs lazily on rendering.
+    query.getAllValues().forEach(w -> assertThat(w.getSqlSegment()).contains("crm_refund"));
+    assertThat(query.getAllValues().getFirst().getParamNameValuePairs().values())
+        .contains("PROCESSING");
+    assertThat(query.getAllValues().get(1).getParamNameValuePairs().values()).contains("SUCCESS");
   }
 
   @Test
@@ -459,6 +566,66 @@ class OrderServiceTest {
     assertThat(result.items().get(2).bdUserName()).isEqualTo("username-only");
     verify(shops, times(1)).listShops();
     verify(kols, times(1)).listByIds(any());
+    verify(bdUsers, times(1)).listByIds(any());
+  }
+
+  @Test
+  void shouldDecorateEachLineWithItsOwnKolAndImage_whenPagingOrders() {
+    var attributed = order(10);
+    attributed.setKolId(100L);
+    var first = item();
+    first.setKolId(100L);
+    first.setProductId(300L);
+    var second = item();
+    second.setId(21L);
+    second.setWeidianItemId("91");
+    second.setKolId(101L);
+    second.setProductId(301L);
+    var deletedKolLine = item();
+    deletedKolLine.setId(22L);
+    deletedKolLine.setWeidianItemId("92");
+    deletedKolLine.setKolId(999L);
+    deletedKolLine.setProductId(302L);
+    var unattributed = item();
+    unattributed.setId(23L);
+    unattributed.setWeidianItemId("93");
+    unattributed.setProductId(303L);
+    when(orders.selectPage(any(), any()))
+        .thenAnswer(
+            call -> {
+              Page<OrderDO> page = call.getArgument(0);
+              page.setRecords(List.of(attributed));
+              page.setTotal(1);
+              return page;
+            });
+    when(items.selectList(any())).thenReturn(List.of(first, second, deletedKolLine, unattributed));
+    when(kols.listByIds(any()))
+        .thenReturn(
+            List.of(
+                new KolRefDTO(100L, "KOL0100", "Creator", true, 99L),
+                new KolRefDTO(101L, "KOL0101", "Other", true, 99L)));
+    when(products.listProducts(any()))
+        .thenReturn(
+            List.of(
+                new ProductRefDTO(300L, "P300", "Product A", "https://img.example/300.png", 1),
+                new ProductRefDTO(301L, "P301", "Product B", null, 1)));
+
+    var result = service.page(filter(null), false);
+
+    assertThat(result.total()).isEqualTo(1);
+    var lines = result.items().getFirst().items();
+    assertThat(lines)
+        .extracting(OrderItemDTO::kolCode)
+        .containsExactly("KOL0100", "KOL0101", null, null);
+    assertThat(lines)
+        .extracting(OrderItemDTO::kolName)
+        .containsExactly("Creator", "Other", null, null);
+    assertThat(lines)
+        .extracting(OrderItemDTO::imageUrl)
+        .containsExactly("https://img.example/300.png", null, null, null);
+    verify(kols, times(1)).listByIds(any());
+    verify(products, times(1)).listProducts(any());
+    verify(shops, times(1)).listShops();
     verify(bdUsers, times(1)).listByIds(any());
   }
 
@@ -603,8 +770,167 @@ class OrderServiceTest {
     assertThat(line.link().linkCode()).isEqualTo("KPL-AAAAAAAAAAAA");
     assertThat(line.refunds()).hasSize(1);
     assertThat(line.refunds().getFirst().refundNo()).isEqualTo("R9");
-    assertThat(line.ledger()).isNull();
-    assertThat(line.withdrawals()).isNull();
+    // No commission:view in this test, so all financial blocks stay null (task 72).
+    assertThat(line.commission()).isNull();
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+  }
+
+  @Test
+  void shouldHideChainFinance_whenViewerLacksCommissionView() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(items.selectList(any())).thenReturn(List.of(item()));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view"));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+    assertThat(chain.lines().getFirst().commission()).isNull();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldAssembleChainFinance_whenViewerHoldsCommissionView() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(shops.findShop(5L)).thenReturn(new ShopAccessDTO(5L, "Main shop", "wd-5", 1, "S005"));
+    var i = item();
+    i.setKolId(100L);
+    i.setQuantity(1);
+    i.setPayAmount(new BigDecimal("12.50"));
+    when(items.selectList(any())).thenReturn(List.of(i));
+    // Same refund id twice (one refund spanning two lines) plus a processing one: 2.00 once.
+    var deduped = new RefundDO();
+    deduped.setId(9L);
+    deduped.setOrderItemId(20L);
+    deduped.setRefundStatus("SUCCESS");
+    deduped.setAmount(new BigDecimal("2.00"));
+    var duplicate = new RefundDO();
+    duplicate.setId(9L);
+    duplicate.setOrderItemId(21L);
+    duplicate.setRefundStatus("SUCCESS");
+    duplicate.setAmount(new BigDecimal("2.00"));
+    var processing = new RefundDO();
+    processing.setId(12L);
+    processing.setOrderItemId(20L);
+    processing.setRefundStatus("PROCESSING");
+    processing.setAmount(new BigDecimal("5.00"));
+    when(refunds.selectList(any())).thenReturn(List.of(deduped, duplicate, processing));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                new BigDecimal("3.75"),
+                false,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L,
+                        new BigDecimal("0.3000"),
+                        new BigDecimal("3.75"),
+                        "CONFIRMED",
+                        new BigDecimal("3.00"),
+                        List.of(
+                            new OrderChainCommissionApi.WithdrawalRefDTO(
+                                31L, "W20261016000001", new BigDecimal("3.00"), "PAID", PAID),
+                            new OrderChainCommissionApi.WithdrawalRefDTO(
+                                32L,
+                                "W20261016000002",
+                                new BigDecimal("1.00"),
+                                "REJECTED",
+                                null)))),
+                List.of(
+                    new OrderChainCommissionApi.FlowDTO(
+                        20L,
+                        "CL900",
+                        "KOL_COMMISSION",
+                        "INCREASE",
+                        new BigDecimal("5.00"),
+                        PAID,
+                        null,
+                        null),
+                    new OrderChainCommissionApi.FlowDTO(
+                        20L,
+                        "WA901",
+                        "KOL_COMMISSION",
+                        "DECREASE",
+                        new BigDecimal("3.00"),
+                        PAID.plusSeconds(1),
+                        PAID.plusSeconds(3600),
+                        "W20261016000001"))));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds().payAmount()).isEqualByComparingTo("12.50");
+    assertThat(chain.funds().refundTotal()).isEqualByComparingTo("2.00");
+    // Any unverified line hides the order total (review: unknown must not pose as zero); the
+    // verified line's own block still carries its 3.75.
+    assertThat(chain.funds().kolCommission()).isNull();
+    assertThat(chain.funds().shopProfit()).isNull();
+    assertThat(chain.funds().accountStatus()).isEqualTo("UNVERIFIED");
+    var block = chain.lines().getFirst().commission();
+    assertThat(block.rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(block.netCommission()).isEqualByComparingTo("3.75");
+    assertThat(block.shopProfit()).isNull();
+    assertThat(block.releaseBasis()).isEqualTo("CONFIRMED");
+    assertThat(block.occupiedTotal()).isEqualByComparingTo("3.00");
+    assertThat(block.withdrawals()).hasSize(2);
+    assertThat(block.withdrawals().getFirst().applicationNo()).isEqualTo("W20261016000001");
+    assertThat(block.withdrawals().getFirst().paidAt()).isEqualTo(PAID);
+    assertThat(chain.financeFlows()).hasSize(2);
+    assertThat(chain.financeFlows().getFirst().flowNo()).isEqualTo("CL900");
+    assertThat(chain.financeFlows().getFirst().shopName()).isEqualTo("Main shop");
+    assertThat(chain.financeFlows().get(1).transferredAt()).isEqualTo(PAID.plusSeconds(3600));
+    assertThat(chain.financeFlows().get(1).withdrawalNo()).isEqualTo("W20261016000001");
+  }
+
+  @Test
+  void shouldHideChainFinance_fromOwnViewerOnMixedAttribution() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    var mine = item();
+    mine.setId(20L);
+    mine.setKolId(100L);
+    var other = item();
+    other.setId(21L);
+    other.setKolId(101L);
+    when(items.selectList(any())).thenReturn(List.of(mine, other));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 7L)));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNull();
+    assertThat(chain.financeFlows()).isNull();
+    assertThat(chain.lines()).extracting(l -> l.commission()).containsOnlyNulls();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldShowChainFinance_toOwnViewerCoveringEveryAttributedLine() {
+    when(orders.selectById(10L)).thenReturn(order(10));
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    var mine = item();
+    mine.setId(20L);
+    mine.setKolId(100L);
+    // Unattributed lines never block the OWN coverage (same basis as settlement details).
+    var unattributed = item();
+    unattributed.setId(21L);
+    when(items.selectList(any())).thenReturn(List.of(mine, unattributed));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 7L)));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                new BigDecimal("0.00"), true, List.of(), List.of()));
+
+    var chain = service.chain(10L);
+
+    assertThat(chain.funds()).isNotNull();
+    // Every line verified: the order total returns the real sum, zero included.
+    assertThat(chain.funds().kolCommission()).isEqualByComparingTo("0.00");
+    assertThat(chain.funds().accountStatus()).isEqualTo("POSTED");
   }
 
   @Test
