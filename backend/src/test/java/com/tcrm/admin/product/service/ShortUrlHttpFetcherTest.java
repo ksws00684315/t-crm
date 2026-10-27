@@ -11,6 +11,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +85,7 @@ class ShortUrlHttpFetcherTest {
    */
   @Test
   void shouldAbortWithinTheTotalDeadline_whenTheServerTricklesHeaderBytes() throws Exception {
+    AtomicBoolean dripping = new AtomicBoolean();
     try (ServerSocket drip = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
       Thread accepter =
           new Thread(
@@ -98,11 +100,13 @@ class ShortUrlHttpFetcherTest {
                     out.flush();
                     Thread.sleep(50);
                   }
-                } catch (Exception ignored) {
-                  // the fetcher closed the connection after the deadline
+                } catch (Exception exception) {
+                  // The fetcher closed the connection after the deadline; end the drip thread.
+                  dripping.set(false);
                 }
               });
       accepter.setDaemon(true);
+      dripping.set(true);
       accepter.start();
       // Plain http, so the null TLS factory is never used; the deadline is shortened for the test.
       ShortUrlHttpFetcher fetcher = new ShortUrlHttpFetcher(null, 800);
