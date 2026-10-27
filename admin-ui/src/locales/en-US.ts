@@ -1757,6 +1757,11 @@ const enUS: MessageSchema = {
       PREPAY_APPROVED: "Creator prepay approved, awaiting payment registration",
       PREPAY_REJECTED: "Creator prepay application rejected",
       PREPAY_PAID: "Creator prepay payment registered",
+      WITHDRAWAL_SUBMITTED: "Creator {kolCode} submitted withdrawal {applicationNo} for review",
+      WITHDRAWAL_APPROVED:
+        "Creator {kolCode} withdrawal {applicationNo} approved, awaiting payment",
+      WITHDRAWAL_REJECTED: "Creator {kolCode} withdrawal {applicationNo} was rejected",
+      WITHDRAWAL_PAID: "Creator {kolCode} withdrawal {applicationNo} was paid",
       PAYOUT_ACCOUNT_SUBMITTED:
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",
