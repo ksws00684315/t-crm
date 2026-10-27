@@ -691,6 +691,9 @@ public class WithdrawalService {
       return detail(user, id);
     }
     WithdrawalRow row = requireRowLocked(id);
+    // withdrawal:pay is grantable through the permission table (task 74 S1): an OWN-scope holder
+    // must not register payments for another BD's creators.
+    requireKolScope(user, requireKol(row.kolId()));
     if (paymentRecorded(requestId, fingerprint)) {
       return detail(user, id);
     }
@@ -1217,7 +1220,7 @@ public class WithdrawalService {
     TenantScope.runCompany(
         tenantId,
         () -> {
-          requireKol(kolId);
+          requireKolScope(user, requireKol(kolId));
           if (freezes.latest(kolId) != null && freezes.latest(kolId).active()) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_FROZEN_ALREADY);
           }
@@ -1248,7 +1251,7 @@ public class WithdrawalService {
     TenantScope.runCompany(
         tenantId,
         () -> {
-          requireKol(kolId);
+          requireKolScope(user, requireKol(kolId));
           Long activeId = freezes.lockActive(kolId);
           if (activeId == null) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_NOT_FROZEN);
