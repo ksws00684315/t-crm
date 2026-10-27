@@ -242,7 +242,7 @@ public class WeidianTokenCenter {
             try {
               renewLocked(auth);
             } catch (RuntimeException e) {
-              LOG.error("Weidian token renewal failed for shop {}", shopId);
+              LOG.error("Weidian token renewal failed for shop {}", shopId, e);
             }
           }
           return null;

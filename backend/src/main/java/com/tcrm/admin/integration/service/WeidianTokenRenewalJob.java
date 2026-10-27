@@ -58,7 +58,7 @@ public class WeidianTokenRenewalJob {
             try {
               TenantScope.runCompany(tenantId, this::renewCompany);
             } catch (RuntimeException e) {
-              LOG.error("Weidian token renewal failed for tenant {}", tenantId);
+              LOG.error("Weidian token renewal failed for tenant {}", tenantId, e);
             }
           }
         });
@@ -81,7 +81,7 @@ public class WeidianTokenRenewalJob {
       try {
         tokens.renewIfDue(row.getShopId());
       } catch (RuntimeException e) {
-        LOG.error("Weidian token renewal failed for shop {}", row.getShopId());
+        LOG.error("Weidian token renewal failed for shop {}", row.getShopId(), e);
       }
     }
   }

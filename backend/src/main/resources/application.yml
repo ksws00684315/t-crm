@@ -1,3 +1,8 @@
+logging:
+  pattern:
+    # traceId from RequestTraceFilter's MDC on every request thread (#106); renders nothing on
+    # non-web threads (blank correlation is omitted, not printed as empty brackets).
+    correlation: "[%X{traceId:-}] "
 server:
   port: ${TCRM_ADMIN_PORT:8080}
 spring:
