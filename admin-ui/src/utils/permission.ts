@@ -4,7 +4,9 @@ import { i18n, translate } from "@/locales";
 
 /** Account the menu, the guard and the button helpers all read. Role names stay inside this module. */
 export interface AbilitySubject {
-  role: Role;
+  /** Null when the stored value is one this build does not know yet (#106). */
+  role: Role | null;
+  /** Null for the platform administrator or an unknown stored value (#106). */
   dataScope: DataScope | null;
   permissions?: readonly string[] | null;
   postTemplate?: PostTemplate | null;
@@ -44,8 +46,9 @@ export function accessOf(user: AbilitySubject | null | undefined): AccessProfile
 }
 
 /** Role name in the current language. Resolved at call time so a switch updates open screens. */
-export function roleLabel(role: Role): string {
-  return translate(`role.${role}`);
+export function roleLabel(role: Role | null | undefined): string {
+  // Null (unknown stored value, #106) renders the dash like the account list does.
+  return role ? translate(`role.${role}`) : translate("post.none");
 }
 
 /** Post template name. Null renders the empty mark from the language pack. */
@@ -64,12 +67,12 @@ export function accountLabel(user: AbilitySubject): string {
 }
 
 /** A company sub-account, the only kind whose permission codes are edited one by one. */
-export function isStaff(user: { role: Role } | null | undefined): boolean {
+export function isStaff(user: { role: Role | null } | null | undefined): boolean {
   return user?.role === "STAFF";
 }
 
 /** Company super administrator. Not the signed-in session flag; use this for a row in a list. */
-export function isSuperAdminAccount(user: { role: Role } | null | undefined): boolean {
+export function isSuperAdminAccount(user: { role: Role | null } | null | undefined): boolean {
   return user?.role === "SUPER_ADMIN";
 }
 

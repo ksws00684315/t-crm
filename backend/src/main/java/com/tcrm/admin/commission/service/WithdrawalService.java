@@ -517,7 +517,10 @@ public class WithdrawalService {
                     account ->
                         new RecipientOption(
                             account.getId(),
-                            account.getAccountType().name(),
+                            // Unknown stored type reads back as null (#106)
+                            account.getAccountType() == null
+                                ? null
+                                : account.getAccountType().name(),
                             cipher.decrypt(account.getAccountCipher()),
                             account.getHolderName(),
                             account.getCurrency(),
@@ -691,6 +694,9 @@ public class WithdrawalService {
       return detail(user, id);
     }
     WithdrawalRow row = requireRowLocked(id);
+    // withdrawal:pay is grantable through the permission table (task 74 S1): an OWN-scope holder
+    // must not register payments for another BD's creators.
+    requireKolScope(user, requireKol(row.kolId()));
     if (paymentRecorded(requestId, fingerprint)) {
       return detail(user, id);
     }
@@ -1134,8 +1140,12 @@ public class WithdrawalService {
         });
   }
 
-  /** CSV export of the withdrawal list: data:export AND the list permission. */
-  @Transactional(readOnly = true)
+  /**
+   * CSV export of the withdrawal list: data:export AND the list permission. Not read-only: the
+   * audit row for the export is written in the same transaction, and a readOnly transaction rejects
+   * that INSERT when no outer transaction exists (production 500, task 73 browser run).
+   */
+  @Transactional(rollbackFor = Exception.class)
   public byte[] export(AccountDTO user, Filter filter) {
     requireTenant(user);
     if (user.role() != Role.SUPER_ADMIN && !user.permissions().contains("data:export")) {
@@ -1151,7 +1161,16 @@ public class WithdrawalService {
             "\uFEFF申请编号,达人编号,达人名称,金额(CNY),状态,收款方式,脱敏收款账户,申请时间,审核备注,"
                 + "付款金额(CNY),支付时间,实际支付金额,实际支付币种\r\n");
     PageResult<AdminRow> first =
-        page(user, new Filter(filter.applicationNo(), null, null, null, filter.status(), 1, 100));
+        page(
+            user,
+            new Filter(
+                filter.applicationNo(),
+                filter.kolId(),
+                filter.kolKeyword(),
+                filter.bdUserId(),
+                filter.status(),
+                1,
+                100));
     if (first.total() > 100000) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -1161,7 +1180,14 @@ public class WithdrawalService {
           csv,
           page(
                   user,
-                  new Filter(filter.applicationNo(), null, null, null, filter.status(), page, 100))
+                  new Filter(
+                      filter.applicationNo(),
+                      filter.kolId(),
+                      filter.kolKeyword(),
+                      filter.bdUserId(),
+                      filter.status(),
+                      page,
+                      100))
               .items());
     }
     audit.recordTenantOperation(
@@ -1217,7 +1243,7 @@ public class WithdrawalService {
     TenantScope.runCompany(
         tenantId,
         () -> {
-          requireKol(kolId);
+          requireKolScope(user, requireKol(kolId));
           if (freezes.latest(kolId) != null && freezes.latest(kolId).active()) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_FROZEN_ALREADY);
           }
@@ -1248,7 +1274,7 @@ public class WithdrawalService {
     TenantScope.runCompany(
         tenantId,
         () -> {
-          requireKol(kolId);
+          requireKolScope(user, requireKol(kolId));
           Long activeId = freezes.lockActive(kolId);
           if (activeId == null) {
             throw new BusinessException(ErrorCode.WITHDRAWAL_NOT_FROZEN);
@@ -1388,7 +1414,8 @@ public class WithdrawalService {
       }
       return new AccountSnapshot(
           account.getId(),
-          account.getAccountType().name(),
+          // Unknown stored type reads back as null (#106)
+          account.getAccountType() == null ? null : account.getAccountType().name(),
           account.getAccountCipher(),
           account.getAccountMasked(),
           account.getCurrency(),

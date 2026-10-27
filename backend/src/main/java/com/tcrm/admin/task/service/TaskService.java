@@ -125,7 +125,10 @@ public class TaskService {
                 .eq(TaskFileDO::getTaskId, id)
                 .eq(TaskFileDO::getKind, TaskFileKind.ERROR));
     if (file == null) {
-      if (task.getStatus().isFinished() && task.getFailed() != null && task.getFailed() > 0) {
+      if (task.getStatus() != null
+          && task.getStatus().isFinished()
+          && task.getFailed() != null
+          && task.getFailed() > 0) {
         throw new BusinessException(ErrorCode.TASK_FILE_EXPIRED);
       }
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);

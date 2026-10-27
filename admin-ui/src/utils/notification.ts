@@ -34,8 +34,11 @@ export function relativeNotificationTime(iso: string, now = Date.now()): string 
   return formatInstant(iso);
 }
 
-/** Message text in the current language. `accountType` stays the raw enum name. */
-export function notificationText(item: NotificationView): string {
+/**
+ * Named interpolation values of a message, shared by the plain-text renderer and the sentence
+ * component so both always agree. `accountType` stays the raw enum name.
+ */
+export function notificationValues(item: NotificationView): Record<string, string | number> {
   const params = item.params ?? {};
   const reason = params.reason ? translate(`notification.reason.${params.reason}`) : "";
   // Departure messages carry codes for the plan type and its outcome; both become words here so
@@ -44,7 +47,7 @@ export function notificationText(item: NotificationView): string {
   const result = params.result
     ? translate(`notification.result.${params.result}`, { heir: params.heirName ?? "" })
     : "";
-  return translate(`notification.type.${item.type}`, {
+  return {
     kolCode: params.kolCode ?? "",
     accountType: params.accountType ?? "",
     shopName: params.shopName ?? "",
@@ -52,10 +55,16 @@ export function notificationText(item: NotificationView): string {
     bdName: params.bdName ?? "",
     count: params.count ?? 0,
     prepayNo: params.prepayNo ?? "",
+    applicationNo: params.applicationNo ?? "",
     time: params.effectiveAt ? formatInstantToMinute(params.effectiveAt) : "",
     kind,
     result
-  });
+  };
+}
+
+/** Message text in the current language, with the creator code inline. */
+export function notificationText(item: NotificationView): string {
+  return translate(`notification.type.${item.type}`, notificationValues(item));
 }
 
 /** Target route. Missing pages render the existing 404. */
@@ -66,6 +75,12 @@ export function notificationHref(item: NotificationView): string {
     case "PREPAY_REJECTED":
     case "PREPAY_PAID":
       return `/fund/prepays?id=${encodeURIComponent(item.bizId ?? "")}`;
+    case "WITHDRAWAL_SUBMITTED":
+    case "WITHDRAWAL_APPROVED":
+    case "WITHDRAWAL_REJECTED":
+    case "WITHDRAWAL_PAID":
+      // withdrawalId opens the task drawer; `id` stays the payout-account jump below.
+      return `/fund/payouts?withdrawalId=${encodeURIComponent(item.bizId ?? "")}`;
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return `/fund/payouts?id=${encodeURIComponent(item.bizId ?? "")}`;
     case "ORDER_SYNC_FAILED":
@@ -96,6 +111,14 @@ export function canOpenNotification(type: string, access: AccessProfile): boolea
         !access.isPlatformAdmin &&
         (access.can("commission:view") || access.can("prepay:review") || access.can("prepay:pay"))
       );
+    case "WITHDRAWAL_SUBMITTED":
+    case "WITHDRAWAL_APPROVED":
+    case "WITHDRAWAL_REJECTED":
+    case "WITHDRAWAL_PAID":
+      // The withdrawal tab and its drawer require financeAbilities.view, i.e. commission:view;
+      // an account holding only payout-account:review would land on the payout tab where the
+      // jump has no target (PR #142 review).
+      return !access.isPlatformAdmin && access.can("commission:view");
     case "PAYOUT_ACCOUNT_SUBMITTED":
       return access.can("payout-account:review") || access.can("commission:view");
     case "ORDER_SYNC_FAILED":

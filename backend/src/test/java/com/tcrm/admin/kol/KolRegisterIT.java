@@ -459,6 +459,36 @@ class KolRegisterIT {
         .isEqualTo(email);
   }
 
+  /**
+   * Registration signs the new creator in immediately; the contact fields typed in the form must
+   * still be in the database afterwards (task 74 D1).
+   */
+  @Test
+  void shouldStorePhoneAndWhatsapp_whenRegistering() throws Exception {
+    Bd owner = bd();
+    String code = link(owner.token()).path("code").asText();
+    String email = "contacts@example.com";
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("code", code);
+    payload.put("email", email);
+    payload.put("password", REGISTER_PASSWORD);
+    payload.put("name", "Ada");
+    payload.put("phone", "+15551230011");
+    payload.put("whatsapp", "+15551239922");
+    payload.put("primaryPlatform", "TikTok");
+    payload.put("primaryHandle", "keeper");
+    mvc.perform(
+            post("/kol-api/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(payload)))
+        .andExpect(status().isOk());
+
+    Map<String, Object> row =
+        jdbc.queryForMap("SELECT phone, whatsapp FROM crm_kol WHERE lower(email) = ?", email);
+    assertThat(row.get("phone")).isEqualTo("+15551230011");
+    assertThat(row.get("whatsapp")).isEqualTo("+15551239922");
+  }
+
   @Test
   void shouldRejectBlankName_whenRegistering() throws Exception {
     String code = link(bd().token()).path("code").asText();

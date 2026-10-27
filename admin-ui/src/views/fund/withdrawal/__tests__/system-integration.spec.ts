@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import { createMemoryHistory, createRouter } from "vue-router";
 import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/commission/finance";
@@ -70,7 +71,11 @@ beforeEach(() => {
 });
 
 const global = {
-  plugins: [ElementPlus, i18n],
+  plugins: [
+    ElementPlus,
+    i18n,
+    createRouter({ history: createMemoryHistory(), routes: [{ path: "/", component: TasksPage }] })
+  ],
   stubs: { IncomeDrawer: true, WithdrawalDrawer: true, PaymentDialog: true }
 };
 

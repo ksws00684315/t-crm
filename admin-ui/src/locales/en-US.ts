@@ -1369,6 +1369,7 @@ const enUS: MessageSchema = {
     itemImageDeveloping: "Order item image data awaits API support",
     productInfo: "Product information",
     actualPaidAmount: "Paid amount",
+    itemImageMissing: "No image",
     listStatus: {
       UNPAID: "Awaiting payment",
       PAID: "Awaiting shipment",
@@ -1514,13 +1515,33 @@ const enUS: MessageSchema = {
       shopProfit: "Shop profit",
       shopProfitFormula:
         "Weidian settlement net amount minus net creator commission; product cost is excluded.",
-      financeLedgerDeveloping:
-        "Commission snapshots, settlement net amounts, withdrawal holds, and payment-linked ledger entries are not available from the API yet. Missing amounts are not shown as zero.",
-      financeType: "Flow type",
+      financeLedgerNote:
+        "Shop receivable flows depend on the Weidian settlement net and withdrawable time (pending M0 verification); unverified amounts show as needs verification, never as zero.",
+      financeType: "Type",
       financeAmount: "Amount",
-      financeTime: "Date",
-      settlementNo: "Settlement number",
-      withdrawalOccupation: "Withdrawal hold",
+      flowNo: "Flow number",
+      shopName: "Shop",
+      direction: "Direction",
+      directionIncrease: "Increase",
+      directionDecrease: "Decrease",
+      businessTime: "Business time",
+      transferTime: "Transfer time",
+      linkedSettlementNo: "Linked settlement no.",
+      flowType: {
+        KOL_COMMISSION: "Creator commission",
+        SHOP_RECEIVABLE: "Shop receivable"
+      },
+      commissionBlock: "Commission & withdrawals",
+      rateSnapshot: "Rate snapshot",
+      releaseBasis: "Release basis",
+      occupiedTotal: "Withdrawal hold total",
+      applicationNo: "Application no.",
+      withdrawalAmount: "Held amount",
+      paidAt: "Paid at",
+      withdrawalOccupation: "Withdrawal holds",
+      noWithdrawal: "No withdrawal hold",
+      noFlows: "No finance flows",
+      noCommissionPermission: "This account cannot view commission data",
       copyJob: "Product copy job",
       copyJobTime: "Created at",
       kolItem: "Creator item link",
@@ -1531,9 +1552,7 @@ const enUS: MessageSchema = {
       orderLine: "Order line",
       refunds: "Refunds",
       noRefund: "No refund",
-      noLines: "No order lines",
-      ledger: "Ledger entries",
-      withdrawals: "Withdrawal holds"
+      noLines: "No order lines"
     },
     importOrders: "Import orders",
     importRefunds: "Import refunds",
@@ -1741,6 +1760,11 @@ const enUS: MessageSchema = {
       PREPAY_APPROVED: "Creator prepay approved, awaiting payment registration",
       PREPAY_REJECTED: "Creator prepay application rejected",
       PREPAY_PAID: "Creator prepay payment registered",
+      WITHDRAWAL_SUBMITTED: "Creator {kolCode} submitted withdrawal {applicationNo} for review",
+      WITHDRAWAL_APPROVED:
+        "Creator {kolCode} withdrawal {applicationNo} approved, awaiting payment",
+      WITHDRAWAL_REJECTED: "Creator {kolCode} withdrawal {applicationNo} was rejected",
+      WITHDRAWAL_PAID: "Creator {kolCode} withdrawal {applicationNo} was paid",
       PAYOUT_ACCOUNT_SUBMITTED:
         "Creator {kolCode} submitted a {accountType} payout account for review",
       ORDER_SYNC_FAILED: "Order synchronization failed for shop {shopName}",

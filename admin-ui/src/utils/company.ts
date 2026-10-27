@@ -10,7 +10,8 @@ export interface CompanySwitchedMessage {
 }
 
 interface CompanySubject {
-  role: Role;
+  /** Null when the stored value is one this build does not know yet (#106). */
+  role: Role | null;
   tenantId?: string | null;
   companies?: CompanyVO[] | null;
 }

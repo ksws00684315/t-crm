@@ -41,7 +41,7 @@ public class OrderSyncFailureWriter {
       row.setTaskId(taskId);
       failures.insert(row);
     } catch (RuntimeException e) {
-      LOG.error("Failed to record order sync failure: {}", e.getClass().getName());
+      LOG.error("Failed to record order sync failure", e);
     }
   }
 }

@@ -6,6 +6,10 @@ export type NotificationType =
   | "PREPAY_APPROVED"
   | "PREPAY_REJECTED"
   | "PREPAY_PAID"
+  | "WITHDRAWAL_SUBMITTED"
+  | "WITHDRAWAL_APPROVED"
+  | "WITHDRAWAL_REJECTED"
+  | "WITHDRAWAL_PAID"
   | "PAYOUT_ACCOUNT_SUBMITTED"
   | "ORDER_SYNC_FAILED"
   | "BD_TRANSFER_CANCELLED"
@@ -16,12 +20,19 @@ export type NotificationType =
 /** Render parameters. Only the fields for the message type are present. */
 export interface NotificationParams {
   kolCode: string | null;
+  /**
+   * Creator display name (task 71, B06): present on newly written messages, null on history that
+   * only carries the code and when the creator no longer resolved at write time.
+   */
+  kolName?: string | null;
   accountType: string | null;
   shopName: string | null;
   reason: string | null;
   bdName: string | null;
   count: number | null;
   prepayNo?: string | null;
+  /** Withdrawal messages (task 63): the application number, e.g. W20261027... */
+  applicationNo?: string | null;
   /** Departure messages: heir display name, ISO instant, result and plan type of the plan. */
   heirName: string | null;
   effectiveAt: string | null;

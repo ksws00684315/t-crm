@@ -16,9 +16,9 @@ import { notifyError } from "@/utils/notify";
 import {
   canOpenNotification,
   notificationHref,
-  notificationText,
   relativeNotificationTime
 } from "@/utils/notification";
+import NotificationText from "@/components/NotificationText.vue";
 import { accessOf } from "@/utils/permission";
 
 defineOptions({ name: "NotificationPage" });
@@ -40,6 +40,10 @@ const icons: Record<NotificationType, typeof Wallet> = {
   PREPAY_APPROVED: Wallet,
   PREPAY_REJECTED: Wallet,
   PREPAY_PAID: Wallet,
+  WITHDRAWAL_SUBMITTED: Wallet,
+  WITHDRAWAL_APPROVED: Wallet,
+  WITHDRAWAL_REJECTED: Wallet,
+  WITHDRAWAL_PAID: Wallet,
   PAYOUT_ACCOUNT_SUBMITTED: Wallet,
   ORDER_SYNC_FAILED: Warning,
   BD_TRANSFER_CANCELLED: Switch,
@@ -144,7 +148,7 @@ onMounted(load);
         @click="openItem(item)"
       >
         <el-icon><component :is="icons[item.type]" /></el-icon>
-        <span>{{ notificationText(item) }}</span>
+        <NotificationText :item="item" />
         <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
       </button>
       <el-pagination

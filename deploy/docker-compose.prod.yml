@@ -78,6 +78,10 @@ services:
       # Empty falls back to CF-Connecting-IP,X-Forwarded-For in ClientIpResolver.
       TCRM_CLIENT_IP_HEADERS: ${TCRM_CLIENT_IP_HEADERS:-}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+      # Fail startup when the database schema is newer than this image (rollback safety, #106).
+      # Local dev and the preview share one database across branches and keep the lenient
+      # default (*:future) instead. Emergency rollback: set to '*:future' and restart.
+      TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS: ""
     expose:
       - "8080"
     depends_on:

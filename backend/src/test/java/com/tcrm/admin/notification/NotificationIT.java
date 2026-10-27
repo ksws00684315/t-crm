@@ -116,7 +116,12 @@ class NotificationIT {
             String.class,
             company.tenantId(),
             bd);
-    assertThat(params).contains("kolCode").contains("PAYPAL").doesNotContain("@");
+    assertThat(params)
+        .contains("kolCode")
+        .contains("kolName")
+        .contains("Ada")
+        .contains("PAYPAL")
+        .doesNotContain("@");
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM crm_notification WHERE tenant_id = ? AND user_id = ?",

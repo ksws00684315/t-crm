@@ -9,7 +9,7 @@ import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
 import { useSessionStore } from "@/stores/session";
 import { siteName } from "@/stores/site-config";
-import { isDemoMode } from "@/api/creator";
+import { isDemoMode } from "@/utils/demo-mode";
 import { NAV_ITEMS } from "./nav";
 
 defineOptions({ name: "AppLayout" });

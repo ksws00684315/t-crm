@@ -188,7 +188,7 @@ const { exporting, exportCsv } = useListExport<UserVO>({
   columns: () => [
     { label: t("common.username"), value: row => row.username },
     { label: t("common.nickname"), value: row => row.nickname },
-    { label: t("user.role"), value: row => (row.role ? roleLabel(row.role) : "") },
+    { label: t("user.role"), value: row => (row.role ? roleLabel(row.role) : t("post.none")) },
     { label: t("user.post"), value: row => postLabel(row.postTemplate) },
     {
       label: t("user.permissionCount"),
@@ -199,7 +199,12 @@ const { exporting, exportCsv } = useListExport<UserVO>({
     },
     {
       label: t("user.dataScope"),
-      value: row => (row.dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort"))
+      value: row =>
+        row.dataScope
+          ? row.dataScope === "ALL"
+            ? t("scope.allShort")
+            : t("scope.ownShort")
+          : t("post.none")
     },
     {
       label: t("common.status"),
@@ -474,7 +479,7 @@ onMounted(load);
         </el-tooltip>
       </template>
       <template #cell-role="{ row }">
-        {{ asUser(row).role ? roleLabel(asUser(row).role) : "" }}
+        {{ asUser(row).role ? roleLabel(asUser(row).role) : t("post.none") }}
       </template>
       <template #cell-post="{ row }">
         {{ postLabel(asUser(row).postTemplate) }}
@@ -497,7 +502,13 @@ onMounted(load);
         <span v-else data-test="perm-count">{{ t("user.allPermissionsShort") }}</span>
       </template>
       <template #cell-dataScope="{ row }">
-        {{ asUser(row).dataScope === "ALL" ? t("scope.allShort") : t("scope.ownShort") }}
+        {{
+          asUser(row).dataScope
+            ? asUser(row).dataScope === "ALL"
+              ? t("scope.allShort")
+              : t("scope.ownShort")
+            : t("post.none")
+        }}
       </template>
       <template #cell-status="{ row }">
         <el-tag :type="asUser(row).status === 1 ? 'success' : 'info'">

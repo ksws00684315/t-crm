@@ -86,7 +86,7 @@ public class OrderSyncCoordinator {
             acquired.complete(false);
           } catch (RuntimeException error) {
             acquired.complete(false);
-            LOG.error("Manual order synchronization failed for shop {}", shopId);
+            LOG.error("Manual order synchronization failed for shop {}", shopId, error);
           }
         });
     if (!acquired.join()) {
@@ -110,7 +110,7 @@ public class OrderSyncCoordinator {
             try {
               TenantScope.runCompany(tenantId, this::company);
             } catch (RuntimeException error) {
-              LOG.error("Order synchronization failed for company {}", tenantId);
+              LOG.error("Order synchronization failed for company {}", tenantId, error);
             }
           }
         });
@@ -128,7 +128,7 @@ public class OrderSyncCoordinator {
         Thread.currentThread().interrupt();
         return;
       } catch (RuntimeException error) {
-        LOG.error("Order synchronization failed for shop {}", shop.id());
+        LOG.error("Order synchronization failed for shop {}", shop.id(), error);
       }
     }
   }

@@ -6,6 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
@@ -400,6 +404,65 @@ class WithdrawalServiceScopeTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+  }
+
+  /**
+   * {@code commission:freeze} can be granted to an OWN-scope BD (task 74 S1): the freeze and the
+   * resume of another BD's creator must answer COMMON_NOT_FOUND and write nothing at all.
+   */
+  @Test
+  void shouldRefuseFreezeAndResume_forForeignCreatorsUnderOwnScope() {
+    var bd = staff(6L, DataScope.OWN, Set.of("commission:freeze"));
+    assertThatThrownBy(() -> service.freeze(bd, KOL, "dispute"))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+    assertThatThrownBy(() -> service.resume(bd, KOL, null))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+    verify(freezes, never()).insert(any());
+    verify(freezes, never()).resume(any());
+    verifyNoInteractions(audit);
+  }
+
+  /** The same grant on the BD's own creators keeps working, freeze record and audit included. */
+  @Test
+  void shouldFreezeAndResumeOwnCreator_underOwnScope() {
+    var bd = staff(5L, DataScope.OWN, Set.of("commission:freeze"));
+    service.freeze(bd, KOL, "dispute");
+    when(freezes.lockActive(KOL)).thenReturn(66L);
+    service.resume(bd, KOL, "resolved");
+    verify(freezes).insert(any());
+    verify(freezes).resume(any());
+    verify(audit, times(2))
+        .recordTenantWriteOperation(anyLong(), anyLong(), any(), any(), any(), any(), any());
+  }
+
+  /** An ALL-scope holder (finance) keeps company-wide freeze and resume. */
+  @Test
+  void shouldKeepFreezeAndResumeCompanyWide_forAllScope() {
+    service.freeze(freezer(), KOL, "dispute");
+    when(freezes.lockActive(KOL)).thenReturn(66L);
+    service.resume(freezer(), KOL, "resolved");
+    verify(freezes).insert(any());
+    verify(freezes).resume(any());
+  }
+
+  /**
+   * {@code withdrawal:pay} is grantable through the same permission table (task 74 S1 check): an
+   * OWN-scope holder must not register the payment for another BD's creator.
+   */
+  @Test
+  void shouldRefusePayment_forForeignCreatorsUnderOwnScope() {
+    when(withdrawals.findRow(anyLong())).thenReturn(row("PENDING_PAYMENT"));
+    when(withdrawals.lockById(ID)).thenReturn(ID);
+    var bd = staff(6L, DataScope.OWN, Set.of("withdrawal:pay"));
+    assertThatThrownBy(() -> service.pay(bd, ID, payment()))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+    verify(withdrawals, never()).insertPayment(any());
   }
 
   // ------------------------------------------------------------------ list page full row

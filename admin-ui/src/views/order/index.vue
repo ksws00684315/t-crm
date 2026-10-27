@@ -17,6 +17,7 @@ import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import NameCode from "@/components/NameCode.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
@@ -79,6 +80,7 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
   { key: "product", label: t("order.productInfo"), minWidth: px(400, 420) },
+  { key: "kol", label: t("order.kol"), minWidth: px(140, 150) },
   { key: "quantity", label: t("order.line.quantity"), width: px(72, 80) },
   { key: "orderStatus", label: t("order.orderStatus"), width: px(160, 190) },
   { key: "payAmount", label: t("order.actualPaidAmount"), width: px(120, 140), amount: true },
@@ -474,9 +476,24 @@ onMounted(() => {
           </span>
         </div>
         <div v-else class="order-product-row">
-          <div class="order-image-placeholder" :aria-label="t('order.itemImageDeveloping')">
+          <el-image
+            v-if="(row as GroupedOrderRow).item?.imageUrl"
+            class="order-item-image"
+            :src="(row as GroupedOrderRow).item?.imageUrl ?? ''"
+            :preview-src-list="[(row as GroupedOrderRow).item?.imageUrl ?? '']"
+            fit="cover"
+            preview-teleported
+            alt=""
+            data-test="order-item-image"
+          />
+          <div
+            v-else
+            class="order-image-placeholder"
+            :aria-label="t('order.itemImageMissing')"
+            data-test="order-item-image-missing"
+          >
             <el-icon class="order-image-placeholder__icon" aria-hidden="true"><Picture /></el-icon>
-            <span>{{ t("common.developing") }}</span>
+            <span>{{ t("order.itemImageMissing") }}</span>
           </div>
           <div class="order-product-row__text">
             <span class="order-product-row__name">{{
@@ -493,6 +510,16 @@ onMounted(() => {
             </div>
           </div>
         </div>
+      </template>
+      <template #cell-kol="{ row }">
+        <template v-if="(row as GroupedOrderRow).kind === 'item'">
+          <NameCode
+            v-if="(row as GroupedOrderRow).item?.kolCode"
+            :name="(row as GroupedOrderRow).item?.kolName"
+            :code="(row as GroupedOrderRow).item?.kolCode"
+          />
+          <span v-else data-test="order-item-kol-empty">-</span>
+        </template>
       </template>
       <template #cell-quantity="{ row }">
         {{
@@ -636,6 +663,13 @@ onMounted(() => {
   gap: var(--tcrm-space-4);
   align-items: center;
   min-width: 0;
+}
+
+.order-item-image {
+  flex: 0 0 80px;
+  width: 80px;
+  height: 64px;
+  border-radius: var(--tcrm-radius-tag);
 }
 
 .order-image-placeholder {

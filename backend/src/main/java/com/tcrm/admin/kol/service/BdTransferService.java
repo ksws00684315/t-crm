@@ -358,10 +358,7 @@ public class BdTransferService {
       try {
         executeDue(row.getId());
       } catch (RuntimeException e) {
-        LOG.error(
-            "BD transfer {} failed; retained for retry ({})",
-            row.getId(),
-            e.getClass().getSimpleName());
+        LOG.error("BD transfer {} failed; retained for retry", row.getId(), e);
       }
     }
   }
