@@ -159,7 +159,46 @@ class OrderServiceTest {
 
   private static OrderFilterDTO filter(String code) {
     return new OrderFilterDTO(
-        5L, PAID.minusSeconds(1), PAID.plusSeconds(1), code, "PAID", null, null, null, 1, 20);
+        5L,
+        PAID.minusSeconds(1),
+        PAID.plusSeconds(1),
+        null,
+        null,
+        code,
+        null,
+        "PAID",
+        null,
+        null,
+        false,
+        null,
+        null,
+        1,
+        20);
+  }
+
+  /** Task 70 filters only; every other condition stays absent. */
+  private static OrderFilterDTO task70Filter(
+      Instant orderTimeFrom,
+      Instant orderTimeTo,
+      String kolKeyword,
+      String refundState,
+      boolean abnormal) {
+    return new OrderFilterDTO(
+        null,
+        null,
+        null,
+        orderTimeFrom,
+        orderTimeTo,
+        null,
+        kolKeyword,
+        null,
+        null,
+        refundState,
+        abnormal,
+        null,
+        null,
+        1,
+        20);
   }
 
   private static void error(Runnable action, ErrorCode expected) {
@@ -384,7 +423,10 @@ class OrderServiceTest {
   @Test
   void shouldApplyOnlyRequestedFilters_whenOptionalQueryFieldsAreAbsent() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
-    service.page(new OrderFilterDTO(null, null, null, null, null, null, null, null, 1, 20), false);
+    service.page(
+        new OrderFilterDTO(
+            null, null, null, null, null, null, null, null, null, null, false, null, null, 1, 20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())
@@ -396,7 +438,23 @@ class OrderServiceTest {
   void shouldConstrainAttributionStatus_whenRequested() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
     service.page(
-        new OrderFilterDTO(null, null, null, null, null, "ATTRIBUTED", null, null, 1, 20), false);
+        new OrderFilterDTO(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "ATTRIBUTED",
+            null,
+            false,
+            null,
+            null,
+            1,
+            20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("attribution_status");
@@ -407,7 +465,10 @@ class OrderServiceTest {
   void shouldMatchExactOrderNoAndIgnoreUnknownChannels_whenFiltering() {
     when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
     service.page(
-        new OrderFilterDTO(null, null, null, null, null, null, "12345", "WEIDIAN", 1, 20), false);
+        new OrderFilterDTO(
+            null, null, null, null, null, null, null, null, null, null, false, "12345", "WEIDIAN",
+            1, 20),
+        false);
     ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment()).contains("weidian_order_id");
@@ -416,11 +477,50 @@ class OrderServiceTest {
     assertThat(
             service
                 .page(
-                    new OrderFilterDTO(null, null, null, null, null, null, null, "TMALL", 1, 20),
+                    new OrderFilterDTO(
+                        null, null, null, null, null, null, null, null, null, null, false, null,
+                        "TMALL", 1, 20),
                     false)
                 .items())
         .isEmpty();
     verify(orders, times(1)).selectPage(any(), any());
+  }
+
+  @Test
+  void shouldReturnEmptyPage_whenKolKeywordMatchesNoCreator() {
+    when(kols.findIdsByKeyword("nobody")).thenReturn(List.of());
+    var result = service.page(task70Filter(null, null, "nobody", null, false), false);
+    assertThat(result.items()).isEmpty();
+    assertThat(result.total()).isZero();
+    verify(orders, never()).selectPage(any(), any());
+  }
+
+  @Test
+  void shouldApplyOrderTimeKolKeywordRefundAndAbnormalFilters_whenRequested() {
+    when(kols.findIdsByKeyword("zoe")).thenReturn(List.of(100L, 200L));
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(
+        task70Filter(PAID.minusSeconds(1), PAID.plusSeconds(1), "zoe", "REFUNDED", true), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders).selectPage(any(), query.capture());
+    assertThat(query.getValue().getSqlSegment())
+        .contains("order_time", "kol_id IN", "crm_refund", "order_status", "attribution_status");
+    assertThat(query.getValue().getParamNameValuePairs().values())
+        .contains(PAID.minusSeconds(1), PAID.plusSeconds(1), 100L, 200L, "SUCCESS");
+  }
+
+  @Test
+  void shouldMapRefundStatesOntoPersistedRefundStatuses_whenFiltering() {
+    when(orders.selectPage(any(), any())).thenReturn(new Page<OrderDO>(1, 20, 0));
+    service.page(task70Filter(null, null, null, "REFUNDING", false), false);
+    service.page(task70Filter(null, null, null, "REFUNDED", false), false);
+    ArgumentCaptor<LambdaQueryWrapper<OrderDO>> query = ArgumentCaptor.captor();
+    verify(orders, times(2)).selectPage(any(), query.capture());
+    // getSqlSegment() first: the EXISTS fragment fills paramNameValuePairs lazily on rendering.
+    query.getAllValues().forEach(w -> assertThat(w.getSqlSegment()).contains("crm_refund"));
+    assertThat(query.getAllValues().getFirst().getParamNameValuePairs().values())
+        .contains("PROCESSING");
+    assertThat(query.getAllValues().get(1).getParamNameValuePairs().values()).contains("SUCCESS");
   }
 
   @Test

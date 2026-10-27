@@ -123,6 +123,8 @@ public class OrderService {
                 filter.orderNo())
             .ge(filter.payFrom() != null, OrderDO::getPayTime, filter.payFrom())
             .lt(filter.payTo() != null, OrderDO::getPayTime, filter.payTo())
+            .ge(filter.orderTimeFrom() != null, OrderDO::getOrderTime, filter.orderTimeFrom())
+            .lt(filter.orderTimeTo() != null, OrderDO::getOrderTime, filter.orderTimeTo())
             .eq(filter.status() != null, OrderDO::getOrderStatus, filter.status())
             .eq(filter.attribution() != null, OrderDO::getAttributionStatus, filter.attribution())
             .eq(user.ownScope(), OrderDO::getBdUserId, user.id());
@@ -135,6 +137,31 @@ public class OrderService {
         return new PageResult<>(List.of(), 0, filter.page(), filter.size());
       }
       query.eq(OrderDO::getKolId, kol.id());
+    }
+    if (filter.kolKeyword() != null && !filter.kolKeyword().isBlank()) {
+      // B02: one keyword over the creator's code (exact) and name (contains); the same main-order
+      // kol_id condition as kolCode, so the hit scope is unchanged.
+      var ids = kols.findIdsByKeyword(filter.kolKeyword());
+      if (ids.isEmpty()) {
+        return new PageResult<>(List.of(), 0, filter.page(), filter.size());
+      }
+      query.in(OrderDO::getKolId, ids);
+    }
+    if (filter.refundState() != null) {
+      // B03: EXISTS keeps one order with several refund rows counted once; the map onto the
+      // persisted refund_status values lives in the §6.2 contract.
+      query.exists(
+          "SELECT 1 FROM crm_refund r WHERE r.order_id = crm_order.id AND r.refund_status = {0}",
+          "REFUNDING".equals(filter.refundState()) ? "PROCESSING" : "SUCCESS");
+    }
+    if (filter.abnormal()) {
+      // B04: one union of the three abnormal markers, intersected with every other condition.
+      query.and(
+          union ->
+              union
+                  .eq(OrderDO::getOrderStatus, "UNKNOWN")
+                  .or()
+                  .in(OrderDO::getAttributionStatus, List.of("UNMATCHED", "CONFLICT")));
     }
     query.orderByDesc(OrderDO::getPayTime, OrderDO::getId);
     var result = orders.selectPage(new Page<>(filter.page(), filter.size()), query);

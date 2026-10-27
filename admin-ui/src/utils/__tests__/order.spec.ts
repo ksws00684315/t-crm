@@ -9,6 +9,7 @@ import {
   orderRefundTagType,
   orderSourceText,
   orderStatusText,
+  orderTimeRangeToQuery,
   payRangeToQuery,
   refundStatusText,
   refundTagType,
@@ -101,6 +102,27 @@ describe("payRangeToQuery", () => {
     expect(payRangeToQuery(null)).toEqual({});
     expect(
       payRangeToQuery([new Date("2026-10-15T16:00:00.000Z"), undefined as unknown as Date])
+    ).toEqual({});
+  });
+});
+
+describe("orderTimeRangeToQuery (task 70 B01)", () => {
+  it("converts a picked platform-order range into UTC instants, end unchanged", () => {
+    expect(
+      orderTimeRangeToQuery([
+        new Date("2026-10-15T16:00:00.000Z"),
+        new Date("2026-10-16T16:00:00.000Z")
+      ])
+    ).toEqual({
+      orderTimeFrom: "2026-10-15T16:00:00.000Z",
+      orderTimeTo: "2026-10-16T16:00:00.000Z"
+    });
+  });
+
+  it("omits both bounds without a complete range", () => {
+    expect(orderTimeRangeToQuery(null)).toEqual({});
+    expect(
+      orderTimeRangeToQuery([undefined as unknown as Date, new Date("2026-10-16T16:00:00.000Z")])
     ).toEqual({});
   });
 });
