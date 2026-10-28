@@ -2,15 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import {
-  downloadOrderImportTemplate,
-  downloadRefundImportTemplate,
-  listOrders,
-  listSyncStates,
-  uploadOrderImport,
-  uploadRefundImport,
-  type OrderQuery
-} from "@/api/order/order";
+import { listOrders, listSyncStates, type OrderQuery } from "@/api/order/order";
 import type { OrderItemVO, OrderStatus, OrderSyncStateVO, OrderVO, PageResult } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
@@ -22,6 +14,7 @@ import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { importTemplateFileName, ORDER_IMPORT, REFUND_IMPORT } from "@/utils/import-types";
 import { orderAbilities } from "@/utils/permission";
 import { orderRefundStatusText, orderRefundTagType, orderTimeRangeToQuery } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
@@ -551,28 +544,28 @@ onMounted(() => {
     <SyncStatesDialog v-model="syncVisible" @synced="load" />
 
     <ImportDialog
-      accept-csv
-      require-data-cutoff
       v-model="orderImportVisible"
-      :title="t('order.orderImportTitle')"
-      :limit-hint="t('order.importLimitHint')"
-      :template-file-name="t('order.orderTemplateFile')"
-      task-type="ORDER_IMPORT"
-      :download-template="downloadOrderImportTemplate"
-      :upload="uploadOrderImport"
+      :title="t(ORDER_IMPORT.titleKey)"
+      :limit-hint="t(ORDER_IMPORT.limitHintKey)"
+      :template-file-name="importTemplateFileName(ORDER_IMPORT, key => t(key))"
+      :task-type="ORDER_IMPORT.taskType"
+      :accept-csv="ORDER_IMPORT.acceptCsv"
+      :require-data-cutoff="ORDER_IMPORT.requireDataCutoff"
+      :download-template="ORDER_IMPORT.downloadTemplate"
+      :upload="ORDER_IMPORT.upload"
       @finished="search"
     />
 
     <ImportDialog
-      accept-csv
-      require-data-cutoff
       v-model="refundImportVisible"
-      :title="t('order.refundImportTitle')"
-      :limit-hint="t('order.importLimitHint')"
-      :template-file-name="t('order.refundTemplateFile')"
-      task-type="REFUND_IMPORT"
-      :download-template="downloadRefundImportTemplate"
-      :upload="uploadRefundImport"
+      :title="t(REFUND_IMPORT.titleKey)"
+      :limit-hint="t(REFUND_IMPORT.limitHintKey)"
+      :template-file-name="importTemplateFileName(REFUND_IMPORT, key => t(key))"
+      :task-type="REFUND_IMPORT.taskType"
+      :accept-csv="REFUND_IMPORT.acceptCsv"
+      :require-data-cutoff="REFUND_IMPORT.requireDataCutoff"
+      :download-template="REFUND_IMPORT.downloadTemplate"
+      :upload="REFUND_IMPORT.upload"
       @finished="search"
     />
 

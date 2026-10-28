@@ -1717,6 +1717,8 @@ const enUS: MessageSchema = {
   },
   importTask: {
     title: "Uploads",
+    upload: "Upload file",
+    chooseType: "Choose import type",
     fileName: "File name",
     type: "Type",
     status: "Status",

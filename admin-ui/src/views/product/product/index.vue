@@ -2,13 +2,7 @@
 import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  downloadProductTemplate,
-  editProduct,
-  listProducts,
-  updateProductStatus,
-  uploadProductImport
-} from "@/api/product/product";
+import { editProduct, listProducts, updateProductStatus } from "@/api/product/product";
 import { listShops } from "@/api/product/shop";
 import type { ProductVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
@@ -20,6 +14,7 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant, formatPrice } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { importTemplateFileName, PRODUCT_IMPORT } from "@/utils/import-types";
 import { canExport, productAbilities } from "@/utils/permission";
 import { formatRate, percentToRate, rateToPercent, validatePercent } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
@@ -111,8 +106,6 @@ const form = reactive({
 });
 const saving = ref(false);
 const importVisible = ref(false);
-const importTitle = computed(() => t("product.importTitle"));
-const importLimitHint = computed(() => t("product.limitHint"));
 
 function appliedQuery() {
   return {
@@ -461,12 +454,14 @@ onMounted(() => {
 
     <ImportDialog
       v-model="importVisible"
-      :title="importTitle"
-      :limit-hint="importLimitHint"
-      template-file-name="product-import-template.xlsx"
-      task-type="PRODUCT_IMPORT"
-      :download-template="downloadProductTemplate"
-      :upload="uploadProductImport"
+      :title="t(PRODUCT_IMPORT.titleKey)"
+      :limit-hint="t(PRODUCT_IMPORT.limitHintKey)"
+      :template-file-name="importTemplateFileName(PRODUCT_IMPORT, key => t(key))"
+      :task-type="PRODUCT_IMPORT.taskType"
+      :accept-csv="PRODUCT_IMPORT.acceptCsv"
+      :require-data-cutoff="PRODUCT_IMPORT.requireDataCutoff"
+      :download-template="PRODUCT_IMPORT.downloadTemplate"
+      :upload="PRODUCT_IMPORT.upload"
       @finished="search"
     />
   </div>
