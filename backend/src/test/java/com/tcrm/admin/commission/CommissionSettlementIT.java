@@ -475,7 +475,8 @@ class CommissionSettlementIT {
                         settledAt == null ? "UNKNOWN" : "CONFIRMED",
                         settledAt,
                         null,
-                        false))));
+                        false,
+                        null))));
   }
 
   private BigDecimal walletBalance(long kolId) {

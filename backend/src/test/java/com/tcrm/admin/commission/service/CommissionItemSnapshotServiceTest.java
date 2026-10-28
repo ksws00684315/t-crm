@@ -230,7 +230,8 @@ class CommissionItemSnapshotServiceTest {
         "UNKNOWN",
         null,
         null,
-        false);
+        false,
+        null);
   }
 
   private static ItemSourceDTO withRefund(ItemSourceDTO item, BigDecimal refund) {
@@ -246,7 +247,8 @@ class CommissionItemSnapshotServiceTest {
         item.settlementState(),
         item.settlementTime(),
         item.completedTime(),
-        item.afterSales());
+        item.afterSales(),
+        item.basisCheckReason());
   }
 
   private static CommissionItemStateDO verifiedRow(

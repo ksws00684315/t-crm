@@ -485,7 +485,8 @@ class OrderChainFinanceIT {
                         "CONFIRMED",
                         SETTLED_AT,
                         null,
-                        false),
+                        false,
+                        null),
                     new ItemSourceDTO(
                         item2,
                         "SUB-" + item2,
@@ -498,7 +499,8 @@ class OrderChainFinanceIT {
                         "UNKNOWN",
                         null,
                         null,
-                        false))));
+                        false,
+                        null))));
   }
 
   private static long nextId() {

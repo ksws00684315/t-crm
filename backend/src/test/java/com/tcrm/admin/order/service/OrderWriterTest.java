@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.RefundDetailResponse;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -34,11 +35,15 @@ class OrderWriterTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final RefundMapper refunds = mock(RefundMapper.class);
   private final OrderAttribution attribution = mock(OrderAttribution.class);
+  private final OrderSettlementFlowMapper settlementFlows = mock(OrderSettlementFlowMapper.class);
   private final OrderCommissionSync commissionSync =
       new OrderCommissionSync(
-          mock(org.springframework.context.ApplicationEventPublisher.class), refunds);
+          mock(org.springframework.context.ApplicationEventPublisher.class),
+          refunds,
+          settlementFlows,
+          orders);
   private final OrderWriter writer =
-      new OrderWriter(orders, items, refunds, attribution, commissionSync);
+      new OrderWriter(orders, items, refunds, attribution, commissionSync, settlementFlows);
 
   @BeforeAll
   static void metadata() {

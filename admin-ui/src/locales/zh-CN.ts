@@ -452,6 +452,8 @@ const zhCN = {
       product_links_convert_token_per_minute: "令牌转换每分钟上限",
       product_links_resolve_token_per_minute: "令牌解析每分钟上限",
       weidian_qps: "微店接口每秒请求数",
+      weidian_settlement_sync_interval_minutes: "结算明细增量拉取间隔（分钟）",
+      weidian_settlement_backfill_hour: "结算明细每日回扫整点（北京时间）",
       link_short_url_allowed_hosts: "短链解析域名白名单"
     },
     restoreDefault: "恢复默认",
