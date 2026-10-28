@@ -101,9 +101,15 @@ const zhWidth = computed(() => localeStore.locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "key", label: t("systemConfig.key"), width: 320 },
-  { key: "name", label: t("systemConfig.description"), minWidth: 180 },
-  { key: "value", label: t("systemConfig.value"), minWidth: 220, tooltip: true },
+  { key: "key", align: "left" as const, label: t("systemConfig.key"), width: 320 },
+  { key: "name", align: "left" as const, label: t("systemConfig.description"), minWidth: 180 },
+  {
+    key: "value",
+    align: "left" as const,
+    label: t("systemConfig.value"),
+    minWidth: 220,
+    tooltip: true
+  },
   // English sizes to the "Actions" header so it never wraps (spec 10: header must fit).
   { key: "actions", label: t("common.actions"), width: px(56, 88) }
 ]);

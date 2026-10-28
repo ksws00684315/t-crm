@@ -35,8 +35,8 @@ const statusOptions: SettlementStatus[] = [
   "WITHDRAWABLE"
 ];
 const columns = computed<DataColumn[]>(() => [
-  { key: "orderNo", label: t("orders.orderNo"), minWidth: 150 },
-  { key: "product", label: t("orders.productSku"), minWidth: 220 },
+  { key: "orderNo", align: "left" as const, label: t("orders.orderNo"), minWidth: 150 },
+  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 220 },
   { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
   { key: "payTime", label: t("orders.payTime"), minWidth: 170 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
@@ -157,7 +157,6 @@ onMounted(load);
 
 <template>
   <section class="orders-page">
-    <h1>{{ t("orders.title") }}</h1>
     <ListSearch @search="search" @reset="reset">
       <template #primary>
         <el-form-item :label="t('orders.dateRange')"

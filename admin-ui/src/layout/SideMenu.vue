@@ -87,7 +87,7 @@ const { t } = useI18n();
   --el-menu-bg-color: transparent;
   --el-menu-hover-bg-color: var(--tcrm-color-muted);
   --el-menu-active-color: var(--tcrm-color-primary-text);
-  --el-menu-text-color: var(--tcrm-color-text);
+  --el-menu-text-color: var(--tcrm-color-text-secondary);
   --el-menu-item-height: 40px;
 }
 .side:not(.is-collapsed) .side__menu :deep(.el-menu-item),

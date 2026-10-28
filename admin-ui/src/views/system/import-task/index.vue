@@ -77,6 +77,7 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   {
     key: "fileName",
+    align: "left" as const,
     label: t("importTask.fileName"),
     prop: "fileName",
     minWidth: 200,
@@ -87,7 +88,13 @@ const columns = computed<DataColumn[]>(() => [
   { key: "totalRows", label: t("importTask.totalRows"), width: 90 },
   { key: "successRows", label: t("importTask.successRows"), width: 90 },
   { key: "failedRows", label: t("importTask.failedRows"), width: 90 },
-  { key: "submitter", label: t("importTask.submitter"), prop: "operatorName", width: 120 },
+  {
+    key: "submitter",
+    align: "left" as const,
+    label: t("importTask.submitter"),
+    prop: "operatorName",
+    width: 120
+  },
   { key: "submitTime", label: t("importTask.submitTime"), width: 170 },
   { key: "finishTime", label: t("importTask.finishTime"), width: 170 },
   // Error file: zh DOM 130px / en 166px + 24px headroom (task 59 R-11 measurements).

@@ -59,10 +59,10 @@ const manualAccount = computed(() => form.payoutAccountId === "manual");
 const money = (value: string) => formatMoney(value, locale.value);
 const columns = computed<DataColumn[]>(() => [
   { key: "appliedAt", label: t("funds.appliedAt"), minWidth: 170 },
-  { key: "applicationNo", label: t("funds.applicationNo"), minWidth: 160 },
+  { key: "applicationNo", align: "left" as const, label: t("funds.applicationNo"), minWidth: 160 },
   { key: "type", label: t("funds.type"), minWidth: 120 },
   { key: "amount", label: t("funds.amount"), minWidth: 130, amount: true },
-  { key: "recipient", label: t("funds.recipient"), minWidth: 170 },
+  { key: "recipient", align: "left" as const, label: t("funds.recipient"), minWidth: 170 },
   { key: "receivedAt", label: t("funds.receivedAt"), minWidth: 170 }
 ]);
 const commissionParts = computed(() =>

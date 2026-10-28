@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { getMatchEvidence } from "@/api/order/order";
 import type { EvidenceMappingVO, MatchEvidenceVO, OrderItemVO, OrderVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { attributionTypeText } from "@/utils/order";
@@ -19,6 +20,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 
 /**
  * Matching-pool evidence (requirement 10.01, task 40 §6). Orders can carry several unmatched
@@ -72,8 +75,8 @@ function reasonText(reason: MatchEvidenceVO["unmatchedReason"] | undefined): str
 }
 
 const mappingColumns = computed<DataColumn[]>(() => [
-  { key: "kol", label: t("order.kol"), minWidth: 150 },
-  { key: "linkCode", label: t("order.chain.linkCode"), width: 120 },
+  { key: "kol", align: "left" as const, label: t("order.kol"), minWidth: 150 },
+  { key: "linkCode", align: "left" as const, label: t("order.chain.linkCode"), width: 120 },
   { key: "valid", label: t("order.pool.effectiveRange"), width: 300 },
   { key: "covers", label: t("order.pool.coversPayTime"), width: 130 }
 ]);
@@ -86,7 +89,7 @@ const mappingColumns = computed<DataColumn[]>(() => [
     size="720px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-loading="loading">
+    <div ref="detailRegion" v-loading="loading">
       <template v-if="order">
         <el-form label-position="top" @submit.prevent>
           <el-form-item :label="t('order.pool.evidenceLine')">
@@ -102,17 +105,17 @@ const mappingColumns = computed<DataColumn[]>(() => [
         </el-form>
 
         <template v-if="evidence">
-          <el-descriptions :column="2" border data-test="evidence-basic">
-            <el-descriptions-item :label="t('order.line.itemId')">
+          <el-descriptions :column="detailColumns" border data-test="evidence-basic">
+            <el-descriptions-item :label="t('order.line.itemId')" :span="detailColumns">
               {{ evidence.weidianItemId }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('order.shop')">
+            <el-descriptions-item :label="t('order.shop')" :span="detailColumns">
               {{ evidence.shopName ?? "-" }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('order.detail.merchantNo')">
+            <el-descriptions-item :label="t('order.detail.merchantNo')" :span="detailColumns">
               {{ evidence.merchantNo ?? "-" }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('order.detail.itemName')">
+            <el-descriptions-item :label="t('order.detail.itemName')" :span="detailColumns">
               {{ evidence.itemName ?? "-" }}{{ evidence.skuName ? ` · ${evidence.skuName}` : "" }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('order.payTime')">
@@ -121,7 +124,7 @@ const mappingColumns = computed<DataColumn[]>(() => [
             <el-descriptions-item :label="t('order.pool.unmatchedReason')">
               {{ reasonText(evidence.unmatchedReason) }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('order.pool.sourceProduct')" :span="2">
+            <el-descriptions-item :label="t('order.pool.sourceProduct')" :span="detailColumns">
               <span v-if="evidence.product">
                 {{
                   formatNameWithCode(
@@ -170,11 +173,16 @@ const mappingColumns = computed<DataColumn[]>(() => [
           </DataTable>
 
           <h4 class="title">{{ t("order.pool.manualRecords") }}</h4>
-          <el-descriptions v-if="evidence.manual" :column="1" border data-test="evidence-manual">
-            <el-descriptions-item :label="t('order.line.attribution')">
+          <el-descriptions
+            v-if="evidence.manual"
+            :column="detailColumns"
+            border
+            data-test="evidence-manual"
+          >
+            <el-descriptions-item :label="t('order.line.attribution')" :span="detailColumns">
               {{ attributionTypeText(evidence.manual.attributionType) }}
             </el-descriptions-item>
-            <el-descriptions-item :label="t('order.pool.reason')">
+            <el-descriptions-item :label="t('order.pool.reason')" :span="detailColumns">
               {{ evidence.manual.manualReason ?? "-" }}
             </el-descriptions-item>
             <el-descriptions-item :label="t('audit.time')">

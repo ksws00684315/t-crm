@@ -17,16 +17,29 @@ function asLine(row: object): OrderItemVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "itemId", label: t("order.line.itemId"), width: 120 },
-  { key: "itemName", label: t("order.line.itemName"), prop: "itemName", minWidth: 160 },
-  { key: "sku", label: t("order.line.sku"), prop: "skuName", minWidth: 100 },
+  { key: "itemId", align: "left" as const, label: t("order.line.itemId"), width: 120 },
+  {
+    key: "itemName",
+    align: "left" as const,
+    label: t("order.line.itemName"),
+    prop: "itemName",
+    minWidth: 160
+  },
+  {
+    key: "sku",
+    align: "left" as const,
+    label: t("order.line.sku"),
+    prop: "skuName",
+    minWidth: 100
+  },
   { key: "quantity", label: t("order.line.quantity"), width: 70 },
   { key: "payAmount", label: t("order.line.payAmount"), width: 110, amount: true },
   { key: "refund", label: t("order.line.refund"), width: 90, amount: true },
-  { key: "kolCode", label: t("order.kol"), width: 140 },
+  { key: "kolCode", align: "left" as const, label: t("order.kol"), width: 140 },
   { key: "attribution", label: t("order.line.attribution"), width: 100 },
   {
     key: "manualReason",
+    align: "left" as const,
     label: t("order.line.manualReason"),
     prop: "manualReason",
     minWidth: 140,

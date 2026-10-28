@@ -32,11 +32,17 @@ function asLink(row: object): LinkVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "productCode", label: t("link.productCode"), width: 140 },
-  { key: "productName", label: t("link.productName"), prop: "productName", minWidth: 120 },
-  { key: "weidianItemId", label: t("link.exclusiveId"), width: 150 },
-  { key: "linkUrl", label: t("link.trackingLink"), minWidth: 260 },
-  { key: "targetUrl", label: t("link.targetUrl"), minWidth: 280 },
+  { key: "productCode", align: "left" as const, label: t("link.productCode"), width: 140 },
+  {
+    key: "productName",
+    align: "left" as const,
+    label: t("link.productName"),
+    prop: "productName",
+    minWidth: 120
+  },
+  { key: "weidianItemId", align: "left" as const, label: t("link.exclusiveId"), width: 150 },
+  { key: "linkUrl", align: "left" as const, label: t("link.trackingLink"), minWidth: 260 },
+  { key: "targetUrl", align: "left" as const, label: t("link.targetUrl"), minWidth: 280 },
   { key: "status", label: t("common.status"), width: 150 },
   { key: "clicks", label: t("link.clicks"), width: 130 }
 ]);

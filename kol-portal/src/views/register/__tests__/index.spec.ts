@@ -62,7 +62,7 @@ function choosePlatform(wrapper: VueWrapper, value: string) {
     .findAllComponents(ElSelect)
     .find(item => item.classes().includes("register-platform"));
   if (!select) throw new Error("platform select was not rendered");
-  select.vm.$emit("update:model-value", value);
+  select.vm.$emit("update:modelValue", value);
 }
 
 async function fill(wrapper: VueWrapper, values: Record<string, string>) {

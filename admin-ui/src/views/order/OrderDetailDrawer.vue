@@ -6,6 +6,7 @@ import { getOrder } from "@/api/order/order";
 import type { OrderDetailItemVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
@@ -23,6 +24,8 @@ const props = defineProps<{ modelValue: boolean; orderId: string | null }>();
 const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>();
 
 const { t } = useI18n();
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 
 function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
   if (!name && !code) return "-";
@@ -64,14 +67,21 @@ const columns = computed<DataColumn[]>(() => [
   { key: "image", label: t("order.detail.image"), width: 70 },
   {
     key: "itemName",
+    align: "left" as const,
     label: t("order.detail.itemName"),
     prop: "itemName",
     minWidth: 160,
     tooltip: true
   },
-  { key: "itemId", label: t("order.line.itemId"), width: 120 },
-  { key: "skuName", label: t("order.line.sku"), prop: "skuName", minWidth: 100 },
-  { key: "kol", label: t("order.kol"), minWidth: 140 },
+  { key: "itemId", align: "left" as const, label: t("order.line.itemId"), width: 120 },
+  {
+    key: "skuName",
+    align: "left" as const,
+    label: t("order.line.sku"),
+    prop: "skuName",
+    minWidth: 100
+  },
+  { key: "kol", align: "left" as const, label: t("order.kol"), minWidth: 140 },
   { key: "quantity", label: t("order.line.quantity"), width: 70 },
   { key: "unitPrice", label: t("order.detail.unitPrice"), width: 90, amount: true },
   { key: "payAmount", label: t("order.line.payAmount"), width: 100, amount: true },
@@ -88,19 +98,19 @@ const columns = computed<DataColumn[]>(() => [
     width="94vw"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-loading="loading">
+    <div ref="detailRegion" v-loading="loading">
       <template v-if="detail">
-        <el-descriptions :column="2" border data-test="order-detail">
-          <el-descriptions-item :label="t('order.orderId')">
+        <el-descriptions :column="detailColumns" border data-test="order-detail">
+          <el-descriptions-item :label="t('order.orderId')" :span="detailColumns">
             <CopyText :value="detail.orderNo" />
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.channel')">
+          <el-descriptions-item :label="t('order.channel')" :span="detailColumns">
             {{ channelText(detail.channel) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.shop')">
+          <el-descriptions-item :label="t('order.shop')" :span="detailColumns">
             {{ shopLabel(detail.shopName, detail.shopCode) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.kol')">
+          <el-descriptions-item :label="t('order.kol')" :span="detailColumns">
             <span v-if="detail.kolCode"
               ><NameCode :name="detail.kolName" :code="detail.kolCode"
             /></span>
@@ -114,7 +124,7 @@ const columns = computed<DataColumn[]>(() => [
               {{ orderRefundStatusText(detail.refundStatus) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.detail.merchantNo')">
+          <el-descriptions-item :label="t('order.detail.merchantNo')" :span="detailColumns">
             {{ detail.merchantNo ?? "-" }}
           </el-descriptions-item>
           <el-descriptions-item :label="t('order.detail.itemAmount')">

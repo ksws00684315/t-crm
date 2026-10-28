@@ -89,33 +89,62 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "jobCode", label: t("copyJob.jobCode"), minWidth: 180 },
+  { key: "jobCode", align: "left" as const, label: t("copyJob.jobCode"), minWidth: 180 },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
   { key: "status", label: t("copyJob.status"), width: 110 },
   // R-01 (browser-measured, assets/task-59/measurements-{zh,en}.md): three nowrap tags need
   // ~232px (zh, 1-digit counts) to ~292px (en, 3-digit counts) including cell padding.
   { key: "result", label: t("copyJob.result"), minWidth: px(240, 300) },
-  { key: "errorMessage", label: t("copyJob.error"), minWidth: 160, tooltip: true },
+  {
+    key: "errorMessage",
+    align: "left" as const,
+    label: t("copyJob.error"),
+    minWidth: 160,
+    tooltip: true
+  },
   { key: "createTime", label: t("copyJob.createTime"), width: 170 },
   { key: "finishTime", label: t("copyJob.finishTime"), width: 170 },
-  { key: "kol", label: t("copyToken.kol"), minWidth: 170, defaultHidden: true },
-  { key: "targetShopCode", label: t("copyJob.targetShopCode"), width: 140, defaultHidden: true },
-  { key: "targetShopName", label: t("copyJob.targetShopName"), minWidth: 140, defaultHidden: true },
+  {
+    key: "kol",
+    align: "left" as const,
+    label: t("copyToken.kol"),
+    minWidth: 170,
+    defaultHidden: true
+  },
+  {
+    key: "targetShopCode",
+    align: "left" as const,
+    label: t("copyJob.targetShopCode"),
+    width: 140,
+    defaultHidden: true
+  },
+  {
+    key: "targetShopName",
+    align: "left" as const,
+    label: t("copyJob.targetShopName"),
+    minWidth: 140,
+    defaultHidden: true
+  },
   // View items: zh canvas 56px, en 98px, +24px headroom (task 59 R-11 measurements).
   { key: "actions", label: t("common.actions"), width: px(84, 128) }
 ]);
 
 const itemColumns = computed<DataColumn[]>(() => [
   { key: "seq", label: t("copyJob.seq"), width: 70 },
-  { key: "sourceProductId", label: t("copyJob.sourceProductId"), minWidth: 150 },
+  {
+    key: "sourceProductId",
+    align: "left" as const,
+    label: t("copyJob.sourceProductId"),
+    minWidth: 150
+  },
   { key: "sourceChannel", label: t("copyJob.sourceChannel"), width: 110 },
-  { key: "sourceShop", label: t("copyJob.sourceShop"), minWidth: 140 },
+  { key: "sourceShop", align: "left" as const, label: t("copyJob.sourceShop"), minWidth: 140 },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
-  { key: "targetShop", label: t("copyJob.targetShop"), minWidth: 140 },
-  { key: "targetItemId", label: t("copyJob.targetItemId"), minWidth: 140 },
-  { key: "targetItemUrl", label: t("copyJob.targetItemUrl"), width: 90 },
+  { key: "targetShop", align: "left" as const, label: t("copyJob.targetShop"), minWidth: 140 },
+  { key: "targetItemId", align: "left" as const, label: t("copyJob.targetItemId"), minWidth: 140 },
+  { key: "targetItemUrl", align: "left" as const, label: t("copyJob.targetItemUrl"), width: 90 },
   { key: "status", label: t("copyJob.status"), width: 90 },
-  { key: "errorMessage", label: t("copyJob.failReason"), minWidth: 160 }
+  { key: "errorMessage", align: "left" as const, label: t("copyJob.failReason"), minWidth: 160 }
 ]);
 
 const detailTitle = computed(() =>

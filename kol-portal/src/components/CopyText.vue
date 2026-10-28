@@ -21,9 +21,21 @@ async function onCopy(): Promise<void> {
 
 <template>
   <span class="copy-text">
-    <!-- The value never wraps (review R-05): it ellipsizes when the cell is too narrow and the
-         full text stays available through the native tooltip. -->
-    <span class="copy-text__value" data-test="value" :title="value || undefined">{{ value }}</span>
+    <el-tooltip
+      :content="value ?? ''"
+      :disabled="!value"
+      :trigger="['hover', 'focus']"
+      :trigger-keys="[]"
+      placement="top"
+    >
+      <span
+        class="copy-text__value"
+        data-test="value"
+        :title="value || undefined"
+        :tabindex="value ? 0 : undefined"
+        >{{ value }}</span
+      >
+    </el-tooltip>
     <el-button
       v-if="value"
       link

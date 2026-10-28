@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { getKolItem } from "@/api/product/kol-item";
 import type { KolItemDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { formatRate } from "@/utils/rate";
@@ -15,6 +16,8 @@ const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
 
 const { t } = useI18n();
 const loading = ref(false);
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 const detail = ref<KolItemDetailVO | null>(null);
 
 watch(
@@ -68,12 +71,12 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
     data-test="detail-drawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-loading="loading">
-      <el-descriptions v-if="detail" :column="1" border>
-        <el-descriptions-item :label="t('mapping.linkCode')">
+    <div ref="detailRegion" v-loading="loading">
+      <el-descriptions v-if="detail" :column="detailColumns" border>
+        <el-descriptions-item :label="t('mapping.linkCode')" :span="detailColumns">
           <CopyText :value="detail.linkCode" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.product')">
+        <el-descriptions-item :label="t('mapping.product')" :span="detailColumns">
           <div class="product-cell">
             <el-image
               v-if="detail.imageUrl"
@@ -88,19 +91,19 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
             <span class="product-name">{{ text(detail.itemName) }}</span>
           </div>
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.kol')"
+        <el-descriptions-item :label="t('mapping.kol')" :span="detailColumns"
           ><NameCode :name="detail.kolName" :code="detail.kolCode"
         /></el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetShop')">
+        <el-descriptions-item :label="t('mapping.targetShop')" :span="detailColumns">
           {{ shopText(detail) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetChannel')">
+        <el-descriptions-item :label="t('mapping.targetChannel')" :span="detailColumns">
           {{ label("channels", detail.targetChannel) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetItemId')">
+        <el-descriptions-item :label="t('mapping.targetItemId')" :span="detailColumns">
           <CopyText :value="detail.targetItemId" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetItemUrl')">
+        <el-descriptions-item :label="t('mapping.targetItemUrl')" :span="detailColumns">
           <el-button
             v-if="detail.targetItemUrl"
             link
@@ -112,13 +115,13 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
           </el-button>
           <CopyText :value="detail.targetItemUrl" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceItemId')">
+        <el-descriptions-item :label="t('mapping.sourceItemId')" :span="detailColumns">
           <CopyText :value="detail.sourceItemId" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceChannel')">
+        <el-descriptions-item :label="t('mapping.sourceChannel')" :span="detailColumns">
           {{ label("channels", detail.sourceChannel) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceItemUrl')">
+        <el-descriptions-item :label="t('mapping.sourceItemUrl')" :span="detailColumns">
           <el-button
             v-if="detail.sourceItemUrl"
             link
@@ -154,10 +157,10 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
         <el-descriptions-item :label="t('mapping.cleanupTime')">
           {{ detail.cleanupTime ? formatInstant(detail.cleanupTime) : "-" }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.cleanupReason')">
+        <el-descriptions-item :label="t('mapping.cleanupReason')" :span="detailColumns">
           {{ text(detail.cleanupReason) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.cleanupFailReason')">
+        <el-descriptions-item :label="t('mapping.cleanupFailReason')" :span="detailColumns">
           {{ text(detail.cleanupFailReason) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.createTime')">

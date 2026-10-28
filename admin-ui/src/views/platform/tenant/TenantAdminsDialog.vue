@@ -46,9 +46,21 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
-  { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
-  { key: "email", label: t("common.email"), minWidth: 180 },
+  {
+    key: "username",
+    align: "left" as const,
+    label: t("common.username"),
+    prop: "username",
+    minWidth: 130
+  },
+  {
+    key: "nickname",
+    align: "left" as const,
+    label: t("common.nickname"),
+    prop: "nickname",
+    minWidth: 120
+  },
+  { key: "email", align: "left" as const, label: t("common.email"), minWidth: 180 },
   { key: "status", label: t("common.status"), width: 90 },
   { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180 },
   // Reset password via RowActions (R-10): zh canvas 56 / en 107 + 24px (task 59 measurements).

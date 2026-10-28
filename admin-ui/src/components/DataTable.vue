@@ -3,6 +3,7 @@ import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@elemen
 import type { TableInstance, TableProps } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import AccessibleCell from "@/components/AccessibleCell.vue";
 import {
   PAGE_SIZES,
   applyDefaultHidden,
@@ -25,6 +26,8 @@ export interface DataColumn {
   width?: number | string;
   minWidth?: number | string;
   amount?: boolean;
+  /** Long content is left aligned; short content is centered by default. */
+  align?: "left" | "center";
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
@@ -70,6 +73,8 @@ const props = withDefaults(
     ) => ReturnType<NonNullable<TableProps<object>["spanMethod"]>>;
     /** Grouped rows cannot merge correctly across Element Plus fixed-column clones. */
     fixedColumns?: boolean;
+    /** Preserve the independently approved order-list presentation from PR #138. */
+    legacyOrderStyle?: boolean;
   }>(),
   {
     loading: false,
@@ -85,7 +90,8 @@ const props = withDefaults(
     selectableRow: undefined,
     expandable: false,
     defaultExpandAll: false,
-    fixedColumns: true
+    fixedColumns: true,
+    legacyOrderStyle: false
   }
 );
 
@@ -387,9 +393,15 @@ function canMove(index: number, delta: -1 | 1): boolean {
   <section
     ref="rootEl"
     class="data-table"
-    :class="[{ 'is-fullscreen': fullscreen, 'is-plain': plain }, `density-${prefs.density}`]"
+    :class="[
+      { 'is-fullscreen': fullscreen, 'is-plain': plain, 'is-legacy-order': legacyOrderStyle },
+      `density-${prefs.density}`
+    ]"
   >
     <header v-if="!plain" class="data-table__toolbar">
+      <div v-if="$slots.title" class="data-table__page-title">
+        <slot name="title" />
+      </div>
       <div v-if="selectable && selected.length" class="data-table__batch" data-test="batch-bar">
         <span class="data-table__batch-count">{{
           t("table.selected", { n: selected.length })
@@ -491,7 +503,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         size="default"
         :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
-        stripe
+        :stripe="legacyOrderStyle"
         @selection-change="onSelection"
       >
         <el-table-column
@@ -511,6 +523,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
           width="44"
           fixed="left"
           :selectable="canSelect"
+          align="center"
+          header-align="center"
         />
         <el-table-column
           v-for="column in visibleColumns"
@@ -529,14 +543,24 @@ function canMove(index: number, delta: -1 | 1): boolean {
                   : undefined
               : undefined
           "
-          :align="column.amount ? 'right' : undefined"
-          :show-overflow-tooltip="column.tooltip"
+          :align="
+            legacyOrderStyle ? (column.amount ? 'right' : undefined) : (column.align ?? 'center')
+          "
+          :header-align="legacyOrderStyle ? undefined : (column.align ?? 'center')"
+          :show-overflow-tooltip="
+            legacyOrderStyle ? column.tooltip : (column.tooltip ?? column.align === 'left')
+          "
           :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
             </template>
+            <AccessibleCell v-else-if="!legacyOrderStyle && column.align === 'left'">
+              <slot :name="`cell-${column.key}`" :row="row">
+                {{ cellText(row, column) }}
+              </slot>
+            </AccessibleCell>
             <template v-else>
               <slot :name="`cell-${column.key}`" :row="row">
                 {{ cellText(row, column) }}
@@ -580,10 +604,23 @@ function canMove(index: number, delta: -1 | 1): boolean {
   min-height: 0;
   max-height: 100%;
   height: auto;
-  padding: var(--tcrm-space-3);
+  padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.data-table.is-legacy-order {
+  padding: var(--tcrm-space-3);
+}
+@media (min-width: 1440px) and (min-height: 900px) {
+  .data-table:not(.is-plain):not(.is-legacy-order) {
+    padding: var(--tcrm-space-5);
+  }
+}
+@media (max-width: 767px) {
+  .data-table:not(.is-plain):not(.is-legacy-order) {
+    padding: var(--tcrm-space-3);
+  }
 }
 .data-table__batch {
   display: flex;
@@ -627,6 +664,16 @@ function canMove(index: number, delta: -1 | 1): boolean {
   gap: var(--tcrm-space-2);
   flex-shrink: 0;
 }
+.data-table__toolbar {
+  flex-wrap: wrap;
+}
+.data-table__page-title {
+  min-width: 0;
+}
+.data-table__page-title :deep(h1),
+.data-table__page-title :deep(p) {
+  margin: 0;
+}
 .data-table__tools {
   display: flex;
   align-items: center;
@@ -650,12 +697,35 @@ function canMove(index: number, delta: -1 | 1): boolean {
   padding: var(--tcrm-space-4) 0;
   color: var(--tcrm-color-text-secondary);
 }
+.data-table:not(.is-legacy-order) :deep(.el-table) {
+  --el-table-text-color: var(--tcrm-color-table-text);
+  --el-table-header-text-color: var(--tcrm-color-table-text);
+  --el-table-border-color: var(--tcrm-color-table-border);
+}
+.data-table:not(.is-legacy-order) :deep(.el-table .el-tag) {
+  height: var(--tcrm-line-height-table);
+  padding-block: 0;
+  vertical-align: top;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table td.is-left .name-code) {
+  align-items: flex-start;
+  text-align: left;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table td.is-left .name-code__name .el-button) {
+  text-align: left;
+}
 .data-table :deep(.el-table__header th) {
-  background: var(--tcrm-color-muted);
+  background: var(--tcrm-color-table-header);
 }
 .data-table :deep(.el-table th.el-table__cell) {
   height: var(--tcrm-table-header-height);
   padding-block: 0;
+}
+.data-table.is-legacy-order :deep(.el-table__header th) {
+  background: var(--tcrm-color-muted);
+}
+.data-table.is-legacy-order :deep(.el-table th.el-table__cell) {
+  height: var(--tcrm-table-legacy-header-height);
 }
 /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
    its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
@@ -673,12 +743,22 @@ function canMove(index: number, delta: -1 | 1): boolean {
   box-shadow: inset 10px 0 8px -8px color-mix(in srgb, var(--tcrm-color-text) 16%, transparent);
 }
 .data-table :deep(.el-table .el-table__cell) {
-  padding-block: var(--tcrm-space-3);
+  padding-block: var(--tcrm-space-4);
+  border-bottom-color: var(--tcrm-color-table-border);
 }
 .data-table.density-small :deep(.el-table .el-table__cell) {
   padding-block: var(--tcrm-space-2);
 }
 .data-table.density-large :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-table-padding-loose);
+}
+.data-table.is-legacy-order :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-space-3);
+}
+.data-table.is-legacy-order.density-small :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-space-2);
+}
+.data-table.is-legacy-order.density-large :deep(.el-table .el-table__cell) {
   padding-block: var(--tcrm-space-4);
 }
 .data-table :deep(.el-table__body tr:hover > td) {
@@ -690,7 +770,15 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table :deep(.el-table .cell .el-button.is-link) {
   height: auto;
   padding: 0;
-  line-height: var(--tcrm-line-height-body);
+  line-height: var(--tcrm-line-height-table);
   vertical-align: baseline;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table .cell .el-button.is-link) {
+  height: var(--tcrm-line-height-table);
+  min-height: var(--tcrm-line-height-table);
+  vertical-align: top;
+}
+.data-table.is-legacy-order :deep(.el-table .cell .el-button.is-link) {
+  line-height: var(--tcrm-line-height-body);
 }
 </style>

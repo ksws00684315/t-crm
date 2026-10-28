@@ -369,7 +369,14 @@ onMounted(() => {
 
 <template>
   <div class="list-page order-list-page">
-    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+    <ListSearch
+      :chips="chips"
+      has-more
+      hide-title
+      @search="search"
+      @reset="reset"
+      @remove="removeChip"
+    >
       <template #primary>
         <el-form-item :label="t('order.orderId')">
           <el-input
@@ -453,6 +460,7 @@ onMounted(() => {
       :filter-count="chips.length"
       row-key="id"
       :fixed-columns="false"
+      legacy-order-style
       :span-method="orderSpanMethod"
       :row-class-name="tableRowClass"
       @update:page="onPage"

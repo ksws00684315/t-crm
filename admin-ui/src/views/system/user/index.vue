@@ -57,8 +57,20 @@ function asUser(row: object): UserVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
-  { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
+  {
+    key: "username",
+    align: "left" as const,
+    label: t("common.username"),
+    prop: "username",
+    minWidth: 130
+  },
+  {
+    key: "nickname",
+    align: "left" as const,
+    label: t("common.nickname"),
+    prop: "nickname",
+    minWidth: 120
+  },
   { key: "role", label: t("user.role"), width: 120 },
   { key: "post", label: t("user.post"), width: 90 },
   // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this

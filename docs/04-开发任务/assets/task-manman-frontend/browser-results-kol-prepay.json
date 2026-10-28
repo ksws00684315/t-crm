@@ -1,0 +1,204 @@
+[
+  {
+    "key": "kol-prepay-1440x900-zh-CN",
+    "url": "/income/prepays",
+    "title": null,
+    "tableTitle": "达人预付",
+    "outsideTitle": [
+      "达人预付"
+    ],
+    "headers": [
+      {
+        "text": "预付单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "实付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付方式（自由填写）",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金钱包余额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "已冲抵",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "待抵扣",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_P0000001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "500.00 CNY",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/27 18:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "t88 transfer",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "-400.00 CNY",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "100.00 CNY",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "400.00 CNY",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "详情\n支付凭证",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": null,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n达人预付\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n达人预付\n\n仅显示已支付结果。申请与审核过程不对达人开放。\n\n已支付预付\n预付流水\n默认\n紧凑\n宽松\n列设置\n预付单号\n\t\n实付金额\n\t\n支付时间\n\t\n支付方式（自由填写）\n\t\n佣金钱包余额\n\t\n已冲抵\n\t\n待抵扣\n\t\n操作\nt88_P0000001\n\t\n500.00 CNY\n\t\n2026/10/27 18:00:00\n\t\nt88 transfer\n\t\n-400.00 CNY\n\t\n100.00 CNY\n\t\n400.00 CNY\n\t\n详情\n支付凭证\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  }
+]

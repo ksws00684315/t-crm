@@ -121,12 +121,18 @@ const callbackUrlInvalid = computed(() => {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "shopCode", label: t("shop.code"), minWidth: 130 },
-    { key: "shopName", label: t("shop.name"), minWidth: 140, tooltip: true },
+    { key: "shopCode", align: "left" as const, label: t("shop.code"), minWidth: 130 },
+    {
+      key: "shopName",
+      align: "left" as const,
+      label: t("shop.name"),
+      minWidth: 140,
+      tooltip: true
+    },
     { key: "channel", label: t("shop.channel"), width: 90 },
     { key: "source", label: t("shop.source"), width: 100 },
     { key: "copyPool", label: t("shop.copyPool"), minWidth: 160 },
-    { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140 },
+    { key: "weidianShopId", align: "left" as const, label: t("shop.weidianId"), minWidth: 140 },
     { key: "authStatus", label: t("shop.authStatus"), width: 110 },
     { key: "authExpiresAt", label: t("shop.authExpiresAt"), minWidth: 160 },
     { key: "apiStatus", label: t("shop.apiStatus"), minWidth: 250 },

@@ -23,8 +23,8 @@ const error = ref(false);
 const copied = ref<string | null>(null);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "item", label: t("items.colItem"), minWidth: 240 },
-  { key: "weidianItemId", label: t("items.colId"), minWidth: 160 },
+  { key: "item", align: "left" as const, label: t("items.colItem"), minWidth: 240 },
+  { key: "weidianItemId", align: "left" as const, label: t("items.colId"), minWidth: 160 },
   { key: "createTime", label: t("items.colCreated"), minWidth: 140 },
   { key: "actions", label: t("common.actions"), width: 120 }
 ]);

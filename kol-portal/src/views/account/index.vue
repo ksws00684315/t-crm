@@ -454,7 +454,7 @@ h1 {
 }
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 var(--tcrm-space-4);
 }
 .form-grid :deep(.el-select) {
@@ -490,9 +490,6 @@ small {
   color: var(--tcrm-color-text-secondary);
 }
 @media (max-width: 767px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
   .actions {
     align-items: flex-start;
     flex-direction: column;

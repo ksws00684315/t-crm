@@ -47,8 +47,8 @@ const financeNote = computed(
     "—"
 );
 const columns = computed<DataColumn[]>(() => [
-  { key: "orderNo", label: t("finance.orderNo"), minWidth: 200 },
-  { key: "product", label: t("finance.orderProduct"), minWidth: 380 },
+  { key: "orderNo", align: "left" as const, label: t("finance.orderNo"), minWidth: 200 },
+  { key: "product", align: "left" as const, label: t("finance.orderProduct"), minWidth: 380 },
   { key: "occupied", label: t("finance.orderOccupied"), minWidth: 140, amount: true },
   { key: "remainingSnapshot", label: t("finance.remainingSnapshot"), minWidth: 160, amount: true }
 ]);

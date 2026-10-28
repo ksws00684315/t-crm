@@ -127,24 +127,30 @@ const skipReasonOptions: PromoSheetSkipReason[] = [
 ];
 
 const newColumns = computed<DataColumn[]>(() => [
-  { key: "shopName", label: t("promoSheet.shop"), prop: "shopName", minWidth: 110 },
-  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110 },
-  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150 },
-  { key: "itemName", label: t("promoSheet.itemName"), minWidth: 160 },
-  { key: "productCode", label: t("mapping.productCode"), minWidth: 130 }
+  {
+    key: "shopName",
+    align: "left" as const,
+    label: t("promoSheet.shop"),
+    prop: "shopName",
+    minWidth: 110
+  },
+  { key: "shopWeidianId", align: "left" as const, label: t("promoSheet.shopId"), minWidth: 110 },
+  { key: "weidianItemId", align: "left" as const, label: t("mapping.exclusiveId"), minWidth: 150 },
+  { key: "itemName", align: "left" as const, label: t("promoSheet.itemName"), minWidth: 160 },
+  { key: "productCode", align: "left" as const, label: t("mapping.productCode"), minWidth: 130 }
 ]);
 
 const conflictColumns = computed<DataColumn[]>(() => [
-  { key: "shopWeidianId", label: t("promoSheet.shopId"), minWidth: 110 },
-  { key: "weidianItemId", label: t("mapping.exclusiveId"), minWidth: 150 },
-  { key: "itemName", label: t("promoSheet.itemName"), minWidth: 150 },
-  { key: "owner", label: t("promoSheet.ownerKol"), minWidth: 180 }
+  { key: "shopWeidianId", align: "left" as const, label: t("promoSheet.shopId"), minWidth: 110 },
+  { key: "weidianItemId", align: "left" as const, label: t("mapping.exclusiveId"), minWidth: 150 },
+  { key: "itemName", align: "left" as const, label: t("promoSheet.itemName"), minWidth: 150 },
+  { key: "owner", align: "left" as const, label: t("promoSheet.ownerKol"), minWidth: 180 }
 ]);
 
 const skipColumns = computed<DataColumn[]>(() => [
   { key: "sheet", label: t("promoSheet.sheet"), minWidth: 130 },
   { key: "row", label: t("promoSheet.rowNumber"), width: 90 },
-  { key: "reason", label: t("promoSheet.reason"), minWidth: 170 }
+  { key: "reason", align: "left" as const, label: t("promoSheet.reason"), minWidth: 170 }
 ]);
 
 function asNew(row: object) {

@@ -57,14 +57,20 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "weidianOrderId", label: t("order.orderId"), width: 150 },
-  { key: "shopName", label: t("order.shop"), prop: "shopName", minWidth: 120 },
+  { key: "weidianOrderId", align: "left" as const, label: t("order.orderId"), width: 150 },
+  {
+    key: "shopName",
+    align: "left" as const,
+    label: t("order.shop"),
+    prop: "shopName",
+    minWidth: 120
+  },
   { key: "payTime", label: t("order.payTime"), width: 170 },
   { key: "orderStatus", label: t("order.orderStatus"), width: 110 },
   { key: "payAmount", label: t("order.payAmount"), width: 100, amount: true },
   { key: "refundAmount", label: t("order.refundTotal"), width: 100, amount: true },
-  { key: "kol", label: t("order.kol"), minWidth: 160 },
-  { key: "bdUserName", label: t("order.bd"), minWidth: 110 },
+  { key: "kol", align: "left" as const, label: t("order.kol"), minWidth: 160 },
+  { key: "bdUserName", align: "left" as const, label: t("order.bd"), minWidth: 110 },
   { key: "attributionStatus", label: t("order.attributionStatus"), width: 100 },
   // Browser-measured max .cell scrollWidth zh 333 / en 395 + 24px (task 59 R-11 measurements).
   { key: "actions", label: t("common.actions"), width: px(360, 420) }

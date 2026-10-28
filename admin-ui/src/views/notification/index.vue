@@ -113,28 +113,31 @@ onMounted(load);
 
 <template>
   <section class="notification-page" data-test="notification-page">
-    <div class="notification-page__toolbar">
-      <el-button-group>
-        <el-button
-          data-test="notification-filter-unread"
-          :type="unreadOnly ? 'primary' : 'default'"
-          @click="showUnread"
-        >
-          {{ t("notification.unread") }}
-        </el-button>
-        <el-button
-          data-test="notification-filter-all"
-          :type="unreadOnly ? 'default' : 'primary'"
-          @click="showAll"
-        >
-          {{ t("common.all") }}
-        </el-button>
-      </el-button-group>
-      <el-button data-test="notification-mark-all" @click="markAll">
-        {{ t("notification.markAll") }}
-      </el-button>
-    </div>
     <div class="notification-page__card">
+      <header class="notification-page__header">
+        <h1>{{ t("route.notifications") }}</h1>
+        <div class="notification-page__toolbar">
+          <el-button-group>
+            <el-button
+              data-test="notification-filter-unread"
+              :type="unreadOnly ? 'primary' : 'default'"
+              @click="showUnread"
+            >
+              {{ t("notification.unread") }}
+            </el-button>
+            <el-button
+              data-test="notification-filter-all"
+              :type="unreadOnly ? 'default' : 'primary'"
+              @click="showAll"
+            >
+              {{ t("common.all") }}
+            </el-button>
+          </el-button-group>
+          <el-button data-test="notification-mark-all" @click="markAll">
+            {{ t("notification.markAll") }}
+          </el-button>
+        </div>
+      </header>
       <p v-if="!loading && rows.length === 0" class="notification-page__empty">
         {{ t("notification.empty") }}
       </p>
@@ -175,10 +178,19 @@ onMounted(load);
   min-height: 0;
 }
 
+.notification-page__header,
 .notification-page__toolbar {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--tcrm-space-3);
+}
+.notification-page__header {
+  justify-content: space-between;
+  margin-bottom: var(--tcrm-space-4);
+}
+.notification-page__header h1 {
+  margin: 0;
 }
 
 /* Same surface as the list and filter cards: the message list was the only page that rendered

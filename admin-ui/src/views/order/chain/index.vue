@@ -127,7 +127,7 @@ function flowProductName(orderItemId: string): string {
 }
 
 const refundColumns = computed<DataColumn[]>(() => [
-  { key: "refundNo", label: t("order.refund.no"), width: 150 },
+  { key: "refundNo", align: "left" as const, label: t("order.refund.no"), width: 150 },
   { key: "refundType", label: t("order.refund.typeColumn"), width: 100 },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: 100 },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
@@ -135,22 +135,32 @@ const refundColumns = computed<DataColumn[]>(() => [
 ]);
 
 const withdrawalColumns = computed<DataColumn[]>(() => [
-  { key: "applicationNo", label: t("order.chain.applicationNo"), width: 170 },
+  {
+    key: "applicationNo",
+    align: "left" as const,
+    label: t("order.chain.applicationNo"),
+    width: 170
+  },
   { key: "occupiedCny", label: t("order.chain.withdrawalAmount"), width: 110, amount: true },
   { key: "status", label: t("finance.status"), width: 100 },
   { key: "paidAt", label: t("order.chain.paidAt"), width: 170 }
 ]);
 
 const flowColumns = computed<DataColumn[]>(() => [
-  { key: "flowNo", label: t("order.chain.flowNo"), width: 130 },
-  { key: "shopName", label: t("order.chain.shopName"), width: 130 },
+  { key: "flowNo", align: "left" as const, label: t("order.chain.flowNo"), width: 130 },
+  { key: "shopName", align: "left" as const, label: t("order.chain.shopName"), width: 130 },
   { key: "type", label: t("order.chain.financeType"), width: 110 },
   { key: "direction", label: t("order.chain.direction"), width: 80 },
   { key: "amount", label: t("order.chain.financeAmount"), width: 110, amount: true },
-  { key: "orderItemId", label: t("order.chain.product"), width: 160 },
+  { key: "orderItemId", align: "left" as const, label: t("order.chain.product"), width: 160 },
   { key: "businessAt", label: t("order.chain.businessTime"), width: 170 },
   { key: "transferredAt", label: t("order.chain.transferTime"), width: 170 },
-  { key: "withdrawalNo", label: t("order.chain.linkedSettlementNo"), width: 170 }
+  {
+    key: "withdrawalNo",
+    align: "left" as const,
+    label: t("order.chain.linkedSettlementNo"),
+    width: 170
+  }
 ]);
 
 /** The product-task page owns the copy jobs; keep the job code as the filter (task 38). */

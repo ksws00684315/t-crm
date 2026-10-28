@@ -1,0 +1,884 @@
+[
+  {
+    "key": "admin-kols-1440x900-zh-CN",
+    "url": "/kol/kols",
+    "title": "达人列表",
+    "tableTitle": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "达人ID/达人名",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邮箱",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "社媒平台/ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "预付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "审核状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "登录状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "关系状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/05 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "已通过",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "正常",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "待推广",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n达人列表\n达人商品\n达人收入\n财务结算\n系统管理\n达人管理/达人列表\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n达人列表\n达人列表\n达人管理\n达人列表\n+ 邀请达人\n达人ID\n达人名称\n邮箱\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n达人ID/达人名\n\t\nPhone/WhatsApp\n\t\n邮箱\n\t\n社媒平台/ID\n\t\n佣金比例\n\t\n预付金额\n\t\n邀请时间\n\t\n邀请人\n\t\n审核状态\n\t\n登录状态\n\t\n关系状态\n\t\n操作\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n2026/10/05 09:02\n\t\n-\n\t\n已通过\n\t\n正常\n\t\n待推广\n\t\n资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-keyboard-fulltext-1440-zh-CN",
+    "focus": {
+      "activeText": "t88 Alice 长名称示例t88_KOL-ASD001",
+      "tag": "SPAN",
+      "tabindex": "0",
+      "outline": "solid",
+      "outlineWidth": "2px",
+      "tooltip": [
+        "t88 Alice 长名称示例t88_KOL-ASD001"
+      ]
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-long-dialog-1366x360-zh-CN",
+    "dialog": {
+      "dialogHeight": 328,
+      "viewportHeight": 360,
+      "bodyHeight": 208,
+      "bodyScroll": 392,
+      "bodyOverflow": "auto",
+      "scrollBefore": 0,
+      "scrollAfter": 184,
+      "footerBefore": 280,
+      "footerAfter": 280,
+      "headerTop": 32,
+      "footerBottom": 328
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-mobile-dialog-390x700-zh-CN",
+    "dialog": {
+      "width": 366,
+      "left": 12,
+      "right": 12,
+      "window": 390,
+      "scroll": 390
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-kol-detail-harness",
+    "desktop": {
+      "viewport": 1440,
+      "bodyWidth": 640,
+      "descriptionWidth": 600,
+      "rows": [
+        [
+          {
+            "text": "达人ID",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "邮箱",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "t88_a_very_long_creator_email_address_for_verification@example.test",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "国家",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "US",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "WhatsApp",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "+10000000000",
+            "span": "0",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "手机号",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "-",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "代购平台",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "t88 AgentOne",
+            "span": "0",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "达人邀请码",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "T88ABC",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "达人推广表格地址",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "https://example.test/t88/a/very/long/spreadsheet/link/with/continuing/path\nhttps://example.test/t88/a/very/long/spreadsheet/link/with/continuing/path",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "来源",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "后台录入",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "关系状态",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "待推广\n佣金信息",
+            "span": "0",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "代购平台",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "账号",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "未激活\n发送邀请",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "Token管理",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "生成复制令牌",
+            "span": "0",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "上传推广表",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "上传推广表",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "负责商务",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "未分配",
+            "span": "0",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "默认佣金比例",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "15.5%",
+            "span": "0",
+            "width": 150
+          },
+          {
+            "text": "状态",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "启用",
+            "span": "1",
+            "width": 150
+          }
+        ],
+        [
+          {
+            "text": "社媒账号",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "TikTok: @t88_a_long_social_account_handle \n主\n（粉丝 1234）主页\nhttps://example.test/t88/social",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "备注",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "t88 A long remark that should occupy an entire row and remain readable in the detail drawer.",
+            "span": "3",
+            "width": 449
+          }
+        ],
+        [
+          {
+            "text": "创建时间",
+            "span": "1",
+            "width": 150
+          },
+          {
+            "text": "2026/10/05 09:02:03",
+            "span": "3",
+            "width": 449
+          }
+        ]
+      ]
+    },
+    "mobile": {
+      "viewport": 390,
+      "bodyWidth": 366,
+      "descriptionWidth": 326,
+      "rows": [
+        [
+          {
+            "text": "达人ID",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "邮箱",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "t88_a_very_long_creator_email_address_for_verification@example.test",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "国家",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "US",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "WhatsApp",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "+10000000000",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "手机号",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "-",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "代购平台",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "t88 AgentOne",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "达人邀请码",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "T88ABC",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "达人推广表格地址",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "https://example.test/t88/a/very/long/spreadsheet/link/with/continuing/path\nhttps://example.test/t88/a/very/long/spreadsheet/link/with/continuing/path",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "来源",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "后台录入",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "关系状态",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "待推广\n佣金信息",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "代购平台",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "账号",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "未激活\n发送邀请",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "Token管理",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "生成复制令牌",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "上传推广表",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "上传推广表",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "负责商务",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "未分配",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "默认佣金比例",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "15.5%",
+            "span": "0",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "状态",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "启用",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "社媒账号",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "TikTok: @t88_a_long_social_account_handle \n主\n（粉丝 1234）主页\nhttps://example.test/t88/social",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "备注",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "t88 A long remark that should occupy an entire row and remain readable in the detail drawer.",
+            "span": "1",
+            "width": 163
+          }
+        ],
+        [
+          {
+            "text": "创建时间",
+            "span": "1",
+            "width": 163
+          },
+          {
+            "text": "2026/10/05 09:02:03",
+            "span": "1",
+            "width": 163
+          }
+        ]
+      ]
+    },
+    "errors": []
+  }
+]
