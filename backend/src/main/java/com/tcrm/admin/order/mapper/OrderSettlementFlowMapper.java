@@ -26,6 +26,20 @@ public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlo
   List<OrderSettlementFlowDO> listByRemoteOrderId(
       @Param("shopId") long shopId, @Param("weidianOrderId") String weidianOrderId);
 
+  /**
+   * Distinct matched orders whose flows were first pulled after {@code since} — the persisted
+   * recovery set for the basis recompute (review rework, task 76): a pull that dies mid-way or a
+   * failed recompute leaves the checkpoint in place, so the next round finds these orders again
+   * even though their fingerprints are no longer new.
+   */
+  @Select(
+      """
+      SELECT DISTINCT order_id FROM crm_order_settlement_flow
+      WHERE shop_id = #{shopId} AND order_id IS NOT NULL
+        AND first_pulled_at > #{since} AND is_deleted = FALSE
+      """)
+  List<Long> listMatchedOrderIdsSince(@Param("shopId") long shopId, @Param("since") Instant since);
+
   /** Backfills the local order id of flows that arrived before their order did. */
   @Update(
       """

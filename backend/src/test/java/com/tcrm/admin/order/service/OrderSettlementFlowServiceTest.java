@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -33,9 +34,10 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Unit tests of the settlement flow pull service (task 76 §3.2): window splitting, dedup insertion,
- * exact order matching and the page-limit safety valve. {@code pull()} always queries both query
- * types, so every stub is keyed by {@code queryType} to isolate the two branches.
+ * Unit tests of the settlement flow pull service (task 76 §3.2, review rework): window splitting,
+ * dedup insertion, exact order matching, the page-limit safety valve and the persisted recovery of
+ * the recompute set. {@code pull()} always queries both query types, so every stub is keyed by
+ * {@code queryType} to isolate the two branches.
  */
 class OrderSettlementFlowServiceTest {
   private static final Instant START = Instant.parse("2026-10-27T00:00:00Z");
@@ -79,19 +81,25 @@ class OrderSettlementFlowServiceTest {
     return request == null ? null : request.queryType();
   }
 
-  @Test
-  void shouldPullBothQueryTypesAndMatchOrdersExactly() {
-    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-    when(orders.selectList(any(LambdaQueryWrapper.class)))
-        .thenReturn(List.of(orderRow(50L, "t76_wd_order_1")));
-    // The recompute path locks the order row and lists its item lines for the basis check.
+  /** Stubs the recompute path: locked order row plus its item lines. */
+  private void stubRecompute() {
     when(orders.selectOne(any(LambdaQueryWrapper.class)))
         .thenReturn(orderRow(50L, "t76_wd_order_1"));
     when(items.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+  }
+
+  @Test
+  void shouldPullBothQueryTypesAndMatchOrdersExactly() {
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(anyLong(), any())).thenReturn(List.of(50L));
+    when(orders.selectList(any(LambdaQueryWrapper.class)))
+        .thenReturn(List.of(orderRow(50L, "t76_wd_order_1")));
+    stubRecompute();
     stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
 
-    service(START.plusSeconds(60)).pull(30L, START, END);
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
 
+    assertThat(ok).isTrue();
     // The exact order id matched the local order and got order_id backfilled for the recompute.
     org.mockito.ArgumentCaptor<OrderSettlementFlowDO> captor =
         org.mockito.ArgumentCaptor.forClass(OrderSettlementFlowDO.class);
@@ -99,20 +107,72 @@ class OrderSettlementFlowServiceTest {
     assertThat(captor.getValue().getOrderId()).isEqualTo(50L);
     assertThat(captor.getValue().getWeidianOrderId()).isEqualTo("t76_wd_order_1");
     verify(commissionSync).sync(any(), any());
+    // The recompute set came from the persisted flows since the checkpoint.
+    verify(flows).listMatchedOrderIdsSince(30L, Instant.EPOCH);
     // Both query types were asked for.
     verify(api, org.mockito.Mockito.times(2))
         .tradeDetail(anyLong(), ArgumentMatchers.any(TradeDetailRequest.class));
   }
 
   @Test
+  void shouldRecomputePersistedFlowsAfterPreviousFailure() {
+    // Review finding 1: fingerprints of the stranded round are no longer new, yet the recompute
+    // set recovers from the database (flows stored after the never-advanced checkpoint).
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new OrderSettlementFlowDO());
+    when(flows.listMatchedOrderIdsSince(30L, Instant.EPOCH)).thenReturn(List.of(50L));
+    stubRecompute();
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
+
+    assertThat(ok).isTrue();
+    verify(flows, never()).insert(any(OrderSettlementFlowDO.class));
+    verify(commissionSync).sync(any(), any());
+  }
+
+  @Test
+  void shouldNotReportSuccessWhenAnOrderRecomputeFails() {
+    // A failing recompute keeps the pull unsuccessful so the checkpoints stay and the affected
+    // order retries on the next round.
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(30L, Instant.EPOCH)).thenReturn(List.of(50L));
+    when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    stubRecompute();
+    org.mockito.Mockito.doThrow(new RuntimeException("wallet down"))
+        .when(commissionSync)
+        .sync(any(), any());
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
+
+    assertThat(ok).isFalse();
+    verify(commissionSync).sync(any(), any());
+  }
+
+  @Test
+  void shouldUseCheckpointAsRecomputeLowerBound() {
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new OrderSettlementFlowDO());
+    when(flows.listMatchedOrderIdsSince(anyLong(), any())).thenReturn(List.of());
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+    Instant checkpoint = Instant.parse("2026-10-27T12:00:00Z");
+
+    service(START.plusSeconds(60)).pull(30L, START, END, checkpoint);
+
+    // Flows pulled before the last successful checkpoint are not recomputed again.
+    verify(flows).listMatchedOrderIdsSince(30L, checkpoint);
+    verify(commissionSync, never()).sync(any(), any());
+  }
+
+  @Test
   void shouldNotMatchSuffixOrderIds() {
     when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(anyLong(), any())).thenReturn(List.of());
     // The local order exists for the plain id; the pulled row uses the refund-suffixed id, which
     // must stay unmatched (exact match only, no suffix truncation).
     when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     stubDetail(detail("t76_wd_order_1_refund", "支出", "退款", "-600"));
 
-    service(START.plusSeconds(60)).pull(30L, START, END);
+    service(START.plusSeconds(60)).pull(30L, START, END, null);
 
     org.mockito.ArgumentCaptor<OrderSettlementFlowDO> captor =
         org.mockito.ArgumentCaptor.forClass(OrderSettlementFlowDO.class);
@@ -123,9 +183,10 @@ class OrderSettlementFlowServiceTest {
   @Test
   void shouldDeduplicateKnownFingerprintsInsteadOfInserting() {
     when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new OrderSettlementFlowDO());
+    when(flows.listMatchedOrderIdsSince(anyLong(), any())).thenReturn(List.of());
     stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
 
-    service(START.plusSeconds(60)).pull(30L, START, END);
+    service(START.plusSeconds(60)).pull(30L, START, END, null);
 
     verify(flows, never()).insert(any(OrderSettlementFlowDO.class));
     verify(flows).touchByFingerprints(any(), any());
@@ -134,49 +195,46 @@ class OrderSettlementFlowServiceTest {
   @Test
   void shouldStopAtReportedTotalAcrossPages() {
     when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(anyLong(), any())).thenReturn(List.of());
     when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     stubDetail(
         detail("t76_wd_order_1", "收入", "货款收入", "600"),
         detail("t76_wd_order_1", "支出", "交易手续费", "-4"));
 
-    service(START.plusSeconds(60)).pull(30L, START, END);
+    service(START.plusSeconds(60)).pull(30L, START, END, null);
 
     verify(flows, org.mockito.Mockito.times(2)).insert(any(OrderSettlementFlowDO.class));
   }
 
   @Test
-  void shouldHitPageCapWithoutRecommuting() {
-    // 202 rows reported but the page cap (200) is hit on page 2 with a full page: the pull keeps
-    // the rows but does not mark orders affected, so no recompute happens this round.
+  void shouldAbortPullWhenPageCapIsHit() {
+    // Review finding 1, page-cap branch: the stored rows are kept, but the pull aborts (no
+    // recompute on incomplete data) and the caller must not advance the checkpoints.
     when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
     when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
-    java.util.List<TradeDetailItem> page1 = new java.util.ArrayList<>();
+    java.util.List<TradeDetailItem> fullPage = new java.util.ArrayList<>();
     for (int i = 0; i < 100; i++) {
-      page1.add(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+      fullPage.add(detail("t76_wd_order_1", "收入", "货款收入", "600"));
     }
-    java.util.List<TradeDetailItem> page2 = new java.util.ArrayList<>();
-    for (int i = 0; i < 100; i++) {
-      page2.add(detail("t76_wd_order_1", "支出", "交易手续费", "-4"));
-    }
-    // Two full pages (100 each) with total 202: page 3 answers empty, stopping the loop before
-    // the 200-page cap. All 200 collected rows are inserted.
     when(api.tradeDetail(
             anyLong(),
             ArgumentMatchers.argThat(
                 r -> SettlementBasisCalculator.QUERY_INCOME_DETAIL.equals(queryType(r)))))
-        .thenReturn(
-            new TradeDetailResponse(page1, 202, null),
-            new TradeDetailResponse(page2, 202, null),
-            new TradeDetailResponse(List.of(), 0, null));
+        .thenAnswer(
+            invocation -> new TradeDetailResponse(new java.util.ArrayList<>(fullPage), null, null));
     when(api.tradeDetail(
             anyLong(),
             ArgumentMatchers.argThat(
                 r -> SettlementBasisCalculator.QUERY_PRE_SETTLE_REFUND.equals(queryType(r)))))
         .thenReturn(new TradeDetailResponse(List.of(), 0, null));
 
-    service(START.plusSeconds(60)).pull(30L, START, END);
+    OrderSettlementFlowService underTest = service(START.plusSeconds(60));
 
-    verify(flows, org.mockito.Mockito.times(200)).insert(any(OrderSettlementFlowDO.class));
+    assertThatThrownBy(() -> underTest.pull(30L, START, END, null))
+        .isInstanceOf(IllegalStateException.class);
+    // A missing total never satisfies the stop condition, so the 200-page cap ends the loop;
+    // every stored row keeps its insert (200 pages x 100 rows), none triggered a recompute.
+    verify(flows, org.mockito.Mockito.times(20_000)).insert(any(OrderSettlementFlowDO.class));
     verify(commissionSync, never()).sync(any(), any());
   }
 

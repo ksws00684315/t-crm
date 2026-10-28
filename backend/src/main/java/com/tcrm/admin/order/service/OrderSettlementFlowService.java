@@ -33,6 +33,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * §3.3). No transaction spans HTTP calls: each page is stored in its own short transaction, and
  * each affected order is re-synced in its own transaction so the commission snapshot and wallet
  * postings commit atomically with the order update.
+ *
+ * <p>Review rework (task 76): the recompute set is recovered from the persisted flows ({@code
+ * first_pulled_at} later than the caller's last successful checkpoint), never from this round's
+ * in-memory state — so a pull that dies mid-way, a page-cap abort or a failed recompute cannot
+ * strand an order. The caller must advance its checkpoints only when {@link #pull} returns true.
  */
 @Service
 public class OrderSettlementFlowService {
@@ -85,26 +90,30 @@ public class OrderSettlementFlowService {
   }
 
   /**
-   * Pulls both query types for the time range and recomputes every order that received a new flow.
-   * The caller holds the per-shop settlement lock and the company tenant scope.
+   * Pulls both query types for the time range and recomputes the commission facts of every order
+   * whose flows were first pulled after {@code sinceCheckpoint} (null = everything). The caller
+   * holds the per-shop settlement lock and the company tenant scope.
+   *
+   * @return true only when the pull and every recompute succeeded; a false return (or a thrown
+   *     error) tells the caller to leave the checkpoints in place so the next round retries both
+   *     the pull and the recompute — the recompute set recovers from the persisted flows, not from
+   *     this round's in-memory state (review rework, task 76)
    */
-  public void pull(long shopId, Instant start, Instant end) {
-    Set<String> affected = new LinkedHashSet<>();
+  public boolean pull(long shopId, Instant start, Instant end, Instant sinceCheckpoint) {
     for (String queryType : QUERY_TYPES) {
       for (Window window : SettlementPullPlanner.windows(start, end)) {
-        affected.addAll(pullWindow(shopId, window, queryType));
+        pullWindow(shopId, window, queryType);
       }
     }
-    recompute(shopId, affected);
+    return recomputeSince(shopId, sinceCheckpoint);
   }
 
   /**
-   * Pages through one window; returns the remote order ids that received a new flow. A truncated
-   * window (page cap hit) returns an empty set: its rows are kept, but a basis computed from
-   * incomplete flows could be wrong, so recomputation waits for the next complete pull.
+   * Pages through one window, storing each page in its own transaction. A truncated window (page
+   * cap hit) aborts the whole pull: its stored rows are kept, but a basis computed from incomplete
+   * flows could be wrong, so nothing is recomputed and the checkpoints stay for the next round.
    */
-  private Set<String> pullWindow(long shopId, Window window, String queryType) {
-    Set<String> newFlowOrderIds = new LinkedHashSet<>();
+  private void pullWindow(long shopId, Window window, String queryType) {
     int collected = 0;
     for (int page = 1; page <= MAX_PAGES_PER_WINDOW; page++) {
       TradeDetailResponse response =
@@ -118,23 +127,28 @@ public class OrderSettlementFlowService {
                   queryType));
       List<TradeDetailItem> rows = rowsOf(response);
       if (rows.isEmpty()) {
-        return newFlowOrderIds;
+        return;
       }
-      newFlowOrderIds.addAll(store(shopId, queryType, rows));
+      store(shopId, queryType, rows);
       collected += rows.size();
       Integer total = response.total();
       if (total != null ? collected >= total : rows.size() < PAGE_SIZE) {
-        return newFlowOrderIds;
+        return;
       }
     }
-    LOG.error(
-        "settlement flow page cap reached for shop {} window {}..{} queryType {}: flows may be"
-            + " incomplete, affected orders wait for the next complete pull",
-        shopId,
-        window.start(),
-        window.end(),
-        queryType);
-    return Set.of();
+    // The rows already stored stay; aborting keeps the checkpoints and retries next round.
+    throw new IllegalStateException(
+        "settlement flow page cap "
+            + MAX_PAGES_PER_WINDOW
+            + " reached for shop "
+            + shopId
+            + " window "
+            + window.start()
+            + ".."
+            + window.end()
+            + " queryType "
+            + queryType
+            + ": flows may be incomplete, pull aborted without recomputing");
   }
 
   private static List<TradeDetailItem> rowsOf(TradeDetailResponse response) {
@@ -143,9 +157,10 @@ public class OrderSettlementFlowService {
 
   /**
    * One short transaction per page: inserts flows with new fingerprints and refreshes {@code
-   * last_pulled_at} of known ones. Returns the remote order ids that received a new row.
+   * last_pulled_at} of known ones. Which orders to recompute is decided afterwards from the
+   * persisted flows, not from this page.
    */
-  private Set<String> store(long shopId, String queryType, List<TradeDetailItem> rows) {
+  private void store(long shopId, String queryType, List<TradeDetailItem> rows) {
     Set<String> remoteIds = new LinkedHashSet<>();
     for (TradeDetailItem row : rows) {
       if (row.orderId() != null && !row.orderId().isBlank()) {
@@ -153,10 +168,9 @@ public class OrderSettlementFlowService {
       }
     }
     Map<String, Long> matched = matchOrders(shopId, remoteIds);
-    return tx.execute(
+    tx.executeWithoutResult(
         status -> {
           Instant now = clock.instant();
-          Set<String> newOrderIds = new LinkedHashSet<>();
           Set<String> knownFingerprints = new LinkedHashSet<>();
           for (TradeDetailItem row : rows) {
             String fingerprint =
@@ -191,12 +205,8 @@ public class OrderSettlementFlowService {
             flow.setFirstPulledAt(now);
             flow.setLastPulledAt(now);
             flows.insert(flow);
-            if (row.orderId() != null) {
-              newOrderIds.add(row.orderId());
-            }
           }
           touchKnown(knownFingerprints, now);
-          return newOrderIds;
         });
   }
 
@@ -239,37 +249,43 @@ public class OrderSettlementFlowService {
   }
 
   /**
-   * Re-publishes the commission facts of every order that received a new flow; each order commits
-   * (or fails) independently. Unmatched remote order ids are skipped: their flows never count.
+   * Re-publishes the commission facts of every order whose matched flows were first pulled after
+   * {@code sinceCheckpoint}, recovering the set from the persisted flows (review rework, task 76):
+   * a pull that dies mid-way, a page-cap abort or a failed recompute all leave the checkpoint in
+   * place, so the next round finds these orders here even though their fingerprints are no longer
+   * new. Each order commits (or fails) independently; any failure makes the whole pull unsuccessful
+   * so the checkpoints stay.
    */
-  private void recompute(long shopId, Set<String> remoteOrderIds) {
-    for (String remoteId : remoteOrderIds) {
+  private boolean recomputeSince(long shopId, Instant sinceCheckpoint) {
+    Instant since = sinceCheckpoint == null ? Instant.EPOCH : sinceCheckpoint;
+    boolean allOk = true;
+    for (Long orderId : flows.listMatchedOrderIdsSince(shopId, since)) {
       try {
-        recomputeOne(shopId, remoteId);
+        recomputeOne(orderId);
       } catch (RuntimeException error) {
+        allOk = false;
         LOG.error(
-            "settlement basis recompute failed for shop {} order {}: it retries when the order or"
-                + " its flows change again",
+            "settlement basis recompute failed for shop {} order {}: the pull checkpoint stays,"
+                + " it retries next round",
             shopId,
-            remoteId,
+            orderId,
             error);
       }
     }
+    return allOk;
   }
 
-  private void recomputeOne(long shopId, String remoteId) {
+  private void recomputeOne(long orderId) {
     tx.executeWithoutResult(
         status -> {
           OrderDO order =
               orders.selectOne(
-                  new LambdaQueryWrapper<OrderDO>()
-                      .eq(OrderDO::getShopId, shopId)
-                      .eq(OrderDO::getWeidianOrderId, remoteId)
-                      .last("FOR UPDATE"));
+                  new LambdaQueryWrapper<OrderDO>().eq(OrderDO::getId, orderId).last("FOR UPDATE"));
           if (order == null) {
             return;
           }
-          flows.backfillOrderId(shopId, remoteId, order.getId(), clock.instant());
+          flows.backfillOrderId(
+              order.getShopId(), order.getWeidianOrderId(), order.getId(), clock.instant());
           List<OrderItemDO> lines = listItems(order.getId());
           commissionSync.sync(order, lines);
         });

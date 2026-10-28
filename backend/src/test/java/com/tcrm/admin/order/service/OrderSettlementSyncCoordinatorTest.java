@@ -59,6 +59,7 @@ class OrderSettlementSyncCoordinatorTest {
     when(states.selectOne(any())).thenReturn(null);
     when(config.getInt("weidian.settlement.sync-interval-minutes")).thenReturn(60);
     when(config.getInt("weidian.settlement.backfill-hour")).thenReturn(3);
+    when(flows.pull(anyLong(), any(), any(), any())).thenReturn(true);
     doAnswer(
             invocation -> {
               invocation.getArgument(3, Runnable.class).run();
@@ -81,13 +82,15 @@ class OrderSettlementSyncCoordinatorTest {
         .pull(
             org.mockito.ArgumentMatchers.eq(10L),
             org.mockito.ArgumentMatchers.eq(NOW.minus(SettlementPullPlanner.BACKFILL_LOOKBACK)),
-            org.mockito.ArgumentMatchers.eq(NOW));
+            org.mockito.ArgumentMatchers.eq(NOW),
+            org.mockito.ArgumentMatchers.eq(null));
     verify(flows, org.mockito.Mockito.times(2))
         .pull(
             org.mockito.ArgumentMatchers.eq(20L),
             org.mockito.ArgumentMatchers.eq(NOW.minus(SettlementPullPlanner.BACKFILL_LOOKBACK)),
-            org.mockito.ArgumentMatchers.eq(NOW));
-    verify(flows, never()).pull(org.mockito.ArgumentMatchers.eq(30L), any(), any());
+            org.mockito.ArgumentMatchers.eq(NOW),
+            org.mockito.ArgumentMatchers.eq(null));
+    verify(flows, never()).pull(org.mockito.ArgumentMatchers.eq(30L), any(), any(), any());
     // Checkpoints persisted for the two pulled shops (twice, once per company scope).
     ArgumentCaptor<OrderSyncStateDO> inserted = ArgumentCaptor.forClass(OrderSyncStateDO.class);
     verify(states, org.mockito.Mockito.times(4)).insert(inserted.capture());
@@ -106,6 +109,7 @@ class OrderSettlementSyncCoordinatorTest {
     // Shop 40 exists but its tenant is disabled (not in enabledTenantIds).
     when(authorization.authorizedShopIds()).thenReturn(List.of(10L));
     when(states.selectOne(any())).thenReturn(null);
+    when(flows.pull(anyLong(), any(), any(), any())).thenReturn(true);
     doAnswer(
             invocation -> {
               invocation.getArgument(3, Runnable.class).run();
@@ -128,7 +132,7 @@ class OrderSettlementSyncCoordinatorTest {
             anyLong(),
             anyLong(),
             any(Runnable.class));
-    verify(flows, never()).pull(org.mockito.ArgumentMatchers.eq(40L), any(), any());
+    verify(flows, never()).pull(org.mockito.ArgumentMatchers.eq(40L), any(), any(), any());
   }
 
   @Test
@@ -138,6 +142,7 @@ class OrderSettlementSyncCoordinatorTest {
     when(authorization.authorizedShopIds()).thenReturn(List.of(10L));
     when(config.getInt("weidian.settlement.sync-interval-minutes")).thenReturn(15);
     when(config.getInt("weidian.settlement.backfill-hour")).thenReturn(3);
+    when(flows.pull(anyLong(), any(), any(), any())).thenReturn(true);
     // Already backfilled today at 03:10; the incremental interval (15 min) elapsed again.
     OrderSyncStateDO state = new OrderSyncStateDO();
     state.setShopId(10L);
@@ -158,7 +163,8 @@ class OrderSettlementSyncCoordinatorTest {
         .pull(
             org.mockito.ArgumentMatchers.eq(10L),
             org.mockito.ArgumentMatchers.eq(NOW.minus(SettlementPullPlanner.INCREMENTAL_LOOKBACK)),
-            org.mockito.ArgumentMatchers.eq(NOW));
+            org.mockito.ArgumentMatchers.eq(NOW),
+            org.mockito.ArgumentMatchers.eq(Instant.parse("2026-10-28T19:10:00Z")));
     verify(states).updateById(state);
     assertThat(state.getSettlementPullAt()).isEqualTo(NOW);
     assertThat(state.getSettlementBackfillAt()).isEqualTo(Instant.parse("2026-10-28T19:10:00Z"));
@@ -179,7 +185,7 @@ class OrderSettlementSyncCoordinatorTest {
 
     coordinator().scheduled();
 
-    verify(flows, never()).pull(anyLong(), any(), any());
+    verify(flows, never()).pull(anyLong(), any(), any(), any());
     verify(states, never()).insert(any(OrderSyncStateDO.class));
     verify(states, never()).updateById(any(OrderSyncStateDO.class));
   }
@@ -199,9 +205,19 @@ class OrderSettlementSyncCoordinatorTest {
             })
         .when(locks)
         .run(any(String.class), anyLong(), anyLong(), any(Runnable.class));
+    // A thrown pull and an unsuccessful pull both leave the checkpoints untouched.
     org.mockito.Mockito.doThrow(new RuntimeException("boom"))
         .when(flows)
-        .pull(anyLong(), any(), any());
+        .pull(anyLong(), any(), any(), any());
+
+    coordinator().scheduled();
+
+    verify(states, never()).insert(any(OrderSyncStateDO.class));
+    verify(states, never()).updateById(any(OrderSyncStateDO.class));
+
+    org.mockito.Mockito.clearInvocations(flows, states);
+    // doReturn, not when(): re-stubbing a throwing mock with when() would invoke the old stub.
+    org.mockito.Mockito.doReturn(false).when(flows).pull(anyLong(), any(), any(), any());
 
     coordinator().scheduled();
 

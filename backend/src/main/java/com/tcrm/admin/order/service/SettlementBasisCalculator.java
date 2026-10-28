@@ -114,7 +114,13 @@ public final class SettlementBasisCalculator {
     }
     OrderSettlementFlowDO income = singleGoodsIncome(incomeFlows);
     BigDecimal orderBasis = signedIncomeTotal(incomeFlows);
-    if (income == null || orderBasis == null || !incomeMatchesPay(income, order)) {
+    // A goods-income row without tradeTime has no determined settlement time: the order would
+    // verify but never release (UNSETTLED forever, without a reason). Treat it as a mismatch so
+    // it stays unverified with a queryable reason (review rework, task 76).
+    if (income == null
+        || income.getTradeTime() == null
+        || orderBasis == null
+        || !incomeMatchesPay(income, order)) {
       return BasisOutcome.unverified(REASON_INCOME_MISMATCH);
     }
     if (distinctKols(items).size() > 1) {

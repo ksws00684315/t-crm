@@ -452,7 +452,63 @@ class OrderSettlementFlowIT {
   private void pull() {
     TenantScope.runCompany(
         TENANT_ID,
-        () -> flows.pull(SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600)));
+        () ->
+            flows.pull(
+                SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600), null));
+  }
+
+  /**
+   * Review finding 1: a pull that dies mid-way (flows already stored) must not strand the order —
+   * the next successful pull recovers the recompute set from the persisted flows, because the
+   * checkpoints never advanced past them.
+   */
+  @Test
+  void shouldRecomputeFlowsLeftByFailedPullOnNextRound() {
+    // Round 1: INCOME_DETAIL stores its flows, then PRE_SETTLE_REFUND blows up mid-pull.
+    when(remote.tradeDetail(anyLong(), argThat(r -> "INCOME_DETAIL".equals(queryType(r)))))
+        .thenReturn(response(List.of(incomeRow("600"), row("支出", "交易手续费", "-4"))));
+    when(remote.tradeDetail(anyLong(), argThat(r -> "PRE_SETTLE_REFUND".equals(queryType(r)))))
+        .thenThrow(new RuntimeException("network glitch"));
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () ->
+                TenantScope.runCompany(
+                    TENANT_ID,
+                    () ->
+                        flows.pull(
+                            SHOP_ID,
+                            INCOME_TIME.minusSeconds(3600),
+                            INCOME_TIME.plusSeconds(3600),
+                            null)))
+        .isInstanceOf(RuntimeException.class);
+
+    // The flows are persisted but the order was never recomputed: no snapshot exists yet.
+    assertThat(flowCount()).isEqualTo(2);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_commission_item_state WHERE order_id = ?",
+                Integer.class,
+                orderId))
+        .isZero();
+
+    // Round 2: everything succeeds; the stored fingerprints are no longer new, yet the order
+    // must still be recomputed from the persisted state.
+    stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
+
+    Boolean ok =
+        TenantScope.callCompany(
+            TENANT_ID,
+            () ->
+                flows.pull(
+                    SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600), null));
+
+    assertThat(ok).isTrue();
+    assertThat(itemField(itemA, "verified")).isEqualTo(true);
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("3.97"));
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
+    assertThat(orderField("settled_time")).isEqualTo(Timestamp.from(INCOME_TIME));
+    assertThat(orderField("commission_basis_reason")).isNull();
   }
 
   private void stubIncomeDetail(TradeDetailItem... rows) {

@@ -109,7 +109,11 @@ public class OrderSettlementSyncCoordinator {
     }
   }
 
-  /** Pulls whichever action the shop is due for and advances the persisted checkpoints. */
+  /**
+   * Pulls whichever action the shop is due for and advances the persisted checkpoints — but only
+   * when the pull fully succeeded (review rework, task 76): a failed pull or recompute leaves the
+   * checkpoints in place, and the next round recovers the recompute set from the persisted flows.
+   */
   void pullIfDue(long shopId) {
     Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
     OrderSyncStateDO state = findState(shopId);
@@ -125,13 +129,21 @@ public class OrderSettlementSyncCoordinator {
     if (action == Action.NONE) {
       return;
     }
+    boolean ok;
     if (action == Action.BACKFILL) {
       // The backfill covers the incremental window, so it also counts as this round's pull.
-      flows.pull(shopId, now.minus(SettlementPullPlanner.BACKFILL_LOOKBACK), now);
-      stamp(shopId, now, now);
+      ok = flows.pull(shopId, now.minus(SettlementPullPlanner.BACKFILL_LOOKBACK), now, lastPull);
+      if (ok) {
+        stamp(shopId, now, now);
+      }
     } else {
-      flows.pull(shopId, now.minus(SettlementPullPlanner.INCREMENTAL_LOOKBACK), now);
-      stamp(shopId, null, now);
+      ok = flows.pull(shopId, now.minus(SettlementPullPlanner.INCREMENTAL_LOOKBACK), now, lastPull);
+      if (ok) {
+        stamp(shopId, null, now);
+      }
+    }
+    if (!ok) {
+      LOG.warn("settlement flow pull incomplete for shop {}: checkpoints stay for retry", shopId);
     }
   }
 

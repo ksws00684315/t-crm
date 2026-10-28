@@ -93,6 +93,21 @@ class SettlementBasisCalculatorTest {
 
     assertThat(SettlementBasisCalculator.compute(order("6.00"), items(1), yuanFlows).reason())
         .isEqualTo("INCOME_MISMATCH");
+    // Goods-income row without tradeTime: no determined settlement time, so the order stays
+    // unverified instead of verifying and never releasing (review rework, task 76).
+    assertThat(
+            SettlementBasisCalculator.compute(
+                    order("6.00"),
+                    items(1),
+                    List.of(
+                        flow(
+                            "收入",
+                            "货款收入",
+                            "600",
+                            null,
+                            SettlementBasisCalculator.QUERY_INCOME_DETAIL)))
+                .reason())
+        .isEqualTo("INCOME_MISMATCH");
     // No goods-income row at all.
     assertThat(
             SettlementBasisCalculator.compute(
