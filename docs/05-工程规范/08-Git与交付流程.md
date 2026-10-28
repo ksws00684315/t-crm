@@ -105,7 +105,7 @@
 git archive --format=tar.gz --prefix=t-crm/ -o t-crm-v{版本}-src.tar.gz v{版本}
 ```
 
-【强制】`.gitattributes` 中标记为 `export-ignore` 的内容不进入交付包：AI 代理规则（`AGENTS.md`、`CLAUDE.md`），以及内部文档（需求原件、报价与合同、调研、开发任务、过程稿）。交付包保留：全部源代码、构建与部署配置、CI 工作流、`THIRD-PARTY-NOTICES`、设计说明书、工程规范、架构决策记录、README 与操作说明。
+【强制】`.gitattributes` 中标记为 `export-ignore` 的内容不进入交付包：AI 代理规则（`AGENTS.md`、`CLAUDE.md`、`.agents/`），以及内部文档（需求原件、报价与合同、调研、开发任务、过程稿）。交付包保留：全部源代码、构建与部署配置、CI 工作流、`THIRD-PARTY-NOTICES`、设计说明书、工程规范、架构决策记录、README 与操作说明。
 【强制】新增内部文档目录时，同步更新 `.gitattributes`。
 【强制】生成交付包后检查清单：解压后不含上述排除内容；能按 README 完成构建；各工程 `THIRD-PARTY-NOTICES` 齐全。
 

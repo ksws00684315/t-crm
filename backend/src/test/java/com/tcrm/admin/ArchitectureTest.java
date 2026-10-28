@@ -44,6 +44,9 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("org.springframework.jdbc..")
+        .because(
+            "controllers must not access data (standard 01 §3); move the query into a service"
+                + " that calls a MyBatis-Plus mapper")
         .check(classes);
     noClasses()
         .that()
@@ -51,6 +54,10 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .haveFullyQualifiedName(JdbcTemplate.class.getName())
+        .because(
+            "hand-written JdbcTemplate SQL bypasses the MyBatis-Plus tenant filter (standard 06"
+                + " §2, task 47); use a mapper in the module's mapper package, with annotation or"
+                + " XML SQL for row locks and ON CONFLICT")
         .check(classes);
   }
 
@@ -62,6 +69,9 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..mapper..")
+        .because(
+            "all data access goes through the service layer (standard 01 §3); call a service"
+                + " method instead of the mapper")
         .check(classes);
     noClasses()
         .that()
@@ -69,6 +79,9 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..controller..")
+        .because(
+            "the controller converts *Request / *Query into service parameters (standard 01 §3);"
+                + " give the service its own *Command or DTO type")
         .check(classes);
     noClasses()
         .that()
@@ -76,12 +89,16 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .haveSimpleNameEndingWith("DO")
+        .because(
+            "*DO must not leave the module's model/mapper/service layers (standard 01 §4); return"
+                + " a *VO from controllers and a *DTO from api facades")
         .check(classes);
     classes()
         .that()
         .haveSimpleNameEndingWith("DO")
         .should()
         .resideInAPackage("..model..")
+        .because("*DO entities live in the module's model package (standard 01 §3, §4)")
         .check(classes);
   }
 
@@ -112,8 +129,19 @@ class ArchitectureTest {
                 }
               }
             })
+        .because(
+            "modules depend on each other only through com.tcrm.admin.<module>.api, and shared"
+                + " depends on no business module (standard 01 §3); add a facade method or DTO to"
+                + " the target module's api package")
         .check(classes);
-    slices().matching("com.tcrm.admin.(*)..").should().beFreeOfCycles().check(classes);
+    slices()
+        .matching("com.tcrm.admin.(*)..")
+        .should()
+        .beFreeOfCycles()
+        .because(
+            "module cycles are forbidden (standard 01 §3); notify the other direction with an"
+                + " application event published through shared.TransactionalEvents")
+        .check(classes);
   }
 
   private static String module(JavaClass type) {
@@ -131,7 +159,8 @@ class ArchitectureTest {
   void shouldRejectEndpoint_whenAccessIsNotDeclared() {
     JavaClasses fixture = new ClassFileImporter().importClasses(UndeclaredEndpointFixture.class);
     assertThatThrownBy(() -> endpointsDeclareAccess().check(fixture))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("because access is denied by default");
   }
 
   private static ArchRule endpointsDeclareAccess() {
@@ -159,7 +188,11 @@ class ArchitectureTest {
                   events.add(new SimpleConditionEvent(method, declared, method.getFullName()));
                 }
               }
-            });
+            })
+        .because(
+            "access is denied by default (standard 06 §2, ADR-018); annotate the endpoint or its"
+                + " controller with @SaCheckPermission or @SaCheckRole, @SaCheckLogin(type ="
+                + " \"kol\") for KOL endpoints, or @PublicEndpoint for public ones");
   }
 
   /**
@@ -208,6 +241,9 @@ class ArchitectureTest {
                 }
               }
             })
+        .because(
+            "public instance fields are forbidden (standard 02 §1); make the field private and"
+                + " add a getter/setter, or use a record")
         .check(classes);
   }
 
@@ -224,7 +260,8 @@ class ArchitectureTest {
   void shouldRejectDirectPublishEvent() {
     JavaClasses fixture = new ClassFileImporter().importClasses(DirectPublishFixture.class);
     assertThatThrownBy(() -> eventsPublishedOnlyThroughTransactionalEvents().check(fixture))
-        .isInstanceOf(AssertionError.class);
+        .isInstanceOf(AssertionError.class)
+        .hasMessageContaining("because @TransactionalEventListener drops events");
   }
 
   private static ArchRule eventsPublishedOnlyThroughTransactionalEvents() {
@@ -244,6 +281,9 @@ class ArchitectureTest {
                   }
                 }
               }
-            });
+            })
+        .because(
+            "@TransactionalEventListener drops events published outside a transaction; inject"
+                + " shared.TransactionalEvents and publish through it");
   }
 }

@@ -22,6 +22,7 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..mapper..")
+        .because("data access goes through the service layer (standard 01 §5)")
         .check(classes);
     noClasses()
         .that()
@@ -29,6 +30,7 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .resideInAPackage("..controller..")
+        .because("services must not depend on controller types (standard 01 §5)")
         .check(classes);
     noClasses()
         .that()
@@ -36,6 +38,7 @@ class ArchitectureTest {
         .should()
         .dependOnClassesThat()
         .haveSimpleName("ClickRedis")
+        .because("controllers record clicks through RedirectService, not ClickRedis directly")
         .check(classes);
   }
 }
