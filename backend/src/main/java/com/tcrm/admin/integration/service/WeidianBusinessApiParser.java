@@ -100,6 +100,27 @@ public class WeidianBusinessApiParser {
         result);
   }
 
+  /** Parses shop.order.trade.detail rows verbatim; missing fields stay null (task 76). */
+  public WeidianBusinessApi.TradeDetailResponse tradeDetail(JsonNode result) {
+    List<WeidianBusinessApi.TradeDetailItem> items = new ArrayList<>();
+    JsonNode rows = result.get("list");
+    if (rows != null && rows.isArray()) {
+      rows.forEach(
+          row ->
+              items.add(
+                  new WeidianBusinessApi.TradeDetailItem(
+                      text(row, "orderId"),
+                      text(row, "refundId"),
+                      text(row, "tradeType"),
+                      text(row, "tradeSubType"),
+                      decimal(row, "amount"),
+                      epochMillis(row, "tradeTime"),
+                      text(row, "remark"),
+                      row)));
+    }
+    return new WeidianBusinessApi.TradeDetailResponse(items, integer(result, "total"), result);
+  }
+
   public WeidianBusinessApi.ItemListResponse itemList(JsonNode result) {
     List<WeidianBusinessApi.ItemSummary> items = new ArrayList<>();
     JsonNode rows = result.get("items");

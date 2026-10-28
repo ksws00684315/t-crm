@@ -22,6 +22,7 @@ import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
@@ -107,7 +108,10 @@ class OrderServiceTest {
           audit,
           sanitizer,
           new OrderCommissionSync(
-              mock(org.springframework.context.ApplicationEventPublisher.class), refunds),
+              mock(org.springframework.context.ApplicationEventPublisher.class),
+              refunds,
+              mock(OrderSettlementFlowMapper.class),
+              orders),
           commissionChain);
 
   @BeforeAll

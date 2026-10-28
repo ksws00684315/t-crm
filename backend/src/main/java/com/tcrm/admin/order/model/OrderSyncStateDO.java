@@ -38,6 +38,14 @@ public class OrderSyncStateDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Long lastImportTaskId;
 
+  /** Last completed settlement detail incremental pull (task 76); null when never pulled. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Instant settlementPullAt;
+
+  /** Last completed settlement detail daily backfill (task 76); null when never backfilled. */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private Instant settlementBackfillAt;
+
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private Long tenantId;
 
@@ -103,6 +111,22 @@ public class OrderSyncStateDO extends BaseEntity {
 
   public void setLastImportTaskId(Long value) {
     lastImportTaskId = value;
+  }
+
+  public Instant getSettlementPullAt() {
+    return settlementPullAt;
+  }
+
+  public void setSettlementPullAt(Instant value) {
+    settlementPullAt = value;
+  }
+
+  public Instant getSettlementBackfillAt() {
+    return settlementBackfillAt;
+  }
+
+  public void setSettlementBackfillAt(Instant value) {
+    settlementBackfillAt = value;
   }
 
   public Long getTenantId() {

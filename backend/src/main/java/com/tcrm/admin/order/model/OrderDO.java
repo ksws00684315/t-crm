@@ -25,6 +25,13 @@ public class OrderDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private Instant settledTime;
 
+  /**
+   * Settlement basis check result (task 76): null when a basis was computed or nothing was checked
+   * yet; otherwise one of the {@code SettlementBasisCalculator.REASON_*} codes.
+   */
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String commissionBasisReason;
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private String attributionStatus;
 
@@ -114,6 +121,14 @@ public class OrderDO extends BaseEntity {
 
   public void setSettledTime(Instant value) {
     settledTime = value;
+  }
+
+  public String getCommissionBasisReason() {
+    return commissionBasisReason;
+  }
+
+  public void setCommissionBasisReason(String value) {
+    commissionBasisReason = value;
   }
 
   public String getAttributionStatus() {
