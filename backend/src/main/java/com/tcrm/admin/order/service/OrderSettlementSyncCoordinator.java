@@ -32,7 +32,9 @@ public class OrderSettlementSyncCoordinator {
   private static final Logger LOG = LoggerFactory.getLogger(OrderSettlementSyncCoordinator.class);
 
   /** Config keys of SystemConfigDefinition; read each round so changes apply without restart. */
-  private static final String KEY_SYNC_INTERVAL_MINUTES = "weidian.settlement.sync-interval-minutes";
+  private static final String KEY_SYNC_INTERVAL_MINUTES =
+      "weidian.settlement.sync-interval-minutes";
+
   private static final String KEY_BACKFILL_HOUR = "weidian.settlement.backfill-hour";
 
   private final OrderSettlementFlowService flows;

@@ -334,9 +334,19 @@ class OrderSettlementFlowIT {
   @Test
   void shouldSkipDisabledAndUnauthorizedShopsAndIsolateCompanies() throws Exception {
     var other = CompanySessions.openCompany(mvc, json, PASSWORD, "t76-settle-co", "t76-admin");
+    var disabledCo =
+        CompanySessions.openCompany(mvc, json, PASSWORD, "t76-settle-off", "t76-off-admin");
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    // A disabled company is skipped entirely, like a disabled or unauthorized shop.
+    mvc.perform(
+            put("/admin-api/platform/tenants/" + disabledCo.tenantId() + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":0}")
+                .header("X-Admin-Token", platform))
+        .andExpect(status().isOk());
     jdbc.update(
         "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,status,create_time,update_time)"
-            + " VALUES(?,?,'SHOP-760002','t76 disabled','30',0,now(),now())",
+            + " VALUES(?,?,'SHOP-760002','t76 disabled shop','30',0,now(),now())",
         DISABLED_SHOP_ID,
         TENANT_ID);
     jdbc.update(
@@ -351,13 +361,21 @@ class OrderSettlementFlowIT {
         "INSERT INTO crm_weidian_shop_auth(id,tenant_id,shop_id,auth_mode,status,create_time,update_time)"
             + " VALUES(40,?,40,'SERVICE','AUTHORIZED',now(),now())",
         other.tenantId());
+    jdbc.update(
+        "INSERT INTO crm_shop(id,tenant_id,shop_code,shop_name,weidian_shop_id,create_time,update_time)"
+            + " VALUES(50,?,'SHOP-760004','t76 disabled company','50',now(),now())",
+        disabledCo.tenantId());
+    jdbc.update(
+        "INSERT INTO crm_weidian_shop_auth(id,tenant_id,shop_id,auth_mode,status,create_time,update_time)"
+            + " VALUES(50,?,50,'SERVICE','AUTHORIZED',now(),now())",
+        disabledCo.tenantId());
     when(remote.tradeDetail(anyLong(), any())).thenReturn(emptyResponse());
 
     coordinator.scheduled();
 
     ArgumentCaptor<Long> shopIds = ArgumentCaptor.forClass(Long.class);
     verify(remote, org.mockito.Mockito.atLeastOnce()).tradeDetail(shopIds.capture(), any());
-    assertThat(shopIds.getAllValues()).contains(SHOP_ID, 40L).doesNotContain(DISABLED_SHOP_ID);
+    assertThat(shopIds.getAllValues()).contains(SHOP_ID, 40L).doesNotContain(DISABLED_SHOP_ID, 50L);
     // Each shop's pull checkpoints are stamped inside its own company.
     assertThat(
             jdbc.queryForObject(
@@ -395,6 +413,40 @@ class OrderSettlementFlowIT {
     ArgumentCaptor<Long> shopIds = ArgumentCaptor.forClass(Long.class);
     verify(remote, org.mockito.Mockito.atLeastOnce()).tradeDetail(shopIds.capture(), any());
     assertThat(shopIds.getAllValues()).contains(SHOP_ID);
+  }
+
+  @Test
+  void shouldPageThroughWindowsUntilTotalIsReached() {
+    // Page 1 is full (100 rows) so the pull must ask for page 2 and stop at the reported total
+    // (102 rows): one goods-income row plus 101 distinct fee rows.
+    java.util.List<TradeDetailItem> page1 = new ArrayList<>();
+    page1.add(incomeRow("600"));
+    for (int i = 1; i <= 99; i++) {
+      page1.add(row("支出", "交易手续费", "-" + i));
+    }
+    java.util.List<TradeDetailItem> page2 =
+        List.of(row("支出", "交易手续费", "-100"), row("支出", "交易手续费", "-101"));
+    when(remote.tradeDetail(anyLong(), argThat(r -> "INCOME_DETAIL".equals(queryType(r)))))
+        .thenAnswer(
+            invocation -> {
+              TradeDetailRequest request = invocation.getArgument(1);
+              // Both pages report the window total (102), like the real API.
+              return new TradeDetailResponse(
+                  new ArrayList<>(request.pageNo() == 1 ? page1 : page2), 102, null);
+            });
+    when(remote.tradeDetail(anyLong(), argThat(r -> "PRE_SETTLE_REFUND".equals(queryType(r)))))
+        .thenReturn(emptyResponse());
+
+    pull();
+
+    assertThat(flowCount()).isEqualTo(102);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_settlement_flow WHERE weidian_order_id ="
+                    + " 't76_wd_order_1' AND order_id = ?",
+                Integer.class,
+                orderId))
+        .isEqualTo(102);
   }
 
   private void pull() {
