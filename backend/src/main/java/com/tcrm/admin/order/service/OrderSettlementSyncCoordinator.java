@@ -10,7 +10,6 @@ import com.tcrm.admin.shared.DistributedLocks;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.api.EnabledTenantApi;
-import com.tcrm.admin.system.model.SystemConfigDefinition;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +30,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class OrderSettlementSyncCoordinator {
   private static final Logger LOG = LoggerFactory.getLogger(OrderSettlementSyncCoordinator.class);
+
+  /** Config keys of SystemConfigDefinition; read each round so changes apply without restart. */
+  private static final String KEY_SYNC_INTERVAL_MINUTES = "weidian.settlement.sync-interval-minutes";
+  private static final String KEY_BACKFILL_HOUR = "weidian.settlement.backfill-hour";
 
   private final OrderSettlementFlowService flows;
   private final DistributedLocks locks;
@@ -113,8 +116,8 @@ public class OrderSettlementSyncCoordinator {
     Action action =
         SettlementPullPlanner.decide(
             now,
-            config.getInt(SystemConfigDefinition.WEIDIAN_SETTLEMENT_SYNC_INTERVAL_MINUTES.key()),
-            config.getInt(SystemConfigDefinition.WEIDIAN_SETTLEMENT_BACKFILL_HOUR.key()),
+            config.getInt(KEY_SYNC_INTERVAL_MINUTES),
+            config.getInt(KEY_BACKFILL_HOUR),
             lastPull,
             lastBackfill);
     if (action == Action.NONE) {

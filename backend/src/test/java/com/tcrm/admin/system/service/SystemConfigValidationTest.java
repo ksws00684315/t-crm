@@ -11,11 +11,16 @@ import org.junit.jupiter.api.Test;
 class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
-    assertThat(SystemConfigDefinition.values()).hasSize(33);
+    // 33 task-34 settings plus the two task-76 settlement pull settings.
+    assertThat(SystemConfigDefinition.values()).hasSize(35);
     assertThat(SystemConfigDefinition.find("link.short-url.allowed-hosts"))
         .isEqualTo(SystemConfigDefinition.SHORT_URL_ALLOWED_HOSTS);
     assertThat(SystemConfigDefinition.find("commission.minimum-withdrawal-cny"))
         .isEqualTo(SystemConfigDefinition.MINIMUM_WITHDRAWAL_CNY);
+    assertThat(SystemConfigDefinition.find("weidian.settlement.sync-interval-minutes"))
+        .isEqualTo(SystemConfigDefinition.WEIDIAN_SETTLEMENT_SYNC_INTERVAL_MINUTES);
+    assertThat(SystemConfigDefinition.find("weidian.settlement.backfill-hour"))
+        .isEqualTo(SystemConfigDefinition.WEIDIAN_SETTLEMENT_BACKFILL_HOUR);
     assertThat(SystemConfigDefinition.list())
         .contains(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS);
     assertThat(SystemConfigDefinition.KOL_INVITE_TTL_HOURS.min()).isEqualTo(1);
@@ -24,7 +29,7 @@ class SystemConfigValidationTest {
             java.util.Arrays.stream(SystemConfigDefinition.values())
                 .map(SystemConfigDefinition::key)
                 .collect(Collectors.toSet()))
-        .hasSize(33);
+        .hasSize(35);
   }
 
   @Test
