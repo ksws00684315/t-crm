@@ -141,6 +141,89 @@ describe("DataTable", () => {
     }
   });
 
+  it("fills the remaining height with an internally scrolling table when explicitly enabled", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "fill-space", rows: [], columns, total: 0, fillAvailableHeight: true },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await flushPromises();
+    expect(wrapper.classes()).toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBe("100%");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBeUndefined();
+    expect(wrapper.find(".data-table__pager").exists()).toBe(true);
+    await wrapper.setProps({ fillAvailableHeight: false });
+    expect(wrapper.classes()).not.toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("keeps a readable minimum body when filters leave too little height", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: {
+        tableId: "fill-minimum",
+        rows: [{ id: "1" }, { id: "2" }],
+        columns,
+        total: 2,
+        fillAvailableHeight: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      await flushPromises();
+      Object.defineProperty(wrapper.element.parentElement, "clientHeight", {
+        value: 200,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__toolbar").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__pager").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".el-table__header-wrapper").element, "offsetHeight", {
+        value: 48,
+        configurable: true
+      });
+      wrapper.findAll(".el-table__body tbody tr").forEach((row, index) =>
+        Object.defineProperty(row.element, "offsetHeight", {
+          value: index === 0 ? 56 : 113,
+          configurable: true
+        })
+      );
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect((wrapper.element as HTMLElement).style.minHeight).toBe("297px");
+      expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBe("100%");
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
+  it("does not force plain detail tables to fill their container", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "plain-fill-ignored",
+        rows: [],
+        columns,
+        total: 0,
+        plain: true,
+        fillAvailableHeight: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await flushPromises();
+    expect(wrapper.classes()).not.toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it("restores space when a sibling filter collapses without resizing the page or table", async () => {
     const observers: {
       callback: ResizeObserverCallback;

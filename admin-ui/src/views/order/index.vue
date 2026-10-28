@@ -457,6 +457,7 @@ onMounted(() => {
     <DataTable
       class="order-list-table"
       table-id="orders"
+      fill-available-height
       :rows="tableRows"
       :columns="columns"
       :loading="loading"

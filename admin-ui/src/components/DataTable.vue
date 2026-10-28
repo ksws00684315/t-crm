@@ -51,6 +51,8 @@ const props = withDefaults(
     rowKey?: string;
     /** Drawers and dialogs keep the table rules without the list toolbar. */
     plain?: boolean;
+    /** Fill the remaining page space; body scrolls and the pager stays at the card bottom. */
+    fillAvailableHeight?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
     exportable?: boolean;
     exporting?: boolean;
@@ -86,6 +88,7 @@ const props = withDefaults(
     filterCount: 0,
     rowKey: "id",
     plain: false,
+    fillAvailableHeight: false,
     exportable: false,
     exporting: false,
     selectable: false,
@@ -147,14 +150,17 @@ const fullscreen = ref(false);
  * generated preview, where the pager sits directly under the last row). The page still owns a
  * definite height, so the table gets a measured ceiling instead of the old `height: 100%`:
  * short pages shrink, long pages scroll inside the body and keep the pager on screen.
+ * The opt-in fill mode instead uses flex space and preserves a readable minimum on short screens.
  */
 const rootEl = ref<HTMLElement | null>(null);
 const tableMaxHeight = ref<number | null>(null);
+const fillMinimumHeight = ref<number | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
 function measureHeights(): void {
   if (props.plain) {
+    fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
     return;
   }
@@ -186,6 +192,25 @@ function measureHeights(): void {
     parseFloat(style.borderBottomWidth || "0");
   const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
   const gap = parseFloat(style.rowGap || "0") || 0;
+  if (props.fillAvailableHeight) {
+    const table = tableRef.value?.$el as HTMLElement | undefined;
+    const headerHeight =
+      table?.querySelector<HTMLElement>(".el-table__header-wrapper")?.offsetHeight ?? 0;
+    const firstRows = [
+      ...(table?.querySelectorAll<HTMLElement>(".el-table__body > tbody > tr") ?? [])
+    ].slice(0, 2);
+    const minimumBody = Math.max(
+      160,
+      firstRows.reduce((sum, row) => sum + row.offsetHeight, 0)
+    );
+    // If filters consume the viewport, let the outer page scroll instead of hiding all details.
+    fillMinimumHeight.value = Math.ceil(
+      toolbar + pager + frameHeight + gap * gapCount + headerHeight + minimumBody
+    );
+    tableMaxHeight.value = null;
+    return;
+  }
+  fillMinimumHeight.value = null;
   const ceiling =
     pageHeight -
     hostPadding -
@@ -250,7 +275,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", scheduleMeasure);
 });
 
-watch(() => [props.rows, props.plain, props.paged, props.exportable], scheduleMeasure);
+watch(
+  () => [props.rows, props.plain, props.fillAvailableHeight, props.paged, props.exportable],
+  scheduleMeasure
+);
 watch(fullscreen, scheduleMeasure);
 
 const locked = computed(() => {
@@ -397,8 +425,18 @@ function canMove(index: number, delta: -1 | 1): boolean {
   <section
     ref="rootEl"
     class="data-table"
+    :style="
+      fillAvailableHeight && !plain && fillMinimumHeight
+        ? { minHeight: `${fillMinimumHeight}px` }
+        : undefined
+    "
     :class="[
-      { 'is-fullscreen': fullscreen, 'is-plain': plain, 'is-legacy-order': legacyOrderStyle },
+      {
+        'is-fullscreen': fullscreen,
+        'is-plain': plain,
+        'is-fill': fillAvailableHeight && !plain,
+        'is-legacy-order': legacyOrderStyle
+      },
       `density-${prefs.density}`
     ]"
   >
@@ -505,7 +543,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :row-class-name="rowClassName"
         :span-method="spanMethod ? resolveSpanMethod : undefined"
         size="default"
-        :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
+        :height="fillAvailableHeight && !plain ? '100%' : undefined"
+        :max-height="plain || fillAvailableHeight ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
         :stripe="legacyOrderStyle"
         @selection-change="onSelection"
@@ -614,6 +653,12 @@ function canMove(index: number, delta: -1 | 1): boolean {
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.data-table.is-fill {
+  flex: 1 1 0;
+}
+.data-table.is-fill > .data-table__body {
+  flex: 1 1 0;
 }
 .data-table.is-legacy-order {
   padding: var(--tcrm-space-3);
