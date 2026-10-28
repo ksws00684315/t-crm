@@ -21,7 +21,7 @@ import NameCode from "@/components/NameCode.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { orderAbilities } from "@/utils/permission";
 import { orderRefundStatusText, orderTimeRangeToQuery } from "@/utils/order";
@@ -79,11 +79,17 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "product", label: t("order.productInfo"), minWidth: px(400, 420) },
-  { key: "kol", label: t("order.kol"), minWidth: px(140, 150) },
-  { key: "quantity", label: t("order.line.quantity"), width: px(72, 80) },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(160, 190) },
-  { key: "payAmount", label: t("order.actualPaidAmount"), width: px(120, 140), amount: true },
+  { key: "product", align: "left", label: t("order.productInfo"), minWidth: px(360, 380) },
+  { key: "kol", align: "center", label: t("order.kol"), minWidth: px(145, 160) },
+  { key: "quantity", label: t("order.line.quantity"), width: px(72, 90) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(130, 160) },
+  {
+    key: "payAmount",
+    align: "center",
+    label: t("order.actualPaidAmount"),
+    width: px(145, 160),
+    amount: true
+  },
   { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
 
@@ -406,8 +412,6 @@ onMounted(() => {
             data-test="filter-kol-keyword"
           />
         </el-form-item>
-      </template>
-      <template #more>
         <el-form-item :label="t('order.orderStatus')">
           <el-select
             v-model="query.status"
@@ -424,6 +428,8 @@ onMounted(() => {
             />
           </el-select>
         </el-form-item>
+      </template>
+      <template #more>
         <el-form-item :label="t('order.orderTime')">
           <el-date-picker
             v-model="query.orderTimeRange"
@@ -460,7 +466,6 @@ onMounted(() => {
       :filter-count="chips.length"
       row-key="id"
       :fixed-columns="false"
-      legacy-order-style
       :span-method="orderSpanMethod"
       :row-class-name="tableRowClass"
       @update:page="onPage"
@@ -557,11 +562,11 @@ onMounted(() => {
         </div>
       </template>
       <template #cell-payAmount="{ row }">
-        {{
+        <span class="order-money">{{
           (row as GroupedOrderRow).kind === "header"
             ? ""
-            : (row as GroupedOrderRow).order.payAmount || "-"
-        }}
+            : formatAmountWithCurrency((row as GroupedOrderRow).order.payAmount)
+        }}</span>
       </template>
       <template #actions="{ row }">
         <RowActions
@@ -604,9 +609,13 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.order-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 :deep(.el-table .order-group-header > td) {
   /* The approved order groups replace shared stripe/hover fills on this page only. */
-  background: color-mix(in srgb, var(--tcrm-color-primary) 2%, var(--tcrm-color-card)) !important;
+  background: var(--tcrm-color-order-band) !important;
   border-top: var(--tcrm-space-4) solid var(--tcrm-color-card);
   border-bottom: none;
   background-clip: padding-box;
@@ -622,9 +631,8 @@ onMounted(() => {
 }
 
 :deep(.order-list-table .el-table th.el-table__cell) {
-  /* Owner-approved 1027 mockup: regular headers, scoped exception to global 600. */
-  font-weight: 400 !important;
-  color: var(--tcrm-color-text-secondary);
+  font-weight: 500 !important;
+  color: var(--tcrm-color-table-text);
 }
 
 :deep(.el-table .order-group-item > td.el-table__cell) {
@@ -725,7 +733,7 @@ onMounted(() => {
 .order-statuses {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tcrm-space-2);
   font-weight: 400;
 }

@@ -20,6 +20,10 @@
   --tcrm-color-table-text: #1f1f1f;
   --tcrm-color-table-secondary: #595959;
   --tcrm-color-table-placeholder: #6b737d;
+  --tcrm-color-order-band: color-mix(in srgb, var(--tcrm-color-primary) 8%, var(--tcrm-color-card));
+  --tcrm-color-chain-finance: #8b5cf6;
+  --tcrm-order-detail-width: 880px;
+  --tcrm-refund-detail-width: 800px;
   --tcrm-color-primary-hover: #1e4bbb;
   --tcrm-color-primary-active: #193fa8;
   --tcrm-color-text: #15181d;

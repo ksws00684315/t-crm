@@ -1103,6 +1103,7 @@ const zhCN = {
     }
   },
   shop: {
+    nameAndId: "店铺名称/店铺ID",
     code: "店铺编码",
     channel: "渠道",
     channelWeidian: "微店",
@@ -1317,6 +1318,7 @@ const zhCN = {
     }
   },
   order: {
+    drawerProduct: "商品",
     shop: "店铺",
     orderId: "订单号",
     channel: "渠道",
@@ -1475,6 +1477,15 @@ const zhCN = {
       lineRefund: "退款金额"
     },
     chain: {
+      summaryProduct: "商品名",
+      summaryKol: "所属达人",
+      summaryRate: "佣金比例",
+      summaryCommission: "达人佣金",
+      orderNode: "订单",
+      financeNode: "账务流水",
+      notLinked: "未关联",
+      linkCreated: "已生成",
+      mixedStates: "多种状态",
       wiringDetails: "链路明细（任务、链接、退款与提现）",
       recordCount: "{count} 条",
       fundsSection: "资金信息",

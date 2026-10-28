@@ -1133,6 +1133,7 @@ const enUS: MessageSchema = {
     }
   },
   shop: {
+    nameAndId: "Shop name / Shop ID",
     code: "Shop Code",
     channel: "Channel",
     channelWeidian: "Weidian",
@@ -1349,6 +1350,7 @@ const enUS: MessageSchema = {
     }
   },
   order: {
+    drawerProduct: "Product",
     shop: "Shop",
     orderId: "Order ID",
     channel: "Channel",
@@ -1508,6 +1510,15 @@ const enUS: MessageSchema = {
       lineRefund: "Refund"
     },
     chain: {
+      summaryProduct: "Product name",
+      summaryKol: "Creator",
+      summaryRate: "Commission rate",
+      summaryCommission: "Creator commission",
+      orderNode: "Order",
+      financeNode: "Financial flows",
+      notLinked: "Not linked",
+      linkCreated: "Created",
+      mixedStates: "Mixed statuses",
       wiringDetails: "Chain details (tasks, links, refunds and withdrawals)",
       recordCount: "{count} records",
       fundsSection: "Funds",

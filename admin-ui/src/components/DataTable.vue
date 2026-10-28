@@ -544,9 +544,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
               : undefined
           "
           :align="
-            legacyOrderStyle ? (column.amount ? 'right' : undefined) : (column.align ?? 'center')
+            column.align ?? (legacyOrderStyle ? (column.amount ? 'right' : undefined) : 'center')
           "
-          :header-align="legacyOrderStyle ? undefined : (column.align ?? 'center')"
+          :header-align="column.align ?? (legacyOrderStyle ? undefined : 'center')"
           :show-overflow-tooltip="
             legacyOrderStyle ? column.tooltip : (column.tooltip ?? column.align === 'left')
           "

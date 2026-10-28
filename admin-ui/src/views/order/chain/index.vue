@@ -1,5 +1,14 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
+import {
+  Document,
+  Link,
+  ShoppingCart,
+  Refresh,
+  Money,
+  Wallet,
+  Right
+} from "@element-plus/icons-vue";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -8,7 +17,7 @@ import type { ChainLineVO, OrderChainVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
-import { formatInstant, formatNameWithCode, formatPrice } from "@/utils/format";
+import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
@@ -18,6 +27,7 @@ import {
   refundTypeText
 } from "@/utils/order";
 import { formatRate } from "@/utils/rate";
+import OrderProductCell from "../OrderProductCell.vue";
 
 defineOptions({ name: "OrderChainPage" });
 
@@ -29,7 +39,7 @@ defineOptions({ name: "OrderChainPage" });
  * the per-line commission block and the finance ledger (funds, flows and line blocks stay null
  * without commission:view or, for OWN scopes, on mixed attribution).
  */
-const { t, te } = useI18n();
+const { t, te, locale } = useI18n();
 
 function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
   if (!name && !code) return "-";
@@ -44,6 +54,22 @@ const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
 /** Header context; degrades to the bare chain when the detail call fails. */
 const detail = ref<OrderDetailVO | null>(null);
+const sourceIds = computed(
+  () =>
+    [
+      ...new Set((chain.value?.lines ?? []).map(line => line.link?.sourceProductId).filter(Boolean))
+    ].join(", ") || "-"
+);
+const targetIds = computed(
+  () =>
+    [
+      ...new Set(
+        (chain.value?.lines ?? [])
+          .map(line => line.link?.targetItemId ?? lineItem(line)?.weidianItemId)
+          .filter(Boolean)
+      )
+    ].join(", ") || "-"
+);
 
 /** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
 const canSeeCommission = computed(() => userStore.can("commission:view"));
@@ -78,7 +104,7 @@ const refundTotalAmount = computed(
 
 /** Pay amount: the funds block first, then the order detail header value. */
 const payAmountText = computed(() =>
-  formatPrice(chain.value?.funds?.payAmount ?? detail.value?.payAmount ?? null, "CNY")
+  formatAmountWithCurrency(chain.value?.funds?.payAmount ?? detail.value?.payAmount ?? null)
 );
 
 /** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
@@ -88,34 +114,155 @@ const flows = computed(() =>
 
 const chainStages = computed(() => {
   const lines = chain.value?.lines ?? [];
-  const count = (values: (string | null | undefined)[]) =>
-    t("order.chain.recordCount", { count: new Set(values.filter(Boolean)).size });
-  return [
-    { label: t("order.chain.copyJob"), value: count(lines.map(line => line.copyJob?.jobCode)) },
-    { label: t("order.chain.kolItem"), value: count(lines.map(line => line.link?.kolItemId)) },
-    { label: t("order.orderId"), value: chain.value?.orderNo ?? "-" },
-    {
-      label: t("order.chain.refunds"),
-      value: count(lines.flatMap(line => line.refunds.map(refund => refund.id)))
-    },
-    {
-      label: t("order.chain.financeLedgerSection"),
-      value: Array.isArray(chain.value?.financeFlows)
-        ? t("order.chain.recordCount", { count: flows.value.length })
-        : "-"
-    },
-    {
-      label: t("order.chain.withdrawalOccupation"),
-      value: lines.some(line => line.commission)
-        ? count(
-            lines.flatMap(
-              line => line.commission?.withdrawals.map(withdrawal => withdrawal.withdrawalId) ?? []
+  const jobs = [
+    ...new Map(
+      lines.filter(line => line.copyJob).map(line => [line.copyJob!.jobCode, line.copyJob!])
+    ).values()
+  ];
+  const links = [
+    ...new Map(
+      lines.filter(line => line.link).map(line => [line.link!.kolItemId, line.link!])
+    ).values()
+  ];
+  const refunds = [
+    ...new Map(lines.flatMap(line => line.refunds).map(refund => [refund.id, refund])).values()
+  ];
+  const jobStates = [...new Set(jobs.map(job => job.status?.trim().toLowerCase()).filter(Boolean))];
+  const missingJobStatus = jobs.some(job => !job.status?.trim());
+  const jobState = jobStates.length === 1 && !missingJobStatus ? jobStates[0] : null;
+  const jobStateKey = `copyJob.jobStatus.${jobState}`;
+  const knownJobState = ["processing", "completed", "partial_failed", "failed"].includes(
+    jobState ?? ""
+  );
+  const count = (value: number) => t("order.chain.recordCount", { count: value });
+  const hasFinancials =
+    canSeeCommission.value && lines.length > 0 && lines.every(line => line.commission != null);
+  const occupied = hasFinancials
+    ? sumKnownCny([
+        ...new Map(lines.map(line => [line.orderItemId, line.commission!.occupiedTotal])).values()
+      ])
+    : null;
+  const withdrawalRecords = hasFinancials
+    ? lines.flatMap(line => line.commission!.withdrawals)
+    : null;
+  const withdrawals =
+    withdrawalRecords &&
+    withdrawalRecords.every(withdrawal =>
+      ["PENDING_REVIEW", "PENDING_PAYMENT", "PAID", "REJECTED", "WITHDRAWN"].includes(
+        withdrawal.status
+      )
+    )
+      ? new Set(
+          withdrawalRecords
+            .filter(withdrawal =>
+              ["PENDING_REVIEW", "PENDING_PAYMENT", "PAID"].includes(withdrawal.status)
             )
-          )
-        : "-"
+            .map(withdrawal => withdrawal.withdrawalId)
+        ).size
+      : null;
+  return [
+    {
+      key: "copy",
+      icon: Document,
+      tone: "success",
+      label: t("order.chain.copyJob"),
+      state: !jobs.length
+        ? t("order.chain.notLinked")
+        : missingJobStatus
+          ? t("finance.unverified")
+          : jobStates.length > 1
+            ? t("order.chain.mixedStates")
+            : knownJobState
+              ? t(jobStateKey)
+              : (jobs[0]?.status ?? t("finance.unverified")),
+      stateTone:
+        jobState === "failed"
+          ? "danger"
+          : jobState === "partial_failed"
+            ? "warning"
+            : jobState === "completed"
+              ? "success"
+              : "info",
+      reference: jobs.length === 1 ? jobs[0]!.jobCode : jobs.length ? count(jobs.length) : "-",
+      amount: null
+    },
+    {
+      key: "link",
+      icon: Link,
+      tone: "success",
+      label: t("order.chain.kolItem"),
+      state: links.length ? t("order.chain.linkCreated") : t("order.chain.notLinked"),
+      stateTone: "info",
+      reference:
+        links.length === 1 ? (links[0]!.linkCode ?? "-") : links.length ? count(links.length) : "-",
+      amount: null
+    },
+    {
+      key: "order",
+      icon: ShoppingCart,
+      tone: "success",
+      label: t("order.chain.orderNode"),
+      state: detail.value ? orderStatusText(detail.value.orderStatus) : "-",
+      stateTone:
+        detail.value?.orderStatus === "UNKNOWN"
+          ? "danger"
+          : ["RECEIVED", "COMPLETED"].includes(detail.value?.orderStatus ?? "")
+            ? "success"
+            : ["PAID", "SHIPPED"].includes(detail.value?.orderStatus ?? "")
+              ? "primary"
+              : "info",
+      reference: chain.value?.orderNo ?? "-",
+      amount: null
+    },
+    {
+      key: "refund",
+      icon: Refresh,
+      tone: "neutral",
+      stateTone: "info",
+      label: t("order.chain.refunds"),
+      state: count(refunds.length),
+      reference: null,
+      amount:
+        refundTotalAmount.value == null
+          ? t("finance.unverified")
+          : formatAmountWithCurrency(refundTotalAmount.value)
+    },
+    {
+      key: "finance",
+      icon: Money,
+      tone: "finance",
+      stateTone: "info",
+      label: t("order.chain.financeNode"),
+      state:
+        canSeeCommission.value && Array.isArray(chain.value?.financeFlows)
+          ? t("order.chain.recordCount", { count: flows.value.length })
+          : "-",
+      reference: null,
+      amount: t("finance.unverified")
+    },
+    {
+      key: "withdrawal",
+      icon: Wallet,
+      tone: "neutral",
+      stateTone: "info",
+      label: t("order.chain.withdrawalOccupation"),
+      state: withdrawals == null ? "-" : count(withdrawals),
+      reference: null,
+      amount: occupied == null ? t("finance.unverified") : formatAmountWithCurrency(occupied)
     }
   ];
 });
+
+/** Sum only the backend's current occupation totals; never mix ledger flow types or use floats. */
+function sumKnownCny(values: string[]): string | null {
+  let cents = 0n;
+  for (const value of values) {
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value);
+    if (!match) return null;
+    cents += BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+  }
+  return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
+}
 
 /**
  * What the finance ledger section shows: the flow table, its empty state, or the reason the
@@ -169,7 +316,7 @@ function flowDirectionText(direction: string | null | undefined): string {
  * visible but the amount itself waits for the M0 Weidian settlement net (never a fake zero).
  */
 function fundsText(value: string | null | undefined): string {
-  if (value != null) return formatPrice(value, "CNY");
+  if (value != null) return formatAmountWithCurrency(value);
   if (!chain.value?.funds) {
     if (!canSeeCommission.value) return t("order.chain.noCommissionPermission");
     if (userStore.isOwnScope) return t("finance.scopeLimited");
@@ -201,12 +348,16 @@ function lineStatus(line: ChainLineVO): string {
 }
 
 const summaryColumns = computed<DataColumn[]>(() => [
-  { key: "product", align: "left", label: t("order.productInfo"), minWidth: 230 },
+  { key: "product", align: "left", label: t("order.chain.summaryProduct"), minWidth: 230 },
   { key: "status", label: t("common.status"), minWidth: 100 },
-  { key: "kol", align: "left", label: t("order.kol"), minWidth: 145 },
+  { key: "kol", align: "center", label: t("order.chain.summaryKol"), minWidth: 145 },
   { key: "payAmount", label: t("order.payAmount"), minWidth: 110, amount: true },
-  { key: "rate", label: t("order.chain.rateSnapshot"), minWidth: 100 },
-  { key: "commission", label: t("order.chain.kolCommission"), minWidth: 120, amount: true },
+  {
+    key: "rate",
+    label: t("order.chain.summaryRate"),
+    minWidth: locale.value.startsWith("en") ? 150 : 100
+  },
+  { key: "commission", label: t("order.chain.summaryCommission"), minWidth: 120, amount: true },
   { key: "profit", label: t("order.chain.shopProfit"), minWidth: 120, amount: true },
   { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
 ]);
@@ -304,7 +455,9 @@ onMounted(load);
           <article class="chain-fund-card">
             <span>{{ t("order.refundTotal") }}</span>
             <strong>{{
-              refundTotalAmount ? formatPrice(refundTotalAmount, "CNY") : t("common.developing")
+              refundTotalAmount
+                ? formatAmountWithCurrency(refundTotalAmount, "CNY")
+                : t("common.developing")
             }}</strong>
           </article>
           <article
@@ -325,9 +478,37 @@ onMounted(load);
       <section class="chain-page__card chain-order-info" data-test="chain-order-info">
         <h3 class="chain-page__title">{{ t("order.chain.orderInfoSection") }}</h3>
         <ol class="chain-stages" :aria-label="t('order.chain.wiringDetails')">
-          <li v-for="stage in chainStages" :key="stage.label">
-            <span>{{ stage.label }}</span
-            ><span class="chain-product__secondary">{{ stage.value }}</span>
+          <li
+            v-for="(stage, index) in chainStages"
+            :key="stage.key"
+            :data-test="`chain-stage-${stage.key}`"
+            :class="`chain-stage--${stage.tone}`"
+          >
+            <span class="chain-stage__icon" aria-hidden="true"
+              ><el-icon><component :is="stage.icon" /></el-icon
+            ></span>
+            <div class="chain-stage__content">
+              <span class="chain-stage__label">{{ stage.label }}</span>
+              <span class="chain-stage__state" :class="`chain-stage__state--${stage.stateTone}`">{{
+                stage.state
+              }}</span>
+              <CopyText
+                v-if="stage.reference && stage.reference !== '-'"
+                :value="stage.reference"
+              />
+              <span v-else-if="stage.reference" class="chain-product__secondary">{{
+                stage.reference
+              }}</span>
+              <span v-if="stage.amount" class="chain-product__secondary chain-money">{{
+                stage.amount
+              }}</span>
+            </div>
+            <el-icon
+              v-if="index < chainStages.length - 1"
+              class="chain-stage__arrow"
+              aria-hidden="true"
+              ><Right
+            /></el-icon>
           </li>
         </ol>
         <div class="chain-page__card chain-page__card--nested" data-test="chain-header">
@@ -346,18 +527,13 @@ onMounted(load);
               <dt>{{ t("order.channel") }}</dt>
               <dd>{{ channelText(detail.channel) }}</dd>
             </div>
-            <div v-if="detail">
-              <dt>{{ t("order.kol") }}</dt>
-              <dd>
-                <span v-if="detail.kolCode"
-                  ><NameCode :name="detail.kolName" :code="detail.kolCode"
-                /></span>
-                <span v-else>-</span>
-              </dd>
+            <div>
+              <dt>{{ t("order.chain.targetItemId") }}</dt>
+              <dd><CopyText v-if="targetIds !== '-'" :value="targetIds" /><span v-else>-</span></dd>
             </div>
-            <div v-if="detail">
-              <dt>{{ t("order.orderStatus") }}</dt>
-              <dd>{{ orderStatusText(detail.orderStatus) }}</dd>
+            <div>
+              <dt>{{ t("order.chain.sourceItemId") }}</dt>
+              <dd><CopyText v-if="sourceIds !== '-'" :value="sourceIds" /><span v-else>-</span></dd>
             </div>
             <div v-if="detail">
               <dt>{{ t("order.detail.orderTime") }}</dt>
@@ -377,36 +553,15 @@ onMounted(load);
           :fixed-columns="false"
         >
           <template #cell-product="{ row }">
-            <div class="chain-product">
-              <el-image
-                v-if="lineItem(row as ChainLineVO)?.imageUrl"
-                class="chain-product__image"
-                :src="lineItem(row as ChainLineVO)?.imageUrl ?? ''"
-                fit="cover"
-                alt=""
-              />
-              <div v-else class="chain-product__image chain-product__missing">
-                {{ t("order.itemImageMissing") }}
-              </div>
-              <div class="chain-product__text">
-                <span>{{ lineName(row as ChainLineVO) }}</span>
-                <span class="chain-product__secondary">{{
-                  lineSku(row as ChainLineVO) ?? "-"
-                }}</span>
-                <span class="chain-product__secondary"
-                  >{{ t("order.chain.targetItemId") }}:
-                  {{
-                    (row as ChainLineVO).link?.targetItemId ??
-                    lineItem(row as ChainLineVO)?.weidianItemId ??
-                    "-"
-                  }}</span
-                >
-                <span class="chain-product__secondary"
-                  >{{ t("order.chain.sourceItemId") }}:
-                  {{ (row as ChainLineVO).link?.sourceProductId ?? "-" }}</span
-                >
-              </div>
-            </div>
+            <OrderProductCell
+              :image-url="lineItem(row as ChainLineVO)?.imageUrl"
+              :name="lineName(row as ChainLineVO)"
+              :sku="lineSku(row as ChainLineVO)"
+              :product-id="
+                (row as ChainLineVO).link?.targetItemId ??
+                lineItem(row as ChainLineVO)?.weidianItemId
+              "
+            />
           </template>
           <template #cell-status="{ row }">{{ lineStatus(row as ChainLineVO) }}</template>
           <template #cell-kol="{ row }">
@@ -418,7 +573,7 @@ onMounted(load);
             <span v-else>-</span>
           </template>
           <template #cell-payAmount="{ row }">{{
-            formatPrice((row as ChainLineVO).payAmount, "CNY")
+            formatAmountWithCurrency((row as ChainLineVO).payAmount)
           }}</template>
           <template #cell-rate="{ row }">{{
             (row as ChainLineVO).commission?.rateSnapshot == null
@@ -510,7 +665,7 @@ onMounted(load);
                   {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
                 </div>
                 <div class="chain-block__text">
-                  {{ t("order.line.payAmount") }}: {{ line.payAmount ?? "-" }}
+                  {{ t("order.line.payAmount") }}: {{ formatAmountWithCurrency(line.payAmount) }}
                 </div>
               </div>
 
@@ -534,7 +689,7 @@ onMounted(load);
                     {{
                       line.commission.netCommission == null
                         ? t("finance.unverified")
-                        : formatPrice(line.commission.netCommission, "CNY")
+                        : formatAmountWithCurrency(line.commission.netCommission)
                     }}
                   </div>
                   <div class="chain-block__text">
@@ -550,7 +705,7 @@ onMounted(load);
                   </div>
                   <div class="chain-block__text">
                     {{ t("order.chain.occupiedTotal") }}:
-                    {{ formatPrice(line.commission.occupiedTotal, "CNY") }}
+                    {{ formatAmountWithCurrency(line.commission.occupiedTotal) }}
                   </div>
                 </div>
                 <template v-if="line.commission.withdrawals.length">
@@ -572,7 +727,11 @@ onMounted(load);
                           : row.status
                         : "-"
                     }}</template>
-                    <template #cell-occupiedCny="{ row }">{{ row.occupiedCny }}</template>
+                    <template #cell-occupiedCny="{ row }"
+                      ><span class="chain-money">{{
+                        formatAmountWithCurrency(row.occupiedCny)
+                      }}</span></template
+                    >
                     <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
                   </DataTable>
                 </template>
@@ -609,7 +768,11 @@ onMounted(load);
                       {{ refundStatusText(row.refundStatus) }}
                     </el-tag>
                   </template>
-                  <template #cell-amount="{ row }">{{ row.amount }}</template>
+                  <template #cell-amount="{ row }"
+                    ><span class="chain-money">{{
+                      formatAmountWithCurrency(row.amount)
+                    }}</span></template
+                  >
                   <template #cell-finishTime="{ row }">{{
                     formatInstant(row.finishTime)
                   }}</template>
@@ -645,7 +808,9 @@ onMounted(load);
           </template>
           <template #cell-type="{ row }">{{ flowTypeText(row.type) }}</template>
           <template #cell-direction="{ row }">{{ flowDirectionText(row.direction) }}</template>
-          <template #cell-amount="{ row }">{{ row.amount }}</template>
+          <template #cell-amount="{ row }"
+            ><span class="chain-money">{{ formatAmountWithCurrency(row.amount) }}</span></template
+          >
           <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
           <template #cell-transferredAt="{ row }">{{ formatInstant(row.transferredAt) }}</template>
           <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "－" }}</template>
@@ -707,7 +872,7 @@ onMounted(load);
 .chain-page__card--nested {
   margin-bottom: var(--tcrm-space-3);
   padding: var(--tcrm-space-3);
-  background: color-mix(in srgb, var(--tcrm-color-primary) 5%, var(--tcrm-color-card));
+  background: var(--tcrm-color-order-band);
 }
 .chain-order-band {
   display: flex;
@@ -729,53 +894,96 @@ onMounted(load);
   margin: 0;
   overflow-wrap: anywhere;
 }
-.chain-product {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-3);
-  min-width: 0;
-}
-.chain-product__image {
-  width: 56px;
-  height: 64px;
-  flex-shrink: 0;
-  border-radius: var(--tcrm-radius-tag);
-}
-.chain-product__missing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--tcrm-color-muted);
-  color: var(--tcrm-color-text-secondary);
-  text-align: center;
-}
-.chain-product__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-1);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
 .chain-product__secondary {
   color: var(--tcrm-color-text-secondary);
   overflow-wrap: anywhere;
 }
 .chain-stages {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: flex;
   gap: var(--tcrm-space-3);
   margin: 0;
-  padding: 0 0 var(--tcrm-space-3);
+  padding: var(--tcrm-space-3) 0;
   list-style: none;
+  overflow-x: auto;
+  min-width: 0;
 }
 .chain-stages li {
   display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-1);
-  border-left: 2px solid var(--tcrm-color-primary);
-  padding-left: var(--tcrm-space-2);
+  align-items: flex-start;
+  position: relative;
+  flex: 1 0 150px;
+  gap: var(--tcrm-space-2);
   min-width: 0;
-  overflow-wrap: anywhere;
+  padding-right: var(--tcrm-space-2);
+}
+.chain-stage__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--tcrm-color-text-secondary);
+  background: var(--tcrm-color-muted);
+}
+.chain-stage--success .chain-stage__icon {
+  color: var(--tcrm-color-success);
+  background: var(--tcrm-color-success-bg);
+}
+.chain-stage--finance .chain-stage__icon {
+  color: var(--tcrm-color-chain-finance);
+  background: color-mix(in srgb, var(--tcrm-color-chain-finance) 8%, var(--tcrm-color-card));
+}
+.chain-stage__content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tcrm-space-1);
+  min-width: 0;
+  flex: 1;
+}
+.chain-stage__label {
+  color: var(--tcrm-color-text);
+}
+.chain-stage__state {
+  color: var(--tcrm-color-text-secondary);
+}
+.chain-stage__state--danger {
+  color: var(--tcrm-color-danger);
+  background: var(--tcrm-color-danger-bg);
+}
+.chain-stage__state--success {
+  color: var(--tcrm-color-success);
+  background: var(--tcrm-color-success-bg);
+}
+.chain-stage__state--warning {
+  color: var(--tcrm-color-warning);
+  background: var(--tcrm-color-warning-bg);
+}
+.chain-stage__state--primary {
+  color: var(--tcrm-color-primary);
+  background: var(--tcrm-color-order-band);
+}
+.chain-stage__state--danger,
+.chain-stage__state--success,
+.chain-stage__state--warning,
+.chain-stage__state--primary {
+  border-radius: var(--tcrm-radius-tag);
+  padding: 0 var(--tcrm-space-1);
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+.chain-stage__arrow {
+  flex-shrink: 0;
+  color: var(--tcrm-color-text-secondary);
+  margin-top: var(--tcrm-space-2);
+}
+.chain-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .chain-wiring-details > summary {
   cursor: pointer;
@@ -868,9 +1076,6 @@ onMounted(load);
   grid-column: 1 / -1;
 }
 @media (max-width: 900px) {
-  .chain-stages {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .chain-fund-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
