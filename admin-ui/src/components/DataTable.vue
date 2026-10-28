@@ -236,7 +236,9 @@ onMounted(async () => {
   if (host && typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(scheduleMeasure);
     resizeObserver.observe(host);
-    resizeObserver.observe(rootEl.value as HTMLElement);
+    // Filter panels can resize while the page and capped table keep their size.
+    // Observe their boxes too so collapsing filters restores the available table height.
+    for (const child of host.children) resizeObserver.observe(child);
   }
   window.addEventListener("resize", scheduleMeasure);
 });

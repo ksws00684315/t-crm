@@ -758,10 +758,8 @@ onMounted(() => {
   color: var(--tcrm-color-danger);
 }
 
-@media (max-width: 1439px) {
-  :deep(.order-list-table .order-group-item > td[rowspan]:not([rowspan="1"])) {
-    /* Keep shared order information readable when only the first product fits above the pager. */
-    vertical-align: top;
-  }
+:deep(.order-list-table .order-group-item > td[rowspan]:not([rowspan="1"])) {
+  /* The first visible product carries shared order data at every screen width. */
+  vertical-align: top;
 }
 </style>

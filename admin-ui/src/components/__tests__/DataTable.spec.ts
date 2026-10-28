@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { nextTick } from "vue";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
 
@@ -138,6 +138,75 @@ describe("DataTable", () => {
     } finally {
       wrapper.unmount();
       host.remove();
+    }
+  });
+
+  it("restores space when a sibling filter collapses without resizing the page or table", async () => {
+    const observers: {
+      callback: ResizeObserverCallback;
+      elements: Set<Element>;
+      disconnected: boolean;
+    }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        state: (typeof observers)[number];
+        constructor(callback: ResizeObserverCallback) {
+          this.state = { callback, elements: new Set(), disconnected: false };
+          observers.push(this.state);
+        }
+        observe(element: Element) {
+          this.state.elements.add(element);
+        }
+        unobserve(element: Element) {
+          this.state.elements.delete(element);
+        }
+        disconnect() {
+          this.state.disconnected = true;
+        }
+      }
+    );
+    const host = document.createElement("div");
+    const search = document.createElement("div");
+    document.body.append(host);
+    let filterHeight = 240;
+    Object.defineProperty(host, "clientHeight", { value: 600, configurable: true });
+    Object.defineProperty(search, "offsetHeight", { get: () => filterHeight, configurable: true });
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: { tableId: "filter-collapse", rows: [], columns, total: 0 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      parent.prepend(search);
+      Object.defineProperty(parent, "clientHeight", { value: 600, configurable: true });
+      await flushPromises();
+      Object.defineProperty(wrapper.get(".data-table__toolbar").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__pager").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      const observer = observers.find(item => item.elements.has(search));
+      expect(observer).toBeDefined();
+      observer!.callback([], {} as ResizeObserver);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(280);
+      filterHeight = 100;
+      observer!.callback([], {} as ResizeObserver);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(420);
+      wrapper.unmount();
+      expect(observer!.disconnected).toBe(true);
+    } finally {
+      if (wrapper.exists()) wrapper.unmount();
+      host.remove();
+      vi.unstubAllGlobals();
     }
   });
 
