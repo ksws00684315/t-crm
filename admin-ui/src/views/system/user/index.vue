@@ -81,7 +81,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
   { key: "createdAt", label: t("common.createdAt"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: px(300, 400) }
+  { key: "actions", label: t("common.actions"), width: px(328, 430) }
 ]);
 
 const applied = ref({
@@ -327,7 +327,7 @@ function rowActions(row: UserVO): RowAction[] {
   return [
     {
       key: "edit",
-      label: t("common.edit"),
+      label: t("user.editInfo"),
       onClick: () => openEdit(row)
     },
     {

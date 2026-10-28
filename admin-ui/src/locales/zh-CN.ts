@@ -573,6 +573,7 @@ const zhCN = {
     subtitle: "页面不存在"
   },
   user: {
+    editInfo: "编辑信息",
     create: "新增用户",
     editTitle: "编辑用户",
     createTitle: "新增用户",
@@ -1474,6 +1475,8 @@ const zhCN = {
       lineRefund: "退款金额"
     },
     chain: {
+      wiringDetails: "链路明细（任务、链接、退款与提现）",
+      recordCount: "{count} 条",
       fundsSection: "资金信息",
       orderInfoSection: "订单信息",
       financeLedgerSection: "财务流水",
@@ -1507,6 +1510,7 @@ const zhCN = {
       withdrawalOccupation: "提现占用",
       noWithdrawal: "无提现占用",
       noFlows: "暂无财务流水",
+      incompleteFlows: "财务流水数据不完整，暂无法展示，请联系管理员。",
       noCommissionPermission: "当前账号无佣金查看权限",
       copyJob: "商品创建任务",
       copyJobTime: "创建时间",
@@ -1658,6 +1662,13 @@ const zhCN = {
     rejected: "已驳回。"
   },
   postTemplate: {
+    accessLevel: "权限",
+    hidden: "隐藏",
+    readOnly: "只读",
+    manage: "管理",
+    finePermissions: "精细权限",
+    unifiedScopeNote:
+      "数据范围统一适用于整个岗位模板；“管理”选择本模块全部可配置权限，也可展开精细权限单独调整。",
     title: "权限设置",
     hint: "只影响之后新建的账号，不会修改已有账号的权限。",
     cardTitle: "{post}岗位模板",

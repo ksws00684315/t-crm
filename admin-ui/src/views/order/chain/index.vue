@@ -29,7 +29,7 @@ defineOptions({ name: "OrderChainPage" });
  * the per-line commission block and the finance ledger (funds, flows and line blocks stay null
  * without commission:view or, for OWN scopes, on mixed attribution).
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
   if (!name && !code) return "-";
@@ -82,19 +82,86 @@ const payAmountText = computed(() =>
 );
 
 /** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
-const flows = computed(() => chain.value?.financeFlows ?? []);
+const flows = computed(() =>
+  Array.isArray(chain.value?.financeFlows) ? chain.value.financeFlows : []
+);
+
+const chainStages = computed(() => {
+  const lines = chain.value?.lines ?? [];
+  const count = (values: (string | null | undefined)[]) =>
+    t("order.chain.recordCount", { count: new Set(values.filter(Boolean)).size });
+  return [
+    { label: t("order.chain.copyJob"), value: count(lines.map(line => line.copyJob?.jobCode)) },
+    { label: t("order.chain.kolItem"), value: count(lines.map(line => line.link?.kolItemId)) },
+    { label: t("order.orderId"), value: chain.value?.orderNo ?? "-" },
+    {
+      label: t("order.chain.refunds"),
+      value: count(lines.flatMap(line => line.refunds.map(refund => refund.id)))
+    },
+    {
+      label: t("order.chain.financeLedgerSection"),
+      value: Array.isArray(chain.value?.financeFlows)
+        ? t("order.chain.recordCount", { count: flows.value.length })
+        : "-"
+    },
+    {
+      label: t("order.chain.withdrawalOccupation"),
+      value: lines.some(line => line.commission)
+        ? count(
+            lines.flatMap(
+              line => line.commission?.withdrawals.map(withdrawal => withdrawal.withdrawalId) ?? []
+            )
+          )
+        : "-"
+    }
+  ];
+});
 
 /**
  * What the finance ledger section shows: the flow table, its empty state, or the reason the
  * financial data is hidden (no commission:view, or an OWN scope on a mixed-attribution order).
  */
-const flowsView = computed<"table" | "empty" | "noPermission" | "scopeLimited">(() => {
-  if (flows.value.length) return "table";
-  if (chain.value?.financeFlows) return "empty";
-  if (!canSeeCommission.value) return "noPermission";
-  if (userStore.isOwnScope) return "scopeLimited";
-  return "empty";
-});
+const flowsView = computed<"table" | "empty" | "noPermission" | "scopeLimited" | "incomplete">(
+  () => {
+    if (!canSeeCommission.value) return "noPermission";
+    if (chain.value && chain.value.financeFlows === undefined) return "incomplete";
+    if (chain.value?.financeFlows != null && !Array.isArray(chain.value.financeFlows))
+      return "incomplete";
+    if (
+      flows.value.some(
+        flow =>
+          !flow ||
+          typeof flow.flowNo !== "string" ||
+          !flow.flowNo.trim() ||
+          typeof flow.orderItemId !== "string" ||
+          !flow.orderItemId.trim() ||
+          typeof flow.type !== "string" ||
+          !flow.type.trim() ||
+          typeof flow.direction !== "string" ||
+          !flow.direction.trim() ||
+          typeof flow.amount !== "string" ||
+          !flow.amount.trim()
+      )
+    )
+      return "incomplete";
+    if (flows.value.length) return "table";
+    if (chain.value?.financeFlows) return "empty";
+    if (userStore.isOwnScope) return "scopeLimited";
+    return "incomplete";
+  }
+);
+
+function flowTypeText(type: string | null | undefined): string {
+  if (!type) return "-";
+  const key = `order.chain.flowType.${type}`;
+  return te(key) ? t(key) : type;
+}
+
+function flowDirectionText(direction: string | null | undefined): string {
+  if (direction === "INCREASE") return t("order.chain.directionIncrease");
+  if (direction === "DECREASE") return t("order.chain.directionDecrease");
+  return direction || "-";
+}
 
 /**
  * Text for a gated fund value: the amount when known, otherwise the reason it is hidden — no
@@ -119,6 +186,30 @@ function lineName(line: ChainLineVO): string {
 function lineSku(line: ChainLineVO): string | null {
   return detail.value?.items.find(candidate => candidate.id === line.orderItemId)?.skuName ?? null;
 }
+
+function lineItem(line: ChainLineVO) {
+  return detail.value?.items.find(item => item.id === line.orderItemId);
+}
+
+function lineStatus(line: ChainLineVO): string {
+  const status = lineItem(line)?.status;
+  if (!status) return "-";
+  const key = `order.line.status.${status}`;
+  if (te(key)) return t(key);
+  const orderKey = `order.status.${status}`;
+  return te(orderKey) ? t(orderKey) : status;
+}
+
+const summaryColumns = computed<DataColumn[]>(() => [
+  { key: "product", align: "left", label: t("order.productInfo"), minWidth: 230 },
+  { key: "status", label: t("common.status"), minWidth: 100 },
+  { key: "kol", align: "left", label: t("order.kol"), minWidth: 145 },
+  { key: "payAmount", label: t("order.payAmount"), minWidth: 110, amount: true },
+  { key: "rate", label: t("order.chain.rateSnapshot"), minWidth: 100 },
+  { key: "commission", label: t("order.chain.kolCommission"), minWidth: 120, amount: true },
+  { key: "profit", label: t("order.chain.shopProfit"), minWidth: 120, amount: true },
+  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
+]);
 
 /** Product name of a finance flow, matched by its order-item id. */
 function flowProductName(orderItemId: string): string {
@@ -152,7 +243,6 @@ const flowColumns = computed<DataColumn[]>(() => [
   { key: "type", label: t("order.chain.financeType"), width: 110 },
   { key: "direction", label: t("order.chain.direction"), width: 80 },
   { key: "amount", label: t("order.chain.financeAmount"), width: 110, amount: true },
-  { key: "orderItemId", align: "left" as const, label: t("order.chain.product"), width: 160 },
   { key: "businessAt", label: t("order.chain.businessTime"), width: 170 },
   { key: "transferredAt", label: t("order.chain.transferTime"), width: 170 },
   {
@@ -234,202 +324,301 @@ onMounted(load);
 
       <section class="chain-page__card chain-order-info" data-test="chain-order-info">
         <h3 class="chain-page__title">{{ t("order.chain.orderInfoSection") }}</h3>
+        <ol class="chain-stages" :aria-label="t('order.chain.wiringDetails')">
+          <li v-for="stage in chainStages" :key="stage.label">
+            <span>{{ stage.label }}</span
+            ><span class="chain-product__secondary">{{ stage.value }}</span>
+          </li>
+        </ol>
         <div class="chain-page__card chain-page__card--nested" data-test="chain-header">
-          <el-descriptions :column="4" border>
-            <el-descriptions-item :label="t('order.orderId')">
-              <CopyText :value="chain.orderNo" />
-            </el-descriptions-item>
-            <el-descriptions-item v-if="detail" :label="t('order.channel')">
-              {{ channelText(detail.channel) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="detail" :label="t('order.shop')">
-              {{ shopLabel(detail.shopName, detail.shopCode) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="detail" :label="t('order.kol')">
-              <span v-if="detail.kolCode"
-                ><NameCode :name="detail.kolName" :code="detail.kolCode"
-              /></span>
-              <span v-else>-</span>
-            </el-descriptions-item>
-            <el-descriptions-item v-if="detail" :label="t('order.orderStatus')">
-              {{ orderStatusText(detail.orderStatus) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="detail" :label="t('order.detail.orderTime')">
-              {{ formatInstant(detail.orderTime) }}
-            </el-descriptions-item>
-          </el-descriptions>
+          <dl class="chain-order-band">
+            <div>
+              <dt>{{ t("order.orderId") }}</dt>
+              <dd>
+                <CopyText :value="chain.orderNo" />
+              </dd>
+            </div>
+            <div v-if="detail">
+              <dt>{{ t("order.shop") }}</dt>
+              <dd>{{ shopLabel(detail.shopName, detail.shopCode) }}</dd>
+            </div>
+            <div v-if="detail">
+              <dt>{{ t("order.channel") }}</dt>
+              <dd>{{ channelText(detail.channel) }}</dd>
+            </div>
+            <div v-if="detail">
+              <dt>{{ t("order.kol") }}</dt>
+              <dd>
+                <span v-if="detail.kolCode"
+                  ><NameCode :name="detail.kolName" :code="detail.kolCode"
+                /></span>
+                <span v-else>-</span>
+              </dd>
+            </div>
+            <div v-if="detail">
+              <dt>{{ t("order.orderStatus") }}</dt>
+              <dd>{{ orderStatusText(detail.orderStatus) }}</dd>
+            </div>
+            <div v-if="detail">
+              <dt>{{ t("order.detail.orderTime") }}</dt>
+              <dd>{{ formatInstant(detail.orderTime) }}</dd>
+            </div>
+          </dl>
         </div>
 
-        <section
-          v-for="line in chain.lines"
-          :key="line.orderItemId"
-          class="chain-page__card chain-line"
-          data-test="chain-line"
+        <DataTable
+          plain
+          table-id="chain-product-summary"
+          data-test="chain-product-summary"
+          :rows="chain.lines"
+          :columns="summaryColumns"
+          :total="chain.lines.length"
+          :paged="false"
+          :fixed-columns="false"
         >
-          <h4 class="chain-line__title">
-            <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
-            <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
-            {{ lineName(line) }}
-            <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
-          </h4>
-
-          <div class="chain-line__blocks">
-            <div class="chain-block" data-test="chain-copy-job">
-              <div class="chain-block__title">{{ t("order.chain.copyJob") }}</div>
-              <template v-if="line.copyJob">
-                <el-button
-                  link
-                  type="primary"
-                  data-test="chain-copy-job-link"
-                  @click="openCopyJob(line.copyJob.jobCode)"
+          <template #cell-product="{ row }">
+            <div class="chain-product">
+              <el-image
+                v-if="lineItem(row as ChainLineVO)?.imageUrl"
+                class="chain-product__image"
+                :src="lineItem(row as ChainLineVO)?.imageUrl ?? ''"
+                fit="cover"
+                alt=""
+              />
+              <div v-else class="chain-product__image chain-product__missing">
+                {{ t("order.itemImageMissing") }}
+              </div>
+              <div class="chain-product__text">
+                <span>{{ lineName(row as ChainLineVO) }}</span>
+                <span class="chain-product__secondary">{{
+                  lineSku(row as ChainLineVO) ?? "-"
+                }}</span>
+                <span class="chain-product__secondary"
+                  >{{ t("order.chain.targetItemId") }}:
+                  {{
+                    (row as ChainLineVO).link?.targetItemId ??
+                    lineItem(row as ChainLineVO)?.weidianItemId ??
+                    "-"
+                  }}</span
                 >
-                  {{ line.copyJob.jobCode }}
-                </el-button>
-                <div class="chain-block__text">
-                  {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
-                </div>
-              </template>
-              <div v-else class="chain-block__text">-</div>
+                <span class="chain-product__secondary"
+                  >{{ t("order.chain.sourceItemId") }}:
+                  {{ (row as ChainLineVO).link?.sourceProductId ?? "-" }}</span
+                >
+              </div>
             </div>
+          </template>
+          <template #cell-status="{ row }">{{ lineStatus(row as ChainLineVO) }}</template>
+          <template #cell-kol="{ row }">
+            <NameCode
+              v-if="lineItem(row as ChainLineVO)?.kolCode || (row as ChainLineVO).link?.kolCode"
+              :name="lineItem(row as ChainLineVO)?.kolName ?? (row as ChainLineVO).link?.kolName"
+              :code="lineItem(row as ChainLineVO)?.kolCode ?? (row as ChainLineVO).link?.kolCode"
+            />
+            <span v-else>-</span>
+          </template>
+          <template #cell-payAmount="{ row }">{{
+            formatPrice((row as ChainLineVO).payAmount, "CNY")
+          }}</template>
+          <template #cell-rate="{ row }">{{
+            (row as ChainLineVO).commission?.rateSnapshot == null
+              ? fundsText(null)
+              : formatRate((row as ChainLineVO).commission!.rateSnapshot)
+          }}</template>
+          <template #cell-commission="{ row }">{{
+            fundsText((row as ChainLineVO).commission?.netCommission)
+          }}</template>
+          <template #cell-profit="{ row }">{{
+            fundsText((row as ChainLineVO).commission?.shopProfit)
+          }}</template>
+          <template #cell-occupied="{ row }">{{
+            fundsText((row as ChainLineVO).commission?.occupiedTotal)
+          }}</template>
+        </DataTable>
 
-            <div class="chain-block" data-test="chain-kol-item">
-              <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
-              <template v-if="line.link">
-                <div class="chain-block__text">
-                  {{ t("order.chain.linkCode") }}:
-                  <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
-                     lands on the creator item list pre-filtered by this code (task 59). -->
+        <details class="chain-wiring-details" data-test="chain-wiring-details">
+          <summary>{{ t("order.chain.wiringDetails") }}</summary>
+          <section
+            v-for="line in chain.lines"
+            :key="line.orderItemId"
+            class="chain-page__card chain-line"
+            data-test="chain-line"
+          >
+            <h4 class="chain-line__title">
+              <!-- R-18: the other blocks read "label + value"; the product title now does too. -->
+              <span class="chain-line__product-label">{{ t("order.chain.product") }}</span>
+              {{ lineName(line) }}
+              <span v-if="lineSku(line)" class="chain-line__sku">{{ lineSku(line) }}</span>
+            </h4>
+
+            <div class="chain-line__blocks">
+              <div class="chain-block" data-test="chain-copy-job">
+                <div class="chain-block__title">{{ t("order.chain.copyJob") }}</div>
+                <template v-if="line.copyJob">
                   <el-button
                     link
                     type="primary"
-                    class="chain-block__code"
-                    data-test="chain-kol-item-link"
-                    @click="openKolItem(line.link.linkCode ?? '')"
+                    data-test="chain-copy-job-link"
+                    @click="openCopyJob(line.copyJob.jobCode)"
                   >
-                    {{ line.link.linkCode ?? "-" }}
+                    {{ line.copyJob.jobCode }}
                   </el-button>
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.kol") }}:
-                  <span v-if="line.link.kolCode"
-                    ><NameCode :name="line.link.kolName" :code="line.link.kolCode"
-                  /></span>
-                  <span v-else>-</span>
-                </div>
-              </template>
-              <div v-else class="chain-block__text">-</div>
-            </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.copyJobTime") }}: {{ formatInstant(line.copyJob.createTime) }}
+                  </div>
+                </template>
+                <div v-else class="chain-block__text">-</div>
+              </div>
 
-            <div class="chain-block" data-test="chain-order-line">
-              <div class="chain-block__title">{{ t("order.chain.orderLine") }}</div>
-              <div class="chain-block__text">
-                {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
+              <div class="chain-block" data-test="chain-kol-item">
+                <div class="chain-block__title">{{ t("order.chain.kolItem") }}</div>
+                <template v-if="line.link">
+                  <div class="chain-block__text">
+                    {{ t("order.chain.linkCode") }}:
+                    <!-- R-05: codes never wrap; the ellipsis keeps the line single-line and the jump
+                     lands on the creator item list pre-filtered by this code (task 59). -->
+                    <el-button
+                      link
+                      type="primary"
+                      class="chain-block__code"
+                      data-test="chain-kol-item-link"
+                      @click="openKolItem(line.link.linkCode ?? '')"
+                    >
+                      {{ line.link.linkCode ?? "-" }}
+                    </el-button>
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.sourceItemId") }}: {{ line.link.sourceProductId ?? "-" }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.targetItemId") }}: {{ line.link.targetItemId ?? "-" }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.kol") }}:
+                    <span v-if="line.link.kolCode"
+                      ><NameCode :name="line.link.kolName" :code="line.link.kolCode"
+                    /></span>
+                    <span v-else>-</span>
+                  </div>
+                </template>
+                <div v-else class="chain-block__text">-</div>
               </div>
-              <div class="chain-block__text">
-                {{ t("order.line.payAmount") }}: {{ line.payAmount ?? "-" }}
-              </div>
-            </div>
 
-            <div
-              class="chain-block chain-block--wide"
-              data-test="chain-commission"
-              v-if="line.commission"
-            >
-              <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
-              <div class="chain-commission-fields">
+              <div class="chain-block" data-test="chain-order-line">
+                <div class="chain-block__title">{{ t("order.chain.orderLine") }}</div>
                 <div class="chain-block__text">
-                  {{ t("order.chain.rateSnapshot") }}:
-                  {{
-                    line.commission.rateSnapshot == null
-                      ? t("finance.unverified")
-                      : formatRate(line.commission.rateSnapshot)
-                  }}
+                  {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
                 </div>
                 <div class="chain-block__text">
-                  {{ t("order.chain.kolCommission") }}:
-                  {{
-                    line.commission.netCommission == null
-                      ? t("finance.unverified")
-                      : formatPrice(line.commission.netCommission, "CNY")
-                  }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.chain.shopProfit") }}: {{ t("finance.unverified") }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.chain.releaseBasis") }}:
-                  {{
-                    line.commission.releaseBasis == null
-                      ? "-"
-                      : t(`finance.${line.commission.releaseBasis}`)
-                  }}
-                </div>
-                <div class="chain-block__text">
-                  {{ t("order.chain.occupiedTotal") }}:
-                  {{ formatPrice(line.commission.occupiedTotal, "CNY") }}
+                  {{ t("order.line.payAmount") }}: {{ line.payAmount ?? "-" }}
                 </div>
               </div>
-              <template v-if="line.commission.withdrawals.length">
-                <div class="chain-block__text chain-block__subtitle">
-                  {{ t("order.chain.withdrawalOccupation") }}
+
+              <div
+                class="chain-block chain-block--wide"
+                data-test="chain-commission"
+                v-if="line.commission"
+              >
+                <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
+                <div class="chain-commission-fields">
+                  <div class="chain-block__text">
+                    {{ t("order.chain.rateSnapshot") }}:
+                    {{
+                      line.commission.rateSnapshot == null
+                        ? t("finance.unverified")
+                        : formatRate(line.commission.rateSnapshot)
+                    }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.kolCommission") }}:
+                    {{
+                      line.commission.netCommission == null
+                        ? t("finance.unverified")
+                        : formatPrice(line.commission.netCommission, "CNY")
+                    }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.shopProfit") }}: {{ t("finance.unverified") }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.releaseBasis") }}:
+                    {{
+                      line.commission.releaseBasis == null
+                        ? "-"
+                        : t(`finance.${line.commission.releaseBasis}`)
+                    }}
+                  </div>
+                  <div class="chain-block__text">
+                    {{ t("order.chain.occupiedTotal") }}:
+                    {{ formatPrice(line.commission.occupiedTotal, "CNY") }}
+                  </div>
                 </div>
+                <template v-if="line.commission.withdrawals.length">
+                  <div class="chain-block__text chain-block__subtitle">
+                    {{ t("order.chain.withdrawalOccupation") }}
+                  </div>
+                  <DataTable
+                    plain
+                    :table-id="`chain-withdrawals-${line.orderItemId}`"
+                    :rows="line.commission.withdrawals"
+                    :columns="withdrawalColumns"
+                    :total="line.commission.withdrawals.length"
+                    :paged="false"
+                  >
+                    <template #cell-status="{ row }">{{
+                      row.status
+                        ? te(`finance.${row.status}`)
+                          ? t(`finance.${row.status}`)
+                          : row.status
+                        : "-"
+                    }}</template>
+                    <template #cell-occupiedCny="{ row }">{{ row.occupiedCny }}</template>
+                    <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
+                  </DataTable>
+                </template>
+                <div v-else class="chain-block__text">{{ t("order.chain.noWithdrawal") }}</div>
+              </div>
+
+              <div class="chain-block chain-block--wide" data-test="chain-refunds">
+                <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
                 <DataTable
+                  v-if="line.refunds.length"
                   plain
-                  :table-id="`chain-withdrawals-${line.orderItemId}`"
-                  :rows="line.commission.withdrawals"
-                  :columns="withdrawalColumns"
-                  :total="line.commission.withdrawals.length"
+                  :table-id="`chain-refunds-${line.orderItemId}`"
+                  :rows="line.refunds"
+                  :columns="refundColumns"
+                  :total="line.refunds.length"
                   :paged="false"
                 >
-                  <template #cell-status="{ row }">{{ t(`finance.${row.status}`) }}</template>
-                  <template #cell-occupiedCny="{ row }">{{ row.occupiedCny }}</template>
-                  <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
+                  <template #cell-refundNo="{ row }">
+                    <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
+                    <el-button
+                      link
+                      type="primary"
+                      data-test="chain-refund-link"
+                      @click="openRefund(row.refundNo)"
+                    >
+                      {{ row.refundNo }}
+                    </el-button>
+                  </template>
+                  <template #cell-refundType="{ row }">{{
+                    refundTypeText(row.refundType)
+                  }}</template>
+                  <template #cell-refundStatus="{ row }">
+                    <el-tag :type="refundTagType(row.refundStatus)">
+                      {{ refundStatusText(row.refundStatus) }}
+                    </el-tag>
+                  </template>
+                  <template #cell-amount="{ row }">{{ row.amount }}</template>
+                  <template #cell-finishTime="{ row }">{{
+                    formatInstant(row.finishTime)
+                  }}</template>
                 </DataTable>
-              </template>
-              <div v-else class="chain-block__text">{{ t("order.chain.noWithdrawal") }}</div>
+                <div v-else class="chain-block__text">{{ t("order.chain.noRefund") }}</div>
+              </div>
             </div>
-
-            <div class="chain-block chain-block--wide" data-test="chain-refunds">
-              <div class="chain-block__title">{{ t("order.chain.refunds") }}</div>
-              <DataTable
-                v-if="line.refunds.length"
-                plain
-                :table-id="`chain-refunds-${line.orderItemId}`"
-                :rows="line.refunds"
-                :columns="refundColumns"
-                :total="line.refunds.length"
-                :paged="false"
-              >
-                <template #cell-refundNo="{ row }">
-                  <!-- Task 59: jump to the refund list pre-filtered by this refund number. -->
-                  <el-button
-                    link
-                    type="primary"
-                    data-test="chain-refund-link"
-                    @click="openRefund(row.refundNo)"
-                  >
-                    {{ row.refundNo }}
-                  </el-button>
-                </template>
-                <template #cell-refundType="{ row }">{{ refundTypeText(row.refundType) }}</template>
-                <template #cell-refundStatus="{ row }">
-                  <el-tag :type="refundTagType(row.refundStatus)">
-                    {{ refundStatusText(row.refundStatus) }}
-                  </el-tag>
-                </template>
-                <template #cell-amount="{ row }">{{ row.amount }}</template>
-                <template #cell-finishTime="{ row }">{{ formatInstant(row.finishTime) }}</template>
-              </DataTable>
-              <div v-else class="chain-block__text">{{ t("order.chain.noRefund") }}</div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </details>
 
         <div v-if="!chain.lines.length" class="chain-page__card chain-page__empty">
           {{ t("order.chain.noLines") }}
@@ -441,7 +630,7 @@ onMounted(load);
         <!-- Shop receivable flows wait for the M0 Weidian settlement net; the type stays reserved. -->
         <el-alert type="info" :closable="false" :title="t('order.chain.financeLedgerNote')" />
         <DataTable
-          v-if="flowsView === 'table'"
+          v-if="flowsView === 'table' || flowsView === 'empty'"
           data-test="chain-flows"
           plain
           table-id="chain-finance-flows"
@@ -450,23 +639,18 @@ onMounted(load);
           :total="flows.length"
           :paged="false"
         >
-          <template #cell-type="{ row }">{{ t(`order.chain.flowType.${row.type}`) }}</template>
-          <template #cell-direction="{ row }">
-            {{
-              t(
-                `order.chain.${
-                  row.direction === "INCREASE" ? "directionIncrease" : "directionDecrease"
-                }`
-              )
-            }}
+          <template #cell-flowNo="{ row }">
+            <CopyText :value="row.flowNo" />
+            <div class="chain-product__secondary">{{ flowProductName(row.orderItemId) }}</div>
           </template>
+          <template #cell-type="{ row }">{{ flowTypeText(row.type) }}</template>
+          <template #cell-direction="{ row }">{{ flowDirectionText(row.direction) }}</template>
           <template #cell-amount="{ row }">{{ row.amount }}</template>
-          <template #cell-orderItemId="{ row }">{{ flowProductName(row.orderItemId) }}</template>
           <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
           <template #cell-transferredAt="{ row }">{{ formatInstant(row.transferredAt) }}</template>
           <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "－" }}</template>
         </DataTable>
-        <div v-else-if="flowsView === 'empty'" class="chain-ledger-empty">
+        <div v-if="flowsView === 'empty'" class="chain-ledger-empty">
           {{ t("order.chain.noFlows") }}
         </div>
         <el-alert
@@ -477,11 +661,18 @@ onMounted(load);
           data-test="chain-flows-no-permission"
         />
         <el-alert
-          v-else
+          v-else-if="flowsView === 'scopeLimited'"
           type="warning"
           :closable="false"
           :title="t('finance.scopeLimited')"
           data-test="chain-flows-scope-limited"
+        />
+        <el-alert
+          v-else-if="flowsView === 'incomplete'"
+          type="warning"
+          :closable="false"
+          :title="t('order.chain.incompleteFlows')"
+          data-test="chain-flows-incomplete"
         />
       </section>
     </template>
@@ -516,7 +707,83 @@ onMounted(load);
 .chain-page__card--nested {
   margin-bottom: var(--tcrm-space-3);
   padding: var(--tcrm-space-3);
-  background: var(--el-fill-color-lighter);
+  background: color-mix(in srgb, var(--tcrm-color-primary) 5%, var(--tcrm-color-card));
+}
+.chain-order-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-3) var(--tcrm-space-5);
+  margin: 0;
+}
+.chain-order-band > div {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.chain-order-band dt {
+  color: var(--tcrm-color-text-secondary);
+  flex-shrink: 0;
+}
+.chain-order-band dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.chain-product {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+  min-width: 0;
+}
+.chain-product__image {
+  width: 56px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--tcrm-radius-tag);
+}
+.chain-product__missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tcrm-color-muted);
+  color: var(--tcrm-color-text-secondary);
+  text-align: center;
+}
+.chain-product__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chain-product__secondary {
+  color: var(--tcrm-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.chain-stages {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--tcrm-space-3);
+  margin: 0;
+  padding: 0 0 var(--tcrm-space-3);
+  list-style: none;
+}
+.chain-stages li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-1);
+  border-left: 2px solid var(--tcrm-color-primary);
+  padding-left: var(--tcrm-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chain-wiring-details > summary {
+  cursor: pointer;
+  color: var(--tcrm-color-primary);
+  padding: var(--tcrm-space-3) 0;
+}
+.chain-wiring-details .chain-line {
+  margin-bottom: var(--tcrm-space-3);
 }
 .chain-order-info {
   display: flex;
@@ -601,6 +868,9 @@ onMounted(load);
   grid-column: 1 / -1;
 }
 @media (max-width: 900px) {
+  .chain-stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .chain-fund-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

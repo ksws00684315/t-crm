@@ -25,7 +25,8 @@ const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>
 
 const { t } = useI18n();
 const detailRegion = ref<HTMLElement | null>(null);
-const detailColumns = useDescriptionColumns(detailRegion);
+const detailColumns = useDescriptionColumns(detailRegion, 4);
+const longFieldSpan = computed(() => (detailColumns.value === 4 ? 2 : detailColumns.value));
 
 function shopLabel(name: string | null | undefined, code: string | null | undefined): string {
   if (!name && !code) return "-";
@@ -101,16 +102,16 @@ const columns = computed<DataColumn[]>(() => [
     <div ref="detailRegion" v-loading="loading">
       <template v-if="detail">
         <el-descriptions :column="detailColumns" border data-test="order-detail">
-          <el-descriptions-item :label="t('order.orderId')" :span="detailColumns">
+          <el-descriptions-item :label="t('order.orderId')" :span="longFieldSpan">
             <CopyText :value="detail.orderNo" />
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.channel')" :span="detailColumns">
-            {{ channelText(detail.channel) }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('order.shop')" :span="detailColumns">
+          <el-descriptions-item :label="t('order.shop')" :span="longFieldSpan">
             {{ shopLabel(detail.shopName, detail.shopCode) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.kol')" :span="detailColumns">
+          <el-descriptions-item :label="t('order.channel')" :span="detailColumns === 2 ? 2 : 1">
+            {{ channelText(detail.channel) }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('order.kol')" :span="longFieldSpan">
             <span v-if="detail.kolCode"
               ><NameCode :name="detail.kolName" :code="detail.kolCode"
             /></span>
@@ -124,7 +125,7 @@ const columns = computed<DataColumn[]>(() => [
               {{ orderRefundStatusText(detail.refundStatus) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('order.detail.merchantNo')" :span="detailColumns">
+          <el-descriptions-item :label="t('order.detail.merchantNo')" :span="longFieldSpan">
             {{ detail.merchantNo ?? "-" }}
           </el-descriptions-item>
           <el-descriptions-item :label="t('order.detail.itemAmount')">

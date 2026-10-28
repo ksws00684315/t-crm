@@ -358,7 +358,7 @@ describe("order chain page (task 40)", () => {
     expect(funds).toContain("20.00");
     expect(funds).toContain("待核实");
     expect(funds).not.toContain("开发中");
-    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("暂无财务流水");
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
     wrapper.unmount();
   });
@@ -411,6 +411,34 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("keeps the 1024 product summary and eight finance columns without guessing missing values", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    const summary = wrapper.get('[data-test="chain-product-summary"]');
+    expect(summary.text()).toContain("t40 Item");
+    expect(summary.text()).toContain("Blue / L");
+    expect(summary.text()).toContain("Zoe");
+    expect(summary.text()).toContain("10%");
+    expect(summary.text()).toContain("¥16.00");
+    expect(summary.text()).toContain("待核实");
+    const flowTable = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(table => table.props("tableId") === "chain-finance-flows");
+    expect(flowTable?.props("columns").map((column: { key: string }) => column.key)).toEqual([
+      "flowNo",
+      "shopName",
+      "type",
+      "direction",
+      "amount",
+      "businessAt",
+      "transferredAt",
+      "withdrawalNo"
+    ]);
+    expect(wrapper.get('[data-test="chain-wiring-details"]').text()).toContain("8001");
+    wrapper.unmount();
+  });
+
   it("explains missing financial data without commission:view (task 72)", async () => {
     signIn("STAFF", ["order:view"]);
     const { wrapper } = await mountPage();
@@ -421,6 +449,49 @@ describe("order chain page (task 40)", () => {
     expect(wrapper.find('[data-test="chain-commission"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="chain-flows-no-permission"]').exists()).toBe(true);
     wrapper.unmount();
+  });
+
+  it("explains an incompatible finance response instead of rendering undefined labels", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      financeFlows: [{ ledgerId: "legacy-flow", amount: "18.00" }]
+    } as unknown as OrderChainVO);
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("flowType.undefined");
+    wrapper.unmount();
+  });
+
+  it("does not describe a legacy response without finance fields as an empty ledger", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      orderId: chain.orderId,
+      orderNo: chain.orderNo,
+      lines: chain.lines
+    } as OrderChainVO);
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).not.toContain("暂无财务流水");
+    wrapper.unmount();
+  });
+
+  it("only calls an explicit empty flow array empty, and rejects blank critical fields", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({ ...financedChain, financeFlows: [] });
+    let result = await mountPage();
+    expect(result.wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain(
+      "暂无财务流水"
+    );
+    result.wrapper.unmount();
+    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({
+      ...financedChain,
+      financeFlows: [{ ...financedChain.financeFlows![0], flowNo: " " }]
+    });
+    result = await mountPage();
+    expect(result.wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    result.wrapper.unmount();
   });
 
   it("treats null financial blocks of an OWN viewer as scope limited (task 72)", async () => {

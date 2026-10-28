@@ -592,6 +592,7 @@ const enUS: MessageSchema = {
     subtitle: "Page not found"
   },
   user: {
+    editInfo: "Edit information",
     create: "Create User",
     editTitle: "Edit User",
     createTitle: "Create User",
@@ -1507,6 +1508,8 @@ const enUS: MessageSchema = {
       lineRefund: "Refund"
     },
     chain: {
+      wiringDetails: "Chain details (tasks, links, refunds and withdrawals)",
+      recordCount: "{count} records",
       fundsSection: "Funds",
       orderInfoSection: "Order information",
       financeLedgerSection: "Financial ledger",
@@ -1541,6 +1544,8 @@ const enUS: MessageSchema = {
       withdrawalOccupation: "Withdrawal holds",
       noWithdrawal: "No withdrawal hold",
       noFlows: "No finance flows",
+      incompleteFlows:
+        "Financial flow data is incomplete and cannot be displayed. Please contact an administrator.",
       noCommissionPermission: "This account cannot view commission data",
       copyJob: "Product copy job",
       copyJobTime: "Created at",
@@ -1699,6 +1704,13 @@ const enUS: MessageSchema = {
     rejected: "Rejected."
   },
   postTemplate: {
+    accessLevel: "Access",
+    hidden: "Hidden",
+    readOnly: "Read only",
+    manage: "Manage",
+    finePermissions: "Individual permissions",
+    unifiedScopeNote:
+      "The data scope applies to the entire template. Manage selects all configurable permissions in this module; expand individual permissions to adjust them.",
     title: "Permissions",
     hint: "Only affects accounts created afterwards; existing accounts are not changed.",
     cardTitle: "{post} post template",

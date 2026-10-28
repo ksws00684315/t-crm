@@ -37,11 +37,27 @@ const permissionModules = computed(() => {
   const selected = new Set(activeDraft.value?.permissions ?? []);
   return groupPermissions(catalog.value).map(group => {
     const codes = group.items.map(item => item.code);
+    const readCodes = codes.filter(
+      code =>
+        code.endsWith(":view") ||
+        ["dashboard:shop", "dashboard:team", "dashboard:kol"].includes(code)
+    );
     const picked = codes.filter(code => selected.has(code)).length;
     return {
       group: group.group,
       label: permissionGroupLabel(group.group),
       codes,
+      readCodes,
+      level:
+        picked === 0
+          ? "HIDDEN"
+          : readCodes.length > 0 &&
+              picked === readCodes.length &&
+              readCodes.every(code => selected.has(code))
+            ? "READ"
+            : picked === codes.length
+              ? "MANAGE"
+              : "CUSTOM",
       allChecked: codes.length > 0 && picked === codes.length,
       partial: picked > 0 && picked < codes.length,
       items: group.items.map(item => ({
@@ -100,6 +116,21 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
   if (!draft) return;
   let next = [...draft.permissions];
   for (const code of codes) next = togglePermission(next, code, checked);
+  draft.permissions = next;
+}
+
+function setModuleLevel(
+  module: { codes: string[]; readCodes: string[] },
+  level: string | number | boolean | undefined
+): void {
+  if (!["HIDDEN", "READ", "MANAGE"].includes(String(level))) return;
+  const draft = activeDraft.value;
+  if (!draft) return;
+  let next = [...draft.permissions];
+  for (const code of module.codes) next = togglePermission(next, code, false);
+  for (const code of level === "MANAGE" ? module.codes : level === "READ" ? module.readCodes : []) {
+    next = togglePermission(next, code, true);
+  }
   draft.permissions = next;
 }
 
@@ -163,6 +194,18 @@ onMounted(load);
               isDefault[activeTemplate] ? t("postTemplate.isDefault") : t("postTemplate.customized")
             }}
           </el-tag>
+          <div class="post-template-page__actions">
+            <el-button @click="reset(activeTemplate)" data-test="template-reset">{{
+              t("postTemplate.reset")
+            }}</el-button>
+            <el-button
+              type="primary"
+              :loading="savingFor === activeTemplate"
+              :data-test="`template-save-${activeTemplate}`"
+              @click="save(activeTemplate)"
+              >{{ t("postTemplate.save") }}</el-button
+            >
+          </div>
         </div>
       </template>
       <el-form label-position="top" @submit.prevent>
@@ -178,8 +221,9 @@ onMounted(load);
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="t('postTemplate.permissions')">
-          <el-table :data="permissionModules" border size="small" data-test="permission-matrix">
-            <el-table-column :label="t('postTemplate.module')" width="190">
+          <p class="permission-note">{{ t("postTemplate.unifiedScopeNote") }}</p>
+          <el-table :data="permissionModules" data-test="permission-matrix">
+            <el-table-column :label="t('postTemplate.module')" min-width="180">
               <template #default="{ row }">
                 <div class="post-template-page__module">
                   <strong>{{ row.label }}</strong>
@@ -194,20 +238,52 @@ onMounted(load);
                 </div>
               </template>
             </el-table-column>
-            <el-table-column :label="t('postTemplate.permissions')">
+            <el-table-column :label="t('postTemplate.accessLevel')" min-width="390">
               <template #default="{ row }">
-                <div class="post-template-page__permission-list">
-                  <el-checkbox
-                    v-for="item in row.items"
-                    :key="item.code"
-                    :model-value="item.checked"
-                    :data-test="`template-permission-${item.code}`"
-                    @change="toggleOne(item.code, isChecked($event))"
+                <div class="post-template-page__levels">
+                  <el-radio-group
+                    :model-value="row.level"
+                    :data-test="`module-level-${row.group}`"
+                    @update:model-value="setModuleLevel(row, $event)"
                   >
-                    <span class="permission-name">{{ item.name }}</span>
-                    <span v-if="item.desc" class="permission-description">{{ item.desc }}</span>
-                  </el-checkbox>
+                    <el-radio-button value="HIDDEN">{{ t("postTemplate.hidden") }}</el-radio-button>
+                    <el-radio-button value="READ" :disabled="!row.readCodes.length">{{
+                      t("postTemplate.readOnly")
+                    }}</el-radio-button>
+                    <el-radio-button
+                      value="MANAGE"
+                      :disabled="row.codes.length === row.readCodes.length"
+                      >{{ t("postTemplate.manage") }}</el-radio-button
+                    >
+                  </el-radio-group>
+                  <el-tag v-if="row.level === 'CUSTOM'" type="info">{{
+                    t("postTemplate.customized")
+                  }}</el-tag>
                 </div>
+                <details class="permission-details">
+                  <summary>{{ t("postTemplate.finePermissions") }}</summary>
+                  <div class="post-template-page__permission-list">
+                    <el-checkbox
+                      v-for="item in row.items"
+                      :key="item.code"
+                      :model-value="item.checked"
+                      :data-test="`template-permission-${item.code}`"
+                      @change="toggleOne(item.code, isChecked($event))"
+                    >
+                      <span class="permission-name">{{ item.name }}</span>
+                      <span v-if="item.desc" class="permission-description">{{ item.desc }}</span>
+                    </el-checkbox>
+                  </div>
+                </details>
+              </template>
+            </el-table-column>
+            <el-table-column :label="t('postTemplate.dataScope')" min-width="180" align="center">
+              <template #default="{ row }">
+                <span :data-test="`module-scope-${row.group}`">{{
+                  activeDraft.dataScope === "OWN"
+                    ? t("postTemplate.scopeOwn")
+                    : t("postTemplate.scopeAll")
+                }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -217,18 +293,6 @@ onMounted(load);
           </p>
         </el-form-item>
       </el-form>
-      <div class="post-template-page__actions">
-        <el-button @click="reset(activeTemplate)" data-test="template-reset">{{
-          t("postTemplate.reset")
-        }}</el-button>
-        <el-button
-          type="primary"
-          :loading="savingFor === activeTemplate"
-          :data-test="`template-save-${activeTemplate}`"
-          @click="save(activeTemplate)"
-          >{{ t("postTemplate.save") }}</el-button
-        >
-      </div>
     </el-card>
   </div>
 </template>
@@ -247,11 +311,34 @@ onMounted(load);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-3);
 }
 .post-template-page__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--tcrm-space-2);
+  margin-left: auto;
+}
+.post-template-page__levels {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
+}
+.permission-details > summary {
+  cursor: pointer;
+  color: var(--tcrm-color-primary);
+  margin-top: var(--tcrm-space-2);
+}
+.permission-details .post-template-page__permission-list {
+  padding-top: var(--tcrm-space-3);
+}
+.post-template-page__card :deep(.el-form-item__content) {
+  display: block;
+}
+.post-template-page__card :deep(.el-table td.el-table__cell) {
+  padding-block: var(--tcrm-space-4);
 }
 .post-template-page__module {
   display: flex;

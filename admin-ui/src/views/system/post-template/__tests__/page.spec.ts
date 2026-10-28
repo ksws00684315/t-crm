@@ -49,9 +49,9 @@ function templates(overrides: Partial<postTemplateApi.PostTemplateVO> = {}) {
   ].map(item => ({ ...item, ...overrides })) as postTemplateApi.PostTemplateVO[];
 }
 
-async function mountPage(items = templates()) {
+async function mountPage(items = templates(), permissionCatalog = catalog) {
   vi.mocked(postTemplateApi.listPostTemplates).mockResolvedValue(items);
-  vi.mocked(userApi.getPermissionCatalog).mockResolvedValue(catalog);
+  vi.mocked(userApi.getPermissionCatalog).mockResolvedValue(permissionCatalog);
   const wrapper = mount(PostTemplatePage, {
     global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body
@@ -99,6 +99,61 @@ describe("post template page (task 32 §2.3)", () => {
     const saved = vi.mocked(postTemplateApi.savePostTemplate).mock.calls[0][1];
     expect(saved.permissions).toContain("kol:view");
     expect(success).toHaveBeenCalledWith("岗位模板已保存");
+    wrapper.unmount();
+  });
+
+  it("maps module access levels to existing codes and preserves other modules and the unified scope", async () => {
+    vi.mocked(postTemplateApi.savePostTemplate).mockResolvedValue(null);
+    const wrapper = await mountPage(
+      templates({ permissions: ["kol:view", "kol:edit", "product:view"] })
+    );
+    await wrapper.get('[data-test="module-level-KOL"] input[value="READ"]').setValue();
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    await flushPromises();
+    const payload = vi.mocked(postTemplateApi.savePostTemplate).mock.calls[0][1];
+    expect(payload.dataScope).toBe("OWN");
+    expect(payload.permissions).toContain("kol:view");
+    expect(payload.permissions).not.toContain("kol:edit");
+    expect(payload.permissions).toContain("product:view");
+    expect(wrapper.get('[data-test="module-scope-KOL"]').text()).toContain("仅本人数据");
+    wrapper.unmount();
+  });
+
+  it("recognizes dashboard grants as read only rather than management", async () => {
+    const permissions = ["dashboard:shop", "dashboard:team", "dashboard:kol"];
+    const wrapper = await mountPage(templates({ permissions }), {
+      ...catalog,
+      permissions: permissions.map(code => ({ code, group: "DASHBOARD" }))
+    });
+    const read = wrapper.get('[data-test="module-level-DASHBOARD"] input[value="READ"]')
+      .element as HTMLInputElement;
+    expect(read.checked).toBe(true);
+    expect(read.disabled).toBe(false);
+    expect(
+      (
+        wrapper.get('[data-test="module-level-DASHBOARD"] input[value="MANAGE"]')
+          .element as HTMLInputElement
+      ).disabled
+    ).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("preserves custom grants until a module level is deliberately selected", async () => {
+    vi.mocked(postTemplateApi.savePostTemplate).mockResolvedValue(null);
+    const permissions = ["kol:view", "kol:edit", "product:view", "future:permission"];
+    const wrapper = await mountPage(templates({ permissions }), {
+      ...catalog,
+      permissions: [...catalog.permissions, { code: "kol:future-action", group: "KOL" }]
+    });
+    expect(wrapper.get('[data-test="module-level-KOL"]').find("input:checked").exists()).toBe(
+      false
+    );
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    await flushPromises();
+    expect(vi.mocked(postTemplateApi.savePostTemplate).mock.calls[0][1]).toEqual({
+      dataScope: "OWN",
+      permissions
+    });
     wrapper.unmount();
   });
 
