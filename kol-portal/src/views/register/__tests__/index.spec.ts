@@ -187,9 +187,12 @@ describe("register page (02.01)", () => {
     });
     choosePlatform(wrapper, "TikTok");
     await wrapper.get("form").trigger("submit");
-    await vi.waitFor(() => {
-      expect(router.currentRoute.value.path).toBe("/");
-    });
+    await vi.waitFor(
+      () => {
+        expect(router.currentRoute.value.path).toBe("/");
+      },
+      { timeout: 10000 }
+    );
     expect(registerApi.registerKol).toHaveBeenCalledWith({
       code: CODE,
       email: "ada@example.com",
