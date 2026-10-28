@@ -28,6 +28,8 @@ export interface DataColumn {
   amount?: boolean;
   /** Long content is left aligned; short content is centered by default. */
   align?: "left" | "center";
+  /** Form controls supply their own focus handling and per-control descriptions. */
+  interactive?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
@@ -556,7 +558,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
             </template>
-            <AccessibleCell v-else-if="!legacyOrderStyle && column.align === 'left'">
+            <AccessibleCell
+              v-else-if="!legacyOrderStyle && column.align === 'left' && !column.interactive"
+            >
               <slot :name="`cell-${column.key}`" :row="row">
                 {{ cellText(row, column) }}
               </slot>

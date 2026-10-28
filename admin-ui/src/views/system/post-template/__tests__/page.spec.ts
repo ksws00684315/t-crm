@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus, { ElMessage, ElMessageBox } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as postTemplateApi from "@/api/system/post-template";
 import * as userApi from "@/api/system/user";
 import { i18n } from "@/locales";
@@ -63,9 +63,22 @@ async function mountPage(items = templates(), permissionCatalog = catalog) {
 describe("post template page (task 32 §2.3)", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    i18n.global.locale.value = "zh-CN";
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    );
+    vi.mocked(postTemplateApi.resetPostTemplate).mockResolvedValue(null);
+    vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+    vi.spyOn(ElMessage, "warning").mockImplementation(() => ({}) as never);
     vi.mocked(postTemplateApi.savePostTemplate).mockReset();
     vi.mocked(postTemplateApi.resetPostTemplate).mockReset();
     setActivePinia(createPinia());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("shows role tabs, the active template state, and the only-future-accounts hint", async () => {
@@ -102,58 +115,161 @@ describe("post template page (task 32 §2.3)", () => {
     wrapper.unmount();
   });
 
-  it("maps module access levels to existing codes and preserves other modules and the unified scope", async () => {
-    vi.mocked(postTemplateApi.savePostTemplate).mockResolvedValue(null);
-    const wrapper = await mountPage(
-      templates({ permissions: ["kol:view", "kol:edit", "product:view"] })
-    );
-    await wrapper.get('[data-test="module-level-KOL"] input[value="READ"]').setValue();
-    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
-    await flushPromises();
-    const payload = vi.mocked(postTemplateApi.savePostTemplate).mock.calls[0][1];
-    expect(payload.dataScope).toBe("OWN");
-    expect(payload.permissions).toContain("kol:view");
-    expect(payload.permissions).not.toContain("kol:edit");
-    expect(payload.permissions).toContain("product:view");
-    expect(wrapper.get('[data-test="module-scope-KOL"]').text()).toContain("仅本人数据");
+  it("shows three columns with all permissions expanded and one unified scope", async () => {
+    const wrapper = await mountPage();
+    expect(wrapper.findAll("th").map(item => item.text())).toEqual([
+      "权限模块",
+      "可配置权限",
+      "模块全选"
+    ]);
+    expect(wrapper.findAll("details")).toHaveLength(0);
+    expect(wrapper.find('[data-test^="module-level-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="module-scope-"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test^="scope-"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-test^="template-permission-"]')).toHaveLength(3);
+    expect(wrapper.get('[data-test="module-count-KOL"]').text()).toBe("已选 2 / 2 项");
     wrapper.unmount();
   });
 
-  it("recognizes dashboard grants as read only rather than management", async () => {
+  it("updates module counts, tri-state selection and preserves unrelated grants", async () => {
+    const wrapper = await mountPage(
+      templates({ permissions: ["kol:view", "product:view", "future:permission"] })
+    );
+    const all = () =>
+      wrapper.get('[data-test="template-module-all-KOL"] input').element as HTMLInputElement;
+    expect(all().indeterminate).toBe(true);
+    expect(wrapper.get('[data-test="module-count-KOL"]').text()).toBe("已选 1 / 2 项");
+    await wrapper.get('[data-test="template-module-all-KOL"] input').setValue(true);
+    expect(all().checked).toBe(true);
+    expect(all().indeterminate).toBe(false);
+    expect(wrapper.get('[data-test="module-count-KOL"]').text()).toBe("已选 2 / 2 项");
+    await wrapper.get('[data-test="template-module-all-KOL"] input').setValue(false);
+    expect(all().checked).toBe(false);
+    expect(wrapper.get('[data-test="module-count-KOL"]').text()).toBe("已选 0 / 2 项");
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    await flushPromises();
+    expect(postTemplateApi.savePostTemplate).toHaveBeenCalledWith("BD", {
+      dataScope: "OWN",
+      permissions: ["product:view", "future:permission"]
+    });
+    wrapper.unmount();
+  });
+
+  it("applies edit/view dependencies to direct checkboxes", async () => {
+    const wrapper = await mountPage(templates({ permissions: ["product:view"] }));
+    await wrapper.get('[data-test="template-permission-kol:edit"] input').setValue(true);
+    expect(
+      (wrapper.get('[data-test="template-permission-kol:view"] input').element as HTMLInputElement)
+        .checked
+    ).toBe(true);
+    await wrapper.get('[data-test="template-permission-kol:view"] input').setValue(false);
+    expect(
+      (wrapper.get('[data-test="template-permission-kol:edit"] input').element as HTMLInputElement)
+        .checked
+    ).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("preserves unknown grants and renders new catalog modules", async () => {
+    const permissions = ["kol:view", "kol:edit", "product:view", "future:permission", "new:action"];
+    const wrapper = await mountPage(templates({ permissions }), {
+      ...catalog,
+      permissions: [...catalog.permissions, { code: "new:action", group: "NEW_GROUP" }]
+    });
+    expect(wrapper.get('[data-test="template-permission-new:action"]').text()).toContain(
+      "new:action"
+    );
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    await flushPromises();
+    expect(postTemplateApi.savePostTemplate).toHaveBeenCalledWith("BD", {
+      dataScope: "OWN",
+      permissions
+    });
+    wrapper.unmount();
+  });
+
+  it("keeps dashboard grants as individually configurable checkboxes", async () => {
     const permissions = ["dashboard:shop", "dashboard:team", "dashboard:kol"];
     const wrapper = await mountPage(templates({ permissions }), {
       ...catalog,
       permissions: permissions.map(code => ({ code, group: "DASHBOARD" }))
     });
-    const read = wrapper.get('[data-test="module-level-DASHBOARD"] input[value="READ"]')
-      .element as HTMLInputElement;
-    expect(read.checked).toBe(true);
-    expect(read.disabled).toBe(false);
-    expect(
-      (
-        wrapper.get('[data-test="module-level-DASHBOARD"] input[value="MANAGE"]')
-          .element as HTMLInputElement
-      ).disabled
-    ).toBe(true);
+    expect(wrapper.get('[data-test="module-count-DASHBOARD"]').text()).toBe("已选 3 / 3 项");
+    expect(wrapper.findAll('[data-test^="template-permission-dashboard:"]')).toHaveLength(3);
     wrapper.unmount();
   });
 
-  it("preserves custom grants until a module level is deliberately selected", async () => {
-    vi.mocked(postTemplateApi.savePostTemplate).mockResolvedValue(null);
-    const permissions = ["kol:view", "kol:edit", "product:view", "future:permission"];
-    const wrapper = await mountPage(templates({ permissions }), {
-      ...catalog,
-      permissions: [...catalog.permissions, { code: "kol:future-action", group: "KOL" }]
-    });
-    expect(wrapper.get('[data-test="module-level-KOL"]').find("input:checked").exists()).toBe(
-      false
+  it("provides descriptions on focus without toggling the permission", async () => {
+    const wrapper = await mountPage();
+    const input = wrapper.get('[data-test="template-permission-kol:view"] input');
+    const before = (input.element as HTMLInputElement).checked;
+    expect((input.element as HTMLInputElement).labels?.[0]?.textContent).toContain(
+      "查看达人列表、详情和商务归属历史"
     );
+    await input.trigger("focusin");
+    await flushPromises();
+    expect(document.body.textContent).toContain("查看达人列表、详情和商务归属历史");
+    expect((input.element as HTMLInputElement).checked).toBe(before);
+    wrapper.unmount();
+  });
+
+  it("shows mobile module cards without a duplicate table", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    );
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="permission-matrix"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="permission-cards"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test^="template-permission-"]')).toHaveLength(3);
+    await wrapper.get('[data-test="template-permission-kol:view"] input').setValue(false);
+    expect(wrapper.get('[data-test="module-count-KOL"]').text()).toBe("已选 0 / 2 项");
+    wrapper.unmount();
+  });
+
+  it("saves the current template's changed unified scope and prevents duplicate submissions", async () => {
+    let finish!: (value: null) => void;
+    vi.mocked(postTemplateApi.savePostTemplate).mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finish = resolve;
+        })
+    );
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="scope-BD"] input[value="ALL"]').setValue(true);
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    await wrapper.get('[data-test="template-save-BD"]').trigger("click");
+    expect(postTemplateApi.savePostTemplate).toHaveBeenCalledTimes(1);
+    expect(postTemplateApi.savePostTemplate).toHaveBeenCalledWith(
+      "BD",
+      expect.objectContaining({ dataScope: "ALL" })
+    );
+    expect(wrapper.get('[data-test="template-reset"]').attributes("disabled")).toBeDefined();
+    finish(null);
+    await flushPromises();
+    wrapper.unmount();
+  });
+
+  it("keeps edits when saving fails and allows retry", async () => {
+    vi.mocked(postTemplateApi.savePostTemplate).mockRejectedValue(new Error("save failed"));
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="template-permission-kol:edit"] input').setValue(false);
     await wrapper.get('[data-test="template-save-BD"]').trigger("click");
     await flushPromises();
-    expect(vi.mocked(postTemplateApi.savePostTemplate).mock.calls[0][1]).toEqual({
-      dataScope: "OWN",
-      permissions
-    });
+    expect(
+      (wrapper.get('[data-test="template-permission-kol:edit"] input').element as HTMLInputElement)
+        .checked
+    ).toBe(false);
+    expect(wrapper.get('[data-test="template-save-BD"]').attributes("disabled")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("does not reset when the confirmation is cancelled", async () => {
+    vi.spyOn(ElMessageBox, "confirm").mockRejectedValue("cancel");
+    const wrapper = await mountPage();
+    await wrapper.get('[data-test="template-reset"]').trigger("click");
+    await flushPromises();
+    expect(postTemplateApi.resetPostTemplate).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

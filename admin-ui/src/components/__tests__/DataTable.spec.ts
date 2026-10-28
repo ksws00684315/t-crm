@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { nextTick } from "vue";
 import { describe, expect, it } from "vitest";
@@ -343,6 +343,32 @@ describe("DataTable expand rows", () => {
     const located = wrapper.findAll("tr.row--located");
     expect(located).toHaveLength(1);
     expect(located[0].text()).toContain("KOL0001");
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable interactive cells", () => {
+  it("leaves custom form focus handling to the slot while retaining left alignment", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "interactive-form",
+        rows: [{ id: "1", name: "Creator" }],
+        total: 1,
+        plain: true,
+        paged: false,
+        columns: [
+          { key: "name", label: "Permissions", align: "left", interactive: true, tooltip: false }
+        ]
+      },
+      slots: { "cell-name": '<label><input type="checkbox" /> View creator</label>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await flushPromises();
+    expect(wrapper.find(".accessible-cell").exists()).toBe(false);
+    expect(wrapper.find("input[type=checkbox]").exists()).toBe(true);
+    expect(wrapper.get("th").classes()).toContain("is-left");
+    expect(wrapper.get("td").classes()).toContain("is-left");
     wrapper.unmount();
   });
 });

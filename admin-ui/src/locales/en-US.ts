@@ -1722,8 +1722,11 @@ const enUS: MessageSchema = {
     readOnly: "Read only",
     manage: "Manage",
     finePermissions: "Individual permissions",
-    unifiedScopeNote:
-      "The data scope applies to the entire template. Manage selects all configurable permissions in this module; expand individual permissions to adjust them.",
+    unifiedScopeNote: "Applies to the current post template.",
+    configurablePermissions: "Configurable Permissions",
+    moduleAll: "Select Module",
+    selectedCount: "{selected} / {total} selected",
+    selectModule: "Select all {module} permissions",
     title: "Permissions",
     hint: "Only affects accounts created afterwards; existing accounts are not changed.",
     cardTitle: "{post} post template",

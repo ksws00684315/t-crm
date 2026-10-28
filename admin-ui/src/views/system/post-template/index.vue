@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { listPostTemplates, resetPostTemplate, savePostTemplate } from "@/api/system/post-template";
 import { getPermissionCatalog, type PermissionItemVO } from "@/api/system/user";
 import type { DataScope, PostTemplate } from "@/api/types";
+import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import PermissionChoices from "./PermissionChoices.vue";
 import { notifyError } from "@/utils/notify";
 import {
   groupPermissions,
@@ -37,27 +39,12 @@ const permissionModules = computed(() => {
   const selected = new Set(activeDraft.value?.permissions ?? []);
   return groupPermissions(catalog.value).map(group => {
     const codes = group.items.map(item => item.code);
-    const readCodes = codes.filter(
-      code =>
-        code.endsWith(":view") ||
-        ["dashboard:shop", "dashboard:team", "dashboard:kol"].includes(code)
-    );
     const picked = codes.filter(code => selected.has(code)).length;
     return {
       group: group.group,
       label: permissionGroupLabel(group.group),
       codes,
-      readCodes,
-      level:
-        picked === 0
-          ? "HIDDEN"
-          : readCodes.length > 0 &&
-              picked === readCodes.length &&
-              readCodes.every(code => selected.has(code))
-            ? "READ"
-            : picked === codes.length
-              ? "MANAGE"
-              : "CUSTOM",
+      picked,
       allChecked: codes.length > 0 && picked === codes.length,
       partial: picked > 0 && picked < codes.length,
       items: group.items.map(item => ({
@@ -119,21 +106,6 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
   draft.permissions = next;
 }
 
-function setModuleLevel(
-  module: { codes: string[]; readCodes: string[] },
-  level: string | number | boolean | undefined
-): void {
-  if (!["HIDDEN", "READ", "MANAGE"].includes(String(level))) return;
-  const draft = activeDraft.value;
-  if (!draft) return;
-  let next = [...draft.permissions];
-  for (const code of module.codes) next = togglePermission(next, code, false);
-  for (const code of level === "MANAGE" ? module.codes : level === "READ" ? module.readCodes : []) {
-    next = togglePermission(next, code, true);
-  }
-  draft.permissions = next;
-}
-
 async function save(post: PostTemplate) {
   const draft = drafts[post];
   if (!draft || savingFor.value) return;
@@ -154,6 +126,7 @@ async function save(post: PostTemplate) {
 }
 
 async function reset(post: PostTemplate) {
+  if (savingFor.value || loading.value) return;
   try {
     await ElMessageBox.confirm(t("postTemplate.resetConfirm"), t("postTemplate.reset"), {
       type: "warning"
@@ -161,211 +134,329 @@ async function reset(post: PostTemplate) {
   } catch {
     return;
   }
+  savingFor.value = post;
   try {
     await resetPostTemplate(post);
     ElMessage.success(t("postTemplate.resetDone"));
     await load();
   } catch (error) {
     notifyError(error);
+  } finally {
+    savingFor.value = null;
   }
 }
 
-onMounted(load);
+const mobile = ref(false);
+let media: MediaQueryList | undefined;
+function updateMobile() {
+  mobile.value = media?.matches ?? false;
+}
+onMounted(() => {
+  media = window.matchMedia("(max-width: 767px)");
+  updateMobile();
+  media.addEventListener("change", updateMobile);
+  void load();
+});
+onBeforeUnmount(() => media?.removeEventListener("change", updateMobile));
+
+const columns = computed<DataColumn[]>(() => [
+  { key: "module", label: t("postTemplate.module"), minWidth: 170, align: "left", tooltip: false },
+  {
+    key: "permissions",
+    label: t("postTemplate.configurablePermissions"),
+    minWidth: 430,
+    align: "left",
+    tooltip: false,
+    interactive: true
+  },
+  { key: "all", label: t("postTemplate.moduleAll"), minWidth: 130 }
+]);
+type PermissionModule = (typeof permissionModules.value)[number];
+function asModule(row: object): PermissionModule {
+  return row as PermissionModule;
+}
 </script>
 
 <template>
   <div class="list-page post-template-page" v-loading="loading">
-    <el-alert
-      class="post-template-page__hint"
-      type="info"
-      :closable="false"
-      :title="t('postTemplate.hint')"
-      data-test="post-template-hint"
-    />
-    <el-tabs v-model="activeTemplate" class="post-template-tabs" data-test="template-tabs">
-      <el-tab-pane v-for="post in TEMPLATES" :key="post" :name="post" :label="postName(post)" />
-    </el-tabs>
-    <el-card v-if="activeDraft" class="post-template-page__card" shadow="never">
-      <template #header>
-        <div class="post-template-page__head">
-          <span>{{ t("postTemplate.cardTitle", { post: postName(activeTemplate) }) }}</span>
-          <el-tag :type="isDefault[activeTemplate] ? 'info' : 'warning'" data-test="template-state">
+    <el-card class="post-template-page__card" shadow="never">
+      <div class="post-template-page__head">
+        <div>
+          <h1 class="page-title">{{ t("postTemplate.title") }}</h1>
+          <p class="post-template-page__hint" data-test="post-template-hint">
+            {{ t("postTemplate.hint") }}
+          </p>
+        </div>
+        <div class="post-template-page__actions">
+          <span class="template-name">{{
+            t("postTemplate.cardTitle", { post: postName(activeTemplate) })
+          }}</span>
+          <el-tag
+            v-if="activeDraft"
+            :type="isDefault[activeTemplate] ? 'info' : 'warning'"
+            data-test="template-state"
+          >
             {{
               isDefault[activeTemplate] ? t("postTemplate.isDefault") : t("postTemplate.customized")
             }}
           </el-tag>
-          <div class="post-template-page__actions">
-            <el-button @click="reset(activeTemplate)" data-test="template-reset">{{
-              t("postTemplate.reset")
-            }}</el-button>
-            <el-button
-              type="primary"
-              :loading="savingFor === activeTemplate"
-              :data-test="`template-save-${activeTemplate}`"
-              @click="save(activeTemplate)"
-              >{{ t("postTemplate.save") }}</el-button
-            >
-          </div>
+          <el-button
+            :disabled="!activeDraft || loading || !!savingFor"
+            @click="reset(activeTemplate)"
+            data-test="template-reset"
+            >{{ t("postTemplate.reset") }}</el-button
+          >
+          <el-button
+            type="primary"
+            :disabled="!activeDraft || loading || !!savingFor"
+            :loading="savingFor === activeTemplate"
+            :data-test="`template-save-${activeTemplate}`"
+            @click="save(activeTemplate)"
+            >{{ t("postTemplate.save") }}</el-button
+          >
         </div>
-      </template>
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="t('postTemplate.dataScope')">
-          <el-radio-group v-model="activeDraft.dataScope" :data-test="`scope-${activeTemplate}`">
-            <el-radio-button
-              v-for="option in scopeOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </el-radio-button>
+      </div>
+      <el-tabs v-model="activeTemplate" class="post-template-tabs" data-test="template-tabs">
+        <el-tab-pane
+          v-for="post in TEMPLATES"
+          :key="post"
+          :name="post"
+          :label="postName(post)"
+          :disabled="!!savingFor"
+        />
+      </el-tabs>
+      <template v-if="activeDraft">
+        <fieldset class="scope-panel" :disabled="loading || !!savingFor">
+          <legend class="sr-only">{{ t("postTemplate.dataScope") }}</legend>
+          <span class="scope-label" aria-hidden="true">{{ t("postTemplate.dataScope") }}</span>
+          <el-radio-group
+            v-model="activeDraft.dataScope"
+            :aria-label="t('postTemplate.dataScope')"
+            :disabled="loading || !!savingFor"
+            :data-test="`scope-${activeTemplate}`"
+          >
+            <el-radio v-for="option in scopeOptions" :key="option.value" :value="option.value">{{
+              option.label
+            }}</el-radio>
           </el-radio-group>
-        </el-form-item>
-        <el-form-item :label="t('postTemplate.permissions')">
-          <p class="permission-note">{{ t("postTemplate.unifiedScopeNote") }}</p>
-          <el-table :data="permissionModules" data-test="permission-matrix">
-            <el-table-column :label="t('postTemplate.module')" min-width="180">
-              <template #default="{ row }">
-                <div class="post-template-page__module">
-                  <strong>{{ row.label }}</strong>
-                  <el-checkbox
-                    :model-value="row.allChecked"
-                    :indeterminate="row.partial"
-                    :data-test="`template-module-all-${row.group}`"
-                    @change="toggleGroup(row.codes, isChecked($event))"
-                  >
-                    {{ t("user.selectAll") }}
-                  </el-checkbox>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column :label="t('postTemplate.accessLevel')" min-width="390">
-              <template #default="{ row }">
-                <div class="post-template-page__levels">
-                  <el-radio-group
-                    :model-value="row.level"
-                    :data-test="`module-level-${row.group}`"
-                    @update:model-value="setModuleLevel(row, $event)"
-                  >
-                    <el-radio-button value="HIDDEN">{{ t("postTemplate.hidden") }}</el-radio-button>
-                    <el-radio-button value="READ" :disabled="!row.readCodes.length">{{
-                      t("postTemplate.readOnly")
-                    }}</el-radio-button>
-                    <el-radio-button
-                      value="MANAGE"
-                      :disabled="row.codes.length === row.readCodes.length"
-                      >{{ t("postTemplate.manage") }}</el-radio-button
-                    >
-                  </el-radio-group>
-                  <el-tag v-if="row.level === 'CUSTOM'" type="info">{{
-                    t("postTemplate.customized")
-                  }}</el-tag>
-                </div>
-                <details class="permission-details">
-                  <summary>{{ t("postTemplate.finePermissions") }}</summary>
-                  <div class="post-template-page__permission-list">
-                    <el-checkbox
-                      v-for="item in row.items"
-                      :key="item.code"
-                      :model-value="item.checked"
-                      :data-test="`template-permission-${item.code}`"
-                      @change="toggleOne(item.code, isChecked($event))"
-                    >
-                      <span class="permission-name">{{ item.name }}</span>
-                      <span v-if="item.desc" class="permission-description">{{ item.desc }}</span>
-                    </el-checkbox>
-                  </div>
-                </details>
-              </template>
-            </el-table-column>
-            <el-table-column :label="t('postTemplate.dataScope')" min-width="180" align="center">
-              <template #default="{ row }">
-                <span :data-test="`module-scope-${row.group}`">{{
-                  activeDraft.dataScope === "OWN"
-                    ? t("postTemplate.scopeOwn")
-                    : t("postTemplate.scopeAll")
+          <span class="scope-note">{{ t("postTemplate.unifiedScopeNote") }}</span>
+        </fieldset>
+        <DataTable
+          v-if="!mobile"
+          table-id="post-template-permission-matrix-a"
+          data-test="permission-matrix"
+          :rows="permissionModules"
+          :columns="columns"
+          :total="permissionModules.length"
+          row-key="group"
+          plain
+          :paged="false"
+          :fixed-columns="false"
+        >
+          <template #cell-module="{ row }">
+            <div class="permission-module">
+              <strong>{{ asModule(row).label }}</strong>
+              <span class="permission-count" :data-test="`module-count-${asModule(row).group}`">{{
+                t("postTemplate.selectedCount", {
+                  selected: asModule(row).picked,
+                  total: asModule(row).codes.length
+                })
+              }}</span>
+            </div>
+          </template>
+          <template #cell-permissions="{ row }">
+            <PermissionChoices
+              v-if="asModule(row).items"
+              :items="asModule(row).items"
+              :disabled="loading || !!savingFor"
+              @toggle="toggleOne"
+            />
+          </template>
+          <template #cell-all="{ row }">
+            <el-checkbox
+              :model-value="asModule(row).allChecked"
+              :indeterminate="asModule(row).partial"
+              :disabled="loading || !!savingFor"
+              :aria-label="t('postTemplate.selectModule', { module: asModule(row).label })"
+              :data-test="`template-module-all-${asModule(row).group}`"
+              @change="toggleGroup(asModule(row).codes, isChecked($event))"
+              ><span class="sr-only">{{
+                t("postTemplate.selectModule", { module: asModule(row).label })
+              }}</span></el-checkbox
+            >
+          </template>
+        </DataTable>
+        <div v-else class="permission-cards" data-test="permission-cards">
+          <el-empty v-if="permissionModules.length === 0" :description="t('table.empty')" />
+          <section v-for="module in permissionModules" :key="module.group" class="permission-card">
+            <header class="permission-card__head">
+              <div class="permission-module">
+                <strong>{{ module.label }}</strong
+                ><span class="permission-count" :data-test="`module-count-${module.group}`">{{
+                  t("postTemplate.selectedCount", {
+                    selected: module.picked,
+                    total: module.codes.length
+                  })
                 }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <p class="permission-note">{{ t("user.permissionDependencies") }}</p>
-          <p class="permission-note">
+              </div>
+              <el-checkbox
+                :model-value="module.allChecked"
+                :indeterminate="module.partial"
+                :disabled="loading || !!savingFor"
+                :aria-label="t('postTemplate.selectModule', { module: module.label })"
+                :data-test="`template-module-all-${module.group}`"
+                @change="toggleGroup(module.codes, isChecked($event))"
+                >{{ t("user.selectAll") }}</el-checkbox
+              >
+            </header>
+            <PermissionChoices
+              :items="module.items"
+              :disabled="loading || !!savingFor"
+              @toggle="toggleOne"
+            />
+          </section>
+        </div>
+        <div class="permission-note">
+          <p>{{ t("user.permissionDependencies") }}</p>
+          <p>
             <strong>{{ t("user.exclusiveTitle") }}</strong> {{ t("user.exclusiveItems") }}
           </p>
-        </el-form-item>
-      </el-form>
+        </div>
+      </template>
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.post-template-page__hint {
-  margin-bottom: var(--tcrm-space-3);
-}
-.post-template-tabs {
-  margin-bottom: var(--tcrm-space-3);
-}
 .post-template-page__card {
   min-width: 0;
 }
 .post-template-page__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-3);
+  gap: var(--tcrm-space-4);
+  margin-bottom: var(--tcrm-space-4);
+}
+.page-title {
+  margin: 0;
+  font-size: var(--tcrm-font-size-title);
+  line-height: var(--tcrm-line-height-title);
+  font-weight: 600;
+}
+.post-template-page__hint {
+  margin: var(--tcrm-space-2) 0 0;
+  color: var(--tcrm-color-text-secondary);
 }
 .post-template-page__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--tcrm-space-2);
-  margin-left: auto;
 }
-.post-template-page__levels {
+.post-template-page__actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.template-name {
+  color: var(--tcrm-color-text-secondary);
+}
+.scope-panel {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-2);
+  gap: var(--tcrm-space-3) var(--tcrm-space-5);
+  min-width: 0;
+  margin: var(--tcrm-space-4) 0 var(--tcrm-space-5);
+  padding: var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-table-header);
 }
-.permission-details > summary {
-  cursor: pointer;
-  color: var(--tcrm-color-primary);
-  margin-top: var(--tcrm-space-2);
-}
-.permission-details .post-template-page__permission-list {
-  padding-top: var(--tcrm-space-3);
-}
-.post-template-page__card :deep(.el-form-item__content) {
-  display: block;
-}
-.post-template-page__card :deep(.el-table td.el-table__cell) {
-  padding-block: var(--tcrm-space-4);
-}
-.post-template-page__module {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tcrm-space-2);
-}
-.post-template-page__permission-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--tcrm-space-2) var(--tcrm-space-4);
-}
-.post-template-page__permission-list :deep(.el-checkbox) {
-  height: auto;
-  margin-right: 0;
-}
-.permission-name {
+.scope-label {
   font-weight: 500;
 }
-.permission-description {
-  display: block;
-  color: var(--el-text-color-secondary);
+.scope-note {
+  margin-left: auto;
+  color: var(--tcrm-color-text-secondary);
+}
+.permission-module {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-1);
+}
+.permission-module strong {
+  font-weight: 500;
+}
+.permission-count {
   font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+  color: var(--tcrm-color-text-secondary);
+}
+:deep(.el-table td.el-table__cell) {
+  padding-block: var(--tcrm-space-4);
 }
 .permission-note {
-  margin: 8px 0 0;
+  margin-top: var(--tcrm-space-4);
+  padding: var(--tcrm-space-3) var(--tcrm-space-4);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-table-header);
   color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
+}
+.permission-note p {
+  margin: 0;
+}
+.permission-note p + p {
+  margin-top: var(--tcrm-space-1);
+}
+.permission-cards {
+  display: grid;
+  gap: var(--tcrm-space-3);
+}
+.permission-card {
+  padding: var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-control);
+}
+.permission-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tcrm-space-2);
+  margin-bottom: var(--tcrm-space-3);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 1279px) {
+  .scope-note {
+    margin-left: 0;
+  }
+}
+@media (max-width: 767px) {
+  .post-template-page__actions {
+    justify-content: flex-start;
+  }
+  .scope-panel {
+    gap: var(--tcrm-space-2);
+  }
+  .scope-label,
+  .scope-note {
+    flex-basis: 100%;
+  }
+  .scope-panel :deep(.el-radio-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--tcrm-space-2);
+  }
+  .scope-panel :deep(.el-radio) {
+    margin-right: var(--tcrm-space-2);
+  }
 }
 </style>

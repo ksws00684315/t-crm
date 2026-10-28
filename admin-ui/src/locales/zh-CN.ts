@@ -1680,8 +1680,11 @@ const zhCN = {
     readOnly: "只读",
     manage: "管理",
     finePermissions: "精细权限",
-    unifiedScopeNote:
-      "数据范围统一适用于整个岗位模板；“管理”选择本模块全部可配置权限，也可展开精细权限单独调整。",
+    unifiedScopeNote: "统一适用于当前岗位模板",
+    configurablePermissions: "可配置权限",
+    moduleAll: "模块全选",
+    selectedCount: "已选 {selected} / {total} 项",
+    selectModule: "全选{module}权限",
     title: "权限设置",
     hint: "只影响之后新建的账号，不会修改已有账号的权限。",
     cardTitle: "{post}岗位模板",
