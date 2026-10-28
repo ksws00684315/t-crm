@@ -1675,6 +1675,8 @@ const zhCN = {
   },
   importTask: {
     title: "上传文件",
+    upload: "上传文件",
+    chooseType: "选择导入类型",
     fileName: "文件名",
     type: "类型",
     status: "状态",

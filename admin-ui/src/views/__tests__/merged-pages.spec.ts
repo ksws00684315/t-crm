@@ -13,7 +13,10 @@ import ShopManagementPage from "@/views/product/shop-management/index.vue";
 
 vi.mock("@/api/product/shop", () => ({ listShops: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/product/product", () => ({
-  listProducts: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 })
+  listProducts: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
+  // Order page reads these through the shared import bindings (task 77).
+  downloadProductTemplate: vi.fn(),
+  uploadProductImport: vi.fn()
 }));
 vi.mock("@/api/product/sheet-source", () => ({ listSheetSources: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/order/order", () => ({
