@@ -98,7 +98,13 @@ public enum SystemConfigDefinition {
       "120",
       1,
       10000),
-  WEIDIAN_QPS("weidian.qps", "security", "integer", "crm.weidian.qps", "5", 1, 50);
+  WEIDIAN_QPS("weidian.qps", "security", "integer", "crm.weidian.qps", "5", 1, 50),
+  /** Settlement detail incremental pull interval (task 76); effective without a restart. */
+  WEIDIAN_SETTLEMENT_SYNC_INTERVAL_MINUTES(
+      "weidian.settlement.sync-interval-minutes", "business", "minutes", null, "60", 15, 1440),
+  /** Beijing hour of the daily settlement detail backfill (task 76). */
+  WEIDIAN_SETTLEMENT_BACKFILL_HOUR(
+      "weidian.settlement.backfill-hour", "business", "integer", null, "3", 0, 23);
 
   private final String key;
   private final String group;

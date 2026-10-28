@@ -36,6 +36,11 @@ public class WeidianBusinessApiClient implements WeidianBusinessApi {
   }
 
   @Override
+  public TradeDetailResponse tradeDetail(long shopId, TradeDetailRequest request) {
+    return parser.tradeDetail(call(shopId, "shop.order.trade.detail", "1.0", request));
+  }
+
+  @Override
   public ItemListResponse itemList(long shopId, ItemListRequest request) {
     return parser.itemList(call(shopId, "vdian.item.list.get", "1.1", request));
   }

@@ -21,6 +21,8 @@ public interface WeidianBusinessApi {
 
   RefundDetailResponse refundDetail(long shopId, RefundDetailRequest request);
 
+  TradeDetailResponse tradeDetail(long shopId, TradeDetailRequest request);
+
   ItemListResponse itemList(long shopId, ItemListRequest request);
 
   ItemResponse item(long shopId, ItemRequest request);
@@ -65,6 +67,18 @@ public interface WeidianBusinessApi {
       @JsonProperty("fromRefundNo") Long fromRefundNo) {}
 
   record RefundDetailRequest(@JsonProperty("refundNo") Long refundNo) {}
+
+  /**
+   * shop.order.trade.detail 1.0 (settlement detail, task 76). {@code startTime}/{@code endTime} are
+   * epoch milliseconds and the window must span at most about 89 days (task 75: a full three
+   * calendar months is rejected); {@code pageSize} is at most 100.
+   */
+  record TradeDetailRequest(
+      @JsonProperty("pageNo") Integer pageNo,
+      @JsonProperty("pageSize") Integer pageSize,
+      @JsonProperty("startTime") Long startTime,
+      @JsonProperty("endTime") Long endTime,
+      @JsonProperty("queryType") String queryType) {}
 
   record ItemListRequest(
       @JsonProperty("update_end") String updateEnd,
@@ -225,6 +239,24 @@ public interface WeidianBusinessApi {
       @JsonProperty("refundNo") String refundNo,
       @JsonProperty("orderId") String orderId,
       @JsonProperty("refundFee") BigDecimal refundFeeFen,
+      JsonNode raw) {}
+
+  /** shop.order.trade.detail result: {@code result.list} rows plus {@code result.total}. */
+  record TradeDetailResponse(List<TradeDetailItem> list, Integer total, JsonNode raw) {}
+
+  /**
+   * One settlement flow row. {@code amount} is the raw value exactly as returned (no unit
+   * conversion); {@code tradeTime} is epoch milliseconds. The open-platform doc records no flow id,
+   * so deduplication happens on a fingerprint of these fields (task 76 §3.2).
+   */
+  record TradeDetailItem(
+      @JsonProperty("orderId") String orderId,
+      @JsonProperty("refundId") String refundId,
+      @JsonProperty("tradeType") String tradeType,
+      @JsonProperty("tradeSubType") String tradeSubType,
+      @JsonProperty("amount") BigDecimal amount,
+      @JsonProperty("tradeTime") Instant tradeTime,
+      @JsonProperty("remark") String remark,
       JsonNode raw) {}
 
   record ItemListResponse(
