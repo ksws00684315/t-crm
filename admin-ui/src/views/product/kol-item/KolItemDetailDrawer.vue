@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import NameCode from "@/components/NameCode.vue";
 import { Picture } from "@element-plus/icons-vue";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getKolItem } from "@/api/product/kol-item";
 import type { KolItemDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
-import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { formatRate } from "@/utils/rate";
@@ -16,8 +14,6 @@ const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
 
 const { t } = useI18n();
 const loading = ref(false);
-const detailRegion = ref<HTMLElement | null>(null);
-const detailColumns = useDescriptionColumns(detailRegion);
 const detail = ref<KolItemDetailVO | null>(null);
 
 watch(
@@ -67,43 +63,29 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
   <el-drawer
     :model-value="modelValue"
     :title="t('mapping.detailTitle')"
-    size="640px"
+    size="min(720px, calc(100vw - 24px))"
+    class="kol-item-detail-drawer"
     data-test="detail-drawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div ref="detailRegion" v-loading="loading">
-      <el-descriptions v-if="detail" :column="detailColumns" border>
-        <el-descriptions-item :label="t('mapping.linkCode')" :span="detailColumns">
+    <div v-loading="loading">
+      <el-descriptions v-if="detail" :column="1" border>
+        <el-descriptions-item :label="t('mapping.linkCode')">
           <CopyText :value="detail.linkCode" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.product')" :span="detailColumns">
-          <div class="product-cell">
-            <el-image
-              v-if="detail.imageUrl"
-              :src="detail.imageUrl"
-              fit="cover"
-              class="product-thumb"
-              data-test="detail-image"
-            />
-            <span v-else class="product-thumb product-thumb--empty" data-test="detail-image">
-              <el-icon><Picture /></el-icon>
-            </span>
-            <span class="product-name">{{ text(detail.itemName) }}</span>
-          </div>
+        <el-descriptions-item :label="t('mapping.kol')">
+          {{ formatNameWithCode(text(detail.kolName), text(detail.kolCode)) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.kol')" :span="detailColumns"
-          ><NameCode :name="detail.kolName" :code="detail.kolCode"
-        /></el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetShop')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.targetShop')">
           {{ shopText(detail) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetChannel')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.targetChannel')">
           {{ label("channels", detail.targetChannel) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetItemId')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.targetItemId')">
           <CopyText :value="detail.targetItemId" />
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.targetItemUrl')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.targetItemUrl')">
           <el-button
             v-if="detail.targetItemUrl"
             link
@@ -113,15 +95,32 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
           >
             {{ t("mapping.open") }}
           </el-button>
-          <CopyText :value="detail.targetItemUrl" />
+          <CopyText v-if="detail.targetItemUrl" class="link-copy" :value="detail.targetItemUrl" />
+          <span v-else>-</span>
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceItemId')" :span="detailColumns">
-          <CopyText :value="detail.sourceItemId" />
+        <el-descriptions-item :label="t('mapping.detailProductName')">
+          {{ text(detail.itemName) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceChannel')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.detailProductImage')">
+          <el-image
+            v-if="detail.imageUrl"
+            :src="detail.imageUrl"
+            fit="contain"
+            class="product-thumb"
+            data-test="detail-image"
+          />
+          <span v-else class="product-thumb product-thumb--empty" data-test="detail-image">
+            <el-icon><Picture /></el-icon>
+          </span>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('mapping.sourceChannel')">
           {{ label("channels", detail.sourceChannel) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.sourceItemUrl')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.sourceItemId')">
+          <CopyText v-if="detail.sourceItemId" :value="detail.sourceItemId" />
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('mapping.sourceItemUrl')">
           <el-button
             v-if="detail.sourceItemUrl"
             link
@@ -131,7 +130,8 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
           >
             {{ t("mapping.open") }}
           </el-button>
-          <CopyText :value="detail.sourceItemUrl" />
+          <CopyText v-if="detail.sourceItemUrl" class="link-copy" :value="detail.sourceItemUrl" />
+          <span v-else>-</span>
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.currentRate')">
           {{ formatRate(detail.currentRate) }}
@@ -145,22 +145,30 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
         <el-descriptions-item :label="t('mapping.totalPayAmount')">
           {{ detail.totalPayAmount }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.refundAmount')">
-          {{ detail.refundAmount }}
-        </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.status')">
-          {{ label("statuses", detail.status) }}
+          <el-tag :type="detail.status === 'ENABLED' ? 'success' : 'info'">{{
+            label("statuses", detail.status)
+          }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.cleanupStatus')">
-          {{ label("cleanups", detail.cleanupStatus) }}
+          <el-tag
+            :type="
+              detail.cleanupStatus === 'FAILED'
+                ? 'danger'
+                : detail.cleanupStatus === 'DONE'
+                  ? 'success'
+                  : 'info'
+            "
+            >{{ label("cleanups", detail.cleanupStatus) }}</el-tag
+          >
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.cleanupTime')">
           {{ detail.cleanupTime ? formatInstant(detail.cleanupTime) : "-" }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.cleanupReason')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.cleanupReason')">
           {{ text(detail.cleanupReason) }}
         </el-descriptions-item>
-        <el-descriptions-item :label="t('mapping.cleanupFailReason')" :span="detailColumns">
+        <el-descriptions-item :label="t('mapping.cleanupFailReason')">
           {{ text(detail.cleanupFailReason) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.createTime')">
@@ -172,29 +180,31 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
 </template>
 
 <style scoped>
-.product-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
-  min-width: 0;
-}
-
 .product-thumb {
-  width: var(--tcrm-space-6);
-  height: var(--tcrm-space-6);
-  flex: none;
-  border-radius: var(--tcrm-radius-tag);
-}
-
-.product-thumb--empty {
   display: inline-flex;
+  width: 120px;
+  height: 120px;
+  max-width: 100%;
+  border-radius: var(--tcrm-radius-tag);
+  vertical-align: middle;
+}
+.product-thumb--empty {
   align-items: center;
   justify-content: center;
   background: var(--tcrm-color-muted);
   color: var(--tcrm-color-text-secondary);
 }
-
-.product-name {
-  min-width: 0;
+.link-copy :deep(.copy-text__value) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+:deep(.el-descriptions__label) {
+  width: 34%;
+}
+:deep(.el-descriptions__content) {
+  overflow-wrap: anywhere;
 }
 </style>

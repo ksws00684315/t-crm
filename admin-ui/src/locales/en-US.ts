@@ -1292,6 +1292,8 @@ const enUS: MessageSchema = {
     view: "View",
     open: "Open",
     product: "Product",
+    detailProductName: "Product Name",
+    detailProductImage: "Product Image",
     detailTitle: "Item Link Detail",
     sourceItemUrl: "Source Link",
     visitCount: "Visits",

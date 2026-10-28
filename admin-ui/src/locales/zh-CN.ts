@@ -1260,6 +1260,8 @@ const zhCN = {
     view: "查看",
     open: "打开",
     product: "商品",
+    detailProductName: "商品名称",
+    detailProductImage: "商品主图",
     detailTitle: "商品链接详情",
     sourceItemUrl: "来源链接",
     visitCount: "访问次数",
