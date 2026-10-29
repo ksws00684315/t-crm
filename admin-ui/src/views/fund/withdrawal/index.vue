@@ -5,7 +5,6 @@ import { useRoute, useRouter } from "vue-router";
 import FinancePreviewNotice from "@/components/FinancePreviewNotice.vue";
 import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { exportWithdrawals, getWithdrawal, listFinanceTasks } from "@/api/commission/finance";
-import { getPrepay } from "@/api/commission/prepay";
 import type { FinanceTask, Withdrawal, WithdrawalQuery } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
@@ -19,8 +18,16 @@ import { saveBlob } from "@/utils/download";
 import WithdrawalDrawer from "./WithdrawalDrawer.vue";
 import ReviewDialog from "./ReviewDialog.vue";
 import PaymentDialog from "./PaymentDialog.vue";
-import PrepayDetailDrawer from "../prepay/DetailDrawer.vue";
-import { prepayAbilities } from "@/utils/prepay";
+
+/** Creator prepays are handled only on the separate prepay page (decision 2026-10-29, task 80). */
+const COMMISSION_TYPE = "COMMISSION" as const;
+const WITHDRAWAL_STATUSES = [
+  "PENDING_REVIEW",
+  "PENDING_PAYMENT",
+  "PAID",
+  "REJECTED",
+  "WITHDRAWN"
+] as const;
 
 defineOptions({ name: "WithdrawalTasksPage" });
 const { t, locale } = useI18n();
@@ -41,12 +48,9 @@ const detailId = ref("");
 const viewOpen = ref(false);
 const reviewOpen = ref(false);
 const paymentOpen = ref(false);
-const prepayOpen = ref(false);
-const prepayId = ref<string | null>(null);
-const prepayInitialAction = ref("");
 
 const columns = computed<DataColumn[]>(() =>
-  ["applicationNo", "kolIdentity", "type", "amount", "status", "createdAt", "actions"].map(key => ({
+  ["applicationNo", "kolIdentity", "amount", "status", "createdAt", "actions"].map(key => ({
     key,
     prop: key,
     label: t(`finance.${key}`),
@@ -58,15 +62,12 @@ const columns = computed<DataColumn[]>(() =>
         : key === "applicationNo"
           ? 175
           : key === "kolIdentity"
-            ? 165
-            : key === "type"
-              ? 125
-              : key === "createdAt"
-                ? 165
-                : key === "amount"
-                  ? 145
-                  : 145,
-    amount: key === "amount"
+            ? 175
+            : key === "createdAt"
+              ? 165
+              : 145,
+    amount: key === "amount",
+    align: key === "applicationNo" || key === "kolIdentity" ? ("left" as const) : undefined
   }))
 );
 const chips = computed(() =>
@@ -84,7 +85,12 @@ async function load() {
   loading.value = true;
   failed.value = false;
   try {
-    const result = await listFinanceTasks({ ...filters, page: page.value, size: size.value });
+    const result = await listFinanceTasks({
+      ...filters,
+      type: COMMISSION_TYPE,
+      page: page.value,
+      size: size.value
+    });
     appliedFilters.value = { ...filters };
     rows.value = result.items;
     total.value = Number(result.total);
@@ -115,47 +121,11 @@ function canReview(row: FinanceTask) {
 function canPay(row: FinanceTask) {
   return abilities.value.pay && row.status === "PENDING_PAYMENT";
 }
-function prepayAction(row: FinanceTask) {
-  const abilities = prepayAbilities(user.user);
-  if (row.type !== "PREPAY") return "";
-  if (row.status === "PENDING_OPERATIONS_REVIEW" && abilities.operationsReview) return "approve";
-  if (row.status === "APPROVED" && abilities.pay) return "pay";
-  return "";
-}
 function processLabel(row: FinanceTask) {
-  if (row.type === "PREPAY") {
-    const action = prepayAction(row);
-    return action === "approve"
-      ? t("prepay.reviewAction")
-      : action === "pay"
-        ? t("prepay.registerPayment")
-        : "";
-  }
   return row.status === "PENDING_REVIEW" ? t("finance.operationsReview") : t("finance.financePay");
 }
 function actions(row: FinanceTask) {
   if (!row.id) return [];
-  if (row.type === "PREPAY") {
-    const progress = prepayAction(row);
-    return [
-      {
-        key: "view",
-        testId: "withdrawal-view",
-        label: t("finance.viewDetails"),
-        onClick: () => openPrepay(row, "")
-      },
-      ...(progress
-        ? [
-            {
-              key: "progress",
-              testId: "withdrawal-progress-action",
-              label: processLabel(row),
-              onClick: () => openPrepay(row, progress)
-            }
-          ]
-        : [])
-    ];
-  }
   const actionLabel = processLabel(row);
   const action =
     canReview(row) || canPay(row)
@@ -184,16 +154,6 @@ function actions(row: FinanceTask) {
     ...(action ? [action] : [])
   ];
 }
-async function openPrepay(row: FinanceTask, action: string) {
-  try {
-    const detail = await getPrepay(row.id);
-    prepayId.value = detail.id;
-    prepayInitialAction.value = action;
-    prepayOpen.value = true;
-  } catch (error) {
-    notifyError(error);
-  }
-}
 async function openCommissionAction(row: FinanceTask) {
   try {
     selected.value = await getWithdrawal(row.id);
@@ -219,17 +179,8 @@ function reviewSaved() {
 function amountCurrency(amount: string, currency: string) {
   return `${amount} ${currency}`;
 }
-function statusLabel(status: string, type: FinanceTask["type"]) {
-  const prepayStatuses = [
-    "WAITING_DETAILS",
-    "PENDING_OPERATIONS_REVIEW",
-    "PENDING_FINANCE_REVIEW",
-    "APPROVED",
-    "CANCELLED"
-  ];
-  return type === "PREPAY" && prepayStatuses.includes(status)
-    ? t(`prepay.status.${status}`)
-    : t(`finance.${status}`);
+function statusLabel(status: string) {
+  return t(`finance.${status}`);
 }
 /**
  * Withdrawal notifications (L-017) jump here with ?withdrawalId=…: open the task drawer. The
@@ -276,20 +227,9 @@ onMounted(load);
           <el-form-item :label="t('finance.status')">
             <el-select v-model="filters.status" clearable data-test="withdrawal-status">
               <el-option
-                v-for="status in [
-                  'WAITING_DETAILS',
-                  'PENDING_REVIEW',
-                  'PENDING_OPERATIONS_REVIEW',
-                  'PENDING_FINANCE_REVIEW',
-                  'PENDING_PAYMENT',
-                  'APPROVED',
-                  'PAID',
-                  'REJECTED',
-                  'WITHDRAWN',
-                  'CANCELLED'
-                ]"
+                v-for="status in WITHDRAWAL_STATUSES"
                 :key="status"
-                :label="statusLabel(status, 'PREPAY')"
+                :label="statusLabel(status)"
                 :value="status"
               />
             </el-select>
@@ -316,12 +256,11 @@ onMounted(load);
           <div class="creator-name">{{ row.kolName }}</div>
           <small class="creator-id">{{ row.kolCode }}</small>
         </template>
-        <template #cell-type="{ row }">{{ row.type ? t(`finance.${row.type}`) : "-" }}</template>
         <template #cell-amount="{ row }">{{ amountCurrency(row.amount, row.currency) }}</template>
         <template #cell-status="{ row }">
           <div class="status">
             <el-tag :type="row.status === 'PAID' ? 'success' : 'info'">
-              {{ statusLabel(row.status ?? "UNVERIFIED", row.type) }}
+              {{ statusLabel(row.status ?? "UNVERIFIED") }}
             </el-tag>
             <el-tooltip v-if="row.paused" :content="t('finance.refundPause')"
               ><el-tag type="danger">{{ t("finance.paused") }}</el-tag></el-tooltip
@@ -334,12 +273,6 @@ onMounted(load);
       <WithdrawalDrawer v-model="viewOpen" :id="detailId" />
       <ReviewDialog v-model="reviewOpen" :withdrawal="selected" @saved="reviewSaved" />
       <PaymentDialog v-model="paymentOpen" :withdrawal="selected" @saved="load" />
-      <PrepayDetailDrawer
-        v-model="prepayOpen"
-        :id="prepayId"
-        :initial-action="prepayInitialAction"
-        @saved="load"
-      />
     </div>
   </div>
 </template>

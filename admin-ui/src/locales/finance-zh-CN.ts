@@ -24,7 +24,7 @@ export default {
   admin: "管理端",
   portal: "达人端",
   income: "达人收入",
-  tasks: "财务结算任务",
+  tasks: "提现申请",
   config: "结算配置",
   settlements: "结算明细",
   overview: "佣金概览",
