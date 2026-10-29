@@ -214,6 +214,7 @@ onMounted(load);
     </ListSearch>
     <DataTable
       table-id="prepay-tasks"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :total="total"

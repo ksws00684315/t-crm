@@ -389,6 +389,7 @@ onBeforeUnmount(() => window.removeEventListener("prepay-updated", onPrepayUpdat
         <DataTable
           class="kol-fit"
           table-id="kol"
+          fill-available-height
           :rows="rows"
           :columns="columns"
           :loading="loading"

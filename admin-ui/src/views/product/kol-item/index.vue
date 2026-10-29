@@ -455,6 +455,7 @@ onMounted(() => {
 
     <DataTable
       table-id="kol-items"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

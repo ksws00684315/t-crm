@@ -241,6 +241,7 @@ onMounted(load);
         v-model:page="page"
         v-model:size="size"
         table-id="commission-withdrawals"
+        fill-available-height
         :rows="rows"
         :columns="columns"
         :total="total"
@@ -316,7 +317,7 @@ onMounted(load);
   .finance-content > * {
     flex-shrink: 0;
   }
-  .finance-content :deep(.data-table) {
+  .finance-content :deep(.data-table:not(.is-fill)) {
     flex: 0 0 auto;
     max-height: none;
   }
