@@ -33,6 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.RequestBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -538,6 +539,17 @@ final class ChainWorld {
     return login(username);
   }
 
+  /**
+   * OWN staff who does not own this creator. The permission list replaces the BD template, so the
+   * account can pass {@code commission:freeze} and {@code withdrawal:pay} and still miss the
+   * creator.
+   */
+  String unassignedFundsToken() throws Exception {
+    String username = "t79-uf-" + ids.suffix();
+    staff(username, "BD", "OWN", List.of("commission:view", "commission:freeze", "withdrawal:pay"));
+    return login(username);
+  }
+
   String viewerToken() throws Exception {
     String username = "t79-vw-" + ids.suffix();
     staff(username, "BD", "ALL", List.of("order:view"));
@@ -562,6 +574,24 @@ final class ChainWorld {
         .andReturn()
         .getResponse()
         .getStatus();
+  }
+
+  /** HTTP status and {@code errorCode}, so a scope miss is not confused with a permission 403. */
+  String postOutcome(String token, String path, String body) throws Exception {
+    return outcome(
+        post(path).header(ADMIN, token).contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  String putOutcome(String token, String path, String body) throws Exception {
+    return outcome(
+        put(path).header(ADMIN, token).contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  private String outcome(RequestBuilder request) throws Exception {
+    MvcResult result = mvc.perform(request).andReturn();
+    String raw = result.getResponse().getContentAsString();
+    String code = json.readTree(raw).path("errorCode").asString();
+    return result.getResponse().getStatus() + " " + code;
   }
 
   /** Matches ledger rows by type, comparing each amount with {@code isEqualByComparingTo}. */

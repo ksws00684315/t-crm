@@ -212,10 +212,22 @@ class GuardChainIT {
     assertThat(world.getStatus(ChainWorld.ADMIN, otherBd, withdrawalPath)).isEqualTo(404);
     assertThat(ChainWorld.count(world.orders(otherBd).path("total"))).isZero();
     assertThat(world.settlements(otherBd).path("items")).isEmpty();
+    // The BD template has neither commission:freeze nor withdrawal:pay, so these 403s stop at
+    // @SaCheckPermission and never reach requireKolScope.
     assertThat(world.postStatus(otherBd, "/admin-api/commission/withdrawal-freezes", freeze))
         .isEqualTo(403);
     assertThat(world.putStatus(otherBd, resume, "{\"reason\":\"t79\"}")).isEqualTo(403);
     assertThat(world.putStatus(otherBd, withdrawalPath + "/payment", payBody())).isEqualTo(403);
+
+    // OWN, not this creator's BD, but holding the freeze and pay codes. The service then applies
+    // requireKolScope and answers 404 COMMON_NOT_FOUND.
+    String payer = world.unassignedFundsToken();
+    assertThat(world.postOutcome(payer, "/admin-api/commission/withdrawal-freezes", freeze))
+        .isEqualTo("404 COMMON_NOT_FOUND");
+    assertThat(world.putOutcome(payer, resume, "{\"reason\":\"t79\"}"))
+        .isEqualTo("404 COMMON_NOT_FOUND");
+    assertThat(world.putOutcome(payer, withdrawalPath + "/payment", payBody()))
+        .isEqualTo("404 COMMON_NOT_FOUND");
 
     JsonNode hidden = world.chain(viewer);
     assertThat(hidden.path("funds").isNull()).isTrue();
