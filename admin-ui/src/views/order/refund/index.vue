@@ -306,6 +306,7 @@ onMounted(() => {
 
     <DataTable
       table-id="order-refunds"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

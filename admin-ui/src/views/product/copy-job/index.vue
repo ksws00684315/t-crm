@@ -323,6 +323,7 @@ onMounted(() => {
 
     <DataTable
       table-id="copy-jobs"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

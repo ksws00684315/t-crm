@@ -151,6 +151,7 @@ onMounted(load);
         v-model:page="page"
         v-model:size="size"
         table-id="commission-settlements"
+        fill-available-height
         :rows="rows"
         :columns="columns"
         :total="total"

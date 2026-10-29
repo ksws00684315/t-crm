@@ -341,6 +341,7 @@ onMounted(() => {
 
     <DataTable
       table-id="copy-tokens"
+      fill-available-height
       :columns="columns"
       :rows="rows"
       :loading="loading"

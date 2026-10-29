@@ -436,6 +436,7 @@ onMounted(load);
 
     <DataTable
       table-id="users"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

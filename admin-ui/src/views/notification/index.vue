@@ -138,22 +138,26 @@ onMounted(load);
           </el-button>
         </div>
       </header>
-      <p v-if="!loading && rows.length === 0" class="notification-page__empty">
-        {{ t("notification.empty") }}
-      </p>
-      <button
-        v-for="item in rows"
-        :key="item.id"
-        type="button"
-        class="notification-page__item"
-        :class="{ 'notification-page__item--unread': !item.readTime }"
-        data-test="notification-item"
-        @click="openItem(item)"
-      >
-        <el-icon><component :is="icons[item.type]" /></el-icon>
-        <NotificationText :item="item" />
-        <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
-      </button>
+      <div class="notification-page__list">
+        <p v-if="!loading && rows.length === 0" class="notification-page__empty">
+          {{ t("notification.empty") }}
+        </p>
+        <button
+          v-for="item in rows"
+          :key="item.id"
+          type="button"
+          class="notification-page__item"
+          :class="{ 'notification-page__item--unread': !item.readTime }"
+          data-test="notification-item"
+          @click="openItem(item)"
+        >
+          <el-icon><component :is="icons[item.type]" /></el-icon>
+          <NotificationText :item="item" />
+          <span class="notification-page__time">{{
+            relativeNotificationTime(item.createTime)
+          }}</span>
+        </button>
+      </div>
       <el-pagination
         v-if="total > size"
         class="notification-page__pager"
@@ -186,6 +190,7 @@ onMounted(load);
   gap: var(--tcrm-space-3);
 }
 .notification-page__header {
+  flex-shrink: 0;
   justify-content: space-between;
   margin-bottom: var(--tcrm-space-4);
 }
@@ -200,11 +205,19 @@ onMounted(load);
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+
+.notification-page__list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Centred in whatever space the card has left, the way the table's empty state reads. */
@@ -216,6 +229,7 @@ onMounted(load);
 }
 
 .notification-page__item {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--tcrm-space-3);
@@ -254,6 +268,7 @@ onMounted(load);
 }
 
 .notification-page__pager {
+  flex-shrink: 0;
   align-self: flex-end;
   padding-top: var(--tcrm-space-3);
 }

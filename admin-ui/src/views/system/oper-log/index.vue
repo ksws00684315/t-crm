@@ -251,6 +251,7 @@ onMounted(() => {
 
     <DataTable
       table-id="oper-log"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

@@ -284,6 +284,7 @@ onMounted(() => {
 
     <DataTable
       table-id="import-tasks"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

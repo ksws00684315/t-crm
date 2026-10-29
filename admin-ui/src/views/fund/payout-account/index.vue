@@ -256,6 +256,7 @@ watch(
 
     <DataTable
       table-id="payout-accounts"
+      fill-available-height
       row-key="id"
       :rows="rows"
       :columns="columns"

@@ -199,6 +199,7 @@ onMounted(load);
         v-model:page="page"
         v-model:size="size"
         table-id="commission-income"
+        fill-available-height
         :rows="rows"
         :columns="columns"
         :total="Number(result?.total ?? 0)"
