@@ -391,7 +391,7 @@ onMounted(() => {
       width="520px"
       :close-on-click-modal="false"
     >
-      <el-form label-width="100px" @submit.prevent>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item :label="t('order.orderId')">
           <el-input :model-value="assigning?.weidianOrderId" disabled />
         </el-form-item>
@@ -445,7 +445,7 @@ onMounted(() => {
       width="520px"
       :close-on-click-modal="false"
     >
-      <el-form label-width="100px" @submit.prevent>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item :label="t('order.orderId')">
           <el-input :model-value="nonKolTarget?.weidianOrderId" disabled />
         </el-form-item>

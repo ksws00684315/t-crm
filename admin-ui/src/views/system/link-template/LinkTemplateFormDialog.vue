@@ -109,7 +109,7 @@ async function submit() {
     :close-on-click-modal="false"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" @submit.prevent>
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
       <el-form-item
         :label="t('linkTemplate.code')"
         prop="templateCode"

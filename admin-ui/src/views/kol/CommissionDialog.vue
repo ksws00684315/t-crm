@@ -300,7 +300,7 @@ function onRecordsPage(page: number): void {
             :title="incompleteAlert"
             data-test="incomplete-alert"
           />
-          <el-form ref="formRef" :model="form" :rules="rules" label-width="130px" @submit.prevent>
+          <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
             <el-form-item :label="t('promotion.field.defaultRate')" prop="percent">
               <el-input
                 v-model="form.percent"

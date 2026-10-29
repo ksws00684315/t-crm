@@ -316,7 +316,7 @@ onMounted(load);
           <div class="creator-name">{{ row.kolName }}</div>
           <small class="creator-id">{{ row.kolCode }}</small>
         </template>
-        <template #cell-type="{ row }">{{ t(`finance.${row.type}`) }}</template>
+        <template #cell-type="{ row }">{{ row.type ? t(`finance.${row.type}`) : "-" }}</template>
         <template #cell-amount="{ row }">{{ amountCurrency(row.amount, row.currency) }}</template>
         <template #cell-status="{ row }">
           <div class="status">

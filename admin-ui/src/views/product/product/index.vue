@@ -434,7 +434,7 @@ onMounted(() => {
       width="520px"
       :close-on-click-modal="false"
     >
-      <el-form label-width="120px" @submit.prevent>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item :label="t('product.code')">
           <el-input :model-value="editing?.productCode" disabled />
         </el-form-item>
