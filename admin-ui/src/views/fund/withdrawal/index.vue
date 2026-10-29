@@ -62,7 +62,7 @@ const columns = computed<DataColumn[]>(() =>
         : key === "applicationNo"
           ? 175
           : key === "kolIdentity"
-            ? 165
+            ? 175
             : key === "createdAt"
               ? 165
               : 145,
