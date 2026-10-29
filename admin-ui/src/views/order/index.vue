@@ -15,7 +15,7 @@ import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { importTemplateFileName, ORDER_IMPORT, REFUND_IMPORT } from "@/utils/import-types";
+import { importTemplateFileName, ORDER_IMPORT } from "@/utils/import-types";
 import { orderAbilities } from "@/utils/permission";
 import { orderRefundStatusText, orderTimeRangeToQuery } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
@@ -260,7 +260,6 @@ const chips = computed<SearchChip[]>(() => {
 
 const syncVisible = ref(false);
 const orderImportVisible = ref(false);
-const refundImportVisible = ref(false);
 const detailVisible = ref(false);
 const detailOrderId = ref<string | null>(null);
 
@@ -441,9 +440,6 @@ onMounted(() => {
         <el-button data-test="import-orders" @click="orderImportVisible = true">
           {{ t("order.importOrders") }}
         </el-button>
-        <el-button data-test="import-refunds" @click="refundImportVisible = true">
-          {{ t("order.importRefunds") }}
-        </el-button>
       </template>
     </ListSearch>
 
@@ -582,19 +578,6 @@ onMounted(() => {
       :require-data-cutoff="ORDER_IMPORT.requireDataCutoff"
       :download-template="ORDER_IMPORT.downloadTemplate"
       :upload="ORDER_IMPORT.upload"
-      @finished="search"
-    />
-
-    <ImportDialog
-      v-model="refundImportVisible"
-      :title="t(REFUND_IMPORT.titleKey)"
-      :limit-hint="t(REFUND_IMPORT.limitHintKey)"
-      :template-file-name="importTemplateFileName(REFUND_IMPORT, key => t(key))"
-      :task-type="REFUND_IMPORT.taskType"
-      :accept-csv="REFUND_IMPORT.acceptCsv"
-      :require-data-cutoff="REFUND_IMPORT.requireDataCutoff"
-      :download-template="REFUND_IMPORT.downloadTemplate"
-      :upload="REFUND_IMPORT.upload"
       @finished="search"
     />
 

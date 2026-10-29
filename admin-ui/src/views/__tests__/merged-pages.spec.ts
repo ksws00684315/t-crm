@@ -89,10 +89,10 @@ describe("merged tab pages (task 32 §2.1)", () => {
     wrapper.unmount();
   });
 
-  it("order query carries the order list and the matching pool tabs", async () => {
+  it("order query keeps only the order list tab", async () => {
     const wrapper = await mountPage(OrderQueryPage, "/order/orders");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["订单列表", "人工匹配池"]);
+    expect(labels).toEqual(["订单列表"]);
     wrapper.unmount();
   });
 
