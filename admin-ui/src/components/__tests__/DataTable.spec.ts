@@ -157,7 +157,7 @@ describe("DataTable", () => {
     wrapper.unmount();
   });
 
-  it("keeps a readable minimum body when filters leave too little height", async () => {
+  it("keeps the first grouped item or one ordinary row readable on short screens", async () => {
     const host = document.createElement("div");
     document.body.append(host);
     const wrapper = mount(DataTable, {
@@ -167,7 +167,8 @@ describe("DataTable", () => {
         rows: [{ id: "1" }, { id: "2" }],
         columns,
         total: 2,
-        fillAvailableHeight: true
+        fillAvailableHeight: true,
+        spanMethod: () => ({ rowspan: 1, colspan: 1 })
       },
       global: { plugins: [ElementPlus, i18n] }
     });
@@ -200,6 +201,16 @@ describe("DataTable", () => {
       await nextTick();
       expect((wrapper.element as HTMLElement).style.minHeight).toBe("297px");
       expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBe("100%");
+      await wrapper.setProps({ spanMethod: undefined });
+      wrapper
+        .findAll(".el-table__body tbody tr")
+        .forEach(row =>
+          Object.defineProperty(row.element, "offsetHeight", { value: 113, configurable: true })
+        );
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect((wrapper.element as HTMLElement).style.minHeight).toBe("288px");
     } finally {
       wrapper.unmount();
       host.remove();

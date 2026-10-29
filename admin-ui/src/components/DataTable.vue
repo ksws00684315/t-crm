@@ -196,9 +196,10 @@ function measureHeights(): void {
     const table = tableRef.value?.$el as HTMLElement | undefined;
     const headerHeight =
       table?.querySelector<HTMLElement>(".el-table__header-wrapper")?.offsetHeight ?? 0;
+    // Grouped orders need the order band plus its first product; ordinary lists need one row.
     const firstRows = [
       ...(table?.querySelectorAll<HTMLElement>(".el-table__body > tbody > tr") ?? [])
-    ].slice(0, 2);
+    ].slice(0, props.spanMethod ? 2 : 1);
     const minimumBody = Math.max(
       160,
       firstRows.reduce((sum, row) => sum + row.offsetHeight, 0)
