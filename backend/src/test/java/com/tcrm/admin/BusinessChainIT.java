@@ -120,16 +120,17 @@ class BusinessChainIT {
     world.open("payout");
     world.syncPaidOrder();
     // Line pays 40.00 and 20.00, freight 5.00, so the order pay is 65.00.
-    // Goods income 6500 fen = 65.00, fee -20 fen = -0.20, profit share -10 fen = -0.10.
-    // Basis = 64.70. Split by line pay: 64.70 * 40/60 = 43.1333... -> 43.13,
-    // 64.70 * 20/60 = 21.5666... -> 21.57. The rounded parts already sum to 64.70, so the
-    // largest-line tail is 0.00. Rate 0.1000 gives 4.31 and 2.16, and 4.31 + 2.16 = 6.47
-    // which equals round(64.70 * 0.10, 2).
+    // Paid but not settled (task 81): the basis is the pay amount. Split by line pay:
+    // 65.00 * 40/60 = 43.333... -> 43.33, 65.00 * 20/60 = 21.666... -> 21.67, tail 0.00.
+    // Rate 0.1000 gives 4.33 and 2.17, and 4.33 + 2.17 = 6.50.
+    assertPaidButUnsettled("43.33", "4.33", "21.67", "2.17");
+    // Goods income 6500 fen = 65.00 confirms that basis; fee -20 and profit share -10 never
+    // enter it (owner decision 2026-10-29).
     world.stubIncome();
     assertThat(world.pull()).isTrue();
-    assertConfirmed("43.13", "4.31", "21.57", "2.16");
+    assertConfirmed("43.33", "4.33", "21.67", "2.17");
     world.release();
-    ChainWorld.money(world.overview().at("/income/available"), "6.47");
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
 
     JsonNode detail = world.order(world.bdToken());
     assertThat(detail.path("orderStatus").asString()).isEqualTo("PAID");
@@ -147,9 +148,9 @@ class BusinessChainIT {
     assertAttributed(detail, listedOrder);
 
     long payoutAccountId = world.approvePayout();
-    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.47");
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
     world.approveWithdrawal(withdrawalId);
-    world.pay(withdrawalId, "6.47");
+    world.pay(withdrawalId, "6.50");
 
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("status").asString())
@@ -158,44 +159,36 @@ class BusinessChainIT {
     assertThat(world.outboxEvents(withdrawalId)).contains("PAID");
     ChainWorld.assertLedger(
         world.ledger(),
-        "COMMISSION_CREDIT=4.31",
-        "COMMISSION_CREDIT=2.16",
-        "COMMISSION_WITHDRAWAL=-6.47");
-    assertChain("6.47", "4.31", "2.16", "6.47", "6.47");
+        "COMMISSION_CREDIT=4.33",
+        "COMMISSION_CREDIT=2.17",
+        "COMMISSION_WITHDRAWAL=-6.50");
+    assertChain("6.50", "4.33", "2.17", "6.50", "6.50");
     JsonNode settlement = world.settlements(world.financeToken());
     assertThat(ChainWorld.count(settlement.path("total"))).isEqualTo(1);
-    ChainWorld.money(settlement.path("items").get(0).path("commission"), "6.47");
+    ChainWorld.money(settlement.path("items").get(0).path("commission"), "6.50");
     assertThat(settlement.path("items").get(0).path("status").asString()).isEqualTo("POSTED");
   }
 
   @Test
-  void shouldReduceAvailableBalance_whenPartialRefundArrivesAfterRelease() throws Exception {
+  void shouldKeepCommission_whenIncomeDetailRefundFlowArrivesAfterRelease() throws Exception {
     world.open("refund");
     world.syncPaidOrder();
     world.stubIncome();
     assertThat(world.pull()).isTrue();
     world.release();
-    ChainWorld.money(world.overview().at("/income/available"), "6.47");
-    // A later income-detail refund of -100 fen = -1.00. Basis becomes 63.70.
-    // 63.70 * 40/60 = 42.4666... -> 42.47; 63.70 * 20/60 = 21.2333... -> 21.23.
-    // Tail is 0.00 again. Commissions 4.25 and 2.12 sum to 6.37. The already released
-    // 4.31 and 2.16 drop by 0.06 and 0.04, and the available balance follows 6.47 -> 6.37.
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    // A later income-detail refund of -100 fen = -1.00 reaches the flows but not the basis: the
+    // basis is the goods income alone (task 81), and refunds reach commission only through the
+    // refund module. No revision and no ledger posting follow.
     int revisions = world.revisionCount();
     world.stubIncome(world.refundFlow());
     assertThat(world.pull()).isTrue();
-    // One new revision per line. There is no revision list API.
-    assertThat(world.revisionCount()).isEqualTo(revisions + 2);
+    assertThat(world.revisionCount()).isEqualTo(revisions);
     world.release();
-    assertConfirmed("42.47", "4.25", "21.23", "2.12");
-    ChainWorld.money(world.overview().at("/income/available"), "6.37");
-    ChainWorld.assertLedger(
-        world.ledger(),
-        "COMMISSION_CREDIT=4.31",
-        "COMMISSION_CREDIT=2.16",
-        "COMMISSION_ADJUSTMENT=-0.06",
-        "COMMISSION_ADJUSTMENT=-0.04");
-    // Credits stay 4.31 + 2.16. The refund is two decreases, 0.06 and 0.04.
-    assertChain("6.37", "4.25", "2.12", "6.47", "0.10");
+    assertConfirmed("43.33", "4.33", "21.67", "2.17");
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    assertChain("6.50", "4.33", "2.17", "6.50", "0.00");
   }
 
   @Test
@@ -222,7 +215,33 @@ class BusinessChainIT {
     JsonNode chain = world.chain(world.bdToken());
     ChainWorld.money(chain.at("/funds/kolCommission"), "0.00");
     assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
-    assertThat(chain.at("/funds/shopProfit").isNull()).isTrue();
+  }
+
+  /**
+   * Paid but not settled (task 81): each line is verified and accrued, release still waits for the
+   * goods-income settlement, the settlement row shows FROZEN and nothing is withdrawable yet.
+   */
+  private void assertPaidButUnsettled(
+      String basisA, String commissionA, String basisB, String commissionB) throws Exception {
+    List<Map<String, Object>> states = world.itemStates();
+    assertThat(states).hasSize(2);
+    assertUnsettledLine(states.get(0), world.exclusiveA(), basisA, commissionA);
+    assertUnsettledLine(states.get(1), world.exclusiveB(), basisB, commissionB);
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    JsonNode settlement = world.settlements(world.financeToken());
+    assertThat(settlement.path("items").get(0).path("status").asString()).isEqualTo("FROZEN");
+    assertThat(settlement.path("items").get(0).path("weidianWithdrawable").isString()).isFalse();
+  }
+
+  private static void assertUnsettledLine(
+      Map<String, Object> state, String itemId, String basis, String commission) {
+    assertThat(state.get("weidian_item_id")).isEqualTo(itemId);
+    assertThat(state.get("verified")).isEqualTo(true);
+    assertThat(ChainWorld.money(state.get("basis_cny"))).isEqualByComparingTo(basis);
+    assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
+        .isEqualByComparingTo(commission);
+    assertThat(state.get("release_basis")).isEqualTo("UNSETTLED");
+    assertThat(state.get("release_at")).isNull();
   }
 
   private void assertConfirmed(
@@ -283,7 +302,6 @@ class BusinessChainIT {
     ChainWorld.money(chain.at("/funds/payAmount"), "65.00");
     ChainWorld.money(chain.at("/funds/refundTotal"), "0.00");
     ChainWorld.money(chain.at("/funds/kolCommission"), orderCommission);
-    assertThat(chain.at("/funds/shopProfit").isNull()).isTrue();
     assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
     assertLineCommission(lineOf(chain, itemA), lineA);
     assertLineCommission(lineOf(chain, itemB), lineB);
@@ -308,7 +326,6 @@ class BusinessChainIT {
     ChainWorld.money(line.at("/commission/netCommission"), commission);
     ChainWorld.money(line.at("/commission/rateSnapshot"), "0.1000");
     assertThat(line.at("/commission/releaseBasis").asString()).isEqualTo("CONFIRMED");
-    assertThat(line.at("/commission/shopProfit").isNull()).isTrue();
   }
 
   private static JsonNode lineOf(JsonNode chain, String orderItemId) {

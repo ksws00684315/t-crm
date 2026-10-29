@@ -32,6 +32,7 @@ import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -108,11 +109,15 @@ class CommissionSettlementDetailServiceTest {
   }
 
   @Test
-  void shouldBuildPostedRowWithNullRetainedAndLineDetails() {
+  void shouldBuildPostedRowWithWithdrawableAndLineDetails() {
     when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(5001L), 1, 1, 20));
     when(orderSettlement.listOrdersByIds(List.of(5001L)))
-        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "COMPLETED")));
+        .thenReturn(
+            List.of(
+                new OrderRefDTO(5001L, "WD-1", 30L, PAY, "COMPLETED", new BigDecimal("200.00"))));
+    when(orderSettlement.weidianWithdrawableByOrderIds(anyCollection()))
+        .thenReturn(Map.of(5001L, new BigDecimal("180.00")));
     when(orderSettlement.listItemsByOrderIds(List.of(5001L)))
         .thenReturn(
             List.of(
@@ -142,13 +147,12 @@ class CommissionSettlementDetailServiceTest {
             TENANT,
             () -> service.page(superAdmin(), new DetailFilter("WD-1", "WEIDIAN", 30L, 1, 20)));
     SettlementRow settlement = page.items().getFirst();
-    // Hand calc: payment 200 − refund 20 = 180 net; commission 18. Retained = Weidian
-    // settlement net − commission, pending M0 (Q-1017-1/2): null even for a fully posted order.
+    // Payment is the order pay amount (freight included); the withdrawable total is display only.
+    // Accrued 18 is fully released, so the row is POSTED.
     assertThat(settlement.payment()).isEqualTo("200.00");
     assertThat(settlement.refund()).isEqualTo("20.00");
-    assertThat(settlement.net()).isEqualTo("180.00");
+    assertThat(settlement.weidianWithdrawable()).isEqualTo("180.00");
     assertThat(settlement.commission()).isEqualTo("18.00");
-    assertThat(settlement.retained()).isNull();
     assertThat(settlement.status()).isEqualTo("POSTED");
     assertThat(settlement.kolNames()).containsExactly("Kol A");
     assertThat(settlement.lines().getFirst().product()).isEqualTo("item");
@@ -159,11 +163,12 @@ class CommissionSettlementDetailServiceTest {
   }
 
   @Test
-  void shouldMarkUnverifiedAndHideRetainedWithNullishParts() {
+  void shouldMarkUnverifiedWithNullWithdrawableAndNullishParts() {
     when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
         .thenReturn(new PageResult<>(List.of(5002L), 1, 1, 20));
     when(orderSettlement.listOrdersByIds(List.of(5002L)))
-        .thenReturn(List.of(new OrderRefDTO(5002L, "WD-2", 30L, PAY, "PAID")));
+        .thenReturn(
+            List.of(new OrderRefDTO(5002L, "WD-2", 30L, PAY, "PAID", new BigDecimal("100.00"))));
     when(orderSettlement.listItemsByOrderIds(List.of(5002L)))
         .thenReturn(
             List.of(
@@ -184,12 +189,46 @@ class CommissionSettlementDetailServiceTest {
             TENANT, () -> service.page(superAdmin(), new DetailFilter(null, null, null, 1, 20)));
     SettlementRow settlement = page.items().getFirst();
     assertThat(settlement.status()).isEqualTo("UNVERIFIED");
-    assertThat(settlement.retained()).isNull();
+    assertThat(settlement.weidianWithdrawable()).isNull();
     assertThat(settlement.kolNames()).isEmpty();
     assertThat(settlement.shop()).isNull();
     assertThat(settlement.lines().getFirst().subject()).isEqualTo("COMPANY");
     assertThat(settlement.lines().getFirst().product()).isEqualTo("Solo");
     assertThat(settlement.lines().getFirst().sku()).isNull();
+  }
+
+  @Test
+  void shouldMarkFrozenWhileAccruedCommissionAwaitsRelease() {
+    // Paid and verified but not yet released (task 81): FROZEN, and no withdrawable total before
+    // the Weidian settlement flow arrives.
+    when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
+        .thenReturn(new PageResult<>(List.of(5003L), 1, 1, 20));
+    when(orderSettlement.listOrdersByIds(List.of(5003L)))
+        .thenReturn(
+            List.of(new OrderRefDTO(5003L, "WD-3", 30L, PAY, "PAID", new BigDecimal("65.00"))));
+    when(orderSettlement.listItemsByOrderIds(List.of(5003L)))
+        .thenReturn(
+            List.of(
+                new ItemRefDTO(
+                    9003L,
+                    5003L,
+                    "Goods A",
+                    null,
+                    1,
+                    new BigDecimal("65.00"),
+                    BigDecimal.ZERO,
+                    77L,
+                    51L)));
+    when(states.listByOrderIds(List.of(5003L)))
+        .thenReturn(List.of(stateRow(5003L, 9003L, 77L, "6.50", "0.00", true, "UNSETTLED")));
+    PageResult<SettlementRow> page =
+        TenantScope.callCompany(
+            TENANT, () -> service.page(superAdmin(), new DetailFilter(null, null, null, 1, 20)));
+    SettlementRow settlement = page.items().getFirst();
+    assertThat(settlement.payment()).isEqualTo("65.00");
+    assertThat(settlement.commission()).isEqualTo("6.50");
+    assertThat(settlement.weidianWithdrawable()).isNull();
+    assertThat(settlement.status()).isEqualTo("FROZEN");
   }
 
   private static AccountDTO superAdmin() {

@@ -41,8 +41,8 @@ public interface CommissionItemApi {
    * @param settlementTime Weidian settlement time; null when unknown
    * @param completedTime trade completion time; null when unknown
    * @param afterSales true when the line has an unconcluded refund (PROCESSING/SUCCESS/UNKNOWN)
-   * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / UNKNOWN_FLOW_TYPE /
-   *     INCOME_MISMATCH / MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
+   * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / INCOME_MISMATCH /
+   *     MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
    */
   record ItemSourceDTO(
       long orderItemId,

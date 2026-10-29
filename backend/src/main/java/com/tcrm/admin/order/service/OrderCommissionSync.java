@@ -23,12 +23,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Publishes commission source facts of an order's item lines (task 62, design §4.8.1; task 76
- * wiring). The {@code commission} module registers snapshots from the event before the order
- * transaction commits. Since task 76 the basis comes from the persisted Weidian settlement flows:
- * {@link SettlementBasisCalculator} checks them against the confirmed rules and either yields a
- * per-line basis (with the settlement time of the goods-income flow) or leaves the order unverified
- * with a queryable reason, persisted on {@code crm_order}.
+ * Publishes commission source facts of an order's item lines (task 62, design §4.8.1; task 81
+ * basis). The {@code commission} module registers snapshots from the event before the order
+ * transaction commits. Since task 81 the basis is the pay amount once the order is paid, and the
+ * persisted Weidian settlement flows only confirm it: {@link SettlementBasisCalculator} yields a
+ * per-line basis (with the settlement time of the goods-income flow once confirmed) or leaves the
+ * order unverified with a queryable reason, persisted on {@code crm_order}. Refunds are netted by
+ * the commission engine, so the event marks the basis as not refund-inclusive.
  */
 @Component
 public class OrderCommissionSync {
@@ -87,7 +88,7 @@ public class OrderCommissionSync {
         item.getAttributionType() == null ? 0 : item.getAttributionType(),
         item.getProductId(),
         lineBasis,
-        lineBasis == null ? null : Boolean.TRUE,
+        lineBasis == null ? null : Boolean.FALSE,
         item.getRefundAmount(),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),

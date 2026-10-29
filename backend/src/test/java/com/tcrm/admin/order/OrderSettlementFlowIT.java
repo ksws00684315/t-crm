@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.commission.job.CommissionReleaseJob;
@@ -18,6 +19,11 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.TradeDetailItem;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.TradeDetailRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.TradeDetailResponse;
+import com.tcrm.admin.order.mapper.OrderItemMapper;
+import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.model.OrderDO;
+import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.service.OrderCommissionSync;
 import com.tcrm.admin.order.service.OrderSettlementFlowService;
 import com.tcrm.admin.order.service.OrderSettlementSyncCoordinator;
 import com.tcrm.admin.shared.TenantScope;
@@ -42,6 +48,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -104,6 +111,10 @@ class OrderSettlementFlowIT {
   @Autowired private OrderSettlementSyncCoordinator coordinator;
   @Autowired private CommissionReleaseJob releaseJob;
   @Autowired private WithdrawalService withdrawals;
+  @Autowired private OrderCommissionSync commissionSync;
+  @Autowired private OrderMapper orderMapper;
+  @Autowired private OrderItemMapper itemMapper;
+  @Autowired private TransactionTemplate tx;
 
   private long kolId;
   private long orderId;
@@ -153,8 +164,8 @@ class OrderSettlementFlowIT {
 
   @Test
   void shouldVerifyAccrueReleaseAndExposeAvailableAmount() throws Exception {
-    // Hand-computed (unit = fen): income 600 + fee -4 -> basis 5.96; income 6.00 == pay 6.00.
-    // Lines pay 4.00/2.00 -> basis 3.97/1.99; at 10% the accrual is 0.40/0.20 = 0.60 total.
+    // Hand-computed (unit = fen): income 600 == pay 6.00 confirms the basis; fee -4 never enters
+    // it (task 81). Lines pay 4.00/2.00 -> basis 4.00/2.00; at 10% the accrual is 0.40/0.20.
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
 
     pull();
@@ -169,11 +180,11 @@ class OrderSettlementFlowIT {
     assertThat(orderField("settled_time")).isEqualTo(Timestamp.from(INCOME_TIME));
     assertThat(orderField("commission_basis_reason")).isNull();
     assertThat(itemField(itemA, "verified")).isEqualTo(true);
-    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("3.97"));
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
     assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
     assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
     assertThat(itemField(itemA, "release_at")).isEqualTo(Timestamp.from(INCOME_TIME));
-    assertThat(itemField(itemB, "basis_cny")).isEqualTo(new BigDecimal("1.99"));
+    assertThat(itemField(itemB, "basis_cny")).isEqualTo(new BigDecimal("2.00"));
     assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
 
     releaseJob.releaseDue();
@@ -194,17 +205,19 @@ class OrderSettlementFlowIT {
   }
 
   @Test
-  void shouldStayUnverifiedWithIncomeMismatchWhenUnitIsWrong() throws Exception {
-    // The API returned yuan while we assume fen: income 6 -> 0.06 != pay 6.00, so the whole
-    // order stays unverified (reason INCOME_MISMATCH) and nothing ever reaches the wallet.
+  void shouldKeepAccrualUnreleasedWithIncomeMismatchWhenUnitIsWrong() throws Exception {
+    // The API returned yuan while we assume fen: income 6 -> 0.06 != pay 6.00, so the goods income
+    // does not confirm. The pay-time accrual stays (4.00/2.00), but release never starts (reason
+    // INCOME_MISMATCH) and nothing reaches the wallet.
     stubIncomeDetail(row("收入", "货款收入", "6"), row("支出", "交易手续费", "-0.04"));
 
     pull();
 
     assertThat(flowCount()).isEqualTo(2);
-    assertThat(itemField(itemA, "verified")).isEqualTo(false);
-    assertThat(itemField(itemA, "basis_cny")).isNull();
-    assertThat(itemField(itemA, "release_basis")).isEqualTo("UNVERIFIED");
+    assertThat(itemField(itemA, "verified")).isEqualTo(true);
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("UNSETTLED");
     assertThat(orderField("commission_basis_reason")).isEqualTo("INCOME_MISMATCH");
     assertThat(orderField("settled_time")).isNull();
     assertThat(
@@ -214,7 +227,7 @@ class OrderSettlementFlowIT {
                     + " ORDER BY id DESC LIMIT 1",
                 String.class,
                 itemA))
-        .contains("INCOME_MISMATCH");
+        .contains("release UNSETTLED");
 
     releaseJob.releaseDue();
 
@@ -227,31 +240,30 @@ class OrderSettlementFlowIT {
   }
 
   @Test
-  void shouldReduceBasisAndPostAdjustmentWhenBackfillFindsRefund() throws Exception {
+  void shouldNotChangeBasisWhenIncomeDetailRefundAppearsAfterRelease() throws Exception {
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
     pull();
     releaseJob.releaseDue();
     assertThat(walletBalance()).isEqualByComparingTo("0.60");
 
-    // The backfill re-observes the window and now sees a partial refund of -60 fen:
-    // basis 5.96 -> 5.36, lines 3.57/1.79, accrual 0.36 + 0.18 = 0.54 < released 0.60,
-    // so a -0.06 COMMISSION_ADJUSTMENT lands and the wallet drops to 0.54.
+    // The backfill re-observes the window and now sees a partial refund of -60 fen. Task 81: the
+    // basis stays the goods income, and refunds reach commission only through the refund module,
+    // so no revision and no COMMISSION_ADJUSTMENT land here.
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"), row("支出", "退款", "-60"));
     pull();
 
     assertThat(flowCount()).isEqualTo(3);
-    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("3.57"));
-    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.36"));
-    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.18"));
-    assertThat(walletBalance()).isEqualByComparingTo("0.54");
-    // The decrease posts one adjustment per released line: -0.04 and -0.02.
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM crm_commission_ledger WHERE kol_id = ?"
-                    + " AND entry_type = 'COMMISSION_ADJUSTMENT' AND amount_cny IN (-0.04, -0.02)",
+                    + " AND entry_type = 'COMMISSION_ADJUSTMENT'",
                 Integer.class,
                 kolId))
-        .isEqualTo(2);
+        .isZero();
   }
 
   @Test
@@ -280,6 +292,56 @@ class OrderSettlementFlowIT {
                 Integer.class,
                 kolId))
         .isEqualTo(2);
+  }
+
+  @Test
+  void shouldAppendOneRevisionAndPostOnceWhenSettlementArrivesAfterPaidAccrual() throws Exception {
+    // Paid order, no settlement flow yet: the commission accrues from the pay amount (basis
+    // 4.00/2.00 -> 0.40/0.20) and stays unreleased, so the wallet is untouched.
+    syncOrderFromDb();
+
+    assertThat(itemField(itemA, "verified")).isEqualTo(true);
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("UNSETTLED");
+    assertThat(itemField(itemB, "basis_cny")).isEqualTo(new BigDecimal("2.00"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemB, "release_basis")).isEqualTo("UNSETTLED");
+    assertThat(orderField("commission_basis_reason")).isEqualTo("NO_SETTLEMENT");
+
+    releaseJob.releaseDue();
+    assertThat(walletBalanceOrZero()).isEqualByComparingTo("0.00");
+
+    long revisionsA = revisionCount(itemA);
+    long revisionsB = revisionCount(itemB);
+
+    // The goods-income flow arrives: it confirms the basis (no new basis, no second posting).
+    stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
+    pull();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisionsA + 1);
+    assertThat(revisionCount(itemB)).isEqualTo(revisionsB + 1);
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
+    assertThat(itemField(itemB, "basis_cny")).isEqualTo(new BigDecimal("2.00"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemB, "release_basis")).isEqualTo("CONFIRMED");
+    assertThat(orderField("commission_basis_reason")).isNull();
+
+    releaseJob.releaseDue();
+
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+    assertThat(creditCount()).isEqualTo(2);
+    assertThat(creditTotal()).isEqualByComparingTo("0.60");
+
+    // Repeat pull with the same flows: no new revision, no new posting.
+    long ledgerBefore = creditCount();
+    pull();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisionsA + 1);
+    assertThat(revisionCount(itemB)).isEqualTo(revisionsB + 1);
+    assertThat(creditCount()).isEqualTo(ledgerBefore);
   }
 
   @Test
@@ -504,7 +566,7 @@ class OrderSettlementFlowIT {
 
     assertThat(ok).isTrue();
     assertThat(itemField(itemA, "verified")).isEqualTo(true);
-    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("3.97"));
+    assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
     assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
     assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
     assertThat(orderField("settled_time")).isEqualTo(Timestamp.from(INCOME_TIME));
@@ -556,6 +618,58 @@ class OrderSettlementFlowIT {
         "SELECT " + column + " FROM crm_commission_item_state WHERE order_item_id = ?",
         Object.class,
         itemId);
+  }
+
+  /** Runs the order commission sync the way the order write path does: in a transaction. */
+  private void syncOrderFromDb() {
+    TenantScope.runCompany(
+        TENANT_ID,
+        () ->
+            tx.executeWithoutResult(
+                status -> {
+                  OrderDO order = orderMapper.selectById(orderId);
+                  List<OrderItemDO> lines =
+                      itemMapper.selectList(
+                          new LambdaQueryWrapper<OrderItemDO>()
+                              .eq(OrderItemDO::getOrderId, orderId)
+                              .orderByAsc(OrderItemDO::getId));
+                  commissionSync.sync(order, lines);
+                }));
+  }
+
+  private long revisionCount(long orderItemId) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM crm_commission_item_revision WHERE item_state_id ="
+            + " (SELECT id FROM crm_commission_item_state WHERE order_item_id = ?)",
+        Long.class,
+        orderItemId);
+  }
+
+  private int creditCount() {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM crm_commission_ledger WHERE kol_id = ?"
+            + " AND entry_type = 'COMMISSION_CREDIT'",
+        Integer.class,
+        kolId);
+  }
+
+  private BigDecimal creditTotal() {
+    return jdbc.queryForObject(
+        "SELECT COALESCE(SUM(amount_cny), 0) FROM crm_commission_ledger WHERE kol_id = ?"
+            + " AND entry_type = 'COMMISSION_CREDIT'",
+        BigDecimal.class,
+        kolId);
+  }
+
+  /** Before the first posting the wallet row may not exist yet; that reads as zero. */
+  private BigDecimal walletBalanceOrZero() {
+    List<BigDecimal> balances =
+        jdbc.queryForList(
+            "SELECT balance_cny FROM crm_commission_wallet WHERE tenant_id = ? AND kol_id = ?",
+            BigDecimal.class,
+            TENANT_ID,
+            kolId);
+    return balances.isEmpty() ? BigDecimal.ZERO : balances.getFirst();
   }
 
   private BigDecimal walletBalance() {

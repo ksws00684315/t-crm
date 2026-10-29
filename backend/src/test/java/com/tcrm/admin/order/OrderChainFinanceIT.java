@@ -241,13 +241,11 @@ class OrderChainFinanceIT {
         .andExpect(jsonPath("$.data.funds.payAmount").value("200.00"))
         .andExpect(jsonPath("$.data.funds.refundTotal").value("100.00"))
         .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.funds.shopProfit").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.funds.accountStatus").value("UNVERIFIED"))
         // Line blocks (B07/B09): pay-time rate snapshot, occupation split by application state.
         .andExpect(jsonPath("$.data.lines[0].orderItemId").value(String.valueOf(item1)))
         .andExpect(jsonPath("$.data.lines[0].commission.rateSnapshot").value("0.3000"))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("120.00"))
-        .andExpect(jsonPath("$.data.lines[0].commission.shopProfit").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].commission.releaseBasis").value("CONFIRMED"))
         .andExpect(jsonPath("$.data.lines[0].commission.occupiedTotal").value("120.00"))
         .andExpect(

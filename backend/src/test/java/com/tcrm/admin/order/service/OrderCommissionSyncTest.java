@@ -55,7 +55,7 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldPublishUnverifiedFactsWithoutFlowsAndMarkAfterSales() {
+  void shouldAccrueFromPayAmountWithoutFlowsAndMarkAfterSales() {
     when(refunds.selectList(any(LambdaQueryWrapper.class)))
         .thenReturn(List.of(refund(9001L, "PROCESSING")));
     when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
@@ -68,14 +68,15 @@ class OrderCommissionSyncTest {
     OrderItemsCommissionEvent event = captor.getValue();
     assertThat(event.payTime()).isEqualTo(PAY_TIME);
     OrderItemsCommissionEvent.ItemFacts facts = event.items().getFirst();
-    // No matched settlement flow: no basis, unverified with the queryable reason code.
-    assertThat(facts.basisCny()).isNull();
+    // Paid, no matched settlement flow yet: the basis is the pay amount, unconfirmed (task 81).
+    assertThat(facts.basisCny()).isEqualByComparingTo("60.00");
     assertThat(facts.basisCheckReason()).isEqualTo("NO_SETTLEMENT");
+    assertThat(facts.basisIncludesRefund()).isFalse();
     assertThat(facts.successfulRefundCny()).isEqualByComparingTo("12.34");
     assertThat(facts.kolId()).isEqualTo(101L);
     assertThat(facts.attributionType()).isEqualTo(1);
     assertThat(facts.afterSales()).isTrue();
-    assertThat(facts.settlementState()).isEqualTo("UNKNOWN");
+    assertThat(facts.settlementState()).isEqualTo("UNSETTLED");
   }
 
   @Test
@@ -97,11 +98,10 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void shouldPublishAllocatedBasisWithIncomeSettlementTime() {
-    // Hand-computed (amounts in fen, the default unit constant): goods income 600 -> 6.00 CNY,
-    // fee -4 -> -0.04 CNY, so the order basis is 5.96. Order pay 6.00 matches the income row.
-    // Lines pay 4.00 + 2.00 = 6.00: 5.96 x 4/6 = 3.9733.. -> 3.97; 5.96 x 2/6 = 1.98667 -> 1.99;
-    // allocated 5.96, tail 0.00.
+  void shouldPublishGoodsIncomeBasisWithSettlementTimeIgnoringFees() {
+    // Hand-computed (amounts in fen, the default unit constant): goods income 600 -> 6.00 CNY
+    // matches pay 6.00; fee -4 (-0.04 CNY) never enters the basis (task 81). Lines pay 4.00 +
+    // 2.00: 6.00 x 4/6 = 4.00; 6.00 x 2/6 = 2.00; tail 0.00.
     when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     when(flows.listByRemoteOrderId(anyLong(), anyString()))
         .thenReturn(
@@ -121,9 +121,9 @@ class OrderCommissionSyncTest {
         ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
     verify(events).publishEvent(captor.capture());
     List<OrderItemsCommissionEvent.ItemFacts> facts = captor.getValue().items();
-    assertThat(facts.get(0).basisCny()).isEqualByComparingTo("3.97");
-    assertThat(facts.get(1).basisCny()).isEqualByComparingTo("1.99");
-    assertThat(facts.get(0).basisIncludesRefund()).isTrue();
+    assertThat(facts.get(0).basisCny()).isEqualByComparingTo("4.00");
+    assertThat(facts.get(1).basisCny()).isEqualByComparingTo("2.00");
+    assertThat(facts.get(0).basisIncludesRefund()).isFalse();
     assertThat(facts.get(0).settlementState()).isEqualTo("CONFIRMED");
     assertThat(facts.get(0).settlementTime()).isEqualTo(SETTLED);
     assertThat(facts.get(0).basisCheckReason()).isNull();
@@ -140,7 +140,7 @@ class OrderCommissionSyncTest {
     order.setCommissionBasisReason("NO_SETTLEMENT");
     TestTransactions.template()
         .executeWithoutResult(
-            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, null))));
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "60.00"))));
     verify(orders, never()).update(org.mockito.ArgumentMatchers.isNull(), any(Wrapper.class));
   }
 
@@ -161,6 +161,7 @@ class OrderCommissionSyncTest {
     order.setShopId(30L);
     order.setWeidianOrderId(REMOTE_ORDER_ID);
     order.setPayTime(PAY_TIME);
+    order.setPayAmount(new BigDecimal("60.00"));
     order.setSettledTime(settledTime);
     return order;
   }

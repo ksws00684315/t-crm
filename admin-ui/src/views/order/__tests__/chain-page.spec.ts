@@ -74,7 +74,6 @@ const financedChain: OrderChainVO = {
     payAmount: "180.00",
     refundTotal: "20.00",
     kolCommission: "16.00",
-    shopProfit: null,
     accountStatus: "UNVERIFIED"
   },
   financeFlows: [
@@ -129,7 +128,6 @@ const financedChain: OrderChainVO = {
       commission: {
         rateSnapshot: "0.1000",
         netCommission: "16.00",
-        shopProfit: null,
         releaseBasis: "CONFIRMED",
         occupiedTotal: "16.00",
         withdrawals: [
@@ -162,7 +160,6 @@ const financedChain: OrderChainVO = {
       commission: {
         rateSnapshot: null,
         netCommission: null,
-        shopProfit: null,
         releaseBasis: "UNVERIFIED",
         occupiedTotal: "0.00",
         withdrawals: []
@@ -370,8 +367,8 @@ describe("order chain page (task 40)", () => {
 
     const funds = wrapper.find('[data-test="chain-funds"]').text();
     expect(funds).toContain("16.00 CNY");
-    // Shop profit waits for the M0 Weidian settlement net: 待核实, never a number.
-    expect(funds).toContain("待核实");
+    // Shop profit is gone from the funds card (task 81, L-024).
+    expect(funds).not.toContain("店铺获利");
 
     // Line 1: rate snapshot, occupation split by application state machine, rejected released.
     const blocks = wrapper.findAll('[data-test="chain-commission"]');
@@ -472,7 +469,6 @@ describe("order chain page (task 40)", () => {
       "支付金额",
       "佣金比例",
       "达人佣金",
-      "店铺获利",
       "提现占用"
     ]);
     wrapper.unmount();
@@ -564,15 +560,15 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("keeps shop profit needs-verification for an OWN viewer whose funds are visible", async () => {
-    // Mixed orders hide the whole funds block; fully covered orders show it, and the M0-pending
-    // shop profit then reads 待核实 exactly like the line-level block — not the scope note.
+  it("hides shop profit for an OWN viewer whose funds are visible", async () => {
+    // Mixed orders hide the whole funds block; fully covered orders show it without a shop
+    // profit card (task 81, L-024) and without the scope note.
     signIn("STAFF", ["order:view", "commission:view"], "OWN");
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
     expect(funds).toContain("16.00 CNY");
-    expect(funds).toContain("待核实");
+    expect(funds).not.toContain("店铺获利");
     expect(funds).not.toContain("当前权限仅展示本人范围商品行");
     expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
     wrapper.unmount();

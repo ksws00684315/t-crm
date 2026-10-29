@@ -53,6 +53,26 @@ class CommissionOrderStateServiceTest {
   }
 
   @Test
+  void shouldMapPaidButUnsettledLineToFrozenInsteadOfInvalid() {
+    // Task 81 (L-031): a paid order accrues from its pay amount before the settlement arrives, so
+    // the creator sees FROZEN with the amount. INVALID is left for zero accrual only.
+    CommissionItemStateDO paid = state(9005L, 5005L, KOL, "4.33", "0.00", true);
+    CommissionItemStateDO zeroAccrual = state(9006L, 5006L, KOL, "0.00", "0.00", true);
+    when(states.listByOrderItemIds(List.of(9005L, 9006L))).thenReturn(List.of(paid, zeroAccrual));
+    when(revisions.listLatestByItemStateIds(List.of(paid.getId(), zeroAccrual.getId())))
+        .thenReturn(List.of(revision(paid.getId(), "0.1000")));
+
+    var result = service.listByOrderItemIds(KOL, List.of(9005L, 9006L));
+
+    assertThat(result)
+        .extracting(CommissionOrderStateApi.ItemCommissionStateDTO::settlementStatus)
+        .containsExactly(
+            CommissionOrderStateApi.STATUS_FROZEN, CommissionOrderStateApi.STATUS_INVALID);
+    assertThat(result.get(0).commissionAmount()).isEqualByComparingTo("4.33");
+    assertThat(result.get(0).releasedAmount()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
   void shouldMapReleasedRowToWithdrawable() {
     CommissionItemStateDO row = state(9002L, 5002L, KOL, "10.00", "10.00", true);
     when(states.listByOrderIds(List.of(5002L))).thenReturn(List.of(row));

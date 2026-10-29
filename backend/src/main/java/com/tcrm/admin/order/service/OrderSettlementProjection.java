@@ -4,15 +4,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.order.api.OrderSettlementApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementQueryMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.shared.PageResult;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +27,17 @@ public class OrderSettlementProjection implements OrderSettlementApi {
   private final OrderMapper orders;
   private final OrderItemMapper items;
   private final OrderSettlementQueryMapper settlementQueries;
+  private final OrderSettlementFlowMapper settlementFlows;
 
   public OrderSettlementProjection(
-      OrderMapper orders, OrderItemMapper items, OrderSettlementQueryMapper settlementQueries) {
+      OrderMapper orders,
+      OrderItemMapper items,
+      OrderSettlementQueryMapper settlementQueries,
+      OrderSettlementFlowMapper settlementFlows) {
     this.orders = orders;
     this.items = items;
     this.settlementQueries = settlementQueries;
+    this.settlementFlows = settlementFlows;
   }
 
   @Override
@@ -83,6 +92,25 @@ public class OrderSettlementProjection implements OrderSettlementApi {
         .stream()
         .map(OrderSettlementProjection::toDto)
         .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Map<Long, BigDecimal> weidianWithdrawableByOrderIds(Collection<Long> orderIds) {
+    Map<Long, BigDecimal> result = new HashMap<>();
+    if (orderIds == null || orderIds.isEmpty()) {
+      return result;
+    }
+    for (OrderDO order :
+        orders.selectList(new LambdaQueryWrapper<OrderDO>().in(OrderDO::getId, orderIds))) {
+      BigDecimal total =
+          SettlementBasisCalculator.incomeDetailTotal(
+              settlementFlows.listByRemoteOrderId(order.getShopId(), order.getWeidianOrderId()));
+      if (total != null) {
+        result.put(order.getId(), total);
+      }
+    }
+    return result;
   }
 
   @Override
@@ -145,7 +173,8 @@ public class OrderSettlementProjection implements OrderSettlementApi {
         row.getWeidianOrderId(),
         row.getShopId(),
         row.getPayTime(),
-        row.getOrderStatus());
+        row.getOrderStatus(),
+        row.getPayAmount());
   }
 
   private static ItemRefDTO toDto(OrderItemDO row) {

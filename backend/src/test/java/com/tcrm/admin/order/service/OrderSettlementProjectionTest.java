@@ -6,15 +6,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementQueryMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.OrderSettlementFlowDO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,8 +38,9 @@ class OrderSettlementProjectionTest {
   private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final OrderSettlementQueryMapper settlementQueries =
       mock(OrderSettlementQueryMapper.class);
+  private final OrderSettlementFlowMapper settlementFlows = mock(OrderSettlementFlowMapper.class);
   private final OrderSettlementProjection projection =
-      new OrderSettlementProjection(orders, items, settlementQueries);
+      new OrderSettlementProjection(orders, items, settlementQueries, settlementFlows);
 
   @BeforeEach
   void prepare() {
@@ -142,5 +147,38 @@ class OrderSettlementProjectionTest {
     assertThat(rows).hasSize(1);
     assertThat(rows.getFirst().quantity()).isZero();
     assertThat(projection.aggregateKolOrders(List.of(), null, null)).isEmpty();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldSumIncomeDetailFlowsAsWithdrawableForOrdersWithSettlementFlows() {
+    OrderDO order = new OrderDO();
+    order.setId(5001L);
+    order.setShopId(30L);
+    order.setWeidianOrderId("WD-1");
+    OrderDO unsettled = new OrderDO();
+    unsettled.setId(5002L);
+    unsettled.setShopId(30L);
+    unsettled.setWeidianOrderId("WD-2");
+    when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order, unsettled));
+    when(settlementFlows.listByRemoteOrderId(30L, "WD-1"))
+        .thenReturn(List.of(flow("收入", "货款收入", "6500"), flow("支出", "交易手续费", "-20")));
+    when(settlementFlows.listByRemoteOrderId(30L, "WD-2")).thenReturn(List.of());
+
+    Map<Long, BigDecimal> withdrawable =
+        projection.weidianWithdrawableByOrderIds(List.of(5001L, 5002L));
+
+    // Display total 65.00 - 0.20 = 64.80; an order without settlement flows is absent (null).
+    assertThat(withdrawable).containsOnlyKeys(5001L);
+    assertThat(withdrawable.get(5001L)).isEqualByComparingTo("64.80");
+  }
+
+  private static OrderSettlementFlowDO flow(String tradeType, String subType, String amount) {
+    OrderSettlementFlowDO flow = new OrderSettlementFlowDO();
+    flow.setTradeType(tradeType);
+    flow.setTradeSubType(subType);
+    flow.setAmountRaw(new BigDecimal(amount));
+    flow.setQueryType(SettlementBasisCalculator.QUERY_INCOME_DETAIL);
+    return flow;
   }
 }

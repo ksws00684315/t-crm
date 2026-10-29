@@ -12,14 +12,15 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests of the settlement basis check (task 76 §3.3, confirmed rules of 2026-10-28). All
- * hand-computations assume the default unit constant (fen) — the task 75 review note's best guess,
- * pending M0 step 11.
+ * Unit tests of the settlement basis check (task 81, design §4.8 / §8.3, owner decisions of
+ * 2026-10-29): the basis is the pay amount from payment on and the goods-income flow only confirms
+ * it. All hand-computations assume the default unit constant (fen), pending M0 step 11.
  */
 class SettlementBasisCalculatorTest {
+  private static final Instant PAY_TIME = Instant.parse("2026-10-10T08:00:00Z");
   private static final Instant INCOME_TIME = Instant.parse("2026-10-20T08:00:00Z");
   private static final long SHOP = 30L;
-  private static final String ORDER = "WD-76-1";
+  private static final String ORDER = "WD-81-1";
 
   @Test
   void shouldConvertFenToCnyExactly() {
@@ -32,142 +33,147 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
-  void shouldReturnNoSettlementWhenNoFlowMatches() {
-    BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), items(1), List.of());
+  void shouldAccrueFromPayAmountBeforeSettlement() {
+    // Simulated order (2026-10-29 record): pay 65.00 = goods A 40.00 + goods B 20.00 + freight.
+    // 65.00 x 40/60 = 43.33; 65.00 x 20/60 = 21.67; no tail. Paid, no settlement flow yet.
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("65.00"), simulatedLines(), List.of());
+
+    assertThat(outcome.reason()).isEqualTo("NO_SETTLEMENT");
+    assertThat(outcome.settlementTime()).isNull();
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("43.33");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("21.67");
+  }
+
+  @Test
+  void shouldNotAccrueUnpaidOrder() {
+    OrderDO unpaid = order("65.00");
+    unpaid.setPayTime(null);
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(unpaid, simulatedLines(), List.of(income("6500")));
 
     assertThat(outcome.reason()).isEqualTo("NO_SETTLEMENT");
     assertThat(outcome.lineBasis()).isEmpty();
   }
 
   @Test
-  void shouldReturnUnknownFlowTypeOutsideKnownSets() {
-    // A tradeType/tradeSubType pair the doc example never mentions blocks the whole order.
-    List<OrderSettlementFlowDO> flows =
-        List.of(
-            income("600"),
-            flow("支出", "平台服务费", "-4", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+  void shouldConfirmWithGoodsIncomeAndReleaseAtItsTradeTime() {
+    // Goods income 6500 fen = 65.00 matches pay: settled, release time = its tradeTime.
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(
+            order("65.00"), simulatedLines(), List.of(income("6500")));
 
-    assertThat(SettlementBasisCalculator.compute(order("6.00"), items(1), flows).reason())
-        .isEqualTo("UNKNOWN_FLOW_TYPE");
-    // A missing type value is equally unknown.
-    assertThat(
-            SettlementBasisCalculator.compute(
-                    order("6.00"),
-                    items(1),
-                    List.of(
-                        flow(
-                            null,
-                            "交易手续费",
-                            "-4",
-                            INCOME_TIME,
-                            SettlementBasisCalculator.QUERY_INCOME_DETAIL)))
-                .reason())
-        .isEqualTo("UNKNOWN_FLOW_TYPE");
-    assertThat(
-            SettlementBasisCalculator.compute(
-                    order("6.00"),
-                    items(1),
-                    List.of(
-                        flow(
-                            "支出",
-                            null,
-                            "-4",
-                            INCOME_TIME,
-                            SettlementBasisCalculator.QUERY_INCOME_DETAIL)))
-                .reason())
-        .isEqualTo("UNKNOWN_FLOW_TYPE");
+    assertThat(outcome.reason()).isNull();
+    assertThat(outcome.settlementTime()).isEqualTo(INCOME_TIME);
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("43.33");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("21.67");
   }
 
   @Test
-  void shouldReturnIncomeMismatchOnWrongUnitOrMissingIncome() {
-    // Unit deliberately wrong: the API returned yuan, we assume fen. 6 yuan -> 0.06 != pay 6.00.
-    List<OrderSettlementFlowDO> yuanFlows =
+  void shouldIgnoreFeesProfitShareRefundsAndUnknownSubtypesWhenConfirming() {
+    // Fee -20, profit share -10, a refund flow and a never-seen subtype: none of them enters the
+    // basis or blocks confirmation. The basis stays the goods income 65.00.
+    List<OrderSettlementFlowDO> flows =
         List.of(
-            flow("收入", "货款收入", "6", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
-            flow(
-                "支出",
-                "交易手续费",
-                "-0.04",
-                INCOME_TIME,
-                SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+            income("6500"),
+            flow("支出", "交易手续费", "-20", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
+            flow("支出", "分润", "-10", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
+            flow("支出", "退款", "-600", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
+            flow("其他", "未知", "7", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
 
-    assertThat(SettlementBasisCalculator.compute(order("6.00"), items(1), yuanFlows).reason())
-        .isEqualTo("INCOME_MISMATCH");
-    // Goods-income row without tradeTime: no determined settlement time, so the order stays
-    // unverified instead of verifying and never releasing (review rework, task 76).
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("65.00"), simulatedLines(), flows);
+
+    assertThat(outcome.reason()).isNull();
+    assertThat(outcome.settlementTime()).isEqualTo(INCOME_TIME);
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("43.33");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("21.67");
+  }
+
+  @Test
+  void shouldKeepAccrualButNotConfirmWhenGoodsIncomeMismatches() {
+    // Wrong unit: the API returned yuan, we read fen. 65 yuan -> 0.65 != pay 65.00. The accrual
+    // from the pay amount stays, release waits, and the reason is queryable.
+    BasisOutcome wrongUnit =
+        SettlementBasisCalculator.compute(order("65.00"), simulatedLines(), List.of(income("65")));
+    assertThat(wrongUnit.reason()).isEqualTo("INCOME_MISMATCH");
+    assertThat(wrongUnit.settlementTime()).isNull();
+    assertThat(wrongUnit.lineBasis().get(9001L)).isEqualByComparingTo("43.33");
+    assertThat(wrongUnit.lineBasis().get(9002L)).isEqualByComparingTo("21.67");
+  }
+
+  @Test
+  void shouldReturnIncomeMismatchOnMissingOrAmbiguousGoodsIncome() {
+    // Goods-income row without tradeTime: no determined settlement time, so it is not confirmed.
     assertThat(
             SettlementBasisCalculator.compute(
-                    order("6.00"),
-                    items(1),
+                    order("65.00"),
+                    simulatedLines(),
                     List.of(
                         flow(
                             "收入",
                             "货款收入",
-                            "600",
+                            "6500",
                             null,
                             SettlementBasisCalculator.QUERY_INCOME_DETAIL)))
                 .reason())
         .isEqualTo("INCOME_MISMATCH");
-    // No goods-income row at all.
+    // No goods-income row at all, only a fee.
     assertThat(
-            SettlementBasisCalculator.compute(
-                    order("6.00"),
-                    items(1),
-                    List.of(
-                        flow(
-                            "支出",
-                            "交易手续费",
-                            "-4",
-                            INCOME_TIME,
-                            SettlementBasisCalculator.QUERY_INCOME_DETAIL)))
+            SettlementBasisCalculator.compute(order("65.00"), simulatedLines(), List.of(fee("-20")))
                 .reason())
         .isEqualTo("INCOME_MISMATCH");
     // Two goods-income rows are ambiguous.
     assertThat(
             SettlementBasisCalculator.compute(
-                    order("6.00"), items(1), List.of(income("600"), income("600")))
+                    order("65.00"), simulatedLines(), List.of(income("6500"), income("6500")))
                 .reason())
         .isEqualTo("INCOME_MISMATCH");
-    // An unparsable amount anywhere blocks the signed sum.
+    // An unparsable goods-income amount blocks confirmation.
     OrderSettlementFlowDO broken =
-        flow("支出", "交易手续费", null, INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL);
+        flow("收入", "货款收入", null, INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL);
     assertThat(
-            SettlementBasisCalculator.compute(
-                    order("6.00"), items(1), List.of(income("600"), broken))
+            SettlementBasisCalculator.compute(order("65.00"), simulatedLines(), List.of(broken))
                 .reason())
         .isEqualTo("INCOME_MISMATCH");
   }
 
   @Test
   void shouldReturnMultipleKolsWhenOrderSpansTwoKols() {
-    List<OrderSettlementFlowDO> flows = List.of(income("600"));
+    List<OrderItemDO> lines = List.of(item(9001L, 101L, "4.00"), item(9002L, 202L, "2.00"));
 
-    assertThat(SettlementBasisCalculator.compute(order("6.00"), items(2), flows).reason())
+    assertThat(
+            SettlementBasisCalculator.compute(order("6.00"), lines, List.of(income("600")))
+                .reason())
+        .isEqualTo("MULTIPLE_KOLS");
+    assertThat(SettlementBasisCalculator.compute(order("6.00"), lines, List.of()).reason())
         .isEqualTo("MULTIPLE_KOLS");
   }
 
   @Test
   void shouldReturnAllocationFailedWhenEveryLinePayIsZero() {
-    OrderDO order = order("6.00");
     List<OrderItemDO> zeroPay = List.of(item(9001L, 101L, "0.00"), item(9002L, 101L, "0.00"));
 
-    assertThat(SettlementBasisCalculator.compute(order, zeroPay, List.of(income("600"))).reason())
+    assertThat(
+            SettlementBasisCalculator.compute(order("6.00"), zeroPay, List.of(income("600")))
+                .reason())
+        .isEqualTo("ALLOCATION_FAILED");
+    assertThat(SettlementBasisCalculator.compute(order("6.00"), zeroPay, List.of()).reason())
         .isEqualTo("ALLOCATION_FAILED");
   }
 
   @Test
-  void shouldAllocateSignedSumAcrossTwoLinesWithTailOnLargestPay() {
-    // Hand-computed: basis = 600 - 4 = 596 fen = 5.96. Lines pay 4.00 and 2.00 (total 6.00):
-    // 5.96 x 4/6 = 3.9733.. -> 3.97; 5.96 x 2/6 = 1.98667 -> 1.99; allocated 5.96, tail 0.00.
+  void shouldAllocateGoodsIncomeAcrossTwoLinesWithTailOnLargestPay() {
+    // Pay 4.00 and 2.00 (total 6.00), goods income 6.00 -> 4.00 and 2.00 exactly. The fee of -0.04
+    // does not reduce the basis (task 81).
     List<OrderSettlementFlowDO> flows = List.of(income("600"), fee("-4"));
     BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), items(1), flows);
 
     assertThat(outcome.reason()).isNull();
     assertThat(outcome.settlementTime()).isEqualTo(INCOME_TIME);
-    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("3.97");
-    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("1.99");
-    assertThat(outcome.lineBasis().get(9001L).add(outcome.lineBasis().get(9002L)))
-        .isEqualByComparingTo("5.96");
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("2.00");
   }
 
   @Test
@@ -176,8 +182,8 @@ class SettlementBasisCalculatorTest {
     // basis 10.00 -> 1.67 + 3.33 + 5.00 = 10.00, tail 0.00;
     // basis 0.05 -> 0.01 + 0.02 + 0.03 = 0.06, tail -0.01 lands on the largest pay line
     // (9003): 0.03 - 0.01 = 0.02, so the lines still add up to 0.05.
-    List<OrderSettlementFlowDO> flows = List.of(income("1005"), fee("-5"));
-    BasisOutcome ten = SettlementBasisCalculator.compute(order("10.05"), items3(), flows);
+    List<OrderSettlementFlowDO> flows = List.of(income("1000"), fee("-5"));
+    BasisOutcome ten = SettlementBasisCalculator.compute(order("10.00"), items3(), flows);
     assertThat(ten.lineBasis().get(9001L)).isEqualByComparingTo("1.67");
     assertThat(ten.lineBasis().get(9002L)).isEqualByComparingTo("3.33");
     assertThat(ten.lineBasis().get(9003L)).isEqualByComparingTo("5.00");
@@ -205,9 +211,9 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
-  void shouldReduceBasisWhenPartialRefundFlowExists() {
-    // Hand-computed: income 600, fee -4, partial refund -60 (all fen) -> basis 536 fen = 5.36.
-    // The income row still matches pay 6.00, so the order verifies with the reduced basis.
+  void shouldIgnorePartialRefundFlowsInBasis() {
+    // Partial refund -60 fen sits in INCOME_DETAIL but is netted by the commission engine
+    // (basisIncludesRefund = FALSE), so the basis stays the goods income 6.00.
     List<OrderSettlementFlowDO> flows =
         List.of(
             income("600"),
@@ -217,13 +223,13 @@ class SettlementBasisCalculatorTest {
     BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), items(1), flows);
 
     assertThat(outcome.reason()).isNull();
-    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("3.57");
-    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("1.79");
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("2.00");
   }
 
   @Test
   void shouldGiveZeroBasisToPreSettleFullRefundOrders() {
-    // Listed under PRE_SETTLE_REFUND only: the amount is determined to be zero, verified, and
+    // Listed under PRE_SETTLE_REFUND only: the basis is determined to be zero, verified, and
     // without a settlement time the release basis stays UNSETTLED.
     List<OrderSettlementFlowDO> flows =
         List.of(
@@ -243,18 +249,16 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
-  void shouldPreferIncomeDetailWhenBothQueryTypesExist() {
-    // A settled order whose full refund arrived after settlement: the signed sum already nets it
-    // out, so the INCOME_DETAIL path governs rather than the pre-settle zero basis.
+  void shouldPreferConfirmedIncomeWhenBothQueryTypesExist() {
+    // A settled order that also lists a pre-settle full refund: the goods income confirms the
+    // basis, so the pre-settle zero path does not apply.
     List<OrderSettlementFlowDO> flows =
         List.of(
             income("600"),
-            fee("-4"),
-            flow("支出", "退款", "-596", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
             flow(
                 "支出",
                 "退款",
-                "-596",
+                "-600",
                 INCOME_TIME,
                 SettlementBasisCalculator.QUERY_PRE_SETTLE_REFUND));
 
@@ -262,7 +266,44 @@ class SettlementBasisCalculatorTest {
 
     assertThat(outcome.reason()).isNull();
     assertThat(outcome.settlementTime()).isEqualTo(INCOME_TIME);
-    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("0.00");
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
+  }
+
+  @Test
+  void shouldSumIncomeDetailFlowsAsWithdrawableAmount() {
+    // Display-only total: 65.00 - 0.20 - 0.10 = 64.70 (the 2026-10-29 simulated order).
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            income("6500"),
+            fee("-20"),
+            flow("支出", "分润", "-10", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    assertThat(SettlementBasisCalculator.incomeDetailTotal(flows)).isEqualByComparingTo("64.70");
+  }
+
+  @Test
+  void shouldReturnNullWithdrawableWithoutIncomeDetailOrReadableAmount() {
+    assertThat(SettlementBasisCalculator.incomeDetailTotal(List.of())).isNull();
+    assertThat(
+            SettlementBasisCalculator.incomeDetailTotal(
+                List.of(
+                    flow(
+                        "支出",
+                        "退款",
+                        "-600",
+                        INCOME_TIME,
+                        SettlementBasisCalculator.QUERY_PRE_SETTLE_REFUND))))
+        .isNull();
+    assertThat(
+            SettlementBasisCalculator.incomeDetailTotal(
+                List.of(
+                    flow(
+                        "支出",
+                        "交易手续费",
+                        null,
+                        INCOME_TIME,
+                        SettlementBasisCalculator.QUERY_INCOME_DETAIL))))
+        .isNull();
   }
 
   private static OrderDO order(String payAmount) {
@@ -270,6 +311,7 @@ class SettlementBasisCalculatorTest {
     order.setId(5001L);
     order.setShopId(SHOP);
     order.setWeidianOrderId(ORDER);
+    order.setPayTime(PAY_TIME);
     order.setPayAmount(new BigDecimal(payAmount));
     return order;
   }
@@ -279,6 +321,11 @@ class SettlementBasisCalculatorTest {
     OrderItemDO first = item(9001L, 101L, "4.00");
     OrderItemDO second = item(9002L, kolCount > 1 ? 202L : 101L, "2.00");
     return List.of(first, second);
+  }
+
+  /** Goods A 40.00 and goods B 20.00 of the simulated order, one KOL. */
+  private static List<OrderItemDO> simulatedLines() {
+    return List.of(item(9001L, 101L, "40.00"), item(9002L, 101L, "20.00"));
   }
 
   /** One KOL, three lines paying 1.00, 2.00 and 3.00. */

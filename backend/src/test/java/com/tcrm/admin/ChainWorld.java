@@ -288,8 +288,9 @@ final class ChainWorld {
   }
 
   /**
-   * Goods income 6500 fen equals pay 65.00. Fee -20 and profit share -10 make the basis 64.70.
-   * Extra rows (a later refund, an unmatched order) are appended.
+   * Goods income 6500 fen equals pay 65.00, which confirms the basis. Fee -20 and profit share -10
+   * are listed for realism and never enter the basis (task 81). Extra rows (a later refund, an
+   * unmatched order) are appended.
    */
   void stubIncome(ChainSamples.Flow... extra) {
     List<ChainSamples.Flow> rows = new ArrayList<>();

@@ -15,16 +15,14 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Pure computation of an order's commission basis from its persisted Weidian settlement flows (task
- * 76, design §4.8 / §8.3, ADR-032 2026-10-28 revision). Fail-safe by design: any fact that does not
- * match the confirmed rules leaves the order unverified with a queryable reason code, so a wrong
- * unit or an unexpected flow type can never produce a wrong commission.
+ * Pure computation of an order's commission basis (task 81, design §4.8 / §8.3, ADR-032 2026-10-29
+ * revision). Owner decisions of 2026-10-29: the basis is the order's pay amount (freight included)
+ * from payment on, split across item lines by pay ratio, so accrual starts when the order is paid.
+ * The Weidian settlement only confirms the basis: the goods-income flow must match the pay amount,
+ * and its settlement time then drives the release. Fees, profit share and refunds in the settlement
+ * flows never enter the basis.
  *
- * <p>Confirmed rules (owner 2026-10-28): the basis is the signed sum of every INCOME_DETAIL flow of
- * the order (goods income, fees, profit share, refunds); freight is not deducted; a single-order
- * basis is split across item lines by each line's pay ratio with the rounding tail on the largest
- * line; pre-settle full refunds have a basis of 0.00; release follows the settlement time of the
- * goods-income flow only.
+ * <p>Unverified orders carry a queryable reason code: unpaid, multiple KOLs, allocation failure.
  */
 public final class SettlementBasisCalculator {
   /** Query type of the regular income detail (partial refunds included). */
@@ -41,30 +39,18 @@ public final class SettlementBasisCalculator {
   static final boolean AMOUNT_IN_MINOR_UNITS = true;
 
   /**
-   * Known {@code tradeType} values, from the open-platform doc example (income / expense). The doc
-   * itself is behind a login, so these follow the recorded example in the task 75 prompt; actual
-   * values are pending M0 step 11. A value outside this set fails the whole order safely.
+   * The subtype of the goods-income row; its amount confirms the basis and its tradeTime is the
+   * order's settlement time. Pending M0 step 11 like {@link #AMOUNT_IN_MINOR_UNITS}.
    */
-  static final Set<String> KNOWN_TRADE_TYPES = Set.of("收入", "支出");
-
-  /**
-   * Known {@code tradeSubType} values from the open-platform doc example rows. Pending M0 step 11
-   * like {@link #KNOWN_TRADE_TYPES}.
-   */
-  static final Set<String> KNOWN_TRADE_SUB_TYPES = Set.of("货款收入", "交易手续费", "分润", "退款");
-
-  /** The subtype of the goods-income row; its tradeTime is the order's settlement time. */
   static final String TRADE_SUB_TYPE_GOODS_INCOME = "货款收入";
 
-  /** No matched settlement flow at all. */
+  /** Not paid yet, or no matched settlement flow while paid: the basis accrues, unconfirmed. */
   public static final String REASON_NO_SETTLEMENT = "NO_SETTLEMENT";
 
-  /** A flow type outside the known sets; the order stays unverified. */
-  public static final String REASON_UNKNOWN_FLOW_TYPE = "UNKNOWN_FLOW_TYPE";
-
   /**
-   * Not exactly one goods-income row, an unparsable amount, or the converted goods income differs
-   * from {@code crm_order.pay_amount} (a wrong unit lands here, preventing a 100x commission).
+   * Not exactly one goods-income row, a row without tradeTime, an unparsable amount, or the
+   * converted goods income differs from {@code crm_order.pay_amount} (a wrong unit lands here,
+   * preventing a 100x commission). The basis still accrues from the pay amount; release waits.
    */
   public static final String REASON_INCOME_MISMATCH = "INCOME_MISMATCH";
 
@@ -89,6 +75,12 @@ public final class SettlementBasisCalculator {
   /** Computes the per-line basis of one order; no database or clock access. */
   public static BasisOutcome compute(
       OrderDO order, List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
+    if (order.getPayTime() == null) {
+      return BasisOutcome.unverified(REASON_NO_SETTLEMENT);
+    }
+    if (distinctKols(items).size() > 1) {
+      return BasisOutcome.unverified(REASON_MULTIPLE_KOLS);
+    }
     List<OrderSettlementFlowDO> incomeFlows = new ArrayList<>();
     boolean preSettleListed = false;
     for (OrderSettlementFlowDO flow : flows) {
@@ -98,39 +90,47 @@ public final class SettlementBasisCalculator {
         preSettleListed = true;
       }
     }
-    if (incomeFlows.isEmpty() && !preSettleListed) {
-      return BasisOutcome.unverified(REASON_NO_SETTLEMENT);
-    }
-    if (flows.stream().anyMatch(SettlementBasisCalculator::unknownType)) {
-      return BasisOutcome.unverified(REASON_UNKNOWN_FLOW_TYPE);
-    }
     if (incomeFlows.isEmpty()) {
-      // Pre-settle full refund: the amount is determined to be zero, so no commission can arise.
-      Map<Long, BigDecimal> zeros = new HashMap<>();
-      for (OrderItemDO item : items) {
-        zeros.put(item.getId(), ZERO);
+      if (preSettleListed) {
+        // Pre-settle full refund: the basis is determined to be zero, so no commission can arise.
+        Map<Long, BigDecimal> zeros = new HashMap<>();
+        for (OrderItemDO item : items) {
+          zeros.put(item.getId(), ZERO);
+        }
+        return new BasisOutcome(null, null, zeros);
       }
-      return new BasisOutcome(null, null, zeros);
+      return accrueUnconfirmed(order, items, REASON_NO_SETTLEMENT);
     }
     OrderSettlementFlowDO income = singleGoodsIncome(incomeFlows);
-    BigDecimal orderBasis = signedIncomeTotal(incomeFlows);
     // A goods-income row without tradeTime has no determined settlement time: the order would
-    // verify but never release (UNSETTLED forever, without a reason). Treat it as a mismatch so
-    // it stays unverified with a queryable reason (review rework, task 76).
-    if (income == null
-        || income.getTradeTime() == null
-        || orderBasis == null
-        || !incomeMatchesPay(income, order)) {
-      return BasisOutcome.unverified(REASON_INCOME_MISMATCH);
+    // verify but never release (UNSETTLED forever, without a reason). Keep it unconfirmed instead.
+    if (income == null || income.getTradeTime() == null || !incomeMatchesPay(income, order)) {
+      return accrueUnconfirmed(order, items, REASON_INCOME_MISMATCH);
     }
-    if (distinctKols(items).size() > 1) {
-      return BasisOutcome.unverified(REASON_MULTIPLE_KOLS);
-    }
-    Map<Long, BigDecimal> lineBasis = allocate(orderBasis, items);
+    Map<Long, BigDecimal> lineBasis = allocate(toCny(income.getAmountRaw()), items);
     if (lineBasis == null) {
       return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
     }
     return new BasisOutcome(null, income.getTradeTime(), lineBasis);
+  }
+
+  /**
+   * Signed sum in CNY of the INCOME_DETAIL flows (the Weidian withdrawable amount, display only);
+   * null when the order has none or an amount cannot be read.
+   */
+  static BigDecimal incomeDetailTotal(List<OrderSettlementFlowDO> flows) {
+    BigDecimal total = null;
+    for (OrderSettlementFlowDO flow : flows) {
+      if (!QUERY_INCOME_DETAIL.equals(flow.getQueryType())) {
+        continue;
+      }
+      BigDecimal cny = toCny(flow.getAmountRaw());
+      if (cny == null) {
+        return null;
+      }
+      total = total == null ? cny : total.add(cny);
+    }
+    return total;
   }
 
   /** Converts a raw flow amount to CNY with two decimals and no precision loss. */
@@ -142,11 +142,17 @@ public final class SettlementBasisCalculator {
     return cny.setScale(2, RoundingMode.HALF_UP);
   }
 
-  private static boolean unknownType(OrderSettlementFlowDO flow) {
-    return flow.getTradeType() == null
-        || !KNOWN_TRADE_TYPES.contains(flow.getTradeType())
-        || flow.getTradeSubType() == null
-        || !KNOWN_TRADE_SUB_TYPES.contains(flow.getTradeSubType());
+  /** Accrues the pay amount without a confirmed settlement time; release stays blocked. */
+  private static BasisOutcome accrueUnconfirmed(
+      OrderDO order, List<OrderItemDO> items, String reason) {
+    if (order.getPayAmount() == null) {
+      return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
+    }
+    Map<Long, BigDecimal> lineBasis = allocate(order.getPayAmount(), items);
+    if (lineBasis == null) {
+      return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
+    }
+    return new BasisOutcome(reason, null, lineBasis);
   }
 
   private static OrderSettlementFlowDO singleGoodsIncome(List<OrderSettlementFlowDO> flows) {
@@ -160,19 +166,6 @@ public final class SettlementBasisCalculator {
       }
     }
     return found;
-  }
-
-  /** Signed sum of every flow's converted amount; null when any amount is missing or unparsable. */
-  private static BigDecimal signedIncomeTotal(List<OrderSettlementFlowDO> flows) {
-    BigDecimal total = ZERO;
-    for (OrderSettlementFlowDO flow : flows) {
-      BigDecimal cny = toCny(flow.getAmountRaw());
-      if (cny == null) {
-        return null;
-      }
-      total = total.add(cny);
-    }
-    return total;
   }
 
   private static boolean incomeMatchesPay(OrderSettlementFlowDO income, OrderDO order) {
