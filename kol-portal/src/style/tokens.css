@@ -81,6 +81,9 @@
   --el-color-info: var(--tcrm-color-text-secondary);
   --el-color-success-light-9: var(--tcrm-color-success-bg);
   --el-color-warning-light-9: var(--tcrm-color-warning-bg);
+  --el-color-error: var(--tcrm-color-danger);
+  --el-color-error-light-9: var(--tcrm-color-danger-bg);
+  --el-color-error-light-8: var(--tcrm-color-danger-bg);
   --el-color-danger-light-9: var(--tcrm-color-danger-bg);
   --el-color-info-light-9: var(--tcrm-color-muted);
   --el-color-success-light-8: var(--tcrm-color-success-bg);

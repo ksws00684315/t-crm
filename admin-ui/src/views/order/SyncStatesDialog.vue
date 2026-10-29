@@ -100,7 +100,7 @@ function asFailure(row: object): SyncFailureVO {
 }
 
 function dataTypeText(type: SyncDataType): string {
-  return t(`order.sync.typeOption.${type}`);
+  return type ? t(`order.sync.typeOption.${type}`) : "-";
 }
 
 function failureKindText(kind: SyncFailureKind): string {

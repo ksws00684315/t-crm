@@ -584,6 +584,12 @@ function canMove(index: number, delta: -1 | 1): boolean {
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
+.data-table.is-fill {
+  flex: 1 1 0;
+}
+.data-table.is-fill > .data-table__body {
+  flex: 1 1 0;
+}
 .data-table.is-legacy-order {
   padding: var(--tcrm-space-3);
 }

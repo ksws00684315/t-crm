@@ -440,6 +440,9 @@ function asModule(row: object): PermissionModule {
   }
 }
 @media (max-width: 767px) {
+  .permission-card__head :deep(.el-checkbox) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
   .post-template-page__actions {
     justify-content: flex-start;
   }

@@ -367,6 +367,9 @@ function close() {
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-help);
 }
+[data-test="no-copy-capacity"] {
+  margin-bottom: var(--tcrm-space-4);
+}
 .capacity-error {
   color: var(--tcrm-color-danger);
 }

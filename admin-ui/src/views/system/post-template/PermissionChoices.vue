@@ -75,6 +75,9 @@ const focused = ref<string | null>(null);
   white-space: nowrap;
 }
 @media (max-width: 767px) {
+  .permission-choice :deep(.el-checkbox) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
   .permission-choices {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

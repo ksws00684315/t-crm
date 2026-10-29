@@ -217,7 +217,7 @@ onMounted(load);
 
 .notification-page__item {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--tcrm-space-3);
   align-items: center;
   padding: var(--tcrm-space-3);
@@ -248,6 +248,7 @@ onMounted(load);
 }
 
 .notification-page__time {
+  white-space: nowrap;
   font-weight: 400;
   color: var(--el-text-color-secondary);
 }
@@ -255,5 +256,14 @@ onMounted(load);
 .notification-page__pager {
   align-self: flex-end;
   padding-top: var(--tcrm-space-3);
+}
+@media (max-width: 767px) {
+  .notification-page__item {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--tcrm-space-1) var(--tcrm-space-2);
+  }
+  .notification-page__time {
+    grid-column: 2;
+  }
 }
 </style>

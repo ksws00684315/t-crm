@@ -264,10 +264,12 @@ onMounted(() => {
       @clear-filters="reset"
     >
       <template #cell-fileName="{ row }">{{ asTask(row).fileName ?? "-" }}</template>
-      <template #cell-type="{ row }">{{ t(`importTask.typeOption.${asTask(row).type}`) }}</template>
+      <template #cell-type="{ row }">{{
+        asTask(row).type ? t(`importTask.typeOption.${asTask(row).type}`) : "-"
+      }}</template>
       <template #cell-status="{ row }">
         <el-tag :type="statusTag(asTask(row).status)" data-test="task-status">
-          {{ t(`importTask.statusOption.${asTask(row).status}`) }}
+          {{ asTask(row).status ? t(`importTask.statusOption.${asTask(row).status}`) : "-" }}
         </el-tag>
       </template>
       <template #cell-totalRows="{ row }">{{ asTask(row).totalRows }}</template>

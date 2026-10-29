@@ -140,4 +140,12 @@ function toggleGroup(codes: readonly string[], checked: boolean): void {
   font-size: var(--tcrm-font-size-body);
   line-height: 22px;
 }
+@media (max-width: 767px) {
+  .perm-group :deep(.el-checkbox) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
+  .perm-group__head :deep(.el-checkbox) {
+    align-items: center;
+  }
+}
 </style>

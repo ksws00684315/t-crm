@@ -15,6 +15,7 @@ import {
 } from "@/api/commission/prepay";
 import PrepayStatusTag from "./PrepayStatusTag.vue";
 import CopyText from "@/components/CopyText.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import ApplicationDetailsForm from "./ApplicationDetailsForm.vue";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
@@ -44,6 +45,8 @@ const canApprove = computed(
       : detail.value?.status === "PENDING_FINANCE_REVIEW" && abilities.value.financeReview)
 );
 const detail = ref<PrepayDetail | null>(null);
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 const loading = ref(false);
 const saving = ref(false);
 const preparing = ref(false);
@@ -375,7 +378,12 @@ async function submitPayment() {
       </div>
       <span v-else>{{ t("prepay.title") }}</span>
     </template>
-    <div v-loading="loading || recipientBusy" class="prepay-detail" data-test="prepay-detail">
+    <div
+      ref="detailRegion"
+      v-loading="loading || recipientBusy"
+      class="prepay-detail"
+      data-test="prepay-detail"
+    >
       <template v-if="detail">
         <ol class="progress" :aria-label="t('prepay.statusLabel')">
           <li
@@ -430,9 +438,11 @@ async function submitPayment() {
           </el-tab-pane>
           <el-tab-pane v-if="paymentStage" :label="t('prepay.paymentInfo')" name="payment">
             <section v-if="detail.payment" class="payment-summary">
-              <el-descriptions :column="2" border>
+              <el-descriptions :column="detailColumns" border>
                 <el-descriptions-item :label="t('prepay.payAmount')"
-                  >{{ detail.payment.payAmountCny }} CNY</el-descriptions-item
+                  ><span class="payment-amount"
+                    >{{ detail.payment.payAmountCny }} CNY</span
+                  ></el-descriptions-item
                 >
                 <el-descriptions-item :label="t('prepay.payTime')">{{
                   formatInstant(detail.payment.payTime)
@@ -443,12 +453,12 @@ async function submitPayment() {
                 <el-descriptions-item :label="t('prepay.actorRole.PAYMENT')">{{
                   person(detail.payment.operatorName, detail.payment.operatorRole || "PAYMENT")
                 }}</el-descriptions-item>
-                <el-descriptions-item :label="t('prepay.payRemark')" :span="2"
+                <el-descriptions-item :label="t('prepay.payRemark')" :span="detailColumns"
                   ><span class="record-reason">{{
                     detail.payment.payRemark || "—"
                   }}</span></el-descriptions-item
                 >
-                <el-descriptions-item :label="t('prepay.voucher')" :span="2"
+                <el-descriptions-item :label="t('prepay.voucher')" :span="detailColumns"
                   ><el-button
                     data-test="prepay-download-voucher"
                     link
@@ -624,6 +634,13 @@ async function submitPayment() {
   </el-dialog>
 </template>
 <style scoped>
+.payment-summary :deep(.el-descriptions__label) {
+  width: 112px;
+}
+.payment-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .prepay-detail {
   overflow-wrap: anywhere;
 }
@@ -709,7 +726,7 @@ async function submitPayment() {
 }
 .payment-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 24px;
   margin-top: 16px;
 }
