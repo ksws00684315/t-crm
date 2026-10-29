@@ -31,7 +31,7 @@ beforeAll(() => {
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: () => undefined });
 });
 
-function failure(errorCode: string, status = 409) {
+function failure(errorCode: string, status = 404) {
   return new ApiError({ errorCode, status, traceId: "test-trace" });
 }
 
@@ -44,7 +44,7 @@ function account(overrides: Partial<PayoutAccountVO> = {}): PayoutAccountVO {
     currency: null,
     network: "TRC20",
     qrFileId: null,
-    status: "PENDING",
+    status: "APPROVED",
     defaultAccount: false,
     rejectReason: null,
     lastSubmittedAt: "2026-10-16T08:00:00Z",
@@ -227,14 +227,14 @@ describe("payout account dialog", () => {
     expect(wrapper.find('[data-test="qr-preview"]').exists()).toBe(true);
   });
 
-  it("prefills an edited account and resubmits it", async () => {
+  it("prefills an approved account and saves the edit", async () => {
     const edited = account({
       accountType: "PAYPAL",
       account: "old@example.com",
       holderName: "Old",
       network: null,
       currency: "EUR",
-      status: "REJECTED"
+      status: "APPROVED"
     });
     const wrapper = await openDialog(edited);
     expect((wrapper.get("#payout-account").element as HTMLInputElement).value).toBe(
@@ -252,8 +252,8 @@ describe("payout account dialog", () => {
     expect(wrapper.emitted("saved")).toHaveLength(1);
   });
 
-  it("reports a locked account instead of saving and lets the page refresh", async () => {
-    vi.mocked(api.updatePayoutAccount).mockRejectedValue(failure("PAYOUT_ACCOUNT_LOCKED"));
+  it("reports a disabled account (404) instead of saving and lets the page refresh", async () => {
+    vi.mocked(api.updatePayoutAccount).mockRejectedValue(failure("COMMON_NOT_FOUND", 404));
     const wrapper = await openDialog(account());
     await submit(wrapper);
     expect(wrapper.emitted("conflict")).toHaveLength(1);

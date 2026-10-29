@@ -81,7 +81,7 @@ afterEach(() => {
 });
 async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
   const wrapper = mount(component, {
-    props: { modelValue: false, kol: { id: "3", kolCode: "KOL-test", name: "Test" }, id: "9" },
+    props: { modelValue: false, id: "9" },
     attachTo: document.body,
     global: {
       plugins: [ElementPlus, i18n],
@@ -101,6 +101,11 @@ async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
   await wrapper.setProps({ modelValue: true });
   await flushPromises();
   return wrapper;
+}
+/** The apply dialog picks its creator from the remote select (task 82); the stub emits the value. */
+async function pickKol(wrapper: VueWrapper, kolId = "3") {
+  wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", kolId);
+  await flushPromises();
 }
 async function set(wrapper: VueWrapper, name: string, value: string) {
   const input = wrapper.get(`[data-test="${name}"]`);
@@ -201,6 +206,7 @@ describe("prepay safe submission", () => {
   it("retains the application UUID and immutable payload after an ambiguous failure", async () => {
     vi.mocked(api.applyPrepay).mockRejectedValue(new Error("network"));
     const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper);
     await set(wrapper, "prepay-amount", "100.00");
     await flushPromises();
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
@@ -307,12 +313,13 @@ describe("prepay safe submission", () => {
       expect(api.approvePrepay).not.toHaveBeenCalled();
     }
   );
-  it("shows only identity amount and readonly state and submits a minimal application", async () => {
+  it("starts without a creator and submits a minimal application for the picked creator", async () => {
     vi.mocked(api.applyPrepay).mockResolvedValue({ ...detail, status: "WAITING_DETAILS" });
     useUserStore().user!.nickname = "Business operator";
     const wrapper = await open(ApplyDialog);
-    expect(wrapper.get('[data-test="prepay-creator-name"]').text()).toBe("Test");
-    expect(wrapper.get('[data-test="prepay-creator-code"]').text()).toBe("KOL-test");
+    // No creator yet: submit is disabled and no application is looked up.
+    expect(wrapper.get('[data-test="prepay-submit"]').attributes("disabled")).toBeDefined();
+    expect(api.getActivePrepay).not.toHaveBeenCalled();
     expect(wrapper.get('[data-test="prepay-application-status"]').text()).toContain("待申请");
     expect(wrapper.text()).not.toContain("Business operator");
     expect(api.prepayAccounts).not.toHaveBeenCalled();
@@ -325,6 +332,8 @@ describe("prepay safe submission", () => {
     ]) {
       expect(wrapper.find('[data-test="' + field + '"]').exists()).toBe(false);
     }
+    await pickKol(wrapper, "3");
+    expect(api.getActivePrepay).toHaveBeenCalledWith("3");
     await set(wrapper, "prepay-amount", "100.00");
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
@@ -340,6 +349,7 @@ describe("prepay safe submission", () => {
   });
   it("requires a positive CNY amount", async () => {
     const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper);
     for (const value of ["", "0", "-1", "1.001"]) {
       await set(wrapper, "prepay-amount", value);
       await wrapper.get('[data-test="prepay-submit"]').trigger("click");

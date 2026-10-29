@@ -14,6 +14,7 @@ export interface PayoutAccountRowVO {
   currency: string | null;
   network: "TRC20" | "ERC20" | "BEP20" | "SOL" | "TON" | null;
   qrFileId: string | null;
+  /** Accounts are in effect at once (task 82); PENDING and REJECTED are history only. */
   status: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
   defaultAccount: boolean;
   rejectReason: string | null;
@@ -27,10 +28,12 @@ export interface PayoutAccountDetailVO extends PayoutAccountRowVO {
 }
 
 export interface PayoutAccountQuery {
-  /** `ALL` lists every status; the review queue `PENDING` is the default. */
+  /** Unset or `ALL` lists every status, disabled accounts included. */
   status?: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED" | "ALL";
   type?: "PAYPAL" | "USDT";
   kolCode?: string;
+  /** Exact creator id, used by the creator's fund dialog. */
+  kolId?: string;
   page: number;
   size: number;
 }
@@ -45,43 +48,17 @@ export function listPayoutAccounts(
       status: query.status,
       type: query.type,
       kolCode: query.kolCode || undefined,
+      kolId: query.kolId || undefined,
       page: query.page,
       size: query.size
     }
   });
 }
 
-/** Accounts the caller may review; feeds the menu badge (0 renders no badge). */
-export async function fetchPayoutPendingCount(): Promise<number> {
-  const result = await http.request<{ count: string } | null>({
-    method: "get",
-    url: "/commission/payout-accounts/pending-count"
-  });
-  return Number(result?.count) || 0;
-}
-
 export function getPayoutAccount(id: string): Promise<PayoutAccountDetailVO> {
   return http.request<PayoutAccountDetailVO>({
     method: "get",
     url: `/commission/payout-accounts/${id}`
-  });
-}
-
-export interface ReviewPayoutAccountPayload {
-  action: "APPROVE" | "REJECT";
-  reason?: string;
-  /** Version the reviewer saw, sent back exactly as received; a mismatch is a 409. */
-  lastSubmittedAt: string;
-}
-
-export function reviewPayoutAccount(
-  id: string,
-  payload: ReviewPayoutAccountPayload
-): Promise<null> {
-  return http.request<null>({
-    method: "put",
-    url: `/commission/payout-accounts/${id}/review`,
-    data: payload
   });
 }
 

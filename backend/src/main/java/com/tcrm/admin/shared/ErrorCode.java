@@ -70,8 +70,6 @@ public enum ErrorCode {
   ORDER_SYNC_RUNNING(409, "Order synchronization is already running for this shop"),
   LINK_REBUILD_RUNNING(409, "A link index rebuild is already running"),
   PAYOUT_ACCOUNT_LIMIT(422, "Payout account count limit reached"),
-  PAYOUT_ACCOUNT_LOCKED(409, "Approved payout accounts cannot be changed; create a new one"),
-  PAYOUT_ACCOUNT_NOT_PENDING(409, "Account was changed or already reviewed; refresh and try again"),
   PAYOUT_ACCOUNT_NOT_APPROVED(422, "Only approved payout accounts can be the default"),
   PAYOUT_ACCOUNT_IN_USE(409, "Payout account is referenced by a withdrawal still in flight"),
   WITHDRAWAL_REQUEST_CONFLICT(409, "Withdrawal request id was reused with different data"),

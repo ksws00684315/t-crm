@@ -378,8 +378,8 @@ final class ChainWorld {
     return data(ADMIN, token, "/admin-api/commission/settlement-details?orderNo=" + ids.order());
   }
 
-  /** PayPal account, approved by the assigned BD. Returns the account id. */
-  long approvePayout() throws Exception {
+  /** PayPal account, in effect at once (task 82: no review). Returns the account id. */
+  long createPayout() throws Exception {
     JsonNode created =
         created(
             KOL_HEADER,
@@ -388,18 +388,7 @@ final class ChainWorld {
             "{\"accountType\":\"PAYPAL\",\"account\":\"t79-"
                 + ids.suffix()
                 + "@example.test\",\"holderName\":\"T79 Creator\",\"currency\":\"USD\"}");
-    String id = created.path("id").asString();
-    // last_submitted_at is TIMESTAMPTZ(3). The create response still carries the in-memory
-    // instant, so the reviewer reads the stored stamp from the detail the same way the UI does.
-    String stamp =
-        data(ADMIN, bdToken, "/admin-api/commission/payout-accounts/" + id)
-            .path("lastSubmittedAt")
-            .asString();
-    putOk(
-        "/admin-api/commission/payout-accounts/" + id + "/review",
-        bdToken,
-        "{\"action\":\"APPROVE\",\"lastSubmittedAt\":\"" + stamp + "\"}");
-    return Long.parseLong(id);
+    return Long.parseLong(created.path("id").asString());
   }
 
   long applyWithdrawal(long payoutAccountId, String amount) throws Exception {

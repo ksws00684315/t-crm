@@ -1,7 +1,6 @@
 /**
  * Interval polling that follows tab visibility, without any component lifecycle. One instance
- * backs both the notification bell (through `useVisibilityPolling`) and the payout-pending store
- * (task 24 §4.1).
+ * backs the notification bell (through `useVisibilityPolling`) (task 24 §4.1).
  *
  * Behavior: `start` runs `load` once right away and then every `intervalMs`; a hidden tab stops
  * the timer (and a tick that fires anyway, say after a missed event, is skipped); becoming

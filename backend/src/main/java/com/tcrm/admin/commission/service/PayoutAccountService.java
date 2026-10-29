@@ -12,13 +12,11 @@ import com.tcrm.admin.commission.model.PayoutAccountType;
 import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.SecretCipher;
-import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.shared.api.SystemConfigApi;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.time.Instant;
@@ -26,21 +24,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Payout account rules (task 15a §4.2): entered by the KOL, reviewed by the owning BD or a super
- * admin. The account is stored encrypted and shown masked everywhere except the KOL's own list and
- * the reviewer's detail view. Accounts are disabled, never deleted; approved accounts are locked.
+ * Payout account rules (task 15a §4.2, task 82): entered by the KOL and in effect at once, with no
+ * review (2026-10-29). The KOL may edit any account that is not disabled; each withdrawal keeps its
+ * own snapshot. The account is stored encrypted and shown masked everywhere except the KOL's own
+ * list and the reviewer's detail view. Accounts are disabled, never deleted.
  */
 @Service
 public class PayoutAccountService {
-  private static final Logger LOG = LoggerFactory.getLogger(PayoutAccountService.class);
   private final SystemConfigApi configs;
 
   /** KOL-side write payload after bean validation; one shape per account type. */
@@ -106,12 +101,9 @@ public class PayoutAccountService {
       Instant lastSubmittedAt,
       Instant reviewedTime) {}
 
-  public record Filter(String status, String type, String kolCode, int page, int size) {}
-
-  public enum ReviewAction {
-    APPROVE,
-    REJECT
-  }
+  /** Admin list filter; {@code kolId} is the exact KOL used by the fund dialog (task 82). */
+  public record Filter(
+      String status, String type, String kolCode, Long kolId, int page, int size) {}
 
   private final PayoutAccountMapper accounts;
   private final WithdrawalMapper withdrawals;
@@ -120,7 +112,6 @@ public class PayoutAccountService {
   private final SecretCipher cipher;
   private final TransactionTemplate tx;
   private final ExternalAuditApi audit;
-  private final ApplicationEventPublisher events;
 
   @Autowired
   public PayoutAccountService(
@@ -131,7 +122,6 @@ public class PayoutAccountService {
       SecretCipher cipher,
       TransactionTemplate tx,
       ExternalAuditApi audit,
-      ApplicationEventPublisher events,
       SystemConfigApi configs) {
     this.accounts = accounts;
     this.withdrawals = withdrawals;
@@ -140,7 +130,6 @@ public class PayoutAccountService {
     this.cipher = cipher;
     this.tx = tx;
     this.audit = audit;
-    this.events = events;
     this.configs = configs;
   }
 
@@ -151,8 +140,7 @@ public class PayoutAccountService {
       KolApi kols,
       SecretCipher cipher,
       TransactionTemplate tx,
-      ExternalAuditApi audit,
-      ApplicationEventPublisher events) {
+      ExternalAuditApi audit) {
     this(
         accounts,
         withdrawals,
@@ -161,7 +149,6 @@ public class PayoutAccountService {
         cipher,
         tx,
         audit,
-        events,
         new SystemConfigApi() {
           @Override
           public String getValue(String key) {
@@ -191,14 +178,14 @@ public class PayoutAccountService {
   }
 
   /**
-   * New account: PENDING, encrypted, with the QR file claimed in the same transaction. The KOL row
-   * is locked first, so counting the live accounts and inserting happen atomically per KOL and two
-   * concurrent creates cannot both pass the limit (task 15a review).
+   * New account: APPROVED at once (task 82, no review), encrypted, with the QR file claimed in the
+   * same transaction. The KOL row is locked first, so counting the live accounts and inserting
+   * happen atomically per KOL and two concurrent creates cannot both pass the limit (task 15a).
    */
   public KolAccountDTO create(long kolId, SaveCommand c, KolAudit auditContext) {
     PayoutAccountDO account = new PayoutAccountDO();
     account.setKolId(kolId);
-    account.setStatus(PayoutAccountStatus.PENDING);
+    account.setStatus(PayoutAccountStatus.APPROVED);
     applyFields(account, c);
     account.setIsDefault(false);
     account.setLastSubmittedAt(Instant.now());
@@ -214,34 +201,27 @@ public class PayoutAccountService {
           if (c.qrFileId() != null) {
             files.claimQrFile(kolId, c.qrFileId(), account.getId());
           }
-          publishSubmitted(kolId, account.getId(), c.type(), auditContext.tenantId());
         });
     auditKol(auditContext, kolId, account.getId(), "Create", account.getAccountMasked());
     return toKolDto(account, c.account());
   }
 
   /**
-   * Edit of a PENDING or REJECTED account: back to PENDING with the review cleared. An APPROVED
-   * account is locked (409 PAYOUT_ACCOUNT_LOCKED); a disabled or foreign account is a 404.
+   * Edit of any account that is not disabled; it stays APPROVED and takes effect at once. Past
+   * withdrawals keep their own snapshot, so the change does not reach them. A disabled or foreign
+   * account is a 404, and a disable that lands between the read and the update is a 404 too.
    */
   public void update(long kolId, long accountId, SaveCommand c, KolAudit auditContext) {
     PayoutAccountDO existing = requireKolAccount(kolId, accountId);
-    if (existing.getStatus() == PayoutAccountStatus.APPROVED) {
-      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LOCKED);
-    }
     Instant now = Instant.now();
     tx.executeWithoutResult(
         status -> {
-          // The status condition makes the read above advisory: a review that committed in between
-          // stops this update (0 rows) instead of overwriting APPROVED back to PENDING.
+          // The status condition keeps a concurrent disable from being overwritten (0 rows).
           int updated =
               accounts.update(
                   null,
                   scoped(accountId)
-                      .in(
-                          PayoutAccountDO::getStatus,
-                          PayoutAccountStatus.PENDING,
-                          PayoutAccountStatus.REJECTED)
+                      .ne(PayoutAccountDO::getStatus, PayoutAccountStatus.DISABLED)
                       .set(PayoutAccountDO::getAccountType, c.type())
                       .set(PayoutAccountDO::getAccountCipher, cipher.encrypt(c.account()))
                       .set(PayoutAccountDO::getAccountMasked, AccountMasker.mask(c.account()))
@@ -249,46 +229,17 @@ public class PayoutAccountService {
                       .set(PayoutAccountDO::getCurrency, currencyOf(c))
                       .set(PayoutAccountDO::getUsdtNetwork, networkOf(c))
                       .set(PayoutAccountDO::getQrFileId, c.qrFileId())
-                      .set(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
+                      .set(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
                       .set(PayoutAccountDO::getRejectReason, null)
-                      .set(PayoutAccountDO::getReviewedBy, null)
-                      .set(PayoutAccountDO::getReviewedTime, null)
                       .set(PayoutAccountDO::getLastSubmittedAt, now)
                       .set(PayoutAccountDO::getUpdateBy, kolId)
                       .set(PayoutAccountDO::getUpdateTime, now));
           if (updated == 0) {
-            throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_LOCKED);
+            throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
           }
           claimQrOnEdit(kolId, accountId, existing.getQrFileId(), c.qrFileId());
-          publishSubmitted(kolId, accountId, c.type(), auditContext.tenantId());
         });
     auditKol(auditContext, kolId, accountId, "Edit", AccountMasker.mask(c.account()));
-  }
-
-  /**
-   * Notifies the creator's current BD and every enabled super admin. A missing creator code skips
-   * the event and does not fail the account save. Account numbers stay out of the event.
-   */
-  private void publishSubmitted(long kolId, Long accountId, PayoutAccountType type, long tenantId) {
-    if (accountId == null) {
-      return;
-    }
-    List<KolRefDTO> refs = kols.listByIds(List.of(kolId));
-    String kolCode = null;
-    if (refs != null) {
-      kolCode =
-          refs.stream()
-              .map(KolRefDTO::kolCode)
-              .filter(code -> code != null && !code.isBlank())
-              .findFirst()
-              .orElse(null);
-    }
-    if (kolCode == null) {
-      LOG.warn("Payout account {} has no creator code; notification skipped", accountId);
-      return;
-    }
-    TransactionalEvents.publish(
-        events, new PayoutAccountSubmittedEvent(tenantId, kolId, accountId, kolCode, type.name()));
   }
 
   /** Default account: only an APPROVED one, exactly one per KOL. */
@@ -357,8 +308,9 @@ public class PayoutAccountService {
   // ------------------------------------------------------------------ Admin side
 
   /**
-   * Account page for reviewers and read-only viewers: masked accounts only, newest submission
-   * first; the status default is PENDING (the review queue, task 15a §4.5).
+   * Account list for reviewers and read-only viewers: masked accounts only, newest submission
+   * first, every status including disabled ones unless the caller filters (task 82: no default
+   * status filter).
    */
   public PageResult<AdminAccountDTO> page(AccountDTO admin, Filter f) {
     PayoutAccountStatus status = statusOrNull(f.status());
@@ -368,7 +320,7 @@ public class PayoutAccountService {
             .eq(status != null, PayoutAccountDO::getStatus, status)
             .eq(type != null, PayoutAccountDO::getAccountType, type)
             .orderByDesc(PayoutAccountDO::getLastSubmittedAt, PayoutAccountDO::getId);
-    List<Long> visible = visibleKolIds(admin, f.kolCode());
+    List<Long> visible = visibleKolIds(admin, f.kolCode(), f.kolId());
     if (visible != null) {
       if (visible.isEmpty()) {
         return new PageResult<>(List.of(), 0, f.page(), f.size());
@@ -405,56 +357,6 @@ public class PayoutAccountService {
         account.getRejectReason(),
         account.getLastSubmittedAt(),
         account.getReviewedTime());
-  }
-
-  /**
-   * Review of a PENDING account: APPROVE locks it, REJECT returns it to the KOL with a reason. The
-   * caller passes the {@code lastSubmittedAt} it saw; the update only matches the very version, so
-   * a KOL edit or another review that landed in between changes 0 rows and returns 409 instead of
-   * approving content the reviewer never saw (task 15a review).
-   */
-  public void review(
-      AccountDTO admin, long id, ReviewAction action, String reason, Instant lastSubmittedAt) {
-    PayoutAccountDO account = requireAdminAccount(admin, id);
-    if (account.getStatus() != PayoutAccountStatus.PENDING) {
-      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING);
-    }
-    Instant now = Instant.now();
-    int updated =
-        accounts.update(
-            null,
-            scoped(id)
-                .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING)
-                .eq(PayoutAccountDO::getLastSubmittedAt, lastSubmittedAt)
-                .set(
-                    PayoutAccountDO::getStatus,
-                    action == ReviewAction.APPROVE
-                        ? PayoutAccountStatus.APPROVED
-                        : PayoutAccountStatus.REJECTED)
-                .set(
-                    PayoutAccountDO::getRejectReason, action == ReviewAction.REJECT ? reason : null)
-                .set(PayoutAccountDO::getReviewedBy, admin.id())
-                .set(PayoutAccountDO::getReviewedTime, now)
-                .set(PayoutAccountDO::getUpdateBy, admin.id())
-                .set(PayoutAccountDO::getUpdateTime, now));
-    if (updated == 0) {
-      throw new BusinessException(ErrorCode.PAYOUT_ACCOUNT_NOT_PENDING);
-    }
-  }
-
-  /** Pending accounts the admin may review; the count backs a future menu badge (task 15a §4.5). */
-  public long pendingCount(AccountDTO admin) {
-    LambdaQueryWrapper<PayoutAccountDO> query =
-        new LambdaQueryWrapper<PayoutAccountDO>()
-            .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.PENDING);
-    List<Long> visible = visibleKolIds(admin, null);
-    if (visible != null) {
-      if (visible.isEmpty()) {
-        return 0;
-      }
-      query.in(PayoutAccountDO::getKolId, visible);
-    }
-    return accounts.selectCount(query);
   }
 
   /**
@@ -551,11 +453,18 @@ public class PayoutAccountService {
 
   /**
    * Kol ids whose accounts the admin may see: null means every KOL of the company; an empty list
-   * means none (OWN scope without KOLs, or a kolCode that matches no KOL).
+   * means none (OWN scope without KOLs, or a kolCode / kolId that matches no visible KOL).
    */
-  private List<Long> visibleKolIds(AccountDTO admin, String kolCode) {
+  private List<Long> visibleKolIds(AccountDTO admin, String kolCode, Long kolId) {
     if (kolCode != null && !kolCode.isBlank()) {
       KolRefDTO kol = kols.getByCode(kolCode.strip());
+      if (kol == null || (admin.ownScope() && !admin.id().equals(kol.bdUserId()))) {
+        return List.of();
+      }
+      return List.of(kol.id());
+    }
+    if (kolId != null) {
+      KolRefDTO kol = kols.listByIds(List.of(kolId)).stream().findFirst().orElse(null);
       if (kol == null || (admin.ownScope() && !admin.id().equals(kol.bdUserId()))) {
         return List.of();
       }

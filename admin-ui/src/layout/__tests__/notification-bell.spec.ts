@@ -160,6 +160,8 @@ describe("notification bell", () => {
   });
 
   it("marks a message read and does not navigate without permission", async () => {
+    // Without kol:view the creator list target is closed.
+    storeState.user = { role: "STAFF", dataScope: "OWN", permissions: [], postTemplate: "BD" };
     const { wrapper, router } = await mountBell();
     const push = vi.spyOn(router, "push");
     await wrapper.get("[data-test=notification-bell]").trigger("click");
@@ -190,6 +192,6 @@ describe("notification bell", () => {
     allowed?.click();
     await flushPromises();
     expect(api.markNotificationRead).toHaveBeenCalledWith("77");
-    expect(push).toHaveBeenCalledWith("/fund/payouts?id=77");
+    expect(push).toHaveBeenCalledWith("/kol/kols");
   });
 });

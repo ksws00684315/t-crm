@@ -9,7 +9,6 @@ import { routes } from "@/router/routes";
 import { useCompanySync } from "@/composables/useCompanySync";
 import { useLocaleStore } from "@/stores/locale";
 import { useMenuSearchStore } from "@/stores/menu-search";
-import { usePayoutPendingStore } from "@/stores/payout-pending";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
@@ -37,7 +36,6 @@ const router = useRouter();
 const user = useUserStore();
 const localeStore = useLocaleStore();
 const menuSearch = useMenuSearchStore();
-const payoutPending = usePayoutPendingStore();
 const reauth = useReauthStore();
 const tabs = useTabsStore();
 const company = useCompanySync();
@@ -50,18 +48,7 @@ const mac = isMacPlatform();
 const access = computed(() => accessOf(user.user));
 const menu = computed(() => {
   void localeStore.locale;
-  const items = buildMenu(routes, access.value);
-  // The pending-review badge rides on the review entry; zero renders no badge (task 15b §4.2.5).
-  const badge = payoutPending.count;
-  if (badge > 0) {
-    for (const item of items) {
-      for (const child of item.children ?? []) {
-        if (child.path === "/fund/payouts") child.badge = badge;
-      }
-      if (item.path === "/fund/payouts") item.badge = badge;
-    }
-  }
-  return items;
+  return buildMenu(routes, access.value);
 });
 const roleText = computed(() => (user.user ? accountLabel(user.user) : ""));
 const tenantLabel = computed(() => {
@@ -149,11 +136,9 @@ watch(
 
 onMounted(() => {
   user.refreshProfile().catch(() => undefined);
-  payoutPending.start();
 });
 
 onBeforeUnmount(() => {
-  payoutPending.stop();
   unsubscribeNarrow();
 });
 </script>

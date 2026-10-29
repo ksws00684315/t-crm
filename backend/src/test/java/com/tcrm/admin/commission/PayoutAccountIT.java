@@ -39,8 +39,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Task 15a against real PostgreSQL and Redis: payout account lifecycle from the KOL portal, review
- * from the admin side, BD data scope, company isolation, file rules and audit.
+ * Task 15a against real PostgreSQL and Redis: payout account lifecycle from the KOL portal, admin
+ * list and detail (no review since task 82), BD data scope, company isolation, file rules, audit.
  */
 @Tag("docker")
 @Testcontainers
@@ -261,32 +261,6 @@ class PayoutAccountIT {
     return count;
   }
 
-  /** Reads the current submission stamp of the account, as the reviewer UI would. */
-  private String lastSubmittedOf(String token, long id) throws Exception {
-    return mvc.perform(
-            get("/admin-api/commission/payout-accounts/" + id).header(ADMIN_TOKEN, token))
-        .andExpect(status().isOk())
-        .andReturn()
-        .getResponse()
-        .getContentAsString()
-        .transform(body -> json.readTree(body).at("/data/lastSubmittedAt").asText());
-  }
-
-  private void review(String token, long id, String action, String reason, String stamp)
-      throws Exception {
-    StringBuilder body = new StringBuilder("{\"action\":\"").append(action).append("\"");
-    if (reason != null) {
-      body.append(",\"reason\":\"").append(reason).append("\"");
-    }
-    body.append(",\"lastSubmittedAt\":\"").append(stamp).append("\"}");
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + id + "/review")
-                .header(ADMIN_TOKEN, token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body.toString()))
-        .andExpect(status().isOk());
-  }
-
   private long createPaypal(LoggedKol kol, String account) throws Exception {
     String body =
         mvc.perform(
@@ -319,7 +293,7 @@ class PayoutAccountIT {
   // ------------------------------------------------------------------- tests
 
   @Test
-  void shouldRunTheWholeLifecycle_fromSubmissionToLockAndDefault() throws Exception {
+  void shouldRunTheWholeLifecycle_fromCreationToDisableAndDefault() throws Exception {
     long bd = staff("bd-review", "OWN", "payout-account:review", "kol:edit");
     String reviewer = loginStaff("bd-review");
     LoggedKol kol = kol("Alice", "alice@example.com", bd);
@@ -344,6 +318,20 @@ class PayoutAccountIT {
     long paypalId = createPaypal(kol, "alice.pay@example.com");
     assertThat(jdbc.queryForObject("SELECT biz_id FROM crm_file WHERE id = ?", Long.class, qrFile))
         .isEqualTo(usdtId);
+
+    // No review since task 82: new accounts are APPROVED at once and carry no reviewer.
+    assertThat(
+            jdbc.queryForList(
+                "SELECT status FROM crm_payout_account WHERE kol_id = ?", String.class, kol.id()))
+        .containsOnly("APPROVED");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_payout_account"
+                    + " WHERE kol_id = ?"
+                    + " AND (reviewed_by IS NOT NULL OR reviewed_time IS NOT NULL)",
+                Long.class,
+                kol.id()))
+        .isZero();
 
     // The owner sees full accounts; the database only ever holds ciphertext.
     String mine =
@@ -372,9 +360,12 @@ class PayoutAccountIT {
         .andExpect(jsonPath("$.data.account").value("alice.pay@example.com"));
     assertThat(awaitAuditRows("View detail")).isEqualTo(1);
 
-    // Approving with the stamp of a version the reviewer never saw (the KOL edited in between) is
-    // a 409 and the account stays PENDING with the new content; refreshing and retrying works.
-    String staleStamp = lastSubmittedOf(reviewer, paypalId);
+    // The new PayPal account is already APPROVED, so it can be the default right away.
+    mvc.perform(
+            put("/kol-api/payout-accounts/" + paypalId + "/default").header(KOL_TOKEN, kol.token()))
+        .andExpect(status().isOk());
+
+    // Editing an approved account is allowed: it stays APPROVED and the masked value follows.
     mvc.perform(
             put("/kol-api/payout-accounts/" + paypalId)
                 .header(KOL_TOKEN, kol.token())
@@ -383,91 +374,20 @@ class PayoutAccountIT {
                     "{\"accountType\":\"PAYPAL\",\"account\":\"resubmitted@example.com\","
                         + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
         .andExpect(status().isOk());
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"APPROVE\",\"lastSubmittedAt\":\"" + staleStamp + "\"}"))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
     assertThat(
             jdbc.queryForObject(
                 "SELECT status FROM crm_payout_account WHERE id = ?", String.class, paypalId))
-        .isEqualTo("PENDING");
-
-    // Approve locks the account; only approved accounts can become the default.
-    review(reviewer, paypalId, "APPROVE", null, lastSubmittedOf(reviewer, paypalId));
-    // A second review with the consumed stamp is the "two reviewers at once" case: 409.
+        .isEqualTo("APPROVED");
     mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"action\":\"APPROVE\",\"lastSubmittedAt\":\""
-                        + lastSubmittedOf(reviewer, paypalId)
-                        + "\"}"))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
-    mvc.perform(
-            put("/kol-api/payout-accounts/" + paypalId)
-                .header(KOL_TOKEN, kol.token())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"accountType\":\"PAYPAL\",\"account\":\"other@example.com\","
-                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_LOCKED"));
-    mvc.perform(
-            put("/kol-api/payout-accounts/" + paypalId + "/default").header(KOL_TOKEN, kol.token()))
-        .andExpect(status().isOk());
-
-    // Rejecting without a reason is a field error; with one, the KOL can fix and resubmit.
-    long third = createPaypal(kol, "third@example.com");
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + third + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"REJECT\"}"))
-        .andExpect(status().isBadRequest());
-    review(reviewer, third, "REJECT", "wrong holder name", lastSubmittedOf(reviewer, third));
-    mvc.perform(get("/kol-api/payout-accounts").header(KOL_TOKEN, kol.token()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[?(@.id == '" + third + "')].status").value("REJECTED"))
+            get("/admin-api/commission/payout-accounts?kolId=" + kol.id())
+                .header(ADMIN_TOKEN, reviewer))
         .andExpect(
-            jsonPath("$.data[?(@.id == '" + third + "')].rejectReason").value("wrong holder name"));
-    mvc.perform(
-            put("/kol-api/payout-accounts/" + third)
-                .header(KOL_TOKEN, kol.token())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"accountType\":\"PAYPAL\",\"account\":\"fixed@example.com\","
-                        + "\"holderName\":\"Alice D\",\"currency\":\"USD\"}"))
-        .andExpect(status().isOk());
-    mvc.perform(get("/admin-api/commission/payout-accounts/" + third).header(ADMIN_TOKEN, reviewer))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.status").value("PENDING"))
-        .andExpect(jsonPath("$.data.rejectReason").doesNotExist());
+            jsonPath("$.data.items[?(@.id == '" + paypalId + "')].accountMasked")
+                .value("re***@example.com"))
+        .andExpect(
+            jsonPath("$.data.items[?(@.id == '" + paypalId + "')].status").value("APPROVED"));
 
-    // Setting a non-approved account as default is rejected.
-    mvc.perform(
-            put("/kol-api/payout-accounts/" + third + "/default").header(KOL_TOKEN, kol.token()))
-        .andExpect(status().isUnprocessableEntity())
-        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_APPROVED"));
-
-    // Reviewing a non-pending account conflicts.
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + paypalId + "/review")
-                .header(ADMIN_TOKEN, reviewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"action\":\"APPROVE\",\"lastSubmittedAt\":\""
-                        + lastSubmittedOf(reviewer, paypalId)
-                        + "\"}"))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.errorCode").value("PAYOUT_ACCOUNT_NOT_PENDING"));
-
-    // Approve the USDT account and switch the default: exactly one remains.
-    review(reviewer, usdtId, "APPROVE", null, lastSubmittedOf(reviewer, usdtId));
+    // Switching the default to the USDT account: exactly one remains.
     mvc.perform(
             put("/kol-api/payout-accounts/" + usdtId + "/default").header(KOL_TOKEN, kol.token()))
         .andExpect(status().isOk());
@@ -639,7 +559,7 @@ class PayoutAccountIT {
     mvc.perform(get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, two))
         .andExpect(status().isOk());
 
-    // A read-only funds viewer lists but never reviews; without the codes nothing is visible.
+    // A read-only funds viewer lists but cannot open details; without the codes nothing is visible.
     staff("funds-view", "ALL", "commission:view");
     String viewer = loginStaff("funds-view");
     mvc.perform(get("/admin-api/commission/payout-accounts").header(ADMIN_TOKEN, viewer))
@@ -647,12 +567,6 @@ class PayoutAccountIT {
         .andExpect(jsonPath("$.data.total").value(1));
     mvc.perform(
             get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, viewer))
-        .andExpect(status().isForbidden());
-    mvc.perform(
-            put("/admin-api/commission/payout-accounts/" + accountId + "/review")
-                .header(ADMIN_TOKEN, viewer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"action\":\"APPROVE\"}"))
         .andExpect(status().isForbidden());
     staff("plain-op", "ALL", "kol:view");
     String plain = loginStaff("plain-op");
@@ -703,22 +617,88 @@ class PayoutAccountIT {
   }
 
   @Test
-  void shouldCountPendingPerScope() throws Exception {
-    long bd = staff("bd-count", "OWN", "payout-account:review", "kol:edit");
-    LoggedKol mine = kol("Eve", "eve@example.com", bd);
-    LoggedKol unassigned = kol("Finn", "finn@example.com", null);
-    createPaypal(mine, "eve@example.com");
-    createPaypal(mine, "eve2@example.com");
-    createPaypal(unassigned, "finn@example.com");
+  void shouldSetDefaultRightAfterCreatingTwoAccounts() throws Exception {
+    LoggedKol kol = kol("Finn", "finn@example.com", null);
+    long qrFile = uploadQr(kol, "finn.png", PNG);
+    long paypalId = createPaypal(kol, "finn.pay@example.com");
+    long usdtId =
+        Long.parseLong(
+            mvc.perform(
+                    post("/kol-api/payout-accounts")
+                        .header(KOL_TOKEN, kol.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            "{\"accountType\":\"USDT\",\"account\":\"TQ5xnPW9tZ3kA7qL9bb\","
+                                + "\"network\":\"TRC20\",\"qrFileId\":\""
+                                + qrFile
+                                + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+                .transform(body -> json.readTree(body).at("/data/id").asText()));
 
-    String bdToken = loginStaff("bd-count");
     mvc.perform(
-            get("/admin-api/commission/payout-accounts/pending-count").header(ADMIN_TOKEN, bdToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.count").value("2"));
+            put("/kol-api/payout-accounts/" + paypalId + "/default").header(KOL_TOKEN, kol.token()))
+        .andExpect(status().isOk());
     mvc.perform(
-            get("/admin-api/commission/payout-accounts/pending-count").header(ADMIN_TOKEN, admin))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.count").value("3"));
+            put("/kol-api/payout-accounts/" + usdtId + "/default").header(KOL_TOKEN, kol.token()))
+        .andExpect(status().isOk());
+    assertThat(
+            jdbc.queryForList(
+                "SELECT id FROM crm_payout_account WHERE kol_id = ? AND is_default",
+                Long.class,
+                kol.id()))
+        .containsExactly(usdtId);
+  }
+
+  @Test
+  void shouldListEveryStatusAndFilterByKolId() throws Exception {
+    long bd = staff("bd-list", "OWN", "payout-account:review", "kol:edit");
+    String bdToken = loginStaff("bd-list");
+    LoggedKol mine = kol("Gina", "gina@example.com", bd);
+    LoggedKol other = kol("Hugo", "hugo@example.com", null);
+    long ginaPaypal = createPaypal(mine, "gina@example.com");
+    createPaypal(mine, "gina2@example.com");
+    createPaypal(other, "hugo@example.com");
+    // Disabled accounts stay in the admin list: no status filter is applied by default.
+    mvc.perform(
+            put("/kol-api/payout-accounts/" + ginaPaypal + "/disable")
+                .header(KOL_TOKEN, mine.token()))
+        .andExpect(status().isOk());
+
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?kolId=" + mine.id())
+                .header(ADMIN_TOKEN, admin))
+        .andExpect(jsonPath("$.data.total").value(2))
+        .andExpect(
+            jsonPath("$.data.items[?(@.id == '" + ginaPaypal + "')].status").value("DISABLED"));
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?status=ALL&kolCode=" + mine.kolCode())
+                .header(ADMIN_TOKEN, admin))
+        .andExpect(jsonPath("$.data.total").value(2));
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?status=DISABLED&kolId=" + mine.id())
+                .header(ADMIN_TOKEN, admin))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items[0].id").value(String.valueOf(ginaPaypal)));
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?status=APPROVED&kolId=" + mine.id())
+                .header(ADMIN_TOKEN, admin))
+        .andExpect(jsonPath("$.data.total").value(1));
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?kolId=" + other.id())
+                .header(ADMIN_TOKEN, admin))
+        .andExpect(jsonPath("$.data.total").value(1));
+
+    // An OWN-scope BD gets an empty list for a KOL that is not assigned to them.
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?kolId=" + other.id())
+                .header(ADMIN_TOKEN, bdToken))
+        .andExpect(jsonPath("$.data.total").value(0));
+    mvc.perform(
+            get("/admin-api/commission/payout-accounts?kolId=" + mine.id())
+                .header(ADMIN_TOKEN, bdToken))
+        .andExpect(jsonPath("$.data.total").value(2));
   }
 }

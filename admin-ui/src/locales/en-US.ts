@@ -132,8 +132,8 @@ const enUS: MessageSchema = {
       desc: "Freeze or unfreeze a creator's withdrawals"
     },
     "payout-account:review": {
-      name: "Review payout accounts",
-      desc: "Approve or reject a creator's payout account"
+      name: "View payout accounts",
+      desc: "View creators' payout accounts, including full accounts and QR codes"
     },
     "withdrawal:review": {
       name: "Review withdrawals",
@@ -331,9 +331,6 @@ const enUS: MessageSchema = {
     ORDER_SYNC_RUNNING: "Order synchronization is already running for this shop.",
     LINK_REBUILD_RUNNING: "A tracking-link index rebuild is already running. Try again later.",
     PAYOUT_ACCOUNT_LIMIT: "The configured payout account limit has been reached.",
-    PAYOUT_ACCOUNT_LOCKED: "Approved accounts cannot be changed. Add a new one instead.",
-    PAYOUT_ACCOUNT_NOT_PENDING:
-      "The account was changed or already reviewed. Refresh and try again.",
     PAYOUT_ACCOUNT_NOT_APPROVED: "Only approved accounts can be the default.",
     PAYOUT_ACCOUNT_IN_USE: "This payout account is still referenced by a withdrawal in flight.",
     WITHDRAWAL_REQUEST_CONFLICT:
@@ -722,7 +719,7 @@ const enUS: MessageSchema = {
     frozen: "Creator frozen",
     unfrozen: "Creator unfrozen",
     saved: "Creator saved",
-    editTitle: "Edit profile {code}",
+    editTitle: "Basic info {code}",
     whatsapp: "WhatsApp",
     whatsappPlaceholder: "With country code, e.g. +8613800000000",
     phone: "Phone",
@@ -735,7 +732,6 @@ const enUS: MessageSchema = {
     handlePlaceholder: "e.g. {'@'}creator",
     inviteTime: "Invited at",
     inviter: "Invited by",
-    prepay: "Prepay",
     sheetUrl: "Creator promo sheet URL",
     sheetUrlPlaceholder: "https://docs.google.com/spreadsheets/...",
     invite: "Send invite",
@@ -798,10 +794,21 @@ const enUS: MessageSchema = {
     reviewApproved: "Profile saved and approved",
     reviewAlreadyDone: "This creator is already reviewed",
     /** Row actions, fixed order (04.01). */
-    actionEdit: "Edit profile",
+    actionEdit: "Basic info",
     actionReview: "Review",
-    actionCommission: "Commission",
-    actionPrepay: "Prepay",
+    actionCommission: "Promotion",
+    actionFund: "Funds",
+    fundEmpty: "This creator has not added a payout account yet",
+    fundType: "Type",
+    fundAccount: "Account (masked)",
+    fundRecipient: "Recipient or network",
+    fundCurrency: "Currency",
+    fundDefault: "Default",
+    fundStatus: "Status",
+    fundActive: "Active",
+    fundDisabled: "Disabled",
+    fundUpdatedAt: "Last updated",
+    fundViewFull: "View full",
     actionCleanup: "Cleanup settings",
     cleanupRemaining: "{days} days left",
     actionFreeze: "Freeze",
@@ -813,8 +820,8 @@ const enUS: MessageSchema = {
     transferRecordsHint: "Transfer records are in System → Audit Log"
   },
   promotion: {
-    configTitle: "Commission",
-    configTitleWithName: "Commission - {code} ({name})",
+    configTitle: "Promotion",
+    configTitleWithName: "Promotion - {code} ({name})",
     platforms: "Agent platforms",
     platformPlaceholder: "Search and select platforms (multiple)",
     platformAddressPlaceholder: "https://creator-specific address",

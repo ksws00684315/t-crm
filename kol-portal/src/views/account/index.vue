@@ -148,8 +148,7 @@ function savePayout() {
             ...(payout.holderName.trim() ? { holderName: payout.holderName.trim() } : {}),
             ...(payout.qrFileId ? { qrFileId: payout.qrFileId } : {})
           };
-    if (currentAccount.value && ["PENDING", "REJECTED"].includes(currentAccount.value.status))
-      await updatePayoutAccount(currentAccount.value.id, payload);
+    if (currentAccount.value) await updatePayoutAccount(currentAccount.value.id, payload);
     else await createPayoutAccount(payload);
     accounts.value = await listPayoutAccounts();
     syncAccount(
@@ -336,7 +335,7 @@ function savePassword() {
                   )"
                   :key="item.id"
                   :value="item.id"
-                  :label="`${item.account} · ${t(`payoutAccounts.status.${item.status}`)}`" /></el-select
+                  :label="item.account" /></el-select
             ></el-form-item>
             <el-form-item
               :label="

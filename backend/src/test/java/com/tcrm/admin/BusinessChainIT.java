@@ -146,7 +146,7 @@ class BusinessChainIT {
     assertThat(listedOrder.path("weidianOrderId").asString()).isEqualTo(world.orderNo());
     assertAttributed(detail, listedOrder);
 
-    long payoutAccountId = world.approvePayout();
+    long payoutAccountId = world.createPayout();
     long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.47");
     world.approveWithdrawal(withdrawalId);
     world.pay(withdrawalId, "6.47");

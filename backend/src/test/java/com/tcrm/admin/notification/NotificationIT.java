@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.CompanySessions.OpenedCompany;
 import com.tcrm.admin.WeidianTestProperties;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
+import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.shared.TransactionalEvents;
@@ -91,44 +91,32 @@ class NotificationIT {
   }
 
   @Test
-  void shouldWriteAfterCommit_forTheBdAndSuperAdmins() throws Exception {
+  void shouldWriteAfterCommit_forTheCompanySuperAdmins() throws Exception {
     OpenedCompany company = open("payout");
     OpenedCompany other = open("elsewhere");
-    long bd =
-        CompanySessions.createStaff(
-            mvc, json, company.token(), PASSWORD, "bd" + company.tenantId(), "BD", "OWN", null);
     long kolId = KOL_IDS.getAndIncrement();
     jdbc.update(
-        "INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, country, bd_user_id, create_time, update_time) VALUES (?, ?, ?, 'Ada', ?, 'US', ?, now(), now())",
+        "INSERT INTO crm_kol (id, tenant_id, kol_code, name, email, country, create_time, update_time) VALUES (?, ?, ?, 'Ada', ?, 'US', now(), now())",
         kolId,
         company.tenantId(),
         "KOL-AAA" + String.format("%03d", kolId),
-        "ada" + kolId + "@example.com",
-        bd);
+        "ada" + kolId + "@example.com");
     publish(
         company.tenantId(),
-        new PayoutAccountSubmittedEvent(
-            company.tenantId(), kolId, 77L, "KOL-AAA" + String.format("%03d", kolId), "PAYPAL"));
-    assertThat(count(company.tenantId())).isEqualTo(2);
+        new BdTransferCancelledEvent(
+            company.tenantId(),
+            kolId,
+            77L,
+            "KOL-AAA" + String.format("%03d", kolId),
+            "OWNERSHIP_CHANGED"));
+    assertThat(count(company.tenantId())).isEqualTo(1);
     String params =
         jdbc.queryForObject(
             "SELECT params::text FROM crm_notification WHERE tenant_id = ? AND user_id = ?",
             String.class,
             company.tenantId(),
-            bd);
-    assertThat(params)
-        .contains("kolCode")
-        .contains("kolName")
-        .contains("Ada")
-        .contains("PAYPAL")
-        .doesNotContain("@");
-    assertThat(
-            jdbc.queryForObject(
-                "SELECT COUNT(*) FROM crm_notification WHERE tenant_id = ? AND user_id = ?",
-                Long.class,
-                company.tenantId(),
-                company.userId()))
-        .isEqualTo(1L);
+            company.userId());
+    assertThat(params).contains("kolCode").contains("kolName").contains("Ada").doesNotContain("@");
     // ADR-022: the super administrator role is per company, so another company's administrator
     // (enabled, opened before the publish) receives nothing.
     assertThat(
