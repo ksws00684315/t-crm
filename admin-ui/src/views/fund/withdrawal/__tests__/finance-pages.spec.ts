@@ -9,6 +9,7 @@ import { createFinanceDemo } from "../../../../../preview/commission/finance-eng
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import DataTable from "@/components/DataTable.vue";
+import ListSearch from "@/components/ListSearch.vue";
 import CommissionTable from "@/components/CommissionTable.vue";
 import IncomePage from "@/views/kol/income/index.vue";
 import ConfigPage from "@/views/fund/settlement-config/index.vue";
@@ -129,7 +130,7 @@ describe("finance admin pages", () => {
         .getComponent(DataTable)
         .props("columns")
         .map((column: { label: string }) => column.label)
-    ).toEqual(["申请编号", "达人名称及ID", "申请类型", "金额", "状态", "申请时间", "操作"]);
+    ).toEqual(["申请编号", "达人名称及ID", "金额", "状态", "申请时间", "操作"]);
     expect(wrapper.find('[data-test="withdrawal-kol-id"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="withdrawal-progress-action"]')).toHaveLength(4);
@@ -149,6 +150,69 @@ describe("finance admin pages", () => {
     expect(wrapper.find('[data-test="withdrawal-progress-action"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="withdrawal-view"]')).toHaveLength(8);
     expect(wrapper.find('[data-test="finance-scenario"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it("always queries commission withdrawals only, through every list entry point", async () => {
+    const wrapper = mount(TasksPage, { global });
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", page: 1 })
+    );
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ type: "PREPAY" })
+    );
+    await wrapper.get('[data-test="withdrawal-number"]').setValue("t80_WD001");
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", applicationNo: "t80_WD001", page: 1 })
+    );
+    wrapper.getComponent(ListSearch).vm.$emit("remove", "applicationNo");
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", applicationNo: "" })
+    );
+    wrapper.getComponent(DataTable).vm.$emit("update:page", 2);
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", page: 2 })
+    );
+    wrapper.getComponent(DataTable).vm.$emit("refresh");
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", page: 2 })
+    );
+    await wrapper.get('[data-test="withdrawal-number"]').setValue("t80_WD002");
+    await wrapper.get('[data-test="search"]').trigger("click");
+    await flushPromises();
+    wrapper.getComponent(ListSearch).vm.$emit("reset");
+    await flushPromises();
+    expect(api.listFinanceTasks).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "COMMISSION", applicationNo: "", page: 1 })
+    );
+    wrapper.unmount();
+  });
+  it("offers only the five commission withdrawal statuses in the filter", async () => {
+    const wrapper = mount(TasksPage, { global });
+    await flushPromises();
+    // DataTable also renders numeric page-size options; only the status filter uses string values.
+    const options = wrapper
+      .findAllComponents({ name: "ElOption" })
+      .filter(option => typeof option.props("value") === "string");
+    expect(options.map(option => option.props("value"))).toEqual([
+      "PENDING_REVIEW",
+      "PENDING_PAYMENT",
+      "PAID",
+      "REJECTED",
+      "WITHDRAWN"
+    ]);
+    expect(options.map(option => option.props("label"))).toEqual([
+      "待审核",
+      "待支付",
+      "已支付",
+      "已驳回",
+      "已撤回"
+    ]);
     wrapper.unmount();
   });
   it("opens the task drawer for the withdrawalId notification jump (L-017)", async () => {

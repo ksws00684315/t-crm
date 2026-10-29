@@ -100,7 +100,7 @@ describe("merged tab pages (task 32 §2.1)", () => {
     vi.spyOn(useUserStore(), "can").mockReturnValue(true);
     const wrapper = await mountPage(FundPayoutPage, "/fund/payouts");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["财务结算任务", "收款账户审核"]);
+    expect(labels).toEqual(["提现申请", "收款账户审核"]);
     wrapper.unmount();
   });
 

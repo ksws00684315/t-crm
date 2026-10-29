@@ -26,7 +26,7 @@ export default {
   admin: "Admin",
   portal: "Creator portal",
   income: "Creator income",
-  tasks: "Finance tasks",
+  tasks: "Withdrawal requests",
   config: "Settlement settings",
   settlements: "Settlement details",
   overview: "Commission overview",
