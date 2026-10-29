@@ -309,6 +309,9 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       ItemSourceDTO item, ResolvedRate rate, CommissionSettlementRules.Result result) {
     if (!result.verified()) {
       if (item.basisCny() == null) {
+        if (item.basisCheckReason() != null) {
+          return "Unverified: settlement basis check failed: " + item.basisCheckReason();
+        }
         return "Unverified: source commissionable amount pending M0 (Q-1017-1/2)";
       }
       if (item.kolId() == null) {

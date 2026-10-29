@@ -471,6 +471,9 @@ const enUS: MessageSchema = {
       product_links_convert_token_per_minute: "Token conversions per minute",
       product_links_resolve_token_per_minute: "Token resolutions per minute",
       weidian_qps: "Weidian requests per second",
+      weidian_settlement_sync_interval_minutes:
+        "Settlement detail incremental pull interval (minutes)",
+      weidian_settlement_backfill_hour: "Settlement detail daily backfill hour (Beijing time)",
       link_short_url_allowed_hosts: "Short-URL allow-list hosts"
     },
     restoreDefault: "Restore default",
@@ -1714,6 +1717,8 @@ const enUS: MessageSchema = {
   },
   importTask: {
     title: "Uploads",
+    upload: "Upload file",
+    chooseType: "Choose import type",
     fileName: "File name",
     type: "Type",
     status: "Status",

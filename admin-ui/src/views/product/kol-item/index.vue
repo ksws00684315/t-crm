@@ -7,7 +7,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listKols } from "@/api/kol/kol";
 import { rebuildLinkIndex } from "@/api/link/link";
-import { downloadKolItemTemplate, listKolItems, uploadKolItemImport } from "@/api/product/kol-item";
+import { listKolItems } from "@/api/product/kol-item";
 import { listShops } from "@/api/product/shop";
 import type { KolItemVO, KolVO, ShopOptionVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
@@ -19,6 +19,7 @@ import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
+import { importTemplateFileName, MAPPING_IMPORT } from "@/utils/import-types";
 import { canExport, kolAbilities, linkAbilities, productAbilities } from "@/utils/permission";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
@@ -132,8 +133,6 @@ const chips = computed<SearchChip[]>(() => {
 });
 
 const importVisible = ref(false);
-const importTitle = computed(() => t("mapping.importTitle"));
-const importLimitHint = computed(() => t("mapping.limitHint"));
 const promoSheetVisible = ref(false);
 const promoSheetKol = ref<{ id: string; label: string; name: string; code: string } | null>(null);
 const kolPickerVisible = ref(false);
@@ -531,12 +530,14 @@ onMounted(() => {
 
     <ImportDialog
       v-model="importVisible"
-      :title="importTitle"
-      :limit-hint="importLimitHint"
-      template-file-name="kol-item-import-template.xlsx"
-      task-type="MAPPING_IMPORT"
-      :download-template="downloadKolItemTemplate"
-      :upload="uploadKolItemImport"
+      :title="t(MAPPING_IMPORT.titleKey)"
+      :limit-hint="t(MAPPING_IMPORT.limitHintKey)"
+      :template-file-name="importTemplateFileName(MAPPING_IMPORT, key => t(key))"
+      :task-type="MAPPING_IMPORT.taskType"
+      :accept-csv="MAPPING_IMPORT.acceptCsv"
+      :require-data-cutoff="MAPPING_IMPORT.requireDataCutoff"
+      :download-template="MAPPING_IMPORT.downloadTemplate"
+      :upload="MAPPING_IMPORT.upload"
       @finished="search"
     />
     <el-dialog v-model="kolPickerVisible" :title="t('promoSheet.open')" width="480px">

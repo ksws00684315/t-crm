@@ -1,0 +1,46 @@
+{
+  "status": {
+    "status_code": 0
+  },
+  "result": {
+    "list": [
+      {
+        "amount": 600,
+        "orderId": "810223180971712",
+        "refundId": "",
+        "tradeType": "收入",
+        "tradeSubType": "货款收入",
+        "tradeTime": 1761234567000,
+        "remark": ""
+      },
+      {
+        "amount": -4,
+        "orderId": "810223180971712",
+        "refundId": "",
+        "tradeType": "支出",
+        "tradeSubType": "交易手续费",
+        "tradeTime": 1761234567000,
+        "remark": ""
+      },
+      {
+        "amount": -300,
+        "orderId": "810223180971712",
+        "refundId": "",
+        "tradeType": "支出",
+        "tradeSubType": "分润",
+        "tradeTime": 1761234567000,
+        "remark": ""
+      },
+      {
+        "amount": -600,
+        "orderId": "810223180971712",
+        "refundId": "820223180971",
+        "tradeType": "支出",
+        "tradeSubType": "退款",
+        "tradeTime": 1761320967000,
+        "remark": "结算前全额退款"
+      }
+    ],
+    "total": 4
+  }
+}

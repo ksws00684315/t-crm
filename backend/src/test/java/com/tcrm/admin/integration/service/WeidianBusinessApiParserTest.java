@@ -206,6 +206,49 @@ class WeidianBusinessApiParserTest {
     assertThat(parser.itemOperation(response).result().intValue()).isEqualTo(200);
   }
 
+  /**
+   * Fixture built from the open-platform doc example as recorded in the task 75 prompt (the doc
+   * itself is behind a login and the shop has no live settlement sample yet): one order with goods
+   * income, fee and profit-share rows plus another order's full refund.
+   */
+  @Test
+  void shouldParseTradeDetailDocExample_10652_v1_0() throws IOException {
+    var parsed = parser.tradeDetail(result("trade-detail-10652-v1.0.json"));
+
+    assertThat(parsed.total()).isEqualTo(4);
+    assertThat(parsed.list()).hasSize(4);
+    var income = parsed.list().getFirst();
+    assertThat(income.orderId()).isEqualTo("810223180971712");
+    assertThat(income.refundId()).isEmpty();
+    assertThat(income.tradeType()).isEqualTo("收入");
+    assertThat(income.tradeSubType()).isEqualTo("货款收入");
+    assertThat(income.amount()).isEqualByComparingTo("600");
+    assertThat(income.tradeTime()).isEqualTo(Instant.ofEpochMilli(1_761_234_567_000L));
+    assertThat(income.remark()).isEmpty();
+    var refund = parsed.list().get(3);
+    assertThat(refund.tradeSubType()).isEqualTo("退款");
+    assertThat(refund.refundId()).isEqualTo("820223180971");
+    assertThat(refund.amount()).isEqualByComparingTo("-600");
+  }
+
+  @Test
+  void shouldParseTradeDetailWithMissingFieldsWithoutFailing() {
+    var empty = parser.tradeDetail(json.readTree("{\"total\":0,\"list\":[]}"));
+
+    assertThat(empty.list()).isEmpty();
+    assertThat(empty.total()).isZero();
+
+    var sparse = parser.tradeDetail(json.readTree("{\"list\":[{\"orderId\":\"9\"}]}"));
+    var row = sparse.list().getFirst();
+    assertThat(row.orderId()).isEqualTo("9");
+    assertThat(row.refundId()).isNull();
+    assertThat(row.tradeType()).isNull();
+    assertThat(row.tradeSubType()).isNull();
+    assertThat(row.amount()).isNull();
+    assertThat(row.tradeTime()).isNull();
+    assertThat(row.remark()).isNull();
+  }
+
   private JsonNode result(String filename) throws IOException {
     JsonNode root = json.readTree(getClass().getResourceAsStream("/weidian/" + filename));
     return root.get("result");

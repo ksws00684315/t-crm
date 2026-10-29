@@ -205,6 +205,7 @@ class SystemIT {
             "crm_notification:NO",
             "crm_order:NO",
             "crm_order_item:NO",
+            "crm_order_settlement_flow:NO",
             "crm_order_sync_failure:NO",
             "crm_order_sync_state:NO",
             "crm_payout_account:NO",

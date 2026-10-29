@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.RefundDetailResponse;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -25,18 +26,21 @@ public class OrderWriter {
   private final RefundMapper refunds;
   private final OrderAttribution attribution;
   private final OrderCommissionSync commissionSync;
+  private final OrderSettlementFlowMapper settlementFlows;
 
   public OrderWriter(
       OrderMapper orders,
       OrderItemMapper items,
       RefundMapper refunds,
       OrderAttribution attribution,
-      OrderCommissionSync commissionSync) {
+      OrderCommissionSync commissionSync,
+      OrderSettlementFlowMapper settlementFlows) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
     this.attribution = attribution;
     this.commissionSync = commissionSync;
+    this.settlementFlows = settlementFlows;
   }
 
   public OrderDO find(long shopId, String remoteId) {
@@ -104,6 +108,9 @@ public class OrderWriter {
     attribution.apply(next, all, false);
     orders.updateById(next);
     all.forEach(items::updateById);
+    // Settlement flows that arrived before their order keep the matched order id current (task 76).
+    settlementFlows.backfillOrderId(
+        next.getShopId(), next.getWeidianOrderId(), next.getId(), Instant.now());
     commissionSync.sync(next, all);
   }
 

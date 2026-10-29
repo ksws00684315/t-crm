@@ -42,6 +42,7 @@ public class CommissionSnapshotListener {
         facts.settlementState(),
         facts.settlementTime(),
         facts.completedTime(),
-        facts.afterSales());
+        facts.afterSales(),
+        facts.basisCheckReason());
   }
 }

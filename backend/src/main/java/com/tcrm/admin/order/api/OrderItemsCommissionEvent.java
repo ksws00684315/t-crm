@@ -22,13 +22,15 @@ public record OrderItemsCommissionEvent(
    * @param attributionType 0 unmatched, 1 item id, 2 manual, 3 non-KOL, 4 conflict
    * @param productId original product id when the mapping resolved it
    * @param basisCny source commissionable amount (semantic {@code WEIDIAN_COMMISSIONABLE_CNY});
-   *     null while the Weidian field waits for M0 verification (Q-1017-1/2)
+   *     null when the settlement basis check failed, with the reason in {@code basisCheckReason}
    * @param basisIncludesRefund whether the source amount already excludes successful refunds
    * @param successfulRefundCny confirmed successful refunds of the line; null when unknown
    * @param settlementState CONFIRMED / UNSETTLED / UNKNOWN from the source
    * @param settlementTime Weidian settlement time; null when unknown
    * @param completedTime trade completion time; null when unknown
    * @param afterSales true when the line has an unconcluded refund (PROCESSING/SUCCESS/UNKNOWN)
+   * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / UNKNOWN_FLOW_TYPE /
+   *     INCOME_MISMATCH / MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
    */
   public record ItemFacts(
       long orderItemId,
@@ -42,5 +44,6 @@ public record OrderItemsCommissionEvent(
       String settlementState,
       Instant settlementTime,
       Instant completedTime,
-      boolean afterSales) {}
+      boolean afterSales,
+      String basisCheckReason) {}
 }
