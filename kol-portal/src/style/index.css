@@ -19,8 +19,60 @@ body {
   box-sizing: border-box;
 }
 
+:focus-visible {
+  outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary);
+  outline-offset: var(--tcrm-focus-width);
+}
+
+.el-overlay-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.el-overlay-dialog .el-dialog:not(.is-fullscreen) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--tcrm-space-6));
+  max-width: calc(100vw - var(--tcrm-space-5));
+  min-width: 0;
+  margin: auto;
+}
+
+.el-overlay .el-drawer {
+  max-width: calc(100vw - var(--tcrm-space-5));
+  min-width: 0;
+}
+
+.el-overlay .el-descriptions__table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.el-overlay .el-descriptions__cell {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .el-overlay .el-drawer.rtl,
+  .el-overlay .el-drawer.ltr {
+    width: calc(100vw - var(--tcrm-space-5)) !important;
+  }
+}
+
+.el-overlay-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.el-overlay-dialog .el-dialog__header,
+.el-overlay-dialog .el-dialog__footer {
+  flex: 0 0 auto;
+}
+
 .tcrm-amount {
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -45,11 +97,35 @@ body {
   line-height: var(--tcrm-line-height-body) !important;
 }
 
-#app h1,
-#app .shell__brand {
+#app h1 {
   font-size: var(--tcrm-font-size-title) !important;
   font-weight: 600;
   line-height: var(--tcrm-line-height-title) !important;
+}
+
+#app .shell__brand {
+  font-size: var(--tcrm-font-size-brand) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-brand) !important;
+}
+
+#app .shell__nav-link,
+#app .shell__nav-link * {
+  font-size: var(--tcrm-font-size-menu) !important;
+  line-height: var(--tcrm-line-height-menu) !important;
+}
+
+#app .data-table .el-table .cell,
+#app .data-table .el-table .cell *,
+.el-overlay .data-table .el-table .cell,
+.el-overlay .data-table .el-table .cell * {
+  font-size: var(--tcrm-font-size-table) !important;
+  line-height: var(--tcrm-line-height-table) !important;
+}
+
+#app .data-table .el-table th.el-table__cell,
+.el-overlay .data-table .el-table th.el-table__cell {
+  font-weight: 500;
 }
 
 #app h2,
@@ -58,7 +134,9 @@ body {
 .el-overlay h1,
 .el-overlay h2,
 .el-overlay .el-dialog__title,
-.el-overlay .el-drawer__title {
+.el-overlay .el-drawer__title,
+.el-overlay .el-message-box__title,
+.el-overlay .el-message-box__title > span {
   font-size: var(--tcrm-font-size-section) !important;
   font-weight: 600;
   line-height: var(--tcrm-line-height-section) !important;
@@ -97,5 +175,25 @@ body {
   #app .el-pagination {
     flex-wrap: wrap;
     row-gap: var(--tcrm-space-2);
+  }
+}
+
+/* Body-mounted surfaces use the same ordinary controls as in-page forms. */
+.el-overlay .el-button:not(.is-link) {
+  font-weight: 600;
+}
+@media (max-width: 767px) {
+  .el-overlay .el-button:not(.is-link),
+  .el-overlay .el-input__wrapper,
+  .el-overlay .el-select__wrapper,
+  .el-overlay .el-textarea__inner,
+  .el-overlay .el-input-number {
+    min-height: var(--tcrm-control-height-mobile);
+  }
+  .el-overlay .el-dialog__headerbtn,
+  .el-overlay .el-drawer__close-btn,
+  .el-overlay .el-message-box__headerbtn {
+    min-width: var(--tcrm-control-height-mobile);
+    min-height: var(--tcrm-control-height-mobile);
   }
 }

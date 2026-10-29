@@ -154,18 +154,42 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "kol", label: t("copyToken.kol"), minWidth: 170 },
+  { key: "kol", align: "left" as const, label: t("copyToken.kol"), minWidth: 170 },
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
   // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
   // those pixels: its values ellipsize with a tooltip either way.
-  { key: "contact", label: t("kol.phoneWhatsapp"), width: px(140, 146), tooltip: true },
-  { key: "email", label: t("kol.email"), width: px(104, 168), tooltip: true },
-  { key: "platform", label: t("kol.primaryPlatform"), width: px(160, 176), tooltip: true },
+  {
+    key: "contact",
+    align: "left" as const,
+    label: t("kol.phoneWhatsapp"),
+    width: px(170, 180),
+    tooltip: true
+  },
+  {
+    key: "email",
+    align: "left" as const,
+    label: t("kol.email"),
+    width: px(104, 168),
+    tooltip: true
+  },
+  {
+    key: "platform",
+    align: "left" as const,
+    label: t("kol.primaryPlatform"),
+    width: px(160, 176),
+    tooltip: true
+  },
   { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
   { key: "prepay", label: t("kol.prepay"), width: px(80, 152), amount: true },
   // en datetime "10/20/2026, 00:15" measured 138px of content; 136 clipped it (task 59).
   { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 142), tooltip: true },
-  { key: "inviter", label: t("kol.inviter"), width: px(80, 104), tooltip: true },
+  {
+    key: "inviter",
+    align: "left" as const,
+    label: t("kol.inviter"),
+    width: px(80, 104),
+    tooltip: true
+  },
   { key: "review", label: t("kol.reviewStatus"), width: px(80, 116) },
   { key: "login", label: t("kol.loginStatus"), width: px(80, 112) },
   // en status tag measured 164px of content; 124 clipped it (task 59 measurement).
@@ -481,6 +505,7 @@ onBeforeUnmount(() => window.removeEventListener("prepay-updated", onPrepayUpdat
 .kol-tabs :deep(.el-tab-pane) {
   display: flex;
   flex-direction: column;
+  gap: var(--tcrm-space-4);
   flex: 1;
   min-height: 0;
 }

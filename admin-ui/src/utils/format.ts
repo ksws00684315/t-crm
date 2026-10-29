@@ -51,6 +51,14 @@ export function formatCodeWithName(
 
 const CURRENCY_SYMBOLS: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", GBP: "£" };
 
+/** Confirmed order/refund presentation; preserve the server's decimal precision. */
+export function formatAmountWithCurrency(
+  amount: string | null | undefined,
+  currency = "CNY"
+): string {
+  return amount == null || amount === "" ? "-" : `${amount} ${currency}`;
+}
+
 /** Display price with its currency: "¥12.50", "$60.00", or "12.50 JPY" without a known symbol. */
 export function formatPrice(
   price: string | null | undefined,

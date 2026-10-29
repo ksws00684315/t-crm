@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Picture } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -12,11 +13,11 @@ import NameCode from "@/components/NameCode.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { importTemplateFileName, ORDER_IMPORT, REFUND_IMPORT } from "@/utils/import-types";
 import { orderAbilities } from "@/utils/permission";
-import { orderRefundStatusText, orderRefundTagType, orderTimeRangeToQuery } from "@/utils/order";
+import { orderRefundStatusText, orderTimeRangeToQuery } from "@/utils/order";
 import { readPageSize } from "@/utils/table-prefs";
 import OrderDetailDrawer from "./OrderDetailDrawer.vue";
 import SyncStatesDialog from "./SyncStatesDialog.vue";
@@ -71,11 +72,17 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "product", label: t("order.line.itemName"), minWidth: px(300, 320) },
-  { key: "kol", label: t("order.kol"), minWidth: px(140, 150) },
-  { key: "quantity", label: t("order.line.quantity"), width: px(90, 100) },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(180, 200) },
-  { key: "payAmount", label: t("order.payAmount"), width: px(140, 160), amount: true },
+  { key: "product", align: "left", label: t("order.productInfo"), minWidth: px(360, 380) },
+  { key: "kol", align: "center", label: t("order.kol"), minWidth: px(145, 160) },
+  { key: "quantity", label: t("order.line.quantity"), width: px(72, 90) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(130, 160) },
+  {
+    key: "payAmount",
+    align: "center",
+    label: t("order.actualPaidAmount"),
+    width: px(145, 160),
+    amount: true
+  },
   { key: "actions", label: t("common.actions"), width: px(104, 128) }
 ]);
 
@@ -163,6 +170,19 @@ function orderListStatus(order: OrderVO): string {
     return t("order.listStatus.ABNORMAL");
   }
   return t(`order.listStatus.${order.orderStatus}`);
+}
+
+function orderStatusTone(order: OrderVO): string {
+  if (
+    order.orderStatus === "UNKNOWN" ||
+    order.attributionStatus === "UNMATCHED" ||
+    order.attributionStatus === "CONFLICT"
+  ) {
+    return "danger";
+  }
+  if (["RECEIVED", "COMPLETED"].includes(order.orderStatus)) return "success";
+  if (["PAID", "SHIPPED"].includes(order.orderStatus)) return "primary";
+  return "muted";
 }
 
 const applied = ref(snapshot());
@@ -347,8 +367,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="list-page">
-    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
+  <div class="list-page order-list-page">
+    <ListSearch
+      :chips="chips"
+      has-more
+      hide-title
+      @search="search"
+      @reset="reset"
+      @remove="removeChip"
+    >
       <template #primary>
         <el-form-item :label="t('order.orderId')">
           <el-input
@@ -378,8 +405,6 @@ onMounted(() => {
             data-test="filter-kol-keyword"
           />
         </el-form-item>
-      </template>
-      <template #more>
         <el-form-item :label="t('order.orderStatus')">
           <el-select
             v-model="query.status"
@@ -396,6 +421,8 @@ onMounted(() => {
             />
           </el-select>
         </el-form-item>
+      </template>
+      <template #more>
         <el-form-item :label="t('order.orderTime')">
           <el-date-picker
             v-model="query.orderTimeRange"
@@ -421,7 +448,9 @@ onMounted(() => {
     </ListSearch>
 
     <DataTable
+      class="order-list-table"
       table-id="orders"
+      fill-available-height
       :rows="tableRows"
       :columns="columns"
       :loading="loading"
@@ -441,15 +470,15 @@ onMounted(() => {
       <template #cell-product="{ row }">
         <div v-if="(row as GroupedOrderRow).kind === 'header'" class="order-group-band">
           <span class="order-group-band__field">
-            <strong>{{ t("order.orderId") }}</strong>
+            <span>{{ t("order.orderId") }}</span>
             <CopyText :value="(row as GroupedOrderRow).order.weidianOrderId" />
           </span>
           <span class="order-group-band__field">
-            <strong>{{ t("order.detail.orderTime") }}</strong>
+            <span>{{ t("order.detail.orderTime") }}</span>
             {{ formatInstant((row as GroupedOrderRow).order.orderTime) }}
           </span>
           <span class="order-group-band__field">
-            <strong>{{ t("order.shop") }}</strong>
+            <span>{{ t("order.shop") }}</span>
             {{ shopText((row as GroupedOrderRow).order) }}
           </span>
         </div>
@@ -470,18 +499,22 @@ onMounted(() => {
             :aria-label="t('order.itemImageMissing')"
             data-test="order-item-image-missing"
           >
-            <span class="order-image-placeholder__icon" aria-hidden="true">▧</span>
+            <el-icon class="order-image-placeholder__icon" aria-hidden="true"><Picture /></el-icon>
             <span>{{ t("order.itemImageMissing") }}</span>
           </div>
           <div class="order-product-row__text">
-            <strong>{{ (row as GroupedOrderRow).item?.itemName ?? "-" }}</strong>
-            <span
-              >{{ t("order.line.itemId") }}:
-              {{ (row as GroupedOrderRow).item?.weidianItemId ?? "-" }}</span
-            >
-            <span v-if="(row as GroupedOrderRow).item?.skuName"
-              >{{ t("order.line.sku") }}: {{ (row as GroupedOrderRow).item?.skuName }}</span
-            >
+            <span class="order-product-row__name">{{
+              (row as GroupedOrderRow).item?.itemName ?? "-"
+            }}</span>
+            <div class="order-product-row__meta">
+              <span
+                >{{ t("order.line.itemId") }}:
+                {{ (row as GroupedOrderRow).item?.weidianItemId ?? "-" }}</span
+              >
+              <span v-if="(row as GroupedOrderRow).item?.skuName"
+                >{{ t("order.line.sku") }}: {{ (row as GroupedOrderRow).item?.skuName }}</span
+              >
+            </div>
           </div>
         </div>
       </template>
@@ -503,35 +536,31 @@ onMounted(() => {
         }}
       </template>
       <template #cell-orderStatus="{ row }">
-        <template v-if="(row as GroupedOrderRow).kind === 'item'">
-          <el-tag
-            :type="
-              (row as GroupedOrderRow).order.orderStatus === 'UNKNOWN' ||
-              ['UNMATCHED', 'CONFLICT'].includes((row as GroupedOrderRow).order.attributionStatus)
-                ? 'danger'
-                : 'info'
-            "
+        <div v-if="(row as GroupedOrderRow).kind === 'item'" class="order-statuses">
+          <span
+            class="order-status"
+            :class="`order-status--${orderStatusTone((row as GroupedOrderRow).order)}`"
           >
             {{ orderListStatus((row as GroupedOrderRow).order) }}
-          </el-tag>
-          <el-tag
+          </span>
+          <span
             v-if="
               (row as GroupedOrderRow).order.refundStatus &&
               (row as GroupedOrderRow).order.refundStatus !== 'NONE'
             "
-            :type="orderRefundTagType((row as GroupedOrderRow).order.refundStatus)"
+            class="order-refund-status"
             data-test="refund-status"
           >
             {{ orderRefundStatusText((row as GroupedOrderRow).order.refundStatus) }}
-          </el-tag>
-        </template>
+          </span>
+        </div>
       </template>
       <template #cell-payAmount="{ row }">
-        {{
+        <span class="order-money">{{
           (row as GroupedOrderRow).kind === "header"
             ? ""
-            : (row as GroupedOrderRow).order.payAmount || "-"
-        }}
+            : formatAmountWithCurrency((row as GroupedOrderRow).order.payAmount)
+        }}</span>
       </template>
       <template #actions="{ row }">
         <RowActions
@@ -574,13 +603,44 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.order-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 :deep(.el-table .order-group-header > td) {
-  background: var(--el-color-primary-light-9) !important;
+  /* The approved order groups replace shared stripe/hover fills on this page only. */
+  background: var(--tcrm-color-order-band) !important;
+  border-top: var(--tcrm-space-4) solid var(--tcrm-color-card);
+  border-bottom: none;
+  background-clip: padding-box;
+}
+
+:deep(.order-list-table .el-table .order-group-header > td.el-table__cell) {
+  /* Metadata bands use inner cell spacing rather than stacking shared density padding. */
+  padding-block: 0;
 }
 
 :deep(.el-table .order-group-header .cell) {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-block: var(--tcrm-space-2);
+}
+
+:deep(.order-list-table .el-table th.el-table__cell) {
+  font-weight: 500 !important;
+  color: var(--tcrm-color-table-text);
+}
+
+:deep(.el-table .order-group-item > td.el-table__cell) {
+  /* Keep merged order cells on the same white surface as every product row. */
+  background: var(--tcrm-color-card) !important;
+  padding-block: var(--tcrm-space-4);
+}
+
+:deep(.data-table.density-small .order-group-item > td.el-table__cell) {
+  padding-block: var(--tcrm-space-2);
+}
+
+:deep(.data-table.density-large .order-group-item > td.el-table__cell) {
+  padding-block: var(--tcrm-space-5);
 }
 
 .order-group-band {
@@ -599,14 +659,18 @@ onMounted(() => {
   min-width: 0;
 }
 
-.order-group-band__field strong {
+.order-group-band__field > span:first-child {
   color: var(--tcrm-color-text-secondary);
-  font-weight: 500;
+}
+
+.order-group-band__field,
+.order-product-row__name {
+  font-weight: 400;
 }
 
 .order-product-row {
   display: flex;
-  gap: var(--tcrm-space-3);
+  gap: var(--tcrm-space-4);
   align-items: center;
   min-width: 0;
 }
@@ -625,7 +689,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   width: 80px;
-  height: 64px;
+  height: 80px;
   overflow: hidden;
   border-radius: var(--tcrm-radius-tag);
   background: var(--el-fill-color-light);
@@ -636,28 +700,60 @@ onMounted(() => {
 }
 
 .order-image-placeholder__icon {
-  font-size: var(--tcrm-font-size-title);
-  line-height: 20px;
+  width: var(--tcrm-space-5);
+  height: var(--tcrm-space-5);
+}
+
+.order-image-placeholder__icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .order-product-row__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--tcrm-space-2);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.order-product-row__text strong {
-  font-weight: 500;
-}
-
-.order-product-row__text > span {
+.order-product-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-1) var(--tcrm-space-4);
   color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
 }
 
-.order-group-item :deep(.el-tag) + :deep(.el-tag) {
-  margin-left: 6px;
+.order-statuses {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  font-weight: 400;
+}
+
+.order-status--primary {
+  color: var(--tcrm-color-primary-text);
+}
+
+.order-status--success {
+  color: var(--tcrm-color-success);
+}
+
+.order-status--muted {
+  color: var(--tcrm-color-text-secondary);
+}
+
+.order-refund-status {
+  color: var(--tcrm-color-warning);
+}
+
+.order-status--danger {
+  color: var(--tcrm-color-danger);
+}
+
+:deep(.order-list-table .order-group-item > td[rowspan]:not([rowspan="1"])) {
+  /* The first visible product carries shared order data at every screen width. */
+  vertical-align: top;
 }
 </style>

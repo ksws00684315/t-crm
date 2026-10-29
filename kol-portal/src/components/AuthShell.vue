@@ -6,7 +6,7 @@ defineProps<{ title: string }>();
 <template>
   <main class="auth-shell">
     <div class="auth-shell__bar"><LocaleSwitch /></div>
-    <el-card class="auth-shell__card" shadow="always">
+    <el-card class="auth-shell__card" shadow="never">
       <h1>{{ title }}</h1>
       <slot />
     </el-card>
@@ -21,6 +21,7 @@ defineProps<{ title: string }>();
   justify-content: center;
   min-height: 100%;
   padding: var(--tcrm-space-6) var(--tcrm-space-4);
+  padding-top: calc(var(--tcrm-space-4) + var(--tcrm-control-height-mobile) + var(--tcrm-space-4));
 }
 .auth-shell__bar {
   position: absolute;

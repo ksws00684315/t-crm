@@ -31,6 +31,7 @@ import {
 } from "@/api/integration/weidian";
 import { triggerOrderSync } from "@/api/order/order";
 import CopyText from "@/components/CopyText.vue";
+import NameCode from "@/components/NameCode.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
@@ -121,16 +122,21 @@ const callbackUrlInvalid = computed(() => {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "shopCode", label: t("shop.code"), minWidth: 130 },
-    { key: "shopName", label: t("shop.name"), minWidth: 140, tooltip: true },
+    { key: "shopCode", align: "left" as const, label: t("shop.code"), minWidth: 130 },
+    {
+      key: "shopName",
+      align: "left" as const,
+      label: t("shop.nameAndId"),
+      minWidth: 190,
+      tooltip: true
+    },
     { key: "channel", label: t("shop.channel"), width: 90 },
     { key: "source", label: t("shop.source"), width: 100 },
     { key: "copyPool", label: t("shop.copyPool"), minWidth: 160 },
-    { key: "weidianShopId", label: t("shop.weidianId"), minWidth: 140 },
+    { key: "productCapacity", label: t("shop.capacity"), minWidth: 140 },
     { key: "authStatus", label: t("shop.authStatus"), width: 110 },
     { key: "authExpiresAt", label: t("shop.authExpiresAt"), minWidth: 160 },
     { key: "apiStatus", label: t("shop.apiStatus"), minWidth: 250 },
-    { key: "capacity", label: t("shop.capacity"), minWidth: 140 },
     { key: "status", label: t("common.status"), width: 90 }
   ];
   if (canManage.value || canSyncOrders.value) {
@@ -590,6 +596,16 @@ onMounted(() => {
       "
     >
       <template #cell-shopCode="{ row }"><CopyText :value="asShop(row).shopCode" /></template>
+      <template #cell-shopName="{ row }"
+        ><NameCode :name="asShop(row).shopName" :code="asShop(row).weidianShopId"
+          ><template #code
+            ><CopyText v-if="asShop(row).weidianShopId" :value="asShop(row).weidianShopId" /><span
+              v-else
+              >-</span
+            ></template
+          ></NameCode
+        ></template
+      >
       <template #cell-channel
         ><span>{{ t("shop.channelWeidian") }}</span></template
       >
@@ -619,9 +635,6 @@ onMounted(() => {
           </el-tooltip>
         </span>
       </template>
-      <template #cell-weidianShopId="{ row }"
-        ><span>{{ asShop(row).weidianShopId || "—" }}</span></template
-      >
       <template #cell-authStatus="{ row }">
         <el-tag
           :type="
@@ -668,7 +681,7 @@ onMounted(() => {
           </span>
         </div>
       </template>
-      <template #cell-capacity="{ row }">
+      <template #cell-productCapacity="{ row }">
         <span
           class="capacity-cell"
           :class="{ 'capacity-cell--full': asShop(row).currentItems >= asShop(row).maxItems }"
@@ -701,7 +714,13 @@ onMounted(() => {
             trigger="click"
             @command="runMoreAction(asShop(row), $event)"
           >
-            <el-button link :data-test="`more-${asShop(row).id}`">{{ t("common.more") }}</el-button>
+            <el-button
+              link
+              type="primary"
+              class="shop-more"
+              :data-test="`more-${asShop(row).id}`"
+              >{{ t("common.more") }}</el-button
+            >
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item
@@ -858,6 +877,9 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--tcrm-space-2);
+}
+.shop-more {
+  font-weight: 400 !important;
 }
 .inline-status,
 .capacity-cell,

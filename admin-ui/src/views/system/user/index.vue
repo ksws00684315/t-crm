@@ -57,8 +57,20 @@ function asUser(row: object): UserVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "username", label: t("common.username"), prop: "username", minWidth: 130 },
-  { key: "nickname", label: t("common.nickname"), prop: "nickname", minWidth: 120 },
+  {
+    key: "username",
+    align: "left" as const,
+    label: t("common.username"),
+    prop: "username",
+    minWidth: 130
+  },
+  {
+    key: "nickname",
+    align: "left" as const,
+    label: t("common.nickname"),
+    prop: "nickname",
+    minWidth: 120
+  },
   { key: "role", label: t("user.role"), width: 120 },
   { key: "post", label: t("user.post"), width: 90 },
   // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this
@@ -69,7 +81,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
   { key: "createdAt", label: t("common.createdAt"), width: 170 },
-  { key: "actions", label: t("common.actions"), width: px(300, 400) }
+  { key: "actions", label: t("common.actions"), width: px(328, 430) }
 ]);
 
 const applied = ref({
@@ -315,7 +327,7 @@ function rowActions(row: UserVO): RowAction[] {
   return [
     {
       key: "edit",
-      label: t("common.edit"),
+      label: t("user.editInfo"),
       onClick: () => openEdit(row)
     },
     {

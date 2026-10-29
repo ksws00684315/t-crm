@@ -331,4 +331,29 @@ function close() {
 .result p {
   margin: 12px 0;
 }
+.picker input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  color: var(--tcrm-color-text-secondary);
+  font: inherit;
+}
+.picker input[type="file"]::file-selector-button {
+  margin-inline-end: var(--tcrm-space-2);
+  padding: var(--tcrm-space-1) var(--tcrm-space-3);
+  min-height: var(--tcrm-control-height);
+  border: 1px solid var(--tcrm-color-input-border);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-card);
+  color: var(--tcrm-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.picker input[type="file"]::file-selector-button:hover {
+  background: var(--tcrm-color-muted);
+}
+@media (max-width: 767px) {
+  .picker input[type="file"]::file-selector-button {
+    min-height: var(--tcrm-control-height-mobile);
+  }
+}
 </style>

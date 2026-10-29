@@ -40,10 +40,16 @@ const detailId = ref<string | null>(null);
 const visible = ref(false);
 const initialAction = ref("");
 const columns = computed<DataColumn[]>(() => [
-  { key: "prepayNo", label: t("prepay.number"), minWidth: 220 },
-  { key: "kol", label: t("prepay.kol"), minWidth: 180 },
+  { key: "prepayNo", align: "left" as const, label: t("prepay.number"), minWidth: 220 },
+  { key: "kol", align: "left" as const, label: t("prepay.kol"), minWidth: 180 },
   { key: "amountCny", label: t("prepay.amount"), prop: "amountCny", minWidth: 160, amount: true },
-  { key: "applicantName", label: t("prepay.applicant"), prop: "applicantName", minWidth: 140 },
+  {
+    key: "applicantName",
+    align: "left" as const,
+    label: t("prepay.applicant"),
+    prop: "applicantName",
+    minWidth: 140
+  },
   { key: "currency", label: t("prepay.currency"), prop: "currency", width: 100 },
   { key: "status", label: t("common.status"), minWidth: 150 },
   { key: "createdAt", label: t("prepay.createdAt"), minWidth: 180 },

@@ -32,7 +32,12 @@ const downloadState = useSubmission();
 let generation = 0;
 const columns = computed<DataColumn[]>(() => {
   const english = locale.value === "en-US";
-  const number = { key: "prepayNo", label: t("prepay.number"), minWidth: 180 };
+  const number = {
+    key: "prepayNo",
+    align: "left" as const,
+    label: t("prepay.number"),
+    minWidth: 180
+  };
   if (tab.value === "ledger")
     return [
       number,
@@ -148,8 +153,6 @@ onMounted(load);
 </script>
 <template>
   <main class="prepay-results" data-test="prepay-results">
-    <h1>{{ t("prepay.title") }}</h1>
-    <p>{{ t("prepay.paidOnly") }}</p>
     <el-alert
       v-if="errorText"
       :title="errorText"
@@ -177,6 +180,10 @@ onMounted(load);
       @update:size="changeSize"
       @refresh="load"
     >
+      <template #title>
+        <h1>{{ t("prepay.title") }}</h1>
+        <p>{{ t("prepay.paidOnly") }}</p>
+      </template>
       <template #toolbar>
         <el-radio-group
           v-model="tab"

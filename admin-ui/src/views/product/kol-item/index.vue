@@ -79,14 +79,20 @@ function named(group: "channels" | "statuses" | "cleanups", value: string | null
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "linkCode", label: t("mapping.linkCode"), minWidth: 180 },
-  { key: "product", label: t("mapping.product"), minWidth: 200, tooltip: true },
-  { key: "kol", label: t("mapping.kol"), minWidth: 160 },
-  { key: "targetShop", label: t("mapping.targetShop"), minWidth: 160 },
+  { key: "linkCode", align: "left" as const, label: t("mapping.linkCode"), minWidth: 180 },
+  {
+    key: "product",
+    align: "left" as const,
+    label: t("mapping.product"),
+    minWidth: 200,
+    tooltip: true
+  },
+  { key: "kol", align: "left" as const, label: t("mapping.kol"), minWidth: 160 },
+  { key: "targetShop", align: "left" as const, label: t("mapping.targetShop"), minWidth: 160 },
   { key: "targetChannel", label: t("mapping.targetChannel"), minWidth: 110 },
-  { key: "targetItemId", label: t("mapping.targetItemId"), minWidth: 160 },
-  { key: "targetItemUrl", label: t("mapping.targetItemUrl"), width: 90 },
-  { key: "sourceItemId", label: t("mapping.sourceItemId"), minWidth: 150 },
+  { key: "targetItemId", align: "left" as const, label: t("mapping.targetItemId"), minWidth: 160 },
+  { key: "targetItemUrl", align: "left" as const, label: t("mapping.targetItemUrl"), width: 90 },
+  { key: "sourceItemId", align: "left" as const, label: t("mapping.sourceItemId"), minWidth: 150 },
   { key: "sourceChannel", label: t("mapping.sourceChannel"), minWidth: 110 },
   { key: "currentRate", label: t("mapping.currentRate"), minWidth: 140 },
   { key: "salesQuantity", label: t("mapping.salesQuantity"), width: 80 },

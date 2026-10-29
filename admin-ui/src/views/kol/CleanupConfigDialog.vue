@@ -106,7 +106,7 @@ async function immediate() {
     width="520px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form label-width="110px" @submit.prevent>
+    <el-form label-position="top" @submit.prevent>
       <el-form-item :label="t('kol.code')">
         <NameCode :name="kol?.name" :code="kol?.kolCode" data-test="cleanup-kol-label" />
       </el-form-item>

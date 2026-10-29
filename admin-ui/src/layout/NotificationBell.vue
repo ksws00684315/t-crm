@@ -117,7 +117,14 @@ async function openItem(item: NotificationVO) {
 </script>
 
 <template>
-  <el-popover trigger="click" placement="bottom-end" :width="360" @after-leave="onHide">
+  <el-popover
+    trigger="click"
+    placement="bottom-end"
+    :width="360"
+    popper-class="notification-bell-popover"
+    :popper-options="{ modifiers: [{ name: 'preventOverflow', options: { padding: 12 } }] }"
+    @after-leave="onHide"
+  >
     <template #reference>
       <el-badge
         :value="badge ?? undefined"
@@ -131,27 +138,36 @@ async function openItem(item: NotificationVO) {
       </el-badge>
     </template>
     <div class="notification-bell__panel">
-      <p v-if="items.length === 0" class="notification-bell__empty">
-        {{ t("notification.empty") }}
-      </p>
-      <button
-        v-for="item in items"
-        :key="item.id"
-        type="button"
-        class="notification-bell__item"
-        :class="{ 'notification-bell__item--unread': !item.readTime }"
-        data-test="notification-item"
-        @click="openItem(item)"
-      >
-        <el-icon><component :is="icons[item.type]" /></el-icon>
-        <NotificationText :item="item" class="notification-bell__text" />
-        <span class="notification-bell__time">{{ relativeNotificationTime(item.createTime) }}</span>
-      </button>
+      <div class="notification-bell__list">
+        <p v-if="items.length === 0" class="notification-bell__empty">
+          {{ t("notification.empty") }}
+        </p>
+        <button
+          v-for="item in items"
+          :key="item.id"
+          type="button"
+          class="notification-bell__item"
+          :class="{ 'notification-bell__item--unread': !item.readTime }"
+          data-test="notification-item"
+          @click="openItem(item)"
+        >
+          <el-icon><component :is="icons[item.type]" /></el-icon>
+          <NotificationText :item="item" class="notification-bell__text" />
+          <span class="notification-bell__time">{{
+            relativeNotificationTime(item.createTime)
+          }}</span>
+        </button>
+      </div>
       <div class="notification-bell__footer">
         <el-button text data-test="notification-mark-all" @click="markAll">
           {{ t("notification.markAll") }}
         </el-button>
-        <el-button text data-test="notification-view-all" @click="router.push('/notifications')">
+        <el-button
+          type="primary"
+          text
+          data-test="notification-view-all"
+          @click="router.push('/notifications')"
+        >
           {{ t("notification.viewAll") }}
         </el-button>
       </div>
@@ -164,6 +180,17 @@ async function openItem(item: NotificationVO) {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-2);
+  max-height: calc(100dvh - var(--tcrm-header-height) - var(--tcrm-space-5) - var(--tcrm-space-5));
+}
+
+:global(.notification-bell-popover) {
+  max-width: calc(100vw - var(--tcrm-space-5));
+}
+
+.notification-bell__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .notification-bell__empty {
@@ -173,7 +200,7 @@ async function openItem(item: NotificationVO) {
 
 .notification-bell__item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--tcrm-space-1) var(--tcrm-space-2);
   padding: var(--tcrm-space-2);
   border: 0;
@@ -182,6 +209,12 @@ async function openItem(item: NotificationVO) {
   cursor: pointer;
 }
 
+.notification-bell__item:hover {
+  background: var(--tcrm-color-muted);
+}
+.notification-bell__footer :deep(.el-button) {
+  font-weight: 600;
+}
 .notification-bell__item--unread {
   font-weight: 600;
 }
@@ -198,7 +231,19 @@ async function openItem(item: NotificationVO) {
 }
 
 .notification-bell__footer {
+  flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
   justify-content: space-between;
+}
+@media (max-width: 767px) {
+  .notification-bell__item,
+  .notification-bell__footer :deep(.el-button) {
+    min-height: var(--tcrm-control-height-mobile);
+  }
+  .notification-bell__footer :deep(.el-button + .el-button) {
+    margin-left: 0;
+  }
 }
 </style>

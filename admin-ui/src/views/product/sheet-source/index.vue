@@ -53,7 +53,13 @@ function asSource(row: object): SheetSourceVO {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "sourceName", label: t("sheetSource.name"), prop: "sourceName", minWidth: 110 },
+    {
+      key: "sourceName",
+      align: "left" as const,
+      label: t("sheetSource.name"),
+      prop: "sourceName",
+      minWidth: 110
+    },
     { key: "sheet", label: t("sheetSource.sheet"), minWidth: 120 },
     { key: "columns", label: t("sheetSource.columns"), minWidth: 150 },
     { key: "defaultShop", label: t("sheetSource.defaultShop"), width: 100 },

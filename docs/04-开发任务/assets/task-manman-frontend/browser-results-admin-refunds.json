@@ -1,0 +1,315 @@
+[
+  {
+    "key": "admin-refunds-1440x900-zh-CN",
+    "url": "/order/refunds",
+    "title": "退款查询",
+    "tableTitle": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "退款单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "原订单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "渠道",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "店铺",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "达人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "退款类型",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "退款状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "退款金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "申请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "成功时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_R12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_2026102800000123456789",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "微店",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "t88 Shop（T88S001）",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Alice\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "仅退款",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "退款成功",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light el-zoom-in-center-enter-from el-zoom-in-center-enter-active",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "8.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/20 18:01:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/20 19:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "查看",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n订单查询\n退款查询\n达人管理\n财务结算\n系统管理\n订单管理/退款查询\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n退款查询\n退款查询\n退款单号\n原订单号\n渠道\n全部\n查询\n重置\n展开\n共 1 条\n默认\n紧凑\n宽松\n列设置\n退款单号\n\t\n原订单号\n\t\n渠道\n\t\n店铺\n\t\n达人\n\t\n退款类型\n\t\n退款状态\n\t\n退款金额\n\t\n申请时间\n\t\n成功时间\n\t\n操作\nt88_R12345678901234567890\n\t\nt88_2026102800000123456789\n\t\n微店\n\t\nt88 Shop（T88S001）\n\t\nt88 Alice\nt88_KOL-ASD001\n\t\n仅退款\n\t\n退款成功\n\t\n8.00\n\t\n2026/10/20 18:01:00\n\t\n2026/10/20 19:00:00\n\t\n查看\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-refund-keyboard-1440-zh-CN",
+    "copied": [
+      "t88_R12345678901234567890",
+      "t88_R12345678901234567890"
+    ],
+    "enterDrawer": 1,
+    "spaceDrawer": 1,
+    "keyboardDetail": {
+      "activeTag": "DIV",
+      "alerts": [
+        "已复制 t88_R12345678901234567890",
+        "已复制 t88_R12345678901234567890"
+      ],
+      "link": [
+        {
+          "text": "t88_2026102800000123456789",
+          "disabled": false
+        }
+      ]
+    },
+    "errors": []
+  }
+]

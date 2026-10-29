@@ -1,7 +1,7 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { nextTick } from "vue";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
 
@@ -12,6 +12,56 @@ const columns = [
 ];
 
 describe("DataTable", () => {
+  it("aligns long columns left and amounts, short values and actions in the center", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "manman-alignment",
+        rows: [{ id: "1", orderNo: "ORDER-123", amount: "100.00", status: "paid" }],
+        columns: [
+          { key: "orderNo", label: "订单号", align: "left" },
+          { key: "amount", label: "金额", amount: true },
+          { key: "status", label: "状态" },
+          { key: "actions", label: "操作" }
+        ],
+        total: 1
+      },
+      slots: { actions: '<button data-test="action">查看</button>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    const rendered = wrapper.findAllComponents({ name: "ElTableColumn" });
+    expect(rendered.map(column => column.props("align"))).toEqual([
+      "left",
+      "center",
+      "center",
+      "center"
+    ]);
+    expect(rendered.map(column => column.props("headerAlign"))).toEqual([
+      "left",
+      "center",
+      "center",
+      "center"
+    ]);
+    expect(wrapper.findComponent({ name: "ElTable" }).props("stripe")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("preserves the separately approved order-list alignment and stripe behavior", () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "order-legacy-style",
+        legacyOrderStyle: true,
+        rows: [],
+        columns: [{ key: "amount", label: "金额", amount: true }],
+        total: 0
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(wrapper.findComponent({ name: "ElTableColumn" }).props("align")).toBe("right");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("stripe")).toBe(true);
+    wrapper.unmount();
+  });
+
   it("places custom tabs in the toolbar while keeping refresh and pagination", async () => {
     const wrapper = mount(DataTable, {
       props: { tableId: "toolbar-tabs", rows: [], columns, total: 0 },
@@ -88,6 +138,158 @@ describe("DataTable", () => {
     } finally {
       wrapper.unmount();
       host.remove();
+    }
+  });
+
+  it("fills the remaining height with an internally scrolling table when explicitly enabled", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "fill-space", rows: [], columns, total: 0, fillAvailableHeight: true },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await flushPromises();
+    expect(wrapper.classes()).toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBe("100%");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBeUndefined();
+    expect(wrapper.find(".data-table__pager").exists()).toBe(true);
+    await wrapper.setProps({ fillAvailableHeight: false });
+    expect(wrapper.classes()).not.toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("keeps a readable minimum body when filters leave too little height", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: {
+        tableId: "fill-minimum",
+        rows: [{ id: "1" }, { id: "2" }],
+        columns,
+        total: 2,
+        fillAvailableHeight: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      await flushPromises();
+      Object.defineProperty(wrapper.element.parentElement, "clientHeight", {
+        value: 200,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__toolbar").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__pager").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".el-table__header-wrapper").element, "offsetHeight", {
+        value: 48,
+        configurable: true
+      });
+      wrapper.findAll(".el-table__body tbody tr").forEach((row, index) =>
+        Object.defineProperty(row.element, "offsetHeight", {
+          value: index === 0 ? 56 : 113,
+          configurable: true
+        })
+      );
+      window.dispatchEvent(new Event("resize"));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect((wrapper.element as HTMLElement).style.minHeight).toBe("297px");
+      expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBe("100%");
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
+  it("does not force plain detail tables to fill their container", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "plain-fill-ignored",
+        rows: [],
+        columns,
+        total: 0,
+        plain: true,
+        fillAvailableHeight: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await flushPromises();
+    expect(wrapper.classes()).not.toContain("is-fill");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("height")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("restores space when a sibling filter collapses without resizing the page or table", async () => {
+    const observers: {
+      callback: ResizeObserverCallback;
+      elements: Set<Element>;
+      disconnected: boolean;
+    }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        state: (typeof observers)[number];
+        constructor(callback: ResizeObserverCallback) {
+          this.state = { callback, elements: new Set(), disconnected: false };
+          observers.push(this.state);
+        }
+        observe(element: Element) {
+          this.state.elements.add(element);
+        }
+        unobserve(element: Element) {
+          this.state.elements.delete(element);
+        }
+        disconnect() {
+          this.state.disconnected = true;
+        }
+      }
+    );
+    const host = document.createElement("div");
+    const search = document.createElement("div");
+    document.body.append(host);
+    let filterHeight = 240;
+    Object.defineProperty(host, "clientHeight", { value: 600, configurable: true });
+    Object.defineProperty(search, "offsetHeight", { get: () => filterHeight, configurable: true });
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: { tableId: "filter-collapse", rows: [], columns, total: 0 },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      parent.prepend(search);
+      Object.defineProperty(parent, "clientHeight", { value: 600, configurable: true });
+      await flushPromises();
+      Object.defineProperty(wrapper.get(".data-table__toolbar").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      Object.defineProperty(wrapper.get(".data-table__pager").element, "offsetHeight", {
+        value: 40,
+        configurable: true
+      });
+      const observer = observers.find(item => item.elements.has(search));
+      expect(observer).toBeDefined();
+      observer!.callback([], {} as ResizeObserver);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(280);
+      filterHeight = 100;
+      observer!.callback([], {} as ResizeObserver);
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(420);
+      wrapper.unmount();
+      expect(observer!.disconnected).toBe(true);
+    } finally {
+      if (wrapper.exists()) wrapper.unmount();
+      host.remove();
+      vi.unstubAllGlobals();
     }
   });
 
@@ -293,6 +495,32 @@ describe("DataTable expand rows", () => {
     const located = wrapper.findAll("tr.row--located");
     expect(located).toHaveLength(1);
     expect(located[0].text()).toContain("KOL0001");
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable interactive cells", () => {
+  it("leaves custom form focus handling to the slot while retaining left alignment", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "interactive-form",
+        rows: [{ id: "1", name: "Creator" }],
+        total: 1,
+        plain: true,
+        paged: false,
+        columns: [
+          { key: "name", label: "Permissions", align: "left", interactive: true, tooltip: false }
+        ]
+      },
+      slots: { "cell-name": '<label><input type="checkbox" /> View creator</label>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await flushPromises();
+    expect(wrapper.find(".accessible-cell").exists()).toBe(false);
+    expect(wrapper.find("input[type=checkbox]").exists()).toBe(true);
+    expect(wrapper.get("th").classes()).toContain("is-left");
+    expect(wrapper.get("td").classes()).toContain("is-left");
     wrapper.unmount();
   });
 });

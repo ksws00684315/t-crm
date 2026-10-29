@@ -57,7 +57,8 @@ async function submit() {
 
 <template>
   <el-card shadow="never" class="password">
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
+    <h1>{{ t("route.password") }}</h1>
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
       <el-form-item :label="t('password.old')" prop="oldPassword" :error="serverErrors.oldPassword">
         <el-input v-model="form.oldPassword" type="password" show-password maxlength="72" />
       </el-form-item>
@@ -81,6 +82,9 @@ async function submit() {
 </template>
 
 <style scoped>
+.password h1 {
+  margin: 0 0 var(--tcrm-space-4);
+}
 .password {
   max-width: 520px;
 }

@@ -174,7 +174,7 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    for (const header of ["商品名称", "达人", "数量", "订单状态", "支付金额", "操作"]) {
+    for (const header of ["商品信息", "达人", "数量", "订单状态", "实付金额", "操作"]) {
       expect(labels).toContain(header);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
@@ -281,19 +281,25 @@ describe("order list page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("shows the wide order detail dialog with merchant and item fields", async () => {
+  it("opens a right-side order drawer with grouped products and currency codes", async () => {
     signIn("SUPER_ADMIN", MANAGER);
     vi.mocked(orderApi.getOrder).mockResolvedValue(detail);
     const wrapper = await mountPage();
     rowButtons("action-view")[0].click();
     await flushPromises();
     expect(vi.mocked(orderApi.getOrder)).toHaveBeenCalledWith("101");
-    const dialog = document.body.querySelector(".order-detail-dialog");
+    const dialog = document.body.querySelector(".order-detail-drawer");
     expect(dialog?.querySelector('[data-test="order-detail"]')).not.toBeNull();
     const dialogText = dialog?.textContent ?? "";
-    for (const expected of ["wd-merchant-1", "115.00", "60.00", "接口同步", "Blue / L"]) {
+    for (const expected of ["wd-merchant-1", "115.00 CNY", "60.00 CNY", "Blue / L"]) {
       expect(dialogText).toContain(expected);
     }
+    expect(dialog?.classList.contains("rtl")).toBe(true);
+    const productHeaders = [...(dialog?.querySelectorAll("thead th") ?? [])].map(item =>
+      item.textContent?.trim()
+    );
+    expect(productHeaders).toEqual(["商品", "达人", "数量", "单价", "实付金额", "状态"]);
+    expect(element("filter-order-status").element.closest('[data-test="search-more"]')).toBeNull();
     expect(dialog?.querySelector(".el-dialog__body")?.getAttribute("style") ?? "").not.toContain(
       "overflow-x: scroll"
     );

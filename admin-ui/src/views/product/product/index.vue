@@ -48,10 +48,21 @@ function asProduct(row: object): ProductVO {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "productCode", label: t("product.code"), width: 130 },
-    { key: "name", label: t("product.name"), prop: "name", minWidth: 160 },
-    { key: "shopName", label: t("product.shop"), prop: "shopName", minWidth: 120 },
-    { key: "weidianItemId", label: t("product.weidianItemId"), minWidth: 130 },
+    { key: "productCode", align: "left" as const, label: t("product.code"), width: 130 },
+    { key: "name", align: "left" as const, label: t("product.name"), prop: "name", minWidth: 160 },
+    {
+      key: "shopName",
+      align: "left" as const,
+      label: t("product.shop"),
+      prop: "shopName",
+      minWidth: 120
+    },
+    {
+      key: "weidianItemId",
+      align: "left" as const,
+      label: t("product.weidianItemId"),
+      minWidth: 130
+    },
     { key: "category", label: t("product.category"), prop: "category", width: 100 },
     { key: "price", label: t("product.price"), width: 100, amount: true },
     { key: "rate", label: t("product.rate"), width: 100, amount: true },
@@ -416,7 +427,7 @@ onMounted(() => {
       width="520px"
       :close-on-click-modal="false"
     >
-      <el-form label-width="120px" @submit.prevent>
+      <el-form label-position="top" @submit.prevent>
         <el-form-item :label="t('product.code')">
           <el-input :model-value="editing?.productCode" disabled />
         </el-form-item>

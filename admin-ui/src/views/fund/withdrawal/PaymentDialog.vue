@@ -212,7 +212,7 @@ async function submit() {
 <style scoped>
 .payment-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 var(--tcrm-space-4);
   margin-top: var(--tcrm-space-4);
 }

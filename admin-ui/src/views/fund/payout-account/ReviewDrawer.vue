@@ -10,6 +10,7 @@ import {
   type PayoutAccountDetailVO
 } from "@/api/commission/payout-account";
 import CopyText from "@/components/CopyText.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
@@ -28,6 +29,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 
 const loading = ref(false);
 const detail = ref<PayoutAccountDetailVO | null>(null);
@@ -144,20 +147,23 @@ async function submitReject(): Promise<void> {
   <el-drawer
     :model-value="modelValue"
     :title="t('payout.detailTitle')"
-    size="560px"
+    size="640px"
     @update:model-value="emit('update:modelValue', $event)"
     @closed="releaseQr"
   >
-    <div v-loading="loading">
+    <div ref="detailRegion" v-loading="loading">
       <template v-if="detail">
         <el-alert class="audit-note" type="info" :closable="false" :title="t('payout.auditNote')" />
-        <el-descriptions :column="1" border>
-          <el-descriptions-item :label="t('payout.kolCode')">
+        <el-descriptions :column="detailColumns" border>
+          <el-descriptions-item :label="t('payout.kolCode')" :span="detailColumns">
             <NameCode :name="detail.kolName" :code="detail.kolCode"
               ><template #code><CopyText :value="detail.kolCode" /></template
             ></NameCode>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('payout.type')">
+          <el-descriptions-item
+            :label="t('payout.type')"
+            :span="detail.accountType === 'PAYPAL' ? 1 : detailColumns"
+          >
             {{ t(`payout.typeOption.${detail.accountType}`) }}
             <template v-if="detail.network"> · {{ detail.network }}</template>
           </el-descriptions-item>
@@ -167,13 +173,13 @@ async function submitReject(): Promise<void> {
           >
             <span data-test="payout-currency">{{ detail.currency || "-" }}</span>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('payout.fullAccount')">
+          <el-descriptions-item :label="t('payout.fullAccount')" :span="detailColumns">
             <CopyText :value="detail.account" />
           </el-descriptions-item>
-          <el-descriptions-item :label="t('payout.holder')">
+          <el-descriptions-item :label="t('payout.holder')" :span="detailColumns">
             {{ detail.holderName || "-" }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('payout.qr')">
+          <el-descriptions-item :label="t('payout.qr')" :span="detailColumns">
             <el-image
               v-if="qrUrl"
               class="qr-image"
@@ -206,6 +212,7 @@ async function submitReject(): Promise<void> {
           <el-descriptions-item
             v-if="detail.status === 'REJECTED' && detail.rejectReason"
             :label="t('payout.rejectReason')"
+            :span="detailColumns"
           >
             {{ detail.rejectReason }}
           </el-descriptions-item>
@@ -216,15 +223,6 @@ async function submitReject(): Promise<void> {
             {{ formatInstant(detail.reviewedTime) }}
           </el-descriptions-item>
         </el-descriptions>
-
-        <div v-if="canDecide" class="review-actions">
-          <el-button type="success" :loading="acting" data-test="approve" @click="approve">
-            {{ t("payout.approve") }}
-          </el-button>
-          <el-button type="danger" plain :loading="acting" data-test="reject" @click="openReject">
-            {{ t("payout.reject") }}
-          </el-button>
-        </div>
       </template>
     </div>
 
@@ -258,6 +256,16 @@ async function submitReject(): Promise<void> {
         </el-button>
       </template>
     </el-dialog>
+    <template v-if="detail && canDecide" #footer>
+      <div class="review-actions">
+        <el-button type="success" :loading="acting" data-test="approve" @click="approve">
+          {{ t("payout.approve") }}
+        </el-button>
+        <el-button type="danger" plain :loading="acting" data-test="reject" @click="openReject">
+          {{ t("payout.reject") }}
+        </el-button>
+      </div>
+    </template>
   </el-drawer>
 </template>
 

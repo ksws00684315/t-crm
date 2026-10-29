@@ -7,6 +7,7 @@ import { getKol, inviteKol } from "@/api/kol/kol";
 import type { BdHistoryVO, KolDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { useUserStore } from "@/stores/user";
 import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
@@ -33,6 +34,8 @@ const emit = defineEmits<{
 }>();
 
 const loading = ref(false);
+const detailRegion = ref<HTMLElement | null>(null);
+const detailColumns = useDescriptionColumns(detailRegion);
 const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
 const copyTokenVisible = ref(false);
@@ -130,7 +133,7 @@ async function sendInvite() {
 }
 
 const historyColumns = computed<DataColumn[]>(() => [
-  { key: "bd", label: t("kol.bdColumn"), minWidth: 120 },
+  { key: "bd", align: "left" as const, label: t("kol.bdColumn"), minWidth: 120 },
   { key: "startedAt", label: t("kol.startedAt"), width: 170 },
   { key: "endedAt", label: t("kol.endedAt"), width: 170 }
 ]);
@@ -143,19 +146,19 @@ const historyColumns = computed<DataColumn[]>(() => [
     size="640px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div v-loading="loading">
+    <div ref="detailRegion" v-loading="loading">
       <template v-if="detail">
         <el-button v-if="canApplyPrepay" data-test="detail-prepay" @click="prepayVisible = true">{{
           t("kol.actionPrepay")
         }}</el-button>
         <PrepayApplyDialog v-model="prepayVisible" :kol="detail" />
-        <el-descriptions :column="1" border>
-          <el-descriptions-item :label="t('kol.code')">
+        <el-descriptions :column="detailColumns" border>
+          <el-descriptions-item :label="t('kol.code')" :span="detailColumns">
             <NameCode :name="detail.name" :code="detail.kolCode"
               ><template #code><CopyText :value="detail.kolCode" /></template
             ></NameCode>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('common.email')">
+          <el-descriptions-item :label="t('common.email')" :span="detailColumns">
             <CopyText :value="detail.email" />
           </el-descriptions-item>
           <el-descriptions-item :label="t('common.country')">{{
@@ -172,11 +175,14 @@ const historyColumns = computed<DataColumn[]>(() => [
           <el-descriptions-item v-if="detail.linkTemplateName" :label="t('kol.agentPlatform')">
             {{ detail.linkTemplateName }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('promotion.creatorInviteCode')">
+          <el-descriptions-item
+            :label="t('promotion.creatorInviteCode')"
+            :span="detail.linkTemplateName ? detailColumns : 1"
+          >
             <CopyText v-if="detail.inviteCode" :value="detail.inviteCode" />
             <span v-else>-</span>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.sheetUrl')">
+          <el-descriptions-item :label="t('kol.sheetUrl')" :span="detailColumns">
             <template v-if="detail.sheetUrl">
               <a
                 data-test="detail-sheet"
@@ -209,7 +215,7 @@ const historyColumns = computed<DataColumn[]>(() => [
               {{ t("promotion.configTitle") }}
             </el-button>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('promotion.platforms')">
+          <el-descriptions-item :label="t('promotion.platforms')" :span="detailColumns">
             <div v-for="platform in detail.platforms" :key="platform.templateId">
               <!-- An empty platform address is stored as the link template URL (with the
                    {PRODUCT_ID} placeholder) — show a dash instead of that non-working link. -->
@@ -260,10 +266,13 @@ const historyColumns = computed<DataColumn[]>(() => [
           <el-descriptions-item :label="t('kol.rateLabel')">
             {{ formatRate(detail.defaultRate) }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('common.status')">
+          <el-descriptions-item
+            :label="t('common.status')"
+            :span="copyTokenVisibleBtn !== promoSheetButton ? detailColumns : 1"
+          >
             {{ detail.status === 1 ? t("common.enabled") : t("common.disabled") }}
           </el-descriptions-item>
-          <el-descriptions-item :label="t('kol.social')">
+          <el-descriptions-item :label="t('kol.social')" :span="detailColumns">
             <div v-if="detail.socialAccounts.length === 0">-</div>
             <div v-for="(account, index) in detail.socialAccounts" :key="index">
               {{ account.platform }}: {{ account.handle }}
@@ -279,7 +288,7 @@ const historyColumns = computed<DataColumn[]>(() => [
               <CopyText v-if="account.url" :value="account.url" />
             </div>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('common.remark')">{{
+          <el-descriptions-item :label="t('common.remark')" :span="detailColumns">{{
             detail.remark || "-"
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('common.createdAt')">

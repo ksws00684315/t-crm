@@ -126,7 +126,7 @@ async function save() {
     :close-on-click-modal="false"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-form label-width="120px" @submit.prevent>
+    <el-form label-position="top" @submit.prevent>
       <el-form-item :label="t('sheetSource.name')" required>
         <el-input v-model="form.sourceName" maxlength="64" data-test="source-name" />
       </el-form-item>
