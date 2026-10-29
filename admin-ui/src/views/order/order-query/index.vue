@@ -2,13 +2,11 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OrderListPage from "@/views/order/index.vue";
-import OrderUnmatchedPage from "@/views/order/unmatched.vue";
 
 defineOptions({ name: "OrderQueryPage" });
 
 /**
- * Orders > Order Query (task 32 §2.1): the order list and the manual matching pool
- * become tabs of one page.
+ * Order Query keeps only the order list after the owner's 2026-10-29 scope update.
  */
 const { t } = useI18n();
 const activeTab = ref("orders");
@@ -19,9 +17,6 @@ const activeTab = ref("orders");
     <el-tabs v-model="activeTab" class="order-query__tabs">
       <el-tab-pane :label="t('route.orderList')" name="orders" lazy>
         <OrderListPage />
-      </el-tab-pane>
-      <el-tab-pane :label="t('route.orderUnmatched')" name="unmatched" lazy>
-        <OrderUnmatchedPage />
       </el-tab-pane>
     </el-tabs>
   </div>
