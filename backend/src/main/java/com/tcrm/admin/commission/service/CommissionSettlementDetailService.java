@@ -240,7 +240,10 @@ public class CommissionSettlementDetailService {
       BigDecimal released =
           row.getReleasedCommissionCny() == null ? BigDecimal.ZERO : row.getReleasedCommissionCny();
       frozen = frozen || row.getAccruedCommissionCny().compareTo(released) > 0;
-      BigDecimal adjustment = released.subtract(row.getAccruedCommissionCny());
+      // Only a reduction after release is an adjustment (refund or attribution change). The frozen
+      // remainder (accrued minus released) is not an adjustment (task 81).
+      BigDecimal adjustment =
+          row.getAccruedCommissionCny().subtract(released).min(BigDecimal.ZERO.setScale(2));
       KolRefDTO kol = row.getKolId() == null ? null : kolsById.get(row.getKolId());
       ItemRefDTO item =
           items.stream().filter(i -> i.id() == row.getOrderItemId()).findFirst().orElse(null);

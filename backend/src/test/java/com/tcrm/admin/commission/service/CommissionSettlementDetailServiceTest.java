@@ -229,6 +229,9 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.commission()).isEqualTo("6.50");
     assertThat(settlement.weidianWithdrawable()).isNull();
     assertThat(settlement.status()).isEqualTo("FROZEN");
+    // Nothing released yet: the frozen amount is not a refund adjustment and reads as a credit.
+    assertThat(settlement.lines().getFirst().adjustment()).isEqualTo("0.00");
+    assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
   }
 
   private static AccountDTO superAdmin() {
