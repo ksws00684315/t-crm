@@ -136,9 +136,7 @@ public class KolOrderService {
                                     item.getQuantity(),
                                     money(item.getPayAmount()),
                                     money(item.getRefundAmount()),
-                                    state == null
-                                        ? CommissionOrderStateApi.STATUS_INVALID
-                                        : state.settlementStatus(),
+                                    settlementStatus(order, state),
                                     state == null ? null : state.rateSnapshot(),
                                     state == null ? null : state.commissionAmount());
                               })
@@ -149,13 +147,25 @@ public class KolOrderService {
                       order.getOrderStatus(),
                       money(payAmount),
                       money(refundAmount),
-                      mostActiveStatus(ownStates),
+                      order.getPayTime() == null ? null : mostActiveStatus(ownStates),
                       itemRows);
                 })
             .toList(),
         total,
         filter.page(),
         filter.size());
+  }
+
+  /**
+   * Line status shown to the creator. An unpaid order has no commission status yet (task 81 PR
+   * review, 2026-10-30), so it shows none instead of pending verification.
+   */
+  private static String settlementStatus(
+      OrderDO order, CommissionOrderStateApi.ItemCommissionStateDTO state) {
+    if (order.getPayTime() == null) {
+      return null;
+    }
+    return state == null ? CommissionOrderStateApi.STATUS_INVALID : state.settlementStatus();
   }
 
   /** Order-level status: the most active own line (appendix B ladder). */
@@ -167,7 +177,8 @@ public class KolOrderService {
             CommissionOrderStateApi.STATUS_WITHDRAWABLE,
             CommissionOrderStateApi.STATUS_FROZEN,
             CommissionOrderStateApi.STATUS_WITHDRAWN,
-            CommissionOrderStateApi.STATUS_INVALID);
+            CommissionOrderStateApi.STATUS_INVALID,
+            CommissionOrderStateApi.STATUS_NO_COMMISSION);
     for (String status : ladder) {
       if (states.stream().anyMatch(state -> status.equals(state.settlementStatus()))) {
         return status;

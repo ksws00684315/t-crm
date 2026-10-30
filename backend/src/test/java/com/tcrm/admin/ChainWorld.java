@@ -114,6 +114,7 @@ final class ChainWorld {
   private Ids ids;
   private Instant tradeTime;
   private JsonNode syncedOrder;
+  private String detailEnvelope;
 
   ChainWorld(
       MockMvc mvc,
@@ -231,6 +232,11 @@ final class ChainWorld {
     return ids.exclusiveB();
   }
 
+  /** Weidian refund number of the n-th refund stubbed by a test. */
+  String refund(int n) {
+    return ids.refund(n);
+  }
+
   String unmatchedOrder() {
     return ids.unmatched();
   }
@@ -247,8 +253,7 @@ final class ChainWorld {
   JsonNode syncPaidOrder() throws Exception {
     tradeTime = Instant.now().plusSeconds(2).truncatedTo(ChronoUnit.SECONDS);
     weidian.stub("vdian.order.list.get", ChainSamples.orderList(ids.order(), tradeTime, "65.00"));
-    weidian.stub(
-        "vdian.order.get",
+    detailEnvelope =
         ChainSamples.orderDetail(
             ids.order(),
             tradeTime,
@@ -257,7 +262,8 @@ final class ChainWorld {
             ids.exclusiveB(),
             "20.00",
             "5.00",
-            "65.00"));
+            "65.00");
+    weidian.stub("vdian.order.get", detailEnvelope);
     accepted(
         "/admin-api/order/syncs",
         adminToken,
@@ -293,10 +299,18 @@ final class ChainWorld {
    * unmatched order) are appended.
    */
   void stubIncome(ChainSamples.Flow... extra) {
+    stubGoodsIncome(6500, extra);
+  }
+
+  /**
+   * Same flows with the given goods income in fen. A partly refunded order receives pay minus the
+   * refund, so 5500 fen is the income of 65.00 pay with a 10.00 refund (task 81).
+   */
+  void stubGoodsIncome(int goodsFen, ChainSamples.Flow... extra) {
     List<ChainSamples.Flow> rows = new ArrayList<>();
     // Fee and profit share are later than the goods income, so release_at can only match
     // the goods-income tradeTime.
-    rows.add(flow(ids.order(), null, "收入", "货款收入", 6500, tradeTime));
+    rows.add(flow(ids.order(), null, "收入", "货款收入", goodsFen, tradeTime));
     rows.add(flow(ids.order(), null, "支出", "交易手续费", -20, tradeTime.plusSeconds(30)));
     rows.add(flow(ids.order(), null, "支出", "分润", -10, tradeTime.plusSeconds(60)));
     rows.addAll(List.of(extra));
@@ -349,6 +363,125 @@ final class ChainWorld {
         () -> !Instant.now().isBefore(tradeTime),
         "release time " + tradeTime + " has not arrived");
     releaseJob.releaseDue();
+  }
+
+  /**
+   * Re-reads the order with another Weidian status, e.g. {@code close}. The listed update time is
+   * ahead of the first sync's pay time, otherwise the sync skips the order. Wait with
+   * awaitOrderStatus.
+   */
+  void restubOrderStatus(String status) throws Exception {
+    Instant updated = Instant.now().plusSeconds(10).truncatedTo(ChronoUnit.SECONDS);
+    weidian.stub("vdian.order.list.get", ChainSamples.orderList(ids.order(), updated, "65.00"));
+    weidian.stub("vdian.order.get", ChainSamples.withOrderStatus(detailEnvelope, status));
+    syncAgain();
+  }
+
+  void awaitOrderStatus(String status) throws Exception {
+    TestWait.until(
+        Duration.ofSeconds(30),
+        () ->
+            status.equals(
+                jdbc.queryForObject(
+                    "SELECT order_status FROM crm_order WHERE id = ?", String.class, orderId())),
+        "order " + ids.order() + " is not " + status);
+  }
+
+  /** Stubs one Weidian refund of the order on one order line, then syncs. */
+  void stubRefund(String refundNo, String subOrderId, int feeFen, String rawStatus)
+      throws Exception {
+    String orderId = ids.order();
+    weidian.stub(
+        "open.SellerQueryRefundList",
+        ChainSamples.refundList(refundNo, orderId, BigDecimal.valueOf(feeFen, 2).toPlainString()));
+    weidian.stub(
+        "open.sellerQueryRefundDetail",
+        ChainSamples.refundDetail(refundNo, orderId, feeFen, rawStatus, subOrderId));
+    syncAgain();
+  }
+
+  /** Waits for the refund row: 10 completed refunds are SUCCESS, any other status is UNKNOWN. */
+  void awaitRefundStatus(String refundNo, String status) throws Exception {
+    TestWait.until(
+        Duration.ofSeconds(30),
+        () ->
+            jdbc.queryForList(
+                    "SELECT refund_status FROM crm_refund WHERE weidian_refund_no = ?",
+                    String.class,
+                    refundNo)
+                .contains(status),
+        "refund " + refundNo + " is not " + status);
+  }
+
+  /** Syncs one unpaid order on the same two products. Returns its Weidian order id. */
+  String syncUnpaidOrder() throws Exception {
+    String unpaid = ids.unmatched();
+    String detail = ChainSamples.unpaidOrderDetail(samePair(unpaid, Instant.now()));
+    return storeOrder(unpaid, detail, "UNPAID");
+  }
+
+  /**
+   * Syncs a second paid order whose line pays are all zero while the order pays 65.00, so its basis
+   * cannot be allocated (ALLOCATION_FAILED): paid but unverified. Returns its Weidian order id.
+   */
+  String syncPaidOrderWithoutLinePay() throws Exception {
+    String other = ids.extraOrder();
+    String detail =
+        ChainSamples.orderDetail(
+            other,
+            Instant.now(),
+            ids.exclusiveA(),
+            "0.00",
+            ids.exclusiveB(),
+            "0.00",
+            "5.00",
+            "65.00");
+    return storeOrder(other, detail, "PAID");
+  }
+
+  private String samePair(String orderId, Instant when) {
+    return ChainSamples.orderDetail(
+        orderId, when, ids.exclusiveA(), "40.00", ids.exclusiveB(), "20.00", "5.00", "65.00");
+  }
+
+  private String storeOrder(String orderId, String detail, String status) throws Exception {
+    weidian.stub("vdian.order.list.get", ChainSamples.orderList(orderId, Instant.now(), "65.00"));
+    weidian.stub("vdian.order.get", detail);
+    syncAgain();
+    TestWait.until(
+        Duration.ofSeconds(30),
+        () ->
+            Integer.valueOf(1)
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM crm_order WHERE weidian_order_id = ?"
+                            + " AND order_status = ?",
+                        Integer.class,
+                        orderId,
+                        status)),
+        "order " + orderId + " was not stored as " + status);
+    return orderId;
+  }
+
+  /** Creator's withdrawal conditions (11.03). */
+  JsonNode conditions() throws Exception {
+    return data(KOL_HEADER, kolToken, "/kol-api/withdrawals/conditions");
+  }
+
+  /** Creator's application, answered as {@code HTTP errorCode} so a rejection can be asserted. */
+  String applyWithdrawalOutcome(long payoutAccountId, String amount) throws Exception {
+    return outcome(
+        post("/kol-api/withdrawals")
+            .header(KOL_HEADER, kolToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                "{\"idempotencyKey\":\""
+                    + UUID.randomUUID()
+                    + "\",\"amount\":\""
+                    + amount
+                    + "\",\"payoutAccountId\":\""
+                    + payoutAccountId
+                    + "\"}"));
   }
 
   JsonNode order(String token) throws Exception {
@@ -521,10 +654,18 @@ final class ChainWorld {
    * Triggers another order sync without moving the pay time. The call returns before it finishes.
    */
   void syncAgain() throws Exception {
-    accepted(
-        "/admin-api/order/syncs",
-        adminToken,
-        json.writeValueAsString(Map.of("shopId", Long.toString(shopId))));
+    String body = json.writeValueAsString(Map.of("shopId", Long.toString(shopId)));
+    // A sync still running answers ORDER_SYNC_RUNNING (409); wait until the shop lock is free.
+    TestWait.until(
+        Duration.ofSeconds(30),
+        () -> {
+          try {
+            return postStatus(adminToken, "/admin-api/order/syncs", body) == 202;
+          } catch (Exception e) {
+            throw new IllegalStateException(e);
+          }
+        },
+        "order sync did not start");
   }
 
   String otherCompanyToken() throws Exception {
@@ -1031,6 +1172,15 @@ final class ChainWorld {
 
     String refund() {
       return Long.toString(base + 5);
+    }
+
+    String extraOrder() {
+      return Long.toString(base + 60);
+    }
+
+    /** Refund number for the n-th refund of a test; each refund number is unique. */
+    String refund(int n) {
+      return Long.toString(base + 100 + n);
     }
 
     String exclusiveA() {

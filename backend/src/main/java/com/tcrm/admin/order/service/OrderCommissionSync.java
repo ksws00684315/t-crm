@@ -80,7 +80,10 @@ public class OrderCommissionSync {
       OrderDO order, OrderItemDO item, BasisOutcome basis, Set<Long> afterSalesItems) {
     BigDecimal lineBasis = basis.lineBasis().get(item.getId());
     String settlementState;
-    if (lineBasis != null) {
+    if (order.getPayTime() == null) {
+      // An unpaid order is not a verification issue (owner decision 2026-10-30).
+      settlementState = "UNPAID";
+    } else if (lineBasis != null) {
       settlementState = basis.settlementTime() == null ? "UNSETTLED" : "CONFIRMED";
     } else {
       settlementState = order.getSettledTime() == null ? "UNKNOWN" : "CONFIRMED";

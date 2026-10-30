@@ -224,6 +224,138 @@ class BusinessChainIT {
     assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
   }
 
+  @Test
+  void shouldZeroCommissionWhenOrderClosesBeforeSettlementWithoutRefundRecord() throws Exception {
+    world.open("closed");
+    world.syncPaidOrder();
+    assertPaidButUnsettled("43.33", "4.33", "21.67", "2.17");
+    // Closed after payment and before any settlement, with no CRM refund (task 81 PR review,
+    // 2026-10-30): the basis is a verified zero, so the frozen commission goes to zero.
+    world.restubOrderStatus("close");
+    world.awaitOrderStatus("CLOSED");
+    for (Map<String, Object> state : world.itemStates()) {
+      assertThat(state.get("verified")).isEqualTo(true);
+      assertThat(ChainWorld.money(state.get("basis_cny"))).isEqualByComparingTo("0.00");
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
+          .isEqualByComparingTo("0.00");
+    }
+    world.release();
+    assertThat(world.ledger()).isEmpty();
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    JsonNode kolOrders = world.kolOrders(world.kolToken());
+    assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("NO_COMMISSION");
+    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("NO_COMMISSION");
+  }
+
+  @Test
+  void shouldTakeReleasedCommissionBackIntoNegativeWalletWhenFullyRefundedAfterWithdrawal()
+      throws Exception {
+    world.open("negative");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    long payoutAccountId = world.approvePayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    world.approveWithdrawal(withdrawalId);
+    world.pay(withdrawalId, "6.50");
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    // Both lines are refunded in full with SUCCESS, then the order closes after settlement.
+    world.stubRefund(world.refund(1), "1", 4000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    world.stubRefund(world.refund(2), "2", 2000, "10");
+    world.awaitRefundStatus(world.refund(2), "SUCCESS");
+    world.restubOrderStatus("close");
+    world.awaitOrderStatus("CLOSED");
+    // The released 6.50 is taken back as negative adjustments, so the wallet goes below zero.
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "-6.50");
+    for (Map<String, Object> state : world.itemStates()) {
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
+          .isEqualByComparingTo("0.00");
+    }
+    // Both lines were withdrawn (paid), so the withdrawal occupation outranks the zero accrual.
+    JsonNode kolOrders = world.kolOrders(world.kolToken());
+    assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("WITHDRAWN");
+    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWN");
+  }
+
+  @Test
+  void shouldReleaseRemainingCommissionWhenPartialRefundSucceedsBeforeSettlement()
+      throws Exception {
+    world.open("partial");
+    world.syncPaidOrder();
+    world.stubRefund(world.refund(1), "1", 1000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    // Goods income is the pay 65.00 less the 10.00 refund, which also confirms the basis
+    // (task 81 rule 5). Line A keeps 43.33 - 10.00 = 33.33, so its accrual is 3.33.
+    world.stubGoodsIncome(5500);
+    assertThat(world.pull()).isTrue();
+    List<Map<String, Object>> states = world.itemStates();
+    assertLine(states.get(0), world.exclusiveA(), "43.33", "3.33", world.tradeTime());
+    assertLine(states.get(1), world.exclusiveB(), "21.67", "2.17", world.tradeTime());
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "5.50");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=3.33", "COMMISSION_CREDIT=2.17");
+  }
+
+  @Test
+  void shouldKeepReleasedLineFrozenAndUnwithdrawableWhileRefundIsOpen() throws Exception {
+    world.open("open");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    // Raw status 2 is not a completed refund, so it stays UNKNOWN and blocks line A (rule 1).
+    world.stubRefund(world.refund(1), "1", 4000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    JsonNode kolOrders = world.kolOrders(world.kolToken());
+    assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("FROZEN");
+    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWABLE");
+    // Line A's released 4.33 cannot be occupied by a new application: only line B is funded.
+    long payoutAccountId = world.approvePayout();
+    assertThat(world.applyWithdrawalOutcome(payoutAccountId, "6.50"))
+        .isEqualTo("422 WITHDRAWAL_INSUFFICIENT_AVAILABLE");
+  }
+
+  @Test
+  void shouldNotCountUnpaidLinesAsUnverifiedOrBlockWithdrawal() throws Exception {
+    world.open("unpaid");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    world.syncUnpaidOrder();
+    // The unpaid order's lines are UNPAID: no count and no block. Its attribution stays PENDING
+    // until payment, so the creator's list shows only the paid order.
+    JsonNode conditions = world.conditions();
+    assertThat(conditions.path("unverifiedCount").asInt()).isZero();
+    assertThat(conditions.path("canApply").asBoolean()).isTrue();
+    assertThat(ChainWorld.count(world.kolOrders(world.kolToken()).path("total"))).isEqualTo(1);
+    // A paid order whose line pays cannot be allocated is unverified, so its two lines count,
+    // while the unpaid order's two lines still do not: the count is 2, not 4.
+    world.syncPaidOrderWithoutLinePay();
+    conditions = world.conditions();
+    assertThat(conditions.path("unverifiedCount").asInt()).isEqualTo(2);
+    assertThat(conditions.path("canApply").asBoolean()).isFalse();
+    assertThat(ChainWorld.count(world.kolOrders(world.kolToken()).path("total"))).isEqualTo(2);
+  }
+
+  /** Settlement status of the creator's order line with the given product name. */
+  private static String kolLineStatus(JsonNode kolOrders, String itemName) {
+    for (JsonNode order : kolOrders.path("items")) {
+      for (JsonNode line : order.path("items")) {
+        if (itemName.equals(line.path("itemName").asString())) {
+          return line.path("settlementStatus").asString();
+        }
+      }
+    }
+    throw new AssertionError("no creator line " + itemName);
+  }
+
   /**
    * Paid but not settled (task 81): each line is verified and accrued, release still waits for the
    * goods-income settlement, the settlement row shows FROZEN and nothing is withdrawable yet.

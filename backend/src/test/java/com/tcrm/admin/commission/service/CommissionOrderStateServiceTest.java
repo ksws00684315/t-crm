@@ -55,7 +55,7 @@ class CommissionOrderStateServiceTest {
   @Test
   void shouldMapPaidButUnsettledLineToFrozenInsteadOfInvalid() {
     // Task 81 (L-031): a paid order accrues from its pay amount before the settlement arrives, so
-    // the creator sees FROZEN with the amount. INVALID is left for zero accrual only.
+    // the creator sees FROZEN with the amount. Zero accrual is NO_COMMISSION, not INVALID.
     CommissionItemStateDO paid = state(9005L, 5005L, KOL, "4.33", "0.00", true);
     CommissionItemStateDO zeroAccrual = state(9006L, 5006L, KOL, "0.00", "0.00", true);
     when(states.listByOrderItemIds(List.of(9005L, 9006L))).thenReturn(List.of(paid, zeroAccrual));
@@ -67,7 +67,7 @@ class CommissionOrderStateServiceTest {
     assertThat(result)
         .extracting(CommissionOrderStateApi.ItemCommissionStateDTO::settlementStatus)
         .containsExactly(
-            CommissionOrderStateApi.STATUS_FROZEN, CommissionOrderStateApi.STATUS_INVALID);
+            CommissionOrderStateApi.STATUS_FROZEN, CommissionOrderStateApi.STATUS_NO_COMMISSION);
     assertThat(result.get(0).commissionAmount()).isEqualByComparingTo("4.33");
     assertThat(result.get(0).releasedAmount()).isEqualByComparingTo("0.00");
   }
@@ -101,21 +101,37 @@ class CommissionOrderStateServiceTest {
   }
 
   @Test
-  void shouldMapUnverifiedAndRefundedOutRowsToInvalidWithNullAmounts() {
+  void shouldMapUnverifiedRowToInvalidWithNullAmounts() {
     CommissionItemStateDO unverified = state(9003L, 5003L, KOL, "0.00", "0.00", false);
-    CommissionItemStateDO refundedOut = state(9004L, 5004L, KOL, "0.00", "0.00", true);
-    when(states.listByOrderItemIds(List.of(9003L, 9004L)))
-        .thenReturn(List.of(unverified, refundedOut));
+    when(states.listByOrderItemIds(List.of(9003L))).thenReturn(List.of(unverified));
 
-    var result = service.listByOrderItemIds(KOL, List.of(9003L, 9004L));
+    var result = service.listByOrderItemIds(KOL, List.of(9003L));
+
+    assertThat(result.getFirst().settlementStatus())
+        .isEqualTo(CommissionOrderStateApi.STATUS_INVALID);
+    assertThat(result.getFirst().commissionAmount()).isNull();
+    assertThat(result.getFirst().releasedAmount()).isNull();
+  }
+
+  @Test
+  void shouldMapVerifiedZeroCommissionRowToNoCommissionEvenIfReleasedBefore() {
+    // Task 81 PR review (2026-10-30): a fully refunded order is verified with zero commission. It
+    // is not pending verification, even when its line was released before the refund.
+    CommissionItemStateDO refundedOut = state(9004L, 5004L, KOL, "0.00", "0.00", true);
+    CommissionItemStateDO refundedAfterRelease = state(9008L, 5008L, KOL, "0.00", "6.50", true);
+    refundedAfterRelease.setAfterSales(true);
+    when(states.listByOrderItemIds(List.of(9004L, 9008L)))
+        .thenReturn(List.of(refundedOut, refundedAfterRelease));
+
+    var result = service.listByOrderItemIds(KOL, List.of(9004L, 9008L));
 
     assertThat(result)
         .extracting(CommissionOrderStateApi.ItemCommissionStateDTO::settlementStatus)
         .containsExactly(
-            CommissionOrderStateApi.STATUS_INVALID, CommissionOrderStateApi.STATUS_INVALID);
-    assertThat(result.get(0).commissionAmount()).isNull();
-    assertThat(result.get(0).releasedAmount()).isNull();
-    assertThat(result.get(1).commissionAmount()).isZero();
+            CommissionOrderStateApi.STATUS_NO_COMMISSION,
+            CommissionOrderStateApi.STATUS_NO_COMMISSION);
+    assertThat(result.get(0).commissionAmount()).isZero();
+    assertThat(result.get(1).releasedAmount()).isEqualByComparingTo("6.50");
   }
 
   @Test

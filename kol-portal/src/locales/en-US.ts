@@ -184,6 +184,7 @@ const enUS = {
       WITHDRAWN: "Withdrawn",
       FROZEN: "Frozen",
       INVALID: "Pending verification",
+      NO_COMMISSION: "No commission",
       WITHDRAWING: "Withdrawing",
       WITHDRAWABLE: "Available"
     },

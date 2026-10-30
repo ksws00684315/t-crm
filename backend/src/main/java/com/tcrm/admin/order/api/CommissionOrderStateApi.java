@@ -17,12 +17,22 @@ public interface CommissionOrderStateApi {
   String STATUS_WITHDRAWABLE = "WITHDRAWABLE";
   String STATUS_FROZEN = "FROZEN";
   String STATUS_WITHDRAWN = "WITHDRAWN";
+
+  /** Unverified line (pending verification). */
   String STATUS_INVALID = "INVALID";
+
+  /** Verified line with zero commission, e.g. a fully refunded order (task 81 PR review). */
+  String STATUS_NO_COMMISSION = "NO_COMMISSION";
 
   /** All accepted settlementStatus filter values. */
   Collection<String> STATUS_VALUES =
       List.of(
-          STATUS_WITHDRAWING, STATUS_WITHDRAWABLE, STATUS_FROZEN, STATUS_WITHDRAWN, STATUS_INVALID);
+          STATUS_WITHDRAWING,
+          STATUS_WITHDRAWABLE,
+          STATUS_FROZEN,
+          STATUS_WITHDRAWN,
+          STATUS_INVALID,
+          STATUS_NO_COMMISSION);
 
   /**
    * Line states of the creator's item lines among {@code orderItemIds}; unknown ids are skipped.
@@ -41,7 +51,8 @@ public interface CommissionOrderStateApi {
    *
    * @param orderId owning order id
    * @param orderItemId order item line id
-   * @param settlementStatus appendix B line status; {@code INVALID} when unverified or refunded out
+   * @param settlementStatus appendix B line status; {@code INVALID} when unverified, {@code
+   *     NO_COMMISSION} when verified with zero commission
    * @param rateSnapshot pay-time rate of the latest revision; null when never accrued
    * @param commissionAmount accrued net commission; null when unverified
    * @param releasedAmount already released into the wallet; null when unverified. Frozen =

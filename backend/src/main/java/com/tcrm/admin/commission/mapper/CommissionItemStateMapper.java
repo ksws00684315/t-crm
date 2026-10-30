@@ -58,10 +58,9 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
 
   /**
    * Unverified lines of paid orders (owner decision 2026-10-30): an unpaid order is not a
-   * verification issue, so it neither blocks withdrawal nor counts in the KOL hint.
+   * verification issue, so its lines are written as settlement state UNPAID and do not count.
    */
-  String UNVERIFIED_PAID =
-      "NOT verified AND order_id IN (SELECT id FROM crm_order WHERE pay_time IS NOT NULL)";
+  String UNVERIFIED_PAID = "NOT verified AND settlement_state != 'UNPAID'";
 
   /**
    * Accrual aggregates per KOL: estimated (accrued), frozen (accrued - released), unverified count.

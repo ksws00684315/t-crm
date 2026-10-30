@@ -191,6 +191,26 @@ class OrderCommissionSyncTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void shouldMarkUnpaidOrderLinesAsUnpaidNotUnverified() {
+    // Task 81 PR review (2026-10-30, M2): an unpaid order is not a verification issue, so its lines
+    // carry the UNPAID state that the unverified counts exclude.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    OrderDO order = order(null);
+    order.setPayTime(null);
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "6.00"))));
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    OrderItemsCommissionEvent.ItemFacts facts = captor.getValue().items().getFirst();
+    assertThat(facts.settlementState()).isEqualTo("UNPAID");
+    assertThat(facts.basisCny()).isNull();
+  }
+
+  @Test
   void shouldSkipEmptyPayloads() {
     TestTransactions.template()
         .executeWithoutResult(
