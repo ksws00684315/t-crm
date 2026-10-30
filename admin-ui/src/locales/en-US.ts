@@ -799,6 +799,7 @@ const enUS: MessageSchema = {
     actionCommission: "Promotion",
     actionFund: "Funds",
     fundEmpty: "This creator has not added a payout account yet",
+    fundLoadFailed: "Failed to load payout accounts. Please try again later.",
     fundType: "Type",
     fundAccount: "Account (masked)",
     fundRecipient: "Recipient or network",

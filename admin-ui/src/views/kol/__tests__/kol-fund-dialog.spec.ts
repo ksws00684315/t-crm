@@ -3,6 +3,7 @@ import ElementPlus from "element-plus";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as payoutApi from "@/api/commission/payout-account";
 import type { KolVO } from "@/api/types";
+import DataTable from "@/components/DataTable.vue";
 import { i18n } from "@/locales";
 import KolFundDialog from "../KolFundDialog.vue";
 
@@ -91,12 +92,12 @@ function elements(testId: string): string[] {
     .map(item => item.textContent?.trim() ?? "");
 }
 
-async function openDialog(items: payoutApi.PayoutAccountRowVO[]) {
+async function openDialog(items: payoutApi.PayoutAccountRowVO[], total = items.length) {
   vi.mocked(payoutApi.listPayoutAccounts).mockResolvedValue({
     items,
-    total: String(items.length),
+    total: String(total),
     page: 1,
-    size: 100
+    size: 20
   });
   const wrapper = mount(KolFundDialog, {
     props: { modelValue: false, kol },
@@ -121,7 +122,7 @@ describe("creator fund dialog (task 82)", () => {
     expect(payoutApi.listPayoutAccounts).toHaveBeenCalledWith({
       kolId: kol.id,
       page: 1,
-      size: 100
+      size: 20
     });
     expect(elements("fund-account-masked")).toEqual(["a***@example.com", "TQ9x...8f2k"]);
     expect(elements("fund-status")).toEqual(["正常", "已停用"]);
@@ -142,6 +143,32 @@ describe("creator fund dialog (task 82)", () => {
     const wrapper = await openDialog([]);
     expect(element("fund-empty").text()).toContain("达人尚未添加收款账户");
     expect(document.body.querySelector('[data-test="fund-account-masked"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("pages the creator's accounts instead of fetching one oversized page", async () => {
+    const wrapper = await openDialog([paypal], 45);
+    wrapper.findComponent(DataTable).vm.$emit("update:page", 3);
+    await flushPromises();
+    expect(payoutApi.listPayoutAccounts).toHaveBeenLastCalledWith({
+      kolId: kol.id,
+      page: 3,
+      size: 20
+    });
+    wrapper.unmount();
+  });
+
+  it("shows a load error instead of the empty state when the request fails", async () => {
+    vi.mocked(payoutApi.listPayoutAccounts).mockRejectedValue(new Error("network"));
+    const wrapper = mount(KolFundDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    expect(element("fund-load-failed").text()).toContain("收款账户加载失败");
+    expect(document.body.querySelector('[data-test="fund-empty"]')).toBeNull();
     wrapper.unmount();
   });
 

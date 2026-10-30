@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { listPayoutAccounts, type PayoutAccountRowVO } from "@/api/commission/payout-account";
 import type { KolVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import PayoutAccountDetailDrawer from "./PayoutAccountDetailDrawer.vue";
@@ -24,7 +25,10 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<PayoutAccountRowVO[]>([]);
+const total = ref(0);
+const query = reactive({ page: 1, size: 20 });
 const detailVisible = ref(false);
 const detailId = ref<string | null>(null);
 
@@ -38,7 +42,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "type", align: "left" as const, label: t("kol.fundType"), minWidth: 90 },
   { key: "account", align: "left" as const, label: t("kol.fundAccount"), minWidth: 160 },
   { key: "recipient", align: "left" as const, label: t("kol.fundRecipient"), minWidth: 120 },
-  { key: "currency", label: t("kol.fundCurrency"), minWidth: 80 },
+  { key: "currency", label: t("kol.fundCurrency"), minWidth: 96 },
   { key: "default", label: t("kol.fundDefault"), minWidth: 72 },
   { key: "status", label: t("kol.fundStatus"), minWidth: 90 },
   { key: "updated", label: t("kol.fundUpdatedAt"), minWidth: 150 },
@@ -49,6 +53,7 @@ watch(
   () => [props.modelValue, props.kol?.id] as const,
   async ([open, kolId]) => {
     if (!open || !kolId) return;
+    query.page = 1;
     await load(kolId);
   },
   { immediate: true }
@@ -56,20 +61,44 @@ watch(
 
 async function load(kolId: string): Promise<void> {
   loading.value = true;
+  loadFailed.value = false;
   try {
-    // Disabled accounts are listed too (no status filter); a creator has few accounts.
-    const page = await listPayoutAccounts({ kolId, page: 1, size: 100 });
+    // Disabled accounts stay in the list (no status filter), so the creator's history is paged.
+    const page = await listPayoutAccounts({ kolId, page: query.page, size: query.size });
     rows.value = page.items;
+    total.value = Number(page.total);
   } catch (error) {
     notifyError(error);
     rows.value = [];
+    total.value = 0;
+    loadFailed.value = true;
   } finally {
     loading.value = false;
   }
 }
 
+function onPage(page: number): void {
+  query.page = page;
+  if (props.kol) void load(props.kol.id);
+}
+
+function onSize(size: number): void {
+  query.size = size;
+}
+
 function asRow(row: object): PayoutAccountRowVO {
   return row as PayoutAccountRowVO;
+}
+
+function rowActions(row: PayoutAccountRowVO): RowAction[] {
+  return [
+    {
+      key: "view",
+      label: t("kol.fundViewFull"),
+      testId: `fund-view-${row.id}`,
+      onClick: () => openDetail(row)
+    }
+  ];
 }
 
 function typeText(row: PayoutAccountRowVO): string {
@@ -101,8 +130,15 @@ function openDetail(row: PayoutAccountRowVO): void {
     data-test="kol-fund-dialog"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <el-alert
+      v-if="loadFailed"
+      type="error"
+      :closable="false"
+      :title="t('kol.fundLoadFailed')"
+      data-test="fund-load-failed"
+    />
     <el-empty
-      v-if="!loading && rows.length === 0"
+      v-else-if="!loading && rows.length === 0"
       :description="t('kol.fundEmpty')"
       data-test="fund-empty"
     />
@@ -110,11 +146,14 @@ function openDetail(row: PayoutAccountRowVO): void {
       v-else
       table-id="kol-fund"
       plain
-      :paged="false"
       :rows="rows"
       :columns="columns"
       :loading="loading"
-      :total="rows.length"
+      :page="query.page"
+      :size="query.size"
+      :total="total"
+      @update:page="onPage"
+      @update:size="onSize"
     >
       <template #cell-type="{ row }">{{ typeText(asRow(row)) }}</template>
       <template #cell-account="{ row }">
@@ -136,13 +175,7 @@ function openDetail(row: PayoutAccountRowVO): void {
       </template>
       <template #cell-updated="{ row }">{{ formatInstant(asRow(row).lastSubmittedAt) }}</template>
       <template #actions="{ row }">
-        <el-button
-          link
-          type="primary"
-          :data-test="`fund-view-${asRow(row).id}`"
-          @click="openDetail(asRow(row))"
-          >{{ t("kol.fundViewFull") }}</el-button
-        >
+        <RowActions :actions="rowActions(asRow(row))" />
       </template>
     </DataTable>
     <PayoutAccountDetailDrawer v-model="detailVisible" :account-id="detailId" />

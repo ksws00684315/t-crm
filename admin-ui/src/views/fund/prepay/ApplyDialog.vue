@@ -182,7 +182,6 @@ async function save() {
         :label-width="locale === 'zh-CN' ? '156px' : '220px'"
         label-position="left"
         class="prepay-form"
-        :disabled="saving || preparing || !!application || locked"
       >
         <el-form-item prop="kolId" :label="t('prepay.kol')" :error="errors.kolId">
           <el-select
@@ -190,6 +189,7 @@ async function save() {
             filterable
             remote
             clearable
+            :disabled="saving || preparing"
             :remote-method="searchKols"
             :loading="kolSearching"
             :placeholder="t('prepay.kolPlaceholder')"
@@ -206,7 +206,11 @@ async function save() {
           </el-select>
         </el-form-item>
         <el-form-item prop="amountCny" :label="t('prepay.amount')" :error="errors.amountCny"
-          ><el-input v-model="form.amountCny" inputmode="decimal" data-test="prepay-amount"
+          ><el-input
+            v-model="form.amountCny"
+            inputmode="decimal"
+            :disabled="saving || preparing || !!application || locked"
+            data-test="prepay-amount"
         /></el-form-item>
       </el-form>
       <div v-if="!application" class="prepay-status" data-test="prepay-application-status">

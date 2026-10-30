@@ -774,6 +774,7 @@ const zhCN = {
     actionCommission: "推广信息",
     actionFund: "资金信息",
     fundEmpty: "达人尚未添加收款账户",
+    fundLoadFailed: "收款账户加载失败，请稍后重试",
     fundType: "类型",
     fundAccount: "账户（脱敏）",
     fundRecipient: "收款人或网络",

@@ -217,7 +217,7 @@ describe("prepay safe submission", () => {
     const calls = vi.mocked(api.applyPrepay).mock.calls;
     expect(calls[0][0].requestId).toMatch(/^[0-9a-f-]{36}$/);
     expect(calls[1][0]).toEqual(calls[0][0]);
-    expect(wrapper.getComponent({ name: "ElForm" }).props("disabled")).toBe(true);
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
   });
   it("allows pay-only users, confirms a difference, refreshes conflict and retries the same UUID", async () => {
     vi.mocked(api.payPrepay)
@@ -338,7 +338,7 @@ describe("prepay safe submission", () => {
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
     expect(wrapper.props("modelValue")).toBe(true);
-    expect(wrapper.getComponent({ name: "ElForm" }).props("disabled")).toBe(true);
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
     expect(wrapper.text()).toContain("PP-test");
     expect(wrapper.text()).toContain(i18n.global.t("prepay.completeInFinance"));
     expect(api.applyPrepay).toHaveBeenCalledExactlyOnceWith({
@@ -346,6 +346,23 @@ describe("prepay safe submission", () => {
       kolId: "3",
       amountCny: "100.00"
     });
+  });
+  it("lets the business switch creator after picking one with an open application", async () => {
+    vi.mocked(api.getActivePrepay).mockResolvedValueOnce({
+      ...detail,
+      kolId: "3",
+      status: "WAITING_DETAILS"
+    });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("PP-test");
+
+    await pickKol(wrapper, "4");
+    expect(api.getActivePrepay).toHaveBeenLastCalledWith("4");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('select[data-test="prepay-kol"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="prepay-application-status"]').text()).toContain("待申请");
   });
   it("requires a positive CNY amount", async () => {
     const wrapper = await open(ApplyDialog);
