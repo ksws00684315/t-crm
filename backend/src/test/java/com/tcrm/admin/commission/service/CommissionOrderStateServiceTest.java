@@ -73,6 +73,22 @@ class CommissionOrderStateServiceTest {
   }
 
   @Test
+  void shouldKeepAfterSalesRowFrozenEvenAfterRelease() {
+    // Task 81 PR review (2026-10-30): an unconcluded refund blocks withdrawal, so a line released
+    // before the refund opened must not show WITHDRAWABLE.
+    CommissionItemStateDO released = state(9007L, 5007L, KOL, "10.00", "10.00", true);
+    released.setAfterSales(true);
+    when(states.listByOrderItemIds(List.of(9007L))).thenReturn(List.of(released));
+    when(revisions.listLatestByItemStateIds(List.of(released.getId())))
+        .thenReturn(List.of(revision(released.getId(), "0.1000")));
+
+    var result = service.listByOrderItemIds(KOL, List.of(9007L));
+
+    assertThat(result.getFirst().settlementStatus())
+        .isEqualTo(CommissionOrderStateApi.STATUS_FROZEN);
+  }
+
+  @Test
   void shouldMapReleasedRowToWithdrawable() {
     CommissionItemStateDO row = state(9002L, 5002L, KOL, "10.00", "10.00", true);
     when(states.listByOrderIds(List.of(5002L))).thenReturn(List.of(row));

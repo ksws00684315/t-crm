@@ -170,25 +170,32 @@ class BusinessChainIT {
   }
 
   @Test
-  void shouldKeepCommission_whenIncomeDetailRefundFlowArrivesAfterRelease() throws Exception {
+  void shouldNetRefundGapOnceWhenIncomeDetailRefundFlowArrivesAfterRelease() throws Exception {
     world.open("refund");
     world.syncPaidOrder();
     world.stubIncome();
     assertThat(world.pull()).isTrue();
     world.release();
     ChainWorld.money(world.overview().at("/income/available"), "6.50");
-    // A later income-detail refund of -100 fen = -1.00 reaches the flows but not the basis: the
-    // basis is the goods income alone (task 81), and refunds reach commission only through the
-    // refund module. No revision and no ledger posting follow.
+    // A later income-detail refund of -100 fen = -1.00 reaches the flows with no CRM refund record
+    // (task 81 PR review, 2026-10-30): the gap 1.00 is netted by pay ratio 40 : 20, so the lines
+    // carry 0.67 and 0.33 extra refund. The basis stays 43.33 / 21.67 and the accrual drops to
+    // (43.33 - 0.67) x 10% = 4.27 and (21.67 - 0.33) x 10% = 2.13. The released surplus is taken
+    // back as COMMISSION_ADJUSTMENT: -0.06 and -0.04.
     int revisions = world.revisionCount();
     world.stubIncome(world.refundFlow());
     assertThat(world.pull()).isTrue();
-    assertThat(world.revisionCount()).isEqualTo(revisions);
+    assertThat(world.revisionCount()).isEqualTo(revisions + 2);
     world.release();
-    assertConfirmed("43.33", "4.33", "21.67", "2.17");
-    ChainWorld.money(world.overview().at("/income/available"), "6.50");
-    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
-    assertChain("6.50", "4.33", "2.17", "6.50", "0.00");
+    assertConfirmed("43.33", "4.27", "21.67", "2.13");
+    ChainWorld.money(world.overview().at("/income/available"), "6.40");
+    ChainWorld.assertLedger(
+        world.ledger(),
+        "COMMISSION_CREDIT=4.33",
+        "COMMISSION_CREDIT=2.17",
+        "COMMISSION_ADJUSTMENT=-0.06",
+        "COMMISSION_ADJUSTMENT=-0.04");
+    assertChain("6.40", "4.27", "2.13", "6.50", "0.10");
   }
 
   @Test

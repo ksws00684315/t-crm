@@ -3,6 +3,7 @@ package com.tcrm.admin.order.service;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.OrderSettlementFlowDO;
+import com.tcrm.admin.order.model.OrderStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -16,11 +17,14 @@ import java.util.Set;
 
 /**
  * Pure computation of an order's commission basis (task 81, design §4.8 / §8.3, ADR-032 2026-10-29
- * revision). Owner decisions of 2026-10-29: the basis is the order's pay amount (freight included)
- * from payment on, split across item lines by pay ratio, so accrual starts when the order is paid.
- * The Weidian settlement only confirms the basis: the goods-income flow must match the pay amount,
- * and its settlement time then drives the release. Fees, profit share and refunds in the settlement
- * flows never enter the basis.
+ * revision, refund rules of the 2026-10-30 PR review). Owner decisions of 2026-10-29: the basis is
+ * the order's pay amount (freight included) from payment on, split across item lines by pay ratio,
+ * so accrual starts when the order is paid. The Weidian settlement only confirms the basis: the
+ * goods-income flow must equal the pay amount, or the pay amount minus the CRM successful refunds.
+ *
+ * <p>Refunds reduce the basis from both sources, counted once: the CRM successful refunds per line,
+ * and the refund rows of the settlement flows when their total exceeds the CRM total (the gap is
+ * allocated by pay ratio). An order closed after payment has a zero basis.
  *
  * <p>Unverified orders carry a queryable reason code: unpaid, multiple KOLs, allocation failure.
  */
@@ -44,13 +48,17 @@ public final class SettlementBasisCalculator {
    */
   static final String TRADE_SUB_TYPE_GOODS_INCOME = "货款收入";
 
+  /** The subtype of a refund row in the income detail (negative amount, its refundId links it). */
+  static final String TRADE_SUB_TYPE_REFUND = "退款";
+
   /** Not paid yet, or no matched settlement flow while paid: the basis accrues, unconfirmed. */
   public static final String REASON_NO_SETTLEMENT = "NO_SETTLEMENT";
 
   /**
-   * Not exactly one goods-income row, a row without tradeTime, an unparsable amount, or the
-   * converted goods income differs from {@code crm_order.pay_amount} (a wrong unit lands here,
-   * preventing a 100x commission). The basis still accrues from the pay amount; release waits.
+   * Not exactly one goods-income row, a row without tradeTime, an unparsable amount, or the goods
+   * income equals neither the pay amount nor the pay amount minus the CRM successful refunds (a
+   * wrong unit lands here, preventing a 100x commission). The basis still accrues from the pay
+   * amount; release waits.
    */
   public static final String REASON_INCOME_MISMATCH = "INCOME_MISMATCH";
 
@@ -64,11 +72,19 @@ public final class SettlementBasisCalculator {
 
   private SettlementBasisCalculator() {}
 
-  /** Result of the basis check: {@code reason} null means the basis was computed. */
+  /**
+   * Result of the basis check. {@code reason} null means the basis was computed. {@code
+   * lineExtraRefund} holds the settlement refund gap allocated per line (empty when there is none);
+   * {@code refundGap} flags that the settlement flows show refunds the CRM records lack.
+   */
   public record BasisOutcome(
-      String reason, Instant settlementTime, Map<Long, BigDecimal> lineBasis) {
+      String reason,
+      Instant settlementTime,
+      Map<Long, BigDecimal> lineBasis,
+      Map<Long, BigDecimal> lineExtraRefund,
+      boolean refundGap) {
     static BasisOutcome unverified(String reason) {
-      return new BasisOutcome(reason, null, Map.of());
+      return new BasisOutcome(reason, null, Map.of(), Map.of(), false);
     }
   }
 
@@ -80,6 +96,10 @@ public final class SettlementBasisCalculator {
     }
     if (distinctKols(items).size() > 1) {
       return BasisOutcome.unverified(REASON_MULTIPLE_KOLS);
+    }
+    if (OrderStatus.CLOSED.name().equals(order.getOrderStatus())) {
+      // Closed after payment: the whole order is refunded, so no commission remains.
+      return zeroBasis(items);
     }
     List<OrderSettlementFlowDO> incomeFlows = new ArrayList<>();
     boolean preSettleListed = false;
@@ -93,25 +113,17 @@ public final class SettlementBasisCalculator {
     if (incomeFlows.isEmpty()) {
       if (preSettleListed) {
         // Pre-settle full refund: the basis is determined to be zero, so no commission can arise.
-        Map<Long, BigDecimal> zeros = new HashMap<>();
-        for (OrderItemDO item : items) {
-          zeros.put(item.getId(), ZERO);
-        }
-        return new BasisOutcome(null, null, zeros);
+        return zeroBasis(items);
       }
-      return accrueUnconfirmed(order, items, REASON_NO_SETTLEMENT);
+      return basis(order, items, flows, REASON_NO_SETTLEMENT, null);
     }
     OrderSettlementFlowDO income = singleGoodsIncome(incomeFlows);
     // A goods-income row without tradeTime has no determined settlement time: the order would
     // verify but never release (UNSETTLED forever, without a reason). Keep it unconfirmed instead.
-    if (income == null || income.getTradeTime() == null || !incomeMatchesPay(income, order)) {
-      return accrueUnconfirmed(order, items, REASON_INCOME_MISMATCH);
+    if (income == null || income.getTradeTime() == null || !incomeConfirms(income, order, items)) {
+      return basis(order, items, flows, REASON_INCOME_MISMATCH, null);
     }
-    Map<Long, BigDecimal> lineBasis = allocate(toCny(income.getAmountRaw()), items);
-    if (lineBasis == null) {
-      return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
-    }
-    return new BasisOutcome(null, income.getTradeTime(), lineBasis);
+    return basis(order, items, flows, null, income.getTradeTime());
   }
 
   /**
@@ -142,9 +154,13 @@ public final class SettlementBasisCalculator {
     return cny.setScale(2, RoundingMode.HALF_UP);
   }
 
-  /** Accrues the pay amount without a confirmed settlement time; release stays blocked. */
-  private static BasisOutcome accrueUnconfirmed(
-      OrderDO order, List<OrderItemDO> items, String reason) {
+  /** Allocates the pay amount, then the settlement refund gap; a null reason means verified. */
+  private static BasisOutcome basis(
+      OrderDO order,
+      List<OrderItemDO> items,
+      List<OrderSettlementFlowDO> flows,
+      String reason,
+      Instant settlementTime) {
     if (order.getPayAmount() == null) {
       return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
     }
@@ -152,7 +168,52 @@ public final class SettlementBasisCalculator {
     if (lineBasis == null) {
       return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
     }
-    return new BasisOutcome(reason, null, lineBasis);
+    BigDecimal gap = refundGap(items, flows);
+    Map<Long, BigDecimal> extra = Map.of();
+    if (gap.signum() > 0) {
+      extra = allocate(gap, items);
+      if (extra == null) {
+        return BasisOutcome.unverified(REASON_ALLOCATION_FAILED);
+      }
+    }
+    return new BasisOutcome(reason, settlementTime, lineBasis, extra, gap.signum() > 0);
+  }
+
+  private static BasisOutcome zeroBasis(List<OrderItemDO> items) {
+    Map<Long, BigDecimal> zeros = new HashMap<>();
+    for (OrderItemDO item : items) {
+      zeros.put(item.getId(), ZERO);
+    }
+    return new BasisOutcome(null, null, zeros, Map.of(), false);
+  }
+
+  /**
+   * Settlement refund total minus the CRM successful refund total: positive when the settlement
+   * flows show refunds the CRM records do not. A refund both sources show is netted once.
+   */
+  static BigDecimal refundGap(List<OrderItemDO> items, List<OrderSettlementFlowDO> flows) {
+    BigDecimal fromFlows = BigDecimal.ZERO;
+    for (OrderSettlementFlowDO flow : flows) {
+      if (!QUERY_INCOME_DETAIL.equals(flow.getQueryType())
+          || !TRADE_SUB_TYPE_REFUND.equals(flow.getTradeSubType())) {
+        continue;
+      }
+      BigDecimal cny = toCny(flow.getAmountRaw());
+      if (cny != null) {
+        fromFlows = fromFlows.add(cny.abs());
+      }
+    }
+    return fromFlows.subtract(crmRefund(items)).setScale(2, RoundingMode.HALF_UP);
+  }
+
+  private static BigDecimal crmRefund(List<OrderItemDO> items) {
+    BigDecimal total = ZERO;
+    for (OrderItemDO item : items) {
+      if (item.getRefundAmount() != null) {
+        total = total.add(item.getRefundAmount());
+      }
+    }
+    return total;
   }
 
   private static OrderSettlementFlowDO singleGoodsIncome(List<OrderSettlementFlowDO> flows) {
@@ -168,11 +229,15 @@ public final class SettlementBasisCalculator {
     return found;
   }
 
-  private static boolean incomeMatchesPay(OrderSettlementFlowDO income, OrderDO order) {
+  /** The goods income equals the pay amount, or the pay amount less the CRM successful refunds. */
+  private static boolean incomeConfirms(
+      OrderSettlementFlowDO income, OrderDO order, List<OrderItemDO> items) {
     BigDecimal incomeCny = toCny(income.getAmountRaw());
-    return incomeCny != null
-        && order.getPayAmount() != null
-        && incomeCny.compareTo(order.getPayAmount()) == 0;
+    if (incomeCny == null || order.getPayAmount() == null) {
+      return false;
+    }
+    BigDecimal netOfRefund = order.getPayAmount().subtract(crmRefund(items));
+    return incomeCny.compareTo(order.getPayAmount()) == 0 || incomeCny.compareTo(netOfRefund) == 0;
   }
 
   private static Set<Long> distinctKols(List<OrderItemDO> items) {
@@ -186,11 +251,11 @@ public final class SettlementBasisCalculator {
   }
 
   /**
-   * Splits the order basis across lines by pay ratio, two decimals each; the rounding tail lands on
-   * the largest-pay line (ties: the smallest order item id), so line bases always add up to the
-   * order basis. Returns null when a non-zero basis meets an all-zero line-pay order.
+   * Splits an amount across lines by pay ratio, two decimals each; the rounding tail lands on the
+   * largest-pay line (ties: the smallest order item id), so line amounts always add up to the
+   * total. Returns null when a non-zero amount meets an all-zero line-pay order.
    */
-  private static Map<Long, BigDecimal> allocate(BigDecimal orderBasis, List<OrderItemDO> items) {
+  private static Map<Long, BigDecimal> allocate(BigDecimal total, List<OrderItemDO> items) {
     Map<Long, BigDecimal> result = new LinkedHashMap<>();
     BigDecimal totalPay = BigDecimal.ZERO;
     for (OrderItemDO item : items) {
@@ -198,7 +263,7 @@ public final class SettlementBasisCalculator {
       totalPay = totalPay.add(pay);
     }
     if (totalPay.signum() == 0) {
-      if (orderBasis.compareTo(ZERO) == 0) {
+      if (total.compareTo(ZERO) == 0) {
         for (OrderItemDO item : items) {
           result.put(item.getId(), ZERO);
         }
@@ -211,9 +276,9 @@ public final class SettlementBasisCalculator {
     BigDecimal allocated = ZERO;
     for (OrderItemDO item : items) {
       BigDecimal pay = item.getPayAmount() == null ? BigDecimal.ZERO : item.getPayAmount();
-      BigDecimal basis = orderBasis.multiply(pay).divide(totalPay, 2, RoundingMode.HALF_UP);
-      result.put(item.getId(), basis);
-      allocated = allocated.add(basis);
+      BigDecimal share = total.multiply(pay).divide(totalPay, 2, RoundingMode.HALF_UP);
+      result.put(item.getId(), share);
+      allocated = allocated.add(share);
       // Largest pay wins the tail; equal pays take the smaller item id.
       if (tailLine == null
           || pay.compareTo(tailLinePay) > 0
@@ -222,7 +287,7 @@ public final class SettlementBasisCalculator {
         tailLinePay = pay;
       }
     }
-    BigDecimal tail = orderBasis.subtract(allocated);
+    BigDecimal tail = total.subtract(allocated);
     if (tail.signum() != 0) {
       result.put(tailLine.getId(), result.get(tailLine.getId()).add(tail));
     }

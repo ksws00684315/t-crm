@@ -81,6 +81,52 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void shouldCarrySettlementRefundGapIntoSuccessfulRefundOnce() {
+    // Goods income 6.00 matches pay 6.00; the flows show a refund 0.60 that no CRM record has.
+    // The gap is netted into the line's successful refund, the basis stays the pay amount.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString()))
+        .thenReturn(
+            List.of(
+                flow("收入", "货款收入", "600", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
+                flow("支出", "退款", "-60", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL)));
+    OrderDO order = order(SETTLED);
+    order.setPayAmount(new BigDecimal("6.00"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "6.00"))));
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    OrderItemsCommissionEvent.ItemFacts facts = captor.getValue().items().getFirst();
+    assertThat(facts.basisCny()).isEqualByComparingTo("6.00");
+    assertThat(facts.basisIncludesRefund()).isFalse();
+    assertThat(facts.successfulRefundCny()).isEqualByComparingTo("0.60");
+    assertThat(facts.basisCheckReason()).isNull();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldQueryOnlyProcessingAndUnknownRefundsAsAfterSales() {
+    // A successful refund is netted from the basis already (task 81 PR review, 2026-10-30), so only
+    // an unconcluded refund may block release.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order(null), List.of(item(9001L, 101L, 1, null, "6.00"))));
+    ArgumentCaptor<LambdaQueryWrapper<RefundDO>> captor =
+        ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+    verify(refunds).selectList(captor.capture());
+    LambdaQueryWrapper<RefundDO> wrapper = captor.getValue();
+    assertThat(wrapper.getSqlSegment()).contains("refund_status IN");
+    assertThat(wrapper.getParamNameValuePairs().values())
+        .contains("PROCESSING", "UNKNOWN")
+        .doesNotContain("SUCCESS");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void shouldPassSettledTimeAsConfirmedState() {
     when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());

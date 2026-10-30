@@ -64,6 +64,10 @@ public class OrderCommissionSync {
       // Owner-confirmed impossible case; defensive only, never logs personal data.
       LOG.warn("settlement basis blocked for order {}: MULTIPLE_KOLS", order.getId());
     }
+    if (basis.refundGap()) {
+      // Settlement flows show refunds the CRM records lack; the gap is netted but needs a look.
+      LOG.warn("settlement refund gap netted for order {}", order.getId());
+    }
     persistOutcome(order, basis);
     List<OrderItemsCommissionEvent.ItemFacts> facts =
         items.stream().map(item -> toFacts(order, item, basis, afterSalesItems)).toList();
@@ -89,12 +93,22 @@ public class OrderCommissionSync {
         item.getProductId(),
         lineBasis,
         lineBasis == null ? null : Boolean.FALSE,
-        item.getRefundAmount(),
+        successfulRefund(item, basis),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),
         /* completedTime */ null,
         afterSalesItems.contains(item.getId()),
         basis.reason());
+  }
+
+  /** CRM successful refund of the line plus its share of the settlement refund gap (task 81). */
+  private static BigDecimal successfulRefund(OrderItemDO item, BasisOutcome basis) {
+    BigDecimal extra = basis.lineExtraRefund().get(item.getId());
+    if (extra == null) {
+      return item.getRefundAmount();
+    }
+    BigDecimal crm = item.getRefundAmount() == null ? BigDecimal.ZERO : item.getRefundAmount();
+    return crm.add(extra);
   }
 
   /**
@@ -122,14 +136,18 @@ public class OrderCommissionSync {
     orders.update(null, update);
   }
 
-  /** Items with an unconcluded refund (PROCESSING / SUCCESS / UNKNOWN block release, §8.4). */
+  /**
+   * Items with an unconcluded refund block release (PROCESSING / UNKNOWN, §8.4). A successful
+   * refund is already netted from the basis, so it no longer blocks (task 81 PR review,
+   * 2026-10-30).
+   */
   private Set<Long> afterSalesItems(long orderId) {
     List<RefundDO> rows =
         refunds.selectList(
             new LambdaQueryWrapper<RefundDO>()
                 .select(RefundDO::getOrderItemId)
                 .eq(RefundDO::getOrderId, orderId)
-                .ne(RefundDO::getRefundStatus, "CLOSED")
+                .in(RefundDO::getRefundStatus, "PROCESSING", "UNKNOWN")
                 .isNotNull(RefundDO::getOrderItemId));
     Set<Long> ids = new HashSet<>();
     for (RefundDO row : rows) {

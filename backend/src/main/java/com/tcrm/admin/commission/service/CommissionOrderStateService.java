@@ -136,6 +136,10 @@ public class CommissionOrderStateService implements CommissionOrderStateApi {
       String occupation = occupations.get(row.getOrderItemId());
       if (occupation != null) {
         status = occupation;
+      } else if (Boolean.TRUE.equals(row.getAfterSales())) {
+        // An unconcluded refund keeps the line frozen even when it was released before (task 81
+        // PR review, 2026-10-30): the line cannot be withdrawn while the refund is open.
+        status = STATUS_FROZEN;
       } else if (accrued.compareTo(BigDecimal.ZERO) > 0
           && released.compareTo(BigDecimal.ZERO) > 0) {
         status = STATUS_WITHDRAWABLE;

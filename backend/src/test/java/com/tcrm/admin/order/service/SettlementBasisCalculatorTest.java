@@ -211,9 +211,9 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
-  void shouldIgnorePartialRefundFlowsInBasis() {
-    // Partial refund -60 fen sits in INCOME_DETAIL but is netted by the commission engine
-    // (basisIncludesRefund = FALSE), so the basis stays the goods income 6.00.
+  void shouldNetSettlementRefundGapByPayRatioWhenCrmHasNoRecord() {
+    // Refund -0.60 sits in INCOME_DETAIL with no CRM refund record: the gap 0.60 is netted by pay
+    // ratio (4 : 2), so the lines carry 0.40 and 0.20 extra refund. The basis stays the pay amount.
     List<OrderSettlementFlowDO> flows =
         List.of(
             income("600"),
@@ -225,6 +225,103 @@ class SettlementBasisCalculatorTest {
     assertThat(outcome.reason()).isNull();
     assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
     assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("2.00");
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("0.40");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("0.20");
+    assertThat(outcome.refundGap()).isTrue();
+  }
+
+  @Test
+  void shouldCountRefundOnceWhenCrmRecordAndFlowAgree() {
+    // The same 0.60 refund is in the CRM records (line 9001) and in the flows: netted once.
+    List<OrderItemDO> lines = items(1);
+    lines.get(0).setRefundAmount(new BigDecimal("0.60"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            income("600"),
+            flow("支出", "退款", "-60", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), lines, flows);
+
+    assertThat(outcome.reason()).isNull();
+    assertThat(outcome.lineExtraRefund()).isEmpty();
+    assertThat(outcome.refundGap()).isFalse();
+  }
+
+  @Test
+  void shouldNetOnlyTheExcessWhenFlowRefundExceedsCrmRecord() {
+    // CRM records 0.20 on line 9002; the flows show 0.60. The excess 0.40 is netted by pay ratio:
+    // 0.40 x 4/6 = 0.27 and 0.40 x 2/6 = 0.13, so the total refund is 0.60 either way.
+    List<OrderItemDO> lines = items(1);
+    lines.get(1).setRefundAmount(new BigDecimal("0.20"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            income("600"),
+            flow("支出", "退款", "-60", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), lines, flows);
+
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("0.27");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("0.13");
+    assertThat(outcome.refundGap()).isTrue();
+  }
+
+  @Test
+  void shouldNotNetFlowsWhenCrmRefundsExceedFlows() {
+    // The CRM record is ahead of the flows (flow refund not yet arrived): the CRM refund alone
+    // stands, nothing extra is netted and no gap is flagged.
+    List<OrderItemDO> lines = items(1);
+    lines.get(0).setRefundAmount(new BigDecimal("0.60"));
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("6.00"), lines, List.of(income("600")));
+
+    assertThat(outcome.lineExtraRefund()).isEmpty();
+    assertThat(outcome.refundGap()).isFalse();
+  }
+
+  @Test
+  void shouldGiveZeroBasisToOrderClosedAfterPayment() {
+    // Closed after payment means the whole order was refunded: the basis is zero even though a
+    // goods income row exists, and no settlement time is set.
+    OrderDO closed = order("6.00");
+    closed.setOrderStatus("CLOSED");
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(closed, items(1), List.of(income("600")));
+
+    assertThat(outcome.reason()).isNull();
+    assertThat(outcome.settlementTime()).isNull();
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("0.00");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldConfirmWhenGoodsIncomeIsPayAmountLessCrmRefund() {
+    // A refund before settlement leaves the goods income at pay minus refund (5.40 = 6.00 - 0.60).
+    List<OrderItemDO> lines = items(1);
+    lines.get(0).setRefundAmount(new BigDecimal("0.60"));
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("6.00"), lines, List.of(income("540")));
+
+    assertThat(outcome.reason()).isNull();
+    assertThat(outcome.settlementTime()).isEqualTo(INCOME_TIME);
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
+    assertThat(outcome.lineBasis().get(9002L)).isEqualByComparingTo("2.00");
+  }
+
+  @Test
+  void shouldReturnIncomeMismatchWhenGoodsIncomeIsNeitherPayNorNetRefund() {
+    // 5.00 matches neither 6.00 nor 5.40: unconfirmed, the basis still accrues from the pay amount.
+    List<OrderItemDO> lines = items(1);
+    lines.get(0).setRefundAmount(new BigDecimal("0.60"));
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("6.00"), lines, List.of(income("500")));
+
+    assertThat(outcome.reason()).isEqualTo("INCOME_MISMATCH");
+    assertThat(outcome.settlementTime()).isNull();
+    assertThat(outcome.lineBasis().get(9001L)).isEqualByComparingTo("4.00");
   }
 
   @Test

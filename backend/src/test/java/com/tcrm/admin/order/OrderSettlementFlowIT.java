@@ -240,30 +240,32 @@ class OrderSettlementFlowIT {
   }
 
   @Test
-  void shouldNotChangeBasisWhenIncomeDetailRefundAppearsAfterRelease() throws Exception {
+  void shouldNetRefundGapOnceWhenIncomeDetailRefundAppearsAfterRelease() throws Exception {
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"));
     pull();
     releaseJob.releaseDue();
     assertThat(walletBalance()).isEqualByComparingTo("0.60");
 
-    // The backfill re-observes the window and now sees a partial refund of -60 fen. Task 81: the
-    // basis stays the goods income, and refunds reach commission only through the refund module,
-    // so no revision and no COMMISSION_ADJUSTMENT land here.
+    // The backfill re-observes the window and now sees a partial refund of -60 fen with no CRM
+    // refund record (task 81 PR review, 2026-10-30). The gap 0.60 is netted by pay ratio 4 : 2:
+    // lines A and B drop by 0.40 and 0.20, so accrual falls to 0.36 and 0.18. The released surplus
+    // is taken back as COMMISSION_ADJUSTMENT -0.04 and -0.02 at the next release run.
     stubIncomeDetail(incomeRow("600"), row("支出", "交易手续费", "-4"), row("支出", "退款", "-60"));
     pull();
+    releaseJob.releaseDue();
 
     assertThat(flowCount()).isEqualTo(3);
     assertThat(itemField(itemA, "basis_cny")).isEqualTo(new BigDecimal("4.00"));
-    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
-    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
-    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.36"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.18"));
+    assertThat(walletBalance()).isEqualByComparingTo("0.54");
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM crm_commission_ledger WHERE kol_id = ?"
                     + " AND entry_type = 'COMMISSION_ADJUSTMENT'",
                 Integer.class,
                 kolId))
-        .isZero();
+        .isEqualTo(2);
   }
 
   @Test
