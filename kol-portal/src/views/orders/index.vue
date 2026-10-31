@@ -216,6 +216,7 @@ onMounted(load);
       :columns="columns"
       :loading="loading"
       :total="total"
+      :paged="total > 0 && !error"
       :page="page"
       :size="size"
       @update:page="pageChanged"
@@ -225,7 +226,10 @@ onMounted(load);
       <template #cell-product="{ row }"
         ><span class="product-cell">{{ productLabel(row) }}</span></template
       >
-      <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
+      <template #cell-payAmount="{ row }"
+        >{{ money(row.payAmount)
+        }}<small class="amount-note">{{ t("orders.amountNote") }}</small></template
+      >
       <template #cell-payTime="{ row }">{{ dateLabel(row.payTime) }}</template>
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
@@ -241,9 +245,11 @@ onMounted(load);
           ><el-tag type="warning">{{ t("orders.split") }}</el-tag></el-tooltip
         ><span v-if="!row.settlementStatus">—</span></template
       >
+      <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
       <template #empty
-        ><div class="empty-state">{{ t("orders.empty") }}</div></template
-      >
+        ><div v-if="!error" class="empty-state">{{ t("orders.empty") }}</div>
+        <span v-else
+      /></template>
     </DataTable>
     <div class="order-cards">
       <article v-for="(order, index) in orders" :key="index" class="order-card">
@@ -256,6 +262,7 @@ onMounted(load);
           <strong>{{ order.orderNo }}</strong>
           <span>{{ productLabel(order) }}</span>
           <span>{{ t("orders.orderAmount") }}: {{ money(order.payAmount) }}</span>
+          <small class="amount-note">{{ t("orders.amountNote") }}</small>
           <span v-if="order.settlementStatus">{{
             t(`orders.settlement.${order.settlementStatus}`)
           }}</span>
@@ -278,6 +285,7 @@ onMounted(load);
       </article>
     </div>
     <el-pagination
+      v-if="total > 0 && !error"
       class="orders-pager"
       :current-page="page"
       :page-size="size"
@@ -309,6 +317,14 @@ h1 {
   padding: var(--tcrm-space-6);
   text-align: center;
   color: var(--tcrm-color-text-secondary);
+}
+.amount-note {
+  display: block;
+  margin-top: var(--tcrm-space-1);
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+  white-space: normal;
 }
 .product-cell {
   display: block;

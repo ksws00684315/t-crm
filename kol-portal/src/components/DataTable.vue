@@ -173,6 +173,12 @@ function measureHeights(): void {
     parseFloat(style.borderBottomWidth || "0");
   const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
   const gap = parseFloat(style.rowGap || "0") || 0;
+  if (fullscreen.value) {
+    // Full screen covers the viewport, so the ceiling comes from the card itself, not the page behind it.
+    const fullscreenCeiling = el.clientHeight - frameHeight - toolbar - pager - gap * gapCount;
+    tableMaxHeight.value = snapToWholeRows(Math.max(160, Math.round(fullscreenCeiling)));
+    return;
+  }
   const ceiling =
     pageHeight -
     hostPadding -

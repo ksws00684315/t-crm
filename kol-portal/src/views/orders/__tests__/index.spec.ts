@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCreatorOrders, type CreatorOrder } from "@/api/creator";
-import { i18n } from "@/locales";
+import { enUS, i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
@@ -105,6 +105,24 @@ describe("creator order details", () => {
     await wrapper.find(".order-card__summary").trigger("click");
     expect(wrapper.text()).toContain("Widget");
     wrapper.unmount();
+  });
+
+  it("explains that commission includes shipping in both desktop and phone layouts", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({ items: [order], total: 1, page: 1, size: 20 });
+    const wrapper = await mountPage();
+    const notes = wrapper.findAll(".amount-note");
+    expect(notes).toHaveLength(2);
+    expect(notes.every(note => note.text() === enUS.orders.amountNote)).toBe(true);
+  });
+
+  it("hides the empty copy and the pager when loading fails", async () => {
+    vi.mocked(getCreatorOrders).mockRejectedValue(new Error("network"));
+    const wrapper = await mountPage();
+    expect(wrapper.text()).toContain(enUS.orders.loadFailed);
+    expect(wrapper.text()).not.toContain(enUS.orders.empty);
+    expect(wrapper.find(".data-table__empty").exists()).toBe(false);
+    expect(wrapper.find(".data-table__pager").exists()).toBe(false);
+    expect(wrapper.find(".orders-pager").exists()).toBe(false);
   });
 
   it("keeps duplicate masked order numbers independently expandable", async () => {

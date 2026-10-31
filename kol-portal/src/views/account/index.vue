@@ -182,7 +182,6 @@ function savePassword() {
 
 <template>
   <section class="account-page">
-    <h1>{{ t("account.title") }}</h1>
     <el-alert v-if="profileError" type="error" :closable="false" :title="profileError" show-icon />
     <el-button v-if="profileError" :loading="profileLoading" @click="load">{{
       t("account.retry")
@@ -192,7 +191,8 @@ function savePassword() {
       <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
       <el-card shadow="never" class="section-card">
         <template #header
-          ><h2>{{ t("account.personalInfo") }}</h2></template
+          ><h1>{{ t("account.title") }}</h1>
+          <h2>{{ t("account.personalInfo") }}</h2></template
         >
         <el-alert
           v-if="profileSaved"
@@ -209,10 +209,10 @@ function savePassword() {
         <el-form label-position="top" @submit.prevent="saveProfile">
           <div class="form-grid">
             <el-form-item :label="t('account.email')"
-              ><el-input :model-value="session.kol.email" readonly disabled
+              ><el-input :model-value="session.kol.email" readonly
             /></el-form-item>
             <el-form-item :label="t('account.systemId')"
-              ><el-input :model-value="systemId" readonly disabled
+              ><el-input :model-value="systemId" readonly
             /></el-form-item>
             <el-form-item :label="t('account.nickname')"
               ><el-input
@@ -446,6 +446,9 @@ h1 {
   line-height: var(--tcrm-line-height-title);
   font-weight: 600;
 }
+.section-card :deep(.el-card__header) h1 + h2 {
+  margin-top: var(--tcrm-space-2);
+}
 .section-card :deep(.el-card__header) h2 {
   margin: 0;
   font-size: var(--tcrm-font-size-section);
@@ -455,6 +458,7 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0 var(--tcrm-space-4);
+  max-width: 640px;
 }
 .form-grid :deep(.el-select) {
   width: 100%;

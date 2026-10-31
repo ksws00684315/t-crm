@@ -177,6 +177,14 @@ body {
     flex-wrap: wrap;
     row-gap: var(--tcrm-space-2);
   }
+
+  /* Phone pager buttons and page numbers reach the 44px minimum (spec 13 §4.1). */
+  #app .el-pagination .btn-prev,
+  #app .el-pagination .btn-next,
+  #app .el-pagination .el-pager li {
+    min-width: var(--tcrm-control-height-mobile);
+    height: var(--tcrm-control-height-mobile);
+  }
 }
 
 /* Body-mounted surfaces use the same ordinary controls as in-page forms. */

@@ -73,9 +73,11 @@ async function signOut() {
         <el-tag v-if="isDemoMode" type="warning" effect="plain">{{ t("common.demoData") }}</el-tag>
         <div class="shell__actions">
           <div v-if="session.kol" class="shell__identity">
-            <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span>{{
-              session.kol.tenantName
-            }}</span>
+            <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span
+              class="shell__company"
+              :title="session.kol.tenantName"
+              >{{ session.kol.tenantName }}</span
+            >
           </div>
           <LocaleSwitch />
           <details class="user-menu">
@@ -202,6 +204,13 @@ async function signOut() {
 .shell__identity :deep(.name-code) {
   min-width: 0;
   max-width: 240px;
+}
+/* One line with an ellipsis; hovering shows the full company name. */
+.shell__company {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .shell__identity :deep(.name-code__name),
 .shell__identity :deep(.name-code__code) {
