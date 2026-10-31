@@ -2,7 +2,6 @@ package com.tcrm.admin.notification.service;
 
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.notification.model.NotificationType;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
@@ -24,14 +23,6 @@ public class NotificationListener {
 
   public NotificationListener(NotificationService notifications) {
     this.notifications = notifications;
-  }
-
-  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void onPayoutAccountSubmitted(PayoutAccountSubmittedEvent event) {
-    safely(
-        event.tenantId(),
-        NotificationType.PAYOUT_ACCOUNT_SUBMITTED,
-        () -> notifications.record(event));
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

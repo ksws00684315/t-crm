@@ -119,12 +119,6 @@ export const getPrepay = (id: string) =>
   http.request<PrepayDetail>({ url: `${root}/${id}`, method: "get" });
 export const getActivePrepay = (kolId: string) =>
   http.request<PrepayDetail | null>({ url: `${root}/active`, method: "get", params: { kolId } });
-export const getPrepayKolSummaries = (kolIds: string[]) =>
-  http.request<{ kolId: string; paidAmountCny: string }[]>({
-    url: `${root}/kol-summaries`,
-    method: "get",
-    params: { kolId: kolIds.join(",") }
-  });
 export const prepayAccounts = (kolId: string) =>
   http.request<PrepayAccount[]>({
     url: `${root}/payout-accounts`,

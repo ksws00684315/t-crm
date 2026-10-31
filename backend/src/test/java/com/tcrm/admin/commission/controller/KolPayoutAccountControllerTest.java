@@ -91,18 +91,18 @@ class KolPayoutAccountControllerTest {
   @Test
   void shouldListOwnAccountsWithFullValues() throws Exception {
     when(accounts.listMine(9007199254740993L))
-        .thenReturn(List.of(dto(PayoutAccountStatus.PENDING)));
+        .thenReturn(List.of(dto(PayoutAccountStatus.APPROVED)));
     mvc.perform(get(BASE).header(KolMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].id").value("77"))
         .andExpect(jsonPath("$.data[0].account").value("TQ5xnPW9tZ3kA7qL9aZ"))
         .andExpect(jsonPath("$.data[0].qrFileId").value("55"))
-        .andExpect(jsonPath("$.data[0].status").value("PENDING"));
+        .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
   }
 
   @Test
   void shouldCreateWithNormalizedCommand() throws Exception {
-    when(accounts.create(anyLong(), any(), any())).thenReturn(dto(PayoutAccountStatus.PENDING));
+    when(accounts.create(anyLong(), any(), any())).thenReturn(dto(PayoutAccountStatus.APPROVED));
     mvc.perform(
             json(
                     post(BASE),

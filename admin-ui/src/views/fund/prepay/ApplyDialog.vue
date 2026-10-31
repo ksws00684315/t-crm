@@ -9,18 +9,25 @@ import {
   type ApplyPrepay,
   type PrepayDetail
 } from "@/api/commission/prepay";
+import { listKols } from "@/api/kol/kol";
+import type { KolVO } from "@/api/types";
 import PrepayStatusTag from "./PrepayStatusTag.vue";
 import CopyText from "@/components/CopyText.vue";
 import { useUserStore } from "@/stores/user";
+import { formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
 import { ApiError } from "@/utils/http/error";
 import { prepayAbilities, validCny } from "@/utils/prepay";
 import { randomUuid } from "@/utils/uuid";
 
+/**
+ * Prepayment request from the prepay page (task 82): the creator is picked here with a remote
+ * search, so the list no longer preselects one. The list only offers creators in the caller's
+ * data scope (the backend filters them).
+ */
 const props = defineProps<{
   modelValue: boolean;
-  kol: { id: string; kolCode: string; name: string | null } | null;
 }>();
 const emit = defineEmits<{ "update:modelValue": [value: boolean]; saved: [] }>();
 const { t, locale } = useI18n();
@@ -30,14 +37,17 @@ const saving = ref(false);
 const preparing = ref(false);
 const locked = ref(false);
 const errors = ref<Record<string, string>>({});
-const form = reactive({ amountCny: "" });
+const form = reactive({ kolId: "", amountCny: "" });
 const application = ref<PrepayDetail | null>(null);
+const kolOptions = ref<KolVO[]>([]);
+const kolSearching = ref(false);
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let attempt: ApplyPrepay | null = null;
 function beforeClose(done: () => void) {
   if (!saving.value && !preparing.value) done();
 }
 const rules = computed<FormRules>(() => ({
+  kolId: [{ required: true, message: t("prepay.kolRequired"), trigger: "change" }],
   amountCny: [
     {
       required: true,
@@ -48,35 +58,66 @@ const rules = computed<FormRules>(() => ({
   ]
 }));
 watch(
-  () => [props.modelValue, props.kol?.id] as const,
-  ([open]) => {
+  () => props.modelValue,
+  open => {
     clearInterval(refreshTimer);
     if (!open) return;
     application.value = null;
-    Object.assign(form, { amountCny: "" });
+    Object.assign(form, { kolId: "", amountCny: "" });
+    kolOptions.value = [];
     attempt = null;
     locked.value = false;
     errors.value = {};
     formRef.value?.clearValidate();
-    void refreshApplication();
-    clearInterval(refreshTimer);
-    refreshTimer = setInterval(() => void refreshApplication(true), 10_000);
   },
   { immediate: true }
 );
+watch(
+  () => form.kolId,
+  kolId => {
+    clearInterval(refreshTimer);
+    application.value = null;
+    attempt = null;
+    locked.value = false;
+    Object.assign(form, { amountCny: "" });
+    if (!kolId) return;
+    void refreshApplication();
+    refreshTimer = setInterval(() => void refreshApplication(true), 10_000);
+  }
+);
 onBeforeUnmount(() => clearInterval(refreshTimer));
+async function searchKols(keyword: string) {
+  if (!keyword.trim()) {
+    kolOptions.value = [];
+    return;
+  }
+  kolSearching.value = true;
+  try {
+    const page = await listKols({ keyword: keyword.trim(), page: 1, size: 100 });
+    kolOptions.value = page.items;
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    kolSearching.value = false;
+  }
+}
+function kolLabel(kol: KolVO): string {
+  return formatNameWithCode(kol.name, kol.kolCode);
+}
 async function refreshApplication(quiet = false) {
-  const kolId = props.kol?.id;
+  const kolId = form.kolId;
   if (!kolId || !props.modelValue) return;
   try {
     const data = await getActivePrepay(kolId);
-    if (!props.modelValue || props.kol?.id !== kolId) return;
+    if (!props.modelValue || form.kolId !== kolId) return;
+    // Polling must not wipe what the business typed or drop a pending retry (same request id).
+    const hadApplication = application.value !== null;
     application.value = data;
     if (data) {
       form.amountCny = data.amountCny;
       attempt = null;
       locked.value = true;
-    } else {
+    } else if (hadApplication) {
       Object.assign(form, { amountCny: "" });
       attempt = null;
       locked.value = false;
@@ -86,14 +127,14 @@ async function refreshApplication(quiet = false) {
   }
 }
 async function save() {
-  if (preparing.value || saving.value || !props.kol || !prepayAbilities(me.user).apply) return;
+  if (preparing.value || saving.value || !prepayAbilities(me.user).apply) return;
   preparing.value = true;
   try {
     if (!(await formRef.value?.validate().catch(() => false))) return;
     if (!attempt)
       attempt = {
         requestId: randomUuid(),
-        kolId: props.kol.id,
+        kolId: form.kolId,
         amountCny: form.amountCny
       };
     saving.value = true;
@@ -108,7 +149,11 @@ async function save() {
     } catch (error) {
       errors.value = serverFieldErrors(error, Object.keys(form));
       notifyError(error);
-      if (error instanceof ApiError && error.status === 409) await refreshApplication(true);
+      if (error instanceof ApiError && error.status === 409) {
+        attempt = null;
+        locked.value = false;
+        await refreshApplication(true);
+      }
       if (error instanceof ApiError && error.status === 400) {
         attempt = null;
         locked.value = false;
@@ -124,22 +169,12 @@ async function save() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="t('kol.actionPrepay')"
+    :title="t('prepay.applyAction')"
     width="min(540px, 95vw)"
     :close-on-click-modal="false"
     :before-close="beforeClose"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <template #header>
-      <div class="prepay-identity" data-test="prepay-creator">
-        <NameCode :name="kol?.name" :code="kol?.kolCode"
-          ><span data-test="prepay-creator-name">{{ kol?.name }}</span
-          ><template #code
-            ><span data-test="prepay-creator-code">{{ kol?.kolCode }}</span></template
-          ></NameCode
-        >
-      </div>
-    </template>
     <div data-test="prepay-apply">
       <el-alert
         v-if="locked && !application"
@@ -154,10 +189,35 @@ async function save() {
         :label-width="locale === 'zh-CN' ? '156px' : '220px'"
         label-position="left"
         class="prepay-form"
-        :disabled="saving || preparing || !!application || locked"
       >
+        <el-form-item prop="kolId" :label="t('prepay.kol')" :error="errors.kolId">
+          <el-select
+            v-model="form.kolId"
+            filterable
+            remote
+            clearable
+            :disabled="saving || preparing"
+            :remote-method="searchKols"
+            :loading="kolSearching"
+            :placeholder="t('prepay.kolPlaceholder')"
+            data-test="prepay-kol"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="kol in kolOptions"
+              :key="kol.id"
+              :label="kolLabel(kol)"
+              :value="kol.id"
+              ><NameCode :name="kol.name" :code="kol.kolCode"
+            /></el-option>
+          </el-select>
+        </el-form-item>
         <el-form-item prop="amountCny" :label="t('prepay.amount')" :error="errors.amountCny"
-          ><el-input v-model="form.amountCny" inputmode="decimal" data-test="prepay-amount"
+          ><el-input
+            v-model="form.amountCny"
+            inputmode="decimal"
+            :disabled="saving || preparing || !!application || locked"
+            data-test="prepay-amount"
         /></el-form-item>
       </el-form>
       <div v-if="!application" class="prepay-status" data-test="prepay-application-status">
@@ -194,7 +254,7 @@ async function save() {
           v-if="!application"
           type="primary"
           :loading="saving || preparing"
-          :disabled="!prepayAbilities(me.user).apply"
+          :disabled="!prepayAbilities(me.user).apply || !form.kolId"
           data-test="prepay-submit"
           @click="save"
           >{{ t("prepay.submitAction") }}</el-button
@@ -204,15 +264,6 @@ async function save() {
   </el-dialog>
 </template>
 <style scoped>
-.prepay-identity h2 {
-  margin: 0;
-  font-size: var(--tcrm-font-size-title);
-  line-height: var(--tcrm-line-height-title);
-  font-weight: 600;
-}
-.prepay-identity p {
-  margin: var(--tcrm-space-1) 0 0;
-}
 .prepay-form {
   margin-top: var(--tcrm-space-5);
 }

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,9 +25,7 @@ import java.time.Instant;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** Controller slice for the admin payout-account endpoints (task 15a §4.4). */
 class AdminPayoutAccountControllerTest {
@@ -76,10 +73,6 @@ class AdminPayoutAccountControllerTest {
         null);
   }
 
-  private MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {
-    return request.contentType(MediaType.APPLICATION_JSON).content(body);
-  }
-
   @Test
   void shouldListMaskedRows_forViewerOrReviewer() throws Exception {
     when(accounts.page(any(), any()))
@@ -92,13 +85,24 @@ class AdminPayoutAccountControllerTest {
   }
 
   @Test
-  void shouldDefaultToListPending() throws Exception {
+  void shouldApplyNoStatusFilterByDefault() throws Exception {
     when(accounts.page(any(), any())).thenReturn(new PageResult<>(java.util.List.of(), 0, 1, 20));
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, reviewer()))
         .andExpect(status().isOk());
     var filter = ArgumentCaptor.forClass(PayoutAccountService.Filter.class);
     verify(accounts).page(any(), filter.capture());
-    org.assertj.core.api.Assertions.assertThat(filter.getValue().status()).isEqualTo("PENDING");
+    org.assertj.core.api.Assertions.assertThat(filter.getValue().status()).isNull();
+    org.assertj.core.api.Assertions.assertThat(filter.getValue().kolId()).isNull();
+  }
+
+  @Test
+  void shouldPassKolIdForTheFundDialog() throws Exception {
+    when(accounts.page(any(), any())).thenReturn(new PageResult<>(java.util.List.of(), 0, 1, 20));
+    mvc.perform(get(BASE).param("kolId", "10").header(AdminMvcSupport.TOKEN_HEADER, reviewer()))
+        .andExpect(status().isOk());
+    var filter = ArgumentCaptor.forClass(PayoutAccountService.Filter.class);
+    verify(accounts).page(any(), filter.capture());
+    org.assertj.core.api.Assertions.assertThat(filter.getValue().kolId()).isEqualTo(10L);
   }
 
   @Test
@@ -124,14 +128,6 @@ class AdminPayoutAccountControllerTest {
     mvc.perform(get(BASE).param("type", "WECHAT").header(AdminMvcSupport.TOKEN_HEADER, reviewer()))
         .andExpect(status().isBadRequest());
     verifyNoInteractions(accounts);
-  }
-
-  @Test
-  void shouldCountPending_forBadge() throws Exception {
-    when(accounts.pendingCount(any())).thenReturn(4L);
-    mvc.perform(get(BASE + "/pending-count").header(AdminMvcSupport.TOKEN_HEADER, viewer()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.count").value("4"));
   }
 
   @Test
@@ -165,67 +161,8 @@ class AdminPayoutAccountControllerTest {
   }
 
   @Test
-  void shouldReviewWithReasonStampAndReject() throws Exception {
-    String token = reviewer();
-    String stamp = ",\"lastSubmittedAt\":\"2026-10-17T00:00:00Z\"";
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isOk());
-    verify(accounts)
-        .review(
-            any(),
-            eq(77L),
-            eq(PayoutAccountService.ReviewAction.APPROVE),
-            any(),
-            eq(Instant.parse("2026-10-17T00:00:00Z")));
-
-    // The submission stamp is required: the reviewer must name the version it saw.
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isBadRequest());
-
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isBadRequest());
-    // Only the first (approve) call reached the service; the blank-reason reject was a 400.
-    verify(accounts, org.mockito.Mockito.times(1)).review(any(), anyLong(), any(), any(), any());
-
-    mvc.perform(
-            json(
-                    put(BASE + "/77/review"),
-                    "{\"action\":\"REJECT\",\"reason\":\" blurry image \"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isOk());
-    verify(accounts)
-        .review(
-            any(),
-            eq(77L),
-            eq(PayoutAccountService.ReviewAction.REJECT),
-            eq("blurry image"),
-            eq(Instant.parse("2026-10-17T00:00:00Z")));
-
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"NOPE\"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, token))
-        .andExpect(status().isBadRequest());
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"REJECT\"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, viewer()))
-        .andExpect(status().isForbidden());
-    mvc.perform(
-            json(put(BASE + "/77/review"), "{\"action\":\"APPROVE\"" + stamp + "}")
-                .header(AdminMvcSupport.TOKEN_HEADER, noAccess()))
-        .andExpect(status().isForbidden());
-  }
-
-  @Test
   void shouldListForbiddenWithoutEitherPermission() throws Exception {
     mvc.perform(get(BASE).header(AdminMvcSupport.TOKEN_HEADER, noAccess()))
-        .andExpect(status().isForbidden());
-    mvc.perform(get(BASE + "/pending-count").header(AdminMvcSupport.TOKEN_HEADER, noAccess()))
         .andExpect(status().isForbidden());
     verifyNoInteractions(accounts);
   }

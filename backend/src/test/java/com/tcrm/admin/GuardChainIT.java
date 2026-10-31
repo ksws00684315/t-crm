@@ -192,7 +192,7 @@ class GuardChainIT {
     world.stubIncome();
     assertThat(world.pull()).isTrue();
     world.release();
-    long payoutAccountId = world.approvePayout();
+    long payoutAccountId = world.createPayout();
     long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
     String outsider = world.otherCompanyToken();
     String otherBd = world.otherBdToken();

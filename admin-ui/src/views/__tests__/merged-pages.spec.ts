@@ -96,11 +96,12 @@ describe("merged tab pages (task 32 §2.1)", () => {
     wrapper.unmount();
   });
 
-  it("creator payouts keeps account review alongside the commission withdrawal tab", async () => {
+  it("creator payouts keeps only the commission withdrawal tab (task 82 removed account review)", async () => {
     vi.spyOn(useUserStore(), "can").mockReturnValue(true);
     const wrapper = await mountPage(FundPayoutPage, "/fund/payouts");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["提现申请", "收款账户审核"]);
+    expect(labels).toEqual(["提现申请"]);
+    expect(labels).not.toContain("收款账户审核");
     wrapper.unmount();
   });
 

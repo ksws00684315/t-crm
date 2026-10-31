@@ -432,17 +432,17 @@ class DeparturePlanIT {
   }
 
   @Test
-  void shouldMovePendingPayoutAccountToHeir_whenCreatorsHandedOver() throws Exception {
+  void shouldShowPayoutAccountToHeir_whenCreatorsHandedOver() throws Exception {
     kol(61L, bdA);
     payoutAccount(61L);
 
-    assertThat(pendingAccounts(bdAToken)).isEqualTo(1);
+    assertThat(payoutAccounts(bdAToken)).isEqualTo(1);
     createPlan(bdA, "RESIGN", null, bdB, null);
 
-    assertThat(pendingAccounts(bdBToken)).isEqualTo(1);
+    assertThat(payoutAccounts(bdBToken)).isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "SELECT count(*) FROM crm_payout_account WHERE kol_id = 61 AND status = 'PENDING'",
+                "SELECT count(*) FROM crm_payout_account WHERE kol_id = 61 AND status = 'APPROVED'",
                 Integer.class))
         .isEqualTo(1);
   }
@@ -519,7 +519,7 @@ class DeparturePlanIT {
         .andExpect(jsonPath("$.errorCode").value(code));
   }
 
-  private int pendingAccounts(String token) throws Exception {
+  private int payoutAccounts(String token) throws Exception {
     return Integer.parseInt(
         json.readTree(
                 mvc.perform(get("/admin-api/commission/payout-accounts").header(TOKEN, token))
@@ -547,7 +547,7 @@ class DeparturePlanIT {
 
   private void payoutAccount(long kolId) {
     jdbc.update(
-        "INSERT INTO crm_payout_account (id, tenant_id, kol_id, account_type, account_cipher, account_masked, holder_name, currency, status, is_default, last_submitted_at, create_time, update_time) VALUES (?, 1, ?, 'PAYPAL', 'v1:test', 'te***@example.test', 'Holder', 'USD', 'PENDING', FALSE, now(), now(), now())",
+        "INSERT INTO crm_payout_account (id, tenant_id, kol_id, account_type, account_cipher, account_masked, holder_name, currency, status, is_default, last_submitted_at, create_time, update_time) VALUES (?, 1, ?, 'PAYPAL', 'v1:test', 'te***@example.test', 'Holder', 'USD', 'APPROVED', FALSE, now(), now(), now())",
         900L + kolId,
         kolId);
   }

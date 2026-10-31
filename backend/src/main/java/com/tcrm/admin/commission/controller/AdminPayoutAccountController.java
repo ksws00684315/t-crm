@@ -19,15 +19,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Admin-side payout accounts (task 15a §4.4). The list is readable with the review permission or
- * the commission view and shows masked accounts; the detail (full account), the review and the QR
- * download need {@code payout-account:review}. An OWN-scope admin only reaches accounts of KOLs
- * currently assigned to them; anything else is a 404.
+ * Admin-side payout accounts (task 15a §4.4, task 82). The list is readable with the review
+ * permission or the commission view and shows masked accounts; the detail (full account) and the QR
+ * download need {@code payout-account:review}. Accounts are no longer reviewed (2026-10-29). An
+ * OWN-scope admin only reaches accounts of KOLs currently assigned to them; anything else is a 404.
  */
 @RestController
 public class AdminPayoutAccountController {
@@ -47,7 +45,10 @@ public class AdminPayoutAccountController {
     this.prepays = prepays;
   }
 
-  /** Review queue by default (PENDING); {@code status=ALL} lists everything. */
+  /**
+   * Accounts of the caller's visible KOLs, every status unless filtered; {@code kolId} gives the
+   * exact KOL for the fund dialog (task 82).
+   */
   @GetMapping("/admin-api/commission/payout-accounts")
   @SaCheckPermission(
       value = {"payout-account:review", "commission:view"},
@@ -56,30 +57,12 @@ public class AdminPayoutAccountController {
     return R.ok(accounts.page(current.user(), q.toFilter()).map(AdminPayoutAccountVO::from));
   }
 
-  /** Pending accounts the caller may review; for a future menu badge (task 15a §4.5). */
-  @GetMapping("/admin-api/commission/payout-accounts/pending-count")
-  @SaCheckPermission(
-      value = {"payout-account:review", "commission:view"},
-      mode = SaMode.OR)
-  public R<PendingCountVO> pendingCount() {
-    return R.ok(new PendingCountVO(accounts.pendingCount(current.user())));
-  }
-
   /** Full account for reviewers; every single view is audited. */
   @GetMapping("/admin-api/commission/payout-accounts/{id}")
   @SaCheckPermission("payout-account:review")
   @AuditLog(module = "PayoutAccount", action = "View detail")
   public R<AdminPayoutAccountDetailVO> detail(@PathVariable @Min(1) Long id) {
     return R.ok(AdminPayoutAccountDetailVO.from(accounts.detail(current.user(), id)));
-  }
-
-  /** Approve or reject a PENDING account; rejecting needs a reason. */
-  @PutMapping("/admin-api/commission/payout-accounts/{id}/review")
-  @SaCheckPermission("payout-account:review")
-  @AuditLog(module = "PayoutAccount", action = "Review")
-  public R<Void> review(@PathVariable @Min(1) Long id, @Valid @RequestBody ReviewRequest r) {
-    accounts.review(current.user(), id, r.toAction(), r.normalizedReason(), r.lastSubmittedAt());
-    return R.ok(null);
   }
 
   /**
@@ -118,8 +101,6 @@ public class AdminPayoutAccountController {
         .contentType(MediaType.parseMediaType(file.contentType()))
         .body(file.content());
   }
-
-  record PendingCountVO(Long count) {}
 
   private BizFileService.FileDTO payoutQrFile(
       com.tcrm.admin.security.api.AccountDTO user, long fileId) {

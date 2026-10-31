@@ -1,22 +1,23 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
-import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   downloadPayoutQr,
   getPayoutAccount,
-  reviewPayoutAccount,
   type PayoutAccountDetailVO
 } from "@/api/commission/payout-account";
 import CopyText from "@/components/CopyText.vue";
 import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import { formatInstant } from "@/utils/format";
-import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
 
-defineOptions({ name: "PayoutReviewDrawer" });
+defineOptions({ name: "PayoutAccountDetailDrawer" });
 
+/**
+ * Read-only full view of one payout account, opened from the creator's fund dialog (task 82).
+ * Every load writes an operation log on the server; nothing here changes the account.
+ */
 const props = defineProps<{
   modelValue: boolean;
   accountId: string | null;
@@ -24,8 +25,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
-  /** A review decision landed; the list and the menu badge refresh. */
-  (event: "reviewed"): void;
 }>();
 
 const { t } = useI18n();
@@ -34,13 +33,11 @@ const detailColumns = useDescriptionColumns(detailRegion);
 
 const loading = ref(false);
 const detail = ref<PayoutAccountDetailVO | null>(null);
-const acting = ref(false);
 const qrUrl = ref<string | null>(null);
-const rejectVisible = ref(false);
-const rejectReason = ref("");
-const rejectError = ref("");
 
-const canDecide = computed(() => detail.value?.status === "PENDING");
+const statusLabel = computed(() =>
+  detail.value?.status === "DISABLED" ? t("kol.fundDisabled") : t("kol.fundActive")
+);
 
 watch(
   () => [props.modelValue, props.accountId] as const,
@@ -73,73 +70,13 @@ async function loadQr(): Promise<void> {
     const blob = await downloadPayoutQr(fileId);
     qrUrl.value = URL.createObjectURL(blob);
   } catch {
-    // The account stays reviewable without the picture.
+    // The drawer stays readable without the picture.
   }
 }
 
 function releaseQr(): void {
   if (qrUrl.value) URL.revokeObjectURL(qrUrl.value);
   qrUrl.value = null;
-}
-
-/**
- * Sends the decision with the `lastSubmittedAt` this drawer loaded; a 409 means the creator
- * changed or someone else reviewed the account meanwhile, so the detail reloads.
- */
-async function decide(action: "APPROVE" | "REJECT", reason?: string): Promise<void> {
-  const current = detail.value;
-  if (!current || !props.accountId) return;
-  acting.value = true;
-  try {
-    await reviewPayoutAccount(props.accountId, {
-      action,
-      ...(action === "REJECT" ? { reason } : {}),
-      lastSubmittedAt: current.lastSubmittedAt
-    });
-    ElMessage.success(action === "APPROVE" ? t("payout.approved") : t("payout.rejected"));
-    emit("reviewed");
-    await load(props.accountId);
-  } catch (error) {
-    if (error instanceof ApiError && error.errorCode === "PAYOUT_ACCOUNT_NOT_PENDING") {
-      ElMessage.warning(t("errors.PAYOUT_ACCOUNT_NOT_PENDING"));
-      // load() reports its own failure and closes the drawer; nothing to catch here.
-      await load(props.accountId);
-      emit("reviewed");
-    } else {
-      notifyError(error);
-    }
-  } finally {
-    acting.value = false;
-  }
-}
-
-async function approve(): Promise<void> {
-  try {
-    await ElMessageBox.confirm(t("payout.approveConfirm"), t("payout.approve"), {
-      type: "warning",
-      confirmButtonText: t("payout.approve"),
-      cancelButtonText: t("common.cancel")
-    });
-  } catch {
-    return; // cancelled
-  }
-  await decide("APPROVE");
-}
-
-function openReject(): void {
-  rejectReason.value = "";
-  rejectError.value = "";
-  rejectVisible.value = true;
-}
-
-async function submitReject(): Promise<void> {
-  const reason = rejectReason.value.trim();
-  if (reason.length < 1 || reason.length > 255) {
-    rejectError.value = t("payout.rejectReasonRule");
-    return;
-  }
-  rejectVisible.value = false;
-  await decide("REJECT", reason);
 }
 </script>
 
@@ -192,80 +129,19 @@ async function submitReject(): Promise<void> {
             <span v-else>{{ detail.qrFileId ? t("payout.qrUnavailable") : "-" }}</span>
           </el-descriptions-item>
           <el-descriptions-item :label="t('common.status')">
-            <el-tag
-              :type="
-                detail.status === 'APPROVED'
-                  ? 'success'
-                  : detail.status === 'REJECTED'
-                    ? 'danger'
-                    : detail.status === 'DISABLED'
-                      ? 'info'
-                      : 'warning'
-              "
-            >
-              {{ t(`payout.status.${detail.status}`) }}
+            <el-tag :type="detail.status === 'DISABLED' ? 'info' : 'success'">
+              {{ statusLabel }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item :label="t('payout.defaultColumn')">
             {{ detail.defaultAccount ? t("payout.defaultColumn") : "-" }}
           </el-descriptions-item>
-          <el-descriptions-item
-            v-if="detail.status === 'REJECTED' && detail.rejectReason"
-            :label="t('payout.rejectReason')"
-            :span="detailColumns"
-          >
-            {{ detail.rejectReason }}
-          </el-descriptions-item>
           <el-descriptions-item :label="t('payout.submittedAt')">
             {{ formatInstant(detail.lastSubmittedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item :label="t('payout.reviewedAt')">
-            {{ formatInstant(detail.reviewedTime) }}
           </el-descriptions-item>
         </el-descriptions>
       </template>
     </div>
-
-    <el-dialog
-      v-model="rejectVisible"
-      :title="t('payout.reject')"
-      width="min(440px, calc(100vw - 24px))"
-      :close-on-click-modal="false"
-      append-to-body
-    >
-      <el-alert
-        v-if="rejectError"
-        class="audit-note"
-        type="error"
-        :closable="false"
-        :title="rejectError"
-      />
-      <el-input
-        v-model="rejectReason"
-        type="textarea"
-        :rows="3"
-        maxlength="255"
-        show-word-limit
-        data-test="reject-reason"
-        :placeholder="t('payout.rejectPlaceholder')"
-      />
-      <template #footer>
-        <el-button @click="rejectVisible = false">{{ t("common.cancel") }}</el-button>
-        <el-button type="danger" data-test="reject-submit" @click="submitReject">
-          {{ t("payout.reject") }}
-        </el-button>
-      </template>
-    </el-dialog>
-    <template v-if="detail && canDecide" #footer>
-      <div class="review-actions">
-        <el-button type="success" :loading="acting" data-test="approve" @click="approve">
-          {{ t("payout.approve") }}
-        </el-button>
-        <el-button type="danger" plain :loading="acting" data-test="reject" @click="openReject">
-          {{ t("payout.reject") }}
-        </el-button>
-      </div>
-    </template>
   </el-drawer>
 </template>
 
@@ -273,20 +149,10 @@ async function submitReject(): Promise<void> {
 .audit-note {
   margin-bottom: 12px;
 }
-.kol-name {
-  margin-left: 8px;
-  color: var(--tcrm-color-text-secondary);
-}
 .qr-image {
   width: 160px;
   height: 160px;
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-control);
-}
-.review-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--tcrm-space-2);
-  margin-top: var(--tcrm-space-3);
 }
 </style>

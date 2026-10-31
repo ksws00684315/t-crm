@@ -147,7 +147,7 @@ class BusinessChainIT {
     assertThat(listedOrder.path("weidianOrderId").asString()).isEqualTo(world.orderNo());
     assertAttributed(detail, listedOrder);
 
-    long payoutAccountId = world.approvePayout();
+    long payoutAccountId = world.createPayout();
     long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
     world.approveWithdrawal(withdrawalId);
     world.pay(withdrawalId, "6.50");
@@ -256,7 +256,7 @@ class BusinessChainIT {
     assertThat(world.pull()).isTrue();
     world.release();
     ChainWorld.money(world.overview().at("/income/available"), "6.50");
-    long payoutAccountId = world.approvePayout();
+    long payoutAccountId = world.createPayout();
     long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
     world.approveWithdrawal(withdrawalId);
     world.pay(withdrawalId, "6.50");
@@ -315,7 +315,7 @@ class BusinessChainIT {
     assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("FROZEN");
     assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWABLE");
     // Line A's released 4.33 cannot be occupied by a new application: only line B is funded.
-    long payoutAccountId = world.approvePayout();
+    long payoutAccountId = world.createPayout();
     assertThat(world.applyWithdrawalOutcome(payoutAccountId, "6.50"))
         .isEqualTo("422 WITHDRAWAL_INSUFFICIENT_AVAILABLE");
   }

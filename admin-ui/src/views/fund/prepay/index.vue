@@ -19,6 +19,7 @@ import { notifyError } from "@/utils/notify";
 import { saveBlob } from "@/utils/download";
 import { PREPAY_STATUSES, prepayAbilities } from "@/utils/prepay";
 import { readPageSize } from "@/utils/table-prefs";
+import ApplyDialog from "./ApplyDialog.vue";
 import DetailDrawer from "./DetailDrawer.vue";
 import PrepayStatusTag from "./PrepayStatusTag.vue";
 
@@ -38,6 +39,7 @@ const loading = ref(false);
 const exporting = ref(false);
 const detailId = ref<string | null>(null);
 const visible = ref(false);
+const applyVisible = ref(false);
 const initialAction = ref("");
 const columns = computed<DataColumn[]>(() => [
   { key: "prepayNo", align: "left" as const, label: t("prepay.number"), minWidth: 220 },
@@ -191,6 +193,11 @@ onMounted(load);
 <template>
   <div class="list-page" data-test="prepay-tasks">
     <ListSearch :chips="chips" @search="search" @reset="reset" @remove="removeChip">
+      <template v-if="abilities.apply" #actions>
+        <el-button type="primary" data-test="prepay-apply-open" @click="applyVisible = true">
+          + {{ t("prepay.applyAction") }}
+        </el-button>
+      </template>
       <template #primary>
         <el-form-item :label="t('prepay.number')"
           ><el-input v-model="filters.prepayNo" clearable data-test="prepay-filter-number"
@@ -251,6 +258,7 @@ onMounted(load);
       <template #cell-createdAt="{ row }">{{ formatInstant(asRow(row).createdAt) }}</template>
       <template #actions="{ row }"><RowActions :actions="actions(asRow(row))" /></template>
     </DataTable>
+    <ApplyDialog v-model="applyVisible" @saved="load" />
     <DetailDrawer
       :model-value="visible"
       :id="detailId"

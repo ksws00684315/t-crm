@@ -41,11 +41,7 @@ describe("payout account API contract", () => {
         return envelope({ fileId: "66" });
       }
       return envelope(
-        config.url === "/payout-accounts" && config.method === "get"
-          ? []
-          : config.url === "/payout-accounts/pending"
-            ? null
-            : { id: "11" }
+        config.url === "/payout-accounts" && config.method === "get" ? [] : { id: "11" }
       );
     };
 
