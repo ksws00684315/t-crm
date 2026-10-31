@@ -344,8 +344,11 @@ public class CopyTokenService implements CopyTokenApi {
 
   private KolRefDTO requireVisibleKol(AccountDTO user, long kolId) {
     KolRefDTO kol = requireKolOrNull(kolId);
-    if (kol == null || (user.ownScope() && !Objects.equals(user.id(), kol.bdUserId()))) {
+    if (kol == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (user.ownScope() && !Objects.equals(user.id(), kol.bdUserId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return kol;
   }

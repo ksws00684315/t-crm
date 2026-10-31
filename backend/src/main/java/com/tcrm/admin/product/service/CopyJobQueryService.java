@@ -144,8 +144,11 @@ public class CopyJobQueryService {
     if (user.ownScope()) {
       List<KolRefDTO> found = kols.listByIds(Set.of(job.getKolId()));
       KolRefDTO kol = found.isEmpty() ? null : found.getFirst();
-      if (kol == null || !Objects.equals(kol.bdUserId(), user.id())) {
+      if (kol == null) {
         throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      }
+      if (!Objects.equals(kol.bdUserId(), user.id())) {
+        throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
       }
     }
     return job;

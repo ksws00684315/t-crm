@@ -223,7 +223,7 @@ class KolItemServiceTest {
   }
 
   @Test
-  void shouldReturn404_whenOwnScopeCannotSeeTheKol() {
+  void shouldReturn403_whenOwnScopeCannotSeeTheKol() {
     when(current.user()).thenReturn(bd());
     when(kols.listByBdUserId(7L))
         .thenReturn(List.of(new KolRefDTO(11L, "KOL-TAA001", "Alice", true, 7L)));
@@ -232,7 +232,7 @@ class KolItemServiceTest {
     assertThatThrownBy(() -> service.detail(2L))
         .isInstanceOf(BusinessException.class)
         .extracting(ex -> ((BusinessException) ex).getErrorCode())
-        .isEqualTo(ErrorCode.COMMON_NOT_FOUND);
+        .isEqualTo(ErrorCode.AUTH_FORBIDDEN);
     verifyNoInteractions(sales, visits);
   }
 

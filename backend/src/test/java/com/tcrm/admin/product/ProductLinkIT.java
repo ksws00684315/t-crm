@@ -564,7 +564,8 @@ class ProductLinkIT {
         .andExpect(jsonPath("$.data.items[0].jobCode").value("t38ownjob"))
         .andExpect(jsonPath("$.data.items[0].kolId").value(Long.toString(ownKol)));
     mvc.perform(get("/admin-api/product/copy-jobs/38002/items").header(ADMIN, bdToken))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
 
     mvc.perform(get("/admin-api/product/copy-jobs").param("jobCode", "t38own").header(ADMIN, admin))
         .andExpect(status().isOk())

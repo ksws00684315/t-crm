@@ -1761,7 +1761,7 @@ public class WithdrawalService {
 
   private static void requireKolScope(AccountDTO user, KolRefDTO kol) {
     if (user.ownScope() && !user.id().equals(kol.bdUserId())) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
   }
 

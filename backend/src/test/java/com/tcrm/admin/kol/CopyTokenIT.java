@@ -219,7 +219,7 @@ class CopyTokenIT {
   }
 
   @Test
-  void shouldHideForeignKolTokens_forOwnScopeBd() throws Exception {
+  void shouldRefuseForeignKolTokens_forOwnScopeBd() throws Exception {
     long bdId = staff("bd17a", "OWN", "kol:copy-token", "kol:view", "kol:edit");
     String bdToken = CompanySessions.login(mvc, json, "bd17a", "staff-pass-123");
     long mine = createKol("Mine", "mine17a@example.com", bdId);
@@ -258,9 +258,18 @@ class CopyTokenIT {
     mvc.perform(
             post("/admin-api/kol/copy-tokens/" + otherTokenId + "/reveal")
                 .header(ADMIN_TOKEN, bdToken))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
     mvc.perform(delete("/admin-api/kol/copy-tokens/" + otherTokenId).header(ADMIN_TOKEN, bdToken))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+    mvc.perform(
+            post("/admin-api/kol/copy-tokens")
+                .header(ADMIN_TOKEN, bdToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kolId\":\"" + other + "\",\"targetChannel\":\"WEIDIAN\"}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
   }
 
   @Test
