@@ -869,12 +869,10 @@ class OrderServiceTest {
     // Any unverified line hides the order total (review: unknown must not pose as zero); the
     // verified line's own block still carries its 3.75.
     assertThat(chain.funds().kolCommission()).isNull();
-    assertThat(chain.funds().shopProfit()).isNull();
     assertThat(chain.funds().accountStatus()).isEqualTo("UNVERIFIED");
     var block = chain.lines().getFirst().commission();
     assertThat(block.rateSnapshot()).isEqualByComparingTo("0.3000");
     assertThat(block.netCommission()).isEqualByComparingTo("3.75");
-    assertThat(block.shopProfit()).isNull();
     assertThat(block.releaseBasis()).isEqualTo("CONFIRMED");
     assertThat(block.occupiedTotal()).isEqualByComparingTo("3.00");
     assertThat(block.withdrawals()).hasSize(2);

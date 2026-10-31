@@ -89,7 +89,7 @@ const demoOrders: CreatorOrder[] = [
     orderNo: "ST-20261021-0306",
     payTime: "2026-10-21T15:05:00Z",
     orderStatus: "CLOSED",
-    settlementStatus: "INVALID",
+    settlementStatus: "NO_COMMISSION",
     payAmount: "320.00",
     refundAmount: "320.00",
     items: [
@@ -101,7 +101,7 @@ const demoOrders: CreatorOrder[] = [
         refundAmount: "320.00",
         rateSnapshot: "0.08",
         commissionAmount: "0.00",
-        settlementStatus: "INVALID"
+        settlementStatus: "NO_COMMISSION"
       }
     ]
   },
@@ -169,7 +169,8 @@ let demoWithdrawalPage = {
   size: 20
 };
 
-export type SettlementStatus = "WITHDRAWN" | "FROZEN" | "INVALID" | "WITHDRAWING" | "WITHDRAWABLE";
+export type SettlementStatus =
+  "WITHDRAWN" | "FROZEN" | "INVALID" | "NO_COMMISSION" | "WITHDRAWING" | "WITHDRAWABLE";
 
 export interface CreatorAnalyticsOverview {
   asOf: string;

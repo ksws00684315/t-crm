@@ -23,12 +23,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Publishes commission source facts of an order's item lines (task 62, design §4.8.1; task 76
- * wiring). The {@code commission} module registers snapshots from the event before the order
- * transaction commits. Since task 76 the basis comes from the persisted Weidian settlement flows:
- * {@link SettlementBasisCalculator} checks them against the confirmed rules and either yields a
- * per-line basis (with the settlement time of the goods-income flow) or leaves the order unverified
- * with a queryable reason, persisted on {@code crm_order}.
+ * Publishes commission source facts of an order's item lines (task 62, design §4.8.1; task 81
+ * basis). The {@code commission} module registers snapshots from the event before the order
+ * transaction commits. Since task 81 the basis is the pay amount once the order is paid, and the
+ * persisted Weidian settlement flows only confirm it: {@link SettlementBasisCalculator} yields a
+ * per-line basis (with the settlement time of the goods-income flow once confirmed) or leaves the
+ * order unverified with a queryable reason, persisted on {@code crm_order}. Refunds are netted by
+ * the commission engine, so the event marks the basis as not refund-inclusive.
  */
 @Component
 public class OrderCommissionSync {
@@ -63,6 +64,10 @@ public class OrderCommissionSync {
       // Owner-confirmed impossible case; defensive only, never logs personal data.
       LOG.warn("settlement basis blocked for order {}: MULTIPLE_KOLS", order.getId());
     }
+    if (basis.refundGap()) {
+      // Settlement flows show refunds the CRM records lack; the gap is netted but needs a look.
+      LOG.warn("settlement refund gap netted for order {}", order.getId());
+    }
     persistOutcome(order, basis);
     List<OrderItemsCommissionEvent.ItemFacts> facts =
         items.stream().map(item -> toFacts(order, item, basis, afterSalesItems)).toList();
@@ -75,7 +80,10 @@ public class OrderCommissionSync {
       OrderDO order, OrderItemDO item, BasisOutcome basis, Set<Long> afterSalesItems) {
     BigDecimal lineBasis = basis.lineBasis().get(item.getId());
     String settlementState;
-    if (lineBasis != null) {
+    if (order.getPayTime() == null) {
+      // An unpaid order is not a verification issue (owner decision 2026-10-30).
+      settlementState = "UNPAID";
+    } else if (lineBasis != null) {
       settlementState = basis.settlementTime() == null ? "UNSETTLED" : "CONFIRMED";
     } else {
       settlementState = order.getSettledTime() == null ? "UNKNOWN" : "CONFIRMED";
@@ -87,13 +95,23 @@ public class OrderCommissionSync {
         item.getAttributionType() == null ? 0 : item.getAttributionType(),
         item.getProductId(),
         lineBasis,
-        lineBasis == null ? null : Boolean.TRUE,
-        item.getRefundAmount(),
+        lineBasis == null ? null : Boolean.FALSE,
+        successfulRefund(item, basis),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),
         /* completedTime */ null,
         afterSalesItems.contains(item.getId()),
         basis.reason());
+  }
+
+  /** CRM successful refund of the line plus its share of the settlement refund gap (task 81). */
+  private static BigDecimal successfulRefund(OrderItemDO item, BasisOutcome basis) {
+    BigDecimal extra = basis.lineExtraRefund().get(item.getId());
+    if (extra == null) {
+      return item.getRefundAmount();
+    }
+    BigDecimal crm = item.getRefundAmount() == null ? BigDecimal.ZERO : item.getRefundAmount();
+    return crm.add(extra);
   }
 
   /**
@@ -121,14 +139,18 @@ public class OrderCommissionSync {
     orders.update(null, update);
   }
 
-  /** Items with an unconcluded refund (PROCESSING / SUCCESS / UNKNOWN block release, §8.4). */
+  /**
+   * Items with an unconcluded refund block release (PROCESSING / UNKNOWN, §8.4). A successful
+   * refund is already netted from the basis, so it no longer blocks (task 81 PR review,
+   * 2026-10-30).
+   */
   private Set<Long> afterSalesItems(long orderId) {
     List<RefundDO> rows =
         refunds.selectList(
             new LambdaQueryWrapper<RefundDO>()
                 .select(RefundDO::getOrderItemId)
                 .eq(RefundDO::getOrderId, orderId)
-                .ne(RefundDO::getRefundStatus, "CLOSED")
+                .in(RefundDO::getRefundStatus, "PROCESSING", "UNKNOWN")
                 .isNotNull(RefundDO::getOrderItemId));
     Set<Long> ids = new HashSet<>();
     for (RefundDO row : rows) {

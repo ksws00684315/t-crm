@@ -31,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Settlement detail list (task 62, requirement 13.05, design §6.2): per-order clearing with the
- * posted/unverified accounting status. BD OWN scope sees only orders whose attributed lines all
- * belong to their own KOLs (mixed attribution stays hidden).
+ * UNVERIFIED / FROZEN / POSTED accounting status (task 81). BD OWN scope sees only orders whose
+ * attributed lines all belong to their own KOLs (mixed attribution stays hidden).
  */
 @Service
 public class CommissionSettlementDetailService {
@@ -61,7 +61,10 @@ public class CommissionSettlementDetailService {
   /** Query of the settlement detail list; {@code channel} accepts only WEIDIAN. */
   public record DetailFilter(String orderNo, String channel, Long shopId, int page, int size) {}
 
-  /** One per-order clearing row. */
+  /**
+   * One per-order clearing row. {@code weidianWithdrawable} is the Weidian settlement flow total
+   * (display only, null before settlement); {@code status} is UNVERIFIED, FROZEN or POSTED.
+   */
   public record SettlementRow(
       long id,
       String orderNo,
@@ -71,10 +74,9 @@ public class CommissionSettlementDetailService {
       List<String> kolNames,
       String payment,
       String refund,
-      String net,
+      String weidianWithdrawable,
       String commission,
       List<String> rates,
-      String retained,
       String status,
       java.time.Instant businessAt,
       List<Line> lines) {}
@@ -180,6 +182,7 @@ public class CommissionSettlementDetailService {
       kolsById.put(kol.id(), kol);
     }
 
+    Map<Long, BigDecimal> withdrawable = orderSettlement.weidianWithdrawableByOrderIds(orderIds);
     List<SettlementRow> rows = new ArrayList<>(orderIds.size());
     for (Long orderId : orderIds) {
       OrderRefDTO order = orders.get(orderId);
@@ -188,7 +191,16 @@ public class CommissionSettlementDetailService {
       if (order == null) {
         continue;
       }
-      rows.add(buildRow(order, items, orderStates, latestRevisions, kolsById, images, shopsById));
+      rows.add(
+          buildRow(
+              order,
+              items,
+              orderStates,
+              latestRevisions,
+              kolsById,
+              images,
+              shopsById,
+              withdrawable.get(orderId)));
     }
     return rows;
   }
@@ -200,15 +212,17 @@ public class CommissionSettlementDetailService {
       Map<Long, CommissionItemRevisionDO> latestRevisions,
       Map<Long, KolRefDTO> kolsById,
       Map<Long, String> images,
-      Map<Long, ShopAccessDTO> shopsById) {
-    BigDecimal payment = BigDecimal.ZERO.setScale(2);
+      Map<Long, ShopAccessDTO> shopsById,
+      BigDecimal withdrawable) {
+    BigDecimal payment =
+        order.payAmount() == null ? BigDecimal.ZERO.setScale(2) : order.payAmount();
     BigDecimal refund = BigDecimal.ZERO.setScale(2);
     for (ItemRefDTO item : items) {
-      payment = payment.add(item.payAmount() == null ? BigDecimal.ZERO : item.payAmount());
       refund = refund.add(item.refundAmount() == null ? BigDecimal.ZERO : item.refundAmount());
     }
     BigDecimal commission = BigDecimal.ZERO.setScale(2);
     boolean unverified = false;
+    boolean frozen = false;
     Set<Long> rowKolIds = new TreeSet<>();
     TreeSet<String> rates = new TreeSet<>();
     List<Line> lines = new ArrayList<>(orderStates.size());
@@ -225,7 +239,11 @@ public class CommissionSettlementDetailService {
       }
       BigDecimal released =
           row.getReleasedCommissionCny() == null ? BigDecimal.ZERO : row.getReleasedCommissionCny();
-      BigDecimal adjustment = released.subtract(row.getAccruedCommissionCny());
+      frozen = frozen || row.getAccruedCommissionCny().compareTo(released) > 0;
+      // Only a reduction after release is an adjustment (refund or attribution change). The frozen
+      // remainder (accrued minus released) is not an adjustment (task 81).
+      BigDecimal adjustment =
+          row.getAccruedCommissionCny().subtract(released).min(BigDecimal.ZERO.setScale(2));
       KolRefDTO kol = row.getKolId() == null ? null : kolsById.get(row.getKolId());
       ItemRefDTO item =
           items.stream().filter(i -> i.id() == row.getOrderItemId()).findFirst().orElse(null);
@@ -256,13 +274,6 @@ public class CommissionSettlementDetailService {
       kolNames.add(kol == null ? String.valueOf(kolId) : kol.name());
     }
     ShopAccessDTO shop = shopsById.get(order.shopId());
-    BigDecimal net = payment.subtract(refund);
-    // Shop retained = Weidian settlement net − net KOL commission, without product cost
-    // (2026-10-25 decision, ADR-032 appendix A); it no longer equals payment − refund −
-    // commission. The Weidian settlement-net field is pending M0 verification (Q-1017-1/2), so
-    // retained stays null for verified and unverified rows alike instead of a look-alike value.
-    // TODO(M0 Q-1017-1/2): read the Weidian settlement net and compute retained here.
-    String retained = null;
     return new SettlementRow(
         order.id(),
         order.orderNo(),
@@ -272,13 +283,23 @@ public class CommissionSettlementDetailService {
         kolNames,
         payment.toPlainString(),
         refund.toPlainString(),
-        net.toPlainString(),
+        withdrawable == null ? null : withdrawable.toPlainString(),
         commission.toPlainString(),
         List.copyOf(rates),
-        retained,
-        unverified ? "UNVERIFIED" : "POSTED",
+        rowStatus(unverified, frozen),
         order.payTime(),
         lines);
+  }
+
+  /**
+   * UNVERIFIED while any line is unverified; FROZEN while any line still has accrued commission
+   * waiting for release (task 81: accrual starts at payment); POSTED once every line is released.
+   */
+  private static String rowStatus(boolean unverified, boolean frozen) {
+    if (unverified) {
+      return "UNVERIFIED";
+    }
+    return frozen ? "FROZEN" : "POSTED";
   }
 
   /** Blank order-line names (a line with no SKU) stay null so the client can tell them apart. */

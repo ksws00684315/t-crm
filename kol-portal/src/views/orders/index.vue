@@ -31,6 +31,7 @@ const statusOptions: SettlementStatus[] = [
   "WITHDRAWN",
   "FROZEN",
   "INVALID",
+  "NO_COMMISSION",
   "WITHDRAWING",
   "WITHDRAWABLE"
 ];
@@ -85,6 +86,7 @@ function statusType(value?: SettlementStatus | null): "success" | "warning" | "i
       WITHDRAWN: "success",
       FROZEN: "warning",
       INVALID: "info",
+      NO_COMMISSION: "info",
       WITHDRAWING: "primary",
       WITHDRAWABLE: "success"
     } as const

@@ -1506,8 +1506,6 @@ const zhCN = {
       financeLedgerSection: "财务流水",
       loadFailed: "订单链路加载失败，请重试",
       kolCommission: "净达人佣金",
-      shopProfit: "店铺获利",
-      shopProfitFormula: "微店结算净额－净达人佣金，不扣商品成本。",
       financeLedgerNote:
         "店铺应收流水依赖微店结算净额与可提现时间，待 M0 核实后接入；未核实金额显示待核实，不以 0 展示。",
       financeType: "类型",

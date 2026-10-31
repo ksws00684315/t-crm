@@ -117,43 +117,49 @@ class GuardChainIT {
   }
 
   @Test
-  void shouldLeaveLinesUnverified_whenGoodsIncomeUnitDoesNotMatchPay() throws Exception {
+  void shouldKeepAccrualUnreleased_whenGoodsIncomeUnitDoesNotMatchPay() throws Exception {
     world.open("unit");
     world.syncPaidOrder();
     // The same 65 is returned as yuan. Fen conversion makes it 0.65, which is not the 65.00 pay,
-    // so the lines stay unverified for INCOME_MISMATCH and the wallet is not credited.
+    // so the goods income does not confirm: the lines keep the pay-time accrual (task 81), stay
+    // unreleased for INCOME_MISMATCH, and the wallet is not credited.
     world.stubIncomeInYuan();
     assertThat(world.pull()).isTrue();
     assertThat(world.basisReason()).isEqualTo("INCOME_MISMATCH");
     assertThat(world.itemStates()).hasSize(2);
     for (Map<String, Object> state : world.itemStates()) {
-      assertThat(state.get("verified")).isEqualTo(false);
-      assertThat(state.get("basis_cny")).isNull();
+      assertThat(state.get("verified")).isEqualTo(true);
+      assertThat(state.get("release_basis")).isEqualTo("UNSETTLED");
       assertThat(state.get("release_at")).isNull();
     }
+    assertThat(ChainWorld.money(world.itemStates().get(0).get("basis_cny")))
+        .isEqualByComparingTo("43.33");
+    assertThat(ChainWorld.money(world.itemStates().get(1).get("basis_cny")))
+        .isEqualByComparingTo("21.67");
     world.release();
     assertThat(world.ledger()).isEmpty();
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     JsonNode chain = world.chain(world.financeToken());
-    assertThat(chain.at("/funds/kolCommission").isNull()).isTrue();
-    assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("UNVERIFIED");
+    ChainWorld.money(chain.at("/funds/kolCommission"), "6.50");
+    assertThat(chain.at("/funds/accountStatus").asString()).isEqualTo("POSTED");
   }
 
   @Test
   void shouldRecomputeStoredFlowsOnce_whenOneSettlementRoundFails() throws Exception {
     world.open("retry");
     world.syncPaidOrder();
-    // Same basis as the payout chain: 6500 - 20 - 10 fen = 64.70, commissions 4.31 and 2.16.
+    // Same basis as the payout chain: the goods income 65.00 confirms the pay, commissions 4.33
+    // and 2.17 (task 81).
     world.stubIncome(world.unmatchedFlow());
     world.failNextPreSettle();
     assertThatThrownBy(world::pull).isInstanceOf(WeidianApiException.class);
-    // Order sync already wrote one unverified row per line. The thrown round skips recompute,
-    // so those rows stay unverified and the wallet stays empty.
+    // Order sync already accrued one row per line from the pay amount. The thrown round skips
+    // recompute, so the rows keep that accrual unconfirmed and the wallet stays empty.
     assertThat(world.basisReason()).isEqualTo("NO_SETTLEMENT");
     assertThat(world.itemStates()).hasSize(2);
     for (Map<String, Object> state : world.itemStates()) {
-      assertThat(state.get("verified")).isEqualTo(false);
-      assertThat(state.get("basis_cny")).isNull();
+      assertThat(state.get("verified")).isEqualTo(true);
+      assertThat(state.get("release_basis")).isEqualTo("UNSETTLED");
     }
     assertThat(world.ledger()).isEmpty();
     assertThat(world.flowOrderIds(world.unmatchedOrder())).singleElement().isNull();
@@ -171,11 +177,11 @@ class GuardChainIT {
     assertThat(world.pull()).isTrue();
     assertThat(world.itemStates()).hasSize(2);
     world.release();
-    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.31", "COMMISSION_CREDIT=2.16");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
     assertThat(world.pull()).isTrue();
     world.release();
-    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.31", "COMMISSION_CREDIT=2.16");
-    ChainWorld.money(world.overview().at("/income/available"), "6.47");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
     assertThat(world.flowOrderIds(world.unmatchedOrder())).singleElement().isNull();
   }
 
@@ -187,7 +193,7 @@ class GuardChainIT {
     assertThat(world.pull()).isTrue();
     world.release();
     long payoutAccountId = world.createPayout();
-    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.47");
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
     String outsider = world.otherCompanyToken();
     String otherBd = world.otherBdToken();
     String viewer = world.viewerToken();

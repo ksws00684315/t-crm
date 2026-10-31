@@ -44,7 +44,6 @@ class SettlementDetailControllerTest {
                         "180.00",
                         "18.00",
                         List.of("0.1000"),
-                        null,
                         "POSTED",
                         Instant.parse("2026-10-10T08:00:00Z"),
                         List.of(
@@ -85,10 +84,9 @@ class SettlementDetailControllerTest {
         .andExpect(jsonPath("$.data.items[0].kolNames[0]").value("Kol A"))
         .andExpect(jsonPath("$.data.items[0].payment").value("200.00"))
         .andExpect(jsonPath("$.data.items[0].refund").value("20.00"))
-        .andExpect(jsonPath("$.data.items[0].net").value("180.00"))
+        .andExpect(jsonPath("$.data.items[0].weidianWithdrawable").value("180.00"))
         .andExpect(jsonPath("$.data.items[0].commission").value("18.00"))
         .andExpect(jsonPath("$.data.items[0].rates[0]").value("0.1000"))
-        .andExpect(jsonPath("$.data.items[0].retained").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.items[0].status").value("POSTED"))
         .andExpect(jsonPath("$.data.items[0].businessAt").value("2026-10-10T08:00:00Z"))
         .andExpect(jsonPath("$.data.items[0].lines[0].id").value("7001"))
@@ -112,7 +110,7 @@ class SettlementDetailControllerTest {
   }
 
   @Test
-  void shouldHideRetainedAndMarkUnverifiedWhenAnyLineIsUnverified() throws Exception {
+  void shouldMarkUnverifiedWithoutWithdrawableWhenAnyLineIsUnverified() throws Exception {
     when(details.page(any(), any(DetailFilter.class)))
         .thenReturn(
             new PageResult<>(
@@ -126,10 +124,9 @@ class SettlementDetailControllerTest {
                         List.of(),
                         "100.00",
                         "0.00",
-                        "100.00",
+                        null,
                         "0.00",
                         List.of(),
-                        null,
                         "UNVERIFIED",
                         null,
                         List.of())),
@@ -140,7 +137,7 @@ class SettlementDetailControllerTest {
             get("/admin-api/commission/settlement-details")
                 .header(AdminMvcSupport.TOKEN_HEADER, viewerToken()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.items[0].retained").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].weidianWithdrawable").doesNotExist())
         .andExpect(jsonPath("$.data.items[0].status").value("UNVERIFIED"));
   }
 

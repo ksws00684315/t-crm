@@ -25,12 +25,13 @@ public record OrderItemsCommissionEvent(
    *     null when the settlement basis check failed, with the reason in {@code basisCheckReason}
    * @param basisIncludesRefund whether the source amount already excludes successful refunds
    * @param successfulRefundCny confirmed successful refunds of the line; null when unknown
-   * @param settlementState CONFIRMED / UNSETTLED / UNKNOWN from the source
+   * @param settlementState CONFIRMED / UNSETTLED / UNKNOWN from the source; UNPAID for an unpaid
+   *     order
    * @param settlementTime Weidian settlement time; null when unknown
    * @param completedTime trade completion time; null when unknown
-   * @param afterSales true when the line has an unconcluded refund (PROCESSING/SUCCESS/UNKNOWN)
-   * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / UNKNOWN_FLOW_TYPE /
-   *     INCOME_MISMATCH / MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
+   * @param afterSales true when the line has an unconcluded refund (PROCESSING/UNKNOWN)
+   * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / INCOME_MISMATCH /
+   *     MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
    */
   public record ItemFacts(
       long orderItemId,

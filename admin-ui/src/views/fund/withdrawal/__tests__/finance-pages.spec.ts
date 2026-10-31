@@ -279,7 +279,7 @@ describe("finance admin pages", () => {
   it("keeps all settlement columns, multiple creators and unknown amounts distinct", async () => {
     const wrapper = mount(SettlementPage, { global });
     await flushPromises();
-    expect(wrapper.getComponent(DataTable).props("columns")).toHaveLength(13);
+    expect(wrapper.getComponent(DataTable).props("columns")).toHaveLength(12);
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("多个");
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("待核实");
     expect(wrapper.get('[data-test="settlement-page"]').text()).toContain("t1023_WD001");

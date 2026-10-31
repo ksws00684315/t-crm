@@ -183,7 +183,8 @@ const enUS = {
     settlement: {
       WITHDRAWN: "Withdrawn",
       FROZEN: "Frozen",
-      INVALID: "Invalid order",
+      INVALID: "Pending verification",
+      NO_COMMISSION: "No commission",
       WITHDRAWING: "Withdrawing",
       WITHDRAWABLE: "Available"
     },
