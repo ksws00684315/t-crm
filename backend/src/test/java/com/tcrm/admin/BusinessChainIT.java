@@ -321,6 +321,32 @@ class BusinessChainIT {
   }
 
   @Test
+  void shouldKeepPullingWhenOpenRefundClosesAndLineReturnsToReleasedFingerprint() throws Exception {
+    world.open("undo");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    int revisions = world.revisionCount();
+    // Line A goes after_sales false -> true -> false, so its fingerprint returns to the first one.
+    // A failed recompute would answer false and hold the shop's checkpoint back.
+    world.stubRefund(world.refund(1), "1", 4000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    assertThat(world.revisionCount()).isEqualTo(revisions + 1);
+    world.closeRefund(world.refund(1));
+    assertThat(world.pull()).isTrue();
+    assertThat(world.revisionCount()).isEqualTo(revisions + 2);
+    // Repeat recompute and release: nothing new, and the one release stands.
+    assertThat(world.pull()).isTrue();
+    world.release();
+    assertThat(world.revisionCount()).isEqualTo(revisions + 2);
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    assertThat(kolLineStatus(world.kolOrders(world.kolToken()), "t79-a")).isEqualTo("WITHDRAWABLE");
+  }
+
+  @Test
   void shouldNotCountUnpaidLinesAsUnverifiedOrBlockWithdrawal() throws Exception {
     world.open("unpaid");
     world.syncPaidOrder();
