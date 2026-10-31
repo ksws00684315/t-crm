@@ -79,6 +79,24 @@ describe("items page", () => {
     expect(wrapper.text()).toContain("商务完成推广配置后，你的商品会显示在这里。");
   });
 
+  it("keeps a visible empty state for the phone card list", async () => {
+    const wrapper = await mountPage();
+    // The table's empty slot disappears together with the table on phones, so the card list
+    // carries its own copy (spec 10 §3: the empty state must stay visible inside the card).
+    const mobileEmpty = wrapper.find('[data-test="items-empty-mobile"]');
+    expect(mobileEmpty.exists()).toBe(true);
+    expect(mobileEmpty.text()).toContain(enUS.items.empty);
+    expect(wrapper.find(".item-list").exists()).toBe(false);
+  });
+
+  it("does not show the phone empty state when loading fails", async () => {
+    vi.mocked(getKolItems).mockRejectedValue(new Error("network"));
+    const wrapper = await mountPage();
+    // A failed request is not an empty list (spec 13 §4.3): only the error alert remains.
+    expect(wrapper.text()).toContain(enUS.items.loadFailed);
+    expect(wrapper.find('[data-test="items-empty-mobile"]').exists()).toBe(false);
+  });
+
   it("falls back to the snapshot name when the product has none", async () => {
     vi.mocked(getKolItems).mockResolvedValue({
       items: [

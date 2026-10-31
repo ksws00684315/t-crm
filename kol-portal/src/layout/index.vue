@@ -332,6 +332,11 @@ async function signOut() {
   .shell__identity {
     display: none;
   }
+  /* Phones: every header tap target stays at the 44px minimum (spec 10 §2). */
+  .user-menu summary,
+  .user-menu__link {
+    min-height: var(--tcrm-control-height-mobile);
+  }
   .shell__main {
     --kol-mobile-nav-height: 88px;
     overflow: visible;

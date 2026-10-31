@@ -148,7 +148,8 @@ body {
   font-weight: 600;
 }
 
-#app .el-table td.el-table__cell {
+#app .el-table td.el-table__cell,
+#app .actions-cell .el-button {
   font-weight: 400;
 }
 

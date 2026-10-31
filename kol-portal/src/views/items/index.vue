@@ -163,7 +163,7 @@ onMounted(loadItems);
     </DataTable>
 
     <!-- Phones show the same items as cards; the table is desktop-only. -->
-    <ul class="item-list">
+    <ul v-if="items.length" class="item-list">
       <li v-for="item in items" :key="item.weidianItemId" class="item-card" data-test="item-card">
         <img
           v-if="item.imageUrl"
@@ -192,6 +192,15 @@ onMounted(loadItems);
         </div>
       </li>
     </ul>
+    <!-- The table's empty slot is hidden with the table on phones; the card list needs its own. -->
+    <div
+      v-else-if="!loading && !error"
+      class="empty-state items-empty-mobile"
+      data-test="items-empty-mobile"
+    >
+      <p>{{ t("items.empty") }}</p>
+      <p class="empty-hint">{{ t("items.emptyHint") }}</p>
+    </div>
     <el-pagination
       class="items-pager"
       :current-page="page"
@@ -214,6 +223,13 @@ onMounted(loadItems);
   padding: var(--tcrm-space-6) var(--tcrm-space-4);
   color: var(--el-text-color-secondary);
   text-align: center;
+}
+/* Shown only where the card list replaces the table (see the media query below). */
+.items-empty-mobile {
+  display: none;
+  background: var(--tcrm-color-card);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
 }
 .empty-state p {
   margin: 0;
@@ -303,6 +319,9 @@ onMounted(loadItems);
   font-variant-numeric: tabular-nums;
 }
 .item-card__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   justify-self: start;
   padding: var(--tcrm-space-2) var(--tcrm-space-3);
   border: 1px solid var(--el-color-primary);
@@ -320,6 +339,12 @@ onMounted(loadItems);
   }
   .item-list {
     display: grid;
+  }
+  .items-empty-mobile {
+    display: block;
+  }
+  .item-card__copy {
+    min-height: var(--tcrm-control-height-mobile);
   }
   .items-pager {
     display: flex;
