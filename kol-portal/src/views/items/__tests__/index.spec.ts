@@ -89,6 +89,14 @@ describe("items page", () => {
     expect(wrapper.find(".item-list").exists()).toBe(false);
   });
 
+  it("does not show the phone empty state when loading fails", async () => {
+    vi.mocked(getKolItems).mockRejectedValue(new Error("network"));
+    const wrapper = await mountPage();
+    // A failed request is not an empty list (spec 13 §4.3): only the error alert remains.
+    expect(wrapper.text()).toContain(enUS.items.loadFailed);
+    expect(wrapper.find('[data-test="items-empty-mobile"]').exists()).toBe(false);
+  });
+
   it("falls back to the snapshot name when the product has none", async () => {
     vi.mocked(getKolItems).mockResolvedValue({
       items: [

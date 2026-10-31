@@ -193,7 +193,11 @@ onMounted(loadItems);
       </li>
     </ul>
     <!-- The table's empty slot is hidden with the table on phones; the card list needs its own. -->
-    <div v-else-if="!loading" class="empty-state items-empty-mobile" data-test="items-empty-mobile">
+    <div
+      v-else-if="!loading && !error"
+      class="empty-state items-empty-mobile"
+      data-test="items-empty-mobile"
+    >
       <p>{{ t("items.empty") }}</p>
       <p class="empty-hint">{{ t("items.emptyHint") }}</p>
     </div>
@@ -223,6 +227,9 @@ onMounted(loadItems);
 /* Shown only where the card list replaces the table (see the media query below). */
 .items-empty-mobile {
   display: none;
+  background: var(--tcrm-color-card);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
 }
 .empty-state p {
   margin: 0;
