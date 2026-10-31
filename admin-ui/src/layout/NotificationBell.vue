@@ -151,7 +151,7 @@ async function openItem(item: NotificationVO) {
           data-test="notification-item"
           @click="openItem(item)"
         >
-          <el-icon><component :is="icons[item.type]" /></el-icon>
+          <el-icon><component :is="icons[item.type] ?? Bell" /></el-icon>
           <NotificationText :item="item" class="notification-bell__text" />
           <span class="notification-bell__time">{{
             relativeNotificationTime(item.createTime)

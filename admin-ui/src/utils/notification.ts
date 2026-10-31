@@ -1,5 +1,5 @@
 import type { NotificationParams, NotificationType } from "@/api/notification/notification";
-import { translate } from "@/locales";
+import { i18n, translate } from "@/locales";
 import type { AccessProfile } from "@/utils/permission";
 import { formatInstant, formatInstantToMinute } from "@/utils/format";
 
@@ -62,9 +62,18 @@ export function notificationValues(item: NotificationView): Record<string, strin
   };
 }
 
+/**
+ * Message key of a type. A type this build does not know (the backend can run ahead of the
+ * admin bundle) falls back to the generic sentence instead of printing the raw enum name.
+ */
+export function notificationKey(type: string): string {
+  const key = `notification.type.${type}`;
+  return i18n.global.te(key) ? key : "notification.unknownType";
+}
+
 /** Message text in the current language, with the creator code inline. */
 export function notificationText(item: NotificationView): string {
-  return translate(`notification.type.${item.type}`, notificationValues(item));
+  return translate(notificationKey(item.type), notificationValues(item));
 }
 
 /** Target route. Missing pages render the existing 404. */

@@ -139,6 +139,19 @@ describe("withdrawal notifications", () => {
   });
 });
 
+describe("unknown notification types", () => {
+  it("falls back to the generic sentence instead of showing the raw type key", () => {
+    const item = { type: "FUTURE_TYPE_FROM_NEWER_BACKEND", params: null, bizId: null };
+    i18n.global.locale.value = "zh-CN";
+    expect(notificationText(item)).toBe("你有一条新消息，请打开消息列表查看");
+    i18n.global.locale.value = "en-US";
+    expect(notificationText(item)).toBe(
+      "You have a new message. Open the notification list to view it"
+    );
+    i18n.global.locale.value = "zh-CN";
+  });
+});
+
 describe("prepay notifications", () => {
   it.each(["PREPAY_SUBMITTED", "PREPAY_APPROVED", "PREPAY_REJECTED", "PREPAY_PAID"])(
     "opens %s only with prepay read authority",

@@ -73,6 +73,10 @@ const targetIds = computed(
 
 /** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
 const canSeeCommission = computed(() => userStore.can("commission:view"));
+/** Why a line's commission block is hidden: no commission:view, or an OWN scope (mixed order). */
+const lineCommissionHint = computed(() =>
+  canSeeCommission.value ? t("finance.scopeLimited") : t("order.chain.noCommissionPermission")
+);
 
 /**
  * Successful-refund total summed on the client, deduplicated by refund id so one refund spanning
@@ -467,6 +471,16 @@ onMounted(load);
             <strong>{{ fundsText(chain.funds?.kolCommission) }}</strong>
           </article>
         </div>
+        <div
+          v-if="chain.funds?.accountStatus"
+          class="chain-account-status"
+          data-test="chain-account-status"
+        >
+          <span>{{ t("finance.accountStatus") }}</span>
+          <el-tag :type="chain.funds.accountStatus === 'POSTED' ? 'success' : 'warning'">{{
+            t(`finance.${chain.funds.accountStatus}`)
+          }}</el-tag>
+        </div>
       </section>
 
       <section class="chain-page__card chain-order-info" data-test="chain-order-info">
@@ -724,6 +738,15 @@ onMounted(load);
                   </DataTable>
                 </template>
                 <div v-else class="chain-block__text">{{ t("order.chain.noWithdrawal") }}</div>
+              </div>
+
+              <div
+                v-else-if="!canSeeCommission || userStore.isOwnScope"
+                class="chain-block chain-block--wide"
+                data-test="chain-commission-hidden"
+              >
+                <div class="chain-block__title">{{ t("order.chain.commissionBlock") }}</div>
+                <div class="chain-block__text">{{ lineCommissionHint }}</div>
               </div>
 
               <div class="chain-block chain-block--wide" data-test="chain-refunds">
@@ -985,6 +1008,12 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-3);
+}
+.chain-account-status {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  margin-top: var(--tcrm-space-3);
 }
 .chain-fund-cards {
   display: grid;

@@ -4,10 +4,20 @@ import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as financeApi from "@/api/commission/finance";
 import type { Settlement } from "@/api/commission/finance-types";
+import * as shopApi from "@/api/product/shop";
 import { i18n } from "@/locales";
 import SettlementDetailsPage from "../index.vue";
 
 vi.mock("@/api/commission/finance", () => ({ listSettlements: vi.fn() }));
+vi.mock("@/api/product/shop", () => ({ listShops: vi.fn() }));
+
+const shopOption = {
+  id: "7001",
+  shopCode: "t87_SHOP_A",
+  shopName: "t87_店铺A",
+  channel: "WEIDIAN",
+  status: 1
+};
 
 const frozenRow: Settlement = {
   id: "5001",
@@ -51,6 +61,28 @@ describe("settlement details page", () => {
       page: 1,
       size: 20
     } as never);
+    vi.mocked(shopApi.listShops).mockResolvedValue([shopOption] as never);
+  });
+
+  it("picks the shop filter from the shop list instead of a typed id", async () => {
+    const wrapper = mount(SettlementDetailsPage, {
+      global: { plugins: [i18n, ElementPlus] }
+    });
+    await flushPromises();
+
+    const shopSelect = wrapper
+      .findAllComponents({ name: "ElSelect" })
+      .find(select => select.attributes("data-test") === "settlement-shop-id");
+    expect(shopSelect).toBeDefined();
+    shopSelect!.vm.$emit("update:modelValue", "7001");
+    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("search");
+    await flushPromises();
+
+    expect(financeApi.listSettlements).toHaveBeenLastCalledWith(
+      expect.objectContaining({ shopId: "7001" })
+    );
+    expect(wrapper.text()).toContain("t87_店铺A");
+    wrapper.unmount();
   });
 
   it("shows the Weidian withdrawable column without a shop profit column", async () => {
