@@ -79,6 +79,7 @@ watch(
     application.value = null;
     attempt = null;
     locked.value = false;
+    Object.assign(form, { amountCny: "" });
     if (!kolId) return;
     void refreshApplication();
     refreshTimer = setInterval(() => void refreshApplication(true), 10_000);
@@ -109,12 +110,14 @@ async function refreshApplication(quiet = false) {
   try {
     const data = await getActivePrepay(kolId);
     if (!props.modelValue || form.kolId !== kolId) return;
+    // Polling must not wipe what the business typed or drop a pending retry (same request id).
+    const hadApplication = application.value !== null;
     application.value = data;
     if (data) {
       form.amountCny = data.amountCny;
       attempt = null;
       locked.value = true;
-    } else {
+    } else if (hadApplication) {
       Object.assign(form, { amountCny: "" });
       attempt = null;
       locked.value = false;
@@ -146,7 +149,11 @@ async function save() {
     } catch (error) {
       errors.value = serverFieldErrors(error, Object.keys(form));
       notifyError(error);
-      if (error instanceof ApiError && error.status === 409) await refreshApplication(true);
+      if (error instanceof ApiError && error.status === 409) {
+        attempt = null;
+        locked.value = false;
+        await refreshApplication(true);
+      }
       if (error instanceof ApiError && error.status === 400) {
         attempt = null;
         locked.value = false;

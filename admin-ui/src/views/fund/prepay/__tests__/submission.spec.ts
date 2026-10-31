@@ -77,6 +77,7 @@ beforeEach(() => {
 afterEach(() => {
   wrappers.splice(0).forEach(w => w.unmount());
   document.body.innerHTML = "";
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
@@ -363,6 +364,52 @@ describe("prepay safe submission", () => {
     expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeUndefined();
     expect(wrapper.get('select[data-test="prepay-kol"]').attributes("disabled")).toBeUndefined();
     expect(wrapper.find('[data-test="prepay-application-status"]').text()).toContain("待申请");
+  });
+  it("keeps the typed amount when polling finds no open application", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    await set(wrapper, "prepay-amount", "1.23");
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushPromises();
+    expect(api.getActivePrepay).toHaveBeenCalledTimes(2);
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe(
+      "1.23"
+    );
+  });
+  it("keeps the same request id for a retry after polling", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.mocked(api.applyPrepay)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({ ...detail, status: "WAITING_DETAILS" });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    await set(wrapper, "prepay-amount", "100.00");
+    await wrapper.get('[data-test="prepay-submit"]').trigger("click");
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushPromises();
+    await wrapper.get('[data-test="prepay-submit"]').trigger("click");
+    await flushPromises();
+    const calls = vi.mocked(api.applyPrepay).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0]).toEqual(calls[0][0]);
+  });
+  it("clears the previous creator's amount when switching to another creator", async () => {
+    vi.mocked(api.getActivePrepay).mockResolvedValueOnce({
+      ...detail,
+      kolId: "3",
+      amountCny: "100.00",
+      status: "WAITING_DETAILS"
+    });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe(
+      "100.00"
+    );
+    await pickKol(wrapper, "4");
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe("");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeUndefined();
   });
   it("requires a positive CNY amount", async () => {
     const wrapper = await open(ApplyDialog);
