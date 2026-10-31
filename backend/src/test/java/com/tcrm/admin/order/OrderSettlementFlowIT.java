@@ -142,6 +142,7 @@ class OrderSettlementFlowIT {
   @AfterEach
   void cleanup() {
     jdbc.update("DELETE FROM crm_order_settlement_flow WHERE tenant_id = ?", TENANT_ID);
+    jdbc.update("DELETE FROM crm_refund WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_commission_item_revision WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_commission_item_state WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_commission_ledger WHERE tenant_id = ?", TENANT_ID);
@@ -347,6 +348,99 @@ class OrderSettlementFlowIT {
   }
 
   @Test
+  void shouldAppendRevisionWhenIncomeMismatchReturnsFingerprintAfterConfirmation()
+      throws Exception {
+    syncOrderFromDb();
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+    long revisions = revisionCount(itemA);
+
+    // A second goods-income row breaks the confirmation: the line is UNSETTLED again with the same
+    // basis, so its source fingerprint equals the one from before the confirmation.
+    stubIncomeDetail(incomeRow("600"), incomeRow("100"));
+    assertThat(pullSucceeds()).isTrue();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisions + 1);
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("UNSETTLED");
+    assertThat(orderField("commission_basis_reason")).isEqualTo("INCOME_MISMATCH");
+
+    // Repeat recompute: same fingerprint as the latest revision, nothing new and nothing posted.
+    assertThat(pullSucceeds()).isTrue();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisions + 1);
+    assertThat(creditCount()).isEqualTo(2);
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+  }
+
+  @Test
+  void shouldAppendRevisionWhenOpenRefundClosesAndFingerprintReturns() throws Exception {
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+    long revisions = revisionCount(itemA);
+
+    long refundId = insertRefund(itemA, "UNKNOWN");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "after_sales")).isEqualTo(true);
+
+    // The refund is rejected: after_sales false -> true -> false, fingerprint back to the first.
+    setRefundStatus(refundId, "CLOSED");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "after_sales")).isEqualTo(false);
+    assertThat(revisionCount(itemA)).isEqualTo(revisions + 2);
+
+    // The same line can go round again, and a repeat sync stays a no-op.
+    setRefundStatus(refundId, "PROCESSING");
+    syncOrderFromDb();
+    setRefundStatus(refundId, "CLOSED");
+    syncOrderFromDb();
+    syncOrderFromDb();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisions + 4);
+    assertThat(creditCount()).isEqualTo(2);
+    assertThat(adjustmentCount()).isZero();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+  }
+
+  @Test
+  void shouldPostEveryWalletChangeOnceWhenRefundFlipsFingerprintBack() throws Exception {
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+
+    // Refund 2.00 on line A: accrual 0.40 -> 0.20, the released surplus is taken back.
+    setItemRefund(itemA, "2.00");
+    syncOrderFromDb();
+    assertThat(walletBalance()).isEqualByComparingTo("0.40");
+
+    // The refund is undone: the fingerprint returns to the released one, and the 0.20 must be
+    // released again rather than matched against the first credit of 0.40.
+    setItemRefund(itemA, "0.00");
+    syncOrderFromDb();
+    releaseJob.releaseDue();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+    assertThat(itemField(itemA, "released_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+
+    // The same refund again: the second -0.20 must post, not read as already posted.
+    setItemRefund(itemA, "2.00");
+    syncOrderFromDb();
+    assertThat(walletBalance()).isEqualByComparingTo("0.40");
+
+    // Repeat sync and release: no extra posting.
+    syncOrderFromDb();
+    releaseJob.releaseDue();
+
+    assertThat(adjustmentCount()).isEqualTo(2);
+    assertThat(creditCount()).isEqualTo(3);
+    assertThat(walletBalance()).isEqualByComparingTo("0.40");
+    assertThat(ledgerTotal()).isEqualByComparingTo("0.40");
+    assertThat(itemField(itemA, "released_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+  }
+
+  @Test
   void shouldSaveUnmatchedFlowsWithoutCommissionEffects() {
     // The unknown order id is stored verbatim with no local order id and never counted; our own
     // order keeps its NO_SETTLEMENT reason and stays unverified.
@@ -521,6 +615,15 @@ class OrderSettlementFlowIT {
                 SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600), null));
   }
 
+  /** False means a recompute failed, which also keeps the shop's checkpoint from advancing. */
+  private boolean pullSucceeds() {
+    return TenantScope.callCompany(
+        TENANT_ID,
+        () ->
+            flows.pull(
+                SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600), null));
+  }
+
   /**
    * Review finding 1: a pull that dies mid-way (flows already stored) must not strand the order —
    * the next successful pull recovers the recompute set from the persisted flows, because the
@@ -655,6 +758,21 @@ class OrderSettlementFlowIT {
         kolId);
   }
 
+  private int adjustmentCount() {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM crm_commission_ledger WHERE kol_id = ?"
+            + " AND entry_type = 'COMMISSION_ADJUSTMENT'",
+        Integer.class,
+        kolId);
+  }
+
+  private BigDecimal ledgerTotal() {
+    return jdbc.queryForObject(
+        "SELECT COALESCE(SUM(amount_cny), 0) FROM crm_commission_ledger WHERE kol_id = ?",
+        BigDecimal.class,
+        kolId);
+  }
+
   private BigDecimal creditTotal() {
     return jdbc.queryForObject(
         "SELECT COALESCE(SUM(amount_cny), 0) FROM crm_commission_ledger WHERE kol_id = ?"
@@ -680,6 +798,31 @@ class OrderSettlementFlowIT {
         BigDecimal.class,
         TENANT_ID,
         kolId);
+  }
+
+  private long insertRefund(long itemId, String status) {
+    long id = Math.abs(UUID.randomUUID().getMostSignificantBits());
+    jdbc.update(
+        "INSERT INTO crm_refund(id,tenant_id,order_id,order_item_id,weidian_refund_no,amount,"
+            + "raw_status,refund_type,refund_status,refund_time,create_time,update_time)"
+            + " VALUES(?,?,?,?,'t83_refund_1',2.00,'2','REFUND_ONLY',?,?,now(),now())",
+        id,
+        TENANT_ID,
+        orderId,
+        itemId,
+        status,
+        Timestamp.from(INCOME_TIME));
+    return id;
+  }
+
+  /** Stands in for the rejected and cancelled mappings RefundDictionary gains at M0 (L-034). */
+  private void setRefundStatus(long refundId, String status) {
+    jdbc.update("UPDATE crm_refund SET refund_status = ? WHERE id = ?", status, refundId);
+  }
+
+  private void setItemRefund(long itemId, String amount) {
+    jdbc.update(
+        "UPDATE crm_order_item SET refund_amount = ?::numeric WHERE id = ?", amount, itemId);
   }
 
   private long insertKol(String rate) {

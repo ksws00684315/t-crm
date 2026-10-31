@@ -413,6 +413,12 @@ final class ChainWorld {
         "refund " + refundNo + " is not " + status);
   }
 
+  /** Stands in for the rejected and cancelled mappings RefundDictionary gains at M0 (L-034). */
+  void closeRefund(String refundNo) {
+    jdbc.update(
+        "UPDATE crm_refund SET refund_status = 'CLOSED' WHERE weidian_refund_no = ?", refundNo);
+  }
+
   /** Syncs one unpaid order on the same two products. Returns its Weidian order id. */
   String syncUnpaidOrder() throws Exception {
     String unpaid = ids.unmatched();
