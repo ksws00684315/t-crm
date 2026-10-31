@@ -259,16 +259,10 @@ class PrepayControllerTest {
   }
 
   @Test
-  void shouldGetDetailAndApprovedPayoutOptions() throws Exception {
+  void shouldGetDetail() throws Exception {
     mvc.perform(get(BASE + "/77").header(AdminMvcSupport.TOKEN_HEADER, token("commission:view")))
         .andExpect(status().isOk());
     verify(service).detail(any(), eq(77L));
-    mvc.perform(
-            get(BASE + "/payout-accounts")
-                .param("kolId", "22")
-                .header(AdminMvcSupport.TOKEN_HEADER, token("prepay:apply")))
-        .andExpect(status().isOk());
-    verify(service).payoutOptions(any(), eq(22L));
   }
 
   @Test
@@ -285,7 +279,7 @@ class PrepayControllerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "/77", "/export", "/payout-accounts?kolId=22"})
+  @ValueSource(strings = {"", "/77", "/export"})
   void shouldDenyReadersWithoutRequiredPermission(String path) throws Exception {
     mvc.perform(get(BASE + path).header(AdminMvcSupport.TOKEN_HEADER, token("kol:view")))
         .andExpect(status().isForbidden());

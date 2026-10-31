@@ -7,7 +7,6 @@ import com.tcrm.admin.commission.model.PrepayDeductionRow;
 import com.tcrm.admin.commission.model.PrepayHead;
 import com.tcrm.admin.commission.model.PrepayHistoryRow;
 import com.tcrm.admin.commission.model.PrepayPageQuery;
-import com.tcrm.admin.commission.model.PrepayPaidSum;
 import com.tcrm.admin.commission.model.PrepayPaymentRow;
 import com.tcrm.admin.commission.model.PrepayRecipientRow;
 import com.tcrm.admin.commission.model.PrepayWrite;
@@ -304,19 +303,6 @@ public interface PrepayMapper {
         #{row.operatorRole})
       """)
   int insertPayment(@Param("row") PrepayWrite.Payment row);
-
-  @Select(
-      """
-      <script>
-      SELECT p.kol_id, SUM(payment.pay_amount_cny) AS paid_amount_cny
-      FROM crm_prepay p
-      JOIN crm_prepay_payment payment ON payment.prepay_id = p.id
-      WHERE p.status = 'PAID' AND p.kol_id IN
-      <foreach collection="kolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
-      GROUP BY p.kol_id
-      </script>
-      """)
-  List<PrepayPaidSum> sumPaid(@Param("kolIds") List<Long> kolIds);
 
   @Select(
       """

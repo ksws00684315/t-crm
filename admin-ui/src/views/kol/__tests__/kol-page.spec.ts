@@ -12,9 +12,6 @@ import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
-vi.mock("@/api/commission/prepay", () => ({
-  prepayAccounts: vi.fn().mockResolvedValue([])
-}));
 vi.mock("@/api/kol/promotion");
 vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");

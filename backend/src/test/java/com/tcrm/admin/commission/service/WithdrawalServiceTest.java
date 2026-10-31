@@ -452,8 +452,7 @@ class WithdrawalServiceTest {
     assertThatThrownBy(() -> service.review(user("withdrawal:review"), ID, "APPROVE", null))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+            exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
   }
 
   // ------------------------------------------------------------------ payment

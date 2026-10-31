@@ -12,9 +12,6 @@ public enum PostTemplate {
   OPERATOR(
       DataScope.ALL,
       Permission.KOL_VIEW,
-      // Creator editing also carries promotion configuration (commission rate) and link cleanup,
-      // which the permission table grants to this post; the code does not split them yet.
-      Permission.KOL_EDIT,
       Permission.PRODUCT_VIEW,
       Permission.PRODUCT_EDIT,
       Permission.PRODUCT_STATUS,
