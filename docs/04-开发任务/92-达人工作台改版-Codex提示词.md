@@ -3,7 +3,7 @@
 > **执行环境**：本机。
 > - **前置**：任务 88（PR #165，改达人端）和任务 90（改可提现、冻结算法）合并后才开始。工作树由架构负责人在派发时创建：`/Users/hh-mini/Public/dev/t-crm/.worktrees/92-kol-workspace-redesign`，分支 `task/92-kol-workspace-redesign`，从最新 `main` 检出。
 > - 后端端口 `TCRM_ADMIN_PORT=18816`，达人端 Vite `8885`（`VITE_KOL_API_TARGET=http://localhost:18816`）。连接共享中间件（`deploy/.env.local` 只读），测试数据前缀 `t92_`。
-> - 改达人端、后端两个只读接口和文档。不新增迁移，不新增依赖（`echarts` 已在 `kol-portal/package.json`）。
+> - 改达人端、后端三个只读接口和文档。不新增迁移，不新增依赖（`echarts` 已在 `kol-portal/package.json`）。
 >
 > **必读**（通用阅读范围见 [`本机任务通用要求.md`](本机任务通用要求.md) 第 1 节）：
 > - 规范 03（接口）、规范 11 第 3、4 节（ECharts、`ChartPanel`）、规范 12；
@@ -86,7 +86,7 @@
 - 用 SQL 聚合，不要把全部订单读进内存。
 - 更新设计说明书的接口清单。
 
-## 4. 资金页
+## 4. 资金页和订单页
 
 `views/funds/index.vue` 整体结构和功能与现在相近，页面标题「资金明细」，从上到下三部分。删除现有收入构成、佣金汇总卡和资金说明，以及因此废弃的计算属性、样式和语言包条目。
 
@@ -122,6 +122,22 @@
 - 现在是全部读入内存后手动分页，保持这种做法也可以，不要为本任务改写成复杂 SQL；单个达人的记录量有限。
 - 只从登录态取达人身份，收款账户继续脱敏。更新设计说明书的接口说明，`src/api/creator.ts` 的类型和演示数据同步。
 
+### 4.4 我的订单页
+
+`views/orders/index.vue` 在筛选卡下方、明细表上方增加四张等宽单行汇总卡：一行内标题靠左、金额靠右，桌面卡高约 40px，内边距 8px 12px、圆角 8px、对应语义浅底、无边框，标题用正文 14／22px，金额 16／24px 字重 600，卡间距 8px，不放小字。卡下一行说明「总销售额未扣除退款，已结算和待结算销售额已扣除退款。」位置依据规范 13 第 3.16 节「标题、筛选、摘要、明细」的顺序，窄屏两列或单列，标题和金额字号不变，明细表继续接收剩余高度。
+
+| 卡片 | 金额 | 口径 |
+|---|---|---|
+| 总销售额（`primary-text`） | `salesCny` | 已支付的本人商品行 `pay_amount` 合计，与工作台销售额口径相同 |
+| 已结算销售额（成功色） | `settledCny` | 行结算状态为 `WITHDRAWABLE`、`WITHDRAWING`、`WITHDRAWN` 的 `pay_amount − refund_amount` 合计 |
+| 待结算销售额（等待色） | `pendingCny` | 行结算状态为 `FROZEN` 的 `pay_amount − refund_amount` 合计 |
+| 已退款销售额（失败色） | `refundedCny` | 已支付的本人商品行 `refund_amount` 合计 |
+
+- 汇总跟随当前筛选条件（时间范围、订单号、商品名称、结算状态），和下方明细同一范围；查询和重置后同步刷新。
+- 结算状态 `INVALID`（待核实）、`NO_COMMISSION`（无佣金）不计入已结算和待结算，所以三项之和可能小于总销售额，这是预期行为。
+- 新增 `GET /kol-api/orders/summary`，放在 `KolOrderController`，查询参数和 `/kol-api/orders` 的筛选一致但没有分页，返回 `{salesCny, settledCny, pendingCny, refundedCny}`，金额序列化为字符串。只从登录态取达人身份，条件复用 `KolOrderService.baseQuery`，结算状态用 `CommissionOrderStateApi`，与列表行状态同一来源。
+- 汇总加载失败时四张卡显示错误文案和重试，不显示 0（规范 13 第 7 章）。
+
 ## 5. 字号与规范
 
 规范 13 第 2 章和 `docs/03-设计/网页字体字号规范.md` 新增两个文字角色，`tokens.css` 新增对应变量（两端都加，保持一致）：
@@ -129,7 +145,7 @@
 | 角色 | 字号／行高 | 字重 | 用于 |
 |---|---|---|---|
 | 首要金额 | 36／44px | 600 | 第一板块预估总收入、可提现金额 |
-| 明细金额 | 24／32px | 600 | 第一板块预估总佣金收入、已收预付款，第二板块金额 |
+| 明细金额 | 24／32px | 600 | 第一板块预估总佣金收入、已收预付款，第二板块金额，资金页佣金进度 |
 
 手机宽度下金额不得溢出容器，长金额可换行，不缩小字号（规范 13 第 6 章）。
 
@@ -173,6 +189,11 @@
 | 可立即申请提现 | Ready to withdraw |
 | 等待打款 | Awaiting payment |
 | 预付款已从佣金扣回 {a}，待扣回 {b}。 | Advances repaid from commission: {a}. Outstanding: {b}. |
+| 总销售额未扣除退款，已结算和待结算销售额已扣除退款。 | Total sales are before refunds. Settled and unsettled sales are after refunds. |
+| 总销售额 | Total sales |
+| 已结算销售额 | Settled sales |
+| 待结算销售额 | Unsettled sales |
+| 已退款销售额 | Refunded sales |
 | 资金记录 | Fund records |
 | 佣金提现 / 预付款 | Commission withdrawal / Advance |
 | 以上四项合计等于预估总佣金。历史订单按下单时的佣金比例计算。 | The four amounts above total the estimated commission. Past orders use the commission rate in effect when they were placed. |
@@ -191,6 +212,7 @@
 - 前端：第一板块在无预付、不抵扣预付、部分已扣回、佣金不够扣四种情况下的取值；第二板块四张卡之和等于 `estimated`；可提现金额等于已结算佣金金额减 `deducted`；各卡底按钮的跳转目标；比例为空；`available` 为负。
 - 趋势：补零、31 天自然月按日、31 天日期范围按月、跨年按月、366 天上限、ECharts 配置（mock `utils/echarts.ts`，规范 11）。
 - 资金页：`?apply=1` 打开弹窗并清参数；四个步骤的取值与工作台一致，预付款小字的显隐；资金记录含全部状态、撤回和重新申请入口只在对应状态出现；原有提现流程测试继续通过。
+- 订单页：四张卡取值、跟随筛选刷新、加载失败状态。后端 `orders/summary` 覆盖状态归类、部分退款、无佣金和待核实不计入已结算、未支付订单不计入、跨达人隔离、筛选条件与列表一致。
 - 后端：`fund-records` 单元测试覆盖全部提现状态、未付款预付不出现、跨达人隔离、排序与分页；原有只含已付款的断言按本任务调整。
 - 原有断言只能为本任务的行为变化调整，每处调整在报告里说明。
 
