@@ -289,10 +289,14 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* A height the rows cannot change, or DataTable's ceiling shrinks with its own table. On a very short
+   window the floor keeps the first row readable and hands scrolling to the page. */
 .orders-page {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-4);
+  height: 100%;
+  min-height: 420px;
   min-width: 0;
 }
 h1 {
@@ -340,6 +344,10 @@ h1 {
   border-top: 1px solid var(--tcrm-color-border);
 }
 @media (max-width: 767px) {
+  .orders-page {
+    height: auto;
+    min-height: 0;
+  }
   .orders-table {
     display: none;
   }
