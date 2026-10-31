@@ -82,6 +82,9 @@ const { t } = useI18n();
   padding: 0;
 }
 .side__menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   border-right: none;
   background: transparent;
   --el-menu-bg-color: transparent;
