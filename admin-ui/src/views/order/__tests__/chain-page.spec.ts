@@ -577,6 +577,19 @@ describe("order chain page (task 40)", () => {
     ownScope.unmount();
   });
 
+  it("keeps the scope hint off a funds-visible OWN order whose line has no commission (t87, L-018)", async () => {
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      lines: [financedChain.lines[0]!, { ...financedChain.lines[1]!, commission: null }]
+    });
+    const { wrapper } = await mountPage();
+    expect(wrapper.findAll('[data-test="chain-commission"]')).toHaveLength(1);
+    expect(wrapper.find('[data-test="chain-commission-hidden"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="chain-flows-scope-limited"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("shows the ledger status next to the funds cards only when funds are present (t87, L-019)", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue({

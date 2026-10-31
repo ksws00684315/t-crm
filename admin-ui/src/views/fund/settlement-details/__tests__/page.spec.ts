@@ -6,10 +6,13 @@ import * as financeApi from "@/api/commission/finance";
 import type { Settlement } from "@/api/commission/finance-types";
 import * as shopApi from "@/api/product/shop";
 import { i18n } from "@/locales";
+import { notifyError } from "@/utils/notify";
+import { saveSession } from "@/utils/session";
 import SettlementDetailsPage from "../index.vue";
 
 vi.mock("@/api/commission/finance", () => ({ listSettlements: vi.fn() }));
 vi.mock("@/api/product/shop", () => ({ listShops: vi.fn() }));
+vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
 
 const shopOption = {
   id: "7001",
@@ -52,9 +55,34 @@ const unverifiedRow: Settlement = {
   status: "UNVERIFIED"
 };
 
+function signIn(permissions: string[]) {
+  saveSession({
+    token: "test-token",
+    expiresAt: Date.now() + 3_600_000,
+    user: {
+      id: "1",
+      username: "me",
+      nickname: "Me",
+      email: null,
+      role: "STAFF",
+      postTemplate: null,
+      permissions,
+      dataScope: "ALL",
+      tenantId: "1",
+      tenantName: "t87_公司",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-01T00:00:00Z"
+    }
+  });
+}
+
 describe("settlement details page", () => {
   beforeEach(() => {
+    localStorage.clear();
     setActivePinia(createPinia());
+    vi.mocked(notifyError).mockClear();
+    vi.mocked(shopApi.listShops).mockReset();
     vi.mocked(financeApi.listSettlements).mockResolvedValue({
       items: [frozenRow, postedRow, unverifiedRow],
       total: 3,
@@ -65,6 +93,7 @@ describe("settlement details page", () => {
   });
 
   it("picks the shop filter from the shop list instead of a typed id", async () => {
+    signIn(["commission:view", "product:view"]);
     const wrapper = mount(SettlementDetailsPage, {
       global: { plugins: [i18n, ElementPlus] }
     });
@@ -82,6 +111,25 @@ describe("settlement details page", () => {
       expect.objectContaining({ shopId: "7001" })
     );
     expect(wrapper.text()).toContain("t87_店铺A");
+    wrapper.unmount();
+  });
+
+  it("hides the shop filter without product:view and never calls its endpoint (L-015)", async () => {
+    signIn(["commission:view"]);
+    vi.mocked(shopApi.listShops).mockRejectedValue(new Error("403"));
+    const wrapper = mount(SettlementDetailsPage, {
+      global: { plugins: [i18n, ElementPlus] }
+    });
+    await flushPromises();
+
+    expect(shopApi.listShops).not.toHaveBeenCalled();
+    expect(notifyError).not.toHaveBeenCalled();
+    expect(
+      wrapper
+        .findAllComponents({ name: "ElSelect" })
+        .some(select => select.attributes("data-test") === "settlement-shop-id")
+    ).toBe(false);
+    expect(wrapper.text()).not.toContain("店铺 ID");
     wrapper.unmount();
   });
 

@@ -15,10 +15,14 @@ import { formatRate } from "@/utils/rate";
 import { formatInstant, formatNameWithCode, formatPrice } from "@/utils/format";
 import { listShops } from "@/api/product/shop";
 import type { ShopOptionVO } from "@/api/types";
+import { useUserStore } from "@/stores/user";
 import { financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 defineOptions({ name: "SettlementDetailsPage" });
 const { t, locale } = useI18n();
+const userStore = useUserStore();
+/** The shop options endpoint needs product:view; this page itself only needs commission:view. */
+const canFilterShop = computed(() => userStore.can("product:view"));
 const narrow = ref(false);
 let unsubscribe: (() => void) | undefined;
 onMounted(() => {
@@ -82,6 +86,7 @@ function shopChipText(id: string) {
   return shop ? formatNameWithCode(shop.shopName, shop.shopCode) : id;
 }
 async function loadShops() {
+  if (!canFilterShop.value) return;
   try {
     shops.value = await listShops();
   } catch (error) {
@@ -156,7 +161,7 @@ onMounted(loadShops);
             ><el-select v-model="filters.channel" clearable
               ><el-option :label="t('finance.weidian')" value="WEIDIAN" /></el-select
           ></el-form-item>
-          <el-form-item :label="t('finance.shopId')"
+          <el-form-item v-if="canFilterShop" :label="t('finance.shopId')"
             ><el-select v-model="filters.shopId" clearable filterable data-test="settlement-shop-id"
               ><el-option
                 v-for="shop in shops"

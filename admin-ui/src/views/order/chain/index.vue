@@ -73,7 +73,7 @@ const targetIds = computed(
 
 /** Financial data needs commission:view; OWN scopes additionally see nothing on mixed orders. */
 const canSeeCommission = computed(() => userStore.can("commission:view"));
-/** Why a line's commission block is hidden: no commission:view, or an OWN scope (mixed order). */
+/** Why a line's commission block is hidden: no commission:view, or an OWN scope on a mixed order. */
 const lineCommissionHint = computed(() =>
   canSeeCommission.value ? t("finance.scopeLimited") : t("order.chain.noCommissionPermission")
 );
@@ -741,7 +741,7 @@ onMounted(load);
               </div>
 
               <div
-                v-else-if="!canSeeCommission || userStore.isOwnScope"
+                v-else-if="!canSeeCommission || (userStore.isOwnScope && !chain.financeFlows)"
                 class="chain-block chain-block--wide"
                 data-test="chain-commission-hidden"
               >

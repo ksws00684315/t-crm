@@ -141,7 +141,7 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "kol", align: "left" as const, label: t("copyToken.kol"), minWidth: 220 },
+  { key: "kol", align: "left" as const, label: t("copyToken.kol"), minWidth: 170 },
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
   // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
   // those pixels: its values ellipsize with a tooltip either way.
