@@ -686,7 +686,6 @@ export interface ChainWithdrawalVO {
 export interface ChainLineCommissionVO {
   rateSnapshot: string | null;
   netCommission: string | null;
-  shopProfit: string | null;
   releaseBasis: string | null;
   occupiedTotal: string;
   withdrawals: ChainWithdrawalVO[];
@@ -697,8 +696,6 @@ export interface OrderChainFundsVO {
   payAmount: string | null;
   refundTotal: string;
   kolCommission: string;
-  /** Weidian settlement net pending M0 (Q-1017-1/2): always null for now, shown as unverified. */
-  shopProfit: string | null;
   accountStatus: "POSTED" | "UNVERIFIED";
 }
 

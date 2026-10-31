@@ -140,6 +140,53 @@ final class ChainSamples {
     return tradeDetail();
   }
 
+  /** The same order detail with another Weidian status, for example {@code close}. */
+  static String withOrderStatus(String detail, String status) {
+    ObjectNode root = (ObjectNode) JSON.readTree(detail);
+    ((ObjectNode) root.get("result")).put("status", status);
+    return root.toString();
+  }
+
+  /** The same order detail as an unpaid order: status {@code unpay} and no pay time. */
+  static String unpaidOrderDetail(String detail) {
+    ObjectNode root = (ObjectNode) JSON.readTree(detail);
+    ObjectNode result = (ObjectNode) root.get("result");
+    result.put("status", "unpay");
+    result.put("status_desc", "未付款");
+    result.putNull("pay_time");
+    return root.toString();
+  }
+
+  /** One refund of the order, from the refund-list sample; {@code amountYuan} is e.g. "40.00". */
+  static String refundList(String refundNo, String orderId, String amountYuan) {
+    ObjectNode root = load("/weidian/refund-list-10582-v2.0.json");
+    ObjectNode result = (ObjectNode) root.get("result");
+    result.put("totalNum", 1);
+    ObjectNode row = (ObjectNode) result.get("list").get(0);
+    row.put("orderID", orderId);
+    row.put("refund_no", Long.parseLong(refundNo));
+    ((ObjectNode) row.get("refund_info")).put("refund_fee", amountYuan);
+    return root.toString();
+  }
+
+  /**
+   * Refund detail of one order line from the refund-detail sample. Status {@code 10} is completed;
+   * any other raw value stays unconcluded (UNKNOWN in the CRM dictionary).
+   */
+  static String refundDetail(
+      String refundNo, String orderId, int feeFen, String rawStatus, String subOrderId) {
+    ObjectNode root = load("/weidian/refund-detail-10583-v2.0.json");
+    ObjectNode basic = (ObjectNode) ((ObjectNode) root.get("result")).get("refundBasicInfo");
+    basic.put("refundNo", Long.parseLong(refundNo));
+    basic.put("orderId", Long.parseLong(orderId));
+    basic.put("refundFee", feeFen);
+    basic.put("status", rawStatus);
+    ArrayNode items = JSON.createArrayNode();
+    items.add(JSON.createObjectNode().put("orderDescId", subOrderId));
+    basic.set("itemList", items);
+    return root.toString();
+  }
+
   static String error(int statusCode) {
     return "{\"status\":{\"status_code\":" + statusCode + ",\"status_reason\":\"chain\"}}";
   }

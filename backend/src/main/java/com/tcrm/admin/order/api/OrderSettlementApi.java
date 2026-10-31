@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Read-only order projections for the commission module (task 62, design §6.2 income and
@@ -33,13 +34,25 @@ public interface OrderSettlementApi {
   List<ItemRefDTO> listItemsByOrderIds(Collection<Long> orderIds);
 
   /**
+   * Weidian withdrawable amount per order (task 81, display only): the signed sum of the order's
+   * INCOME_DETAIL settlement flows in CNY. Orders without such a flow are absent from the map.
+   */
+  Map<Long, BigDecimal> weidianWithdrawableByOrderIds(Collection<Long> orderIds);
+
+  /**
    * Pays-time window aggregates per KOL for the income list (11.02): order count (distinct paid
    * orders with at least one line of the KOL) and quantity (line pieces).
    */
   List<KolOrderRowDTO> aggregateKolOrders(Collection<Long> kolIds, Instant start, Instant end);
 
-  /** Order projection for display. */
-  record OrderRefDTO(long id, String orderNo, long shopId, Instant payTime, String orderStatus) {}
+  /** Order projection for display; {@code payAmount} includes freight. */
+  record OrderRefDTO(
+      long id,
+      String orderNo,
+      long shopId,
+      Instant payTime,
+      String orderStatus,
+      BigDecimal payAmount) {}
 
   /** Item line projection for display. */
   record ItemRefDTO(

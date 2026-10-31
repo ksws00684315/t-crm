@@ -40,7 +40,7 @@ public class KolOrderController {
       @RequestParam(required = false) @Size(max = 128) String orderNo,
       @RequestParam(required = false) @Size(max = 128) String productName,
       @RequestParam(required = false)
-          @Pattern(regexp = "WITHDRAWING|WITHDRAWABLE|FROZEN|WITHDRAWN|INVALID")
+          @Pattern(regexp = "WITHDRAWING|WITHDRAWABLE|FROZEN|WITHDRAWN|INVALID|NO_COMMISSION")
           String settlementStatus,
       @RequestParam(defaultValue = "1") @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
       @RequestParam(defaultValue = "20") @Min(1) @Max(50) Integer size) {

@@ -1531,9 +1531,6 @@ const enUS: MessageSchema = {
       financeLedgerSection: "Financial ledger",
       loadFailed: "Unable to load the order chain. Please try again.",
       kolCommission: "Net creator commission",
-      shopProfit: "Shop profit",
-      shopProfitFormula:
-        "Weidian settlement net amount minus net creator commission; product cost is excluded.",
       financeLedgerNote:
         "Shop receivable flows depend on the Weidian settlement net and withdrawable time (pending M0 verification); unverified amounts show as needs verification, never as zero.",
       financeType: "Type",

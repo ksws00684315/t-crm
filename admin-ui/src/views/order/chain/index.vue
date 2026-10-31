@@ -358,7 +358,6 @@ const summaryColumns = computed<DataColumn[]>(() => [
     minWidth: locale.value.startsWith("en") ? 150 : 100
   },
   { key: "commission", label: t("order.chain.summaryCommission"), minWidth: 120, amount: true },
-  { key: "profit", label: t("order.chain.shopProfit"), minWidth: 120, amount: true },
   { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
 ]);
 
@@ -467,12 +466,7 @@ onMounted(load);
             <span>{{ t("order.chain.kolCommission") }}</span>
             <strong>{{ fundsText(chain.funds?.kolCommission) }}</strong>
           </article>
-          <article class="chain-fund-card chain-fund-card--pending">
-            <span>{{ t("order.chain.shopProfit") }}</span>
-            <strong>{{ fundsText(chain.funds?.shopProfit) }}</strong>
-          </article>
         </div>
-        <p class="chain-funds-note">{{ t("order.chain.shopProfitFormula") }}</p>
       </section>
 
       <section class="chain-page__card chain-order-info" data-test="chain-order-info">
@@ -583,9 +577,6 @@ onMounted(load);
           <template #cell-commission="{ row }">{{
             fundsText((row as ChainLineVO).commission?.netCommission)
           }}</template>
-          <template #cell-profit="{ row }">{{
-            fundsText((row as ChainLineVO).commission?.shopProfit)
-          }}</template>
           <template #cell-occupied="{ row }">{{
             fundsText((row as ChainLineVO).commission?.occupiedTotal)
           }}</template>
@@ -691,9 +682,6 @@ onMounted(load);
                         ? t("finance.unverified")
                         : formatAmountWithCurrency(line.commission.netCommission)
                     }}
-                  </div>
-                  <div class="chain-block__text">
-                    {{ t("order.chain.shopProfit") }}: {{ t("finance.unverified") }}
                   </div>
                   <div class="chain-block__text">
                     {{ t("order.chain.releaseBasis") }}:
@@ -1029,11 +1017,6 @@ onMounted(load);
   padding: var(--tcrm-space-5);
   color: var(--tcrm-color-text-secondary);
   text-align: center;
-}
-.chain-funds-note {
-  margin: var(--tcrm-space-3) 0 0;
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
 }
 .chain-page__title {
   margin: 0 0 var(--tcrm-space-3);

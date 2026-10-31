@@ -525,8 +525,7 @@ export function createFinanceDemo() {
               ],
               payment: null,
               refund: null,
-              net: null,
-              retained: null,
+              weidianWithdrawable: null,
               commission,
               scopeLimited: true
             }

@@ -194,11 +194,11 @@ export interface Settlement {
   kolNames: string[];
   payment: string | null;
   refund: string | null;
-  net: string | null;
+  /** Weidian settlement flow total, display only (task 81); null until the settlement arrives. */
+  weidianWithdrawable: string | null;
   commission: string | null;
   rates: string[];
-  retained: string | null;
-  status: "POSTED" | "UNVERIFIED";
+  status: "UNVERIFIED" | "FROZEN" | "POSTED";
   businessAt: string;
   lines: CommissionLine[];
 }
