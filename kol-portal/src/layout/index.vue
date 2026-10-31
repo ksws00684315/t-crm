@@ -201,7 +201,11 @@ async function signOut() {
   color: var(--tcrm-color-text-secondary);
   overflow-wrap: anywhere;
 }
+/* NameCode fills its parent elsewhere; here that would take the company name's share of the row.
+   It also keeps its own width, so only the company name gives way to a long company name. */
 .shell__identity :deep(.name-code) {
+  flex-shrink: 0;
+  width: auto;
   min-width: 0;
   max-width: 240px;
 }

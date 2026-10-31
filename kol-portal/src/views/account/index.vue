@@ -188,10 +188,10 @@ function savePassword() {
     }}</el-button>
     <el-skeleton v-if="profileLoading && !session.kol" :rows="4" animated />
     <template v-else-if="session.kol">
-      <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
       <el-card shadow="never" class="section-card">
         <template #header
           ><h1>{{ t("account.title") }}</h1>
+          <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
           <h2>{{ t("account.personalInfo") }}</h2></template
         >
         <el-alert
@@ -446,8 +446,11 @@ h1 {
   line-height: var(--tcrm-line-height-title);
   font-weight: 600;
 }
-.section-card :deep(.el-card__header) h1 + h2 {
-  margin-top: var(--tcrm-space-2);
+.section-card :deep(.el-card__header) .name-code {
+  align-items: flex-start;
+  margin: var(--tcrm-space-2) 0;
+  font-weight: 400;
+  text-align: left;
 }
 .section-card :deep(.el-card__header) h2 {
   margin: 0;

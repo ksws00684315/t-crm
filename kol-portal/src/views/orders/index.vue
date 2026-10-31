@@ -209,6 +209,9 @@ onMounted(load);
       show-icon
       :title="t('orders.loadFailed')"
     />
+    <p v-if="orders.length && !error" class="orders-note" data-test="orders-amount-note">
+      {{ t("orders.amountNote") }}
+    </p>
     <DataTable
       table-id="kol-orders"
       class="orders-table"
@@ -226,10 +229,7 @@ onMounted(load);
       <template #cell-product="{ row }"
         ><span class="product-cell">{{ productLabel(row) }}</span></template
       >
-      <template #cell-payAmount="{ row }"
-        >{{ money(row.payAmount)
-        }}<small class="amount-note">{{ t("orders.amountNote") }}</small></template
-      >
+      <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
       <template #cell-payTime="{ row }">{{ dateLabel(row.payTime) }}</template>
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
@@ -318,13 +318,19 @@ h1 {
   text-align: center;
   color: var(--tcrm-color-text-secondary);
 }
-.amount-note {
-  display: block;
-  margin-top: var(--tcrm-space-1);
+.amount-note,
+.orders-note {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-help);
   line-height: var(--tcrm-line-height-help);
+}
+.amount-note {
+  display: block;
+  margin-top: var(--tcrm-space-1);
   white-space: normal;
+}
+.orders-note {
+  margin: 0;
 }
 .product-cell {
   display: block;
@@ -364,7 +370,8 @@ h1 {
     height: auto;
     min-height: 0;
   }
-  .orders-table {
+  .orders-table,
+  .orders-note {
     display: none;
   }
   .order-cards {

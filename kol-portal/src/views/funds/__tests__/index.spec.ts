@@ -4,7 +4,7 @@ import { createPinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/api/creator";
 import { uploadQrFile } from "@/api/payout-account";
-import { i18n } from "@/locales";
+import { enUS, i18n } from "@/locales";
 import { ApiError } from "@/utils/http/error";
 import FundsPage from "../index.vue";
 
@@ -71,19 +71,18 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-async function page() {
+const dataTableStub = {
+  name: "DataTable",
+  props: ["rows"],
+  template: '<div><slot v-for="row in rows" name="cell-amount" :row="row" /></div>'
+};
+
+async function page(options: { realTable?: boolean } = {}) {
   wrapper = mount(FundsPage, {
     attachTo: document.body,
     global: {
       plugins: [ElementPlus, i18n, createPinia()],
-      stubs: {
-        RouterLink: true,
-        DataTable: {
-          name: "DataTable",
-          props: ["rows"],
-          template: '<div><slot v-for="row in rows" name="cell-amount" :row="row" /></div>'
-        }
-      }
+      stubs: { RouterLink: true, ...(options.realTable ? {} : { DataTable: dataTableStub }) }
     }
   });
   await flushPromises();
@@ -97,6 +96,25 @@ async function submit(amount = "250.00") {
   await wrapper.get('[data-test="submit-withdrawal"]').trigger("click");
   await flushPromises();
 }
+
+describe("creator fund records list states", () => {
+  it("hides the empty copy and the pager when loading fails", async () => {
+    vi.mocked(api.getFundRecords).mockRejectedValue(new Error("network"));
+    await page({ realTable: true });
+    expect(wrapper.text()).toContain(enUS.funds.loadFailed);
+    expect(wrapper.text()).not.toContain(enUS.funds.empty);
+    expect(wrapper.find(".data-table__empty").exists()).toBe(false);
+    expect(wrapper.find(".data-table__pager").exists()).toBe(false);
+    expect(wrapper.find(".fund-records-pager").exists()).toBe(false);
+  });
+
+  it("shows the empty copy without a pager on an empty list", async () => {
+    await page({ realTable: true });
+    expect(wrapper.text()).toContain(enUS.funds.empty);
+    expect(wrapper.find(".data-table__pager").exists()).toBe(false);
+    expect(wrapper.find(".fund-records-pager").exists()).toBe(false);
+  });
+});
 
 describe("creator withdrawal application", () => {
   it("renders foreign-currency history amounts without a CNY symbol", async () => {

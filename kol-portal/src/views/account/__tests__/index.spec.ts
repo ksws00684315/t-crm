@@ -58,10 +58,17 @@ describe("creator profile validation", () => {
     }
   });
 
-  it("puts the page title at the top of the first card", async () => {
+  it("makes the title the top of the page, with the identity right below it in the first card", async () => {
     await page();
-    expect(wrapper.findAll(".section-card")[0].find("h1").exists()).toBe(true);
+    const firstCard = wrapper.findAll(".section-card")[0];
+    expect(wrapper.get(".account-page").element.firstElementChild).toBe(firstCard.element);
+    const header = firstCard.get(".el-card__header");
+    expect(header.element.firstElementChild?.tagName).toBe("H1");
     expect(wrapper.findAll(".section-card h1")).toHaveLength(1);
+    expect(header.get("h1").element.nextElementSibling).toBe(
+      header.get('[data-test="name-code"]').element
+    );
+    expect(wrapper.findAll('[data-test="name-code"]')).toHaveLength(1);
   });
 
   it("enforces the backend handle length instead of allowing 255 characters", async () => {
