@@ -125,6 +125,7 @@ onMounted(loadItems);
       :columns="columns"
       :loading="loading"
       :total="total"
+      :paged="total > 0 && !error"
       :page="page"
       :size="size"
       row-key="weidianItemId"
@@ -154,11 +155,13 @@ onMounted(loadItems);
       <template #actions="{ row }">
         <RowActions :actions="rowActions(row)" />
       </template>
+      <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
       <template #empty>
-        <div class="empty-state" data-test="items-empty">
+        <div v-if="!error" class="empty-state" data-test="items-empty">
           <p>{{ t("items.empty") }}</p>
           <p class="empty-hint">{{ t("items.emptyHint") }}</p>
         </div>
+        <span v-else />
       </template>
     </DataTable>
 
@@ -202,6 +205,7 @@ onMounted(loadItems);
       <p class="empty-hint">{{ t("items.emptyHint") }}</p>
     </div>
     <el-pagination
+      v-if="total > 0 && !error"
       class="items-pager"
       :current-page="page"
       :page-size="size"
