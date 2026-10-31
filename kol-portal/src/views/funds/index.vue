@@ -1019,6 +1019,17 @@ h1 {
 small {
   color: var(--tcrm-color-text-secondary);
 }
+/* A long document with cards above and below, so this card cannot take the page's leftover height.
+   DataTable caps itself from the card, so the card keeps a height the rows cannot pull down. */
+@media (min-width: 768px) {
+  .records-card {
+    height: 560px;
+  }
+  .records-card :deep(.el-card__body) {
+    box-sizing: border-box;
+    height: 100%;
+  }
+}
 @media (max-width: 1279px) {
   .commission-cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));

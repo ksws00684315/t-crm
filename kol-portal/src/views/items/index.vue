@@ -213,10 +213,14 @@ onMounted(loadItems);
 </template>
 
 <style scoped>
+/* A height the rows cannot change, or DataTable's ceiling shrinks with its own table. On a very short
+   window the floor keeps the first row readable and hands scrolling to the page. */
 .items-page {
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-4);
+  height: 100%;
+  min-height: 420px;
   min-width: 0;
 }
 .empty-state {
@@ -334,6 +338,10 @@ onMounted(loadItems);
   background: var(--el-color-primary-light-9);
 }
 @media (max-width: 767px) {
+  .items-page {
+    height: auto;
+    min-height: 0;
+  }
   .items-page .items-table {
     display: none;
   }
