@@ -77,11 +77,12 @@ beforeEach(() => {
 afterEach(() => {
   wrappers.splice(0).forEach(w => w.unmount());
   document.body.innerHTML = "";
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
   const wrapper = mount(component, {
-    props: { modelValue: false, kol: { id: "3", kolCode: "KOL-test", name: "Test" }, id: "9" },
+    props: { modelValue: false, id: "9" },
     attachTo: document.body,
     global: {
       plugins: [ElementPlus, i18n],
@@ -101,6 +102,11 @@ async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
   await wrapper.setProps({ modelValue: true });
   await flushPromises();
   return wrapper;
+}
+/** The apply dialog picks its creator from the remote select (task 82); the stub emits the value. */
+async function pickKol(wrapper: VueWrapper, kolId = "3") {
+  wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", kolId);
+  await flushPromises();
 }
 async function set(wrapper: VueWrapper, name: string, value: string) {
   const input = wrapper.get(`[data-test="${name}"]`);
@@ -201,6 +207,7 @@ describe("prepay safe submission", () => {
   it("retains the application UUID and immutable payload after an ambiguous failure", async () => {
     vi.mocked(api.applyPrepay).mockRejectedValue(new Error("network"));
     const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper);
     await set(wrapper, "prepay-amount", "100.00");
     await flushPromises();
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
@@ -211,7 +218,7 @@ describe("prepay safe submission", () => {
     const calls = vi.mocked(api.applyPrepay).mock.calls;
     expect(calls[0][0].requestId).toMatch(/^[0-9a-f-]{36}$/);
     expect(calls[1][0]).toEqual(calls[0][0]);
-    expect(wrapper.getComponent({ name: "ElForm" }).props("disabled")).toBe(true);
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
   });
   it("allows pay-only users, confirms a difference, refreshes conflict and retries the same UUID", async () => {
     vi.mocked(api.payPrepay)
@@ -307,12 +314,13 @@ describe("prepay safe submission", () => {
       expect(api.approvePrepay).not.toHaveBeenCalled();
     }
   );
-  it("shows only identity amount and readonly state and submits a minimal application", async () => {
+  it("starts without a creator and submits a minimal application for the picked creator", async () => {
     vi.mocked(api.applyPrepay).mockResolvedValue({ ...detail, status: "WAITING_DETAILS" });
     useUserStore().user!.nickname = "Business operator";
     const wrapper = await open(ApplyDialog);
-    expect(wrapper.get('[data-test="prepay-creator-name"]').text()).toBe("Test");
-    expect(wrapper.get('[data-test="prepay-creator-code"]').text()).toBe("KOL-test");
+    // No creator yet: submit is disabled and no application is looked up.
+    expect(wrapper.get('[data-test="prepay-submit"]').attributes("disabled")).toBeDefined();
+    expect(api.getActivePrepay).not.toHaveBeenCalled();
     expect(wrapper.get('[data-test="prepay-application-status"]').text()).toContain("待申请");
     expect(wrapper.text()).not.toContain("Business operator");
     expect(api.prepayAccounts).not.toHaveBeenCalled();
@@ -325,11 +333,13 @@ describe("prepay safe submission", () => {
     ]) {
       expect(wrapper.find('[data-test="' + field + '"]').exists()).toBe(false);
     }
+    await pickKol(wrapper, "3");
+    expect(api.getActivePrepay).toHaveBeenCalledWith("3");
     await set(wrapper, "prepay-amount", "100.00");
     await wrapper.get('[data-test="prepay-submit"]').trigger("click");
     await flushPromises();
     expect(wrapper.props("modelValue")).toBe(true);
-    expect(wrapper.getComponent({ name: "ElForm" }).props("disabled")).toBe(true);
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
     expect(wrapper.text()).toContain("PP-test");
     expect(wrapper.text()).toContain(i18n.global.t("prepay.completeInFinance"));
     expect(api.applyPrepay).toHaveBeenCalledExactlyOnceWith({
@@ -338,8 +348,72 @@ describe("prepay safe submission", () => {
       amountCny: "100.00"
     });
   });
+  it("lets the business switch creator after picking one with an open application", async () => {
+    vi.mocked(api.getActivePrepay).mockResolvedValueOnce({
+      ...detail,
+      kolId: "3",
+      status: "WAITING_DETAILS"
+    });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("PP-test");
+
+    await pickKol(wrapper, "4");
+    expect(api.getActivePrepay).toHaveBeenLastCalledWith("4");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('select[data-test="prepay-kol"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="prepay-application-status"]').text()).toContain("待申请");
+  });
+  it("keeps the typed amount when polling finds no open application", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    await set(wrapper, "prepay-amount", "1.23");
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushPromises();
+    expect(api.getActivePrepay).toHaveBeenCalledTimes(2);
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe(
+      "1.23"
+    );
+  });
+  it("keeps the same request id for a retry after polling", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.mocked(api.applyPrepay)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({ ...detail, status: "WAITING_DETAILS" });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    await set(wrapper, "prepay-amount", "100.00");
+    await wrapper.get('[data-test="prepay-submit"]').trigger("click");
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await flushPromises();
+    await wrapper.get('[data-test="prepay-submit"]').trigger("click");
+    await flushPromises();
+    const calls = vi.mocked(api.applyPrepay).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0]).toEqual(calls[0][0]);
+  });
+  it("clears the previous creator's amount when switching to another creator", async () => {
+    vi.mocked(api.getActivePrepay).mockResolvedValueOnce({
+      ...detail,
+      kolId: "3",
+      amountCny: "100.00",
+      status: "WAITING_DETAILS"
+    });
+    const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper, "3");
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe(
+      "100.00"
+    );
+    await pickKol(wrapper, "4");
+    expect((wrapper.get('[data-test="prepay-amount"]').element as HTMLInputElement).value).toBe("");
+    expect(wrapper.get('[data-test="prepay-amount"]').attributes("disabled")).toBeUndefined();
+  });
   it("requires a positive CNY amount", async () => {
     const wrapper = await open(ApplyDialog);
+    await pickKol(wrapper);
     for (const value of ["", "0", "-1", "1.001"]) {
       await set(wrapper, "prepay-amount", value);
       await wrapper.get('[data-test="prepay-submit"]').trigger("click");

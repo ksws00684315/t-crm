@@ -45,7 +45,7 @@ function account(overrides: Partial<PayoutAccountVO> = {}): PayoutAccountVO {
     currency: "USD",
     network: null,
     qrFileId: null,
-    status: "PENDING",
+    status: "APPROVED",
     defaultAccount: false,
     rejectReason: null,
     lastSubmittedAt: "2026-10-16T08:00:00Z",
@@ -100,53 +100,50 @@ afterEach(() => {
 describe("payout accounts page", () => {
   it("shows the empty state with a create button in English and Chinese", async () => {
     const wrapper = await page([]);
-    expect(wrapper.text()).toContain(
-      "Add a PayPal or USDT account; once approved it is used to pay you."
-    );
+    expect(wrapper.text()).toContain("Add a PayPal or USDT account to receive your withdrawals.");
     expect(wrapper.get('[data-test="empty-create"]').text()).toBe("Add payout account");
 
     useLocaleStore().setLocale("zh-CN");
     await flushPromises();
-    expect(wrapper.text()).toContain("添加 PayPal 或 USDT 账户，审核通过后用于收款。");
+    expect(wrapper.text()).toContain("添加 PayPal 或 USDT 账户，用于接收提现款项。");
     expect(wrapper.text()).toContain("收款账户");
   });
 
-  it("renders each account card with type, full account, status and default tag", async () => {
+  it("renders each account card with type, full account and only the default tag", async () => {
     const wrapper = await page([
       usdt({ status: "APPROVED", defaultAccount: true }),
-      account({ id: "13", status: "REJECTED", rejectReason: "Wrong holder name" })
+      account({ id: "13", status: "APPROVED" })
     ]);
     expect(wrapper.get('[data-test="account-12"] [data-test="type"]').text()).toBe("USDT · TRC20");
     expect(wrapper.get('[data-test="account-12"] [data-test="account"]').text()).toBe(
       "TQ5xK9aZPn7vQm"
     );
-    expect(wrapper.get('[data-test="account-12"] [data-test="status"]').text()).toBe("Approved");
     expect(wrapper.find('[data-test="account-12"] [data-test="default-tag"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="account-13"] [data-test="default-tag"]').exists()).toBe(false);
 
-    const rejected = wrapper.get('[data-test="account-13"]');
-    expect(rejected.get('[data-test="status"]').text()).toBe("Rejected");
-    expect(rejected.get('[data-test="reject-reason"]').text()).toContain("Wrong holder name");
+    // Accounts no longer carry a review status or a rejection reason.
+    expect(wrapper.find('[data-test="status"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="reject-reason"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toMatch(/Under review|Approved|Rejected|Pending/);
     expect(wrapper.text()).toContain("Ada Lovelace");
   });
 
-  it("shows edit only for PENDING or REJECTED and set-default only for APPROVED non-default", async () => {
+  it("offers edit on every enabled account and set-default only on approved non-default ones", async () => {
     const wrapper = await page([
-      account({ id: "21", status: "PENDING" }),
-      account({ id: "22", status: "REJECTED", rejectReason: "No" }),
-      account({ id: "23", status: "APPROVED" }),
-      account({ id: "24", status: "APPROVED", defaultAccount: true })
+      account({ id: "21", status: "APPROVED" }),
+      account({ id: "22", status: "APPROVED", defaultAccount: true }),
+      account({ id: "23", status: "APPROVED" })
     ]);
-    expect(wrapper.find('[data-test="account-21"] [data-test="edit"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="account-22"] [data-test="edit"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="account-23"] [data-test="edit"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="account-24"] [data-test="edit"]').exists()).toBe(false);
+    for (const id of ["21", "22", "23"]) {
+      expect(wrapper.find(`[data-test="account-${id}"] [data-test="edit"]`).exists()).toBe(true);
+    }
 
-    expect(wrapper.find('[data-test="account-21"] [data-test="set-default"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="account-21"] [data-test="set-default"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="account-22"] [data-test="set-default"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="account-23"] [data-test="set-default"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="account-24"] [data-test="set-default"]').exists()).toBe(false);
 
     // Every account can be disabled; disabled ones never come back from the API.
-    for (const id of ["21", "22", "23", "24"]) {
+    for (const id of ["21", "22", "23"]) {
       expect(wrapper.find(`[data-test="account-${id}"] [data-test="disable"]`).exists()).toBe(true);
     }
   });
@@ -185,7 +182,7 @@ describe("payout accounts page", () => {
     cancelled.mockRestore();
   });
 
-  it("sets an approved account as the default and reloads", async () => {
+  it("sets a new (approved) account as the default and reloads", async () => {
     vi.mocked(api.setDefaultPayoutAccount).mockResolvedValue(null);
     const wrapper = await page([account({ id: "51", status: "APPROVED" })]);
     await wrapper.get('[data-test="account-51"] [data-test="set-default"]').trigger("click");
@@ -201,9 +198,9 @@ describe("payout accounts page", () => {
     expect(api.downloadQrFile).toHaveBeenCalledWith("66");
   });
 
-  it("closes the dialog, explains and reloads when the account was approved meanwhile", async () => {
-    vi.mocked(api.updatePayoutAccount).mockRejectedValue(failure("PAYOUT_ACCOUNT_LOCKED", 409));
-    const wrapper = await page([account({ id: "61", status: "PENDING" })]);
+  it("closes the dialog, explains and reloads when the account was disabled meanwhile", async () => {
+    vi.mocked(api.updatePayoutAccount).mockRejectedValue(failure("COMMON_NOT_FOUND", 404));
+    const wrapper = await page([account({ id: "61", status: "APPROVED" })]);
 
     await wrapper.get('[data-test="account-61"] [data-test="edit"]').trigger("click");
     await flushPromises();
@@ -216,6 +213,7 @@ describe("payout accounts page", () => {
 
     expect(api.updatePayoutAccount).toHaveBeenCalled();
     expect(api.listPayoutAccounts).toHaveBeenCalledTimes(2);
+    expect(document.body.textContent).toContain("The account has been disabled.");
   });
 
   it("shows the API message with a retry button when the list cannot load", async () => {

@@ -17,7 +17,7 @@ defineOptions({ name: "PayoutAccountDialog" });
 
 const props = defineProps<{
   modelValue: boolean;
-  /** Null creates a new account; a value resubmits that PENDING or REJECTED account. */
+  /** Null creates a new account; a value edits that account (any account not yet disabled). */
   account: PayoutAccountVO | null;
 }>();
 
@@ -167,7 +167,8 @@ function save() {
       if (props.account) await updatePayoutAccount(props.account.id, payload);
       else await createPayoutAccount(payload);
     } catch (error) {
-      if (error instanceof ApiError && error.errorCode === "PAYOUT_ACCOUNT_LOCKED") {
+      // 404 on edit means the account was disabled (or is not ours) meanwhile; the page explains it.
+      if (props.account && error instanceof ApiError && error.status === 404) {
         error.handled = true;
         emit("conflict");
         return;

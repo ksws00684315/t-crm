@@ -136,8 +136,8 @@ const zhCN = {
       desc: "冻结或解冻达人提现"
     },
     "payout-account:review": {
-      name: "审核收款账户",
-      desc: "审核或驳回达人收款账户"
+      name: "查看收款账户",
+      desc: "查看达人收款账户，含完整账号与二维码"
     },
     "withdrawal:review": {
       name: "审核提现",
@@ -321,8 +321,6 @@ const zhCN = {
     ORDER_SYNC_RUNNING: "该店铺的订单同步正在进行，请稍后重试。",
     LINK_REBUILD_RUNNING: "链接索引正在重建，请稍后再试",
     PAYOUT_ACCOUNT_LIMIT: "已达到系统配置的收款账户数量上限",
-    PAYOUT_ACCOUNT_LOCKED: "已通过的账户不能修改，请新建一个",
-    PAYOUT_ACCOUNT_NOT_PENDING: "账户已被修改或已审核，请刷新后重试",
     PAYOUT_ACCOUNT_NOT_APPROVED: "只有已通过的账户才能设为默认",
     PAYOUT_ACCOUNT_IN_USE: "该收款账户仍有处理中的提现申请，暂不能停用。",
     WITHDRAWAL_REQUEST_CONFLICT: "提现申请 UUID 已被不同内容使用，请刷新后重试。",
@@ -697,7 +695,7 @@ const zhCN = {
     frozen: "达人已冻结",
     unfrozen: "达人已解冻",
     saved: "达人已保存",
-    editTitle: "资料编辑 {code}",
+    editTitle: "基础资料 {code}",
     whatsapp: "WhatsApp",
     whatsappPlaceholder: "含国际区号，如 +8613800000000",
     phone: "手机号",
@@ -710,7 +708,6 @@ const zhCN = {
     handlePlaceholder: "如 {'@'}creator",
     inviteTime: "邀请时间",
     inviter: "邀请人",
-    prepay: "预付金额",
     sheetUrl: "达人推广表格地址",
     sheetUrlPlaceholder: "https://docs.google.com/spreadsheets/...",
     invite: "发送邀请",
@@ -772,10 +769,22 @@ const zhCN = {
     reviewApproved: "资料已保存，审核通过",
     reviewAlreadyDone: "该达人已审核",
     /** Row actions, fixed order (04.01). */
-    actionEdit: "资料编辑",
+    actionEdit: "基础资料",
     actionReview: "审核",
-    actionCommission: "佣金信息",
-    actionPrepay: "预付金额",
+    actionCommission: "推广信息",
+    actionFund: "资金信息",
+    fundEmpty: "达人尚未添加收款账户",
+    fundLoadFailed: "收款账户加载失败，请稍后重试",
+    fundType: "类型",
+    fundAccount: "账户（脱敏）",
+    fundRecipient: "收款人或网络",
+    fundCurrency: "币种",
+    fundDefault: "默认",
+    fundStatus: "状态",
+    fundActive: "正常",
+    fundDisabled: "已停用",
+    fundUpdatedAt: "最近更新时间",
+    fundViewFull: "查看完整",
     actionCleanup: "清理配置",
     cleanupRemaining: "剩余{days}天",
     actionFreeze: "冻结",
@@ -787,8 +796,8 @@ const zhCN = {
     transferRecordsHint: "转移记录请到 系统管理 → 操作日志 查询"
   },
   promotion: {
-    configTitle: "佣金信息",
-    configTitleWithName: "佣金信息 - {code}（{name}）",
+    configTitle: "推广信息",
+    configTitleWithName: "推广信息 - {code}（{name}）",
     platforms: "代购平台",
     platformPlaceholder: "搜索并选择平台（可多选）",
     platformAddressPlaceholder: "https://达人专属地址",

@@ -168,3 +168,39 @@ describe("finance prepay tasks", () => {
     wrapper.unmount();
   });
 });
+
+describe("prepay apply entry (task 82)", () => {
+  it.each([
+    [["prepay:apply"], true],
+    [["prepay:review"], false]
+  ])("shows the apply button only with prepay:apply (%j)", async (permissions, shown) => {
+    setActivePinia(createPinia());
+    useUserStore().user = {
+      id: "7",
+      username: "test",
+      nickname: "Test",
+      email: null,
+      role: "STAFF",
+      postTemplate: "BD",
+      permissions: permissions as "prepay:apply"[],
+      dataScope: "OWN",
+      tenantId: "1",
+      tenantName: "Test",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-22T00:00:00Z"
+    };
+    vi.mocked(listPrepays).mockResolvedValue({ items: [], total: "0", page: 1, size: 20 });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: Page }]
+    });
+    await router.push("/");
+    const wrapper = mount(Page, {
+      global: { plugins: [ElementPlus, i18n, router], stubs: { DetailDrawer: true } }
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="prepay-apply-open"]').exists()).toBe(shown);
+    wrapper.unmount();
+  });
+});

@@ -60,7 +60,7 @@ export function createPayoutAccount(payload: PayoutAccountPayload): Promise<Payo
       currency: payload.currency ?? null,
       network: payload.network ?? null,
       qrFileId: payload.qrFileId ?? null,
-      status: "PENDING",
+      status: "APPROVED",
       defaultAccount: false,
       rejectReason: null,
       lastSubmittedAt: new Date().toISOString(),
@@ -72,7 +72,7 @@ export function createPayoutAccount(payload: PayoutAccountPayload): Promise<Payo
   return http.request<PayoutAccountVO>({ method: "POST", url: "/payout-accounts", data: payload });
 }
 
-/** Resubmits a PENDING or REJECTED account; the backend answers with empty data, so reload after. */
+/** Edits any account that is not disabled; the backend answers with empty data, so reload after. */
 export function updatePayoutAccount(id: string, payload: PayoutAccountPayload): Promise<null> {
   if (demoMode) {
     demoAccounts = demoAccounts.map(account =>
@@ -85,7 +85,7 @@ export function updatePayoutAccount(id: string, payload: PayoutAccountPayload): 
             currency: payload.currency ?? null,
             network: payload.network ?? null,
             qrFileId: payload.qrFileId ?? null,
-            status: "PENDING",
+            status: "APPROVED",
             lastSubmittedAt: new Date().toISOString()
           }
         : account

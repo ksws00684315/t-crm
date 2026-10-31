@@ -257,11 +257,10 @@ describe("buildMenu", () => {
     expect(titles(staff("OWN", ["product:view"]))).toEqual(expected);
   });
 
-  it("shows the payouts page to either of its two permission codes", () => {
+  it("shows the payouts page only to commission:view (payout-account:review no longer opens it)", () => {
+    // Task 82: account review is gone, so payout-account:review alone shows no finance menu.
     expect(titles(staff("ALL", ["payout-account:review"]))).toEqual([
       "工作台",
-      "财务结算",
-      "达人提现",
       "系统管理",
       "上传文件"
     ]);
@@ -311,18 +310,22 @@ describe("canAccessRoute", () => {
   });
 
   it("treats an array permission as any-of and a single code as before", () => {
-    const review = {
-      permission: ["payout-account:review", "commission:view"] as const
+    // Same shape as the prepays route: any one of its codes opens it.
+    const prepays = {
+      permission: ["commission:view", "prepay:review"] as const
     };
-    expect(canAccessRoute(review, accessOf(staff("ALL", ["payout-account:review"])))).toBe(true);
-    expect(canAccessRoute(review, accessOf(staff("ALL", ["commission:view"])))).toBe(true);
+    expect(canAccessRoute(prepays, accessOf(staff("ALL", ["prepay:review"])))).toBe(true);
+    expect(canAccessRoute(prepays, accessOf(staff("ALL", ["commission:view"])))).toBe(true);
     expect(
-      canAccessRoute(review, accessOf(staff("ALL", ["payout-account:review", "commission:view"])))
+      canAccessRoute(prepays, accessOf(staff("ALL", ["prepay:review", "commission:view"])))
     ).toBe(true);
-    expect(canAccessRoute(review, accessOf(staff("ALL", ["kol:view"])))).toBe(false);
-    expect(canAccessRoute(review, accessOf(staff("ALL", [])))).toBe(false);
-    expect(canAccessRoute(review, accessOf(superAdmin))).toBe(true);
-    expect(canAccessRoute(review, accessOf(platformAdmin))).toBe(false);
+    expect(canAccessRoute(prepays, accessOf(staff("ALL", ["kol:view"])))).toBe(false);
+    expect(canAccessRoute(prepays, accessOf(staff("ALL", [])))).toBe(false);
+    expect(canAccessRoute(prepays, accessOf(superAdmin))).toBe(true);
+    expect(canAccessRoute(prepays, accessOf(platformAdmin))).toBe(false);
+    // The payouts route now needs commission:view alone, so payout-account:review cannot open it.
+    const payouts = { permission: ["commission:view"] as const };
+    expect(canAccessRoute(payouts, accessOf(staff("ALL", ["payout-account:review"])))).toBe(false);
   });
 
   it("limits platform administrators to platform pages and hidden account pages", () => {

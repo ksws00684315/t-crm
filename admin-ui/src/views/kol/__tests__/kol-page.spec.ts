@@ -13,8 +13,7 @@ import KolPage from "../index.vue";
 
 vi.mock("@/api/kol/kol");
 vi.mock("@/api/commission/prepay", () => ({
-  prepayAccounts: vi.fn().mockResolvedValue([]),
-  getPrepayKolSummaries: vi.fn().mockResolvedValue([])
+  prepayAccounts: vi.fn().mockResolvedValue([])
 }));
 vi.mock("@/api/kol/promotion");
 vi.mock("@/api/kol/bd-transfer");
@@ -162,7 +161,7 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("renders the creator columns in order and the paid prepay total", async () => {
+  it("renders the creator columns in order without the prepay column", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage();
     const headers = wrapper
@@ -170,14 +169,14 @@ describe("creator list page (task 32 §2.2)", () => {
       .map(item => item.text())
       .filter(Boolean);
     // Owner decision 2026-10-24 (task 59 review): every requirement column shows by default and
-    // the table scrolls horizontally inside the card when it overflows.
+    // the table scrolls horizontally inside the card when it overflows. Task 82 removed the
+    // prepay amount column; prepay lives in the finance pages now.
     expect(headers).toEqual([
       "达人ID/达人名",
       "Phone/WhatsApp",
       "邮箱",
       "社媒平台/ID",
       "佣金比例",
-      "预付金额",
       "邀请时间",
       "邀请人",
       "审核状态",
@@ -185,7 +184,7 @@ describe("creator list page (task 32 §2.2)", () => {
       "关系状态",
       "操作"
     ]);
-    expect(element("kol-prepay-total").text()).toBe("0.00");
+    expect(document.body.querySelector('[data-test="kol-prepay-total"]')).toBeNull();
     // The name is plain text, not a link any more.
     const name = element("kol-name");
     expect(name.find("a, button").exists()).toBe(false);
@@ -195,7 +194,7 @@ describe("creator list page (task 32 §2.2)", () => {
       .findAll(".el-table__header colgroup col")
       .map(col => Number(col.element.getAttribute("width") ?? 0))
       .filter(w => w > 0);
-    expect(fixed.length).toBe(12);
+    expect(fixed.length).toBe(11);
     expect(fixed.reduce((sum, width) => sum + width, 0)).toBeGreaterThan(1000);
     wrapper.unmount();
   });
@@ -220,7 +219,7 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
-  it("moves review into its status and opens authorized prepay applications", async () => {
+  it("moves review into its status and keeps the commission gate per row", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
       { ...row, reviewStatus: "PENDING", id: "1" },
@@ -235,12 +234,30 @@ describe("creator list page (task 32 §2.2)", () => {
       false,
       false
     ]);
-    const prepay = ["1", "2", "3"].map(id => rowButtons(`action-prepay-${id}`)[0]);
-    expect(prepay.every(item => !item?.classList.contains("is-disabled"))).toBe(true);
-    await element("action-prepay-2").trigger("click");
-    await flushPromises();
-    expect(document.querySelector('[data-test="prepay-apply"]')).not.toBeNull();
-    expect(wrapper.getComponent({ name: "ApplyDialog" }).props("kol")).toMatchObject({ id: "2" });
+    // The prepay row action is gone (task 82).
+    expect(document.body.querySelector('[data-test^="action-prepay"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("enables the fund entry only with payout-account:review on a creator the BD owns", async () => {
+    // Without payout-account:review, a BD cannot open funds on any creator.
+    signIn("STAFF", "OWN", BD);
+    let wrapper = await mountPage("2", [
+      { ...row, id: "1", bdUserId: "1", bdUserName: "Me" },
+      { ...row, id: "2", bdUserId: null, bdUserName: null }
+    ]);
+    expect(rowButtons("action-fund-1").map(item => item.disabled)).toEqual([true]);
+    expect(rowButtons("action-fund-2").map(item => item.disabled)).toEqual([true]);
+    wrapper.unmount();
+
+    // With the permission, only creators the BD owns are enabled.
+    signIn("STAFF", "OWN", [...BD, "payout-account:review"]);
+    wrapper = await mountPage("2", [
+      { ...row, id: "1", bdUserId: "1", bdUserName: "Me" },
+      { ...row, id: "2", bdUserId: "9", bdUserName: "Other" }
+    ]);
+    expect(rowButtons("action-fund-1").map(item => item.disabled)).toEqual([false]);
+    expect(rowButtons("action-fund-2").map(item => item.disabled)).toEqual([true]);
     wrapper.unmount();
   });
 
@@ -383,7 +400,7 @@ describe("creator list page (task 32 §2.2)", () => {
     const wrapper = await mountPage();
     await element("action-commission").trigger("click");
     await flushPromises();
-    expect(document.body.textContent).toContain("佣金信息 - KOL-ASD001");
+    expect(document.body.textContent).toContain("推广信息 - KOL-ASD001");
     wrapper.unmount();
   });
 

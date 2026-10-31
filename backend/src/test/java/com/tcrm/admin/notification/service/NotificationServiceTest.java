@@ -16,7 +16,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.notification.api.WithdrawalNotification;
 import com.tcrm.admin.notification.mapper.NotificationMapper;
 import com.tcrm.admin.notification.model.NotificationDO;
@@ -64,54 +63,6 @@ class NotificationServiceTest {
   @BeforeEach
   void companyUser() {
     when(current.user()).thenReturn(account(8L, Role.STAFF, 2L));
-  }
-
-  @Test
-  void shouldNotifyTheBdAndEverySuperAdmin_whenAPayoutAccountIsSubmitted() {
-    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(10L, "KOL0010", "Ada", true, 3L)));
-    when(superAdmins.listEnabledIds()).thenReturn(List.of(1L, 2L));
-    service.record(new PayoutAccountSubmittedEvent(9L, 10L, 77L, "KOL0010", "PAYPAL"));
-    var rows = ArgumentCaptor.forClass(NotificationDO.class);
-    verify(notifications, times(3)).insert(rows.capture());
-    assertThat(rows.getAllValues())
-        .extracting(NotificationDO::getUserId)
-        .containsExactly(3L, 1L, 2L);
-    assertThat(rows.getAllValues())
-        .allSatisfy(
-            row -> {
-              assertThat(row.getTenantId()).isEqualTo(9L);
-              assertThat(row.getType()).isEqualTo(NotificationType.PAYOUT_ACCOUNT_SUBMITTED);
-              assertThat(row.getBizType()).isEqualTo(NotificationService.BIZ_PAYOUT_ACCOUNT);
-              assertThat(row.getBizId()).isEqualTo(77L);
-              assertThat(row.getCreateTime())
-                  .isEqualTo(NOW.truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
-              assertThat(row.getParams())
-                  .isEqualTo(
-                      "{\"kolCode\":\"KOL0010\",\"kolName\":\"Ada\",\"accountType\":\"PAYPAL\"}");
-              assertThat(row.getParams()).doesNotContain("@");
-            });
-  }
-
-  @Test
-  void shouldNotifyOnlySuperAdmins_whenTheCreatorHasNoBd() {
-    when(kols.listByIds(any()))
-        .thenReturn(List.of(new KolRefDTO(10L, "KOL0010", "Ada", true, null)));
-    when(superAdmins.listEnabledIds()).thenReturn(List.of(1L));
-    service.record(new PayoutAccountSubmittedEvent(9L, 10L, 77L, "KOL0010", "USDT"));
-    var rows = ArgumentCaptor.forClass(NotificationDO.class);
-    verify(notifications).insert(rows.capture());
-    assertThat(rows.getValue().getUserId()).isEqualTo(1L);
-  }
-
-  @Test
-  void shouldKeepOnlyTheCode_whenTheCreatorNoLongerResolves() {
-    when(kols.listByIds(any())).thenReturn(List.of());
-    when(superAdmins.listEnabledIds()).thenReturn(List.of(1L));
-    service.record(new PayoutAccountSubmittedEvent(9L, 10L, 77L, "KOL0010", "USDT"));
-    var rows = ArgumentCaptor.forClass(NotificationDO.class);
-    verify(notifications).insert(rows.capture());
-    assertThat(rows.getValue().getParams())
-        .isEqualTo("{\"kolCode\":\"KOL0010\",\"accountType\":\"USDT\"}");
   }
 
   @Test
@@ -187,16 +138,6 @@ class NotificationServiceTest {
     assertThat(item.params().kolName()).isNull();
     assertThat(item.params().kolCode()).isEqualTo("KOL0010");
     assertThat(item.params().accountType()).isEqualTo("PAYPAL");
-  }
-
-  @Test
-  void shouldNotifyAPersonOnce_whenTheBdIsAlsoListedAsSuperAdmin() {
-    when(kols.listByIds(any())).thenReturn(List.of(new KolRefDTO(10L, "KOL0010", "Ada", true, 1L)));
-    when(superAdmins.listEnabledIds()).thenReturn(List.of(1L, 2L));
-    service.record(new PayoutAccountSubmittedEvent(9L, 10L, 77L, "KOL0010", "PAYPAL"));
-    var rows = ArgumentCaptor.forClass(NotificationDO.class);
-    verify(notifications, times(2)).insert(rows.capture());
-    assertThat(rows.getAllValues()).extracting(NotificationDO::getUserId).containsExactly(1L, 2L);
   }
 
   @Test

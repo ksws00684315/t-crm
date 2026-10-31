@@ -8,23 +8,24 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * Admin list filters (task 15a §4.4): status defaults to the PENDING review queue, {@code ALL}
- * shows every status; {@code kolCode} matches exactly.
+ * Admin list filters (task 15a §4.4, task 82): no status is applied by default, so disabled
+ * accounts are listed too; {@code ALL} also means no filter. {@code kolCode} matches exactly and
+ * {@code kolId} is the exact KOL id used by the fund dialog.
  */
 public record PayoutAccountQuery(
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size,
-    @Pattern(regexp = "PENDING|APPROVED|REJECTED|DISABLED|ALL") String status,
+    @Pattern(regexp = "APPROVED|REJECTED|DISABLED|PENDING|ALL") String status,
     @Pattern(regexp = "PAYPAL|USDT") String type,
-    @Size(max = 16) String kolCode) {
+    @Size(max = 16) String kolCode,
+    @Min(1) Long kolId) {
   public PayoutAccountQuery {
     page = page == null ? 1 : page;
     size = size == null ? 20 : size;
-    status = status == null ? "PENDING" : status;
   }
 
   PayoutAccountService.Filter toFilter() {
     return new PayoutAccountService.Filter(
-        "ALL".equals(status) ? null : status, type, kolCode, page, size);
+        status == null || "ALL".equals(status) ? null : status, type, kolCode, kolId, page, size);
   }
 }

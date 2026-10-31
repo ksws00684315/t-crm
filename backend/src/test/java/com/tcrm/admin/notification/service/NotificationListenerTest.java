@@ -7,7 +7,6 @@ import static org.mockito.Mockito.mock;
 
 import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.order.api.OrderSyncFailedEvent;
 import com.tcrm.admin.system.api.DeparturePlanExecutedEvent;
 import com.tcrm.admin.system.api.DeparturePlanSubmittedEvent;
@@ -25,12 +24,7 @@ class NotificationListenerTest {
   void shouldSwallowAWriteFailure() {
     doThrow(new IllegalStateException("database"))
         .when(notifications)
-        .record(org.mockito.ArgumentMatchers.any(PayoutAccountSubmittedEvent.class));
-    assertThatCode(
-            () ->
-                listener.onPayoutAccountSubmitted(
-                    new PayoutAccountSubmittedEvent(1L, 2L, 3L, "KOL0002", "PAYPAL")))
-        .doesNotThrowAnyException();
+        .record(org.mockito.ArgumentMatchers.any(OrderSyncFailedEvent.class));
     assertThatCode(() -> listener.onOrderSyncFailed(new OrderSyncFailedEvent(1L, 9L, "Shop")))
         .doesNotThrowAnyException();
     assertThatCode(
@@ -72,6 +66,6 @@ class NotificationListenerTest {
       listeners++;
       assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
-    assertThat(listeners).isEqualTo(6);
+    assertThat(listeners).isEqualTo(5);
   }
 }

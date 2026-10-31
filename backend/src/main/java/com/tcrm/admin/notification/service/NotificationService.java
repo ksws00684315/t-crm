@@ -8,7 +8,6 @@ import com.tcrm.admin.kol.api.BdTransferCancelledEvent;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.api.KolsUnassignedEvent;
-import com.tcrm.admin.notification.api.PayoutAccountSubmittedEvent;
 import com.tcrm.admin.notification.api.PrepayNotification;
 import com.tcrm.admin.notification.api.PrepayNotificationApi;
 import com.tcrm.admin.notification.api.WithdrawalNotification;
@@ -45,7 +44,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class NotificationService implements PrepayNotificationApi, WithdrawalNotificationApi {
-  static final String BIZ_PAYOUT_ACCOUNT = "PAYOUT_ACCOUNT";
   static final String BIZ_SHOP = "SHOP";
   static final String BIZ_BD_TRANSFER = "BD_TRANSFER";
   static final String BIZ_STAFF = "STAFF";
@@ -211,30 +209,6 @@ public class NotificationService implements PrepayNotificationApi, WithdrawalNot
                     row.setCreateTime(created);
                     notifications.insertWithdrawalEvent(row);
                   }
-                }));
-  }
-
-  public void record(PayoutAccountSubmittedEvent event) {
-    tx.executeWithoutResult(
-        status ->
-            TenantScope.runCompany(
-                event.tenantId(),
-                () -> {
-                  KolRefDTO kol = kolRef(event.kolId());
-                  write(
-                      kol == null ? null : kol.bdUserId(),
-                      NotificationType.PAYOUT_ACCOUNT_SUBMITTED,
-                      new NotificationParamsDTO(
-                          event.kolCode(),
-                          kol == null ? null : kol.name(),
-                          event.accountType(),
-                          null,
-                          null,
-                          null,
-                          null,
-                          null),
-                      BIZ_PAYOUT_ACCOUNT,
-                      event.accountId());
                 }));
   }
 

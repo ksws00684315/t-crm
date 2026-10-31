@@ -79,10 +79,11 @@ export function notificationHref(item: NotificationView): string {
     case "WITHDRAWAL_APPROVED":
     case "WITHDRAWAL_REJECTED":
     case "WITHDRAWAL_PAID":
-      // withdrawalId opens the task drawer; `id` stays the payout-account jump below.
+      // withdrawalId opens the task drawer.
       return `/fund/payouts?withdrawalId=${encodeURIComponent(item.bizId ?? "")}`;
     case "PAYOUT_ACCOUNT_SUBMITTED":
-      return `/fund/payouts?id=${encodeURIComponent(item.bizId ?? "")}`;
+      // Accounts are no longer reviewed (task 82); the creator list holds the fund dialog.
+      return "/kol/kols";
     case "ORDER_SYNC_FAILED":
       return "/order/orders";
     case "BD_TRANSFER_CANCELLED":
@@ -120,7 +121,7 @@ export function canOpenNotification(type: string, access: AccessProfile): boolea
       // jump has no target (PR #142 review).
       return !access.isPlatformAdmin && access.can("commission:view");
     case "PAYOUT_ACCOUNT_SUBMITTED":
-      return access.can("payout-account:review") || access.can("commission:view");
+      return access.can("kol:view");
     case "ORDER_SYNC_FAILED":
       return access.can("order:view");
     case "BD_TRANSFER_CANCELLED":

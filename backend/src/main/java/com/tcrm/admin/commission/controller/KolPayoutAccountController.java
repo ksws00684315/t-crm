@@ -74,7 +74,7 @@ public class KolPayoutAccountController {
         KolPayoutAccountVO.from(accounts.create(kol.id(), r.toCommand(), audit(kol, request))));
   }
 
-  /** Edits a PENDING or REJECTED account and resubmits it; APPROVED ones are locked. */
+  /** Edits an account that is not disabled; the change takes effect at once (task 82). */
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @PutMapping("/kol-api/payout-accounts/{id}")
   public R<KolPayoutAccountVO> edit(

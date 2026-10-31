@@ -240,10 +240,10 @@ describe("installGuard with the real route table", () => {
       // The chain page opens in its own tab from the order list (task 40 §4).
       ["orders/:id/chain", "order:view", false]
     ]);
-    // The fund pages accept either a review role or general commission visibility.
+    // Payouts need commission visibility alone (task 82); prepays also accept the prepay roles.
     const fund = layout?.children?.find(route => route.path === "fund");
     expect(fund?.children?.map(route => route.meta?.permission ?? null)).toEqual([
-      ["payout-account:review", "commission:view"],
+      ["commission:view"],
       ["commission:view", "prepay:review", "prepay:finance-review", "prepay:pay"],
       "commission:view",
       "commission:view"

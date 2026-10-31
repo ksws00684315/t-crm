@@ -260,8 +260,7 @@ export const routes: RouteRecordRaw[] = [
             component: () => import("@/views/fund/payout/index.vue"),
             meta: {
               title: "route.payouts",
-              // Either code opens the page; the review drawer itself needs payout-account:review.
-              permission: ["payout-account:review", "commission:view"],
+              permission: ["commission:view"],
               componentName: "FundPayoutPage"
             }
           },

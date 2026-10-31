@@ -17,9 +17,6 @@ import CopyTokenCreateDialog from "@/views/product/copy-token/CopyTokenCreateDia
 import PromoSheetUploadDialog from "./PromoSheetUploadDialog.vue";
 import { formatRate } from "@/utils/rate";
 import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
-import PrepayApplyDialog from "@/views/fund/prepay/ApplyDialog.vue";
-import { prepayAbilities } from "@/utils/prepay";
-import { accessOf } from "@/utils/permission";
 
 defineOptions({ name: "KolDetailDrawer" });
 
@@ -40,14 +37,6 @@ const inviting = ref(false);
 const detail = ref<KolDetailVO | null>(null);
 const copyTokenVisible = ref(false);
 const promoSheetVisible = ref(false);
-const prepayVisible = ref(false);
-const canApplyPrepay = computed(
-  () =>
-    !!detail.value &&
-    prepayAbilities(me.user).apply &&
-    (!accessOf(me.user).isOwnScope || detail.value.bdUserId === me.user?.id)
-);
-
 const promoSheetButton = computed(() => {
   const kol = detail.value;
   return !!kol && kolAbilities(me.user).canWrite;
@@ -148,10 +137,6 @@ const historyColumns = computed<DataColumn[]>(() => [
   >
     <div ref="detailRegion" v-loading="loading">
       <template v-if="detail">
-        <el-button v-if="canApplyPrepay" data-test="detail-prepay" @click="prepayVisible = true">{{
-          t("kol.actionPrepay")
-        }}</el-button>
-        <PrepayApplyDialog v-model="prepayVisible" :kol="detail" />
         <el-descriptions :column="detailColumns" border>
           <el-descriptions-item :label="t('kol.code')" :span="detailColumns">
             <NameCode :name="detail.name" :code="detail.kolCode"

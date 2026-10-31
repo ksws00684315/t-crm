@@ -46,11 +46,6 @@ function openEdit(account: PayoutAccountVO) {
   dialogVisible.value = true;
 }
 
-/** Only PENDING and REJECTED accounts may be edited again (task 15b §4.1.4). */
-function canEdit(account: PayoutAccountVO): boolean {
-  return account.status === "PENDING" || account.status === "REJECTED";
-}
-
 /** Only an APPROVED account that is not already the default can become the default. */
 function canSetDefault(account: PayoutAccountVO): boolean {
   return account.status === "APPROVED" && !account.defaultAccount;
@@ -123,10 +118,6 @@ function closeQrView(): void {
   qrViewUrl.value = null;
 }
 
-function statusText(status: PayoutAccountVO["status"]): string {
-  return t(`payoutAccounts.status.${status}`);
-}
-
 function typeText(account: PayoutAccountVO): string {
   if (account.accountType === "USDT")
     return t("payoutAccounts.type.USDT") + " · " + t(`payoutAccounts.network.${account.network}`);
@@ -156,10 +147,10 @@ function onSaved() {
   void load();
 }
 
-/** The account was approved by someone else while being edited: close, explain, refresh. */
+/** The account was disabled by someone else while being edited (404): close, explain, refresh. */
 function onConflict() {
   dialogVisible.value = false;
-  ElMessage.warning(translate("errors.PAYOUT_ACCOUNT_LOCKED"));
+  ElMessage.warning(t("payoutAccounts.disabled"));
   void load();
 }
 
@@ -204,19 +195,6 @@ load();
         <div class="payout__card-head">
           <span class="payout__type" data-test="type">{{ typeText(account) }}</span>
           <span class="payout__tags">
-            <el-tag
-              size="small"
-              :type="
-                account.status === 'APPROVED'
-                  ? 'success'
-                  : account.status === 'REJECTED'
-                    ? 'danger'
-                    : 'warning'
-              "
-              data-test="status"
-            >
-              {{ statusText(account.status) }}
-            </el-tag>
             <el-tag v-if="account.defaultAccount" size="small" data-test="default-tag">
               {{ t("payoutAccounts.defaultTag") }}
             </el-tag>
@@ -245,16 +223,6 @@ load();
           <dd>{{ formatTime(account.lastSubmittedAt) }}</dd>
         </dl>
 
-        <el-alert
-          v-if="account.status === 'REJECTED' && account.rejectReason"
-          class="payout__reject"
-          type="error"
-          :closable="false"
-          :title="t('payoutAccounts.rejectReason')"
-          :description="account.rejectReason"
-          data-test="reject-reason"
-        />
-
         <div class="payout__actions">
           <el-button
             v-if="account.qrFileId"
@@ -266,13 +234,7 @@ load();
           >
             {{ t("payoutAccounts.viewQr") }}
           </el-button>
-          <el-button
-            v-if="canEdit(account)"
-            link
-            type="primary"
-            data-test="edit"
-            @click="openEdit(account)"
-          >
+          <el-button link type="primary" data-test="edit" @click="openEdit(account)">
             {{ t("common.edit") }}
           </el-button>
           <el-button
@@ -388,9 +350,6 @@ load();
 .payout__account-value {
   overflow-wrap: anywhere;
   font-family: var(--tcrm-font-sans);
-}
-.payout__reject {
-  margin-top: var(--tcrm-space-3);
 }
 .payout__actions {
   display: flex;

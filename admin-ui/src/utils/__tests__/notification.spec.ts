@@ -74,7 +74,7 @@ describe("notification text", () => {
         params: {},
         bizId: "77"
       })
-    ).toBe("/fund/payouts?id=77");
+    ).toBe("/kol/kols");
     expect(notificationHref({ type: "ORDER_SYNC_FAILED", params: {}, bizId: null })).toBe(
       "/order/orders"
     );
@@ -88,7 +88,14 @@ describe("notification text", () => {
     expect(canOpenNotification("KOLS_UNASSIGNED", accessOf(staff))).toBe(true);
     expect(canOpenNotification("ORDER_SYNC_FAILED", accessOf(staff))).toBe(false);
     expect(canOpenNotification("BD_TRANSFER_CANCELLED", accessOf(superAdmin))).toBe(true);
-    expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(staff))).toBe(false);
+    // Accounts are no longer reviewed (task 82): the creator list is the target, so kol:view opens it.
+    expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(staff))).toBe(true);
+    expect(
+      canOpenNotification(
+        "PAYOUT_ACCOUNT_SUBMITTED",
+        accessOf({ ...staff, permissions: ["payout-account:review"] })
+      )
+    ).toBe(false);
     expect(canOpenNotification("PAYOUT_ACCOUNT_SUBMITTED", accessOf(superAdmin))).toBe(true);
   });
 });
