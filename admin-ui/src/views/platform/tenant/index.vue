@@ -32,10 +32,17 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "tenantCode", label: t("tenant.code"), minWidth: 150 },
-  { key: "name", label: t("tenant.name"), prop: "name", minWidth: 160 },
+  { key: "tenantCode", align: "left" as const, label: t("tenant.code"), minWidth: 150 },
+  { key: "name", align: "left" as const, label: t("tenant.name"), prop: "name", minWidth: 160 },
   { key: "status", label: t("common.status"), width: 100 },
-  { key: "remark", label: t("common.remark"), prop: "remark", minWidth: 200, tooltip: true },
+  {
+    key: "remark",
+    align: "left" as const,
+    label: t("common.remark"),
+    prop: "remark",
+    minWidth: 200,
+    tooltip: true
+  },
   { key: "createdAt", label: t("common.createdAt"), width: 180 },
   // Edit / Admins / Disable via RowActions (R-10): zh canvas 84 / en 180 + gaps, padding, headroom.
   { key: "actions", label: t("common.actions"), width: px(128, 184) }

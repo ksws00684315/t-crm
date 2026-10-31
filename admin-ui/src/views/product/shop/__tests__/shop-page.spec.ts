@@ -107,6 +107,41 @@ describe("shop list buttons", () => {
     admin.unmount();
   });
 
+  it("combines the external shop ID with its name and places capacity after the pool even with old saved columns", async () => {
+    signIn("SUPER_ADMIN", []);
+    localStorage.setItem(
+      "tcrm.admin.table.shops",
+      JSON.stringify({
+        v: 1,
+        density: "small",
+        pageSize: 20,
+        columns: [
+          "shopCode",
+          "shopName",
+          "channel",
+          "source",
+          "copyPool",
+          "weidianShopId",
+          "authStatus",
+          "authExpiresAt",
+          "apiStatus",
+          "capacity",
+          "status",
+          "actions"
+        ].map(key => ({ key, visible: true }))
+      })
+    );
+    const wrapper = await mountPage();
+    const labels = wrapper.findAll("thead th").map(item => item.text());
+    expect(labels).toContain("店铺名称/店铺ID");
+    expect(labels).not.toContain("微店店铺标识");
+    expect(labels.indexOf("商品容量")).toBe(labels.indexOf("自动复制池") + 1);
+    expect(wrapper.find('[data-test="identity-name"]').text()).toBe("旗舰店");
+    expect(wrapper.find('[data-test="identity-code"]').text()).toBe("100");
+    expect(wrapper.find(".data-table").classes()).toContain("density-small");
+    wrapper.unmount();
+  });
+
   it("keeps order sync visible to staff while hiding shop maintenance", async () => {
     signIn("STAFF", ["product:view", "product:edit", "product:status", "order:manage"]);
     const staff = await mountPage();

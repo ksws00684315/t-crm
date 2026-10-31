@@ -595,6 +595,7 @@ const enUS: MessageSchema = {
     subtitle: "Page not found"
   },
   user: {
+    editInfo: "Edit information",
     create: "Create User",
     editTitle: "Edit User",
     createTitle: "Create User",
@@ -1135,6 +1136,7 @@ const enUS: MessageSchema = {
     }
   },
   shop: {
+    nameAndId: "Shop name / Shop ID",
     code: "Shop Code",
     channel: "Channel",
     channelWeidian: "Weidian",
@@ -1293,6 +1295,8 @@ const enUS: MessageSchema = {
     view: "View",
     open: "Open",
     product: "Product",
+    detailProductName: "Product Name",
+    detailProductImage: "Product Image",
     detailTitle: "Item Link Detail",
     sourceItemUrl: "Source Link",
     visitCount: "Visits",
@@ -1351,6 +1355,7 @@ const enUS: MessageSchema = {
     }
   },
   order: {
+    drawerProduct: "Product",
     shop: "Shop",
     orderId: "Order ID",
     channel: "Channel",
@@ -1369,6 +1374,9 @@ const enUS: MessageSchema = {
     kolCode: "Creator code",
     kolKeyword: "Creator code or name",
     orderTime: "Order time",
+    itemImageDeveloping: "Order item image data awaits API support",
+    productInfo: "Product information",
+    actualPaidAmount: "Paid amount",
     itemImageMissing: "No image",
     listStatus: {
       UNPAID: "Awaiting payment",
@@ -1507,14 +1515,22 @@ const enUS: MessageSchema = {
       lineRefund: "Refund"
     },
     chain: {
+      summaryProduct: "Product name",
+      summaryKol: "Creator",
+      summaryRate: "Commission rate",
+      summaryCommission: "Creator commission",
+      orderNode: "Order",
+      financeNode: "Financial flows",
+      notLinked: "Not linked",
+      linkCreated: "Created",
+      mixedStates: "Mixed statuses",
+      wiringDetails: "Chain details (tasks, links, refunds and withdrawals)",
+      recordCount: "{count} records",
       fundsSection: "Funds",
       orderInfoSection: "Order information",
       financeLedgerSection: "Financial ledger",
       loadFailed: "Unable to load the order chain. Please try again.",
       kolCommission: "Net creator commission",
-      shopProfit: "Shop profit",
-      shopProfitFormula:
-        "Weidian settlement net amount minus net creator commission; product cost is excluded.",
       financeLedgerNote:
         "Shop receivable flows depend on the Weidian settlement net and withdrawable time (pending M0 verification); unverified amounts show as needs verification, never as zero.",
       financeType: "Type",
@@ -1541,6 +1557,8 @@ const enUS: MessageSchema = {
       withdrawalOccupation: "Withdrawal holds",
       noWithdrawal: "No withdrawal hold",
       noFlows: "No finance flows",
+      incompleteFlows:
+        "Financial flow data is incomplete and cannot be displayed. Please contact an administrator.",
       noCommissionPermission: "This account cannot view commission data",
       copyJob: "Product copy job",
       copyJobTime: "Created at",
@@ -1699,6 +1717,16 @@ const enUS: MessageSchema = {
     rejected: "Rejected."
   },
   postTemplate: {
+    accessLevel: "Access",
+    hidden: "Hidden",
+    readOnly: "Read only",
+    manage: "Manage",
+    finePermissions: "Individual permissions",
+    unifiedScopeNote: "Applies to the current post template.",
+    configurablePermissions: "Configurable Permissions",
+    moduleAll: "Select Module",
+    selectedCount: "{selected} / {total} selected",
+    selectModule: "Select all {module} permissions",
     title: "Permissions",
     hint: "Only affects accounts created afterwards; existing accounts are not changed.",
     cardTitle: "{post} post template",
@@ -1717,6 +1745,8 @@ const enUS: MessageSchema = {
   },
   importTask: {
     title: "Uploads",
+    upload: "Upload file",
+    chooseType: "Choose import type",
     fileName: "File name",
     type: "Type",
     status: "Status",

@@ -20,9 +20,7 @@ public record OrderChainDTO(
     List<FlowDTO> financeFlows) {
 
   /**
-   * Order-level funds (B07). {@code shopProfit} is the Weidian settlement net minus the net creator
-   * commission; the net waits for M0 (Q-1017-1/2), so it stays null (待核实) instead of being faked
-   * from the buyer payment.
+   * Order-level funds (B07). The shop-profit field is gone (task 81, L-024): it is not displayed.
    *
    * @param refundTotal successful refunds deduplicated by refund id, so one refund spanning several
    *     lines never counts twice
@@ -34,7 +32,6 @@ public record OrderChainDTO(
       BigDecimal payAmount,
       BigDecimal refundTotal,
       BigDecimal kolCommission,
-      BigDecimal shopProfit,
       String accountStatus) {}
 
   /** One order line with its chain links. */
@@ -56,7 +53,6 @@ public record OrderChainDTO(
    *     never accrued — never recomputed from the creator's current rate
    * @param netCommission accumulated net commission; null while the line is unverified or has no
    *     snapshot (unknown, distinct from a real zero)
-   * @param shopProfit always null until the M0 hookup
    * @param releaseBasis CONFIRMED / FALLBACK / UNSETTLED / AFTER_SALES / UNVERIFIED; null when the
    *     line has no snapshot
    * @param occupiedTotal occupation total of PENDING_REVIEW / PENDING_PAYMENT / PAID applications;
@@ -67,7 +63,6 @@ public record OrderChainDTO(
   record LineCommissionDTO(
       BigDecimal rateSnapshot,
       BigDecimal netCommission,
-      BigDecimal shopProfit,
       String releaseBasis,
       BigDecimal occupiedTotal,
       List<LineWithdrawalDTO> withdrawals) {}

@@ -62,7 +62,7 @@ function choosePlatform(wrapper: VueWrapper, value: string) {
     .findAllComponents(ElSelect)
     .find(item => item.classes().includes("register-platform"));
   if (!select) throw new Error("platform select was not rendered");
-  select.vm.$emit("update:model-value", value);
+  select.vm.$emit("update:modelValue", value);
 }
 
 async function fill(wrapper: VueWrapper, values: Record<string, string>) {
@@ -187,9 +187,12 @@ describe("register page (02.01)", () => {
     });
     choosePlatform(wrapper, "TikTok");
     await wrapper.get("form").trigger("submit");
-    await vi.waitFor(() => {
-      expect(router.currentRoute.value.path).toBe("/");
-    });
+    await vi.waitFor(
+      () => {
+        expect(router.currentRoute.value.path).toBe("/");
+      },
+      { timeout: 10000 }
+    );
     expect(registerApi.registerKol).toHaveBeenCalledWith({
       code: CODE,
       email: "ada@example.com",

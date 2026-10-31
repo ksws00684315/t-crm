@@ -575,6 +575,7 @@ const zhCN = {
     subtitle: "页面不存在"
   },
   user: {
+    editInfo: "编辑信息",
     create: "新增用户",
     editTitle: "编辑用户",
     createTitle: "新增用户",
@@ -1104,6 +1105,7 @@ const zhCN = {
     }
   },
   shop: {
+    nameAndId: "店铺名称/店铺ID",
     code: "店铺编码",
     channel: "渠道",
     channelWeidian: "微店",
@@ -1260,6 +1262,8 @@ const zhCN = {
     view: "查看",
     open: "打开",
     product: "商品",
+    detailProductName: "商品名称",
+    detailProductImage: "商品主图",
     detailTitle: "商品链接详情",
     sourceItemUrl: "来源链接",
     visitCount: "访问次数",
@@ -1318,6 +1322,7 @@ const zhCN = {
     }
   },
   order: {
+    drawerProduct: "商品",
     shop: "店铺",
     orderId: "订单号",
     channel: "渠道",
@@ -1336,6 +1341,9 @@ const zhCN = {
     kolCode: "达人编号",
     kolKeyword: "达人编号/姓名",
     orderTime: "下单时间",
+    itemImageDeveloping: "订单列表商品图片字段待接口支持",
+    productInfo: "商品信息",
+    actualPaidAmount: "实付金额",
     itemImageMissing: "暂无图片",
     listStatus: {
       UNPAID: "待付款",
@@ -1473,13 +1481,22 @@ const zhCN = {
       lineRefund: "退款金额"
     },
     chain: {
+      summaryProduct: "商品名",
+      summaryKol: "所属达人",
+      summaryRate: "佣金比例",
+      summaryCommission: "达人佣金",
+      orderNode: "订单",
+      financeNode: "账务流水",
+      notLinked: "未关联",
+      linkCreated: "已生成",
+      mixedStates: "多种状态",
+      wiringDetails: "链路明细（任务、链接、退款与提现）",
+      recordCount: "{count} 条",
       fundsSection: "资金信息",
       orderInfoSection: "订单信息",
       financeLedgerSection: "财务流水",
       loadFailed: "订单链路加载失败，请重试",
       kolCommission: "净达人佣金",
-      shopProfit: "店铺获利",
-      shopProfitFormula: "微店结算净额－净达人佣金，不扣商品成本。",
       financeLedgerNote:
         "店铺应收流水依赖微店结算净额与可提现时间，待 M0 核实后接入；未核实金额显示待核实，不以 0 展示。",
       financeType: "类型",
@@ -1506,6 +1523,7 @@ const zhCN = {
       withdrawalOccupation: "提现占用",
       noWithdrawal: "无提现占用",
       noFlows: "暂无财务流水",
+      incompleteFlows: "财务流水数据不完整，暂无法展示，请联系管理员。",
       noCommissionPermission: "当前账号无佣金查看权限",
       copyJob: "商品创建任务",
       copyJobTime: "创建时间",
@@ -1657,6 +1675,16 @@ const zhCN = {
     rejected: "已驳回。"
   },
   postTemplate: {
+    accessLevel: "权限",
+    hidden: "隐藏",
+    readOnly: "只读",
+    manage: "管理",
+    finePermissions: "精细权限",
+    unifiedScopeNote: "统一适用于当前岗位模板",
+    configurablePermissions: "可配置权限",
+    moduleAll: "模块全选",
+    selectedCount: "已选 {selected} / {total} 项",
+    selectModule: "全选{module}权限",
     title: "权限设置",
     hint: "只影响之后新建的账号，不会修改已有账号的权限。",
     cardTitle: "{post}岗位模板",
@@ -1675,6 +1703,8 @@ const zhCN = {
   },
   importTask: {
     title: "上传文件",
+    upload: "上传文件",
+    chooseType: "选择导入类型",
     fileName: "文件名",
     type: "类型",
     status: "状态",

@@ -3,6 +3,7 @@ import { Download, FullScreen, Refresh, ScaleToOriginal, Setting } from "@elemen
 import type { TableInstance, TableProps } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import AccessibleCell from "@/components/AccessibleCell.vue";
 import {
   PAGE_SIZES,
   applyDefaultHidden,
@@ -25,6 +26,10 @@ export interface DataColumn {
   width?: number | string;
   minWidth?: number | string;
   amount?: boolean;
+  /** Long content is left aligned; short content is centered by default. */
+  align?: "left" | "center";
+  /** Form controls supply their own focus handling and per-control descriptions. */
+  interactive?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
@@ -46,6 +51,8 @@ const props = withDefaults(
     rowKey?: string;
     /** Drawers and dialogs keep the table rules without the list toolbar. */
     plain?: boolean;
+    /** Fill the remaining page space; body scrolls and the pager stays at the card bottom. */
+    fillAvailableHeight?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
     exportable?: boolean;
     exporting?: boolean;
@@ -70,6 +77,8 @@ const props = withDefaults(
     ) => ReturnType<NonNullable<TableProps<object>["spanMethod"]>>;
     /** Grouped rows cannot merge correctly across Element Plus fixed-column clones. */
     fixedColumns?: boolean;
+    /** Preserve the independently approved order-list presentation from PR #138. */
+    legacyOrderStyle?: boolean;
   }>(),
   {
     loading: false,
@@ -79,13 +88,15 @@ const props = withDefaults(
     filterCount: 0,
     rowKey: "id",
     plain: false,
+    fillAvailableHeight: false,
     exportable: false,
     exporting: false,
     selectable: false,
     selectableRow: undefined,
     expandable: false,
     defaultExpandAll: false,
-    fixedColumns: true
+    fixedColumns: true,
+    legacyOrderStyle: false
   }
 );
 
@@ -139,14 +150,17 @@ const fullscreen = ref(false);
  * generated preview, where the pager sits directly under the last row). The page still owns a
  * definite height, so the table gets a measured ceiling instead of the old `height: 100%`:
  * short pages shrink, long pages scroll inside the body and keep the pager on screen.
+ * The opt-in fill mode instead uses flex space and preserves a readable minimum on short screens.
  */
 const rootEl = ref<HTMLElement | null>(null);
 const tableMaxHeight = ref<number | null>(null);
+const fillMinimumHeight = ref<number | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
 function measureHeights(): void {
   if (props.plain) {
+    fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
     return;
   }
@@ -178,6 +192,26 @@ function measureHeights(): void {
     parseFloat(style.borderBottomWidth || "0");
   const gapCount = (toolbar ? 1 : 0) + (pager ? 1 : 0);
   const gap = parseFloat(style.rowGap || "0") || 0;
+  if (props.fillAvailableHeight) {
+    const table = tableRef.value?.$el as HTMLElement | undefined;
+    const headerHeight =
+      table?.querySelector<HTMLElement>(".el-table__header-wrapper")?.offsetHeight ?? 0;
+    // Grouped orders need the order band plus its first product; ordinary lists need one row.
+    const firstRows = [
+      ...(table?.querySelectorAll<HTMLElement>(".el-table__body > tbody > tr") ?? [])
+    ].slice(0, props.spanMethod ? 2 : 1);
+    const minimumBody = Math.max(
+      160,
+      firstRows.reduce((sum, row) => sum + row.offsetHeight, 0)
+    );
+    // If filters consume the viewport, let the outer page scroll instead of hiding all details.
+    fillMinimumHeight.value = Math.ceil(
+      toolbar + pager + frameHeight + gap * gapCount + headerHeight + minimumBody
+    );
+    tableMaxHeight.value = null;
+    return;
+  }
+  fillMinimumHeight.value = null;
   const ceiling =
     pageHeight -
     hostPadding -
@@ -228,7 +262,9 @@ onMounted(async () => {
   if (host && typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(scheduleMeasure);
     resizeObserver.observe(host);
-    resizeObserver.observe(rootEl.value as HTMLElement);
+    // Filter panels can resize while the page and capped table keep their size.
+    // Observe their boxes too so collapsing filters restores the available table height.
+    for (const child of host.children) resizeObserver.observe(child);
   }
   window.addEventListener("resize", scheduleMeasure);
 });
@@ -240,7 +276,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", scheduleMeasure);
 });
 
-watch(() => [props.rows, props.plain, props.paged, props.exportable], scheduleMeasure);
+watch(
+  () => [props.rows, props.plain, props.fillAvailableHeight, props.paged, props.exportable],
+  scheduleMeasure
+);
 watch(fullscreen, scheduleMeasure);
 
 const locked = computed(() => {
@@ -387,9 +426,25 @@ function canMove(index: number, delta: -1 | 1): boolean {
   <section
     ref="rootEl"
     class="data-table"
-    :class="[{ 'is-fullscreen': fullscreen, 'is-plain': plain }, `density-${prefs.density}`]"
+    :style="
+      fillAvailableHeight && !plain && fillMinimumHeight
+        ? { minHeight: `${fillMinimumHeight}px` }
+        : undefined
+    "
+    :class="[
+      {
+        'is-fullscreen': fullscreen,
+        'is-plain': plain,
+        'is-fill': fillAvailableHeight && !plain,
+        'is-legacy-order': legacyOrderStyle
+      },
+      `density-${prefs.density}`
+    ]"
   >
     <header v-if="!plain" class="data-table__toolbar">
+      <div v-if="$slots.title" class="data-table__page-title">
+        <slot name="title" />
+      </div>
       <div v-if="selectable && selected.length" class="data-table__batch" data-test="batch-bar">
         <span class="data-table__batch-count">{{
           t("table.selected", { n: selected.length })
@@ -489,9 +544,10 @@ function canMove(index: number, delta: -1 | 1): boolean {
         :row-class-name="rowClassName"
         :span-method="spanMethod ? resolveSpanMethod : undefined"
         size="default"
-        :max-height="plain ? undefined : (tableMaxHeight ?? undefined)"
+        :height="fillAvailableHeight && !plain ? '100%' : undefined"
+        :max-height="plain || fillAvailableHeight ? undefined : (tableMaxHeight ?? undefined)"
         :default-expand-all="defaultExpandAll"
-        stripe
+        :stripe="legacyOrderStyle"
         @selection-change="onSelection"
       >
         <el-table-column
@@ -511,6 +567,8 @@ function canMove(index: number, delta: -1 | 1): boolean {
           width="44"
           fixed="left"
           :selectable="canSelect"
+          align="center"
+          header-align="center"
         />
         <el-table-column
           v-for="column in visibleColumns"
@@ -529,14 +587,26 @@ function canMove(index: number, delta: -1 | 1): boolean {
                   : undefined
               : undefined
           "
-          :align="column.amount ? 'right' : undefined"
-          :show-overflow-tooltip="column.tooltip"
+          :align="
+            column.align ?? (legacyOrderStyle ? (column.amount ? 'right' : undefined) : 'center')
+          "
+          :header-align="column.align ?? (legacyOrderStyle ? undefined : 'center')"
+          :show-overflow-tooltip="
+            legacyOrderStyle ? column.tooltip : (column.tooltip ?? column.align === 'left')
+          "
           :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
             </template>
+            <AccessibleCell
+              v-else-if="!legacyOrderStyle && column.align === 'left' && !column.interactive"
+            >
+              <slot :name="`cell-${column.key}`" :row="row">
+                {{ cellText(row, column) }}
+              </slot>
+            </AccessibleCell>
             <template v-else>
               <slot :name="`cell-${column.key}`" :row="row">
                 {{ cellText(row, column) }}
@@ -580,10 +650,29 @@ function canMove(index: number, delta: -1 | 1): boolean {
   min-height: 0;
   max-height: 100%;
   height: auto;
-  padding: var(--tcrm-space-3);
+  padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.data-table.is-fill {
+  flex: 1 1 0;
+}
+.data-table.is-fill > .data-table__body {
+  flex: 1 1 0;
+}
+.data-table.is-legacy-order {
+  padding: var(--tcrm-space-3);
+}
+@media (min-width: 1440px) and (min-height: 900px) {
+  .data-table:not(.is-plain):not(.is-legacy-order) {
+    padding: var(--tcrm-space-5);
+  }
+}
+@media (max-width: 767px) {
+  .data-table:not(.is-plain):not(.is-legacy-order) {
+    padding: var(--tcrm-space-3);
+  }
 }
 .data-table__batch {
   display: flex;
@@ -627,6 +716,16 @@ function canMove(index: number, delta: -1 | 1): boolean {
   gap: var(--tcrm-space-2);
   flex-shrink: 0;
 }
+.data-table__toolbar {
+  flex-wrap: wrap;
+}
+.data-table__page-title {
+  min-width: 0;
+}
+.data-table__page-title :deep(h1),
+.data-table__page-title :deep(p) {
+  margin: 0;
+}
 .data-table__tools {
   display: flex;
   align-items: center;
@@ -650,12 +749,35 @@ function canMove(index: number, delta: -1 | 1): boolean {
   padding: var(--tcrm-space-4) 0;
   color: var(--tcrm-color-text-secondary);
 }
+.data-table:not(.is-legacy-order) :deep(.el-table) {
+  --el-table-text-color: var(--tcrm-color-table-text);
+  --el-table-header-text-color: var(--tcrm-color-table-text);
+  --el-table-border-color: var(--tcrm-color-table-border);
+}
+.data-table:not(.is-legacy-order) :deep(.el-table .el-tag) {
+  height: var(--tcrm-line-height-table);
+  padding-block: 0;
+  vertical-align: top;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table td.is-left .name-code) {
+  align-items: flex-start;
+  text-align: left;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table td.is-left .name-code__name .el-button) {
+  text-align: left;
+}
 .data-table :deep(.el-table__header th) {
-  background: var(--tcrm-color-muted);
+  background: var(--tcrm-color-table-header);
 }
 .data-table :deep(.el-table th.el-table__cell) {
   height: var(--tcrm-table-header-height);
   padding-block: 0;
+}
+.data-table.is-legacy-order :deep(.el-table__header th) {
+  background: var(--tcrm-color-muted);
+}
+.data-table.is-legacy-order :deep(.el-table th.el-table__cell) {
+  height: var(--tcrm-table-legacy-header-height);
 }
 /* Overflow must be discoverable: a 1440 desktop shows 9 of the 13 roster columns. Element Plus keeps
    its scrollbar hidden until hover, so the track is forced on and the pinned action column casts a
@@ -673,12 +795,22 @@ function canMove(index: number, delta: -1 | 1): boolean {
   box-shadow: inset 10px 0 8px -8px color-mix(in srgb, var(--tcrm-color-text) 16%, transparent);
 }
 .data-table :deep(.el-table .el-table__cell) {
-  padding-block: var(--tcrm-space-3);
+  padding-block: var(--tcrm-space-4);
+  border-bottom-color: var(--tcrm-color-table-border);
 }
 .data-table.density-small :deep(.el-table .el-table__cell) {
   padding-block: var(--tcrm-space-2);
 }
 .data-table.density-large :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-table-padding-loose);
+}
+.data-table.is-legacy-order :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-space-3);
+}
+.data-table.is-legacy-order.density-small :deep(.el-table .el-table__cell) {
+  padding-block: var(--tcrm-space-2);
+}
+.data-table.is-legacy-order.density-large :deep(.el-table .el-table__cell) {
   padding-block: var(--tcrm-space-4);
 }
 .data-table :deep(.el-table__body tr:hover > td) {
@@ -690,7 +822,15 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table :deep(.el-table .cell .el-button.is-link) {
   height: auto;
   padding: 0;
-  line-height: var(--tcrm-line-height-body);
+  line-height: var(--tcrm-line-height-table);
   vertical-align: baseline;
+}
+.data-table:not(.is-legacy-order) :deep(.el-table .cell .el-button.is-link) {
+  height: var(--tcrm-line-height-table);
+  min-height: var(--tcrm-line-height-table);
+  vertical-align: top;
+}
+.data-table.is-legacy-order :deep(.el-table .cell .el-button.is-link) {
+  line-height: var(--tcrm-line-height-body);
 }
 </style>

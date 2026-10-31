@@ -62,7 +62,7 @@ describe("creator paid prepay projection", () => {
       .findAllComponents({ name: "ElTableColumn" })
       .filter(column => column.props("className") === "tcrm-amount");
     expect(amountColumns).toHaveLength(4);
-    expect(amountColumns.every(column => column.props("align") === "right")).toBe(true);
+    expect(amountColumns.every(column => column.props("align") === "center")).toBe(true);
     wrapper.unmount();
   });
   it("shows the paid amount and negative wallet with no administrative controls", async () => {

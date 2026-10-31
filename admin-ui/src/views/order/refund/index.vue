@@ -64,13 +64,13 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "refundNo", label: t("order.refund.no"), width: 150 },
-  { key: "orderNo", label: t("order.refund.orderNo"), width: 150 },
+  { key: "refundNo", align: "left" as const, label: t("order.refund.no"), width: 150 },
+  { key: "orderNo", align: "left" as const, label: t("order.refund.orderNo"), width: 150 },
   // Owner decision 2026-10-24 (task 59 review): the 08.02 columns all show by default; the table
   // scrolls horizontally inside the card when it overflows (pinned action column, scrollbar on).
   { key: "channel", label: t("order.channel"), width: 80 },
-  { key: "shop", label: t("order.shop"), minWidth: 170 },
-  { key: "kol", label: t("order.kol"), minWidth: 170 },
+  { key: "shop", align: "left" as const, label: t("order.shop"), minWidth: 170 },
+  { key: "kol", align: "left" as const, label: t("order.kol"), minWidth: 170 },
   { key: "refundType", label: t("order.refund.typeColumn"), width: px(100, 130) },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: px(90, 110) },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
@@ -306,6 +306,7 @@ onMounted(() => {
 
     <DataTable
       table-id="order-refunds"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"

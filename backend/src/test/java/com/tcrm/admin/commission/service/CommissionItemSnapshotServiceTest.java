@@ -200,11 +200,135 @@ class CommissionItemSnapshotServiceTest {
   }
 
   @Test
+  void shouldAppendRevisionWhenFingerprintReturnsToEarlierValue() {
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    String first = row.getSourceVersion();
+
+    syncAfterSales(true);
+    syncAfterSales(false);
+    syncAfterSales(false);
+
+    ArgumentCaptor<CommissionItemRevisionDO> appended =
+        ArgumentCaptor.forClass(CommissionItemRevisionDO.class);
+    verify(revisions, times(3)).insert(appended.capture());
+    assertThat(appended.getAllValues())
+        .extracting(CommissionItemRevisionDO::getSourceVersion)
+        .doesNotHaveDuplicates()
+        .endsWith(row.getSourceVersion());
+    assertThat(row.getSourceVersion()).isNotEqualTo(first);
+    assertThat(row.getSourceVersion().substring(0, 32)).isEqualTo(first.substring(0, 32));
+  }
+
+  @Test
+  void shouldUseNewWalletKeyForEveryRepeatedDecrease() {
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    row.setId(7001L);
+    row.setReleasedCommissionCny(new BigDecimal("10.00"));
+
+    syncRefund(new BigDecimal("50.00"));
+    syncRefund(null);
+    row.setReleasedCommissionCny(new BigDecimal("10.00"));
+    syncRefund(new BigDecimal("50.00"));
+    syncRefund(new BigDecimal("50.00"));
+
+    ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+    verify(wallet, times(2))
+        .postCommissionAdjustment(
+            eq(TENANT), eq(KOL_A), eq(7001L), keys.capture(), eq(new BigDecimal("-5.00")), eq(NOW));
+    assertThat(keys.getAllValues()).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void shouldUseNewClawbackKeyWhenOwnershipFlipsBack() {
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    whenRateAtPayTime(KOL_B, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    row.setId(7001L);
+    row.setReleasedCommissionCny(new BigDecimal("10.00"));
+
+    syncOwner(KOL_B);
+    syncOwner(KOL_A);
+    row.setReleasedCommissionCny(new BigDecimal("10.00"));
+    syncOwner(KOL_B);
+
+    ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+    verify(wallet, times(2))
+        .postCommissionAdjustment(
+            eq(TENANT),
+            eq(KOL_A),
+            eq(7001L),
+            keys.capture(),
+            eq(new BigDecimal("-10.00")),
+            eq(NOW));
+    assertThat(keys.getAllValues()).doesNotHaveDuplicates();
+  }
+
+  @Test
+  void shouldNotAppendRevisionWhenAmountOnlyDiffersInScale() {
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    firstRevision(new BigDecimal("100.00"));
+
+    // Order writes hold an unscaled zero, the settlement recompute reads 0.00 from the database.
+    syncRefund(new BigDecimal("0.00"));
+    org.mockito.Mockito.clearInvocations(revisions);
+    syncRefund(BigDecimal.ZERO);
+    syncLine(withRefund(item(9001L, KOL_A, 1, new BigDecimal("100"), null), BigDecimal.ZERO));
+
+    verify(revisions, never()).insert(any(CommissionItemRevisionDO.class));
+  }
+
+  @Test
+  void shouldTreatBareFingerprintOfExistingRowAsCurrentVersion() {
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    // Rows written before task 83 carry the bare fingerprint.
+    row.setSourceVersion(row.getSourceVersion().substring(0, 32));
+    String legacy = row.getSourceVersion();
+    org.mockito.Mockito.clearInvocations(states, revisions);
+
+    syncAfterSales(false);
+    verify(revisions, never()).insert(any(CommissionItemRevisionDO.class));
+
+    syncAfterSales(true);
+    assertThat(row.getSourceVersion()).isNotEqualTo(legacy).endsWith("#1");
+  }
+
+  @Test
   void shouldDeleteStaleRowsDroppedFromSync() {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
     TenantScope.runCompany(
         TENANT, () -> service.syncOrderItems(order(), List.of(item(9001L, KOL_A, 1, null, null))));
     verify(states).deleteStaleByOrder(eq(5001L), eq(List.of(9001L)), eq(NOW));
+  }
+
+  /** Registers line 9001 and makes later syncs of the test find the row it created. */
+  private CommissionItemStateDO firstRevision(BigDecimal basis) {
+    when(states.lockByOrderItemId(9001L)).thenReturn(null);
+    TenantScope.runCompany(
+        TENANT, () -> service.syncOrderItems(order(), List.of(item(9001L, KOL_A, 1, basis, null))));
+    ArgumentCaptor<CommissionItemStateDO> inserted =
+        ArgumentCaptor.forClass(CommissionItemStateDO.class);
+    verify(states).insert(inserted.capture());
+    when(states.lockByOrderItemId(9001L)).thenReturn(inserted.getValue());
+    return inserted.getValue();
+  }
+
+  private void syncAfterSales(boolean afterSales) {
+    syncLine(withAfterSales(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), afterSales));
+  }
+
+  private void syncRefund(BigDecimal refund) {
+    syncLine(withRefund(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), refund));
+  }
+
+  private void syncOwner(long kolId) {
+    syncLine(item(9001L, kolId, 1, new BigDecimal("100.00"), null));
+  }
+
+  private void syncLine(ItemSourceDTO line) {
+    TenantScope.runCompany(TENANT, () -> service.syncOrderItems(order(), List.of(line)));
   }
 
   private void whenRateAtPayTime(long kolId, String rate, int version) {
@@ -248,6 +372,23 @@ class CommissionItemSnapshotServiceTest {
         item.settlementTime(),
         item.completedTime(),
         item.afterSales(),
+        item.basisCheckReason());
+  }
+
+  private static ItemSourceDTO withAfterSales(ItemSourceDTO item, boolean afterSales) {
+    return new ItemSourceDTO(
+        item.orderItemId(),
+        item.subOrderId(),
+        item.kolId(),
+        item.attributionType(),
+        item.productId(),
+        item.basisCny(),
+        item.basisIncludesRefund(),
+        item.successfulRefundCny(),
+        item.settlementState(),
+        item.settlementTime(),
+        item.completedTime(),
+        afterSales,
         item.basisCheckReason());
   }
 

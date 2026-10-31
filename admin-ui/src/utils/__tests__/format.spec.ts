@@ -4,8 +4,19 @@ import {
   formatCodeWithName,
   formatInstant,
   formatInstantToMinute,
-  formatNameWithCode
+  formatNameWithCode,
+  formatAmountWithCurrency
 } from "../format";
+
+describe("formatAmountWithCurrency", () => {
+  it("keeps the backend precision and distinguishes zero from missing money", () => {
+    expect(formatAmountWithCurrency("50.00")).toBe("50.00 CNY");
+    expect(formatAmountWithCurrency("0.00")).toBe("0.00 CNY");
+    expect(formatAmountWithCurrency("-1234567890123456.7890")).toBe("-1234567890123456.7890 CNY");
+    expect(formatAmountWithCurrency("1.25", "USD")).toBe("1.25 USD");
+    expect(formatAmountWithCurrency(null)).toBe("-");
+  });
+});
 
 describe("formatInstant", () => {
   afterEach(() => {

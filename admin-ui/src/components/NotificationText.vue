@@ -20,6 +20,7 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
 <template>
   <i18n-t
     :keypath="`notification.type.${item.type}`"
+    scope="global"
     tag="span"
     class="notification-text"
     data-test="notification-text"
@@ -47,6 +48,11 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
 </template>
 
 <style scoped>
+.notification-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .notification-text__kol {
   display: inline-flex;
   width: auto;

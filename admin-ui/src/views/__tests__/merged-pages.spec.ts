@@ -13,7 +13,10 @@ import ShopManagementPage from "@/views/product/shop-management/index.vue";
 
 vi.mock("@/api/product/shop", () => ({ listShops: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/product/product", () => ({
-  listProducts: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 })
+  listProducts: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
+  // Order page reads these through the shared import bindings (task 77).
+  downloadProductTemplate: vi.fn(),
+  uploadProductImport: vi.fn()
 }));
 vi.mock("@/api/product/sheet-source", () => ({ listSheetSources: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/order/order", () => ({
@@ -86,10 +89,10 @@ describe("merged tab pages (task 32 §2.1)", () => {
     wrapper.unmount();
   });
 
-  it("order query carries the order list and the matching pool tabs", async () => {
+  it("order query keeps only the order list tab", async () => {
     const wrapper = await mountPage(OrderQueryPage, "/order/orders");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["订单列表", "人工匹配池"]);
+    expect(labels).toEqual(["订单列表"]);
     wrapper.unmount();
   });
 
@@ -97,7 +100,7 @@ describe("merged tab pages (task 32 §2.1)", () => {
     vi.spyOn(useUserStore(), "can").mockReturnValue(true);
     const wrapper = await mountPage(FundPayoutPage, "/fund/payouts");
     const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["财务结算任务", "收款账户审核"]);
+    expect(labels).toEqual(["提现申请", "收款账户审核"]);
     wrapper.unmount();
   });
 

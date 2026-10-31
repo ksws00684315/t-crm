@@ -24,10 +24,22 @@ function asMissing(row: object): SheetMissingVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "productCode", label: t("product.code"), width: 130 },
-  { key: "productName", label: t("product.name"), prop: "productName", minWidth: 160 },
-  { key: "shopName", label: t("product.shop"), prop: "shopName", minWidth: 120 },
-  { key: "weidianItemId", label: t("product.weidianItemId"), width: 150 },
+  { key: "productCode", align: "left" as const, label: t("product.code"), width: 130 },
+  {
+    key: "productName",
+    align: "left" as const,
+    label: t("product.name"),
+    prop: "productName",
+    minWidth: 160
+  },
+  {
+    key: "shopName",
+    align: "left" as const,
+    label: t("product.shop"),
+    prop: "shopName",
+    minWidth: 120
+  },
+  { key: "weidianItemId", align: "left" as const, label: t("product.weidianItemId"), width: 150 },
   { key: "status", label: t("common.status"), width: 90 },
   { key: "sheetRow", label: t("sheetSource.row"), prop: "sheetRow", width: 80 },
   { key: "lastSeen", label: t("sheetSource.lastSeen"), width: 170 }

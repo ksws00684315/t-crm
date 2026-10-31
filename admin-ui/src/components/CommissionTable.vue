@@ -27,6 +27,7 @@ const columns = computed<DataColumn[]>(() =>
     label: t(`finance.${key}`),
     minWidth: ["releaseBasis", "businessAt", "product"].includes(key) ? 210 : 160,
     amount: ["base", "commission", "adjustment"].includes(key),
+    align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
     tooltip: true
   }))
 );

@@ -11,9 +11,17 @@ import {
 } from "@/api/task/task";
 import type { TaskStatus, TaskType } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import ImportDialog from "@/components/ImportDialog.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import { useLocaleStore } from "@/stores/locale";
+import { useUserStore } from "@/stores/user";
+import { saveBlob } from "@/utils/download";
 import { formatInstant } from "@/utils/format";
+import {
+  importTemplateFileName,
+  visibleImportTypes,
+  type ImportTypeBinding
+} from "@/utils/import-types";
 import { notifyError } from "@/utils/notify";
 import { readPageSize } from "@/utils/table-prefs";
 
@@ -25,6 +33,26 @@ defineOptions({ name: "SystemImportTaskPage" });
  */
 const { t } = useI18n();
 const route = useRoute();
+const me = useUserStore();
+const availableTypes = computed(() => visibleImportTypes(me.user));
+const typePickerVisible = ref(false);
+const pickedType = ref<ImportTypeBinding["taskType"] | "">("");
+const importVisible = ref(false);
+const activeBinding = ref<ImportTypeBinding | null>(null);
+
+function openTypePicker(): void {
+  importVisible.value = false;
+  pickedType.value = "";
+  typePickerVisible.value = true;
+}
+
+function confirmType(): void {
+  const binding = availableTypes.value.find(item => item.taskType === pickedType.value);
+  if (!binding) return;
+  activeBinding.value = binding;
+  typePickerVisible.value = false;
+  importVisible.value = true;
+}
 
 const TYPES: TaskType[] = [
   "PRODUCT_IMPORT",
@@ -77,6 +105,7 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   {
     key: "fileName",
+    align: "left" as const,
     label: t("importTask.fileName"),
     prop: "fileName",
     minWidth: 200,
@@ -87,7 +116,13 @@ const columns = computed<DataColumn[]>(() => [
   { key: "totalRows", label: t("importTask.totalRows"), width: 90 },
   { key: "successRows", label: t("importTask.successRows"), width: 90 },
   { key: "failedRows", label: t("importTask.failedRows"), width: 90 },
-  { key: "submitter", label: t("importTask.submitter"), prop: "operatorName", width: 120 },
+  {
+    key: "submitter",
+    align: "left" as const,
+    label: t("importTask.submitter"),
+    prop: "operatorName",
+    width: 120
+  },
   { key: "submitTime", label: t("importTask.submitTime"), width: 170 },
   { key: "finishTime", label: t("importTask.finishTime"), width: 170 },
   // Error file: zh DOM 130px / en 166px + 24px headroom (task 59 R-11 measurements).
@@ -147,7 +182,8 @@ function statusTag(status: TaskStatus): "info" | "primary" | "success" | "warnin
 
 async function downloadError(row: ImportTaskVO) {
   try {
-    await downloadTaskErrorFile(row.id);
+    const file = await downloadTaskErrorFile(row.id);
+    saveBlob(file.blob, file.fileName ?? `task-${row.id}-errors.xlsx`);
   } catch (error) {
     notifyError(error);
   }
@@ -239,10 +275,16 @@ onMounted(() => {
           </el-select>
         </el-form-item>
       </template>
+      <template v-if="availableTypes.length > 0" #actions>
+        <el-button type="primary" data-test="upload-entry" @click="openTypePicker">
+          {{ t("importTask.upload") }}
+        </el-button>
+      </template>
     </ListSearch>
 
     <DataTable
       table-id="import-tasks"
+      fill-available-height
       :rows="rows"
       :columns="columns"
       :loading="loading"
@@ -257,10 +299,12 @@ onMounted(() => {
       @clear-filters="reset"
     >
       <template #cell-fileName="{ row }">{{ asTask(row).fileName ?? "-" }}</template>
-      <template #cell-type="{ row }">{{ t(`importTask.typeOption.${asTask(row).type}`) }}</template>
+      <template #cell-type="{ row }">{{
+        asTask(row).type ? t(`importTask.typeOption.${asTask(row).type}`) : "-"
+      }}</template>
       <template #cell-status="{ row }">
         <el-tag :type="statusTag(asTask(row).status)" data-test="task-status">
-          {{ t(`importTask.statusOption.${asTask(row).status}`) }}
+          {{ asTask(row).status ? t(`importTask.statusOption.${asTask(row).status}`) : "-" }}
         </el-tag>
       </template>
       <template #cell-totalRows="{ row }">{{ asTask(row).totalRows }}</template>
@@ -286,6 +330,52 @@ onMounted(() => {
         >
       </template>
     </DataTable>
+
+    <el-dialog
+      v-model="typePickerVisible"
+      :title="t('importTask.chooseType')"
+      width="420px"
+      :close-on-click-modal="false"
+      data-test="upload-type-dialog"
+    >
+      <div class="upload-type-group">
+        <el-radio-group v-model="pickedType" data-test="upload-type-group">
+          <el-radio
+            v-for="binding in availableTypes"
+            :key="binding.taskType"
+            :value="binding.taskType"
+            :data-test="`upload-type-${binding.taskType}`"
+          >
+            {{ t(`importTask.typeOption.${binding.taskType}`) }}
+          </el-radio>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <el-button @click="typePickerVisible = false">{{ t("common.cancel") }}</el-button>
+        <el-button
+          type="primary"
+          :disabled="pickedType === ''"
+          data-test="upload-type-confirm"
+          @click="confirmType"
+        >
+          {{ t("common.confirm") }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <ImportDialog
+      v-if="activeBinding"
+      v-model="importVisible"
+      :title="t(activeBinding.titleKey)"
+      :limit-hint="t(activeBinding.limitHintKey)"
+      :template-file-name="importTemplateFileName(activeBinding, key => t(key))"
+      :task-type="activeBinding.taskType"
+      :accept-csv="activeBinding.acceptCsv"
+      :require-data-cutoff="activeBinding.requireDataCutoff"
+      :download-template="activeBinding.downloadTemplate"
+      :upload="activeBinding.upload"
+      @finished="load"
+    />
   </div>
 </template>
 
@@ -295,6 +385,12 @@ onMounted(() => {
 }
 .fail {
   color: var(--tcrm-color-danger);
+}
+.upload-type-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tcrm-space-3);
 }
 /* R-02: the row the sync dialog navigated to. */
 :deep(.import-task-row--located) td {

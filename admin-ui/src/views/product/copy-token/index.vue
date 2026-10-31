@@ -94,10 +94,10 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "hint", label: t("copyToken.hint"), minWidth: 200 },
-    { key: "kol", label: t("copyToken.kol"), minWidth: 160 },
+    { key: "hint", align: "left", label: t("copyToken.hint"), minWidth: 200 },
+    { key: "kol", align: "left" as const, label: t("copyToken.kol"), minWidth: 160 },
     { key: "channel", label: t("copyToken.channel"), width: 90 },
-    { key: "shop", label: t("copyToken.shop"), minWidth: 120 },
+    { key: "shop", align: "left" as const, label: t("copyToken.shop"), minWidth: 120 },
     { key: "usage", label: t("copyToken.usage"), width: 110 },
     { key: "validMinutes", label: t("copyToken.validMinutes"), width: 100 },
     { key: "expiresAt", label: t("copyToken.expiresAt"), width: 170 },
@@ -341,6 +341,7 @@ onMounted(() => {
 
     <DataTable
       table-id="copy-tokens"
+      fill-available-height
       :columns="columns"
       :rows="rows"
       :loading="loading"

@@ -40,10 +40,9 @@ const columns = computed<DataColumn[]>(() =>
     "creator",
     "payment",
     "refund",
-    "net",
+    "weidianWithdrawable",
     "commission",
     "rate",
-    "retained",
     "accountStatus",
     "businessAt",
     "actions"
@@ -53,7 +52,7 @@ const columns = computed<DataColumn[]>(() =>
     label: t(`finance.${key}`),
     minWidth:
       key === "businessAt" ? 200 : key === "orderNo" ? 210 : locale.value === "en-US" ? 180 : 140,
-    amount: ["payment", "refund", "net", "commission", "retained"].includes(key),
+    amount: ["payment", "refund", "weidianWithdrawable", "commission"].includes(key),
     tooltip: true
   }))
 );
@@ -145,12 +144,13 @@ onMounted(load);
             ><el-input v-model="filters.shopId" clearable data-test="settlement-shop-id"
           /></el-form-item> </template
       ></ListSearch>
-      <p>{{ t("finance.retainedNote") }}</p>
+      <p>{{ t("finance.weidianWithdrawableNote") }}</p>
       <el-alert v-if="failed" :title="t('finance.loadFailed')" type="error" :closable="false" />
       <DataTable
         v-model:page="page"
         v-model:size="size"
         table-id="commission-settlements"
+        fill-available-height
         :rows="rows"
         :columns="columns"
         :total="total"
@@ -172,7 +172,7 @@ onMounted(load);
               : t("finance.unverified")
         }}</template>
         <template
-          v-for="key in ['payment', 'refund', 'net', 'commission', 'retained']"
+          v-for="key in ['payment', 'refund', 'commission']"
           :key="key"
           #[`cell-${key}`]="{ row }"
           >{{
@@ -180,7 +180,9 @@ onMounted(load);
               ? t(row.scopeLimited ? "finance.scopeLimited" : "finance.unverified")
               : formatPrice(row[key], "CNY")
           }}</template
-        >
+        ><template #cell-weidianWithdrawable="{ row }">{{
+          row.weidianWithdrawable === null ? "-" : formatPrice(row.weidianWithdrawable, "CNY")
+        }}</template>
         <template #cell-accountStatus="{ row }"
           ><el-tag :type="row.status === 'POSTED' ? 'success' : 'warning'">{{
             t(`finance.${row.status ?? "UNVERIFIED"}`)
@@ -204,7 +206,7 @@ onMounted(load);
           <h2><CopyText :value="detail.orderNo" /></h2>
           <el-descriptions :column="narrow ? 1 : 2" border
             ><el-descriptions-item
-              v-for="key in ['payment', 'refund', 'net', 'commission', 'retained'] as const"
+              v-for="key in ['payment', 'refund', 'commission'] as const"
               :key="key"
               :label="t(`finance.${key}`)"
               >{{
@@ -212,7 +214,11 @@ onMounted(load);
                   ? t(detail.scopeLimited ? "finance.scopeLimited" : "finance.unverified")
                   : formatPrice(detail[key], "CNY")
               }}</el-descriptions-item
-            ></el-descriptions
+            ><el-descriptions-item :label="t('finance.weidianWithdrawable')">{{
+              detail.weidianWithdrawable === null
+                ? "-"
+                : formatPrice(detail.weidianWithdrawable, "CNY")
+            }}</el-descriptions-item></el-descriptions
           >
           <DataTable
             table-id="settlement-item-movements"

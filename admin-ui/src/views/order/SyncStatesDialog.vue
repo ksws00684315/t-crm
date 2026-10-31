@@ -100,7 +100,7 @@ function asFailure(row: object): SyncFailureVO {
 }
 
 function dataTypeText(type: SyncDataType): string {
-  return t(`order.sync.typeOption.${type}`);
+  return type ? t(`order.sync.typeOption.${type}`) : "-";
 }
 
 function failureKindText(kind: SyncFailureKind): string {
@@ -108,7 +108,13 @@ function failureKindText(kind: SyncFailureKind): string {
 }
 
 const stateColumns = computed<DataColumn[]>(() => [
-  { key: "shopName", label: t("order.syncShop"), prop: "shopName", minWidth: 150 },
+  {
+    key: "shopName",
+    align: "left" as const,
+    label: t("order.syncShop"),
+    prop: "shopName",
+    minWidth: 150
+  },
   { key: "dataType", label: t("order.sync.typeColumn"), width: 80 },
   { key: "source", label: t("order.sync.source"), width: 100 },
   { key: "lastSuccessAt", label: t("order.syncLastSuccess"), width: 170 },
@@ -120,11 +126,17 @@ const stateColumns = computed<DataColumn[]>(() => [
 ]);
 
 const failureColumns = computed<DataColumn[]>(() => [
-  { key: "shopName", label: t("order.syncShop"), minWidth: 150 },
+  { key: "shopName", align: "left" as const, label: t("order.syncShop"), minWidth: 150 },
   { key: "kind", label: t("order.sync.typeColumn"), width: 110 },
   { key: "time", label: t("order.sync.time"), width: 170 },
-  { key: "error", label: t("order.syncLastError"), minWidth: 200, tooltip: true },
-  { key: "task", label: t("order.sync.linkedTask"), width: 120 }
+  {
+    key: "error",
+    align: "left" as const,
+    label: t("order.syncLastError"),
+    minWidth: 200,
+    tooltip: true
+  },
+  { key: "task", align: "left" as const, label: t("order.sync.linkedTask"), width: 120 }
 ]);
 
 async function load() {

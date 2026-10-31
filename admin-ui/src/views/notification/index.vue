@@ -113,44 +113,51 @@ onMounted(load);
 
 <template>
   <section class="notification-page" data-test="notification-page">
-    <div class="notification-page__toolbar">
-      <el-button-group>
-        <el-button
-          data-test="notification-filter-unread"
-          :type="unreadOnly ? 'primary' : 'default'"
-          @click="showUnread"
-        >
-          {{ t("notification.unread") }}
-        </el-button>
-        <el-button
-          data-test="notification-filter-all"
-          :type="unreadOnly ? 'default' : 'primary'"
-          @click="showAll"
-        >
-          {{ t("common.all") }}
-        </el-button>
-      </el-button-group>
-      <el-button data-test="notification-mark-all" @click="markAll">
-        {{ t("notification.markAll") }}
-      </el-button>
-    </div>
     <div class="notification-page__card">
-      <p v-if="!loading && rows.length === 0" class="notification-page__empty">
-        {{ t("notification.empty") }}
-      </p>
-      <button
-        v-for="item in rows"
-        :key="item.id"
-        type="button"
-        class="notification-page__item"
-        :class="{ 'notification-page__item--unread': !item.readTime }"
-        data-test="notification-item"
-        @click="openItem(item)"
-      >
-        <el-icon><component :is="icons[item.type]" /></el-icon>
-        <NotificationText :item="item" />
-        <span class="notification-page__time">{{ relativeNotificationTime(item.createTime) }}</span>
-      </button>
+      <header class="notification-page__header">
+        <h1>{{ t("route.notifications") }}</h1>
+        <div class="notification-page__toolbar">
+          <el-button-group>
+            <el-button
+              data-test="notification-filter-unread"
+              :type="unreadOnly ? 'primary' : 'default'"
+              @click="showUnread"
+            >
+              {{ t("notification.unread") }}
+            </el-button>
+            <el-button
+              data-test="notification-filter-all"
+              :type="unreadOnly ? 'default' : 'primary'"
+              @click="showAll"
+            >
+              {{ t("common.all") }}
+            </el-button>
+          </el-button-group>
+          <el-button data-test="notification-mark-all" @click="markAll">
+            {{ t("notification.markAll") }}
+          </el-button>
+        </div>
+      </header>
+      <div class="notification-page__list">
+        <p v-if="!loading && rows.length === 0" class="notification-page__empty">
+          {{ t("notification.empty") }}
+        </p>
+        <button
+          v-for="item in rows"
+          :key="item.id"
+          type="button"
+          class="notification-page__item"
+          :class="{ 'notification-page__item--unread': !item.readTime }"
+          data-test="notification-item"
+          @click="openItem(item)"
+        >
+          <el-icon><component :is="icons[item.type]" /></el-icon>
+          <NotificationText :item="item" />
+          <span class="notification-page__time">{{
+            relativeNotificationTime(item.createTime)
+          }}</span>
+        </button>
+      </div>
       <el-pagination
         v-if="total > size"
         class="notification-page__pager"
@@ -175,10 +182,20 @@ onMounted(load);
   min-height: 0;
 }
 
+.notification-page__header,
 .notification-page__toolbar {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--tcrm-space-3);
+}
+.notification-page__header {
+  flex-shrink: 0;
+  justify-content: space-between;
+  margin-bottom: var(--tcrm-space-4);
+}
+.notification-page__header h1 {
+  margin: 0;
 }
 
 /* Same surface as the list and filter cards: the message list was the only page that rendered
@@ -188,11 +205,19 @@ onMounted(load);
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+
+.notification-page__list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Centred in whatever space the card has left, the way the table's empty state reads. */
@@ -204,8 +229,9 @@ onMounted(load);
 }
 
 .notification-page__item {
+  flex-shrink: 0;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--tcrm-space-3);
   align-items: center;
   padding: var(--tcrm-space-3);
@@ -236,12 +262,23 @@ onMounted(load);
 }
 
 .notification-page__time {
+  white-space: nowrap;
   font-weight: 400;
   color: var(--el-text-color-secondary);
 }
 
 .notification-page__pager {
+  flex-shrink: 0;
   align-self: flex-end;
   padding-top: var(--tcrm-space-3);
+}
+@media (max-width: 767px) {
+  .notification-page__item {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--tcrm-space-1) var(--tcrm-space-2);
+  }
+  .notification-page__time {
+    grid-column: 2;
+  }
 }
 </style>

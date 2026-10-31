@@ -43,15 +43,22 @@ function asRow(row: object): PayoutAccountRowVO {
 }
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "kolCode", label: t("payout.kol"), width: 170 },
+  { key: "kolCode", align: "left" as const, label: t("payout.kol"), width: 170 },
   { key: "type", label: t("payout.type"), width: 120 },
   {
     key: "accountMasked",
+    align: "left" as const,
     label: t("payout.account"),
     prop: "accountMasked",
     minWidth: 150
   },
-  { key: "holderName", label: t("payout.holder"), prop: "holderName", minWidth: 110 },
+  {
+    key: "holderName",
+    align: "left" as const,
+    label: t("payout.holder"),
+    prop: "holderName",
+    minWidth: 110
+  },
   { key: "status", label: t("common.status"), width: 100 },
   { key: "defaultAccount", label: t("payout.defaultColumn"), width: 80 },
   { key: "lastSubmittedAt", label: t("payout.submittedAt"), width: 170 },
@@ -249,6 +256,7 @@ watch(
 
     <DataTable
       table-id="payout-accounts"
+      fill-available-height
       row-key="id"
       :rows="rows"
       :columns="columns"

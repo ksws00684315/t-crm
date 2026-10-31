@@ -57,13 +57,21 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
   CommissionItemStateDO lockById(@Param("id") long id);
 
   /**
+   * Unverified lines of paid orders (owner decision 2026-10-30): an unpaid order is not a
+   * verification issue, so its lines are written as settlement state UNPAID and do not count.
+   */
+  String UNVERIFIED_PAID = "NOT verified AND settlement_state != 'UNPAID'";
+
+  /**
    * Accrual aggregates per KOL: estimated (accrued), frozen (accrued - released), unverified count.
    */
   @Select(
       "<script>SELECT kol_id,"
           + " COALESCE(SUM(CASE WHEN verified THEN accrued_commission_cny ELSE 0 END), 0) AS estimated_cny,"
           + " COALESCE(SUM(CASE WHEN verified THEN accrued_commission_cny - released_commission_cny ELSE 0 END), 0) AS frozen_cny,"
-          + " COUNT(*) FILTER (WHERE NOT verified) AS unverified_count"
+          + " COUNT(*) FILTER (WHERE "
+          + UNVERIFIED_PAID
+          + ") AS unverified_count"
           + " FROM crm_commission_item_state WHERE is_deleted = FALSE AND kol_id IN "
           + "<foreach collection='kolIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
           + " GROUP BY kol_id</script>")
@@ -74,7 +82,10 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
       """
       SELECT COALESCE(SUM(CASE WHEN verified THEN accrued_commission_cny ELSE 0 END), 0) AS estimated_cny,
              COALESCE(SUM(CASE WHEN verified THEN accrued_commission_cny - released_commission_cny ELSE 0 END), 0) AS frozen_cny,
-             COUNT(*) FILTER (WHERE NOT verified) AS unverified_count
+             COUNT(*) FILTER (WHERE """
+          + UNVERIFIED_PAID
+          + """
+      ) AS unverified_count
       FROM crm_commission_item_state WHERE is_deleted = FALSE
       """)
   KolAccrualRow aggregateCompany();
@@ -91,7 +102,8 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
 
   @Select(
       "SELECT COUNT(*) FROM crm_commission_item_state"
-          + " WHERE is_deleted = FALSE AND kol_id = #{kolId} AND NOT verified")
+          + " WHERE is_deleted = FALSE AND kol_id = #{kolId} AND "
+          + UNVERIFIED_PAID)
   long countUnverifiedByKol(@Param("kolId") long kolId);
 
   /** All live snapshot rows of the KOL, newest business update first (income detail lines). */

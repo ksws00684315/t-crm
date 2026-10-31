@@ -259,15 +259,30 @@ describe("Kol item page", () => {
     expect(kolItemApi.getKolItem).toHaveBeenCalledWith("1");
     const drawer = findTest(wrapper, "detail-drawer");
     expect(drawer.find('[data-test="detail-image"]').exists()).toBe(true);
+    expect(
+      drawer.findAll(".el-descriptions__body tr").every(row => row.findAll("td").length === 2)
+    ).toBe(true);
+    expect(drawer.text()).toContain("商品名称");
+    expect(drawer.text()).toContain("商品主图");
+    expect(drawer.text()).toContain("Alice（KOL-TAA001）");
     expect(drawer.text()).toContain("访问次数");
     expect(drawer.text()).toContain("累计支付金额");
-    expect(drawer.text()).toContain("累计退款");
-    expect(drawer.text()).toContain("3.50");
+    expect(drawer.text()).not.toContain("累计退款");
     expect(drawer.text()).toContain("closed");
     expect(drawer.text()).toContain("rejected");
     await findTest(wrapper, "open-source").trigger("click");
     expect(open).toHaveBeenCalledWith(detail.sourceItemUrl, "_blank", "noopener");
     open.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("keeps missing creator identity visible in the single-column detail", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    vi.mocked(kolItemApi.getKolItem).mockResolvedValue({ ...detail, kolName: null, kolCode: null });
+    const wrapper = await mountPage();
+    await dataRow(wrapper, row.linkCode).get('[data-test="view"]').trigger("click");
+    await flushPromises();
+    expect(findTest(wrapper, "detail-drawer").text()).toContain("-（-）");
     wrapper.unmount();
   });
 

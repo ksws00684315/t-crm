@@ -32,8 +32,11 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Commission source snapshot engine (task 62, design §4.8.1 / §8.3, ADR-032 §2-§5). Registers one
  * {@code crm_commission_item_state} row per order item line and appends a revision whenever the
- * source version changes. Wallet postings stay with the wallet service: positive releases go
- * through {@code postCommissionCredit} (FIFO prepay recovery), clawbacks through {@code
+ * source fingerprint differs from the latest one. A fingerprint can return to an earlier value
+ * (refund undone, confirmation lost), so the stored source version is {@code
+ * {fingerprint}#{revision number}} and stays unique per line (task 83); it also keeps the wallet
+ * source keys of every real change apart. Wallet postings stay with the wallet service: positive
+ * releases go through {@code postCommissionCredit} (FIFO prepay recovery), clawbacks through {@code
  * postCommissionAdjustment}.
  */
 @Service
@@ -41,6 +44,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private static final Logger LOG = LoggerFactory.getLogger(CommissionItemSnapshotService.class);
   private static final JsonMapper JSON = JsonMapper.builder().build();
   private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
+  private static final char REVISION_SEPARATOR = '#';
 
   private final CommissionItemStateMapper states;
   private final CommissionItemRevisionMapper revisions;
@@ -95,10 +99,11 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
         row = newRow(item, order, now);
       }
       ResolvedRate rate = resolveRate(order, item, kolRates);
-      String version = fingerprint(order, item, rate, rule);
-      if (exists && version.equals(row.getSourceVersion())) {
+      String fingerprint = fingerprint(order, item, rate, rule);
+      if (exists && fingerprint.equals(fingerprintOf(row.getSourceVersion()))) {
         continue;
       }
+      String version = fingerprint + REVISION_SEPARATOR + (revisionNo(row.getSourceVersion()) + 1);
       applyRevision(tenantId, row, order, item, rate, rule, version, now);
     }
     deleteStaleRows(order, items, now);
@@ -292,9 +297,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
             text(item.kolId()),
             String.valueOf(item.attributionType()),
             text(item.productId()),
-            text(item.basisCny()),
+            // Money at scale 2: order writes hold 0, the settlement recompute reads 0.00.
+            text(scale(item.basisCny())),
             text(item.basisIncludesRefund()),
-            text(item.successfulRefundCny()),
+            text(scale(item.successfulRefundCny())),
             item.settlementState() == null ? "" : item.settlementState(),
             text(item.settlementTime()),
             text(item.completedTime()),
@@ -322,6 +328,21 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     // Verified rows always accrue from the pay-time promotion config (2026-10-25 decision).
     String source = "promotion config v" + rate.configVersion();
     return "Accrued from " + source + ", release " + result.releaseBasis();
+  }
+
+  /** Fingerprint of a stored source version; versions before task 83 are the bare fingerprint. */
+  private static String fingerprintOf(String sourceVersion) {
+    if (sourceVersion == null) {
+      return null;
+    }
+    int separator = sourceVersion.indexOf(REVISION_SEPARATOR);
+    return separator < 0 ? sourceVersion : sourceVersion.substring(0, separator);
+  }
+
+  /** Numbers restart at 1 on rows of bare fingerprints: their versions never carry a suffix. */
+  private static int revisionNo(String sourceVersion) {
+    int separator = sourceVersion == null ? -1 : sourceVersion.indexOf(REVISION_SEPARATOR);
+    return separator < 0 ? 0 : Integer.parseInt(sourceVersion.substring(separator + 1));
   }
 
   static String releaseSourceKey(long itemStateId, String sourceVersion) {

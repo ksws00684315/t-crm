@@ -33,12 +33,14 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   {
     key: "templateCode",
+    align: "left" as const,
     label: t("linkTemplate.code"),
     prop: "templateCode",
     minWidth: 160
   },
   {
     key: "templateUrl",
+    align: "left" as const,
     label: t("linkTemplate.url"),
     prop: "templateUrl",
     minWidth: 280,

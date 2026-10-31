@@ -149,7 +149,7 @@ async function signOut() {
   margin: 0 var(--tcrm-space-2) var(--tcrm-space-1);
   padding: 0 var(--tcrm-space-4);
   border-radius: var(--tcrm-radius-control);
-  color: var(--tcrm-color-text);
+  color: var(--tcrm-color-text-secondary);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -265,7 +265,7 @@ async function signOut() {
   overflow-y: auto;
   overflow-x: hidden;
 }
-@media (max-width: 1279px) {
+@media (max-width: 1439px) {
   .shell__main {
     padding: var(--tcrm-space-4);
   }

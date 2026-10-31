@@ -1,0 +1,6140 @@
+[
+  {
+    "key": "admin-kols-1440x900-zh-CN",
+    "url": "/kol/kols",
+    "title": "达人列表",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "达人ID/达人名",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邮箱",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "社媒平台/ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "预付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "审核状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "登录状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "关系状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/05 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "已通过",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light el-zoom-in-center-enter-from el-zoom-in-center-enter-active",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "正常",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light el-zoom-in-center-enter-from el-zoom-in-center-enter-active",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "待推广",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "资料编辑\n佣金信息\n预付金额\n剩余14天\n冻结",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n达人列表\n达人商品\n达人收入\n财务结算\n系统管理\n达人管理/达人列表\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n达人列表\n达人列表\n达人管理\n达人列表\n+ 邀请达人\n达人ID\n达人名称\n邮箱\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n达人ID/达人名\n\t\nPhone/WhatsApp\n\t\n邮箱\n\t\n社媒平台/ID\n\t\n佣金比例\n\t\n预付金额\n\t\n邀请时间\n\t\n邀请人\n\t\n审核状态\n\t\n登录状态\n\t\n关系状态\n\t\n操作\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n2026/10/05 09:02\n\t\n-\n\t\n已通过\n\t\n正常\n\t\n待推广\n\t\n资料编辑\n佣金信息\n预付金额\n剩余14天\n冻结\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-keyboard-fulltext-1440-zh-CN",
+    "focus": {
+      "activeText": "t88 Alice 长名称示例t88_KOL-ASD001",
+      "tag": "SPAN",
+      "tabindex": "0",
+      "outline": "solid",
+      "outlineWidth": "2px",
+      "tooltip": [
+        "t88 Alice 长名称示例t88_KOL-ASD001"
+      ]
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-long-dialog-1366x360-zh-CN",
+    "dialog": {
+      "dialogHeight": 328,
+      "viewportHeight": 360,
+      "bodyHeight": 208,
+      "bodyScroll": 392,
+      "bodyOverflow": "auto",
+      "scrollBefore": 0,
+      "scrollAfter": 184,
+      "footerBefore": 280,
+      "footerAfter": 280,
+      "headerTop": 32,
+      "footerBottom": 328
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-mobile-dialog-390x700-zh-CN",
+    "dialog": {
+      "width": 366,
+      "left": 12,
+      "right": 12,
+      "window": 390,
+      "scroll": 390
+    },
+    "errors": []
+  },
+  {
+    "key": "admin-kols-1366x768-zh-CN",
+    "url": "/kol/kols",
+    "title": "达人列表",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "达人ID/达人名",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邮箱",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "社媒平台/ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "预付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "审核状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "登录状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "关系状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/05 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "已通过",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "正常",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "待推广",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n达人列表\n达人商品\n达人收入\n财务结算\n系统管理\n达人管理/达人列表\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n达人列表\n达人列表\n达人管理\n达人列表\n+ 邀请达人\n达人ID\n达人名称\n邮箱\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n达人ID/达人名\n\t\nPhone/WhatsApp\n\t\n邮箱\n\t\n社媒平台/ID\n\t\n佣金比例\n\t\n预付金额\n\t\n邀请时间\n\t\n邀请人\n\t\n审核状态\n\t\n登录状态\n\t\n关系状态\n\t\n操作\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n2026/10/05 09:02\n\t\n-\n\t\n已通过\n\t\n正常\n\t\n待推广\n\t\n资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-1280x800-zh-CN",
+    "url": "/kol/kols",
+    "title": "达人列表",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "达人ID/达人名",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邮箱",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "社媒平台/ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "预付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "审核状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "登录状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "关系状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/05 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "已通过",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "正常",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "待推广",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n达人列表\n达人商品\n达人收入\n财务结算\n系统管理\n达人管理/达人列表\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n达人列表\n达人列表\n达人管理\n达人列表\n+ 邀请达人\n达人ID\n达人名称\n邮箱\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n达人ID/达人名\n\t\nPhone/WhatsApp\n\t\n邮箱\n\t\n社媒平台/ID\n\t\n佣金比例\n\t\n预付金额\n\t\n邀请时间\n\t\n邀请人\n\t\n审核状态\n\t\n登录状态\n\t\n关系状态\n\t\n操作\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n2026/10/05 09:02\n\t\n-\n\t\n已通过\n\t\n正常\n\t\n待推广\n\t\n资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-2560x1440-zh-CN",
+    "url": "/kol/kols",
+    "title": "达人列表",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "达人ID/达人名",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邮箱",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "社媒平台/ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "预付金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "邀请人",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "审核状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "登录状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "关系状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/05 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "已通过",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "正常",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "待推广",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n达人列表\n达人商品\n达人收入\n财务结算\n系统管理\n达人管理/达人列表\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n达人列表\n达人列表\n达人管理\n达人列表\n+ 邀请达人\n达人ID\n达人名称\n邮箱\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n达人ID/达人名\n\t\nPhone/WhatsApp\n\t\n邮箱\n\t\n社媒平台/ID\n\t\n佣金比例\n\t\n预付金额\n\t\n邀请时间\n\t\n邀请人\n\t\n审核状态\n\t\n登录状态\n\t\n关系状态\n\t\n操作\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n2026/10/05 09:02\n\t\n-\n\t\n已通过\n\t\n正常\n\t\n待推广\n\t\n资料编辑\n佣金信息\n预付金额\n剩余7天\n冻结\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-1440x900-en-US",
+    "url": "/kol/kols",
+    "title": "Creator List",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Creator name / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Email",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Social platform / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Prepay",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited at",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited by",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Review status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Login status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Relation status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/05/2026, 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Approved",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Normal",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Pending promotion",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Edit profile\nCommission\nPrepay\n7 days left\nFreeze",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nCreator List\nCreator Products\nCreator Income\nFinance\nSystem\nCreators/Creator List\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nCreator List\nCreator List\nCreator Management\nCreator List\n+ Invite creator\nCreator ID\nCreator name\nEmail\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nCreator name / ID\n\t\nPhone/WhatsApp\n\t\nEmail\n\t\nSocial platform / ID\n\t\nCommission\n\t\nPrepay\n\t\nInvited at\n\t\nInvited by\n\t\nReview status\n\t\nLogin status\n\t\nRelation status\n\t\nActions\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n10/05/2026, 09:02\n\t\n-\n\t\nApproved\n\t\nNormal\n\t\nPending promotion\n\t\nEdit profile\nCommission\nPrepay\n7 days left\nFreeze\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-1366x768-en-US",
+    "url": "/kol/kols",
+    "title": "Creator List",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Creator name / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Email",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Social platform / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Prepay",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited at",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited by",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Review status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Login status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Relation status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/05/2026, 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Approved",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Normal",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Pending promotion",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Edit profile\nCommission\nPrepay\n7 days left\nFreeze",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nCreator List\nCreator Products\nCreator Income\nFinance\nSystem\nCreators/Creator List\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nCreator List\nCreator List\nCreator Management\nCreator List\n+ Invite creator\nCreator ID\nCreator name\nEmail\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nCreator name / ID\n\t\nPhone/WhatsApp\n\t\nEmail\n\t\nSocial platform / ID\n\t\nCommission\n\t\nPrepay\n\t\nInvited at\n\t\nInvited by\n\t\nReview status\n\t\nLogin status\n\t\nRelation status\n\t\nActions\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n10/05/2026, 09:02\n\t\n-\n\t\nApproved\n\t\nNormal\n\t\nPending promotion\n\t\nEdit profile\nCommission\nPrepay\n7 days left\nFreeze\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-1280x800-en-US",
+    "url": "/kol/kols",
+    "title": "Creator List",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Creator name / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Email",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Social platform / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Prepay",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited at",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited by",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Review status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Login status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Relation status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/05/2026, 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Approved",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Normal",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Pending promotion",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Edit profile\nCommission\nPrepay\n7 days left\nFreeze",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nCreator List\nCreator Products\nCreator Income\nFinance\nSystem\nCreators/Creator List\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nCreator List\nCreator List\nCreator Management\nCreator List\n+ Invite creator\nCreator ID\nCreator name\nEmail\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nCreator name / ID\n\t\nPhone/WhatsApp\n\t\nEmail\n\t\nSocial platform / ID\n\t\nCommission\n\t\nPrepay\n\t\nInvited at\n\t\nInvited by\n\t\nReview status\n\t\nLogin status\n\t\nRelation status\n\t\nActions\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n10/05/2026, 09:02\n\t\n-\n\t\nApproved\n\t\nNormal\n\t\nPending promotion\n\t\nEdit profile\nCommission\nPrepay\n7 days left\nFreeze\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-kols-2560x1440-en-US",
+    "url": "/kol/kols",
+    "title": "Creator List",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Creator name / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Phone/WhatsApp",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Email",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Social platform / ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Prepay",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited at",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Invited by",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Review status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Login status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Relation status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88 Alice 长名称示例\nt88_KOL-ASD001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 52,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 52,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "+10000000000",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_alice@example.test",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "TikTok / @t88_alice",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "15.5%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "0.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/05/2026, 09:02",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "-",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Approved",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Normal",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      },
+      {
+        "text": "Pending promotion",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "relation",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "Edit profile\nCommission\nPrepay\n7 days left\nFreeze",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 85,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": {
+      "alignItems": "flex-start",
+      "textAlign": "left"
+    },
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nCreator List\nCreator Products\nCreator Income\nFinance\nSystem\nCreators/Creator List\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nCreator List\nCreator List\nCreator Management\nCreator List\n+ Invite creator\nCreator ID\nCreator name\nEmail\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nCreator name / ID\n\t\nPhone/WhatsApp\n\t\nEmail\n\t\nSocial platform / ID\n\t\nCommission\n\t\nPrepay\n\t\nInvited at\n\t\nInvited by\n\t\nReview status\n\t\nLogin status\n\t\nRelation status\n\t\nActions\nt88 Alice 长名称示例\nt88_KOL-ASD001\n\t\n+10000000000\n\t\nt88_alice@example.test\n\t\nTikTok / @t88_alice\n\t\n15.5%\n\t\n0.00\n\t\n10/05/2026, 09:02\n\t\n-\n\t\nApproved\n\t\nNormal\n\t\nPending promotion\n\t\nEdit profile\nCommission\nPrepay\n7 days left\nFreeze\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-order-138-1440x900-zh-CN",
+    "url": "/order/orders",
+    "title": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品信息",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "达人",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "数量",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "订单状态",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "实付金额",
+        "align": "right",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "操作",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      }
+    ],
+    "cells": [
+      {
+        "text": "订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）",
+        "align": "left",
+        "font": "14px",
+        "line": "22px",
+        "height": 54,
+        "paddingTop": "0px",
+        "paddingBottom": "0px",
+        "borderTop": "16px",
+        "borderBottom": "0px",
+        "cellHeight": 38,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "order-group-band",
+            "height": 22,
+            "display": "flex",
+            "line": "22px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "16px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": "订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）",
+    "orderImage": true,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n订单查询\n退款查询\n达人管理\n财务结算\n系统管理\n订单管理/订单查询\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n订单查询\n订单列表\n人工匹配池\n订单号\n店铺\n全部\n达人编号/姓名\n查询\n重置\n展开\n同步状态\n导入订单\n导入退款\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品信息\n\t\n达人\n\t\n数量\n\t\n订单状态\n\t\n实付金额\n\t\n操作\n订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）\n\n\nt88 Product sample\n商品 ID: t88_ITEM-1001\n型号: Blue / L\n\t\nt88 Alice\nt88_KOL-ASD001\n\t\n2\n\t\n待发货\n\t\n120.00\n\t\n查看\n链路\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-order-138-1280x800-zh-CN",
+    "url": "/order/orders",
+    "title": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品信息",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "达人",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "数量",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "订单状态",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "实付金额",
+        "align": "right",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "操作",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      }
+    ],
+    "cells": [
+      {
+        "text": "订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）",
+        "align": "left",
+        "font": "14px",
+        "line": "22px",
+        "height": 54,
+        "paddingTop": "0px",
+        "paddingBottom": "0px",
+        "borderTop": "16px",
+        "borderBottom": "0px",
+        "cellHeight": 38,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "order-group-band",
+            "height": 22,
+            "display": "flex",
+            "line": "22px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": "订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）",
+    "orderImage": true,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n订单查询\n退款查询\n达人管理\n财务结算\n系统管理\n订单管理/订单查询\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n订单查询\n订单列表\n人工匹配池\n订单号\n店铺\n全部\n达人编号/姓名\n查询\n重置\n展开\n同步状态\n导入订单\n导入退款\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品信息\n\t\n达人\n\t\n数量\n\t\n订单状态\n\t\n实付金额\n\t\n操作\n订单号\nt88_2026102800000123456789\n下单时间\n2026/10/20 18:00:00\n店铺\nt88 Shop（T88S001）\n\n\nt88 Product sample\n商品 ID: t88_ITEM-1001\n型号: Blue / L\n\t\nt88 Alice\nt88_KOL-ASD001\n\t\n2\n\t\n待发货\n\t\n120.00\n\t\n查看\n链路\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-order-138-1440x900-en-US",
+    "url": "/order/orders",
+    "title": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Product information",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Creator",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Qty",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Order Status",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Paid amount",
+        "align": "right",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Actions",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      }
+    ],
+    "cells": [
+      {
+        "text": "Order ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)",
+        "align": "left",
+        "font": "14px",
+        "line": "22px",
+        "height": 54,
+        "paddingTop": "0px",
+        "paddingBottom": "0px",
+        "borderTop": "16px",
+        "borderBottom": "0px",
+        "cellHeight": 38,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "order-group-band",
+            "height": 22,
+            "display": "flex",
+            "line": "22px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "16px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": "Order ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)",
+    "orderImage": true,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nOrder Query\nRefund Query\nCreators\nFinance\nSystem\nOrders/Order Query\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nOrder Query\nOrder List\nMatching Pool\nOrder ID\nShop\nAll\nCreator code or name\nSearch\nReset\nExpand\nSync status\nImport orders\nImport refunds\n1 in total\nDefault\nCompact\nLoose\nColumns\nProduct information\n\t\nCreator\n\t\nQty\n\t\nOrder Status\n\t\nPaid amount\n\t\nActions\nOrder ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)\n\n\nt88 Product sample\nItem ID: t88_ITEM-1001\nSKU: Blue / L\n\t\nt88 Alice\nt88_KOL-ASD001\n\t\n2\n\t\nAwaiting shipment\n\t\n120.00\n\t\nView\nChain\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-order-138-1280x800-en-US",
+    "url": "/order/orders",
+    "title": null,
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Product information",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Creator",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Qty",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Order Status",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Paid amount",
+        "align": "right",
+        "font": "14px",
+        "weight": "400"
+      },
+      {
+        "text": "Actions",
+        "align": "left",
+        "font": "14px",
+        "weight": "400"
+      }
+    ],
+    "cells": [
+      {
+        "text": "Order ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)",
+        "align": "left",
+        "font": "14px",
+        "line": "22px",
+        "height": 54,
+        "paddingTop": "0px",
+        "paddingBottom": "0px",
+        "borderTop": "16px",
+        "borderBottom": "0px",
+        "cellHeight": 38,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "order-group-band",
+            "height": 22,
+            "display": "flex",
+            "line": "22px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": "Order ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)",
+    "orderImage": true,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nOrder Query\nRefund Query\nCreators\nFinance\nSystem\nOrders/Order Query\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nOrder Query\nOrder List\nMatching Pool\nOrder ID\nShop\nAll\nCreator code or name\nSearch\nReset\nExpand\nSync status\nImport orders\nImport refunds\n1 in total\nDefault\nCompact\nLoose\nColumns\nProduct information\n\t\nCreator\n\t\nQty\n\t\nOrder Status\n\t\nPaid amount\n\t\nActions\nOrder ID\nt88_2026102800000123456789\nOrdered at\n10/20/2026, 18:00:00\nShop\nt88 Shop (T88S001)\n\n\nt88 Product sample\nItem ID: t88_ITEM-1001\nSKU: Blue / L\n\t\nt88 Alice\nt88_KOL-ASD001\n\t\n2\n\t\nAwaiting shipment\n\t\n120.00\n\t\nView\nChain\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "admin-notifications-1440x900-zh-CN",
+    "url": "/notifications",
+    "title": null,
+    "outsideTitle": [
+      "站内消息"
+    ],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "24px",
+    "searchPadding": null,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": "站内消息",
+    "notificationActions": 3,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n财务结算\n系统管理\n站内消息\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n站内消息\n站内消息\n未读\n全部\n全部已读\n达人预付已登记支付\n9 小时前",
+    "errors": []
+  },
+  {
+    "key": "admin-notifications-1280x800-zh-CN",
+    "url": "/notifications",
+    "title": null,
+    "outsideTitle": [
+      "站内消息"
+    ],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "16px",
+    "searchPadding": null,
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": "站内消息",
+    "notificationActions": 3,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 管理端\n工作台\n经营分析\n商品管理\n订单管理\n达人管理\n财务结算\n系统管理\n站内消息\n搜索菜单\nCtrl K\n中文\nt88 Reviewer（超级管理员）\nt88 默认公司\n工作台\n站内消息\n站内消息\n未读\n全部\n全部已读\n达人预付已登记支付\n9 小时前",
+    "errors": []
+  },
+  {
+    "key": "admin-notifications-1440x900-en-US",
+    "url": "/notifications",
+    "title": null,
+    "outsideTitle": [
+      "Notifications"
+    ],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "24px",
+    "searchPadding": null,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": "Notifications",
+    "notificationActions": 3,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nFinance\nSystem\nNotifications\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nNotifications\nNotifications\nUnread\nAll\nMark all as read\nCreator prepay payment registered\n9 hours ago",
+    "errors": []
+  },
+  {
+    "key": "admin-notifications-1280x800-en-US",
+    "url": "/notifications",
+    "title": null,
+    "outsideTitle": [
+      "Notifications"
+    ],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "16px",
+    "searchPadding": null,
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [],
+    "nameAlign": null,
+    "notificationHeader": "Notifications",
+    "notificationActions": 3,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Admin\nHome\nAnalytics\nProducts\nOrders\nCreators\nFinance\nSystem\nNotifications\nSearch menu\nCtrl K\nEnglish\nt88 Reviewer (Super Admin)\nt88 默认公司\nHome\nNotifications\nNotifications\nUnread\nAll\nMark all as read\nCreator prepay payment registered\n9 hours ago",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1440x900-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "订单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品名及SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/15 20:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "可提现",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n订单号\n\t\n商品名及SKU\n\t\n订单金额\n\t\n支付时间\n\t\n佣金比例\n\t\n佣金金额\n\t\n订单状态\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n2026/10/15 20:00:00\n\t\n15.00%\n\t\n¥18.00\n\t\n可提现\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1366x768-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "订单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品名及SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/15 20:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "可提现",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n订单号\n\t\n商品名及SKU\n\t\n订单金额\n\t\n支付时间\n\t\n佣金比例\n\t\n佣金金额\n\t\n订单状态\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n2026/10/15 20:00:00\n\t\n15.00%\n\t\n¥18.00\n\t\n可提现\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1280x800-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "订单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品名及SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/15 20:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "可提现",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n订单号\n\t\n商品名及SKU\n\t\n订单金额\n\t\n支付时间\n\t\n佣金比例\n\t\n佣金金额\n\t\n订单状态\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n2026/10/15 20:00:00\n\t\n15.00%\n\t\n¥18.00\n\t\n可提现\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-2560x1440-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "订单号",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品名及SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "支付时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金比例",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "佣金金额",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "订单状态",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "2026/10/15 20:00:00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "可提现",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n订单号\n\t\n商品名及SKU\n\t\n订单金额\n\t\n支付时间\n\t\n佣金比例\n\t\n佣金金额\n\t\n订单状态\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n2026/10/15 20:00:00\n\t\n15.00%\n\t\n¥18.00\n\t\n可提现\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-390x844-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "mobileCards": 1,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\nt88_12345678901234567890\nt88 Widget long product name · Blue / M\n订单金额: ¥128.00\n可提现\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-375x812-zh-CN",
+    "url": "/orders",
+    "title": "我的订单",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "mobileCards": 1,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的订单\n中文\n我的信息\n我的订单\n时间范围\n最近 30 天\n订单号\n产品名\n订单状态\n全部状态\n查询\n重置\nt88_12345678901234567890\nt88 Widget long product name · Blue / M\n订单金额: ¥128.00\n可提现\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1440x900-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Order number",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Product and SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Payment time",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission rate",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "10/15/2026, 8:00:00 PM",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Available",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nOrder number\n\t\nProduct and SKU\n\t\nOrder amount\n\t\nPayment time\n\t\nCommission rate\n\t\nCommission amount\n\t\nOrder status\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n10/15/2026, 8:00:00 PM\n\t\n15.00%\n\t\n¥18.00\n\t\nAvailable\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1366x768-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Order number",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Product and SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Payment time",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission rate",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "10/15/2026, 8:00:00 PM",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 48,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Available",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nOrder number\n\t\nProduct and SKU\n\t\nOrder amount\n\t\nPayment time\n\t\nCommission rate\n\t\nCommission amount\n\t\nOrder status\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n10/15/2026, 8:00:00 PM\n\t\n15.00%\n\t\n¥18.00\n\t\nAvailable\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-1280x800-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Order number",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Product and SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Payment time",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission rate",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "10/15/2026, 8:00:00 PM",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 48,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Available",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 81,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nOrder number\n\t\nProduct and SKU\n\t\nOrder amount\n\t\nPayment time\n\t\nCommission rate\n\t\nCommission amount\n\t\nOrder status\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n10/15/2026, 8:00:00 PM\n\t\n15.00%\n\t\n¥18.00\n\t\nAvailable\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-2560x1440-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Order number",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Product and SKU",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Payment time",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission rate",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Commission amount",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Order status",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t88_12345678901234567890",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88 Widget long product name · Blue / M",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥128.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "10/15/2026, 8:00:00 PM",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "15.00%",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "",
+            "height": 20,
+            "display": "inline",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "¥18.00",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Available",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 57,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "el-tag el-tag--success el-tag--light",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "top"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nOrder number\n\t\nProduct and SKU\n\t\nOrder amount\n\t\nPayment time\n\t\nCommission rate\n\t\nCommission amount\n\t\nOrder status\nt88_12345678901234567890\n\t\nt88 Widget long product name · Blue / M\n\t\n¥128.00\n\t\n10/15/2026, 8:00:00 PM\n\t\n15.00%\n\t\n¥18.00\n\t\nAvailable\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-390x844-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "mobileCards": 1,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\nt88_12345678901234567890\nt88 Widget long product name · Blue / M\nOrder amount: ¥128.00\nAvailable\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-orders-375x812-en-US",
+    "url": "/orders",
+    "title": "My orders",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "mobileCards": 1,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy orders\nEnglish\nMy information\nMy orders\nDate range\nLast 30 days\nOrder number\nProduct name\nOrder status\nAll statuses\nSearch\nReset\nt88_12345678901234567890\nt88 Widget long product name · Blue / M\nOrder amount: ¥128.00\nAvailable\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1440x900-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品 ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "创建时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/15",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "复制链接",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品\n\t\n商品 ID\n\t\n创建时间\n\t\n操作\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n2026/10/15\n\t\n复制链接\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1366x768-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品 ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "创建时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/15",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "复制链接",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品\n\t\n商品 ID\n\t\n创建时间\n\t\n操作\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n2026/10/15\n\t\n复制链接\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1280x800-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品 ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "创建时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/15",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "复制链接",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品\n\t\n商品 ID\n\t\n创建时间\n\t\n操作\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n2026/10/15\n\t\n复制链接\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-2560x1440-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "商品",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "商品 ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "创建时间",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "操作",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "2026/10/15",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "复制链接",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\nt88 Alice\nt88_KOL-ASD001\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\n共 1 条\n默认\n紧凑\n宽松\n列设置\n商品\n\t\n商品 ID\n\t\n创建时间\n\t\n操作\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n2026/10/15\n\t\n复制链接\n第 1–1 条 / 共 1 条\n20条/页\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-390x844-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\nt\n\nt88 Product with a long name\n\nt88_ITEM-1001\n2026/10/15\n\n复制链接\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-375x812-zh-CN",
+    "url": "/items",
+    "title": "我的商品",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "mobileCards": 0,
+    "nav": [
+      "工作台",
+      "我的商品",
+      "订单明细",
+      "资金明细",
+      "我的信息"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack 达人端\n工作台\n我的商品\n订单明细\n资金明细\n我的信息\n我的商品\n中文\n我的信息\n我的商品\n商品名称\n查询\n重置\nt\n\nt88 Product with a long name\n\nt88_ITEM-1001\n2026/10/15\n\n复制链接\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1440x900-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Item",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Item ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Created",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/15/2026",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Copy link",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nItem\n\t\nItem ID\n\t\nCreated\n\t\nActions\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n10/15/2026\n\t\nCopy link\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1366x768-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Item",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Item ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Created",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/15/2026",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Copy link",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1366,
+    "clientWidth": 1366,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nItem\n\t\nItem ID\n\t\nCreated\n\t\nActions\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n10/15/2026\n\t\nCopy link\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-1280x800-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Item",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Item ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Created",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/15/2026",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Copy link",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "16px",
+    "searchPadding": "16px",
+    "scrollWidth": 1280,
+    "clientWidth": 1280,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nItem\n\t\nItem ID\n\t\nCreated\n\t\nActions\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n10/15/2026\n\t\nCopy link\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-2560x1440-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [
+      {
+        "text": "Item",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Item ID",
+        "align": "left",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Created",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      },
+      {
+        "text": "Actions",
+        "align": "center",
+        "font": "15px",
+        "weight": "500"
+      }
+    ],
+    "cells": [
+      {
+        "text": "t\nt88 Product with a long name",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 40,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 40,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "t88_ITEM-1001",
+        "align": "left",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "SPAN",
+            "cls": "accessible-cell el-tooltip__trigger el-tooltip__trigger",
+            "height": 24,
+            "display": "block",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      },
+      {
+        "text": "10/15/2026",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": []
+      },
+      {
+        "text": "Copy link",
+        "align": "center",
+        "font": "15px",
+        "line": "24px",
+        "height": 73,
+        "paddingTop": "16px",
+        "paddingBottom": "16px",
+        "borderTop": "0px",
+        "borderBottom": "1px",
+        "cellHeight": 24,
+        "children": [
+          {
+            "tag": "DIV",
+            "cls": "actions-cell",
+            "height": 24,
+            "display": "inline-flex",
+            "line": "24px",
+            "verticalAlign": "baseline"
+          }
+        ]
+      }
+    ],
+    "mainPadding": "24px",
+    "searchPadding": "24px",
+    "scrollWidth": 2560,
+    "clientWidth": 2560,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nt88 Alice\nt88_KOL-ASD001\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\n1 in total\nDefault\nCompact\nLoose\nColumns\nItem\n\t\nItem ID\n\t\nCreated\n\t\nActions\nt\nt88 Product with a long name\n\t\nt88_ITEM-1001\n\t\n10/15/2026\n\t\nCopy link\n1–1 of 1\n20/page\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-390x844-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\nt\n\nt88 Product with a long name\n\nt88_ITEM-1001\n10/15/2026\n\nCopy link\n1",
+    "errors": []
+  },
+  {
+    "key": "kol-items-375x812-en-US",
+    "url": "/items",
+    "title": "My items",
+    "outsideTitle": [],
+    "headers": [],
+    "cells": [],
+    "mainPadding": "12px 12px 88px",
+    "searchPadding": "12px",
+    "scrollWidth": 375,
+    "clientWidth": 375,
+    "mobileCards": 0,
+    "nav": [
+      "Home",
+      "My items",
+      "My orders",
+      "Funds",
+      "My information"
+    ],
+    "nameAlign": null,
+    "notificationHeader": null,
+    "notificationActions": 0,
+    "orderBand": null,
+    "orderImage": false,
+    "body": "SparkTrack Creator\nHome\nMy items\nMy orders\nFunds\nMy information\nMy items\nEnglish\nMy information\nMy items\nProduct name\nSearch\nReset\nt\n\nt88 Product with a long name\n\nt88_ITEM-1001\n10/15/2026\n\nCopy link\n1",
+    "errors": []
+  }
+]

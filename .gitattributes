@@ -7,3 +7,4 @@ docs/01-报价与合同/ export-ignore
 docs/02-调研/ export-ignore
 docs/04-开发任务/ export-ignore
 docs/99-过程稿/ export-ignore
+.agents/ export-ignore

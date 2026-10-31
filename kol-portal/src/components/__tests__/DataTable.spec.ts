@@ -17,6 +17,40 @@ const columns = [
 ];
 
 describe("DataTable", () => {
+  it("aligns long content left while amounts, status and actions remain centered", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "manman-alignment",
+        rows: [{ id: "1", orderNo: "ORDER-123", amount: "100.00", status: "paid" }],
+        columns: [
+          { key: "orderNo", label: "订单号", align: "left" },
+          { key: "amount", label: "金额", amount: true },
+          { key: "status", label: "状态" },
+          { key: "actions", label: "操作" }
+        ],
+        total: 1
+      },
+      slots: { actions: '<button data-test="action">查看</button>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    const rendered = wrapper.findAllComponents({ name: "ElTableColumn" });
+    expect(rendered.map(column => column.props("align"))).toEqual([
+      "left",
+      "center",
+      "center",
+      "center"
+    ]);
+    expect(rendered.map(column => column.props("headerAlign"))).toEqual([
+      "left",
+      "center",
+      "center",
+      "center"
+    ]);
+    expect(wrapper.findComponent({ name: "ElTable" }).props("stripe")).toBe(false);
+    wrapper.unmount();
+  });
+
   it("places custom tabs in the toolbar while keeping refresh and pagination", async () => {
     const wrapper = mount(DataTable, {
       props: { tableId: "toolbar-tabs", rows: [], columns, total: 0 },

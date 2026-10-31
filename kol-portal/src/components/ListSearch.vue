@@ -1,6 +1,6 @@
 <!-- Ported from admin-ui/src/components/ListSearch.vue (task 58). Identical behaviour and styling; keep both in sync. -->
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, getCurrentInstance, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 defineOptions({ name: "ListSearch" });
@@ -11,12 +11,14 @@ export interface SearchChip {
   text: string;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     chips?: SearchChip[];
     hasMore?: boolean;
+    hideTitle?: boolean;
+    title?: string;
   }>(),
-  { chips: () => [], hasMore: false }
+  { chips: () => [], hasMore: false, hideTitle: false, title: undefined }
 );
 
 const emit = defineEmits<{
@@ -26,6 +28,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const instance = getCurrentInstance();
+const pageTitle = computed(() => {
+  if (props.hideTitle) return "";
+  if (props.title) return props.title;
+  const titleKey = instance?.proxy?.$route?.meta?.title;
+  return typeof titleKey === "string" ? t(titleKey) : "";
+});
 const expanded = ref(false);
 
 /** HTML will not submit a form that has several text inputs and no submit button. */
@@ -40,6 +49,12 @@ function onEnter(event: KeyboardEvent): void {
 
 <template>
   <section class="list-search">
+    <header v-if="pageTitle" class="list-search__header">
+      <h1>{{ pageTitle }}</h1>
+      <div v-if="$slots.actions" class="list-search__page-actions">
+        <slot name="actions" />
+      </div>
+    </header>
     <el-form class="list-search__form" @submit.prevent="emit('search')" @keyup.enter="onEnter">
       <div class="list-search__row">
         <slot name="primary" />
@@ -63,7 +78,7 @@ function onEnter(event: KeyboardEvent): void {
           >
             {{ expanded ? t("search.collapse") : t("search.expand") }}
           </el-button>
-          <div v-if="$slots.actions" class="list-search__extra">
+          <div v-if="$slots.actions && !pageTitle" class="list-search__extra">
             <slot name="actions" />
           </div>
         </div>
@@ -96,6 +111,30 @@ function onEnter(event: KeyboardEvent): void {
   background: var(--tcrm-color-card);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
+}
+.list-search__header,
+.list-search__page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+}
+.list-search__header {
+  justify-content: space-between;
+  margin-bottom: var(--tcrm-space-4);
+}
+.list-search__header h1 {
+  margin: 0;
+}
+@media (min-width: 1440px) and (min-height: 900px) {
+  .list-search {
+    padding: var(--tcrm-space-5);
+  }
+}
+@media (max-width: 767px) {
+  .list-search {
+    padding: var(--tcrm-space-3);
+  }
 }
 .list-search__form :deep(.el-form-item) {
   display: flex;

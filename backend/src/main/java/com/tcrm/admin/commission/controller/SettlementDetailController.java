@@ -90,10 +90,9 @@ public class SettlementDetailController {
       List<String> kolNames,
       String payment,
       String refund,
-      String net,
+      String weidianWithdrawable,
       String commission,
       List<String> rates,
-      String retained,
       String status,
       String businessAt,
       List<LineVO> lines) {
@@ -107,10 +106,9 @@ public class SettlementDetailController {
           row.kolNames(),
           row.payment(),
           row.refund(),
-          row.net(),
+          row.weidianWithdrawable(),
           row.commission(),
           row.rates(),
-          row.retained(),
           row.status(),
           row.businessAt() == null ? null : row.businessAt().toString(),
           row.lines().stream().map(LineVO::from).toList());

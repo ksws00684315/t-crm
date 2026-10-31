@@ -204,6 +204,10 @@ describe("refund query page (task 40)", () => {
     expect(drawer?.querySelector('[data-test="refund-detail"]')).not.toBeNull();
     expect(drawer?.textContent).toContain("wd-merchant-1");
     expect(drawer?.textContent).toContain("Blue / L");
+    expect(
+      [...(drawer?.querySelectorAll("thead th") ?? [])].map(item => item.textContent?.trim())
+    ).toEqual(["商品", "达人", "数量", "退款金额"]);
+    expect(drawer?.textContent).toContain("20.00 CNY");
     wrapper.unmount();
   });
 

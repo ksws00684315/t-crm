@@ -350,7 +350,7 @@ class CommissionIncomeServiceTest {
   void shouldBuildLinesWithDebitDirectionAndMissingParts() {
     when(states.listByKol(KOL)).thenReturn(List.of(stateRow()));
     when(orderSettlement.listOrdersByIds(anyCollection()))
-        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID")));
+        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID", null)));
     when(orderSettlement.listItemsByOrderIds(anyCollection()))
         .thenReturn(
             List.of(
@@ -399,7 +399,7 @@ class CommissionIncomeServiceTest {
     when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of());
     when(states.listByKol(KOL)).thenReturn(List.of(named, blankSku, missing));
     when(orderSettlement.listOrdersByIds(anyCollection()))
-        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID")));
+        .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID", null)));
     when(orderSettlement.listItemsByOrderIds(anyCollection()))
         .thenReturn(
             List.of(

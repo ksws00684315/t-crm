@@ -37,6 +37,18 @@ const Host = defineComponent({
 });
 
 describe("ListSearch", () => {
+  it("places the title and page actions inside the search card header", () => {
+    const wrapper = mount(ListSearch, {
+      props: { title: "订单列表" },
+      slots: { actions: '<button data-test="page-action">新增</button>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(wrapper.get(".list-search__header h1").text()).toBe("订单列表");
+    expect(wrapper.find(".list-search__header [data-test=page-action]").exists()).toBe(true);
+    expect(wrapper.find(".list-search__actions [data-test=page-action]").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("searches on a real Enter key in either of two inputs", async () => {
     const wrapper = mount(Host, { global: { plugins: [ElementPlus, i18n] } });
     expect(wrapper.text()).toContain("国家：美国");

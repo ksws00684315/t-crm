@@ -74,7 +74,6 @@ const financedChain: OrderChainVO = {
     payAmount: "180.00",
     refundTotal: "20.00",
     kolCommission: "16.00",
-    shopProfit: null,
     accountStatus: "UNVERIFIED"
   },
   financeFlows: [
@@ -129,7 +128,6 @@ const financedChain: OrderChainVO = {
       commission: {
         rateSnapshot: "0.1000",
         netCommission: "16.00",
-        shopProfit: null,
         releaseBasis: "CONFIRMED",
         occupiedTotal: "16.00",
         withdrawals: [
@@ -162,7 +160,6 @@ const financedChain: OrderChainVO = {
       commission: {
         rateSnapshot: null,
         netCommission: null,
-        shopProfit: null,
         releaseBasis: "UNVERIFIED",
         occupiedTotal: "0.00",
         withdrawals: []
@@ -358,7 +355,7 @@ describe("order chain page (task 40)", () => {
     expect(funds).toContain("20.00");
     expect(funds).toContain("待核实");
     expect(funds).not.toContain("开发中");
-    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain("暂无财务流水");
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
     wrapper.unmount();
   });
@@ -369,9 +366,9 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
 
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥16.00");
-    // Shop profit waits for the M0 Weidian settlement net: 待核实, never a number.
-    expect(funds).toContain("待核实");
+    expect(funds).toContain("16.00 CNY");
+    // Shop profit is gone from the funds card (task 81, L-024).
+    expect(funds).not.toContain("店铺获利");
 
     // Line 1: rate snapshot, occupation split by application state machine, rejected released.
     const blocks = wrapper.findAll('[data-test="chain-commission"]');
@@ -379,7 +376,7 @@ describe("order chain page (task 40)", () => {
     const first = blocks[0].text();
     expect(first).toContain("佣金与提现");
     expect(first).toContain("10%");
-    expect(first).toContain("¥16.00");
+    expect(first).toContain("16.00 CNY");
     expect(first).toContain("微店确认结算");
     expect(first).toContain("W20261023000001");
     expect(first).toContain("W20261025000002");
@@ -387,10 +384,10 @@ describe("order chain page (task 40)", () => {
     expect(first).toContain("已支付");
     expect(first).toContain("待支付");
     expect(first).toContain("已驳回");
-    // Line 2 stays unverified: null amounts read 待核实, the known occupation zero reads ¥0.00.
+    // Line 2 stays unverified: null amounts read 待核实, the known occupation zero reads 0.00 CNY.
     const secondText = blocks[1].text();
     expect(secondText).toContain("待核实");
-    expect(secondText).toContain("¥0.00");
+    expect(secondText).toContain("0.00 CNY");
     expect(secondText).toContain("无提现占用");
 
     // Finance flows: increase for the release credit, decrease for clawback and allocations,
@@ -411,6 +408,34 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("keeps the 1024 product summary and eight finance columns without guessing missing values", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    const summary = wrapper.get('[data-test="chain-product-summary"]');
+    expect(summary.text()).toContain("t40 Item");
+    expect(summary.text()).toContain("Blue / L");
+    expect(summary.text()).toContain("Zoe");
+    expect(summary.text()).toContain("10%");
+    expect(summary.text()).toContain("16.00 CNY");
+    expect(summary.text()).toContain("待核实");
+    const flowTable = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(table => table.props("tableId") === "chain-finance-flows");
+    expect(flowTable?.props("columns").map((column: { key: string }) => column.key)).toEqual([
+      "flowNo",
+      "shopName",
+      "type",
+      "direction",
+      "amount",
+      "businessAt",
+      "transferredAt",
+      "withdrawalNo"
+    ]);
+    expect(wrapper.get('[data-test="chain-wiring-details"]').text()).toContain("8001");
+    wrapper.unmount();
+  });
+
   it("explains missing financial data without commission:view (task 72)", async () => {
     signIn("STAFF", ["order:view"]);
     const { wrapper } = await mountPage();
@@ -423,6 +448,109 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("shows the six lifecycle nodes and backend occupation total without mixing finance flow amounts", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper } = await mountPage();
+    expect(wrapper.findAll(".chain-stages > li")).toHaveLength(6);
+    expect(wrapper.get('[data-test="chain-stage-order"]').text()).toContain("2026102100001");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("16.00 CNY");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("2 条");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("3 条");
+    expect(wrapper.get('[data-test="chain-stage-finance"]').text()).toContain("待核实");
+    const band = wrapper.get('[data-test="chain-header"]').text();
+    expect(band).not.toContain("Zoe");
+    expect(band).not.toContain("订单状态");
+    const summary = wrapper.get('[data-test="chain-product-summary"]');
+    expect(summary.findAll("thead th").map(item => item.text())).toEqual([
+      "商品名",
+      "状态",
+      "所属达人",
+      "支付金额",
+      "佣金比例",
+      "达人佣金",
+      "提现占用"
+    ]);
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["completed", "已完成", "success"],
+    ["failed", "失败", "danger"],
+    ["partial_failed", "部分失败", "warning"],
+    ["processing", "处理中", "info"],
+    [null, "待核实", "info"]
+  ])("renders the actual task status %s without inventing a state", async (status, text, tone) => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...chain,
+      lines: [{ ...chain.lines[0], copyJob: { jobCode: "JOB1", createTime: null, status } }]
+    });
+    const { wrapper } = await mountPage();
+    const node = wrapper.get('[data-test="chain-stage-copy"]');
+    expect(node.text()).toContain(text);
+    expect(node.find(`.chain-stage__state--${tone}`).exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("does not turn a partly unknown task set into a confirmed mixed state", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...chain,
+      lines: chain.lines.map((line, index) => ({
+        ...line,
+        copyJob: { jobCode: `JOB${index}`, createTime: null, status: index ? null : "completed" }
+      }))
+    });
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="chain-stage-copy"]').text()).toContain("待核实");
+    expect(wrapper.get('[data-test="chain-stage-copy"]').text()).not.toContain("多种状态");
+    wrapper.unmount();
+  });
+
+  it("explains an incompatible finance response instead of rendering undefined labels", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      financeFlows: [{ ledgerId: "legacy-flow", amount: "18.00" }]
+    } as unknown as OrderChainVO);
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("flowType.undefined");
+    wrapper.unmount();
+  });
+
+  it("does not describe a legacy response without finance fields as an empty ledger", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      orderId: chain.orderId,
+      orderNo: chain.orderNo,
+      lines: chain.lines
+    } as OrderChainVO);
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="chain-finance-ledger"]').text()).not.toContain("暂无财务流水");
+    wrapper.unmount();
+  });
+
+  it("only calls an explicit empty flow array empty, and rejects blank critical fields", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({ ...financedChain, financeFlows: [] });
+    let result = await mountPage();
+    expect(result.wrapper.find('[data-test="chain-finance-ledger"]').text()).toContain(
+      "暂无财务流水"
+    );
+    result.wrapper.unmount();
+    vi.mocked(orderApi.getOrderChain).mockResolvedValueOnce({
+      ...financedChain,
+      financeFlows: [{ ...financedChain.financeFlows![0], flowNo: " " }]
+    });
+    result = await mountPage();
+    expect(result.wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
+    result.wrapper.unmount();
+  });
+
   it("treats null financial blocks of an OWN viewer as scope limited (task 72)", async () => {
     signIn("STAFF", ["order:view", "commission:view"], "OWN");
     const { wrapper } = await mountPage();
@@ -432,15 +560,15 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("keeps shop profit needs-verification for an OWN viewer whose funds are visible", async () => {
-    // Mixed orders hide the whole funds block; fully covered orders show it, and the M0-pending
-    // shop profit then reads 待核实 exactly like the line-level block — not the scope note.
+  it("hides shop profit for an OWN viewer whose funds are visible", async () => {
+    // Mixed orders hide the whole funds block; fully covered orders show it without a shop
+    // profit card (task 81, L-024) and without the scope note.
     signIn("STAFF", ["order:view", "commission:view"], "OWN");
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥16.00");
-    expect(funds).toContain("待核实");
+    expect(funds).toContain("16.00 CNY");
+    expect(funds).not.toContain("店铺获利");
     expect(funds).not.toContain("当前权限仅展示本人范围商品行");
     expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
     wrapper.unmount();
@@ -449,7 +577,7 @@ describe("order chain page (task 40)", () => {
   it("deduplicates one refund across lines in the fallback total and formats every card", async () => {
     // Without commission:view the funds block is null, so the refund total falls back to the
     // client sum: the same refund attached to both lines must count once (B07 dedup rule), and
-    // all four cards share the formatPrice rendering (¥ prefix), not raw strings.
+    // all four cards share the amount-plus-currency rendering, not raw strings.
     signIn("STAFF", ["order:view"]);
     const duplicated: OrderChainVO = {
       ...chain,
@@ -473,8 +601,8 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("¥180.00");
-    expect(funds).toContain("¥20.00");
+    expect(funds).toContain("180.00 CNY");
+    expect(funds).toContain("20.00 CNY");
     wrapper.unmount();
   });
 

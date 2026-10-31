@@ -119,7 +119,7 @@ async function save(): Promise<void> {
         {{ t("user.currentPost", { post: postLabel(user?.postTemplate) }) }}
       </p>
       <PermissionPicker v-if="catalog" v-model="permissions" :items="catalog.permissions" />
-      <el-form label-width="110px">
+      <el-form label-position="top">
         <el-form-item :label="t('user.dataScope')">
           <el-radio-group v-model="dataScope" data-test="data-scope">
             <el-radio v-for="scope in dataScopes" :key="scope.value" :value="scope.value">

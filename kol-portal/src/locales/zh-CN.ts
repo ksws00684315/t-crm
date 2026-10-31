@@ -183,7 +183,8 @@ const zhCN: MessageSchema = {
     settlement: {
       WITHDRAWN: "已提现",
       FROZEN: "冻结中",
-      INVALID: "失效订单",
+      INVALID: "待核实",
+      NO_COMMISSION: "无佣金",
       WITHDRAWING: "提现中",
       WITHDRAWABLE: "可提现"
     },

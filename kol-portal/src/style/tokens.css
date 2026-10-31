@@ -14,6 +14,18 @@
   --tcrm-color-card: #ffffff;
   --tcrm-color-muted: #f0f2f5;
   --tcrm-color-border: #e2e5ea;
+  --tcrm-color-input-border: #d5dbe5;
+  --tcrm-color-table-header: #fafafa;
+  --tcrm-color-table-border: #e9edf2;
+  --tcrm-color-table-text: #1f1f1f;
+  --tcrm-color-table-secondary: #595959;
+  --tcrm-color-table-placeholder: #6b737d;
+  --tcrm-color-order-band: color-mix(in srgb, var(--tcrm-color-primary) 8%, var(--tcrm-color-card));
+  --tcrm-color-chain-finance: #8b5cf6;
+  --tcrm-order-detail-width: 880px;
+  --tcrm-refund-detail-width: 800px;
+  --tcrm-color-primary-hover: #1e4bbb;
+  --tcrm-color-primary-active: #193fa8;
   --tcrm-color-text: #15181d;
   --tcrm-color-text-secondary: #5c6470;
   --tcrm-color-success: #1e7a4c;
@@ -32,32 +44,46 @@
   --tcrm-space-6: 32px;
   --tcrm-control-height: 32px;
   --tcrm-control-height-mobile: 44px;
+  --tcrm-focus-width: 2px;
   --tcrm-radius-card: 12px;
   --tcrm-radius-control: 8px;
   --tcrm-radius-tag: 6px;
   --tcrm-sidebar-width: 224px;
   --tcrm-sidebar-collapsed: 64px;
   --tcrm-header-height: 56px;
-  --tcrm-table-header-height: 40px;
+  --tcrm-table-header-height: 48px;
+  --tcrm-table-legacy-header-height: 40px;
+  --tcrm-table-padding-loose: 20px;
   --tcrm-font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial,
     sans-serif;
   --tcrm-font-size-body: 14px;
   --tcrm-line-height-body: 22px;
-  --tcrm-font-size-title: 20px;
-  --tcrm-line-height-title: 28px;
+  --tcrm-font-size-title: 24px;
+  --tcrm-line-height-title: 32px;
+  --tcrm-font-size-brand: 20px;
+  --tcrm-line-height-brand: 28px;
+  --tcrm-font-size-table: 15px;
+  --tcrm-line-height-table: 24px;
+  --tcrm-font-size-menu: 15px;
+  --tcrm-line-height-menu: 24px;
   --tcrm-font-size-section: 16px;
   --tcrm-line-height-section: 24px;
-  --tcrm-font-size-help: 12px;
-  --tcrm-line-height-help: 20px;
+  --tcrm-font-size-help: 14px;
+  --tcrm-line-height-help: 22px;
 
   --el-color-primary: var(--tcrm-color-primary);
+  --el-color-primary-light-3: var(--tcrm-color-primary-hover);
+  --el-color-primary-dark-2: var(--tcrm-color-primary-active);
   --el-color-success: var(--tcrm-color-success);
   --el-color-warning: var(--tcrm-color-warning);
   --el-color-danger: var(--tcrm-color-danger);
   --el-color-info: var(--tcrm-color-text-secondary);
   --el-color-success-light-9: var(--tcrm-color-success-bg);
   --el-color-warning-light-9: var(--tcrm-color-warning-bg);
+  --el-color-error: var(--tcrm-color-danger);
+  --el-color-error-light-9: var(--tcrm-color-danger-bg);
+  --el-color-error-light-8: var(--tcrm-color-danger-bg);
   --el-color-danger-light-9: var(--tcrm-color-danger-bg);
   --el-color-info-light-9: var(--tcrm-color-muted);
   --el-color-success-light-8: var(--tcrm-color-success-bg);
@@ -108,4 +134,9 @@
 .el-input__wrapper,
 .el-select__wrapper {
   border-radius: var(--tcrm-radius-control);
+}
+
+.el-input__wrapper,
+.el-select__wrapper {
+  box-shadow: 0 0 0 1px var(--tcrm-color-input-border) inset;
 }
