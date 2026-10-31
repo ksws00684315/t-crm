@@ -185,6 +185,13 @@ license.override = ["BSD-3-Clause"]
 reason = "Registry metadata carries no license; the packaged LICENSE is the BSD-3-Clause text (Copyright (c) 2009-2011, Mozilla Foundation and contributors). Runtime dependency of the Vue/Vite toolchain output. Official original: https://github.com/7rulnik/source-map-js/blob/v1.2.2/LICENSE"
 
 [[PackageOverrides]]
+name = "@isaacs/nonrecursive-glob-match"
+version = "1.0.3"
+ecosystem = "npm"
+license.ignore = true
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): minimatch@11.0.1 > @isaacs/nonrecursive-glob-match, via eslint, typescript-eslint and generate-license-file. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
+
+[[PackageOverrides]]
 name = "argparse"
 version = "2.0.1"
 ecosystem = "npm"
@@ -207,10 +214,10 @@ reason = "Actual license: BlueOak-1.0.0 (license field of the installed package)
 
 [[PackageOverrides]]
 name = "glob"
-version = "13.0.6"
+version = "14.0.2"
 ecosystem = "npm"
 license.ignore = true
-reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > glob, and @vue/test-utils > js-beautify > glob. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > glob, and @vue/test-utils > js-beautify > glob; pinned to 14.0.2 by the overrides in pnpm-workspace.yaml (GHSA-3g3m-2fjr-6pw4). Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "isexe"
@@ -228,10 +235,10 @@ reason = "Actual license: BlueOak-1.0.0 (license field of the installed package)
 
 [[PackageOverrides]]
 name = "minimatch"
-version = "10.2.6"
+version = "11.0.1"
 ecosystem = "npm"
 license.ignore = true
-reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > @npmcli/arborist > minimatch, typescript-eslint > @typescript-eslint/typescript-estree > minimatch (also via eslint-plugin-vue > @typescript-eslint/parser), and @vue/test-utils > js-beautify > editorconfig > minimatch. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): eslint > @eslint/config-array > minimatch (also via typescript-eslint, eslint-plugin-vue, eslint-plugin-prettier), generate-license-file > @npmcli/arborist > minimatch, and @vue/test-utils > js-beautify > editorconfig > minimatch; pinned to 11.0.1 by the overrides in pnpm-workspace.yaml (GHSA-g3hv-75wg-m249). Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "minipass"
@@ -249,10 +256,10 @@ reason = "Actual license: BlueOak-1.0.0 (license field of the installed package)
 
 [[PackageOverrides]]
 name = "path-scurry"
-version = "2.0.2"
+version = "3.0.0"
 ecosystem = "npm"
 license.ignore = true
-reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): generate-license-file > glob > path-scurry, and @vue/test-utils > js-beautify > glob > path-scurry. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
+reason = "Actual license: BlueOak-1.0.0 (license field of the installed package). Introduction path (devDependencies only, in both admin-ui and kol-portal): glob@14.0.2 > path-scurry, via generate-license-file and @vue/test-utils > js-beautify. Not in any build artifact: absent from the production dependency tree (`pnpm list --prod`), so it is not bundled into dist/, not listed in THIRD-PARTY-NOTICES, and not copied into the static bundles or images. Basis: spec 07 section 3 build/test tool rule (OSI-approved license, not shipped, unmodified, not linked into business code; ADR-007)."
 
 [[PackageOverrides]]
 name = "spdx-exceptions"
