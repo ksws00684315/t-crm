@@ -2,3 +2,8 @@
 # Only esbuild needs its postinstall (downloads/links the platform binary).
 onlyBuiltDependencies:
   - esbuild
+
+# Patched transitive dev-tool dependencies (OSV: GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249).
+overrides:
+  glob: 14.0.2
+  "minimatch@<11.0.1": 11.0.1
