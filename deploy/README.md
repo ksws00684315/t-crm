@@ -11,7 +11,11 @@
 | `scripts/renew-public-cert.sh` | 申请与续期 `admin.`、`upload.` 的 Let's Encrypt 公开证书（DNS-01），放到证书目录并重载 Nginx |
 | `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `scripts/local-infra.sh` | 本地共享中间件的启动、停止、备份、恢复与维护命令 |
-| `backup/pg-backup.sh` | 每日 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 R2） |
+| `backup/pg-backup.sh` | 每日加密 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 S3） |
+| `backup/pgbackrest-backup.sh` | pgBackRest 定时备份（周日全量、其余日差异，结束前 `check`） |
+| `backup/restore-pitr.sh` | 时间点 / 最新点恢复脚本（需输入 `yes`） |
+| `backup/iam-policy.example.json` | 备份写入身份的 IAM 最小权限策略示例 |
+| `postgres/` | 带 pgBackRest 的 PostgreSQL 镜像（Dockerfile、`pgbackrest.conf`）与初始化脚本 |
 | `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
 
@@ -140,8 +144,8 @@ deploy/scripts/local-infra.sh psql
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
    商品源表（ADR-021）不需要新的环境变量，但要求后端能直连 `oauth2.googleapis.com` 与 `sheets.googleapis.com`（服务器部署在海外）。客户需在自己的 Google Cloud 项目中创建服务账号、启用 Google Sheets API、下载 JSON 密钥；超管在管理端「商品 → 商品源表」上传密钥（私钥加密保存，依赖 `TCRM_SECRET_KEY`），再把每张源表分享给页面上显示的服务账号邮箱（查看者）。
 3. 构建前端静态文件：`deploy/scripts/build-static.sh`（需要 Node.js 与 pnpm），输出到 `TCRM_STATIC_DIR`（默认 `deploy/www`）。
-4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时 `up` 会报找不到卷。先生成公开证书（下文），再启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`（没有 `public.pem` 时 Nginx 起不来）。
-5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`（在容器内以管理超级用户 `TCRM_DB_SUPERUSER_USERNAME` 执行 `pg_dump`；备份中的对象归属应用账号，恢复时同样用超级用户）；上线前做一次恢复演练（命令见脚本头部）。
+4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时 `up` 会报找不到卷。先生成公开证书（下文），再启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`（postgres 镜像暂在本机构建，含写死版本的 pgBackRest，任务 95 改为拉取镜像）；首次启动后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份（没有 `public.pem` 时 Nginx 起不来）。
+5. 备份（ADR-037）：按下文「备份与恢复」配置 pgBackRest 与每日加密逻辑备份，上线前做一次完整恢复演练。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
 8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`public.pem` 覆盖 `upload.<域名>`（用 `openssl s_client -connect upload.<域名>:443 -servername upload.<域名> </dev/null | openssl x509 -noout -issuer -subject` 确认签发者是 Let's Encrypt，而不是 Cloudflare 源站证书）；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
@@ -169,6 +173,105 @@ deploy/scripts/local-infra.sh psql
 - 安全组入站只开 80、443（任意来源，`upload.` 灰云需要直连）和 SSH（限制为负责人的固定来源 IP，不要对 `0.0.0.0/0` 开放）。PostgreSQL、Redis、后台、跳转服务没有发布端口，不要为它们开放任何入站规则。
 - `upload.` 直连会暴露源站 IP，安全组无法只放行 Cloudflare 回源段；`t.`、`kol.`、`admin.` 由 Nginx 的回源认证拒绝绕过 Cloudflare 的请求。
 - `/etc/docker/daemon.json` 建议设置 `{"live-restore": true}`（修改后 `systemctl reload docker`）：升级或重启 Docker 守护进程时，容器继续运行。该文件属主机配置，不在仓库内。
+
+## 备份与恢复
+
+依据 [ADR-037](../docs/06-架构决策/ADR-037-生产部署拓扑与AWS备份容灾.md) 决定 5、6。恢复目标是**建议值，待客户确认**（待确认清单第 35 项）：最多丢失约 5 分钟数据，整机故障 2 小时内恢复。
+
+### 备份层次
+
+| 层次 | 内容 | 频率与保留 | 位置 |
+|---|---|---|---|
+| 1. pgBackRest | 全量 + 差异备份，加 WAL 连续归档；客户端加密（aes-256-cbc），S3 只看到密文 | WAL 持续归档（`archive_timeout=300`，空闲时最多 5 分钟切换一次）；周日全量、其余日差异；保留 4 个全量（约四周） | S3，路径 `PGBACKREST_REPO1_PATH`（默认 `/pgbackrest`） |
+| 2. 逻辑备份 | `pg_dump` 自定义格式，`gpg` 对称加密（AES256），只保留 `.dump.gpg` | 每日 03:00；7 日 + 4 周（周日） | 本机 `TCRM_BACKUP_DIR`；S3 `<前缀>/daily/`、`<前缀>/weekly/` |
+| 3. S3 防护 | 跨区域复制、Object Lock、生命周期规则（`daily/` 7 日、`weekly/` 28 日） | 由负责人在 AWS 控制台配置（负责人操作清单），仓库不创建 | S3 |
+| 4. 云快照 | 只用于恢复主机系统环境，**不是**数据备份 | 按需 | EC2 / Lightsail |
+| Redis | 只在本机保留 AOF，**不做异地备份** | 持续 | 本机数据卷 |
+
+两层数据库备份互为补充：pgBackRest 负责按时间点恢复，逻辑备份用于跨版本迁移、单库取回，以及 pgBackRest 仓库本身出问题时的兜底。
+
+**Redis 不做异地备份的理由**：Redis 里是可重建的数据。链接索引由数据库重建（每天 04:30 UTC 自动全量重建，丢失后超管点「重建链接索引」立即恢复）；登录会话丢失只需重新登录；未消费的点击流是仅有的损失，量小且只影响统计。需要永久保存的业务数据都在 PostgreSQL。因此不为 Redis 增加备份和恢复流程。
+
+**主密钥和备份口令必须与备份分开存放**。以下三项分别保存在受控的密钥库（如密码管理器），不放在主机的备份目录、S3 桶或仓库里，也不要只保存在被备份的这台主机上：`PGBACKREST_REPO1_CIPHER_PASS`（丢失则 pgBackRest 的所有备份无法读取）、`TCRM_BACKUP_PASSPHRASE_FILE` 的内容（丢失则所有 `.dump.gpg` 无法解密）、`TCRM_SECRET_KEY`（数据库里的微店等凭证用它加密，丢失则恢复后凭证全部要重新录入）。备份与密钥放在一起，加密就失去意义。
+
+### 配置与首次启用
+
+1. 在 `deploy/.env` 填写 `.env.example`「Backup and restore」一节：`PGBACKREST_REPO1_S3_BUCKET`、`PGBACKREST_REPO1_CIPHER_PASS`（`openssl rand -base64 32` 生成）、区域；凭证二选一：**实例角色**（`PGBACKREST_REPO1_S3_KEY_TYPE=auto`，不写访问密钥那两行）或**访问密钥**（`KEY_TYPE=shared` 并设置 `PGBACKREST_REPO1_S3_KEY`、`PGBACKREST_REPO1_S3_KEY_SECRET`）。可选变量要么注释掉要么删除，**不能留空**：pgBackRest 对空的 `PGBACKREST_*` 变量直接报错。密钥和口令只经环境变量传入，不写进 `command`、`pgbackrest.conf` 或镜像；`pg_stat_activity`、PostgreSQL 日志和 pgBackRest 日志里都没有口令（pgBackRest 自己的日志把它显示为 `<redacted>`）。
+2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
+3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：
+
+   ```bash
+   cd /opt/tcrm   # 仓库根目录
+   PB="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -u postgres postgres pgbackrest --stanza=tcrm"
+   $PB stanza-create
+   $PB check                                  # 确认 WAL 能归档到 S3
+   deploy/backup/pgbackrest-backup.sh full
+   $PB info                                   # 查看备份集和 WAL 范围
+   ```
+
+4. 逻辑备份需要主机装有 `gpg` 和 AWS CLI。口令文件放在仓库之外，权限 600：`install -m 600 /dev/null /etc/tcrm/backup.pass`，再写入随机口令（`openssl rand -base64 32 > /etc/tcrm/backup.pass`），路径写进 `TCRM_BACKUP_PASSPHRASE_FILE`。脚本发现权限不是 600 会拒绝运行。
+5. 定时任务（主机 crontab，时间为主机时钟，建议主机用 UTC）：
+
+   ```
+   0 2 * * * /opt/tcrm/deploy/backup/pgbackrest-backup.sh >> /var/log/tcrm-pgbackrest.log 2>&1
+   0 3 * * * /opt/tcrm/deploy/backup/pg-backup.sh >> /var/log/tcrm-backup.log 2>&1
+   ```
+
+   两个脚本失败时都非零退出；告警接入由任务 96 完成。
+
+### S3 不可用时
+
+WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：积压超过 4 GiB 后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据盘不会被写满、数据库继续可写。数据盘要为此预留空间：最坏情况下 `pg_wal` 约为 4 GiB 队列加 PostgreSQL 自身的 `max_wal_size`（默认 1 GiB）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。监控 `archive_command` 失败和 `pg_wal` 大小是任务 96 的内容。
+
+### 恢复
+
+**pgBackRest 时间点恢复**（整库）：
+
+```bash
+deploy/backup/restore-pitr.sh latest                          # 最新已归档点，最多丢失约 5 分钟
+deploy/backup/restore-pitr.sh "2026-11-01 08:30:00"           # 指定时间点，未带时区时按 UTC
+deploy/backup/restore-pitr.sh --overwrite "2026-11-01 08:30:00"  # 数据目录非空时必须显式加
+```
+
+脚本先打印目标项目、目标时间和将被覆盖的内容，输入 `yes` 才继续；数据目录非空而没有 `--overwrite` 时拒绝。随后停止 crm-admin、crm-redirect、postgres（站点不可用），用一次性容器执行 `pgbackrest restore`，启动 postgres 等待回放结束，再启动应用。结束时打印必须人工完成的事：
+
+1. 登录超管，在「对应关系」页点击「重建链接索引」（Redis 没有被恢复）；
+2. 核对钱包核对日志：`docker compose ... logs crm-admin | grep "wallet reconciliation"`，出现 `mismatched creators` 时逐个达人核对余额与台账；
+3. 核对恢复点之后发生的人工操作（人工归因、提现付款、预付）。它们无法从微店补拉，要按业务记录补录；
+4. 立即做一次全量备份（恢复产生新的时间线）；
+5. 管理员和达人需要重新登录。
+
+主机崩溃后数据卷还在、但 PostgreSQL 没有正常关闭时，数据目录里会残留 `postmaster.pid`，pgBackRest 会拒绝恢复（提示 `unable to restore while PostgreSQL is running`）。确认 postgres 容器已停止后，手动删除这个文件再重新执行脚本。
+
+整机丢失时：按「生产部署」在新主机上准备 `.env`（同样的 `TCRM_SECRET_KEY`、`PGBACKREST_*`）和一个**空**数据卷，启动 Compose 之前不要初始化数据库；执行 `restore-pitr.sh latest`（空数据卷不需要 `--overwrite`），其余同上。
+
+**逻辑备份恢复**（取回某个 `.dump.gpg`；对象归属应用账号，恢复到空库，用管理超级用户）：
+
+```bash
+# 从 S3 取回（本机的备份在 TCRM_BACKUP_DIR 里）
+aws s3 cp --region us-west-2 s3://<桶>/<前缀>/daily/tcrm-<时间>.dump.gpg .
+# 解密后直接送入 pg_restore，明文只在管道里
+gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.pass \
+    --decrypt tcrm-<时间>.dump.gpg \
+  | docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T postgres \
+      sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+```
+
+### 恢复演练（上线前一次，此后每季度一次）
+
+在**另一台**主机或独立的 Compose 项目上做，不要动生产数据卷：
+
+1. 准备与生产相同的 `.env`（`PGBACKREST_*`、`TCRM_SECRET_KEY`），数据卷为空。
+2. 执行 `deploy/backup/restore-pitr.sh latest`，再试一次指定时间点；记录从开始到后台可登录的总耗时（对照 2 小时目标）和实际丢失的数据量（对照约 5 分钟目标）。
+3. 另取最近一个 `.dump.gpg` 走一遍逻辑备份恢复，确认解密口令有效。
+4. 核对项，与生产对照（SQL 在恢复出的库里执行）：
+   - 达人：`select count(*) from crm_kol;`
+   - 订单：`select count(*), max(create_time) from crm_order;`
+   - 钱包余额：`select count(*), sum(balance_cny) from crm_commission_wallet;`
+   - 提现记录：`select count(*), max(create_time) from crm_commission_withdrawal;`
+   - 后台能启动，Flyway 严格模式校验通过（日志出现 `Successfully validated ... migrations` 和 `Schema "public" is up to date`）；
+   - 登录超管，重建链接索引，抽查一条推广链接能跳转；钱包核对日志没有 `mismatched creators`。
+5. 把耗时、丢失窗口、核对结果记入演练记录；S3 连通、跨区域复制和 Object Lock 的实际效果也在这次演练里确认。
 
 ## 邮件服务（Resend）
 
