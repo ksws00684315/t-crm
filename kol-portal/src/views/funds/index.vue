@@ -397,15 +397,15 @@ onMounted(load);
         </ol>
         <p v-if="prepayNote" class="progress-note" data-test="prepay-note">{{ prepayNote }}</p>
       </section>
-      <section class="action-card" data-test="action-card">
-        <el-button type="primary" data-test="apply-withdrawal" @click="openApply()">{{
-          t("funds.apply")
-        }}</el-button>
-        <el-button data-test="manage-accounts" @click="router.push('/payout-accounts')">{{
-          t("funds.manageAccounts")
-        }}</el-button>
-      </section>
     </template>
+    <section class="action-card" data-test="action-card">
+      <el-button type="primary" data-test="apply-withdrawal" @click="openApply()">{{
+        t("funds.apply")
+      }}</el-button>
+      <el-button data-test="manage-accounts" @click="router.push('/payout-accounts')">{{
+        t("funds.manageAccounts")
+      }}</el-button>
+    </section>
     <DataTable
       table-id="fund-records"
       class="records-table"
@@ -685,6 +685,9 @@ h1 {
 .progress-step--success {
   border-color: var(--tcrm-color-success);
   background: var(--tcrm-color-success-bg);
+}
+.progress-step--warning {
+  background: var(--tcrm-color-warning-bg);
 }
 .progress-step__label {
   display: inline-flex;

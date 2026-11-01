@@ -170,7 +170,6 @@ const zhCN: MessageSchema = {
     gmv: "GMV",
     commission: "佣金",
     ordersCount: "订单数",
-    tooltipDate: "日期",
     gmvNote: "GMV 为订单支付金额，未扣除退款。",
     noTrend: "该期间暂无销售数据",
     trendLabel: "GMV 与佣金趋势图"

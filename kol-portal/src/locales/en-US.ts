@@ -173,7 +173,6 @@ const enUS = {
     gmv: "GMV",
     commission: "Commission",
     ordersCount: "Orders",
-    tooltipDate: "Date",
     gmvNote: "GMV is the amount paid, before refunds.",
     noTrend: "No sales data for this period",
     trendLabel: "GMV and commission trend chart"

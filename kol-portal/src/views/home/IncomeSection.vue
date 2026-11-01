@@ -202,6 +202,11 @@ function withdraw() {
   }
 }
 @media (max-width: 767px) {
+  /* On a phone the button always sits under the amount. */
+  .withdraw-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .income-card {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--tcrm-space-4);

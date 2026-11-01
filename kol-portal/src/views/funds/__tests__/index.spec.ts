@@ -387,6 +387,14 @@ describe("withdrawal actions and the ?apply=1 link (task 92 sections 4.2, 4.3)",
     expect(wrapper.findAll('[data-test="apply-withdrawal"]')).toHaveLength(1);
   });
 
+  it("keeps the withdrawal actions when the overview fails to load", async () => {
+    vi.mocked(api.getFundSummary).mockRejectedValue(new Error("down"));
+    await page();
+    expect(wrapper.find('[data-test="progress-card"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="apply-withdrawal"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="manage-accounts"]').exists()).toBe(true);
+  });
+
   it("requests the records from the server page by page and not the old withdrawal list", async () => {
     await page();
     expect(api.getFundRecords).toHaveBeenCalledTimes(1);

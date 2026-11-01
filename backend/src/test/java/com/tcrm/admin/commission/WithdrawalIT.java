@@ -81,6 +81,7 @@ class WithdrawalIT {
 
   @Autowired private JdbcTemplate jdbc;
   @Autowired private WithdrawalService withdrawals;
+  @Autowired private com.tcrm.admin.commission.service.KolCommissionService kolCommission;
   @Autowired private CommissionWalletService walletService;
   @Autowired private WithdrawalOutboxDelivery outbox;
   @Autowired private SecretCipher cipher;
@@ -527,6 +528,21 @@ class WithdrawalIT {
                   null));
       assertThat(withdrawals.withdraw(kol(kolId), open.id()).status()).isEqualTo("WITHDRAWN");
       assertThat(withdrawals.conditions(TENANT_ID, kolId).available()).isEqualTo("250.00");
+      // Fund records (task 92) list every application in any status, newest first, with no
+      // receipt time until paid, and show nothing of another creator.
+      var records = kolCommission.fundRecords(TENANT_ID, kolId, 1, 20);
+      assertThat(records.total()).isEqualTo(3);
+      assertThat(records.items())
+          .extracting(row -> String.valueOf(row.sourceId()))
+          .containsExactly(
+              String.valueOf(open.id()),
+              String.valueOf(resubmitted.id()),
+              String.valueOf(applied.id()));
+      assertThat(records.items())
+          .extracting(com.tcrm.admin.commission.service.KolCommissionService.FundRecord::publicStatus)
+          .containsExactly("WITHDRAWN", "PENDING_REVIEW", "REJECTED");
+      assertThat(records.items()).allMatch(row -> row.receivedAt() == null);
+      assertThat(kolCommission.fundRecords(TENANT_ID, kolId + 1, 1, 20).items()).isEmpty();
     }
   }
 
