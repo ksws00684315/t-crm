@@ -335,6 +335,7 @@ class AdminWithdrawalControllerTest {
                         "BD",
                         "PREPAY",
                         "APPROVED",
+                        false,
                         "70.00",
                         "CNY",
                         NOW)),

@@ -8,7 +8,6 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -25,25 +24,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommissionWalletService {
   private final CommissionWalletMapper wallets;
   private final KolApi kols;
-  private final SystemConfigApi configs;
   private final Clock clock;
 
   @Autowired
-  public CommissionWalletService(
-      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs) {
-    this(wallets, kols, configs, Clock.systemUTC());
+  public CommissionWalletService(CommissionWalletMapper wallets, KolApi kols) {
+    this(wallets, kols, Clock.systemUTC());
   }
 
-  CommissionWalletService(
-      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs, Clock clock) {
+  CommissionWalletService(CommissionWalletMapper wallets, KolApi kols, Clock clock) {
     this.wallets = wallets;
     this.kols = kols;
-    this.configs = configs;
     this.clock = clock;
   }
-
-  public record Balance(
-      String availableCny, String minimumWithdrawalCny, boolean withdrawalEligible) {}
 
   public record CreditCommand(
       long tenantId,
@@ -207,23 +199,6 @@ public class CommissionWalletService {
   }
 
   @Transactional(readOnly = true)
-  public Balance balance(long tenantId, long kolId, BigDecimal minimumWithdrawalCny) {
-    BigDecimal available = currentBalance(tenantId, kolId);
-    BigDecimal minimum = minimumWithdrawalCny.setScale(2, RoundingMode.UNNECESSARY);
-    return new Balance(
-        money(available),
-        money(minimum),
-        available.signum() >= 0 && available.compareTo(minimum) >= 0);
-  }
-
-  /** Balance and configured withdrawal threshold for the future withdrawal application flow. */
-  @Transactional(readOnly = true)
-  public Balance withdrawalEligibility(long tenantId, long kolId) {
-    BigDecimal minimum = BigDecimal.valueOf(configs.getInt("commission.minimum-withdrawal-cny"));
-    return balance(tenantId, kolId, minimum);
-  }
-
-  @Transactional(readOnly = true)
   public BigDecimal currentBalance(long tenantId, long kolId) {
     return TenantScope.callCompany(
         tenantId,
@@ -356,9 +331,5 @@ public class CommissionWalletService {
 
   private static Instant truncate(Instant value) {
     return value.truncatedTo(ChronoUnit.MILLIS);
-  }
-
-  private static String money(BigDecimal value) {
-    return value.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
   }
 }

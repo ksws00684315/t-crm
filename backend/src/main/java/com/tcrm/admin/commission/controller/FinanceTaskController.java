@@ -98,6 +98,7 @@ public class FinanceTaskController {
       String amount,
       String currency,
       String status,
+      boolean paused,
       String createdAt,
       String bdId,
       String bdName) {
@@ -112,6 +113,7 @@ public class FinanceTaskController {
           row.amount(),
           row.currency(),
           row.status(),
+          row.paused(),
           row.createdAt().toString(),
           row.bdId() == null ? null : row.bdId().toString(),
           row.bdName());

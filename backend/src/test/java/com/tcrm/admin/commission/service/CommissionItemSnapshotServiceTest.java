@@ -43,18 +43,20 @@ class CommissionItemSnapshotServiceTest {
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionRuleVersionMapper ruleVersions = mock(CommissionRuleVersionMapper.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
+  private final WithdrawalPauseService pauses = mock(WithdrawalPauseService.class);
   private final KolApi kols = mock(KolApi.class);
   private final com.tcrm.admin.shared.CurrentTenantResolver tenantResolver = () -> TENANT;
   private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
   private final CommissionItemSnapshotService service =
       new CommissionItemSnapshotService(
-          states, revisions, ruleVersions, wallet, kols, tenantResolver, clock);
+          states, revisions, ruleVersions, wallet, pauses, kols, tenantResolver, clock);
 
   @BeforeEach
   void prepare() {
     when(ruleVersions.findEffectiveAt(any())).thenReturn(null);
     when(kols.rateEffectiveAt(anyLong(), any())).thenReturn(null);
     when(states.deleteStaleByOrder(anyLong(), anyCollection(), any())).thenReturn(0);
+    when(states.findStaleIdsByOrder(anyLong(), anyCollection())).thenReturn(List.of());
   }
 
   @Test
@@ -301,6 +303,43 @@ class CommissionItemSnapshotServiceTest {
     TenantScope.runCompany(
         TENANT, () -> service.syncOrderItems(order(), List.of(item(9001L, KOL_A, 1, null, null))));
     verify(states).deleteStaleByOrder(eq(5001L), eq(List.of(9001L)), eq(NOW));
+  }
+
+  @Test
+  void shouldPauseWithdrawalsWhenLineEntersAfterSales_andResumeWhenItLeaves() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+
+    syncAfterSales(true);
+    verify(pauses).pauseForItem(row.getId());
+    verify(pauses, never()).resumeForItem(anyLong());
+
+    syncAfterSales(false);
+    verify(pauses).resumeForItem(row.getId());
+  }
+
+  @Test
+  void shouldNotRepeatPauseLinkageWhenRepeatedSyncChangesNothing() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    firstRevision(new BigDecimal("100.00"));
+    syncAfterSales(true);
+    org.mockito.Mockito.clearInvocations(pauses);
+    // Same fingerprint as the stored revision: the sync skips the line entirely, so no duplicate
+    // PAUSED history or calls.
+    syncAfterSales(true);
+    verify(pauses, never()).pauseForItem(anyLong());
+    verify(pauses, never()).resumeForItem(anyLong());
+  }
+
+  @Test
+  void shouldResumePausesHeldByLinesDroppedFromAFullSync() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    firstRevision(new BigDecimal("100.00"));
+    when(states.findStaleIdsByOrder(eq(5001L), anyCollection())).thenReturn(List.of(7001L));
+    // The next sync only carries line 9002, so line 9001's snapshot goes stale and can no longer
+    // block: the pause it held must lift.
+    syncLine(item(9002L, KOL_A, 1, new BigDecimal("50.00"), null));
+    verify(pauses).resumeForItem(7001L);
   }
 
   /** Registers line 9001 and makes later syncs of the test find the row it created. */

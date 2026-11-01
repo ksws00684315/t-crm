@@ -314,6 +314,11 @@ class BusinessChainIT {
     JsonNode kolOrders = world.kolOrders(world.kolToken());
     assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("FROZEN");
     assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWABLE");
+    // 可提现 (L-033): the wallet still holds 6.50, but line A's 4.33 sits in the open refund, so
+    // the displayed available drops to what the rows still fund — line B's 2.17 — and equals the
+    // cap an application can actually allocate.
+    ChainWorld.money(world.conditions().at("/available"), "2.17");
+    ChainWorld.money(world.overview().at("/income/available"), "2.17");
     // Line A's released 4.33 cannot be occupied by a new application: only line B is funded.
     long payoutAccountId = world.createPayout();
     assertThat(world.applyWithdrawalOutcome(payoutAccountId, "6.50"))
@@ -347,6 +352,83 @@ class BusinessChainIT {
   }
 
   @Test
+  void shouldPauseAndResumeTheWithdrawal_whenRefundsBlockAndClearTheOccupiedLines()
+      throws Exception {
+    world.open("pause");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    // Reviewed up front, so the pause hits a PENDING_PAYMENT application — the state the payment
+    // registration runs on.
+    world.approveWithdrawal(withdrawalId);
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("paused").asBoolean())
+        .isFalse();
+
+    // Both occupied lines go into an open refund (raw status 2 stays UNKNOWN): the application is
+    // paused, once, even though the recompute runs twice (L-032).
+    world.stubRefund(world.refund(1), "1", 4000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    world.stubRefund(world.refund(2), "2", 2000, "2");
+    world.awaitRefundStatus(world.refund(2), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    JsonNode paused = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(paused.path("paused").asBoolean()).isTrue();
+    assertThat(historyCount(paused, "PAUSED")).isEqualTo(1);
+    assertThat(world.pull()).isTrue();
+    assertThat(historyCount(world.withdrawal(world.financeToken(), withdrawalId), "PAUSED"))
+        .isEqualTo(1);
+
+    // Payment is refused while paused (design §4.8.6: the pause blocks payment only).
+    assertThat(world.payWithdrawalOutcome(withdrawalId, "6.50")).isEqualTo("409 WITHDRAWAL_PAUSED");
+    // Wallet 6.50 is fully occupied and every released row is blocked: nothing is withdrawable.
+    ChainWorld.money(world.conditions().at("/available"), "0.00");
+
+    // Line A's refund closes first: one unblocked line does not lift the whole application.
+    world.closeRefund(world.refund(1));
+    assertThat(world.pull()).isTrue();
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("paused").asBoolean())
+        .isTrue();
+    assertThat(historyCount(world.withdrawal(world.financeToken(), withdrawalId), "RESUMED"))
+        .isZero();
+
+    // Line B closes too: every line is unblocked, the pause lifts and RESUMED is written.
+    world.closeRefund(world.refund(2));
+    assertThat(world.pull()).isTrue();
+    JsonNode resumed = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(resumed.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(resumed, "RESUMED")).isEqualTo(1);
+
+    world.pay(withdrawalId, "6.50");
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("status").asString())
+        .isEqualTo("PAID");
+  }
+
+  @Test
+  void shouldLeavePaidApplicationUnpaused_whenOccupiedLinesRefundAfterwards() throws Exception {
+    world.open("paid-pause");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    world.approveWithdrawal(withdrawalId);
+    world.pay(withdrawalId, "6.50");
+    // A refund opens afterwards: the paid application is outside the active set, so the linkage
+    // leaves it alone — no paused flag and no PAUSED history (L-032).
+    world.stubRefund(world.refund(1), "1", 4000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    JsonNode detail = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(detail.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(detail, "PAUSED")).isZero();
+  }
+
+  @Test
   void shouldNotCountUnpaidLinesAsUnverifiedOrBlockWithdrawal() throws Exception {
     world.open("unpaid");
     world.syncPaidOrder();
@@ -368,6 +450,17 @@ class BusinessChainIT {
     assertThat(conditions.path("unverifiedCount").asInt()).isEqualTo(2);
     assertThat(conditions.path("canApply").asBoolean()).isFalse();
     assertThat(ChainWorld.count(world.kolOrders(world.kolToken()).path("total"))).isEqualTo(2);
+  }
+
+  /** PAUSED/RESUMED entries of one withdrawal detail history. */
+  private static long historyCount(JsonNode detail, String action) {
+    long count = 0;
+    for (JsonNode event : detail.path("history")) {
+      if (action.equals(event.path("action").asString())) {
+        count++;
+      }
+    }
+    return count;
   }
 
   /** Settlement status of the creator's order line with the given product name. */

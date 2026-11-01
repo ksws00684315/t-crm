@@ -130,6 +130,48 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
   List<CommissionItemStateDO> listReleasedForWithdrawal(
       @Param("kolId") long kolId, @Param("now") Instant now);
 
+  /**
+   * Row-level allocatable money per KOL (L-033): the same rows the FIFO allocation funds from, each
+   * counted only up to its unoccupied leftover, so after-sales released money stays out. The
+   * occupation side repeats {@code ItemStateWithdrawalFundingSource#listReleasedRows}'s filter
+   * (this creator's applications, funding statuses).
+   */
+  @Select(
+      """
+      <script>
+      SELECT s.kol_id AS kol_id,
+             COALESCE(SUM(GREATEST(s.released_commission_cny - COALESCE(o.occupied_cny, 0), 0)), 0)
+               AS amount_cny
+      FROM crm_commission_item_state s
+      LEFT JOIN (
+        SELECT a.order_item_id, SUM(a.occupied_cny) AS occupied_cny
+        FROM crm_commission_withdrawal_allocation a
+        JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id
+        WHERE w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+          AND w.kol_id IN
+        <foreach collection='kolIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+        GROUP BY a.order_item_id
+      ) o ON o.order_item_id = s.order_item_id
+      WHERE s.is_deleted = FALSE AND s.kol_id IN
+        <foreach collection='kolIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+        AND s.verified = TRUE AND s.after_sales = FALSE
+        AND s.release_basis IN ('CONFIRMED', 'FALLBACK')
+        AND s.release_at &lt;= #{now} AND s.released_commission_cny &gt; 0
+      GROUP BY s.kol_id
+      </script>
+      """)
+  List<KolAllocatableRow> aggregateAllocatableByKol(
+      @Param("kolIds") Collection<Long> kolIds, @Param("now") Instant now);
+
+  /** Snapshots of one order whose item lines a later full sync dropped, for the pause linkage. */
+  @Select(
+      "<script>SELECT id FROM crm_commission_item_state"
+          + " WHERE order_id = #{orderId} AND is_deleted = FALSE AND order_item_id NOT IN "
+          + "<foreach collection='itemIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+          + "</script>")
+  List<Long> findStaleIdsByOrder(
+      @Param("orderId") long orderId, @Param("itemIds") Collection<Long> itemIds);
+
   /** Logically deletes snapshots whose order item lines disappeared from a later full sync. */
   @Update(
       "<script>UPDATE crm_commission_item_state SET is_deleted = TRUE, update_time = #{now}"
@@ -163,4 +205,7 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
 
   /** Accrual roll-up of one order. */
   record OrderAccrualRow(Long orderId, BigDecimal estimatedCny, Long unverifiedCount) {}
+
+  /** Allocatable (unoccupied released, not after-sales blocked) money of one KOL. */
+  record KolAllocatableRow(Long kolId, BigDecimal amountCny) {}
 }

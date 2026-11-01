@@ -7,6 +7,7 @@ import com.tcrm.admin.commission.service.WithdrawalFundingSource.FundingRow;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,21 @@ public class ItemStateWithdrawalFundingSource implements WithdrawalFundingSource
       }
     }
     return List.copyOf(funding);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Map<Long, BigDecimal> allocatableByKol(Collection<Long> kolIds) {
+    if (kolIds == null || kolIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, BigDecimal> allocatable = new HashMap<>();
+    // Wall-clock now as a parameter: same read as listReleasedRows (see the comment there).
+    for (CommissionItemStateMapper.KolAllocatableRow row :
+        states.aggregateAllocatableByKol(kolIds, Instant.now())) {
+      allocatable.put(row.kolId(), nz(row.amountCny()));
+    }
+    return Map.copyOf(allocatable);
   }
 
   @Override

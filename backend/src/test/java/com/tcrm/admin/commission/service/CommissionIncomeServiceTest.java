@@ -60,13 +60,22 @@ class CommissionIncomeServiceTest {
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionFinanceQueryMapper finance = mock(CommissionFinanceQueryMapper.class);
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
+  private final WithdrawalFundingSource funding = mock(WithdrawalFundingSource.class);
   private final KolApi kols = mock(KolApi.class);
   private final OrderSettlementApi orderSettlement = mock(OrderSettlementApi.class);
   private final ProductAccessApi products = mock(ProductAccessApi.class);
   private final AccountNameApi accountNames = mock(AccountNameApi.class);
   private final CommissionIncomeService service =
       new CommissionIncomeService(
-          states, revisions, finance, withdrawals, kols, orderSettlement, products, accountNames);
+          states,
+          revisions,
+          finance,
+          withdrawals,
+          funding,
+          kols,
+          orderSettlement,
+          products,
+          accountNames);
 
   @BeforeEach
   void prepare() {
@@ -89,6 +98,25 @@ class CommissionIncomeServiceTest {
                 anyCollection(), nullable(Instant.class), nullable(Instant.class)))
         .thenReturn(List.of());
     lenient().when(withdrawals.sumActiveOccupiedByKol(anyCollection())).thenReturn(List.of());
+    // Default row-level cap mirrors the wallet remainder so the hand computed rows hold; the cap
+    // gets its own test below.
+    lenient()
+        .when(funding.availableByKol(anyCollection(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              java.util.Collection<Long> ids = invocation.getArgument(0);
+              java.util.Map<Long, BigDecimal> balances = invocation.getArgument(1);
+              java.util.Map<Long, BigDecimal> occupied = invocation.getArgument(2);
+              java.util.Map<Long, BigDecimal> available = new java.util.HashMap<>();
+              for (Long id : ids) {
+                available.put(
+                    id,
+                    balances
+                        .getOrDefault(id, BigDecimal.ZERO)
+                        .subtract(occupied.getOrDefault(id, BigDecimal.ZERO)));
+              }
+              return available;
+            });
     lenient()
         .when(
             withdrawals.sumPaidInWindow(
@@ -275,6 +303,21 @@ class CommissionIncomeServiceTest {
     assertThat(prepayMoney.cumulativePaid()).isEqualByComparingTo("70.00");
     assertThat(prepayPage.summary().paid()).isEqualByComparingTo("10.00");
     assertThat(prepayPage.summary().commissionPaid()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldCapRowAvailableAtRowLevelAllocatable_whenLineIsInAfterSales() {
+    // Hand calc: the wallet shows 120.00 free, but the released line sits in an open refund, so
+    // the row level only funds 30.00 and the row shows the smaller figure (L-033).
+    when(finance.walletBalances(List.of(KOL)))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("120.00"))));
+    when(funding.availableByKol(eq(List.of(KOL)), any(), any()))
+        .thenReturn(java.util.Map.of(KOL, new BigDecimal("30.00")));
+    IncomePage page =
+        TenantScope.callCompany(
+            TENANT,
+            () -> service.list(superAdmin(), new IncomeFilter(null, null, null, null, 1, 20)));
+    assertThat(page.page().items().getFirst().money().available()).isEqualByComparingTo("30.00");
   }
 
   @Test

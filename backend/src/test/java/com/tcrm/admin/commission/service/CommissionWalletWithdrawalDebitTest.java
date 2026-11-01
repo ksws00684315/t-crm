@@ -15,7 +15,6 @@ import com.tcrm.admin.commission.model.LedgerSourceRow;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
-import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -33,12 +32,11 @@ class CommissionWalletWithdrawalDebitTest {
 
   private final CommissionWalletMapper wallets = mock(CommissionWalletMapper.class);
   private final KolApi kols = mock(KolApi.class);
-  private final SystemConfigApi configs = mock(SystemConfigApi.class);
   private CommissionWalletService service;
 
   @BeforeEach
   void prepare() {
-    service = new CommissionWalletService(wallets, kols, configs, Clock.fixed(NOW, ZoneOffset.UTC));
+    service = new CommissionWalletService(wallets, kols, Clock.fixed(NOW, ZoneOffset.UTC));
     lenient().when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("400.00"));
   }
 

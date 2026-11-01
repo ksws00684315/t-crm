@@ -55,6 +55,60 @@ public interface WithdrawalMapper {
   @Select("SELECT id FROM crm_commission_withdrawal WHERE id = #{id} FOR UPDATE")
   Long lockById(@Param("id") long id);
 
+  /**
+   * Active applications holding this item state, ascending id so the pause linkage always locks in
+   * one order (the refund-block reverse lookup index). {@code paused} picks the side to process.
+   */
+  @Select(
+      """
+      SELECT DISTINCT w.id
+      FROM crm_commission_withdrawal w
+      JOIN crm_commission_withdrawal_allocation a ON a.withdrawal_id = w.id
+      WHERE a.item_state_id = #{itemStateId}
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND w.paused = #{paused}
+      ORDER BY w.id
+      """)
+  List<Long> findActiveIdsByItemState(
+      @Param("itemStateId") long itemStateId, @Param("paused") boolean paused);
+
+  /**
+   * Refund pause of one locked application (ADR-032 §6 退款阻断联动). Status and pause state are
+   * re-checked here because the lock wait may outlast the caller's snapshot of the row.
+   */
+  @Update(
+      """
+      UPDATE crm_commission_withdrawal
+      SET paused = TRUE, pause_reason = #{reason}, update_time = #{now}
+      WHERE id = #{id}
+        AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND paused = FALSE
+      """)
+  int pause(@Param("id") long id, @Param("reason") String reason, @Param("now") Instant now);
+
+  /** Lifts the refund pause of one locked application; 0 when it left the active set meanwhile. */
+  @Update(
+      """
+      UPDATE crm_commission_withdrawal
+      SET paused = FALSE, pause_reason = NULL, update_time = #{now}
+      WHERE id = #{id}
+        AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND paused = TRUE
+      """)
+  int resume(@Param("id") long id, @Param("now") Instant now);
+
+  /**
+   * Allocated lines of the application that still block payment (unconcluded refund, §8.4);
+   * detached or logically deleted lines no longer block.
+   */
+  @Select(
+      """
+      SELECT count(*) FROM crm_commission_withdrawal_allocation a
+      JOIN crm_commission_item_state s ON s.id = a.item_state_id
+      WHERE a.withdrawal_id = #{withdrawalId} AND s.is_deleted = FALSE AND s.after_sales = TRUE
+      """)
+  long countBlockedItems(@Param("withdrawalId") long withdrawalId);
+
   @Select("SELECT status FROM crm_commission_withdrawal WHERE id = #{id}")
   String statusOf(@Param("id") long id);
 
@@ -467,7 +521,7 @@ public interface WithdrawalMapper {
       """
       <script>
       SELECT id, kol_id, application_no, 'COMMISSION' AS type,
-             status, amount_cny AS amount, create_time AS created_at
+             status, paused, amount_cny AS amount, create_time AS created_at
       FROM crm_commission_withdrawal
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
@@ -506,7 +560,7 @@ public interface WithdrawalMapper {
       """
       <script>
       SELECT id, kol_id, prepay_no AS application_no, 'PREPAY' AS type, status,
-             amount_cny AS amount, create_time AS created_at
+             FALSE AS paused, amount_cny AS amount, create_time AS created_at
       FROM crm_prepay
       <where>
         <if test="q.applicationNo != null">AND prepay_no = #{q.applicationNo}</if>

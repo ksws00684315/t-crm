@@ -342,6 +342,7 @@ public class WithdrawalService {
       String bdName,
       String type,
       String status,
+      boolean paused,
       String amount,
       String currency,
       Instant createdAt) {}
@@ -371,7 +372,10 @@ public class WithdrawalService {
           BigDecimal frozen = funding.frozenCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
           BigDecimal estimated = funding.estimatedCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
           long unverified = funding.unverifiedCount(kolId);
-          BigDecimal available = balance.subtract(occupied).setScale(2, RoundingMode.UNNECESSARY);
+          // 可提现 (L-033): one figure for the pages and the application check — wallet money minus
+          // active occupations, capped by what the released rows can still fund.
+          BigDecimal available =
+              funding.availableCny(kolId, balance, occupied).setScale(2, RoundingMode.UNNECESSARY);
           BigDecimal minimum = minimum();
           boolean withdrawalFrozen =
               freezes.latest(kolId) != null && freezes.latest(kolId).active();
@@ -1366,6 +1370,7 @@ public class WithdrawalService {
                   kol == null || kol.bdUserId() == null ? null : bdNames.get(kol.bdUserId()),
                   row.type(),
                   row.status(),
+                  row.paused(),
                   money(row.amount()),
                   "CNY",
                   row.createdAt());
@@ -1499,14 +1504,16 @@ public class WithdrawalService {
   }
 
   /**
-   * Checks the funding rows cover the amount before writing anything: available wallet money and
-   * released order items can drift apart only until task 62 merges.
+   * Checks the funding covers the amount before writing anything: the same 可提现 figure the
+   * conditions endpoint shows (wallet money minus active occupations, capped by the released rows'
+   * leftovers), so the display can never promise more than the allocation can deliver (L-033).
    */
   private void requireFunding(long kolId, BigDecimal amount) {
     wallets.insertIgnore(IdWorker.getId(), kolId, now());
     BigDecimal balance = requireBalance(wallets.lockBalance(kolId));
     BigDecimal occupied = nz(withdrawals.sumActiveOccupied(kolId));
-    BigDecimal available = balance.subtract(occupied).setScale(2, RoundingMode.UNNECESSARY);
+    BigDecimal available =
+        funding.availableCny(kolId, balance, occupied).setScale(2, RoundingMode.UNNECESSARY);
     BigDecimal minimum = minimum();
     if (amount.compareTo(minimum) < 0) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_BELOW_MINIMUM);

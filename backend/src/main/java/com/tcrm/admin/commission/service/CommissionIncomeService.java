@@ -57,6 +57,7 @@ public class CommissionIncomeService {
   private final CommissionItemRevisionMapper revisions;
   private final CommissionFinanceQueryMapper finance;
   private final WithdrawalMapper withdrawals;
+  private final WithdrawalFundingSource funding;
   private final KolApi kols;
   private final OrderSettlementApi orderSettlement;
   private final ProductAccessApi products;
@@ -67,6 +68,7 @@ public class CommissionIncomeService {
       CommissionItemRevisionMapper revisions,
       CommissionFinanceQueryMapper finance,
       WithdrawalMapper withdrawals,
+      WithdrawalFundingSource funding,
       KolApi kols,
       OrderSettlementApi orderSettlement,
       ProductAccessApi products,
@@ -75,6 +77,7 @@ public class CommissionIncomeService {
     this.revisions = revisions;
     this.finance = finance;
     this.withdrawals = withdrawals;
+    this.funding = funding;
     this.kols = kols;
     this.orderSettlement = orderSettlement;
     this.products = products;
@@ -277,6 +280,8 @@ public class CommissionIncomeService {
     Map<Long, BigDecimal> prepayPaidAll =
         prepayMoneyMap(finance.prepayPaidSums(kolIds, null, null));
     Map<Long, BigDecimal> occupied = occupiedMap(kolIds);
+    // 可提现 (L-033): the shared available computation per KOL, not the raw wallet remainder.
+    Map<Long, BigDecimal> available = funding.availableByKol(kolIds, balances, occupied);
     PeriodPaid period = periodPaid(kolIds, filter);
 
     Map<Long, Long> orderCounts = new HashMap<>();
@@ -299,7 +304,6 @@ public class CommissionIncomeService {
     Map<Long, KolMoney> money = new HashMap<>();
     for (Long id : kolIds) {
       BigDecimal held = occupied.getOrDefault(id, zero());
-      BigDecimal balance = balances.getOrDefault(id, zero());
       BigDecimal commission = period.commission().getOrDefault(id, zero());
       BigDecimal prepayWindow = period.prepay().getOrDefault(id, zero());
       BigDecimal prepayAll = prepayPaidAll.getOrDefault(id, zero());
@@ -308,7 +312,7 @@ public class CommissionIncomeService {
           new KolMoney(
               estimated.getOrDefault(id, zero()),
               frozen.getOrDefault(id, zero()),
-              balance.subtract(held),
+              available.getOrDefault(id, zero()),
               held,
               commissionPaidAll.getOrDefault(id, zero()).add(prepayAll),
               deducted.getOrDefault(id, zero()),

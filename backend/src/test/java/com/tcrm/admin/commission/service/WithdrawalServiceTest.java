@@ -125,6 +125,15 @@ class WithdrawalServiceTest {
             List.of(
                 new FundingRow(ITEM_1, 0L, new BigDecimal("350.00")),
                 new FundingRow(ITEM_2, 0L, new BigDecimal("150.00"))));
+    // Default 可提现 mirrors the wallet remainder so the existing hand computed numbers hold;
+    // the row-level cap gets its own tests below.
+    when(funding.availableCny(eq(KOL), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              BigDecimal balance = invocation.getArgument(1);
+              BigDecimal occupied = invocation.getArgument(2);
+              return balance.subtract(occupied);
+            });
     when(orderItems.listByIds(anyList()))
         .thenReturn(
             List.of(
@@ -161,6 +170,19 @@ class WithdrawalServiceTest {
     assertThat(conditions.available()).isEqualTo("180.00");
     assertThat(conditions.occupied()).isEqualTo("120.00");
     assertThat(conditions.minimum()).isEqualTo("200.00");
+    assertThat(conditions.canApply()).isFalse();
+  }
+
+  @Test
+  void shouldCapConditionsAvailableAtRowLevelAllocatable_whenLineIsInAfterSales() {
+    // Hand calc: the wallet shows 300.00 − 120.00 = 180.00, but the released line sits in an open
+    // refund, so the rows only fund 30.00 — the displayed cap follows the rows (L-033).
+    when(wallets.findBalance(KOL)).thenReturn(new BigDecimal("300.00"));
+    when(withdrawals.sumActiveOccupied(KOL)).thenReturn(new BigDecimal("120.00"));
+    when(funding.availableCny(KOL, new BigDecimal("300.00"), new BigDecimal("120.00")))
+        .thenReturn(new BigDecimal("30.00"));
+    var conditions = service.conditions(COMPANY, KOL);
+    assertThat(conditions.available()).isEqualTo("30.00");
     assertThat(conditions.canApply()).isFalse();
   }
 
@@ -239,6 +261,19 @@ class WithdrawalServiceTest {
     // wallet 500.00 but released rows total only 350.00 → 400.00 cannot be allocated
     when(funding.listReleasedRows(KOL))
         .thenReturn(List.of(new FundingRow(ITEM_1, 0L, new BigDecimal("350.00"))));
+    assertThatThrownBy(() -> service.apply(kol(), apply("400.00", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE));
+  }
+
+  @Test
+  void shouldRejectApplicationAboveRowLevelAllocatable() {
+    // Hand calc: the wallet has 500.00 free, but the released rows only fund 100.00 (the rest of
+    // the released money sits in an open refund), so 400.00 cannot be allocated (L-033).
+    when(funding.availableCny(eq(KOL), any(), any())).thenReturn(new BigDecimal("100.00"));
     assertThatThrownBy(() -> service.apply(kol(), apply("400.00", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
@@ -491,6 +526,29 @@ class WithdrawalServiceTest {
   }
 
   @Test
+  void shouldApprovePausedPendingReviewApplication() {
+    // The refund pause blocks payment only (design §4.8.6): review proceeds on a paused row.
+    when(withdrawals.findRow(ID)).thenReturn(pausedRow("PENDING_REVIEW"));
+    when(withdrawals.decide(any())).thenReturn(1);
+    doReturn(detail("PENDING_PAYMENT")).when(service).detail(any(), anyLong());
+    assertThat(service.review(reviewer("withdrawal:review"), ID, "APPROVE", "ok").status())
+        .isEqualTo("PENDING_PAYMENT");
+    verify(withdrawals).insertHistory(historyAction("APPROVED"));
+  }
+
+  @Test
+  void shouldRefusePaymentOfPausedApplication() {
+    // L-032: the refund pause blocks payment even in PENDING_PAYMENT until the source unblocks.
+    when(withdrawals.findRow(ID)).thenReturn(pausedRow("PENDING_PAYMENT"));
+    assertThatThrownBy(
+            () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY")))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WITHDRAWAL_PAUSED));
+  }
+
+  @Test
   void shouldRefuseSecondSuccessfulPayment() {
     when(withdrawals.findRow(ID)).thenReturn(row("PENDING_PAYMENT"));
     when(withdrawals.sumAllocated(ID)).thenReturn(new BigDecimal("400.00"));
@@ -696,6 +754,7 @@ class WithdrawalServiceTest {
                     "W1",
                     "COMMISSION",
                     "PENDING_REVIEW",
+                    false,
                     new BigDecimal("100.00"),
                     NOW.minusSeconds(60)),
                 new FinanceTaskRow(
@@ -704,13 +763,14 @@ class WithdrawalServiceTest {
                     "W2",
                     "COMMISSION",
                     "PAID",
+                    false,
                     new BigDecimal("50.00"),
                     NOW.minusSeconds(600))));
     when(withdrawals.pagePrepayTasks(any()))
         .thenReturn(
             List.of(
                 new FinanceTaskRow(
-                    3L, KOL, "PP1", "PREPAY", "APPROVED", new BigDecimal("70.00"), NOW)));
+                    3L, KOL, "PP1", "PREPAY", "APPROVED", false, new BigDecimal("70.00"), NOW)));
     var page =
         service.financeTasks(
             reviewer("commission:view"),
@@ -719,7 +779,10 @@ class WithdrawalServiceTest {
     assertThat(page.items()).hasSize(2);
     assertThat(page.items().get(0).applicationNo()).isEqualTo("PP1");
     assertThat(page.items().get(1).applicationNo()).isEqualTo("W1");
-    // the raw status passes straight through to both branches
+    // the raw status passes straight through to both branches; the paused flag rides the
+    // withdrawal rows (L-032) and prepays are never paused
+    assertThat(page.items().get(0).paused()).isFalse();
+    assertThat(page.items().get(1).paused()).isFalse();
     ArgumentCaptor<FinanceTaskQuery> query = ArgumentCaptor.forClass(FinanceTaskQuery.class);
     verify(withdrawals).pageWithdrawalTasks(query.capture());
     assertThat(query.getValue().status()).isNull();
@@ -730,6 +793,29 @@ class WithdrawalServiceTest {
     verify(withdrawals, times(2)).pageWithdrawalTasks(query.capture());
     assertThat(query.getValue().status()).isEqualTo("PENDING_PAYMENT");
     assertThat(filtered).isNotNull();
+  }
+
+  @Test
+  void shouldCarryTheRefundPauseOnTheWithdrawalFinanceTaskRows() {
+    // L-032: the unified list drives the admin page's paused tag and the disabled pay entry.
+    when(withdrawals.countWithdrawalTasks(any())).thenReturn(1L);
+    when(withdrawals.pageWithdrawalTasks(any()))
+        .thenReturn(
+            List.of(
+                new FinanceTaskRow(
+                    1L,
+                    KOL,
+                    "W1",
+                    "COMMISSION",
+                    "PENDING_PAYMENT",
+                    true,
+                    new BigDecimal("100.00"),
+                    NOW)));
+    var page =
+        service.financeTasks(
+            reviewer("commission:view"),
+            new WithdrawalService.FinanceFilter(null, null, null, null, 1, 20));
+    assertThat(page.items().getFirst().paused()).isTrue();
   }
 
   @Test
@@ -879,6 +965,35 @@ class WithdrawalServiceTest {
 
   private static WithdrawalRow row(String status) {
     return row(status, KOL, KOL);
+  }
+
+  private static WithdrawalRow pausedRow(String status) {
+    return new WithdrawalRow(
+        ID,
+        KOL,
+        "W20261025000007",
+        UUID.fromString(UUID_TEXT),
+        "f".repeat(64),
+        null,
+        new BigDecimal("400.00"),
+        status,
+        true,
+        WithdrawalPauseService.PAUSE_REASON,
+        null,
+        "PAYPAL",
+        CIPHER_TEXT,
+        "cr***@example.com",
+        "USD",
+        null,
+        "Creator Name",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        KOL,
+        NOW);
   }
 
   private static WithdrawalRow row(String status, long kolId) {

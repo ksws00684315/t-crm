@@ -50,6 +50,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private final CommissionItemRevisionMapper revisions;
   private final CommissionRuleVersionMapper ruleVersions;
   private final CommissionWalletService wallet;
+  private final WithdrawalPauseService pauses;
   private final KolApi kols;
   private final com.tcrm.admin.shared.CurrentTenantResolver currentTenant;
   private final Clock clock;
@@ -60,9 +61,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionItemRevisionMapper revisions,
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
+      WithdrawalPauseService pauses,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant) {
-    this(states, revisions, ruleVersions, wallet, kols, currentTenant, Clock.systemUTC());
+    this(states, revisions, ruleVersions, wallet, pauses, kols, currentTenant, Clock.systemUTC());
   }
 
   CommissionItemSnapshotService(
@@ -70,6 +72,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionItemRevisionMapper revisions,
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
+      WithdrawalPauseService pauses,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant,
       Clock clock) {
@@ -77,6 +80,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     this.revisions = revisions;
     this.ruleVersions = ruleVersions;
     this.wallet = wallet;
+    this.pauses = pauses;
     this.kols = kols;
     this.currentTenant = currentTenant;
     this.clock = clock;
@@ -112,7 +116,12 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   /** Snapshots of item lines dropped by a later full sync stop counting (logical delete). */
   private void deleteStaleRows(OrderSourceDTO order, List<ItemSourceDTO> items, Instant now) {
     List<Long> itemIds = items.stream().map(ItemSourceDTO::orderItemId).toList();
+    List<Long> stale = states.findStaleIdsByOrder(order.orderId(), itemIds);
     states.deleteStaleByOrder(order.orderId(), itemIds, now);
+    // A dropped line can no longer block payment: lift the pauses it was holding.
+    for (Long itemStateId : stale) {
+      pauses.resumeForItem(itemStateId);
+    }
   }
 
   private void applyRevision(
@@ -124,6 +133,9 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       RuleSnapshot rule,
       String version,
       Instant now) {
+    // The after-sales flag entering or leaving the row drives the withdrawal pause linkage below,
+    // so the previous value is captured before the source facts overwrite it.
+    boolean wasAfterSales = Boolean.TRUE.equals(row.getAfterSales());
     CommissionSettlementRules.Result result =
         CommissionSettlementRules.evaluate(
             new CommissionSettlementRules.Inputs(
@@ -200,6 +212,17 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       states.insert(row);
     } else {
       states.updateById(row);
+    }
+    // Refund pause linkage (ADR-032 §6 退款阻断联动): pause the applications occupying this line
+    // while the refund is open, lift them once every allocated line is unblocked. Runs in the
+    // revision transaction, so every sync path shares one write; an unchanged fingerprint never
+    // gets here, which keeps repeated syncs from writing duplicate history.
+    if (item.afterSales() != wasAfterSales) {
+      if (item.afterSales()) {
+        pauses.pauseForItem(row.getId());
+      } else {
+        pauses.resumeForItem(row.getId());
+      }
     }
 
     CommissionItemRevisionDO revision = new CommissionItemRevisionDO();
