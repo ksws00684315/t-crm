@@ -44,6 +44,8 @@
   --tcrm-space-6: 32px;
   --tcrm-control-height: 32px;
   --tcrm-control-height-mobile: 44px;
+  --tcrm-control-height-large: 40px;
+  --tcrm-control-padding-large: 20px;
   --tcrm-focus-width: 2px;
   --tcrm-radius-card: 12px;
   --tcrm-radius-control: 8px;
@@ -71,6 +73,10 @@
   --tcrm-line-height-section: 24px;
   --tcrm-font-size-help: 14px;
   --tcrm-line-height-help: 22px;
+  --tcrm-font-size-amount-primary: 36px;
+  --tcrm-line-height-amount-primary: 44px;
+  --tcrm-font-size-amount-detail: 24px;
+  --tcrm-line-height-amount-detail: 32px;
 
   --el-color-primary: var(--tcrm-color-primary);
   --el-color-primary-light-3: var(--tcrm-color-primary-hover);

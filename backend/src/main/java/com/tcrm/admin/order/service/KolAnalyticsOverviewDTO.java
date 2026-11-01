@@ -19,6 +19,9 @@ public record KolAnalyticsOverviewDTO(
     BigDecimal frozenCny,
     List<Day> daily) {
 
-  /** One calendar day of the trend; {@code date} is formatted as {@code yyyy-MM-dd}. */
-  public record Day(String date, BigDecimal salesCny, BigDecimal commissionCny) {}
+  /**
+   * One calendar day of the trend; {@code date} is formatted as {@code yyyy-MM-dd}. {@code
+   * orderCount} is the number of attributed orders paid that day (task 92).
+   */
+  public record Day(String date, BigDecimal salesCny, BigDecimal commissionCny, long orderCount) {}
 }

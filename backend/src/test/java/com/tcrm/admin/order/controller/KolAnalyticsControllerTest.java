@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.KolMvcSupport;
 import com.tcrm.admin.order.service.KolAnalyticsOverviewDTO;
 import com.tcrm.admin.order.service.KolAnalyticsService;
+import com.tcrm.admin.order.service.KolSalesTotalDTO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
@@ -46,7 +47,7 @@ class KolAnalyticsControllerTest {
                 BigDecimal.ZERO.setScale(2),
                 List.of(
                     new KolAnalyticsOverviewDTO.Day(
-                        "2026-10-01", new BigDecimal("100.50"), BigDecimal.ZERO.setScale(2)))));
+                        "2026-10-01", new BigDecimal("100.50"), BigDecimal.ZERO.setScale(2), 2L))));
     String token = KolMvcSupport.actAs(current, kol());
 
     mvc.perform(
@@ -61,7 +62,28 @@ class KolAnalyticsControllerTest {
         .andExpect(jsonPath("$.data.daily[0].date").value("2026-10-01"))
         .andExpect(jsonPath("$.data.daily[0].salesCny").value("100.50"))
         .andExpect(jsonPath("$.data.daily[0].commissionCny").value("0.00"))
+        .andExpect(jsonPath("$.data.daily[0].orderCount").value(2))
         .andExpect(jsonPath("$.data.asOf").isNotEmpty());
+  }
+
+  @Test
+  void shouldRequireKolTokenForTheSalesTotal() throws Exception {
+    mvc.perform(get("/kol-api/analytics/sales-total")).andExpect(status().isUnauthorized());
+    verifyNoInteractions(analytics);
+  }
+
+  @Test
+  void shouldServeTheSalesTotalWithTheAmountAsString() throws Exception {
+    when(analytics.salesTotal())
+        .thenReturn(
+            new KolSalesTotalDTO(
+                new BigDecimal("12345678.90"), Instant.parse("2026-11-01T03:00:00Z")));
+    String token = KolMvcSupport.actAs(current, kol());
+
+    mvc.perform(get("/kol-api/analytics/sales-total").header(KolMvcSupport.TOKEN_HEADER, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("12345678.90"))
+        .andExpect(jsonPath("$.data.asOf").value("2026-11-01T03:00:00Z"));
   }
 
   @Test

@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.tcrm.admin.order.service.KolOrderDTO;
 import com.tcrm.admin.order.service.KolOrderFilterDTO;
 import com.tcrm.admin.order.service.KolOrderService;
+import com.tcrm.admin.order.service.KolOrderSummaryDTO;
 import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
@@ -48,5 +49,30 @@ public class KolOrderController {
         orders.page(
             new KolOrderFilterDTO(
                 payFrom, payTo, orderStatus, orderNo, productName, settlementStatus, page, size)));
+  }
+
+  /**
+   * Requires a KOL token; same filters as the list without paging, so the summary covers exactly
+   * the orders the list shows.
+   */
+  @SaCheckLogin(type = StpKolUtil.TYPE)
+  @GetMapping("/kol-api/orders/summary")
+  public R<KolOrderSummaryDTO> summary(
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant payFrom,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant payTo,
+      @RequestParam(required = false)
+          @Pattern(regexp = "UNPAID|PAID|SHIPPED|RECEIVED|COMPLETED|CLOSED|UNKNOWN")
+          String orderStatus,
+      @RequestParam(required = false) @Size(max = 128) String orderNo,
+      @RequestParam(required = false) @Size(max = 128) String productName,
+      @RequestParam(required = false)
+          @Pattern(regexp = "WITHDRAWING|WITHDRAWABLE|FROZEN|WITHDRAWN|INVALID|NO_COMMISSION")
+          String settlementStatus) {
+    return R.ok(
+        orders.summary(
+            new KolOrderFilterDTO(
+                payFrom, payTo, orderStatus, orderNo, productName, settlementStatus, 1, 1)));
   }
 }

@@ -3,6 +3,7 @@ package com.tcrm.admin.order.controller;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.tcrm.admin.order.service.KolAnalyticsOverviewDTO;
 import com.tcrm.admin.order.service.KolAnalyticsService;
+import com.tcrm.admin.order.service.KolSalesTotalDTO;
 import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.R;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,5 +28,12 @@ public class KolAnalyticsController {
   public R<KolAnalyticsOverviewDTO> overview(
       @RequestParam("from") String from, @RequestParam("to") String to) {
     return R.ok(analytics.overview(from, to));
+  }
+
+  /** Requires a KOL token; cumulative sales of the signed-in creator, no range parameters. */
+  @SaCheckLogin(type = StpKolUtil.TYPE)
+  @GetMapping("/kol-api/analytics/sales-total")
+  public R<KolSalesTotalDTO> salesTotal() {
+    return R.ok(analytics.salesTotal());
   }
 }

@@ -83,7 +83,7 @@ public class KolCommissionService {
       String paid,
       String commissionPaid) {}
 
-  /** One unified payment record (prepay now; commission withdrawals join in task 63). */
+  /** One unified fund record: a commission withdrawal application or a paid prepay. */
   public record FundRecord(
       long id,
       String type,
@@ -156,9 +156,10 @@ public class KolCommissionService {
     return TenantScope.callCompany(
         tenantId,
         () -> {
-          // Commission withdrawals (task 63) and prepay payments on one page, newest first.
+          // Every commission withdrawal application (task 92, any status) and the paid prepay
+          // payments on one list, newest application first. Unpaid prepays stay hidden.
           List<FundRecord> all = new ArrayList<>();
-          for (var row : withdrawals.listKolPaidWithdrawals(kolId)) {
+          for (var row : withdrawals.listKolWithdrawals(kolId)) {
             all.add(toWithdrawalRecord(row));
           }
           for (PrepayPaymentRow row : finance.prepayPayments(List.of(kolId), null, null)) {
@@ -176,8 +177,8 @@ public class KolCommissionService {
         });
   }
 
-  /** One paid withdrawal as the creator sees it (masked recipient, public status). */
-  private static FundRecord toWithdrawalRecord(WithdrawalMapper.KolPaidWithdrawalRow row) {
+  /** One withdrawal application as the creator sees it (masked recipient, real status). */
+  private static FundRecord toWithdrawalRecord(WithdrawalMapper.KolWithdrawalFundRow row) {
     return new FundRecord(
         row.withdrawalId(),
         "COMMISSION",
@@ -187,7 +188,7 @@ public class KolCommissionService {
         "CNY",
         row.accountMasked(),
         row.paidAt(),
-        "PAID",
+        row.status(),
         row.withdrawalId());
   }
 

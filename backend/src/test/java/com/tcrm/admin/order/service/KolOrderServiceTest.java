@@ -472,6 +472,146 @@ class KolOrderServiceTest {
         .isInstanceOf(BusinessException.class);
   }
 
+  private static com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO state(
+      long orderId, long itemId, String status) {
+    return new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+        orderId, itemId, status, new BigDecimal("0.1000"), BigDecimal.ONE, BigDecimal.ZERO);
+  }
+
+  private static OrderItemDO summaryLine(long id, String pay, String refund) {
+    OrderItemDO value = item(id, 700L, pay, refund);
+    value.setOrderId(21L);
+    return value;
+  }
+
+  @Test
+  void shouldSummariseSalesSettledPendingAndRefundedByLineStatus() {
+    when(orders.selectList(any()))
+        .thenReturn(List.of(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
+    when(items.selectList(any()))
+        .thenReturn(
+            List.of(
+                // Settled in three flavours: pay 100 refund 20 -> 80, 50 -> 50, 30 refund 30 -> 0.
+                summaryLine(1L, "100.00", "20.00"),
+                summaryLine(2L, "50.00", "0.00"),
+                summaryLine(3L, "30.00", "30.00"),
+                // Pending (frozen) 40 refund 10 -> 30.
+                summaryLine(4L, "40.00", "10.00"),
+                // Unverified (no snapshot) and no-commission lines count in sales only.
+                summaryLine(5L, "7.00", "0.00"),
+                summaryLine(6L, "8.00", "8.00")));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                state(21L, 1L, "WITHDRAWABLE"),
+                state(21L, 2L, "WITHDRAWING"),
+                state(21L, 3L, "WITHDRAWN"),
+                state(21L, 4L, "FROZEN"),
+                state(21L, 6L, "NO_COMMISSION")));
+
+    var summary = service.summary(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 1));
+
+    assertThat(summary.salesCny()).isEqualTo(new BigDecimal("235.00"));
+    assertThat(summary.settledCny()).isEqualTo(new BigDecimal("130.00"));
+    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("30.00"));
+    assertThat(summary.refundedCny()).isEqualTo(new BigDecimal("68.00"));
+    // Verify the order query is the list's base query restricted to paid orders.
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectList(query.capture());
+    assertThat(query.getValue().getSqlSegment())
+        .contains("kol_id")
+        .contains("attribution_status")
+        .contains("pay_time IS NOT NULL");
+    var lines = ArgumentCaptor.forClass(Wrapper.class);
+    verify(items).selectList(lines.capture());
+    assertThat(lines.getValue().getSqlSegment()).contains("kol_id");
+  }
+
+  @Test
+  void shouldReturnZeroSummaryWithoutReadingLines_whenNoOrderMatches() {
+    when(orders.selectList(any())).thenReturn(List.of());
+
+    var summary = service.summary(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 1));
+
+    assertThat(summary.salesCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.settledCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.refundedCny()).isEqualTo(new BigDecimal("0.00"));
+    verifyNoInteractions(items);
+  }
+
+  @Test
+  void shouldApplyTheSameFiltersToTheSummaryAsToTheList() {
+    when(orders.selectList(any())).thenReturn(List.of());
+
+    service.summary(
+        new KolOrderFilterDTO(
+            Instant.parse("2026-10-01T00:00:00Z"),
+            Instant.parse("2026-11-01T00:00:00Z"),
+            "PAID",
+            "1234",
+            "Widget",
+            null,
+            1,
+            1));
+
+    var query = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).selectList(query.capture());
+    String sql = query.getValue().getSqlSegment();
+    assertThat(sql)
+        .contains("pay_time")
+        .contains("order_status")
+        .contains("weidian_order_id ILIKE")
+        .contains("oi.item_name ILIKE")
+        .contains("oi.kol_id");
+    assertThat(params(query.getValue()).values()).contains("%1234%", "%Widget%", 700L, "PAID");
+  }
+
+  @Test
+  void shouldSummariseOnlyOrdersWhoseStatusMatchesTheSettlementFilter() {
+    OrderDO frozen = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    OrderDO released = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    when(orders.selectList(any())).thenReturn(List.of(frozen, released));
+    when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
+        .thenReturn(List.of(state(21L, 21L, "FROZEN"), state(31L, 31L, "WITHDRAWABLE")));
+    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(List.of(state(21L, 21L, "FROZEN")));
+
+    var summary =
+        service.summary(new KolOrderFilterDTO(null, null, null, null, null, "FROZEN", 1, 1));
+
+    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("10.00"));
+    // Only the FROZEN order's id reaches the line query.
+    var lines = ArgumentCaptor.forClass(Wrapper.class);
+    verify(items).selectList(lines.capture());
+    assertThat(lines.getValue().getSqlSegment()).contains("order_id");
+    assertThat(params(lines.getValue()).values()).contains(21L).doesNotContain(31L);
+  }
+
+  @Test
+  void shouldRejectInvalidSummaryFilters() {
+    assertThatThrownBy(
+            () ->
+                service.summary(
+                    new KolOrderFilterDTO(null, null, null, null, null, "MYSTERY", 1, 1)))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                service.summary(
+                    new KolOrderFilterDTO(
+                        Instant.parse("2026-10-02T00:00:00Z"),
+                        Instant.parse("2026-10-01T00:00:00Z"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        1,
+                        1)))
+        .isInstanceOf(BusinessException.class);
+    verifyNoInteractions(orders);
+  }
+
   private static KolAccountDTO kol() {
     return new KolAccountDTO(
         700L,
