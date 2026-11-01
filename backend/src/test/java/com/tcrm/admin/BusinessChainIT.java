@@ -432,6 +432,39 @@ class BusinessChainIT {
   }
 
   @Test
+  void shouldRefuseThePayment_whenTheWalletCannotCoverItAfterAnotherLineWasPaidAndRefunded()
+      throws Exception {
+    world.open("shortfall");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    // Two applications: line A's 4.33 is paid out first (wallet 2.17), line B's 2.17 is still
+    // awaiting payment when line A is refunded in full — the clawback drags the wallet to
+    // −2.16. Line B itself is not over-occupied, so nothing is paused; the payment is refused
+    // on the wallet balance instead (owner decision 2026-11-01).
+    long first = world.applyWithdrawal(payoutAccountId, "4.33");
+    world.approveWithdrawal(first);
+    world.pay(first, "4.33");
+    long second = world.applyWithdrawal(payoutAccountId, "2.17");
+    world.approveWithdrawal(second);
+    world.stubRefund(world.refund(1), "1", 4000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    assertThat(world.pull()).isTrue();
+    // Line B is not blocked, so the stored pause must be clear before the wallet check fires.
+    JsonNode detail = world.withdrawal(world.financeToken(), second);
+    assertThat(detail.path("status").asString()).isEqualTo("PENDING_PAYMENT");
+    assertThat(detail.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(detail, "PAUSED")).isZero();
+    assertThat(world.payWithdrawalOutcome(second, "2.17"))
+        .isEqualTo("422 WITHDRAWAL_INSUFFICIENT_AVAILABLE");
+    // The refused payment leaves the wallet untouched (−1.83 stays) and the rejection exit is
+    // still available: 预估 2.50 = 冻结 0.00 + 可提现(−4.00) + 占用 2.17 + 已付 4.33.
+    ChainWorld.money(world.overview().at("/income/available"), "-4.00");
+  }
+
+  @Test
   void shouldKeepTheWithdrawalPaused_whenTheRefundSucceedsShortOfTheOccupation() throws Exception {
     world.open("short");
     world.syncPaidOrder();

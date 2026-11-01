@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,34 @@ class CommissionWalletWithdrawalDebitTest {
   void prepare() {
     service = new CommissionWalletService(wallets, kols, Clock.fixed(NOW, ZoneOffset.UTC));
     lenient().when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("400.00"));
+  }
+
+  /** Owner decision 2026-11-01: 余额等于金额允许(付完为 0),不足即拒绝(422),余额不动。 */
+  @Test
+  void shouldAllowThePayment_whenTheBalanceEqualsTheAmount() {
+    lenient().when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("300.00"));
+    var balance =
+        service.postWithdrawalDebit(COMPANY, KOL, WITHDRAWAL, new BigDecimal("300"), NOW, 6L);
+    assertThat(balance).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldRefuseThePayment_whenTheBalanceIsShort_andLeaveTheWalletUntouched() {
+    when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("100.00"));
+    assertThatThrownBy(
+            () ->
+                service.postWithdrawalDebit(
+                    COMPANY, KOL, WITHDRAWAL, new BigDecimal("300"), NOW, 6L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE));
+    verify(wallets, never())
+        .insertLedger(
+            anyLong(), anyLong(), any(), any(), any(), anyLong(), any(), any(), any(), anyLong(),
+            any());
+    verify(wallets, never()).updateBalance(anyLong(), any(), any());
   }
 
   @Test
@@ -100,12 +129,22 @@ class CommissionWalletWithdrawalDebitTest {
   }
 
   @Test
-  void shouldAllowNegativeResultingBalance_whenPrepayDeductionRacedIn() {
-    // wallet 100.00, withdrawal 300.00 → balance -200.00 recovered by later commission credits
+  void shouldRefuseThePayment_whenAPrepayDeductionLeftTheBalanceShort() {
+    // Changed with the 2026-11-01 owner decision (was: allowed the wallet to go negative when a
+    // prepay deduction raced in between approval and payment). A payment must no longer drive the
+    // wallet below zero: wallet 100.00, withdrawal 300.00 → refused 422, wallet untouched; the
+    // shortfall is handled by the finance side (retry after refill or reject), and the negative
+    // balances that DO appear come from later clawbacks/COMMISSION_ADJUSTMENT instead.
     when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("100.00"));
-    var balance =
-        service.postWithdrawalDebit(COMPANY, KOL, WITHDRAWAL, new BigDecimal("300.00"), NOW, 6L);
-    assertThat(balance).isEqualByComparingTo("-200.00");
+    assertThatThrownBy(
+            () ->
+                service.postWithdrawalDebit(
+                    COMPANY, KOL, WITHDRAWAL, new BigDecimal("300.00"), NOW, 6L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE));
   }
 
   @Test

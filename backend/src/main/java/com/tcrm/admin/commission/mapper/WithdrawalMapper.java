@@ -98,61 +98,69 @@ public interface WithdrawalMapper {
   int resume(@Param("id") long id, @Param("now") Instant now);
 
   /**
-   * Allocated lines of the application that still block payment under the shared blocked-line
-   * predicate: the line sits in an unconcluded refund, or its occupations (including PAID, the same
-   * scope as the row leftover) outrun its released money — paying would push the wallet negative
-   * (ADR-032 §6 退款阻断联动, 2026-11-01 owner decision). Detached or logically deleted lines no longer
-   * block. The payment registration re-runs this under the application lock, so a pause missed by a
-   * concurrent sync still cannot be paid.
+   * The blocked-line predicate, written once and shared by {@link #countBlockedItems} and {@link
+   * #isItemBlocked}: the line sits in an unconcluded refund, or its occupations (including PAID,
+   * the same scope as the row leftover) outrun its released money — paying would push the wallet
+   * negative (ADR-032 §6 退款阻断联动, 2026-11-01 owner decision). A logically deleted line cannot trip
+   * the after-sales half, but its over-occupation still counts — conservative, and the occupations
+   * of a dropped line are real money.
+   */
+  String BLOCKED_LINE =
+      " ((s.is_deleted = FALSE AND s.after_sales = TRUE)"
+          + " OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny) ";
+
+  /** Occupations (funding statuses, including PAID) grouped per line, for {@link #BLOCKED_LINE}. */
+  String OCCUPATION_JOIN =
+      " LEFT JOIN ("
+          + "SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny"
+          + " FROM crm_commission_withdrawal_allocation a2"
+          + " JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id"
+          + " WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')"
+          + " GROUP BY a2.order_item_id"
+          + ") o ON o.order_item_id = s.order_item_id ";
+
+  /**
+   * Allocated lines of the application that still block payment. The payment registration re-runs
+   * this under the application lock, so a pause missed by a concurrent sync still cannot be paid.
    */
   @Select(
-      """
-      SELECT count(*) FROM crm_commission_withdrawal_allocation a
-      JOIN crm_commission_item_state s ON s.id = a.item_state_id
-      LEFT JOIN (
-        SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny
-        FROM crm_commission_withdrawal_allocation a2
-        JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id
-        WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
-        GROUP BY a2.order_item_id
-      ) o ON o.order_item_id = s.order_item_id
-      WHERE a.withdrawal_id = #{withdrawalId}
-        AND ( (s.is_deleted = FALSE AND s.after_sales = TRUE)
-           OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny )
-      """)
+      "SELECT count(*) FROM crm_commission_withdrawal_allocation a"
+          + " JOIN crm_commission_item_state s ON s.id = a.item_state_id"
+          + OCCUPATION_JOIN
+          + " WHERE a.withdrawal_id = #{withdrawalId} AND "
+          + BLOCKED_LINE)
   long countBlockedItems(@Param("withdrawalId") long withdrawalId);
 
   /**
-   * The blocked-line predicate for one item state — the SQL twin of {@link #countBlockedItems}'s
-   * per-line condition (after-sales, or occupations with PAID outrunning the release). Null when
-   * the row is gone.
+   * The blocked-line predicate for one item state — the per-line condition of {@link
+   * #countBlockedItems}. Null when the row is gone.
+   */
+  @Select(
+      "SELECT "
+          + BLOCKED_LINE
+          + " FROM crm_commission_item_state s"
+          + OCCUPATION_JOIN
+          + " WHERE s.id = #{itemStateId}")
+  Boolean isItemBlocked(@Param("itemStateId") long itemStateId);
+
+  /**
+   * Active applications holding any of these item states, deduplicated and ordered once — the one
+   * ascending lock order for a whole order's revision transaction (a multi-line order must not lock
+   * the wallet of line 1 and only then the applications of line 2).
    */
   @Select(
       """
-      SELECT (s.is_deleted = FALSE AND s.after_sales = TRUE)
-          OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny
-      FROM crm_commission_item_state s
-      LEFT JOIN (
-        SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny
-        FROM crm_commission_withdrawal_allocation a2
-        JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id
-        WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
-        GROUP BY a2.order_item_id
-      ) o ON o.order_item_id = s.order_item_id
-      WHERE s.id = #{itemStateId}
+      <script>
+      SELECT DISTINCT w.id
+      FROM crm_commission_withdrawal w
+      JOIN crm_commission_withdrawal_allocation a ON a.withdrawal_id = w.id
+      WHERE a.item_state_id IN
+      <foreach collection='itemStateIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+      ORDER BY w.id
+      </script>
       """)
-  Boolean isItemBlocked(@Param("itemStateId") long itemStateId);
-
-  /** Occupations (including PAID) holding one item state, for the before/after block check. */
-  @Select(
-      """
-      SELECT COALESCE(SUM(a.occupied_cny), 0)
-      FROM crm_commission_withdrawal_allocation a
-      JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id
-      WHERE a.item_state_id = #{itemStateId}
-        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
-      """)
-  java.math.BigDecimal sumOccupiedByItemState(@Param("itemStateId") long itemStateId);
+  List<Long> findActiveIdsByItemStates(@Param("itemStateIds") Collection<Long> itemStateIds);
 
   @Select("SELECT status FROM crm_commission_withdrawal WHERE id = #{id}")
   String statusOf(@Param("id") long id);

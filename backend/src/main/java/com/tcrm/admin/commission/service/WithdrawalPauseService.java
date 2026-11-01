@@ -3,9 +3,9 @@ package com.tcrm.admin.commission.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.model.WithdrawalWrite;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,26 +91,20 @@ public class WithdrawalPauseService {
   }
 
   /**
-   * Locks — in ascending id order — the active applications holding this item state, on both the
-   * paused and the not-yet-paused side. The snapshot revision transaction calls this BEFORE any
-   * wallet write, so it never holds a wallet lock while waiting for an application lock: the
-   * payment registration takes application → wallet, and the linkage must not take wallet →
-   * application (deadlock).
+   * Locks, in one pass and one global ascending order, every active application holding any of
+   * these item states. The snapshot revision transaction calls this ONCE at its start — before any
+   * wallet write and for all lines of the order at once — so it never holds a wallet lock (line 1)
+   * while waiting for an application lock (line 2): the payment registration takes application →
+   * wallet, and the linkage must not take wallet → application (deadlock).
    */
   @Transactional(rollbackFor = Exception.class)
-  public void prelockItem(long itemStateId) {
-    for (long id : sorted(withdrawals.findActiveIdsByItemState(itemStateId, false))) {
+  public void prelockForItems(Collection<Long> itemStateIds) {
+    if (itemStateIds == null || itemStateIds.isEmpty()) {
+      return;
+    }
+    for (long id : sorted(withdrawals.findActiveIdsByItemStates(itemStateIds))) {
       withdrawals.lockById(id);
     }
-    for (long id : sorted(withdrawals.findActiveIdsByItemState(itemStateId, true))) {
-      withdrawals.lockById(id);
-    }
-  }
-
-  /** Occupations (including PAID) holding one item state, for the before/after block check. */
-  public BigDecimal occupiedOfItem(long itemStateId) {
-    BigDecimal occupied = withdrawals.sumOccupiedByItemState(itemStateId);
-    return occupied == null ? BigDecimal.ZERO.setScale(2) : occupied;
   }
 
   /** The blocked-line predicate (after-sales or over-occupied) for one item state. */

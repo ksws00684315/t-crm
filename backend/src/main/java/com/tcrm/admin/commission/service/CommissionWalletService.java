@@ -149,9 +149,11 @@ public class CommissionWalletService {
 
   /**
    * Money a paid withdrawal takes out of the wallet (task 63): one negative COMMISSION_WITHDRAWAL
-   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. The balance may
-   * go negative only if a prepay deduction raced in between approval and payment; that state is
-   * recovered by later commission credits like any other deduction.
+   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. A balance
+   * smaller than the payment amount is refused inside the wallet lock (owner decision 2026-11-01:
+   * 付款时钱包余额不足即拒绝,余额等于金额允许) — a payment can no longer drive the wallet negative; a negative balance
+   * can only come from later clawbacks or prepay deductions and is recovered by later commission
+   * credits like any other deduction.
    */
   @Transactional(rollbackFor = Exception.class)
   public BigDecimal postWithdrawalDebit(
@@ -179,6 +181,11 @@ public class CommissionWalletService {
                   amount.negate().setScale(2, RoundingMode.UNNECESSARY));
           if (existing != null) {
             return existing;
+          }
+          if (balance.compareTo(amount) < 0) {
+            // The payment transaction rolls back: the application stays PENDING_PAYMENT, the
+            // balance is untouched, and finance can retry once the wallet refills or reject.
+            throw new BusinessException(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE);
           }
           BigDecimal next = balance.subtract(amount).setScale(2, RoundingMode.UNNECESSARY);
           wallets.insertLedger(

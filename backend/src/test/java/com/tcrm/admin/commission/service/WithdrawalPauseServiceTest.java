@@ -68,6 +68,25 @@ class WithdrawalPauseServiceTest {
   }
 
   @Test
+  void shouldLockEveryHoldingApplicationOnce_inOneGlobalAscendingOrder() {
+    // Two blocked lines of one order, held by applications 7 and 3: the up-front pass locks both
+    // in a single deduplicated, ascending pass — never per line, never paused/unpaused split.
+    when(withdrawals.findActiveIdsByItemStates(java.util.List.of(501L, 502L)))
+        .thenReturn(java.util.List.of(7L, 3L));
+    when(withdrawals.lockById(3L)).thenReturn(3L);
+    when(withdrawals.lockById(7L)).thenReturn(7L);
+
+    service.prelockForItems(java.util.List.of(501L, 502L));
+
+    var order = org.mockito.Mockito.inOrder(withdrawals);
+    order.verify(withdrawals).findActiveIdsByItemStates(java.util.List.of(501L, 502L));
+    order.verify(withdrawals).lockById(3L);
+    order.verify(withdrawals).lockById(7L);
+    verify(withdrawals, never())
+        .findActiveIdsByItemState(anyLong(), org.mockito.ArgumentMatchers.anyBoolean());
+  }
+
+  @Test
   void shouldSkipApplicationThatFinishedWhileWaitingForTheLock() {
     when(withdrawals.findActiveIdsByItemState(ITEM_STATE, false)).thenReturn(List.of(7L));
     when(withdrawals.lockById(7L)).thenReturn(7L);

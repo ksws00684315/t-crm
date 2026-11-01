@@ -95,13 +95,13 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     Instant now = clock.instant();
     Map<Long, PayTimeRule> kolRates = new HashMap<>();
     RuleSnapshot rule = ruleEffectiveAt(order.payTime());
-    // Lines a later full sync dropped can no longer block: their applications must be locked now,
-    // before any wallet write of this transaction (lock order: application → wallet), so the
-    // resume at the end can never wait on an application lock while holding the wallet lock.
+    // Lock — once, up front, in one ascending order — every active application holding any line
+    // of this order (the lines a later full sync drops are still live rows at this point). The
+    // transaction is per order, so this covers every pause/resume below; payment takes
+    // application → wallet, and this must never hold the wallet lock of line 1 while waiting for
+    // the application lock of line 2.
+    pauses.prelockForItems(states.findIdsByOrder(order.orderId()));
     List<Long> stale = states.findStaleIdsByOrder(order.orderId(), itemIds(items));
-    for (Long itemStateId : stale) {
-      pauses.prelockItem(itemStateId);
-    }
     for (ItemSourceDTO item : items) {
       long tenantId = currentTenant();
       CommissionItemStateDO row = states.lockByOrderItemId(item.orderItemId());
@@ -137,11 +137,11 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       RuleSnapshot rule,
       String version,
       Instant now) {
-    // The line's blocked state — after-sales, or occupations (including PAID) that outrun its
-    // released money — drives the withdrawal pause linkage below, so both the previous blocked
-    // flag and the occupations are captured before the source facts and wallet writes change the
-    // picture.
-    BigDecimal previousOccupation = row.getId() == null ? ZERO : pauses.occupiedOfItem(row.getId());
+    // The line's blocked state (after-sales, or occupations including PAID outrunning its
+    // released money) drives the withdrawal pause linkage: the previous value is read before the
+    // revision, the new one after the write, both through the shared SQL predicate. All holding
+    // applications were locked at the start of this transaction, so applying the flip here cannot
+    // deadlock with the payment registration.
     boolean wasBlocked = row.getId() != null && pauses.isItemBlocked(row.getId());
     CommissionSettlementRules.Result result =
         CommissionSettlementRules.evaluate(
@@ -170,21 +170,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
             && !Objects.equals(previousKol, item.kolId())
             && previousReleased.signum() > 0;
     if (ownershipChanged) {
-      released = ZERO;
-    }
-    // Same-owner decrease after release (refund, source correction): negative adjustment now.
-    if (!ownershipChanged && item.kolId() != null && result.accruedCny().compareTo(released) < 0) {
-      released = result.accruedCny();
-    }
-    // Locked BEFORE any wallet write: payment takes application → wallet, so this transaction
-    // must never hold the wallet lock while waiting for an application lock (deadlock). A
-    // block-state flip needs the locks; the writes below apply it.
-    boolean blocked = item.afterSales() || released.compareTo(previousOccupation) < 0;
-    if (row.getId() != null && blocked != wasBlocked) {
-      pauses.prelockItem(row.getId());
-    }
-    walletDelta = ZERO;
-    if (ownershipChanged) {
       BigDecimal clawback = previousReleased.negate();
       wallet.postCommissionAdjustment(
           tenantId,
@@ -194,11 +179,11 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
           clawback,
           now);
       walletDelta = walletDelta.add(clawback);
+      released = ZERO;
     }
-    if (!ownershipChanged
-        && item.kolId() != null
-        && result.accruedCny().compareTo(previousReleased) < 0) {
-      BigDecimal decrease = result.accruedCny().subtract(previousReleased);
+    // Same-owner decrease after release (refund, source correction): negative adjustment now.
+    if (item.kolId() != null && result.accruedCny().compareTo(released) < 0) {
+      BigDecimal decrease = result.accruedCny().subtract(released);
       wallet.postCommissionAdjustment(
           tenantId,
           item.kolId(),
@@ -207,6 +192,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
           decrease,
           now);
       walletDelta = walletDelta.add(decrease);
+      released = result.accruedCny();
     }
 
     row.setKolId(item.kolId());
@@ -240,11 +226,14 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     // released money keeps the application paused until it is rejected or withdrawn. Runs in the
     // revision transaction, so every sync path shares one write; an unchanged fingerprint never
     // gets here, which keeps repeated syncs from writing duplicate history.
-    if (row.getId() != null && blocked != wasBlocked) {
-      if (blocked) {
-        pauses.pauseForItem(row.getId());
-      } else {
-        pauses.resumeForItem(row.getId());
+    if (row.getId() != null) {
+      boolean blocked = pauses.isItemBlocked(row.getId());
+      if (blocked != wasBlocked) {
+        if (blocked) {
+          pauses.pauseForItem(row.getId());
+        } else {
+          pauses.resumeForItem(row.getId());
+        }
       }
     }
 
