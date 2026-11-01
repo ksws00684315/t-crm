@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import AmountText from "@/components/AmountText.vue";
 import { formatMoney } from "@/utils/orders";
 import { isNegativeAmount, type WorkspaceFigures } from "@/utils/workspace";
 
@@ -76,9 +77,9 @@ function go(path: string) {
     <div class="flow">
       <div class="flow__item">
         <span class="flow__label">{{ t("home.sales") }}</span>
-        <strong class="tcrm-amount-detail flow__sales" data-test="sales-amount">{{
-          money(salesCny)
-        }}</strong>
+        <strong class="tcrm-amount-detail flow__sales" data-test="sales-amount"
+          ><AmountText :value="money(salesCny)"
+        /></strong>
         <span class="caption">{{ t("home.salesCaption") }}</span>
       </div>
       <span class="flow__rate" data-test="commission-rate"
@@ -86,9 +87,9 @@ function go(path: string) {
       >
       <div class="flow__item">
         <span class="flow__label">{{ t("home.estimated") }}</span>
-        <strong class="tcrm-amount-detail" data-test="estimated-amount">{{
-          money(figures.estimatedCommission)
-        }}</strong>
+        <strong class="tcrm-amount-detail" data-test="estimated-amount"
+          ><AmountText :value="money(figures.estimatedCommission)"
+        /></strong>
         <span class="caption">{{ t("home.estimatedCaption") }}</span>
       </div>
     </div>
@@ -105,8 +106,8 @@ function go(path: string) {
           class="tcrm-amount-detail card__amount"
           :class="{ negative: isNegativeAmount(card.amount) }"
           :data-test="`card-${card.key}-amount`"
-          >{{ money(card.amount) }}</strong
-        >
+          ><AmountText :value="money(card.amount)"
+        /></strong>
         <span class="caption">{{ t(card.caption) }}</span>
         <div class="card__action">
           <el-button :data-test="`card-${card.key}-action`" @click="go(card.to)">{{
@@ -160,14 +161,14 @@ function go(path: string) {
   max-width: 100%;
 }
 .flow__item strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .flow__sales {
   color: var(--tcrm-color-primary-text);
 }
 .flow__rate {
   align-self: center;
-  color: var(--tcrm-color-text);
+  color: var(--tcrm-color-text-secondary);
 }
 .cards {
   display: grid;
@@ -196,7 +197,7 @@ function go(path: string) {
   font-weight: 600;
 }
 .card__amount {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .card .caption {
   color: var(--tcrm-color-text-secondary);

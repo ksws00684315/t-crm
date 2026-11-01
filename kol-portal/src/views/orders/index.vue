@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { formatInstant } from "@/utils/format";
 import {
   getCreatorOrders,
   getCreatorOrderSummary,
@@ -8,6 +9,7 @@ import {
   type CreatorOrderSummary,
   type SettlementStatus
 } from "@/api/creator";
+import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
@@ -49,7 +51,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "orderNo", align: "left" as const, label: t("orders.orderNo"), minWidth: 150 },
   { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 220 },
   { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
-  { key: "payTime", label: t("orders.payTime"), minWidth: 170 },
+  { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
   { key: "commission", label: t("orders.commissionAmount"), minWidth: 120, amount: true },
   { key: "settlementStatus", label: t("orders.settlementStatus"), minWidth: 130 }
@@ -58,8 +60,8 @@ function money(value: string) {
   return formatMoney(value, locale.value);
 }
 function dateLabel(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(locale.value);
+  const text = formatInstant(value);
+  return text === "-" ? "—" : text;
 }
 function productLabel(row: CreatorOrder) {
   return (
@@ -265,9 +267,11 @@ onMounted(() => {
           :data-test="`summary-${card.key}`"
         >
           <span>{{ t(card.label) }}</span>
-          <strong class="tcrm-role-section" :data-test="`summary-${card.key}-amount`">{{
-            card.amount == null ? "—" : money(card.amount)
-          }}</strong>
+          <strong class="tcrm-role-section" :data-test="`summary-${card.key}-amount`"
+            ><AmountText v-if="card.amount != null" :value="money(card.amount)" /><template v-else
+              >—</template
+            ></strong
+          >
         </div>
       </div>
       <p class="summary__note" data-test="summary-note">{{ t("orders.summaryNote") }}</p>
@@ -430,7 +434,7 @@ h1 {
 }
 .summary-card strong {
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .summary-card--total {
   background: var(--tcrm-color-order-band);

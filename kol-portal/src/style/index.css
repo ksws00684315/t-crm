@@ -131,6 +131,12 @@ body {
   padding: 0 var(--tcrm-control-padding-large);
 }
 
+#app .tcrm-button-large,
+#app .tcrm-button-large * {
+  font-size: var(--tcrm-font-size-section) !important;
+  line-height: var(--tcrm-line-height-section) !important;
+}
+
 #app h1 {
   font-size: var(--tcrm-font-size-title) !important;
   font-weight: 600;

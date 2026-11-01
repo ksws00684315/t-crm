@@ -58,7 +58,12 @@ export function isNegativeAmount(value: string): boolean {
   return moneyCents(value) < 0n;
 }
 
-/** Percentage text of the profile's commission rate ("12" -> "12%"); null when not configured. */
+/**
+ * Percentage text of the profile's commission rate: the server sends "12.00", the page shows "12%"
+ * ("12.50" -> "12.5%"). Null while no rate is configured.
+ */
 export function rateLabel(rate: string | null | undefined): string | null {
-  return rate == null || rate === "" ? null : `${rate}%`;
+  if (rate == null || rate === "") return null;
+  const trimmed = rate.includes(".") ? rate.replace(/0+$/, "").replace(/\.$/, "") : rate;
+  return `${trimmed}%`;
 }

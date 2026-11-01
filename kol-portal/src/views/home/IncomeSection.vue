@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import AmountText from "@/components/AmountText.vue";
 import { formatMoney } from "@/utils/orders";
 import { isNegativeAmount, type WorkspaceFigures } from "@/utils/workspace";
 
@@ -27,8 +28,8 @@ function withdraw() {
           class="tcrm-amount-primary income-band__amount"
           :class="{ negative: isNegativeAmount(figures.totalIncome) }"
           data-test="income-total"
-          >{{ money(figures.totalIncome) }}</strong
-        >
+          ><AmountText :value="money(figures.totalIncome)"
+        /></strong>
         <span class="caption">{{ t("home.incomeTotalCaption") }}</span>
       </div>
       <ul class="income-list">
@@ -42,8 +43,8 @@ function withdraw() {
             class="tcrm-amount-detail income-list__amount"
             :class="{ negative: commissionNegative }"
             data-test="income-commission"
-            >{{ money(figures.commissionIncome) }}</strong
-          >
+            ><AmountText :value="money(figures.commissionIncome)"
+          /></strong>
         </li>
         <li class="income-list__row">
           <span class="dot dot--prepay" aria-hidden="true" />
@@ -51,9 +52,9 @@ function withdraw() {
             <span class="tcrm-role-section">{{ t("home.incomePrepay") }}</span>
             <span class="caption">{{ t("home.incomePrepayCaption") }}</span>
           </div>
-          <strong class="tcrm-amount-detail income-list__amount" data-test="income-prepay">{{
-            money(figures.prepayPaid)
-          }}</strong>
+          <strong class="tcrm-amount-detail income-list__amount" data-test="income-prepay"
+            ><AmountText :value="money(figures.prepayPaid)"
+          /></strong>
         </li>
       </ul>
     </article>
@@ -64,8 +65,8 @@ function withdraw() {
           class="tcrm-amount-primary withdraw-card__amount"
           :class="{ negative: availableNegative }"
           data-test="available-amount"
-          >{{ money(figures.available) }}</strong
-        >
+          ><AmountText :value="money(figures.available)"
+        /></strong>
         <span class="caption">{{ t("home.withdrawableCaption") }}</span>
       </div>
       <el-button type="primary" class="tcrm-button-large" data-test="withdraw" @click="withdraw">{{
@@ -118,7 +119,7 @@ function withdraw() {
 }
 .income-band__amount {
   color: var(--tcrm-color-primary-text);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .income-list {
   display: grid;
@@ -128,10 +129,10 @@ function withdraw() {
   list-style: none;
 }
 .income-list__row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--tcrm-space-3);
+  gap: var(--tcrm-space-2) var(--tcrm-space-3);
   padding: var(--tcrm-space-3) 0;
 }
 .income-list__row + .income-list__row {
@@ -139,14 +140,18 @@ function withdraw() {
 }
 .income-list__text {
   display: flex;
+  flex: 1 1 14em;
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
 }
+/* A long amount drops below the text instead of squeezing it, and stays at the list's right end. */
 .income-list__amount {
+  flex: 0 1 auto;
   min-width: 0;
+  margin-left: auto;
   text-align: right;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .caption {
   color: var(--tcrm-color-text-secondary);
@@ -183,7 +188,7 @@ function withdraw() {
   color: var(--tcrm-color-text-secondary);
 }
 .withdraw-card__amount {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .withdraw-card .el-button {
   flex: none;

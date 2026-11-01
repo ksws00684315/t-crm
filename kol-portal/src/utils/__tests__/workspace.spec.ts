@@ -113,7 +113,10 @@ describe("workspace figures (task 92 section 2.1)", () => {
 
   it("formats the profile rate and reports an unset one as null", () => {
     expect(rateLabel("12")).toBe("12%");
-    expect(rateLabel("12.5")).toBe("12.5%");
+    expect(rateLabel("12.00")).toBe("12%");
+    expect(rateLabel("12.50")).toBe("12.5%");
+    expect(rateLabel("0.00")).toBe("0%");
+    expect(rateLabel("100.00")).toBe("100%");
     expect(rateLabel(null)).toBeNull();
     expect(rateLabel(undefined)).toBeNull();
     expect(rateLabel("")).toBeNull();

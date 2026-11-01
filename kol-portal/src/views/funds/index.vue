@@ -17,6 +17,7 @@ import {
   type WithdrawalConditions
 } from "@/api/creator";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { uploadQrFile } from "@/api/payout-account";
@@ -62,16 +63,25 @@ const form = reactive({
 });
 const manualAccount = computed(() => form.payoutAccountId === "manual");
 const money = (value: string) => formatMoney(value, locale.value);
-const columns = computed<DataColumn[]>(() => [
-  { key: "appliedAt", label: t("funds.appliedAt"), minWidth: 170 },
-  { key: "applicationNo", align: "left" as const, label: t("funds.applicationNo"), minWidth: 190 },
-  { key: "type", label: t("funds.type"), minWidth: 130 },
-  { key: "amount", label: t("funds.amount"), minWidth: 140, amount: true },
-  { key: "status", label: t("funds.statusLabel"), minWidth: 170 },
-  { key: "recipient", align: "left" as const, label: t("funds.recipient"), minWidth: 190 },
-  { key: "receivedAt", label: t("funds.receivedAt"), minWidth: 170 },
-  { key: "actions", label: t("common.actions"), width: locale.value === "zh-CN" ? 130 : 170 }
-]);
+/** Column floors per language (规范 11 §2): long English labels get more room, nothing wraps. */
+const columns = computed<DataColumn[]>(() => {
+  const zh = locale.value === "zh-CN";
+  return [
+    { key: "appliedAt", label: t("funds.appliedAt"), minWidth: zh ? 180 : 200 },
+    {
+      key: "applicationNo",
+      align: "left" as const,
+      label: t("funds.applicationNo"),
+      minWidth: 210
+    },
+    { key: "type", label: t("funds.type"), minWidth: zh ? 110 : 200 },
+    { key: "amount", label: t("funds.amount"), minWidth: 130, amount: true },
+    { key: "status", label: t("funds.statusLabel"), minWidth: zh ? 190 : 250 },
+    { key: "recipient", align: "left" as const, label: t("funds.recipient"), minWidth: 200 },
+    { key: "receivedAt", label: t("funds.receivedAt"), minWidth: zh ? 180 : 200 },
+    { key: "actions", label: t("common.actions"), width: zh ? 110 : 150 }
+  ];
+});
 const figures = computed(() => (summary.value ? workspaceFigures(summary.value) : null));
 /** The four steps of a commission, left to right (task 92 section 4.1). */
 type StepKey = "frozen" | "withdrawable" | "withdrawing" | "withdrawn";
@@ -376,8 +386,8 @@ onMounted(load);
                 class="tcrm-amount-detail progress-step__amount"
                 :class="{ negative: isNegativeAmount(step.amount) }"
                 :data-test="`step-${step.key}-amount`"
-                >{{ money(step.amount) }}</strong
-              >
+                ><AmountText :value="money(step.amount)"
+              /></strong>
               <span class="progress-step__caption">{{ t(stepText[step.key][1]) }}</span>
             </li>
             <li v-if="index < steps.length - 1" class="progress-arrow" aria-hidden="true">
@@ -695,7 +705,7 @@ h1 {
   background: var(--tcrm-color-success);
 }
 .progress-step__amount {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .progress-step--success .progress-step__amount:not(.negative) {
   color: var(--tcrm-color-success);
@@ -707,6 +717,12 @@ h1 {
   display: flex;
   align-items: center;
   color: var(--tcrm-color-text-secondary);
+}
+/* The icon is 16px (规范 13 §4.5); the global type reset would otherwise shrink it to the body size. */
+.progress-arrow :deep(.el-icon),
+.progress-arrow :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
 .progress-note {
   margin: 0;
@@ -760,6 +776,17 @@ h1 {
   margin: 0;
   min-width: 0;
   text-align: right;
+  overflow-wrap: anywhere;
+}
+/* A long status such as "Approved, awaiting payment" wraps inside the card instead of widening the page. */
+.fund-record-card dd .el-tag {
+  max-width: 100%;
+  height: auto;
+  padding-block: var(--tcrm-space-1);
+  white-space: normal;
+}
+.fund-record-card dd :deep(.el-tag__content) {
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .fund-record-card__actions {
