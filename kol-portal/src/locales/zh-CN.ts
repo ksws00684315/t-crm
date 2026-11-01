@@ -174,6 +174,7 @@ const zhCN: MessageSchema = {
     orderNo: "订单号",
     productSku: "商品名及SKU",
     orderAmount: "订单金额",
+    amountNote: "不含运费；佣金按含运费的实付金额计算。",
     productName: "产品名",
     commissionRate: "佣金比例",
     commissionAmount: "佣金金额",

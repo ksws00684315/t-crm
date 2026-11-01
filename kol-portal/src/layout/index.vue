@@ -73,9 +73,11 @@ async function signOut() {
         <el-tag v-if="isDemoMode" type="warning" effect="plain">{{ t("common.demoData") }}</el-tag>
         <div class="shell__actions">
           <div v-if="session.kol" class="shell__identity">
-            <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span>{{
-              session.kol.tenantName
-            }}</span>
+            <NameCode :name="session.kol.name" :code="session.kol.kolCode" /><span
+              class="shell__company"
+              :title="session.kol.tenantName"
+              >{{ session.kol.tenantName }}</span
+            >
           </div>
           <LocaleSwitch />
           <details class="user-menu">
@@ -199,9 +201,20 @@ async function signOut() {
   color: var(--tcrm-color-text-secondary);
   overflow-wrap: anywhere;
 }
+/* NameCode fills its parent elsewhere; here that would take the company name's share of the row.
+   It also keeps its own width, so only the company name gives way to a long company name. */
 .shell__identity :deep(.name-code) {
+  flex-shrink: 0;
+  width: auto;
   min-width: 0;
   max-width: 240px;
+}
+/* One line with an ellipsis; hovering shows the full company name. */
+.shell__company {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .shell__identity :deep(.name-code__name),
 .shell__identity :deep(.name-code__code) {

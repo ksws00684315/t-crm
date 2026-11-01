@@ -45,6 +45,32 @@ describe("creator profile validation", () => {
     expect(identity.get('[data-test="identity-code"]').text()).toBe("t60_creator");
     expect(wrapper.get('[data-test="profile-name"]').element).toBeInstanceOf(HTMLInputElement);
   });
+  it("keeps email and system ID read-only without the disabled look", async () => {
+    await page();
+    // The first two form items are email and system ID; Element Plus selects also carry readonly.
+    const fields = wrapper.findAll(".form-grid > .el-form-item").slice(0, 2);
+    expect(fields).toHaveLength(2);
+    for (const field of fields) {
+      const input = field.get("input");
+      expect(input.attributes("readonly")).toBeDefined();
+      expect(input.attributes("disabled")).toBeUndefined();
+      expect(field.classes()).not.toContain("is-disabled");
+    }
+  });
+
+  it("makes the title the top of the page, with the identity right below it in the first card", async () => {
+    await page();
+    const firstCard = wrapper.findAll(".section-card")[0];
+    expect(wrapper.get(".account-page").element.firstElementChild).toBe(firstCard.element);
+    const header = firstCard.get(".el-card__header");
+    expect(header.element.firstElementChild?.tagName).toBe("H1");
+    expect(wrapper.findAll(".section-card h1")).toHaveLength(1);
+    expect(header.get("h1").element.nextElementSibling).toBe(
+      header.get('[data-test="name-code"]').element
+    );
+    expect(wrapper.findAll('[data-test="name-code"]')).toHaveLength(1);
+  });
+
   it("enforces the backend handle length instead of allowing 255 characters", async () => {
     await page();
     expect(wrapper.get('[data-test="profile-handle"]').attributes("maxlength")).toBe("128");

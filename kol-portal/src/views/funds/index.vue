@@ -443,6 +443,7 @@ onMounted(load);
           :columns="columns"
           :loading="loading"
           :total="total"
+          :paged="total > 0 && !failure"
           :page="page"
           :size="size"
           @update:page="pageChanged"
@@ -465,9 +466,11 @@ onMounted(load);
           >
           <template #cell-recipient="{ row }">{{ row.maskedRecipient || "—" }}</template>
           <template #cell-receivedAt="{ row }">{{ dateLabel(row.receivedAt) }}</template>
+          <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
           <template #empty
-            ><div class="empty-state">{{ t("funds.empty") }}</div></template
-          >
+            ><div v-if="!failure" class="empty-state">{{ t("funds.empty") }}</div>
+            <span v-else
+          /></template>
         </DataTable>
         <div class="fund-record-cards" :aria-busy="loading">
           <article
@@ -495,9 +498,13 @@ onMounted(load);
               <dd>{{ dateLabel(record.receivedAt) }}</dd>
             </dl>
           </article>
-          <el-empty v-if="!records.length && !loading" :description="t('funds.empty')" />
+          <el-empty
+            v-if="!records.length && !loading && !failure"
+            :description="t('funds.empty')"
+          />
         </div>
         <el-pagination
+          v-if="total > 0 && !failure"
           class="fund-records-pager"
           :current-page="page"
           :page-size="size"

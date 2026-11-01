@@ -274,12 +274,11 @@ describe("account and logout", () => {
     store.acceptSession(session);
     await flushPromises();
     expect(api.getMe).toHaveBeenCalledOnce();
-    expect((wrapper.get("input[readonly][disabled]").element as HTMLInputElement).value).toBe(
-      kol.email
+    // L-040: read-only without the disabled look, so the values stay selectable.
+    expect((wrapper.get("input[readonly]").element as HTMLInputElement).value).toBe(kol.email);
+    expect((wrapper.findAll("input[readonly]")[1]?.element as HTMLInputElement).value).toBe(
+      kol.kolCode
     );
-    expect(
-      (wrapper.findAll("input[readonly][disabled]")[1]?.element as HTMLInputElement).value
-    ).toBe(kol.kolCode);
   });
   it("shows an old-password error and replaces the session after a successful change", async () => {
     vi.mocked(api.changePassword)

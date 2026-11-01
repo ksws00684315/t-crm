@@ -130,6 +130,41 @@ describe("DataTable", () => {
     }
   });
 
+  it("caps a full-screen table by the card height instead of the page behind it", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: {
+        tableId: "fullscreen-rows",
+        rows: Array.from({ length: 6 }, (_, index) => ({ id: String(index), code: String(index) })),
+        columns,
+        total: 6
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      Object.defineProperty(parent, "clientHeight", { value: 360, configurable: true });
+      Object.defineProperty(wrapper.element, "clientHeight", { value: 800, configurable: true });
+      const toolbar = wrapper.get(".data-table__toolbar").element;
+      const pager = wrapper.get(".data-table__pager").element;
+      Object.defineProperty(toolbar, "offsetHeight", { value: 40, configurable: true });
+      Object.defineProperty(pager, "offsetHeight", { value: 40, configurable: true });
+      const header = wrapper.get(".el-table__header-wrapper").element;
+      Object.defineProperty(header, "offsetHeight", { value: 40, configurable: true });
+      await wrapper.get(`[aria-label="${i18n.global.t("table.fullscreen")}"]`).trigger("click");
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.classes()).toContain("is-fullscreen");
+      // 800px card − toolbar 40 − pager 40; the six 50px rows fit inside the 720px ceiling.
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(720);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+
   it("reserves space for filters when capping a long list", async () => {
     const host = document.createElement("div");
     const search = document.createElement("div");

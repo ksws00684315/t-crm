@@ -174,6 +174,8 @@ const enUS = {
     orderNo: "Order number",
     productSku: "Product and SKU",
     orderAmount: "Order amount",
+    amountNote:
+      "Excludes shipping; commission is calculated on the paid amount including shipping.",
     productName: "Product name",
     commissionRate: "Commission rate",
     commissionAmount: "Commission amount",

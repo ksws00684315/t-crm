@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCreatorOrders, type CreatorOrder } from "@/api/creator";
-import { i18n } from "@/locales";
+import { enUS, i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
@@ -105,6 +105,43 @@ describe("creator order details", () => {
     await wrapper.find(".order-card__summary").trigger("click");
     expect(wrapper.text()).toContain("Widget");
     wrapper.unmount();
+  });
+
+  it("explains the amount once above the desktop table and on every phone card", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({
+      items: [order, order],
+      total: 2,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    const desktopNotes = wrapper.findAll('[data-test="orders-amount-note"]');
+    expect(desktopNotes).toHaveLength(1);
+    expect(desktopNotes[0].text()).toBe(enUS.orders.amountNote);
+    // The note sits directly above the table, not inside any of its rows.
+    expect(desktopNotes[0].element.nextElementSibling).toBe(wrapper.get(".orders-table").element);
+    expect(wrapper.find(".orders-table .amount-note").exists()).toBe(false);
+    const cardNotes = wrapper.findAll(".order-card .amount-note");
+    expect(cardNotes).toHaveLength(2);
+    expect(cardNotes.every(note => note.text() === enUS.orders.amountNote)).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("shows no amount note without data", async () => {
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="orders-amount-note"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("hides the empty copy, the amount note and the pager when loading fails", async () => {
+    vi.mocked(getCreatorOrders).mockRejectedValue(new Error("network"));
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="orders-amount-note"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain(enUS.orders.loadFailed);
+    expect(wrapper.text()).not.toContain(enUS.orders.empty);
+    expect(wrapper.find(".data-table__empty").exists()).toBe(false);
+    expect(wrapper.find(".data-table__pager").exists()).toBe(false);
+    expect(wrapper.find(".orders-pager").exists()).toBe(false);
   });
 
   it("keeps duplicate masked order numbers independently expandable", async () => {
