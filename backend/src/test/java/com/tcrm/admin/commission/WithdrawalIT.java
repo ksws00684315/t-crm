@@ -539,7 +539,8 @@ class WithdrawalIT {
               String.valueOf(resubmitted.id()),
               String.valueOf(applied.id()));
       assertThat(records.items())
-          .extracting(com.tcrm.admin.commission.service.KolCommissionService.FundRecord::publicStatus)
+          .extracting(
+              com.tcrm.admin.commission.service.KolCommissionService.FundRecord::publicStatus)
           .containsExactly("WITHDRAWN", "PENDING_REVIEW", "REJECTED");
       assertThat(records.items()).allMatch(row -> row.receivedAt() == null);
       assertThat(kolCommission.fundRecords(TENANT_ID, kolId + 1, 1, 20).items()).isEmpty();
