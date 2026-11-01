@@ -68,6 +68,13 @@ public class OrderCommissionSync {
       // Settlement flows show refunds the CRM records lack; the gap is netted but needs a look.
       LOG.warn("settlement refund gap netted for order {}", order.getId());
     }
+    if (basis.refundGapUnallocated().signum() > 0) {
+      // Every line is already netted to zero; the rest of the flow refunds has nothing to reduce.
+      LOG.warn(
+          "settlement refund gap exceeds the remaining basis of order {}: {} not netted",
+          order.getId(),
+          basis.refundGapUnallocated().toPlainString());
+    }
     persistOutcome(order, basis);
     List<OrderItemsCommissionEvent.ItemFacts> facts =
         items.stream().map(item -> toFacts(order, item, basis, afterSalesItems)).toList();
@@ -116,21 +123,32 @@ public class OrderCommissionSync {
 
   /**
    * Persists the settlement time and the basis check reason on the order with a targeted update, so
-   * the column can also be cleared back to null once a basis verifies. Only changed values are
-   * written.
+   * the columns can also be cleared back to null. Only changed values are written.
+   *
+   * <p>The settlement time is cleared only when the stored confirmation no longer holds (task 91,
+   * L-038): the order has income flows but they do not confirm the basis ({@code INCOME_MISMATCH}).
+   * A round without income flows ({@code NO_SETTLEMENT}), an uncomputable basis (multiple KOLs,
+   * allocation failure) and the zero-basis shortcuts (closed, pre-settle refund) say nothing about
+   * the confirmation, so a time that was set earlier stays.
    */
   private void persistOutcome(OrderDO order, BasisOutcome basis) {
-    boolean settledChange =
+    boolean confirmationLost =
+        SettlementBasisCalculator.REASON_INCOME_MISMATCH.equals(basis.reason());
+    boolean settledSet =
         basis.settlementTime() != null && !basis.settlementTime().equals(order.getSettledTime());
+    boolean settledClear = confirmationLost && order.getSettledTime() != null;
     boolean reasonChange = !Objects.equals(basis.reason(), order.getCommissionBasisReason());
-    if (!settledChange && !reasonChange) {
+    if (!settledSet && !settledClear && !reasonChange) {
       return;
     }
     LambdaUpdateWrapper<OrderDO> update =
         new LambdaUpdateWrapper<OrderDO>().eq(OrderDO::getId, order.getId());
-    if (settledChange) {
+    if (settledSet) {
       update.set(OrderDO::getSettledTime, basis.settlementTime());
       order.setSettledTime(basis.settlementTime());
+    } else if (settledClear) {
+      update.set(OrderDO::getSettledTime, null);
+      order.setSettledTime(null);
     }
     if (reasonChange) {
       update.set(OrderDO::getCommissionBasisReason, basis.reason());

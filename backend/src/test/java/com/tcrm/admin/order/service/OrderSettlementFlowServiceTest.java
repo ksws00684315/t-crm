@@ -131,13 +131,14 @@ class OrderSettlementFlowServiceTest {
   }
 
   @Test
-  void shouldNotReportSuccessWhenAnOrderRecomputeFails() {
-    // A failing recompute keeps the pull unsuccessful so the checkpoints stay and the affected
-    // order retries on the next round.
+  void shouldMarkFailedOrderAndLetTheCheckpointAdvance() {
+    // Task 91 (L-023): a failing recompute is recorded on the order and no longer holds the
+    // shop's checkpoint back (the pull returns true), so the caller advances it.
     when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
     when(flows.listMatchedOrderIdsSince(30L, Instant.EPOCH)).thenReturn(List.of(50L));
     when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
     stubRecompute();
+    when(orders.settlementRecomputeFailures(50L)).thenReturn(1);
     org.mockito.Mockito.doThrow(new RuntimeException("wallet down"))
         .when(commissionSync)
         .sync(any(), any());
@@ -145,8 +146,115 @@ class OrderSettlementFlowServiceTest {
 
     boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
 
-    assertThat(ok).isFalse();
+    assertThat(ok).isTrue();
     verify(commissionSync).sync(any(), any());
+    verify(orders).markSettlementRecomputeFailed(50L);
+    verify(orders, never()).clearSettlementRecomputeFailed(anyLong());
+  }
+
+  @Test
+  void shouldRecomputeTheOtherOrdersWhenOneFails() {
+    // Order 50 fails, order 51 is unaffected: it recomputes, nothing is marked for it.
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(30L, Instant.EPOCH)).thenReturn(List.of(50L, 51L));
+    when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(orders.selectOne(any(LambdaQueryWrapper.class)))
+        .thenReturn(orderRow(50L, "t91_wd_order_50"), orderRow(51L, "t91_wd_order_51"));
+    when(items.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(orders.settlementRecomputeFailures(50L)).thenReturn(1);
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              if (invocation.<OrderDO>getArgument(0).getId() == 50L) {
+                throw new RuntimeException("recompute broke");
+              }
+              return null;
+            })
+        .when(commissionSync)
+        .sync(any(), any());
+    stubDetail(detail("t91_wd_order_50", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
+
+    assertThat(ok).isTrue();
+    verify(commissionSync, org.mockito.Mockito.times(2)).sync(any(), any());
+    verify(orders).markSettlementRecomputeFailed(50L);
+    verify(orders, never()).markSettlementRecomputeFailed(51L);
+  }
+
+  @Test
+  void shouldRetryOnlyTheMarkedOrderAndClearItsMarkOnSuccess() {
+    // Next round: the checkpoint moved past the old flows, nothing new arrived, but order 50
+    // carries a retry mark. Only it is recomputed; success clears the mark.
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new OrderSettlementFlowDO());
+    Instant checkpoint = Instant.parse("2026-10-27T12:00:00Z");
+    when(flows.listMatchedOrderIdsSince(30L, checkpoint)).thenReturn(List.of());
+    when(orders.listSettlementRecomputePending(30L)).thenReturn(List.of(50L));
+    stubRecompute();
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, checkpoint);
+
+    assertThat(ok).isTrue();
+    verify(commissionSync).sync(any(), any());
+    verify(orders).clearSettlementRecomputeFailed(50L);
+    verify(orders, never()).markSettlementRecomputeFailed(anyLong());
+  }
+
+  @Test
+  void shouldKeepTheMarkAndCountAgainWhenTheRetryFailsAgain() {
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(new OrderSettlementFlowDO());
+    Instant checkpoint = Instant.parse("2026-10-27T12:00:00Z");
+    when(flows.listMatchedOrderIdsSince(30L, checkpoint)).thenReturn(List.of());
+    when(orders.listSettlementRecomputePending(30L)).thenReturn(List.of(50L));
+    stubRecompute();
+    when(orders.settlementRecomputeFailures(50L)).thenReturn(3);
+    org.mockito.Mockito.doThrow(new RuntimeException("still broken"))
+        .when(commissionSync)
+        .sync(any(), any());
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, checkpoint);
+
+    // One attempt per round, never a loop; the pull still counts as done.
+    assertThat(ok).isTrue();
+    verify(commissionSync).sync(any(), any());
+    verify(orders).markSettlementRecomputeFailed(50L);
+    verify(orders, never()).clearSettlementRecomputeFailed(anyLong());
+  }
+
+  @Test
+  void shouldKeepTheCheckpointWhenTheRetryMarkCannotBeWritten() {
+    // Nothing would remember the order once the checkpoint moves on, so the old behavior stays:
+    // the pull is reported unsuccessful and the recompute set recovers from the persisted flows.
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(flows.listMatchedOrderIdsSince(30L, Instant.EPOCH)).thenReturn(List.of(50L));
+    when(orders.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    stubRecompute();
+    org.mockito.Mockito.doThrow(new RuntimeException("wallet down"))
+        .when(commissionSync)
+        .sync(any(), any());
+    when(orders.markSettlementRecomputeFailed(50L)).thenThrow(new RuntimeException("db down"));
+    stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+
+    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
+
+    assertThat(ok).isFalse();
+  }
+
+  @Test
+  void shouldNotRecomputeOrMarkAnythingWhenTheWeidianPullFails() {
+    // Task 76 review rule kept: a failed pull throws before any recompute, so the caller leaves
+    // the checkpoints in place.
+    when(flows.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+    when(api.tradeDetail(anyLong(), any(TradeDetailRequest.class)))
+        .thenThrow(new RuntimeException("weidian down"));
+
+    OrderSettlementFlowService underTest = service(START.plusSeconds(60));
+
+    assertThatThrownBy(() -> underTest.pull(30L, START, END, null))
+        .isInstanceOf(RuntimeException.class);
+    verify(commissionSync, never()).sync(any(), any());
+    verify(orders, never()).markSettlementRecomputeFailed(anyLong());
   }
 
   @Test

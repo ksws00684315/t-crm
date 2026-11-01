@@ -25,7 +25,9 @@ import org.springframework.stereotype.Service;
  * ({@code weidian.settlement.sync-interval-minutes}) and the daily Beijing backfill hour ({@code
  * weidian.settlement.backfill-hour}) are read each round, so configuration changes apply without a
  * restart. Per-shop non-waiting watchdog locks prevent double execution; pull failures only log and
- * retry on the next round without touching the order sync.
+ * retry on the next round without touching the order sync. A commission recompute that fails for a
+ * single order does not hold the shop back (task 91, L-023): that order carries a retry mark and
+ * only it is retried, while the checkpoints advance.
  */
 @Service
 public class OrderSettlementSyncCoordinator {
@@ -111,8 +113,10 @@ public class OrderSettlementSyncCoordinator {
 
   /**
    * Pulls whichever action the shop is due for and advances the persisted checkpoints — but only
-   * when the pull fully succeeded (review rework, task 76): a failed pull or recompute leaves the
-   * checkpoints in place, and the next round recovers the recompute set from the persisted flows.
+   * when the pull succeeded (review rework, task 76): a failed Weidian pull leaves the checkpoints
+   * in place, and the next round recovers the recompute set from the persisted flows. Since task 91
+   * (L-023) a failed recompute of one order is recorded on that order and no longer counts against
+   * the pull, so the checkpoints advance; only a failure that could not be recorded keeps them.
    */
   void pullIfDue(long shopId) {
     Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
