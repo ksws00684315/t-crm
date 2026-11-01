@@ -29,6 +29,7 @@ CLAUDE.local.md
 
 # Deployment working directories (certificates, built static files, backups)
 deploy/certs/
+deploy/certbot/
 deploy/www/
 deploy/www-preview/
 deploy/.env.preview

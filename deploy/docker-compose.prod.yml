@@ -1,6 +1,7 @@
 # PRODUCTION TEMPLATE (single 4-core / 8 GB host, design document section 10).
 # Review every value before use. Run from the repository root:
 #   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+# First deployment: create the data volumes once (docker volume create tcrm_pgdata tcrm_redisdata).
 # Only Nginx publishes ports (80/443); PostgreSQL, Redis, crm-admin and crm-redirect are reachable
 # only inside the compose network. Memory limits follow the design: PostgreSQL 2G, Redis 1.5G,
 # crm-admin 2G, crm-redirect 512M, the rest is left for Nginx and the operating system.
@@ -9,9 +10,17 @@ name: tcrm
 x-restart: &restart
   restart: unless-stopped
 
+# Rotate container logs (json-file keeps them until the container is removed): 5 x 50 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+      max-file: "5"
+
 services:
   nginx:
-    <<: *restart
+    <<: [*restart, *logging]
     image: nginx:1.30.5-alpine
     ports:
       - "80:80"
@@ -35,7 +44,7 @@ services:
     mem_limit: 256m
 
   crm-admin:
-    <<: *restart
+    <<: [*restart, *logging]
     build:
       context: ..
       dockerfile: backend/Dockerfile
@@ -106,7 +115,7 @@ services:
     mem_limit: 2g
 
   crm-redirect:
-    <<: *restart
+    <<: [*restart, *logging]
     build:
       context: ..
       dockerfile: redirect/Dockerfile
@@ -145,13 +154,20 @@ services:
     mem_limit: 512m
 
   postgres:
-    <<: *restart
+    <<: [*restart, *logging]
     image: postgres:17.11
     environment:
       POSTGRES_DB: ${TCRM_DB_NAME:-tcrm}
-      POSTGRES_USER: ${TCRM_DB_USERNAME}
-      POSTGRES_PASSWORD: ${TCRM_DB_PASSWORD}
+      # Superuser, used only for administration (initdb script, backups); crm-admin never gets it.
+      POSTGRES_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      POSTGRES_PASSWORD: ${TCRM_DB_SUPERUSER_PASSWORD}
+      # Application account and its password; initdb/01-app-role.sh creates the account (not a
+      # superuser) and makes it the owner of the database. Used on first start of an empty data volume only.
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
       TZ: UTC
+    # PostgreSQL shared memory (parallel queries, dynamic shared memory); Docker's 64 MB default is too small.
+    shm_size: 256m
     command:
       - postgres
       - -c
@@ -161,6 +177,7 @@ services:
       - log_min_duration_statement=100
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
     expose:
       - "5432"
     healthcheck:
@@ -171,7 +188,7 @@ services:
     mem_limit: 2g
 
   redis:
-    <<: *restart
+    <<: [*restart, *logging]
     image: redis:7.4.5
     # Streams and the link index live here, so nothing may be evicted (noeviction); maxmemory leaves
     # headroom below the 1.5G container limit for fork/replication buffers. Authentication is mandatory.
@@ -206,6 +223,12 @@ networks:
       config:
         - subnet: 172.30.0.0/24
 
+# Data volumes are created by hand once (docker volume create tcrm_pgdata tcrm_redisdata) and are
+# external, so "docker compose down -v" cannot delete them (ADR-037; deploy/README.md).
 volumes:
   pgdata:
+    external: true
+    name: tcrm_pgdata
   redisdata:
+    external: true
+    name: tcrm_redisdata
