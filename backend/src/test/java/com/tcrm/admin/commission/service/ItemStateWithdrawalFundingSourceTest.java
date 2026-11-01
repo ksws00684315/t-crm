@@ -136,6 +136,31 @@ class ItemStateWithdrawalFundingSourceTest {
   }
 
   @Test
+  void shouldReportTheBlockedReleasedMoneyAsFrozenShortfall() {
+    // L-033 equation: the blocked line's released money is neither available nor occupied, so it
+    // shows up as frozen: shortfall = wallet remainder − row-level allocatable.
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("2.17"))));
+    assertThat(source.frozenShortfallCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .isEqualByComparingTo("4.33");
+    // Fully occupied wallet: nothing unaccounted, no shortfall.
+    assertThat(source.frozenShortfallCny(KOL, new BigDecimal("2.17"), new BigDecimal("2.17")))
+        .isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldComputeBatchFrozenShortfallForListPages() {
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("2.17"))));
+    var shortfall =
+        source.frozenShortfallByKol(
+            List.of(KOL), java.util.Map.of(KOL, new BigDecimal("6.50")), java.util.Map.of());
+    assertThat(shortfall.get(KOL)).isEqualByComparingTo("4.33");
+  }
+
+  @Test
   void shouldComputeBatchAvailableForListPages() {
     long other = 33L;
     when(states.aggregateAllocatableByKol(anyCollection(), any()))

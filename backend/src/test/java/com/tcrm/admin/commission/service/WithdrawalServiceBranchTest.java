@@ -112,6 +112,7 @@ class WithdrawalServiceBranchTest {
               BigDecimal occupied = invocation.getArgument(2);
               return balance.subtract(occupied);
             });
+    when(funding.frozenShortfallCny(eq(KOL), any(), any())).thenReturn(BigDecimal.ZERO);
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
     when(funding.configVersion(KOL)).thenReturn(0);

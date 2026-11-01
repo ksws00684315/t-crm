@@ -51,6 +51,38 @@ public interface WithdrawalFundingSource {
     return available;
   }
 
+  /**
+   * Released wallet money the allocatable rows cannot back — blocked (after-sales or over-occupied)
+   * lines that are neither available nor occupied. It stays displayed as frozen so the five-layer
+   * equation 预估 = 冻结 + 可提现 + 占用 + 已付 keeps holding once 可提现 shrinks to the allocatable cap (L-033,
+   * design §4.8.1「阻断期间该行一律显示冻结」).
+   */
+  default BigDecimal frozenShortfallCny(long kolId, BigDecimal balanceCny, BigDecimal occupiedCny) {
+    BigDecimal wallet = balanceCny.subtract(occupiedCny);
+    BigDecimal rowLevel =
+        allocatableByKol(List.of(kolId)).getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
+    return wallet.subtract(rowLevel).max(BigDecimal.ZERO.setScale(2));
+  }
+
+  /** Batch form of {@link #frozenShortfallCny} for list pages. */
+  default Map<Long, BigDecimal> frozenShortfallByKol(
+      Collection<Long> kolIds, Map<Long, BigDecimal> balances, Map<Long, BigDecimal> occupied) {
+    Map<Long, BigDecimal> allocatable = allocatableByKol(kolIds);
+    Map<Long, BigDecimal> shortfall = new HashMap<>();
+    for (Long kolId : kolIds) {
+      BigDecimal wallet =
+          balances
+              .getOrDefault(kolId, BigDecimal.ZERO.setScale(2))
+              .subtract(occupied.getOrDefault(kolId, BigDecimal.ZERO.setScale(2)));
+      shortfall.put(
+          kolId,
+          wallet
+              .subtract(allocatable.getOrDefault(kolId, BigDecimal.ZERO.setScale(2)))
+              .max(BigDecimal.ZERO.setScale(2)));
+    }
+    return shortfall;
+  }
+
   /** Commission accrued but not released yet (frozen money, shown by the withdrawal conditions). */
   BigDecimal frozenCny(long kolId);
 

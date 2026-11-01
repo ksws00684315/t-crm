@@ -316,9 +316,12 @@ class BusinessChainIT {
     assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWABLE");
     // 可提现 (L-033): the wallet still holds 6.50, but line A's 4.33 sits in the open refund, so
     // the displayed available drops to what the rows still fund — line B's 2.17 — and equals the
-    // cap an application can actually allocate.
+    // cap an application can actually allocate. The blocked released money stays visible as
+    // frozen, keeping 预估 6.50 = 冻结 4.33 + 可提现 2.17 + 占用 0.00.
     ChainWorld.money(world.conditions().at("/available"), "2.17");
+    ChainWorld.money(world.conditions().at("/frozen"), "4.33");
     ChainWorld.money(world.overview().at("/income/available"), "2.17");
+    ChainWorld.money(world.overview().at("/income/frozen"), "4.33");
     // Line A's released 4.33 cannot be occupied by a new application: only line B is funded.
     long payoutAccountId = world.createPayout();
     assertThat(world.applyWithdrawalOutcome(payoutAccountId, "6.50"))
@@ -426,6 +429,89 @@ class BusinessChainIT {
     JsonNode detail = world.withdrawal(world.financeToken(), withdrawalId);
     assertThat(detail.path("paused").asBoolean()).isFalse();
     assertThat(historyCount(detail, "PAUSED")).isZero();
+  }
+
+  @Test
+  void shouldKeepTheWithdrawalPaused_whenTheRefundSucceedsShortOfTheOccupation() throws Exception {
+    world.open("short");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    world.approveWithdrawal(withdrawalId);
+    // Open refund pauses the application; a refund that concludes still leaves line A's
+    // occupation (4.33) above its released money (refunded in full → 0.00), so the pause stays —
+    // owner decision 2026-11-01: no resume, payment refused, reject is the only exit.
+    world.stubRefund(world.refund(1), "1", 4000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("paused").asBoolean())
+        .isTrue();
+    world.stubRefund(world.refund(1), "1", 4000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    assertThat(world.pull()).isTrue();
+    JsonNode detail = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(detail.path("paused").asBoolean()).isTrue();
+    assertThat(historyCount(detail, "RESUMED")).isZero();
+    assertThat(world.payWithdrawalOutcome(withdrawalId, "6.50")).isEqualTo("409 WITHDRAWAL_PAUSED");
+    // Rejecting clears the stored pause without a RESUMED row; the wallet keeps 2.17.
+    world.rejectWithdrawal(withdrawalId, "t90 refund shortfall, reapply");
+    JsonNode rejected = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(rejected.path("status").asString()).isEqualTo("REJECTED");
+    assertThat(rejected.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(rejected, "RESUMED")).isZero();
+  }
+
+  @Test
+  void shouldPauseTheWithdrawal_whenTheRefundArrivesStraightAsSuccess() throws Exception {
+    world.open("straight");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    world.approveWithdrawal(withdrawalId);
+    // The refund never passes through an open state: the line lands refunded in full straight
+    // away, the release drops below the occupation, and the expanded trigger still pauses the
+    // application before any payment can go out.
+    world.stubRefund(world.refund(1), "1", 4000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    assertThat(world.pull()).isTrue();
+    JsonNode detail = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(detail.path("paused").asBoolean()).isTrue();
+    assertThat(historyCount(detail, "PAUSED")).isEqualTo(1);
+    assertThat(world.payWithdrawalOutcome(withdrawalId, "6.50")).isEqualTo("409 WITHDRAWAL_PAUSED");
+  }
+
+  @Test
+  void shouldResumeTheWithdrawal_whenTheRefundedLineStillCoversTheOccupation() throws Exception {
+    world.open("fits");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    // Only 2.00 of line A (4.33) is occupied: a 10.00 refund on it still leaves 3.33 released ≥
+    // 2.00, so once the refund concludes the pause lifts and the payment goes through.
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "2.00");
+    world.approveWithdrawal(withdrawalId);
+    world.stubRefund(world.refund(1), "1", 1000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("paused").asBoolean())
+        .isTrue();
+    world.stubRefund(world.refund(1), "1", 1000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    assertThat(world.pull()).isTrue();
+    JsonNode resumed = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(resumed.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(resumed, "RESUMED")).isEqualTo(1);
+    world.pay(withdrawalId, "2.00");
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("status").asString())
+        .isEqualTo("PAID");
   }
 
   @Test

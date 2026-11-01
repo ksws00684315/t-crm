@@ -122,6 +122,7 @@ class WithdrawalServiceScopeTest {
               BigDecimal occupied = invocation.getArgument(2);
               return balance.subtract(occupied);
             });
+    when(funding.frozenShortfallCny(eq(KOL), any(), any())).thenReturn(BigDecimal.ZERO);
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("600.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(2L);
     when(funding.configVersion(KOL)).thenReturn(3);

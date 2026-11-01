@@ -120,10 +120,13 @@ public class KolCommissionService {
           BigDecimal prepay = prepayPaid.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
           // 可提现 (L-033): the shared available computation, not the raw wallet remainder.
           BigDecimal available = funding.availableCny(kolId, balance, occupied).setScale(2);
+          // Frozen display keeps the equation: blocked released money stays visible as frozen.
+          BigDecimal frozenDisplay =
+              frozen.add(funding.frozenShortfallCny(kolId, balance, occupied)).setScale(2);
           OverviewMoney money =
               new OverviewMoney(
                   estimated,
-                  frozen,
+                  frozenDisplay,
                   available,
                   occupied,
                   commission.add(prepay),

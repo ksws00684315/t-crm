@@ -98,16 +98,61 @@ public interface WithdrawalMapper {
   int resume(@Param("id") long id, @Param("now") Instant now);
 
   /**
-   * Allocated lines of the application that still block payment (unconcluded refund, §8.4);
-   * detached or logically deleted lines no longer block.
+   * Allocated lines of the application that still block payment under the shared blocked-line
+   * predicate: the line sits in an unconcluded refund, or its occupations (including PAID, the same
+   * scope as the row leftover) outrun its released money — paying would push the wallet negative
+   * (ADR-032 §6 退款阻断联动, 2026-11-01 owner decision). Detached or logically deleted lines no longer
+   * block. The payment registration re-runs this under the application lock, so a pause missed by a
+   * concurrent sync still cannot be paid.
    */
   @Select(
       """
       SELECT count(*) FROM crm_commission_withdrawal_allocation a
       JOIN crm_commission_item_state s ON s.id = a.item_state_id
-      WHERE a.withdrawal_id = #{withdrawalId} AND s.is_deleted = FALSE AND s.after_sales = TRUE
+      LEFT JOIN (
+        SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny
+        FROM crm_commission_withdrawal_allocation a2
+        JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id
+        WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+        GROUP BY a2.order_item_id
+      ) o ON o.order_item_id = s.order_item_id
+      WHERE a.withdrawal_id = #{withdrawalId}
+        AND ( (s.is_deleted = FALSE AND s.after_sales = TRUE)
+           OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny )
       """)
   long countBlockedItems(@Param("withdrawalId") long withdrawalId);
+
+  /**
+   * The blocked-line predicate for one item state — the SQL twin of {@link #countBlockedItems}'s
+   * per-line condition (after-sales, or occupations with PAID outrunning the release). Null when
+   * the row is gone.
+   */
+  @Select(
+      """
+      SELECT (s.is_deleted = FALSE AND s.after_sales = TRUE)
+          OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny
+      FROM crm_commission_item_state s
+      LEFT JOIN (
+        SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny
+        FROM crm_commission_withdrawal_allocation a2
+        JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id
+        WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+        GROUP BY a2.order_item_id
+      ) o ON o.order_item_id = s.order_item_id
+      WHERE s.id = #{itemStateId}
+      """)
+  Boolean isItemBlocked(@Param("itemStateId") long itemStateId);
+
+  /** Occupations (including PAID) holding one item state, for the before/after block check. */
+  @Select(
+      """
+      SELECT COALESCE(SUM(a.occupied_cny), 0)
+      FROM crm_commission_withdrawal_allocation a
+      JOIN crm_commission_withdrawal w ON w.id = a.withdrawal_id
+      WHERE a.item_state_id = #{itemStateId}
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')
+      """)
+  java.math.BigDecimal sumOccupiedByItemState(@Param("itemStateId") long itemStateId);
 
   @Select("SELECT status FROM crm_commission_withdrawal WHERE id = #{id}")
   String statusOf(@Param("id") long id);
@@ -131,7 +176,10 @@ public interface WithdrawalMapper {
       """)
   int insert(@Param("row") WithdrawalWrite.Insert row);
 
-  /** Review decision: approve moves to PENDING_PAYMENT, reject to REJECTED. */
+  /**
+   * Review decision: approve moves to PENDING_PAYMENT, reject to REJECTED. A rejection also clears
+   * the refund pause — the pause only blocks payment and a rejected task is terminal.
+   */
   @Update(
       """
       UPDATE crm_commission_withdrawal
@@ -139,6 +187,8 @@ public interface WithdrawalMapper {
           review_note = #{row.reviewNote,jdbcType=VARCHAR},
           reviewer_id = #{row.reviewerId},
           reviewed_at = #{row.now},
+          paused = CASE WHEN #{row.next} = 'REJECTED' THEN FALSE ELSE paused END,
+          pause_reason = CASE WHEN #{row.next} = 'REJECTED' THEN NULL ELSE pause_reason END,
           update_by = #{row.reviewerId},
           update_time = #{row.now}
       WHERE id = #{row.id} AND status = #{row.current}
@@ -150,6 +200,8 @@ public interface WithdrawalMapper {
       """
       UPDATE crm_commission_withdrawal
       SET status = 'WITHDRAWN',
+          paused = FALSE,
+          pause_reason = NULL,
           update_by = #{row.kolId},
           update_time = #{row.now}
       WHERE id = #{row.id} AND status = 'PENDING_REVIEW' AND kol_id = #{row.kolId}

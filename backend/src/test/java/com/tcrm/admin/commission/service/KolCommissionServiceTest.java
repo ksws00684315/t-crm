@@ -56,6 +56,7 @@ class KolCommissionServiceTest {
               BigDecimal occupied = invocation.getArgument(2);
               return balance.subtract(occupied);
             });
+    lenient().when(funding.frozenShortfallCny(anyLong(), any(), any())).thenReturn(BigDecimal.ZERO);
     lenient().when(withdrawals.listKolPaidWithdrawals(anyLong())).thenReturn(List.of());
   }
 
@@ -98,6 +99,24 @@ class KolCommissionServiceTest {
     assertThat(overview.income().commissionPaid()).isEqualTo("20.00");
     assertThat(overview.income().prepayPaid()).isEqualTo("300.00");
     assertThat(overview.income().paid()).isEqualTo("320.00");
+  }
+
+  @Test
+  void shouldKeepTheFiveLayerEquation_whenBlockedReleasedMoneyLeavesTheAvailableFigure() {
+    // 预估 6.50 = 冻结 4.33 + 可提现 2.17 + 占用 0.00;the blocked released line stays visible.
+    when(states.aggregateByKol(List.of(KOL)))
+        .thenReturn(List.of(new KolAccrualRow(KOL, new BigDecimal("6.50"), BigDecimal.ZERO, 0L)));
+    when(finance.walletBalances(List.of(KOL)))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("6.50"))));
+    when(funding.availableCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .thenReturn(new BigDecimal("2.17"));
+    when(funding.frozenShortfallCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .thenReturn(new BigDecimal("4.33"));
+    var overview = TenantScope.callCompany(TENANT, () -> service.overview(TENANT, KOL));
+    assertThat(overview.income().estimated()).isEqualTo("6.50");
+    assertThat(overview.income().frozen()).isEqualTo("4.33");
+    assertThat(overview.income().available()).isEqualTo("2.17");
+    assertThat(overview.income().occupied()).isEqualTo("0.00");
   }
 
   @Test

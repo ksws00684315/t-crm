@@ -95,6 +95,13 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     Instant now = clock.instant();
     Map<Long, PayTimeRule> kolRates = new HashMap<>();
     RuleSnapshot rule = ruleEffectiveAt(order.payTime());
+    // Lines a later full sync dropped can no longer block: their applications must be locked now,
+    // before any wallet write of this transaction (lock order: application → wallet), so the
+    // resume at the end can never wait on an application lock while holding the wallet lock.
+    List<Long> stale = states.findStaleIdsByOrder(order.orderId(), itemIds(items));
+    for (Long itemStateId : stale) {
+      pauses.prelockItem(itemStateId);
+    }
     for (ItemSourceDTO item : items) {
       long tenantId = currentTenant();
       CommissionItemStateDO row = states.lockByOrderItemId(item.orderItemId());
@@ -110,18 +117,15 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       String version = fingerprint + REVISION_SEPARATOR + (revisionNo(row.getSourceVersion()) + 1);
       applyRevision(tenantId, row, order, item, rate, rule, version, now);
     }
-    deleteStaleRows(order, items, now);
-  }
-
-  /** Snapshots of item lines dropped by a later full sync stop counting (logical delete). */
-  private void deleteStaleRows(OrderSourceDTO order, List<ItemSourceDTO> items, Instant now) {
-    List<Long> itemIds = items.stream().map(ItemSourceDTO::orderItemId).toList();
-    List<Long> stale = states.findStaleIdsByOrder(order.orderId(), itemIds);
-    states.deleteStaleByOrder(order.orderId(), itemIds, now);
+    states.deleteStaleByOrder(order.orderId(), itemIds(items), now);
     // A dropped line can no longer block payment: lift the pauses it was holding.
     for (Long itemStateId : stale) {
       pauses.resumeForItem(itemStateId);
     }
+  }
+
+  private static List<Long> itemIds(List<ItemSourceDTO> items) {
+    return items.stream().map(ItemSourceDTO::orderItemId).toList();
   }
 
   private void applyRevision(
@@ -133,9 +137,12 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       RuleSnapshot rule,
       String version,
       Instant now) {
-    // The after-sales flag entering or leaving the row drives the withdrawal pause linkage below,
-    // so the previous value is captured before the source facts overwrite it.
-    boolean wasAfterSales = Boolean.TRUE.equals(row.getAfterSales());
+    // The line's blocked state — after-sales, or occupations (including PAID) that outrun its
+    // released money — drives the withdrawal pause linkage below, so both the previous blocked
+    // flag and the occupations are captured before the source facts and wallet writes change the
+    // picture.
+    BigDecimal previousOccupation = row.getId() == null ? ZERO : pauses.occupiedOfItem(row.getId());
+    boolean wasBlocked = row.getId() != null && pauses.isItemBlocked(row.getId());
     CommissionSettlementRules.Result result =
         CommissionSettlementRules.evaluate(
             new CommissionSettlementRules.Inputs(
@@ -163,6 +170,21 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
             && !Objects.equals(previousKol, item.kolId())
             && previousReleased.signum() > 0;
     if (ownershipChanged) {
+      released = ZERO;
+    }
+    // Same-owner decrease after release (refund, source correction): negative adjustment now.
+    if (!ownershipChanged && item.kolId() != null && result.accruedCny().compareTo(released) < 0) {
+      released = result.accruedCny();
+    }
+    // Locked BEFORE any wallet write: payment takes application → wallet, so this transaction
+    // must never hold the wallet lock while waiting for an application lock (deadlock). A
+    // block-state flip needs the locks; the writes below apply it.
+    boolean blocked = item.afterSales() || released.compareTo(previousOccupation) < 0;
+    if (row.getId() != null && blocked != wasBlocked) {
+      pauses.prelockItem(row.getId());
+    }
+    walletDelta = ZERO;
+    if (ownershipChanged) {
       BigDecimal clawback = previousReleased.negate();
       wallet.postCommissionAdjustment(
           tenantId,
@@ -172,11 +194,11 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
           clawback,
           now);
       walletDelta = walletDelta.add(clawback);
-      released = ZERO;
     }
-    // Same-owner decrease after release (refund, source correction): negative adjustment now.
-    if (item.kolId() != null && result.accruedCny().compareTo(released) < 0) {
-      BigDecimal decrease = result.accruedCny().subtract(released);
+    if (!ownershipChanged
+        && item.kolId() != null
+        && result.accruedCny().compareTo(previousReleased) < 0) {
+      BigDecimal decrease = result.accruedCny().subtract(previousReleased);
       wallet.postCommissionAdjustment(
           tenantId,
           item.kolId(),
@@ -185,7 +207,6 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
           decrease,
           now);
       walletDelta = walletDelta.add(decrease);
-      released = result.accruedCny();
     }
 
     row.setKolId(item.kolId());
@@ -213,12 +234,14 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     } else {
       states.updateById(row);
     }
-    // Refund pause linkage (ADR-032 §6 退款阻断联动): pause the applications occupying this line
-    // while the refund is open, lift them once every allocated line is unblocked. Runs in the
+    // Refund pause linkage (ADR-032 §6 退款阻断联动, owner decision 2026-11-01): pause the
+    // applications occupying this line while it blocks; lift them only when every allocated line
+    // is unblocked — a refund that concluded with the occupations no longer covered by the
+    // released money keeps the application paused until it is rejected or withdrawn. Runs in the
     // revision transaction, so every sync path shares one write; an unchanged fingerprint never
     // gets here, which keeps repeated syncs from writing duplicate history.
-    if (item.afterSales() != wasAfterSales) {
-      if (item.afterSales()) {
+    if (row.getId() != null && blocked != wasBlocked) {
+      if (blocked) {
         pauses.pauseForItem(row.getId());
       } else {
         pauses.resumeForItem(row.getId());

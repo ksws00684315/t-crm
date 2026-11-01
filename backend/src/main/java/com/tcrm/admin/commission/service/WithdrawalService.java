@@ -369,7 +369,13 @@ public class WithdrawalService {
         () -> {
           BigDecimal balance = nz(wallets.findBalance(kolId));
           BigDecimal occupied = nz(withdrawals.sumActiveOccupied(kolId));
-          BigDecimal frozen = funding.frozenCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
+          // Frozen display keeps the equation (L-033): released money of blocked lines that is
+          // neither available nor occupied stays shown as frozen.
+          BigDecimal frozen =
+              funding
+                  .frozenCny(kolId)
+                  .add(funding.frozenShortfallCny(kolId, balance, occupied))
+                  .setScale(2, RoundingMode.UNNECESSARY);
           BigDecimal estimated = funding.estimatedCny(kolId).setScale(2, RoundingMode.UNNECESSARY);
           long unverified = funding.unverifiedCount(kolId);
           // 可提现 (L-033): one figure for the pages and the application check — wallet money minus
@@ -712,8 +718,11 @@ public class WithdrawalService {
     if (!"PENDING_PAYMENT".equals(row.status())) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_STATE_CONFLICT);
     }
-    // A paused application blocks payment until its source is verified (ADR-032 §12).
-    if (row.paused()) {
+    // A paused application blocks payment until its source is verified (ADR-032 §12). The
+    // blocked-line check re-runs under the application lock: a concurrent sync may have blocked a
+    // line without seeing this application's (uncommitted) occupation, so the stored flag alone
+    // cannot be trusted (ADR-032 §6, owner decision 2026-11-01).
+    if (row.paused() || withdrawals.countBlockedItems(id) > 0) {
       throw new BusinessException(ErrorCode.WITHDRAWAL_PAUSED);
     }
     if (row.amountCny().compareTo(amount) != 0) {

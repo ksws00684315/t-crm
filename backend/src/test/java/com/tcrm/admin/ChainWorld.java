@@ -554,6 +554,14 @@ final class ChainWorld {
         "{\"decision\":\"APPROVE\"}");
   }
 
+  /** Pre-payment rejection (needs withdrawal:pay), e.g. a refund-paused task. */
+  void rejectWithdrawal(long withdrawalId, String note) throws Exception {
+    putOk(
+        "/admin-api/commission/withdrawals/" + withdrawalId + "/review",
+        financeToken,
+        "{\"decision\":\"REJECT\",\"note\":\"" + note + "\"}");
+  }
+
   void pay(long withdrawalId, String amount) throws Exception {
     MvcResult uploaded =
         mvc.perform(

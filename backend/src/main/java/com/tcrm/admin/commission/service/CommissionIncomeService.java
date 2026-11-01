@@ -282,6 +282,8 @@ public class CommissionIncomeService {
     Map<Long, BigDecimal> occupied = occupiedMap(kolIds);
     // 可提现 (L-033): the shared available computation per KOL, not the raw wallet remainder.
     Map<Long, BigDecimal> available = funding.availableByKol(kolIds, balances, occupied);
+    // Frozen display keeps the equation: blocked released money stays visible as frozen.
+    Map<Long, BigDecimal> shortfall = funding.frozenShortfallByKol(kolIds, balances, occupied);
     PeriodPaid period = periodPaid(kolIds, filter);
 
     Map<Long, Long> orderCounts = new HashMap<>();
@@ -311,7 +313,7 @@ public class CommissionIncomeService {
           id,
           new KolMoney(
               estimated.getOrDefault(id, zero()),
-              frozen.getOrDefault(id, zero()),
+              frozen.getOrDefault(id, zero()).add(shortfall.getOrDefault(id, zero())),
               available.getOrDefault(id, zero()),
               held,
               commissionPaidAll.getOrDefault(id, zero()).add(prepayAll),

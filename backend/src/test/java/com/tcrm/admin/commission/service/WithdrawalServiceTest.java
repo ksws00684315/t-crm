@@ -134,6 +134,8 @@ class WithdrawalServiceTest {
               BigDecimal occupied = invocation.getArgument(2);
               return balance.subtract(occupied);
             });
+    // Default frozen shortfall: the rows can back the whole wallet remainder.
+    when(funding.frozenShortfallCny(eq(KOL), any(), any())).thenReturn(BigDecimal.ZERO);
     when(orderItems.listByIds(anyList()))
         .thenReturn(
             List.of(
@@ -171,6 +173,22 @@ class WithdrawalServiceTest {
     assertThat(conditions.occupied()).isEqualTo("120.00");
     assertThat(conditions.minimum()).isEqualTo("200.00");
     assertThat(conditions.canApply()).isFalse();
+  }
+
+  @Test
+  void shouldAddBlockedReleasedMoneyToTheFrozenDisplay() {
+    // L-033 equation: 预估 6.50 = 冻结 4.33 + 可提现 2.17 + 占用 0.00 (no prepay, no paid).
+    when(wallets.findBalance(KOL)).thenReturn(new BigDecimal("6.50"));
+    when(withdrawals.sumActiveOccupied(KOL)).thenReturn(BigDecimal.ZERO);
+    when(funding.frozenCny(KOL)).thenReturn(BigDecimal.ZERO);
+    when(funding.availableCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .thenReturn(new BigDecimal("2.17"));
+    when(funding.frozenShortfallCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .thenReturn(new BigDecimal("4.33"));
+    var conditions = service.conditions(COMPANY, KOL);
+    assertThat(conditions.frozen()).isEqualTo("4.33");
+    assertThat(conditions.available()).isEqualTo("2.17");
+    assertThat(conditions.occupied()).isEqualTo("0.00");
   }
 
   @Test
@@ -540,6 +558,20 @@ class WithdrawalServiceTest {
   void shouldRefusePaymentOfPausedApplication() {
     // L-032: the refund pause blocks payment even in PENDING_PAYMENT until the source unblocks.
     when(withdrawals.findRow(ID)).thenReturn(pausedRow("PENDING_PAYMENT"));
+    assertThatThrownBy(
+            () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY")))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WITHDRAWAL_PAUSED));
+  }
+
+  @Test
+  void shouldRefusePayment_whenTheLiveBlockCheckHitsWithoutTheStoredFlag() {
+    // The flag can lag: a sync may have blocked a line without seeing this (uncommitted)
+    // application, so the payment re-runs the blocked-line check under the lock.
+    when(withdrawals.findRow(ID)).thenReturn(row("PENDING_PAYMENT"));
+    when(withdrawals.countBlockedItems(ID)).thenReturn(1L);
     assertThatThrownBy(
             () -> service.pay(reviewer("withdrawal:pay"), ID, payment("400.00", "400.00", "CNY")))
         .isInstanceOfSatisfying(

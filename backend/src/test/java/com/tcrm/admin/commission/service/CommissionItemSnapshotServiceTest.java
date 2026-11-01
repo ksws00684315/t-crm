@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -57,6 +58,9 @@ class CommissionItemSnapshotServiceTest {
     when(kols.rateEffectiveAt(anyLong(), any())).thenReturn(null);
     when(states.deleteStaleByOrder(anyLong(), anyCollection(), any())).thenReturn(0);
     when(states.findStaleIdsByOrder(anyLong(), anyCollection())).thenReturn(List.of());
+    // No occupations anywhere: the block state then follows the after-sales flag alone.
+    lenient().when(pauses.occupiedOfItem(anyLong())).thenReturn(java.math.BigDecimal.ZERO);
+    lenient().when(pauses.isItemBlocked(anyLong())).thenReturn(false);
   }
 
   @Test
@@ -310,12 +314,40 @@ class CommissionItemSnapshotServiceTest {
     whenRateAtPayTime(KOL_A, "0.1500", 3);
     CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
 
+    when(pauses.isItemBlocked(row.getId())).thenReturn(false);
     syncAfterSales(true);
     verify(pauses).pauseForItem(row.getId());
     verify(pauses, never()).resumeForItem(anyLong());
 
+    // The pause wrote its flag, so the row now reads as blocked; only clearing it lifts.
+    when(pauses.isItemBlocked(row.getId())).thenReturn(true);
     syncAfterSales(false);
     verify(pauses).resumeForItem(row.getId());
+  }
+
+  @Test
+  void shouldPauseWhenOccupationsOutrunTheReleasedMoney_withoutAfterSales() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    // The refund already concluded (after-sales false), but the clawback cut the release (15.00
+    // → 0.00) below the occupation (15.00 held): the line blocks and the holding application is
+    // paused — and the application locks precede the wallet write (payment takes application →
+    // wallet, so the revision must not take wallet → application).
+    when(pauses.occupiedOfItem(row.getId())).thenReturn(new BigDecimal("15.00"));
+    when(pauses.isItemBlocked(row.getId())).thenReturn(false);
+    // The line's money was released (the unit test has no release job): the clawback below now
+    // cuts a real released amount, exactly like the refund chain on a live stack.
+    row.setReleasedCommissionCny(new BigDecimal("15.00"));
+    syncLine(
+        withRefund(
+            item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), new BigDecimal("100.00")));
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses, wallet);
+    order.verify(pauses).prelockItem(row.getId());
+    order
+        .verify(wallet)
+        .postCommissionAdjustment(anyLong(), anyLong(), anyLong(), any(), any(), any());
+    order.verify(pauses).pauseForItem(row.getId());
+    verify(pauses, never()).resumeForItem(anyLong());
   }
 
   @Test
@@ -337,9 +369,11 @@ class CommissionItemSnapshotServiceTest {
     firstRevision(new BigDecimal("100.00"));
     when(states.findStaleIdsByOrder(eq(5001L), anyCollection())).thenReturn(List.of(7001L));
     // The next sync only carries line 9002, so line 9001's snapshot goes stale and can no longer
-    // block: the pause it held must lift.
+    // block: the pause it held must lift, with the application locked before any wallet write.
     syncLine(item(9002L, KOL_A, 1, new BigDecimal("50.00"), null));
-    verify(pauses).resumeForItem(7001L);
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses);
+    order.verify(pauses).prelockItem(7001L);
+    order.verify(pauses).resumeForItem(7001L);
   }
 
   /** Registers line 9001 and makes later syncs of the test find the row it created. */

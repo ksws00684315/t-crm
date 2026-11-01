@@ -101,6 +101,9 @@ class CommissionIncomeServiceTest {
     // Default row-level cap mirrors the wallet remainder so the hand computed rows hold; the cap
     // gets its own test below.
     lenient()
+        .when(funding.frozenShortfallByKol(anyCollection(), any(), any()))
+        .thenReturn(java.util.Map.of());
+    lenient()
         .when(funding.availableByKol(anyCollection(), any(), any()))
         .thenAnswer(
             invocation -> {
@@ -303,6 +306,26 @@ class CommissionIncomeServiceTest {
     assertThat(prepayMoney.cumulativePaid()).isEqualByComparingTo("70.00");
     assertThat(prepayPage.summary().paid()).isEqualByComparingTo("10.00");
     assertThat(prepayPage.summary().commissionPaid()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldFoldTheFrozenShortfallIntoTheRowFrozen() {
+    // 预估 6.50 = 冻结 4.33 + 可提现 2.17;the income row shows the equation (L-033).
+    when(states.aggregateByKol(anyCollection()))
+        .thenReturn(List.of(new KolAccrualRow(KOL, new BigDecimal("6.50"), BigDecimal.ZERO, 0L)));
+    when(finance.walletBalances(List.of(KOL)))
+        .thenReturn(List.of(new KolMoneyRow(KOL, new BigDecimal("6.50"))));
+    when(funding.availableByKol(eq(List.of(KOL)), any(), any()))
+        .thenReturn(java.util.Map.of(KOL, new BigDecimal("2.17")));
+    when(funding.frozenShortfallByKol(eq(List.of(KOL)), any(), any()))
+        .thenReturn(java.util.Map.of(KOL, new BigDecimal("4.33")));
+    IncomePage page =
+        TenantScope.callCompany(
+            TENANT,
+            () -> service.list(superAdmin(), new IncomeFilter(null, null, null, null, 1, 20)));
+    var money = page.page().items().getFirst().money();
+    assertThat(money.frozen()).isEqualByComparingTo("4.33");
+    assertThat(money.available()).isEqualByComparingTo("2.17");
   }
 
   @Test
