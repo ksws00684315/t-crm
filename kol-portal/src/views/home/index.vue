@@ -7,6 +7,7 @@ import {
   type CreatorAnalyticsOverview,
   type FundSummary
 } from "@/api/creator";
+import { formatInstant } from "@/utils/format";
 import { formatMoney } from "@/utils/orders";
 
 defineOptions({ name: "HomePage" });
@@ -169,9 +170,7 @@ onMounted(load);
           <RouterLink to="/items" class="fund-link">{{ t("home.viewItems") }} →</RouterLink>
         </el-card>
       </div>
-      <p class="as-of">
-        {{ t("home.updatedAt") }}: {{ new Date(analytics.asOf).toLocaleString(locale) }}
-      </p>
+      <p class="as-of">{{ t("home.updatedAt") }}: {{ formatInstant(analytics.asOf) }}</p>
     </template>
   </section>
 </template>

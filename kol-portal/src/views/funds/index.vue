@@ -21,6 +21,7 @@ import CopyText from "@/components/CopyText.vue";
 import { uploadQrFile } from "@/api/payout-account";
 import { ApiError } from "@/utils/http/error";
 import { checkQrFile } from "@/utils/payout-account";
+import { formatInstant } from "@/utils/format";
 import { formatMoney } from "@/utils/orders";
 import { randomUuid } from "@/utils/uuid";
 
@@ -276,11 +277,6 @@ async function cancelWithdrawal(item: WithdrawalRecord) {
     }
   }
 }
-function dateLabel(value: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(locale.value);
-}
 function pageChanged(value: number) {
   page.value = value;
   void load();
@@ -450,7 +446,7 @@ onMounted(load);
           @update:size="sizeChanged"
           @refresh="load"
         >
-          <template #cell-appliedAt="{ row }">{{ dateLabel(row.appliedAt) }}</template>
+          <template #cell-appliedAt="{ row }">{{ formatInstant(row.appliedAt) }}</template>
           <template #cell-applicationNo="{ row }"
             ><span class="application-no">{{ row.applicationNo || "—" }}</span></template
           >
@@ -465,7 +461,7 @@ onMounted(load);
             }}</span></template
           >
           <template #cell-recipient="{ row }">{{ row.maskedRecipient || "—" }}</template>
-          <template #cell-receivedAt="{ row }">{{ dateLabel(row.receivedAt) }}</template>
+          <template #cell-receivedAt="{ row }">{{ formatInstant(row.receivedAt) }}</template>
           <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
           <template #empty
             ><div v-if="!failure" class="empty-state">{{ t("funds.empty") }}</div>
@@ -489,13 +485,13 @@ onMounted(load);
                 }}</el-tag>
               </dd>
               <dt>{{ t("funds.appliedAt") }}</dt>
-              <dd>{{ dateLabel(record.appliedAt) }}</dd>
+              <dd>{{ formatInstant(record.appliedAt) }}</dd>
               <dt>{{ t("funds.amount") }}</dt>
               <dd class="fund-record-amount">{{ amountLabel(record.amount, record.currency) }}</dd>
               <dt>{{ t("funds.recipient") }}</dt>
               <dd>{{ record.maskedRecipient || "—" }}</dd>
               <dt>{{ t("funds.receivedAt") }}</dt>
-              <dd>{{ dateLabel(record.receivedAt) }}</dd>
+              <dd>{{ formatInstant(record.receivedAt) }}</dd>
             </dl>
           </article>
           <el-empty
@@ -523,7 +519,7 @@ onMounted(load);
             <span>{{ item.applicationNo }}</span
             ><strong>{{ amountLabel(item.amount, item.currency) }}</strong
             ><el-tag>{{ t(`funds.status.${item.status}`, item.status) }}</el-tag
-            ><span>{{ dateLabel(item.createdAt) }}</span>
+            ><span>{{ formatInstant(item.createdAt) }}</span>
             <el-button
               v-if="item.status === 'PENDING_REVIEW'"
               link

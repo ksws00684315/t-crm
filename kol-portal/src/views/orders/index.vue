@@ -5,6 +5,7 @@ import { getCreatorOrders, type CreatorOrder, type SettlementStatus } from "@/ap
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
+import { formatInstant } from "@/utils/format";
 import {
   formatMoney,
   localDateRangeToUtc,
@@ -46,10 +47,6 @@ const columns = computed<DataColumn[]>(() => [
 ]);
 function money(value: string) {
   return formatMoney(value, locale.value);
-}
-function dateLabel(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(locale.value);
 }
 function productLabel(row: CreatorOrder) {
   return (
@@ -230,7 +227,7 @@ onMounted(load);
         ><span class="product-cell">{{ productLabel(row) }}</span></template
       >
       <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
-      <template #cell-payTime="{ row }">{{ dateLabel(row.payTime) }}</template>
+      <template #cell-payTime="{ row }">{{ formatInstant(row.payTime) }}</template>
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
       >
@@ -268,7 +265,7 @@ onMounted(load);
           }}</span>
         </button>
         <div v-if="expanded.has(index)" class="order-card__details">
-          <span>{{ t("orders.payTime") }}: {{ dateLabel(order.payTime) }}</span>
+          <span>{{ t("orders.payTime") }}: {{ formatInstant(order.payTime) }}</span>
           <span>{{ t("orders.commissionRate") }}: {{ rate(order) }}</span>
           <span
             >{{ t("orders.commissionAmount") }}:

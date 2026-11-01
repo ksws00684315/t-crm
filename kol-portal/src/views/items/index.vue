@@ -7,11 +7,12 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { copyText } from "@/utils/copy";
+import { formatInstant } from "@/utils/format";
 import { readPageSize } from "@/utils/table-prefs";
 
 defineOptions({ name: "ItemsPage" });
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const items = ref<KolItem[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -28,11 +29,6 @@ const columns = computed<DataColumn[]>(() => [
   { key: "createTime", label: t("items.colCreated"), minWidth: 140 },
   { key: "actions", label: t("common.actions"), width: 120 }
 ]);
-
-function dateLabel(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(locale.value);
-}
 
 async function loadItems() {
   loading.value = true;
@@ -151,7 +147,7 @@ onMounted(loadItems);
       <template #cell-weidianItemId="{ row }">
         <CopyText :value="row.weidianItemId" />
       </template>
-      <template #cell-createTime="{ row }">{{ dateLabel(row.createTime) }}</template>
+      <template #cell-createTime="{ row }">{{ formatInstant(row.createTime) }}</template>
       <template #actions="{ row }">
         <RowActions :actions="rowActions(row)" />
       </template>
@@ -182,7 +178,7 @@ onMounted(loadItems);
           <p class="item-card__name">{{ item.itemName ?? t("items.unnamed") }}</p>
           <p class="item-card__meta">
             <span class="item-card__id">{{ item.weidianItemId }}</span>
-            <span>{{ dateLabel(item.createTime) }}</span>
+            <span>{{ formatInstant(item.createTime) }}</span>
           </p>
           <button
             class="item-card__copy"

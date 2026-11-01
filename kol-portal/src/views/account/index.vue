@@ -13,6 +13,7 @@ import {
 } from "@/api/payout-account";
 import { useSessionStore } from "@/stores/session";
 import { validPassword } from "@/utils/auth";
+import { formatInstant } from "@/utils/format";
 import { USDT_NETWORKS, type UsdtNetwork } from "@/utils/payout-account";
 import { useSubmission } from "@/utils/useSubmission";
 
@@ -292,7 +293,7 @@ function savePassword() {
           >
           <template v-if="session.kol.rateEffectiveAt"
             ><dt>{{ t("account.rateEffectiveAt") }}</dt>
-            <dd>{{ new Date(session.kol.rateEffectiveAt).toLocaleString() }}</dd></template
+            <dd>{{ formatInstant(session.kol.rateEffectiveAt) }}</dd></template
           >
         </dl>
       </el-card>
