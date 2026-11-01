@@ -199,8 +199,6 @@ class CommissionWalletIT {
       assertThat(paid.timeline())
           .extracting(PrepayService.Timeline::operatorName)
           .containsOnly("Test");
-      assertThat(prepays.summaries(reviewer, List.of(creator)).getFirst().paidAmountCny())
-          .isEqualTo("300.00");
       assertThat(
               prepays
                   .apply(

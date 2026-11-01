@@ -541,7 +541,7 @@ class PayoutAccountIT {
     mvc.perform(get("/admin-api/commission/payout-accounts").header(ADMIN_TOKEN, two))
         .andExpect(jsonPath("$.data.total").value(0));
     mvc.perform(get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, two))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden());
     mvc.perform(get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, one))
         .andExpect(status().isOk());
 
@@ -555,7 +555,7 @@ class PayoutAccountIT {
     mvc.perform(get("/admin-api/commission/payout-accounts").header(ADMIN_TOKEN, one))
         .andExpect(jsonPath("$.data.total").value(0));
     mvc.perform(get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, one))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden());
     mvc.perform(get("/admin-api/commission/payout-accounts/" + accountId).header(ADMIN_TOKEN, two))
         .andExpect(status().isOk());
 

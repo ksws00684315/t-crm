@@ -98,8 +98,11 @@ public class KolItemService {
   public KolItemDetail detail(long id) {
     AccountDTO user = current.user();
     KolItemDO row = items.selectById(id);
-    if (row == null || !visible(user, row.getKolId())) {
+    if (row == null) {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+    }
+    if (!visible(user, row.getKolId())) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     Instant now = Instant.now();
     Context ctx = load(List.of(row), true);

@@ -408,7 +408,7 @@ class WithdrawalServiceScopeTest {
 
   /**
    * {@code commission:freeze} can be granted to an OWN-scope BD (task 74 S1): the freeze and the
-   * resume of another BD's creator must answer COMMON_NOT_FOUND and write nothing at all.
+   * resume of another BD's creator must answer AUTH_FORBIDDEN and write nothing at all.
    */
   @Test
   void shouldRefuseFreezeAndResume_forForeignCreatorsUnderOwnScope() {
@@ -416,11 +416,11 @@ class WithdrawalServiceScopeTest {
     assertThatThrownBy(() -> service.freeze(bd, KOL, "dispute"))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
     assertThatThrownBy(() -> service.resume(bd, KOL, null))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
     verify(freezes, never()).insert(any());
     verify(freezes, never()).resume(any());
     verifyNoInteractions(audit);
@@ -461,7 +461,7 @@ class WithdrawalServiceScopeTest {
     assertThatThrownBy(() -> service.pay(bd, ID, payment()))
         .isInstanceOfSatisfying(
             BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
     verify(withdrawals, never()).insertPayment(any());
   }
 

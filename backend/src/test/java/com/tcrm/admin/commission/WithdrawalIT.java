@@ -565,7 +565,7 @@ class WithdrawalIT {
       assertThatThrownBy(() -> withdrawals.detail(reviewerA, applied.id()))
           .isInstanceOfSatisfying(
               BusinessException.class,
-              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COMMON_NOT_FOUND));
+              e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AUTH_FORBIDDEN));
       // the new BD approves; history keeps the submitter record regardless of the transfer
       var reviewed = withdrawals.review(reviewerB, applied.id(), "APPROVE", null);
       assertThat(reviewed.history().getFirst().action()).isEqualTo("SUBMITTED");

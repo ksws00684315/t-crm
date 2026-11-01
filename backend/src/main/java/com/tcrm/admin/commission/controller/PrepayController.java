@@ -73,13 +73,6 @@ public class PrepayController {
     return R.ok(PrepayDetailVO.from(prepays.activeApplication(current.user(), kolId)));
   }
 
-  @GetMapping("/admin-api/commission/prepays/kol-summaries")
-  @SaCheckPermission("kol:view")
-  public R<List<PrepayKolSummaryVO>> summaries(@RequestParam List<@Positive Long> kolId) {
-    List<PrepayService.KolSummary> rows = prepays.summaries(current.user(), kolId);
-    return R.ok(rows == null ? List.of() : rows.stream().map(PrepayKolSummaryVO::from).toList());
-  }
-
   /**
    * CSV export. Annotation requires {@code data:export}; service also requires a prepay list
    * permission ({@code prepay:apply}/{@code prepay:review}/{@code prepay:finance-review}/{@code
@@ -139,15 +132,6 @@ public class PrepayController {
                 attachments == null
                     ? List.of()
                     : attachments.stream().map(PrepayController::uploaded).toList())));
-  }
-
-  @GetMapping("/admin-api/commission/prepays/payout-accounts")
-  @SaCheckPermission(
-      value = {"prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay"},
-      mode = SaMode.OR)
-  public R<List<PrepayPayoutOptionVO>> payoutAccounts(@RequestParam @Positive Long kolId) {
-    List<PrepayService.PayoutOption> rows = prepays.payoutOptions(current.user(), kolId);
-    return R.ok(rows == null ? List.of() : rows.stream().map(PrepayPayoutOptionVO::from).toList());
   }
 
   @GetMapping("/admin-api/commission/prepays/{id}")

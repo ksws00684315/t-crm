@@ -1,6 +1,5 @@
 package com.tcrm.admin.commission.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.PrepayMapper;
@@ -14,7 +13,6 @@ import com.tcrm.admin.commission.model.PrepayDeductionRow;
 import com.tcrm.admin.commission.model.PrepayHead;
 import com.tcrm.admin.commission.model.PrepayHistoryRow;
 import com.tcrm.admin.commission.model.PrepayPageQuery;
-import com.tcrm.admin.commission.model.PrepayPaidSum;
 import com.tcrm.admin.commission.model.PrepayPaymentRow;
 import com.tcrm.admin.commission.model.PrepayRecipientRow;
 import com.tcrm.admin.commission.model.PrepayWrite;
@@ -149,8 +147,6 @@ public class PrepayService {
   }
 
   public record PrepayApplication(String requestId, Long kolId, String amountCny) {}
-
-  public record KolSummary(Long kolId, String paidAmountCny) {}
 
   public record ApplicationDetails(
       String reason,
@@ -386,37 +382,6 @@ public class PrepayService {
     return detail(user, id);
   }
 
-  public List<PayoutOption> payoutOptions(AccountDTO user, long kolId) {
-    requireAnyPermission(user, "prepay:apply", "prepay:review", "prepay:pay");
-    long tenantId = requireTenant(user);
-    return TenantScope.callCompany(
-        tenantId,
-        () -> {
-          KolRefDTO kol = requireKol(kolId);
-          if (!hasFinanceAccess(user)) {
-            requireKolScope(user, kol);
-          }
-          return payoutAccounts
-              .selectList(
-                  new LambdaQueryWrapper<PayoutAccountDO>()
-                      .eq(PayoutAccountDO::getKolId, kolId)
-                      .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
-                      .orderByAsc(PayoutAccountDO::getId))
-              .stream()
-              .map(
-                  account ->
-                      new PayoutOption(
-                          account.getId(),
-                          // Unknown stored type reads back as null (#106)
-                          account.getAccountType() == null ? null : account.getAccountType().name(),
-                          account.getCurrency(),
-                          account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
-                          account.getAccountMasked(),
-                          account.getHolderName()))
-              .toList();
-        });
-  }
-
   public PrepayDetail activeApplication(AccountDTO user, long kolId) {
     requirePermission(user, "prepay:apply");
     long tenantId = requireTenant(user);
@@ -428,38 +393,6 @@ public class PrepayService {
           Long id = prepays.findLatestActiveId(kolId);
           return id == null ? null : detail(user, id);
         });
-  }
-
-  public List<KolSummary> summaries(AccountDTO user, List<Long> kolIds) {
-    requirePermission(user, "kol:view");
-    long tenantId = requireTenant(user);
-    if (kolIds == null || kolIds.isEmpty()) {
-      return List.of();
-    }
-    if (kolIds.size() > 100) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-    }
-    List<Long> requested = kolIds.stream().distinct().toList();
-    return TenantScope.callCompany(tenantId, () -> summariesInCompany(user, requested));
-  }
-
-  private List<KolSummary> summariesInCompany(AccountDTO user, List<Long> requested) {
-    if (user.ownScope()) {
-      List<Long> visible = kols.listByBdUserId(user.id()).stream().map(KolRefDTO::id).toList();
-      if (!visible.containsAll(requested)) {
-        throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
-      }
-    }
-    Map<Long, BigDecimal> paidByKol = new HashMap<>();
-    for (PrepayPaidSum sum : prepays.sumPaid(requested)) {
-      paidByKol.put(sum.kolId(), sum.paidAmountCny());
-    }
-    List<KolSummary> result = new ArrayList<>();
-    for (Long kolId : requested) {
-      BigDecimal paid = paidByKol.get(kolId);
-      result.add(new KolSummary(kolId, money(paid == null ? BigDecimal.ZERO : paid)));
-    }
-    return List.copyOf(result);
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -1200,7 +1133,7 @@ public class PrepayService {
 
   private static void requireKolScope(AccountDTO user, KolRefDTO kol) {
     if (user.ownScope() && !user.id().equals(kol.bdUserId())) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
   }
 

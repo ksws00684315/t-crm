@@ -99,12 +99,25 @@ class CopyJobQueryServiceTest {
   }
 
   @Test
-  void shouldHideJob_whenBdDoesNotOwnTheKol() {
+  void shouldRefuseJob_whenBdDoesNotOwnTheKol() {
     when(current.user()).thenReturn(staff(7L));
     CopyJobDO job = job(3L, 20L);
     when(jobs.selectById(3L)).thenReturn(job);
     when(kols.listByIds(Set.of(20L)))
         .thenReturn(List.of(new KolRefDTO(20L, "K1", "Ada", true, 8L)));
+
+    assertThatThrownBy(() -> service.items(3L, 1, 20))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.AUTH_FORBIDDEN);
+  }
+
+  @Test
+  void shouldHideJob_whenItsKolIsMissingForBd() {
+    when(current.user()).thenReturn(staff(7L));
+    CopyJobDO job = job(3L, 20L);
+    when(jobs.selectById(3L)).thenReturn(job);
+    when(kols.listByIds(Set.of(20L))).thenReturn(List.of());
 
     assertThatThrownBy(() -> service.items(3L, 1, 20))
         .isInstanceOf(BusinessException.class)

@@ -119,12 +119,6 @@ export const getPrepay = (id: string) =>
   http.request<PrepayDetail>({ url: `${root}/${id}`, method: "get" });
 export const getActivePrepay = (kolId: string) =>
   http.request<PrepayDetail | null>({ url: `${root}/active`, method: "get", params: { kolId } });
-export const prepayAccounts = (kolId: string) =>
-  http.request<PrepayAccount[]>({
-    url: `${root}/payout-accounts`,
-    method: "get",
-    params: { kolId }
-  });
 /** Loaded only for an open application dialog; never persisted in a store. */
 export const prepayRecipient = (id: string) =>
   http.request<Omit<PrepayAccount, "id"> & { account: string }>({

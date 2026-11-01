@@ -439,7 +439,7 @@ public class PayoutAccountService {
       throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
     }
     if (admin.ownScope() && !Objects.equals(kolBd(account.getKolId()), admin.id())) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return account;
   }

@@ -207,7 +207,7 @@ class CopyTokenServiceTest {
   }
 
   @Test
-  void shouldReturn404_whenOwnScopeTouchesForeignToken() {
+  void shouldReturn403_whenOwnScopeTouchesForeignToken() {
     when(current.user()).thenReturn(bd(8L));
     KolCopyTokenDO row =
         stored(100L, 11L, KolCopyTokenDO.STATUS_ACTIVE, 0, 10, NOW.plusSeconds(60));
@@ -216,8 +216,35 @@ class CopyTokenServiceTest {
 
     assertThatThrownBy(() -> service.reveal(100L))
         .isInstanceOf(BusinessException.class)
-        .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
+        .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
     assertThatThrownBy(() -> service.revoke(100L))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
+  }
+
+  @Test
+  void shouldReturn403_whenOwnScopeCreatesForForeignKol() {
+    when(current.user()).thenReturn(bd(8L));
+    when(kols.listByIds(List.of(11L))).thenReturn(List.of(kol(11L, true, 9L)));
+
+    assertThatThrownBy(() -> service.create(new CreateCopyTokenCommand(11L, 10, 60, null)))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
+  }
+
+  @Test
+  void shouldReturn404_whenTokenOrItsKolIsMissing() {
+    when(current.user()).thenReturn(bd(8L));
+    when(tokens.selectById(100L)).thenReturn(null);
+    assertThatThrownBy(() -> service.reveal(100L))
+        .isInstanceOf(BusinessException.class)
+        .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
+
+    KolCopyTokenDO row =
+        stored(101L, 11L, KolCopyTokenDO.STATUS_ACTIVE, 0, 10, NOW.plusSeconds(60));
+    when(tokens.selectById(101L)).thenReturn(row);
+    when(kols.listByIds(List.of(11L))).thenReturn(List.of());
+    assertThatThrownBy(() -> service.reveal(101L))
         .isInstanceOf(BusinessException.class)
         .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
   }

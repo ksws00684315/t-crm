@@ -191,8 +191,8 @@ class KolItemQueryIT {
 
     assertThat(list(bdToken, "").get("total").asText()).isEqualTo("4");
     mvc.perform(get("/admin-api/product/kol-items/9303").header(TOKEN, bdToken))
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.errorCode").value("COMMON_NOT_FOUND"));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
 
     assertThat(list(companyB.token(), "").get("items").get(0).get("id").asText()).isEqualTo("9306");
     assertThat(detail(companyB.token(), 9306).get("payAmount").asText()).isEqualTo("90.00");

@@ -264,13 +264,13 @@ class PayoutAccountServiceTest {
   }
 
   @Test
-  void shouldHideOtherBdsAccountsFromOwnScopeAdmins() {
+  void shouldRefuseOtherBdsAccountsFromOwnScopeAdmins() {
     when(accounts.selectById(ACCOUNT_ID)).thenReturn(account(PayoutAccountStatus.PENDING));
     when(kols.listByIds(List.of(KOL)))
         .thenReturn(List.of(new KolRefDTO(KOL, "KOL0001", "A", true, 99L)));
 
     assertThatThrownBy(() -> service.detail(admin(Role.STAFF, DataScope.OWN, 5L), ACCOUNT_ID))
-        .hasMessage(ErrorCode.COMMON_NOT_FOUND.message());
+        .hasMessage(ErrorCode.AUTH_FORBIDDEN.message());
   }
 
   @Test

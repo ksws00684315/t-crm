@@ -525,7 +525,7 @@ public class CommissionIncomeService {
     }
     KolRefDTO kol = found.getFirst();
     if (user.ownScope() && !java.util.Objects.equals(kol.bdUserId(), user.id())) {
-      throw new BusinessException(ErrorCode.COMMON_NOT_FOUND);
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
     return kol;
   }

@@ -11,7 +11,6 @@ import DetailDrawer from "../DetailDrawer.vue";
 vi.mock("@/api/commission/prepay", () => ({
   applyPrepay: vi.fn(),
   getActivePrepay: vi.fn(),
-  prepayAccounts: vi.fn(),
   getPrepay: vi.fn(),
   payPrepay: vi.fn(),
   prepayRecipient: vi.fn(),
@@ -69,9 +68,6 @@ beforeEach(() => {
     maskedAccount: "***",
     holderName: null
   });
-  vi.mocked(api.prepayAccounts).mockResolvedValue([
-    { id: "2", type: "PAYPAL", maskedAccount: "t***", holderName: "Test" }
-  ]);
   vi.spyOn(ElMessageBox, "confirm").mockResolvedValue({ action: "confirm" } as never);
 });
 afterEach(() => {
@@ -323,7 +319,6 @@ describe("prepay safe submission", () => {
     expect(api.getActivePrepay).not.toHaveBeenCalled();
     expect(wrapper.get('[data-test="prepay-application-status"]').text()).toContain("待申请");
     expect(wrapper.text()).not.toContain("Business operator");
-    expect(api.prepayAccounts).not.toHaveBeenCalled();
     for (const field of [
       "prepay-reason",
       "prepay-date",
@@ -482,7 +477,6 @@ describe("prepay safe submission", () => {
     );
     expect(wrapper.find('[data-test="finance-prepay-details-save"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="prepay-application-details"]')).toHaveLength(1);
-    expect(api.prepayAccounts).not.toHaveBeenCalled();
   });
   it.each([0, 1000, 1001])(
     "validates manual recipient boundary %i before submission",

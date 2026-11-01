@@ -25,7 +25,6 @@ import com.tcrm.admin.commission.model.PrepayPageQuery;
 import com.tcrm.admin.commission.model.PrepayPaymentRow;
 import com.tcrm.admin.commission.model.PrepayRecipientRow;
 import com.tcrm.admin.commission.model.PrepayWrite;
-import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -198,8 +197,7 @@ class PrepayServiceTest {
     fails(
         () -> service.apply(user("prepay:apply"), application("300")), ErrorCode.COMMON_NOT_FOUND);
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
-    fails(
-        () -> service.apply(user("prepay:apply"), application("300")), ErrorCode.COMMON_NOT_FOUND);
+    fails(() -> service.apply(user("prepay:apply"), application("300")), ErrorCode.AUTH_FORBIDDEN);
     assertThat(writes).isEmpty();
   }
 
@@ -637,7 +635,7 @@ class PrepayServiceTest {
   @Test
   void shouldEnforceOwnScopeBeforeDecryptingRecipient() {
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(999L)));
-    fails(() -> service.recipient(user("commission:view"), ID), ErrorCode.COMMON_NOT_FOUND);
+    fails(() -> service.recipient(user("commission:view"), ID), ErrorCode.AUTH_FORBIDDEN);
     verify(cipher, never()).decrypt(any());
     verify(audit, never()).recordTenantOperation(anyLong(), anyLong(), any(), any(), any(), any());
   }
@@ -756,7 +754,7 @@ class PrepayServiceTest {
     fails(() -> service.cancel(user("prepay:apply"), ID, null), ErrorCode.COMMON_NOT_FOUND);
     rows(sql -> sql.contains("JOIN crm_kol"), row("WAITING_DETAILS"));
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
-    fails(() -> service.detail(user("commission:view"), ID), ErrorCode.COMMON_NOT_FOUND);
+    fails(() -> service.detail(user("commission:view"), ID), ErrorCode.AUTH_FORBIDDEN);
   }
 
   @Test
@@ -892,28 +890,13 @@ class PrepayServiceTest {
   }
 
   @Test
-  void shouldShowOnlyApprovedPayoutOptionsAndUseFinanceScope() {
-    var paypal = account();
-    var usdt = account();
-    usdt.setAccountType(PayoutAccountType.USDT);
-    usdt.setUsdtNetwork(UsdtNetwork.TRC20);
-    when(accounts.selectList(any())).thenReturn(List.of(paypal, usdt));
-    assertThat(service.payoutOptions(user("prepay:apply"), KOL))
-        .extracting(PrepayService.PayoutOption::network)
-        .containsExactly(null, "TRC20");
-    when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
-    fails(() -> service.payoutOptions(user("prepay:apply"), KOL), ErrorCode.COMMON_NOT_FOUND);
-    assertThat(service.payoutOptions(user("prepay:review"), KOL)).hasSize(2);
-  }
-
-  @Test
   void shouldAuthorizeAdminFilesAgainstCurrentTaskAndBd() {
     var file = file();
     when(files.attachedFile(88L))
         .thenReturn(new BizFileService.AttachedFile(FileBizType.PREPAY_ATTACHMENT, ID, file));
     assertThat(service.adminFile(user("commission:view"), 88L)).isEqualTo(file);
     when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
-    fails(() -> service.adminFile(user("commission:view"), 88L), ErrorCode.COMMON_NOT_FOUND);
+    fails(() -> service.adminFile(user("commission:view"), 88L), ErrorCode.AUTH_FORBIDDEN);
     assertThat(service.adminFile(user("prepay:pay"), 88L)).isEqualTo(file);
     fixtures.clear();
     fails(() -> service.adminFile(user("prepay:pay"), 88L), ErrorCode.COMMON_NOT_FOUND);
@@ -958,7 +941,6 @@ class PrepayServiceTest {
     fails(
         () -> service.saveApplicationDetails(noAccess, ID, details(true), null),
         ErrorCode.AUTH_FORBIDDEN);
-    fails(() -> service.payoutOptions(noAccess, KOL), ErrorCode.AUTH_FORBIDDEN);
     fails(() -> service.adminFile(noAccess, 88L), ErrorCode.AUTH_FORBIDDEN);
     fails(
         () -> service.page(noAccess, new PrepayService.Filter(null, null, null, 1, 20)),
