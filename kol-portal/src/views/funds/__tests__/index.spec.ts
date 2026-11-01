@@ -126,6 +126,7 @@ describe("creator fund records list states", () => {
     await page({ realTable: true });
     expect(wrapper.text()).toContain(enUS.funds.loadFailed);
     expect(wrapper.text()).not.toContain(enUS.funds.empty);
+    expect(wrapper.text()).not.toContain(enUS.table.total.replace("{total}", "0"));
     expect(wrapper.find(".data-table__empty").exists()).toBe(false);
     expect(wrapper.find(".data-table__pager").exists()).toBe(false);
     expect(wrapper.find(".fund-records-pager").exists()).toBe(false);
@@ -499,5 +500,7 @@ describe("withdrawal actions and the ?apply=1 link (task 92 sections 4.2, 4.3)",
     expect(cards[0].find('[data-test="cancel-withdrawal"]').exists()).toBe(true);
     expect(cards[3].find('[data-test="resubmit-withdrawal"]').exists()).toBe(true);
     expect(cards[2].find('[data-test="row-actions"]').exists()).toBe(false);
+    expect(cards[2].get('[data-test="fund-card-action-placeholder"]').text()).toBe("-");
+    expect(cards[0].find('[data-test="fund-card-action-placeholder"]').exists()).toBe(false);
   });
 });

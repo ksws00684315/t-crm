@@ -424,11 +424,11 @@ onMounted(load);
       <template #title
         ><h2>{{ t("funds.recordsTitle") }}</h2></template
       >
-      <template #toolbar
-        ><span v-if="!failure" class="records-total">{{
-          t("table.total", { total })
-        }}</span></template
-      >
+      <!-- A comment-only slot falls back to DataTable's "0 in total". Keep a real element. -->
+      <template #toolbar>
+        <span v-if="!failure" class="records-total">{{ t("table.total", { total }) }}</span>
+        <span v-else />
+      </template>
       <template #cell-appliedAt="{ row }">{{ formatInstant(row.appliedAt) }}</template>
       <template #cell-applicationNo="{ row }"><CopyText :value="row.applicationNo" /></template>
       <template #cell-type="{ row }">{{ recordType(row.type) }}</template>
@@ -485,6 +485,9 @@ onMounted(load);
           class="fund-record-card__actions"
           :actions="rowActions(record)"
         />
+        <span v-else class="fund-record-card__actions" data-test="fund-card-action-placeholder"
+          >-</span
+        >
       </article>
       <el-empty v-if="!records.length && !loading && !failure" :description="t('funds.empty')" />
       <el-pagination

@@ -49,7 +49,7 @@ const statusOptions: SettlementStatus[] = [
 ];
 const columns = computed<DataColumn[]>(() => [
   { key: "orderNo", align: "left" as const, label: t("orders.orderNo"), minWidth: 150 },
-  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 220 },
+  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 150 },
   { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
   { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
@@ -299,16 +299,19 @@ onMounted(() => {
       @update:page="pageChanged"
       @refresh="refresh"
     >
-      <!-- A failed load must not read "0 in total". -->
-      <template #toolbar
-        ><span v-if="!error" class="orders-total">{{ t("table.total", { total }) }}</span></template
-      >
+      <!-- A comment-only slot falls back to DataTable's "0 in total". Keep a real element. -->
+      <template #toolbar>
+        <span v-if="!error" class="orders-total">{{ t("table.total", { total }) }}</span>
+        <span v-else />
+      </template>
       <template #cell-orderNo="{ row }"><CopyText :value="row.orderNo" /></template>
       <template #cell-product="{ row }"
         ><span class="product-cell">{{ productLabel(row) }}</span></template
       >
       <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
-      <template #cell-payTime="{ row }">{{ dateLabel(row.payTime) }}</template>
+      <template #cell-payTime="{ row }"
+        ><span class="pay-time">{{ dateLabel(row.payTime) }}</span></template
+      >
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
       >
@@ -418,6 +421,9 @@ h1 {
 }
 .orders-total {
   color: var(--tcrm-color-text-secondary);
+}
+.pay-time {
+  white-space: nowrap;
 }
 .summary {
   display: flex;

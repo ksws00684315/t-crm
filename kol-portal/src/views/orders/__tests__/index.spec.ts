@@ -258,6 +258,14 @@ describe("sales summary cards (task 92 section 4.4)", () => {
     wrapper.unmount();
   });
 
+  it("does not show a zero total when the order list fails to load", async () => {
+    vi.mocked(getCreatorOrders).mockRejectedValue(new Error("down"));
+    const wrapper = await mountPage();
+    expect(wrapper.text()).toContain(enUS.orders.loadFailed);
+    expect(wrapper.text()).not.toContain(enUS.table.total.replace("{total}", "0"));
+    wrapper.unmount();
+  });
+
   it("shows a failure with a retry instead of zeros, and recovers on retry", async () => {
     vi.mocked(getCreatorOrderSummary).mockRejectedValueOnce(new Error("down"));
     const wrapper = await mountPage();
