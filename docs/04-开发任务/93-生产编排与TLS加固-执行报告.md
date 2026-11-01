@@ -150,4 +150,6 @@ rm -rf deploy/www-preview
 
 ## 12. PR 与 CI
 
-见 PR 描述；推送后 `gh pr checks` 结果见本节末尾补充（不轮询）。
+PR：https://github.com/ksws00684315/t-crm/pull/169（不合并）。分支头提交 `863a5347`（本报告补充提交在其后）。
+
+推送后看一次 `gh pr checks 169`（创建约 20 秒后）：`Compose files and Dockerfiles` pending、`Vulnerabilities and licenses` pending，均尚未出结果；按要求不轮询，最终以 CI 为准。
