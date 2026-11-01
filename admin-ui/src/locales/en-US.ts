@@ -199,7 +199,6 @@ const enUS: MessageSchema = {
     kolIncome: "Creator Income",
     fund: "Finance",
     payouts: "Creator Payouts",
-    payoutAccounts: "Payout Account Review",
     settlementDetails: "Settlement Details",
     settlementConfig: "Settlement Config",
     system: "System",
@@ -1661,6 +1660,8 @@ const enUS: MessageSchema = {
     stepTemplate: "Download the template and fill in the columns ({limitHint}).",
     downloadTemplate: "Download import template",
     stepUpload: "Choose the completed .xlsx file and upload it. The import runs in the background.",
+    stepUploadCsv:
+      "Choose the completed .xlsx or .csv file and upload it. The import runs in the background.",
     downloadErrors: "Download error file",
     closeRunning: "Keep running, close window",
     close: "Close",
@@ -1793,6 +1794,7 @@ const enUS: MessageSchema = {
     minutes: "{n} minutes ago",
     hours: "{n} hours ago",
     days: "{n} days ago",
+    unknownType: "You have a new message. Open the notification list to view it",
     type: {
       PREPAY_SUBMITTED: "Creator prepay application awaits review",
       PREPAY_APPROVED: "Creator prepay approved, awaiting payment registration",

@@ -241,7 +241,7 @@ function close() {
           {{ t("import.downloadTemplate") }}
         </el-button>
       </li>
-      <li>{{ t("import.stepUpload") }}</li>
+      <li>{{ t(props.acceptCsv ? "import.stepUploadCsv" : "import.stepUpload") }}</li>
     </ol>
 
     <div v-if="!task" class="picker">

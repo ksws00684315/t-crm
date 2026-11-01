@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Avatar, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
+import { Avatar, Bell, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -151,7 +151,7 @@ onMounted(load);
           data-test="notification-item"
           @click="openItem(item)"
         >
-          <el-icon><component :is="icons[item.type]" /></el-icon>
+          <el-icon><component :is="icons[item.type] ?? Bell" /></el-icon>
           <NotificationText :item="item" />
           <span class="notification-page__time">{{
             relativeNotificationTime(item.createTime)

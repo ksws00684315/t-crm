@@ -203,7 +203,6 @@ const zhCN = {
     kolIncome: "达人收入",
     fund: "财务结算",
     payouts: "达人提现",
-    payoutAccounts: "收款账户审核",
     settlementDetails: "结算明细",
     settlementConfig: "结算配置",
     system: "系统管理",
@@ -1622,6 +1621,7 @@ const zhCN = {
     stepTemplate: "下载模板并按列填写（{limitHint}）。",
     downloadTemplate: "下载导入模板",
     stepUpload: "选择填好的 .xlsx 文件并上传，导入在后台进行。",
+    stepUploadCsv: "选择填好的 .xlsx 或 .csv 文件并上传，导入在后台进行。",
     downloadErrors: "下载错误文件",
     closeRunning: "后台继续，关闭窗口",
     close: "关闭",
@@ -1752,6 +1752,7 @@ const zhCN = {
     minutes: "{n} 分钟前",
     hours: "{n} 小时前",
     days: "{n} 天前",
+    unknownType: "你有一条新消息，请打开消息列表查看",
     type: {
       PREPAY_SUBMITTED: "达人预付申请待审核",
       PREPAY_APPROVED: "达人预付已通过，等待支付登记",

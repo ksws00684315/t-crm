@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { NotificationVO } from "@/api/notification/notification";
 import NameCode from "@/components/NameCode.vue";
-import { notificationValues } from "@/utils/notification";
+import { notificationKey, notificationValues } from "@/utils/notification";
 
 /**
  * One notification sentence. When the message carries `kolName` (task 71, B06) the creator renders
@@ -19,7 +19,7 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
 
 <template>
   <i18n-t
-    :keypath="`notification.type.${item.type}`"
+    :keypath="notificationKey(item.type)"
     scope="global"
     tag="span"
     class="notification-text"

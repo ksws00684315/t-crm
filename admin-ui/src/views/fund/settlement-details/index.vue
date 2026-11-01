@@ -12,11 +12,17 @@ import CopyText from "@/components/CopyText.vue";
 import RowActions from "@/components/RowActions.vue";
 import CommissionTable from "@/components/CommissionTable.vue";
 import { formatRate } from "@/utils/rate";
-import { formatInstant, formatPrice } from "@/utils/format";
+import { formatInstant, formatNameWithCode, formatPrice } from "@/utils/format";
+import { listShops } from "@/api/product/shop";
+import type { ShopOptionVO } from "@/api/types";
+import { useUserStore } from "@/stores/user";
 import { financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 defineOptions({ name: "SettlementDetailsPage" });
 const { t, locale } = useI18n();
+const userStore = useUserStore();
+/** The shop options endpoint needs product:view; this page itself only needs commission:view. */
+const canFilterShop = computed(() => userStore.can("product:view"));
 const narrow = ref(false);
 let unsubscribe: (() => void) | undefined;
 onMounted(() => {
@@ -24,6 +30,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => unsubscribe?.());
 const filters = reactive({ orderNo: "", channel: "", shopId: "" });
+const shops = ref<ShopOptionVO[]>([]);
 const rows = ref<Settlement[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -70,9 +77,22 @@ const chips = computed(() =>
     .map(([key, value]) => ({
       key,
       label: t(`finance.${key}`),
-      text: key === "channel" ? t("finance.weidian") : value
+      text:
+        key === "channel" ? t("finance.weidian") : key === "shopId" ? shopChipText(value) : value
     }))
 );
+function shopChipText(id: string) {
+  const shop = shops.value.find(item => item.id === id);
+  return shop ? formatNameWithCode(shop.shopName, shop.shopCode) : id;
+}
+async function loadShops() {
+  if (!canFilterShop.value) return;
+  try {
+    shops.value = await listShops();
+  } catch (error) {
+    notifyError(error);
+  }
+}
 async function load() {
   if (!financeApiReady) return;
   loading.value = true;
@@ -125,6 +145,7 @@ watch(
   }
 );
 onMounted(load);
+onMounted(loadShops);
 </script>
 <template>
   <FinanceUnavailable v-if="!financeApiReady" />
@@ -140,9 +161,14 @@ onMounted(load);
             ><el-select v-model="filters.channel" clearable
               ><el-option :label="t('finance.weidian')" value="WEIDIAN" /></el-select
           ></el-form-item>
-          <el-form-item :label="t('finance.shopId')"
-            ><el-input v-model="filters.shopId" clearable data-test="settlement-shop-id"
-          /></el-form-item> </template
+          <el-form-item v-if="canFilterShop" :label="t('finance.shopId')"
+            ><el-select v-model="filters.shopId" clearable filterable data-test="settlement-shop-id"
+              ><el-option
+                v-for="shop in shops"
+                :key="shop.id"
+                :label="formatNameWithCode(shop.shopName, shop.shopCode)"
+                :value="shop.id" /></el-select
+          ></el-form-item> </template
       ></ListSearch>
       <p>{{ t("finance.weidianWithdrawableNote") }}</p>
       <el-alert v-if="failed" :title="t('finance.loadFailed')" type="error" :closable="false" />

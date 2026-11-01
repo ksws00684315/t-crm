@@ -392,6 +392,12 @@ onMounted(() => {
   align-items: flex-start;
   gap: var(--tcrm-space-3);
 }
+.upload-type-group :deep(.el-radio-group) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tcrm-space-3);
+}
 /* R-02: the row the sync dialog navigated to. */
 :deep(.import-task-row--located) td {
   background: var(--tcrm-color-warning-bg);

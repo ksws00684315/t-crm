@@ -560,6 +560,54 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("explains a hidden line commission block for each reason (t87, L-018)", async () => {
+    signIn("STAFF", ["order:view"]);
+    const { wrapper: noPermission } = await mountPage();
+    const hiddenForNoPermission = noPermission.find('[data-test="chain-commission-hidden"]');
+    expect(hiddenForNoPermission.exists()).toBe(true);
+    expect(hiddenForNoPermission.text()).toContain("当前账号无佣金查看权限");
+    noPermission.unmount();
+
+    setActivePinia(createPinia());
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    const { wrapper: ownScope } = await mountPage();
+    const hiddenForOwnScope = ownScope.find('[data-test="chain-commission-hidden"]');
+    expect(hiddenForOwnScope.exists()).toBe(true);
+    expect(hiddenForOwnScope.text()).toContain("当前权限仅展示本人范围商品行");
+    ownScope.unmount();
+  });
+
+  it("keeps the scope hint off a funds-visible OWN order whose line has no commission (t87, L-018)", async () => {
+    signIn("STAFF", ["order:view", "commission:view"], "OWN");
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      lines: [financedChain.lines[0]!, { ...financedChain.lines[1]!, commission: null }]
+    });
+    const { wrapper } = await mountPage();
+    expect(wrapper.findAll('[data-test="chain-commission"]')).toHaveLength(1);
+    expect(wrapper.find('[data-test="chain-commission-hidden"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="chain-flows-scope-limited"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("shows the ledger status next to the funds cards only when funds are present (t87, L-019)", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue({
+      ...financedChain,
+      funds: { ...financedChain.funds!, accountStatus: "POSTED" }
+    });
+    const { wrapper: posted } = await mountPage();
+    const status = posted.find('[data-test="chain-account-status"]');
+    expect(status.text()).toContain("账务状态");
+    expect(status.text()).toContain("已入账");
+    posted.unmount();
+
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
+    const { wrapper: noFunds } = await mountPage();
+    expect(noFunds.find('[data-test="chain-account-status"]').exists()).toBe(false);
+    noFunds.unmount();
+  });
+
   it("hides shop profit for an OWN viewer whose funds are visible", async () => {
     // Mixed orders hide the whole funds block; fully covered orders show it without a shop
     // profit card (task 81, L-024) and without the scope note.

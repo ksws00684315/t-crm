@@ -8,6 +8,7 @@ import * as api from "@/api/commission/finance";
 import { createFinanceDemo } from "../../../../../preview/commission/finance-engine";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
+import { clearStoredSession, saveSession } from "@/utils/session";
 import DataTable from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
 import CommissionTable from "@/components/CommissionTable.vue";
@@ -36,6 +37,7 @@ vi.mock("@/utils/finance", async original => ({
   financeApiReady: true
 }));
 vi.mock("@/utils/notify", () => ({ notifyError: vi.fn() }));
+vi.mock("@/api/product/shop", () => ({ listShops: vi.fn().mockResolvedValue([]) }));
 beforeEach(() => {
   vi.clearAllMocks();
   setActivePinia(createPinia());
@@ -286,9 +288,19 @@ describe("finance admin pages", () => {
     wrapper.unmount();
   });
   it("sends the shop filter as shopId and omits the unsupported BD name filter", async () => {
+    // The filter is gated on product:view, which needs a live session rather than a bare user.
+    saveSession({
+      token: "test-token",
+      expiresAt: Date.now() + 3_600_000,
+      user: useUserStore().user!
+    });
+    setActivePinia(createPinia());
     const wrapper = mount(SettlementPage, { global });
     await flushPromises();
-    await wrapper.get('[data-test="settlement-shop-id"]').setValue("1023001");
+    wrapper
+      .findAllComponents({ name: "ElSelect" })
+      .find(select => select.attributes("data-test") === "settlement-shop-id")!
+      .vm.$emit("update:modelValue", "1023001");
     await wrapper.get('[data-test="search"]').trigger("click");
     await flushPromises();
     const query = vi.mocked(api.listSettlements).mock.lastCall?.[0];
@@ -299,6 +311,7 @@ describe("finance admin pages", () => {
     expect(taskPage.find('[data-test="withdrawal-bd-name"]').exists()).toBe(false);
     expect(vi.mocked(api.listFinanceTasks).mock.lastCall?.[0]).not.toHaveProperty("bdName");
     wrapper.unmount();
+    clearStoredSession();
     taskPage.unmount();
   });
   it("shows an unverified refund adjustment when its commission line is unverified", async () => {

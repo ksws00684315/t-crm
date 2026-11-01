@@ -18,6 +18,14 @@ describe("message packs", () => {
     expect(flattenKeys(enUS)).toEqual(flattenKeys(zhCN));
   });
 
+  it("drops the unreferenced L-028 keys from both languages", () => {
+    const removed = ["finance.applicationType", "finance.type", "route.payoutAccounts"];
+    for (const pack of [zhCN, enUS]) {
+      const keys = flattenKeys(pack);
+      expect(keys.filter(key => removed.includes(key))).toEqual([]);
+    }
+  });
+
   it("keeps the KOL word out of user-facing English copy; Creator is the term (task 24 §4.3)", () => {
     const offenders: string[] = [];
     const visit = (value: object, prefix = "") => {
