@@ -244,5 +244,5 @@ docker compose -f .tmp/verify/compose.yml --env-file .tmp/verify/env down -v   #
 
 见 PR 描述。CI 状态在推送后看一次，结果记录如下。
 
-- PR：（待填）
-- `gh pr checks`：（待填）
+- PR：https://github.com/ksws00684315/t-crm/pull/177
+- `gh pr checks`（推送后看一次，未轮询）：`Compose files and Dockerfiles` pending，`Vulnerabilities and licenses` pending，其余工作流未触发。最终结果以 PR 页面为准。
