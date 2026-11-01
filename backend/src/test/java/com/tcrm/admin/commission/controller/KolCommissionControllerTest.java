@@ -88,6 +88,33 @@ class KolCommissionControllerTest {
   }
 
   @Test
+  void shouldExposeUnpaidWithdrawalsWithRealStatusAndNoReceiptTime() throws Exception {
+    when(commissions.fundRecords(11L, 22L, 1, 20))
+        .thenReturn(
+            new PageResult<>(
+                List.of(
+                    new FundRecord(
+                        42L,
+                        "COMMISSION",
+                        Instant.parse("2026-10-23T08:00:00Z"),
+                        "WD20261023000042",
+                        "800.00",
+                        "CNY",
+                        "pa***@example.test",
+                        null,
+                        "PENDING_REVIEW",
+                        42L)),
+                1,
+                1,
+                20));
+    mvc.perform(get("/kol-api/fund-records").header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].type").value("COMMISSION"))
+        .andExpect(jsonPath("$.data.items[0].publicStatus").value("PENDING_REVIEW"))
+        .andExpect(jsonPath("$.data.items[0].receivedAt").doesNotExist());
+  }
+
+  @Test
   void shouldRejectAnonymousAccess() throws Exception {
     mvc.perform(get("/kol-api/commissions/overview")).andExpect(status().isUnauthorized());
   }

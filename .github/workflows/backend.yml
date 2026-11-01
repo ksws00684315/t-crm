@@ -2,6 +2,7 @@ name: Backend
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: ['backend/**', 'config/**', 'scripts/**', '.github/workflows/backend.yml']
   push:
     branches: [main]
@@ -11,6 +12,8 @@ permissions:
 jobs:
   verify:
     name: Backend verify
+    # Skip draft PRs; still run on push/schedule (no pull_request payload)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

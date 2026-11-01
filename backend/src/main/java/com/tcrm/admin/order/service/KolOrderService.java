@@ -27,6 +27,12 @@ public class KolOrderService {
   private static final int MAX_PAGE = PageResult.MAX_PAGE;
   private static final int MAX_SIZE = 50;
   private static final int MAX_KEYWORD = 128;
+  private static final int SUMMARY_CHUNK = 1000;
+  private static final List<String> SETTLED_STATUSES =
+      List.of(
+          CommissionOrderStateApi.STATUS_WITHDRAWABLE,
+          CommissionOrderStateApi.STATUS_WITHDRAWING,
+          CommissionOrderStateApi.STATUS_WITHDRAWN);
   private static final List<String> STATUSES =
       List.of("UNPAID", "PAID", "SHIPPED", "RECEIVED", "COMPLETED", "CLOSED", "UNKNOWN");
 
@@ -47,14 +53,7 @@ public class KolOrderService {
   }
 
   public PageResult<KolOrderDTO> page(KolOrderFilterDTO filter) {
-    if ((filter.payFrom() != null
-            && filter.payTo() != null
-            && !filter.payFrom().isBefore(filter.payTo()))
-        || (filter.orderStatus() != null && !STATUSES.contains(filter.orderStatus()))
-        || (filter.orderNo() != null && filter.orderNo().length() > MAX_KEYWORD)
-        || (filter.productName() != null && filter.productName().length() > MAX_KEYWORD)
-        || (notBlank(filter.settlementStatus())
-            && !CommissionOrderStateApi.STATUS_VALUES.contains(filter.settlementStatus()))
+    if (invalidConditions(filter)
         || filter.page() < 1
         || filter.page() > MAX_PAGE
         || filter.size() < 1
@@ -154,6 +153,83 @@ public class KolOrderService {
         total,
         filter.page(),
         filter.size());
+  }
+
+  /**
+   * Sales summary over the same orders the list shows for these filters (paging ignored). Only paid
+   * orders count. Settled and pending amounts are net of refunds and classified by the line status
+   * of the commission port, the same source as the list rows; unverified and no-commission lines
+   * belong to neither, so the three figures may add up to less than the total.
+   */
+  public KolOrderSummaryDTO summary(KolOrderFilterDTO filter) {
+    if (invalidConditions(filter)) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    KolAccountDTO kol = current.kol();
+    List<OrderDO> candidates =
+        orders.selectList(
+            baseQuery(filter, kol.id()).select(OrderDO::getId).isNotNull(OrderDO::getPayTime));
+    List<Long> orderIds;
+    if (notBlank(filter.settlementStatus())) {
+      orderIds =
+          groupOrderIdsByStatus(kol.id(), candidates)
+              .getOrDefault(filter.settlementStatus(), List.of());
+    } else {
+      orderIds = candidates.stream().map(OrderDO::getId).toList();
+    }
+    BigDecimal sales = BigDecimal.ZERO;
+    BigDecimal settled = BigDecimal.ZERO;
+    BigDecimal pending = BigDecimal.ZERO;
+    BigDecimal refunded = BigDecimal.ZERO;
+    for (int from = 0; from < orderIds.size(); from += SUMMARY_CHUNK) {
+      List<Long> chunk = orderIds.subList(from, Math.min(from + SUMMARY_CHUNK, orderIds.size()));
+      List<OrderItemDO> lines =
+          orderItems.selectList(
+              new LambdaQueryWrapper<OrderItemDO>()
+                  .select(
+                      OrderItemDO::getId,
+                      OrderItemDO::getOrderId,
+                      OrderItemDO::getPayAmount,
+                      OrderItemDO::getRefundAmount)
+                  .in(OrderItemDO::getOrderId, chunk)
+                  .eq(OrderItemDO::getKolId, kol.id()));
+      Map<Long, CommissionOrderStateApi.ItemCommissionStateDTO> statesByItem =
+          commissionStates
+              .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
+              .stream()
+              .collect(
+                  Collectors.toMap(
+                      CommissionOrderStateApi.ItemCommissionStateDTO::orderItemId, s -> s));
+      for (OrderItemDO line : lines) {
+        BigDecimal pay = line.getPayAmount() == null ? BigDecimal.ZERO : line.getPayAmount();
+        BigDecimal refund =
+            line.getRefundAmount() == null ? BigDecimal.ZERO : line.getRefundAmount();
+        BigDecimal net = pay.subtract(refund);
+        sales = sales.add(pay);
+        refunded = refunded.add(refund);
+        CommissionOrderStateApi.ItemCommissionStateDTO state = statesByItem.get(line.getId());
+        String status =
+            state == null ? CommissionOrderStateApi.STATUS_INVALID : state.settlementStatus();
+        if (SETTLED_STATUSES.contains(status)) {
+          settled = settled.add(net);
+        } else if (CommissionOrderStateApi.STATUS_FROZEN.equals(status)) {
+          pending = pending.add(net);
+        }
+      }
+    }
+    return new KolOrderSummaryDTO(money(sales), money(settled), money(pending), money(refunded));
+  }
+
+  /** Conditions shared by the list and the summary; paging is validated by the list only. */
+  private static boolean invalidConditions(KolOrderFilterDTO filter) {
+    return (filter.payFrom() != null
+            && filter.payTo() != null
+            && !filter.payFrom().isBefore(filter.payTo()))
+        || (filter.orderStatus() != null && !STATUSES.contains(filter.orderStatus()))
+        || (filter.orderNo() != null && filter.orderNo().length() > MAX_KEYWORD)
+        || (filter.productName() != null && filter.productName().length() > MAX_KEYWORD)
+        || (notBlank(filter.settlementStatus())
+            && !CommissionOrderStateApi.STATUS_VALUES.contains(filter.settlementStatus()));
   }
 
   /**

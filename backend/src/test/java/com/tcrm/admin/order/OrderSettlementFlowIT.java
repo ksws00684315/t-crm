@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -47,6 +48,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
@@ -111,7 +113,7 @@ class OrderSettlementFlowIT {
   @Autowired private OrderSettlementSyncCoordinator coordinator;
   @Autowired private CommissionReleaseJob releaseJob;
   @Autowired private WithdrawalService withdrawals;
-  @Autowired private OrderCommissionSync commissionSync;
+  @MockitoSpyBean OrderCommissionSync commissionSync;
   @Autowired private OrderMapper orderMapper;
   @Autowired private OrderItemMapper itemMapper;
   @Autowired private TransactionTemplate tx;
@@ -152,6 +154,12 @@ class OrderSettlementFlowIT {
     jdbc.update(
         "DELETE FROM crm_order_item WHERE tenant_id = ? AND order_id = ?", TENANT_ID, orderId);
     jdbc.update("DELETE FROM crm_order WHERE tenant_id = ? AND id = ?", TENANT_ID, orderId);
+    jdbc.update(
+        "DELETE FROM crm_order_item WHERE tenant_id = ? AND order_id IN"
+            + " (SELECT id FROM crm_order WHERE tenant_id = ? AND weidian_order_id LIKE 't91\\_%')",
+        TENANT_ID, TENANT_ID);
+    jdbc.update(
+        "DELETE FROM crm_order WHERE tenant_id = ? AND weidian_order_id LIKE 't91\\_%'", TENANT_ID);
     jdbc.update("DELETE FROM crm_kol WHERE tenant_id = ? AND id = ?", TENANT_ID, kolId);
     jdbc.update("DELETE FROM crm_order_sync_state WHERE tenant_id = ?", TENANT_ID);
     jdbc.update("DELETE FROM crm_weidian_shop_auth WHERE tenant_id = ?", TENANT_ID);
@@ -607,6 +615,148 @@ class OrderSettlementFlowIT {
         .isEqualTo(102);
   }
 
+  /**
+   * Task 91, L-023: one order whose recompute keeps failing must not hold the shop's checkpoint
+   * back. Round 1 runs through the coordinator: order 1 fails and is marked, order 2 is recomputed,
+   * and the pull checkpoint is stamped. Round 2 (checkpoint after every stored flow) retries only
+   * the marked order and clears its mark.
+   */
+  @Test
+  void shouldAdvanceCheckpointWhenOneOrderFailsAndRetryOnlyThatOrder() {
+    long[] second = insertOrder("t91_wd_order_2", kolId, "6.00", "4.00", "2.00");
+    when(remote.tradeDetail(anyLong(), argThat(r -> "INCOME_DETAIL".equals(queryType(r)))))
+        .thenReturn(
+            response(List.of(incomeRow("600"), rowFor("t91_wd_order_2", "收入", "货款收入", "600"))));
+    when(remote.tradeDetail(anyLong(), argThat(r -> "PRE_SETTLE_REFUND".equals(queryType(r)))))
+        .thenReturn(emptyResponse());
+    org.mockito.Mockito.doThrow(new RuntimeException("t91 forced failure"))
+        .when(commissionSync)
+        .sync(argThat(order -> order != null && order.getId() == orderId), any());
+
+    coordinator.scheduled();
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_state WHERE shop_id = ?"
+                    + " AND settlement_pull_at IS NOT NULL",
+                Integer.class,
+                SHOP_ID))
+        .isEqualTo(1);
+    assertThat(orderField("settlement_recompute_failures")).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT settlement_recompute_failures FROM crm_order WHERE id = ?",
+                Integer.class,
+                second[0]))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_commission_item_state WHERE order_id = ?",
+                Integer.class,
+                orderId))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_commission_item_state WHERE order_id = ?"
+                    + " AND release_basis = 'CONFIRMED'",
+                Integer.class,
+                second[0]))
+        .isEqualTo(2);
+
+    // Round 2: the failure is gone, the checkpoint is past every stored flow, only order 1 is left.
+    org.mockito.Mockito.reset(commissionSync);
+    boolean ok =
+        TenantScope.callCompany(
+            TENANT_ID,
+            () ->
+                flows.pull(
+                    SHOP_ID,
+                    INCOME_TIME.minusSeconds(3600),
+                    INCOME_TIME.plusSeconds(3600),
+                    Instant.now().plusSeconds(1)));
+
+    assertThat(ok).isTrue();
+    verify(commissionSync, times(1)).sync(any(), any());
+    verify(commissionSync, never())
+        .sync(argThat(order -> order != null && order.getId() == second[0]), any());
+    assertThat(orderField("settlement_recompute_failures")).isEqualTo(0);
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+  }
+
+  /** The task 76 review rule: a failed Weidian pull must leave the checkpoints where they are. */
+  @Test
+  void shouldNotAdvanceCheckpointWhenTheWeidianPullFails() {
+    when(remote.tradeDetail(anyLong(), any())).thenThrow(new RuntimeException("t91 weidian down"));
+
+    coordinator.scheduled();
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_state WHERE shop_id = ?"
+                    + " AND (settlement_pull_at IS NOT NULL OR settlement_backfill_at IS NOT NULL)",
+                Integer.class,
+                SHOP_ID))
+        .isZero();
+    assertThat(orderField("settlement_recompute_failures")).isEqualTo(0);
+  }
+
+  /** L-038: a lost confirmation clears the stale settlement time, a quiet round keeps it. */
+  @Test
+  void shouldClearSettledTimeWhenConfirmationIsLostButKeepItWithoutFlows() throws Exception {
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+    assertThat(orderField("settled_time")).isEqualTo(Timestamp.from(INCOME_TIME));
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+
+    // A second goods-income row: the confirmation no longer holds.
+    stubIncomeDetail(incomeRow("600"), incomeRow("100"));
+    assertThat(pullSucceeds()).isTrue();
+
+    assertThat(orderField("settled_time")).isNull();
+    assertThat(orderField("commission_basis_reason")).isEqualTo("INCOME_MISMATCH");
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("UNSETTLED");
+    // Accrual and the wallet are untouched by the clearing.
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+
+    // No flows at all in a round (nothing to judge): a time on the order stays.
+    jdbc.update("DELETE FROM crm_order_settlement_flow WHERE tenant_id = ?", TENANT_ID);
+    jdbc.update(
+        "UPDATE crm_order SET settled_time = ?, commission_basis_reason = NULL WHERE id = ?",
+        Timestamp.from(INCOME_TIME),
+        orderId);
+    syncOrderFromDb();
+
+    assertThat(orderField("settled_time")).isEqualTo(Timestamp.from(INCOME_TIME));
+    assertThat(orderField("commission_basis_reason")).isEqualTo("NO_SETTLEMENT");
+  }
+
+  /**
+   * L-035: line A is fully refunded in the CRM (4.00), the flows show 5.00, so the gap is 1.00. The
+   * pay-ratio share of A (0.67) cannot be taken from it, so B (2.00 basis) takes all 1.00 and
+   * accrues 10% of 1.00. A repeat pull must not append a revision.
+   */
+  @Test
+  void shouldMoveTruncatedRefundGapToTheOtherLineAndStayStable() throws Exception {
+    setItemRefund(itemA, "4.00");
+    stubIncomeDetail(incomeRow("600"), row("支出", "退款", "-500"));
+    assertThat(pullSucceeds()).isTrue();
+
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.00"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.10"));
+    long revisionsA = revisionCount(itemA);
+    long revisionsB = revisionCount(itemB);
+
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+
+    assertThat(revisionCount(itemA)).isEqualTo(revisionsA);
+    assertThat(revisionCount(itemB)).isEqualTo(revisionsB);
+    assertThat(walletBalance()).isEqualByComparingTo("0.10");
+  }
+
   private void pull() {
     TenantScope.runCompany(
         TENANT_ID,
@@ -702,8 +852,13 @@ class OrderSettlementFlowIT {
   }
 
   private static TradeDetailItem row(String tradeType, String subType, String fen) {
+    return rowFor("t76_wd_order_1", tradeType, subType, fen);
+  }
+
+  private static TradeDetailItem rowFor(
+      String weidianOrderId, String tradeType, String subType, String fen) {
     return new TradeDetailItem(
-        "t76_wd_order_1", null, tradeType, subType, new BigDecimal(fen), INCOME_TIME, "", null);
+        weidianOrderId, null, tradeType, subType, new BigDecimal(fen), INCOME_TIME, "", null);
   }
 
   private int flowCount() {

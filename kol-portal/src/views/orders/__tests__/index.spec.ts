@@ -3,14 +3,14 @@ import ElementPlus, { ElSelect } from "element-plus";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getCreatorOrders, type CreatorOrder } from "@/api/creator";
+import { getCreatorOrders, getCreatorOrderSummary, type CreatorOrder } from "@/api/creator";
 import { enUS, i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
 import type { LocaleId } from "@/utils/locale";
 import OrdersPage from "../index.vue";
 
-vi.mock("@/api/creator", () => ({ getCreatorOrders: vi.fn() }));
+vi.mock("@/api/creator", () => ({ getCreatorOrders: vi.fn(), getCreatorOrderSummary: vi.fn() }));
 
 const order: CreatorOrder = {
   orderNo: "1234****9012",
@@ -51,6 +51,12 @@ beforeEach(() => {
   localStorage.clear();
   vi.resetAllMocks();
   vi.mocked(getCreatorOrders).mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
+  vi.mocked(getCreatorOrderSummary).mockResolvedValue({
+    salesCny: "1000.00",
+    settledCny: "500.00",
+    pendingCny: "300.00",
+    refundedCny: "120.00"
+  });
 });
 
 describe("creator order details", () => {
@@ -187,6 +193,102 @@ describe("creator order details", () => {
     expect(getCreatorOrders).toHaveBeenLastCalledWith(
       expect.objectContaining({ orderNo: "ORDER-9", productName: "Widget" })
     );
+    wrapper.unmount();
+  });
+});
+
+describe("sales summary cards (task 92 section 4.4)", () => {
+  const amount = (wrapper: Awaited<ReturnType<typeof mountPage>>, key: string) =>
+    wrapper.get(`[data-test="summary-${key}-amount"]`).text();
+
+  it("shows the four sales figures in the owner's order, with the refund note beneath", async () => {
+    const wrapper = await mountPage();
+    const cards = wrapper.findAll(".summary-card");
+    expect(cards.map(card => card.text())).toEqual([
+      `${enUS.orders.summaryTotal}¥1,000.00`,
+      `${enUS.orders.summarySettled}¥500.00`,
+      `${enUS.orders.summaryPending}¥300.00`,
+      `${enUS.orders.summaryRefunded}¥120.00`
+    ]);
+    expect(wrapper.get('[data-test="summary-note"]').text()).toBe(
+      "Total sales are before refunds. Settled and unsettled sales are after refunds."
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps the owner's Chinese wording", () => {
+    const zh = (key: string) => i18n.global.t(key, {}, { locale: "zh-CN" });
+    expect(zh("orders.summaryTotal")).toBe("总销售额");
+    expect(zh("orders.summarySettled")).toBe("已结算销售额");
+    expect(zh("orders.summaryPending")).toBe("待结算销售额");
+    expect(zh("orders.summaryRefunded")).toBe("已退款销售额");
+    expect(zh("orders.summaryNote")).toBe("总销售额未扣除退款，已结算和待结算销售额已扣除退款。");
+  });
+
+  it("asks for the summary with the same filters as the list", async () => {
+    const wrapper = await mountPage();
+    const listFilter = vi.mocked(getCreatorOrders).mock.calls[0][0];
+    const expected: Record<string, unknown> = { ...listFilter };
+    delete expected.page;
+    delete expected.size;
+    expect(getCreatorOrderSummary).toHaveBeenCalledWith(expected);
+    wrapper.unmount();
+  });
+
+  it("refreshes after a search and after a reset, but not when only the page changes", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({ items: [order], total: 60, page: 1, size: 20 });
+    const wrapper = await mountPage();
+    vi.mocked(getCreatorOrderSummary).mockClear();
+    await wrapper
+      .get('[data-test="orders-order-no"] input, input[data-test="orders-order-no"]')
+      .setValue("1234");
+    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("search");
+    await flushPromises();
+    expect(getCreatorOrderSummary).toHaveBeenCalledTimes(1);
+    expect(getCreatorOrderSummary).toHaveBeenLastCalledWith(
+      expect.objectContaining({ orderNo: "1234" })
+    );
+    wrapper.findComponent({ name: "DataTable" }).vm.$emit("update:page", 2);
+    await flushPromises();
+    expect(getCreatorOrderSummary).toHaveBeenCalledTimes(1);
+    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("reset");
+    await flushPromises();
+    expect(getCreatorOrderSummary).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(getCreatorOrderSummary).mock.calls[1][0]).not.toHaveProperty("orderNo");
+    wrapper.unmount();
+  });
+
+  it("does not show a zero total when the order list fails to load", async () => {
+    vi.mocked(getCreatorOrders).mockRejectedValue(new Error("down"));
+    const wrapper = await mountPage();
+    expect(wrapper.text()).toContain(enUS.orders.loadFailed);
+    expect(wrapper.text()).not.toContain(enUS.table.total.replace("{total}", "0"));
+    wrapper.unmount();
+  });
+
+  it("shows a failure with a retry instead of zeros, and recovers on retry", async () => {
+    vi.mocked(getCreatorOrderSummary).mockRejectedValueOnce(new Error("down"));
+    const wrapper = await mountPage();
+    expect(wrapper.get('[data-test="summary-failed"]').text()).toContain(enUS.orders.summaryFailed);
+    expect(wrapper.find('[data-test="summary-total-amount"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("¥0.00");
+    await wrapper.get('[data-test="summary-retry"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="summary-failed"]').exists()).toBe(false);
+    expect(amount(wrapper, "total")).toBe("¥1,000.00");
+    wrapper.unmount();
+  });
+
+  it("shows long amounts in full", async () => {
+    vi.mocked(getCreatorOrderSummary).mockResolvedValue({
+      salesCny: "12345678.90",
+      settledCny: "9876543.21",
+      pendingCny: "0.00",
+      refundedCny: "0.00"
+    });
+    const wrapper = await mountPage();
+    expect(amount(wrapper, "total")).toBe("¥12,345,678.90");
+    expect(amount(wrapper, "pending")).toBe("¥0.00");
     wrapper.unmount();
   });
 });

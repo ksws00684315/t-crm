@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.mapper.CommissionFinanceQueryMapper;
@@ -57,7 +58,7 @@ class KolCommissionServiceTest {
               return balance.subtract(occupied);
             });
     lenient().when(funding.frozenShortfallCny(anyLong(), any(), any())).thenReturn(BigDecimal.ZERO);
-    lenient().when(withdrawals.listKolPaidWithdrawals(anyLong())).thenReturn(List.of());
+    lenient().when(withdrawals.listKolWithdrawals(anyLong())).thenReturn(List.of());
   }
 
   @Test
@@ -154,6 +155,77 @@ class KolCommissionServiceTest {
         TenantScope.callCompany(TENANT, () -> service.fundRecords(TENANT, KOL, 5, 20));
     assertThat(page.total()).isZero();
     assertThat(page.items()).isEmpty();
+  }
+
+  @Test
+  void shouldListEveryWithdrawalStatusWithRealStatusAndNoReceiptTimeUntilPaid() {
+    Instant base = Instant.parse("2026-10-25T00:00:00Z");
+    when(withdrawals.listKolWithdrawals(KOL))
+        .thenReturn(
+            List.of(
+                withdrawal(5L, "PAID", base.plusSeconds(500), base.plusSeconds(900)),
+                withdrawal(4L, "WITHDRAWN", base.plusSeconds(400), null),
+                withdrawal(3L, "REJECTED", base.plusSeconds(300), null),
+                withdrawal(2L, "PENDING_PAYMENT", base.plusSeconds(200), null),
+                withdrawal(1L, "PENDING_REVIEW", base.plusSeconds(100), null)));
+
+    PageResult<KolCommissionService.FundRecord> page =
+        TenantScope.callCompany(TENANT, () -> service.fundRecords(TENANT, KOL, 1, 20));
+
+    assertThat(page.total()).isEqualTo(5);
+    assertThat(page.items())
+        .extracting(KolCommissionService.FundRecord::publicStatus)
+        .containsExactly("PAID", "WITHDRAWN", "REJECTED", "PENDING_PAYMENT", "PENDING_REVIEW");
+    assertThat(page.items())
+        .extracting(KolCommissionService.FundRecord::receivedAt)
+        .containsExactly(base.plusSeconds(900), null, null, null, null);
+    assertThat(page.items()).allMatch(row -> "COMMISSION".equals(row.type()));
+    assertThat(page.items().getFirst().maskedRecipient()).isEqualTo("pa***@example.test");
+  }
+
+  @Test
+  void shouldMergeWithdrawalsAndPaidPrepaysNewestApplicationFirstAndPageThem() {
+    // Application times: prepay 10-24 08:00, withdrawal 10-25 00:01, withdrawal 10-23 00:00.
+    when(withdrawals.listKolWithdrawals(KOL))
+        .thenReturn(
+            List.of(
+                withdrawal(8L, "PENDING_REVIEW", Instant.parse("2026-10-25T00:01:00Z"), null),
+                withdrawal(7L, "REJECTED", Instant.parse("2026-10-23T00:00:00Z"), null)));
+    when(finance.prepayPayments(eq(List.of(KOL)), any(), any()))
+        .thenReturn(List.of(payment(2L, "300.00", Instant.parse("2026-10-24T09:00:00Z"))));
+
+    var first = TenantScope.callCompany(TENANT, () -> service.fundRecords(TENANT, KOL, 1, 2));
+    var second = TenantScope.callCompany(TENANT, () -> service.fundRecords(TENANT, KOL, 2, 2));
+
+    assertThat(first.total()).isEqualTo(3);
+    assertThat(first.items())
+        .extracting(KolCommissionService.FundRecord::type)
+        .containsExactly("COMMISSION", "PREPAY");
+    assertThat(second.items())
+        .extracting(KolCommissionService.FundRecord::sourceId)
+        .containsExactly(7L);
+    // The prepay row comes only from paid payments; there is no unpaid prepay source to leak.
+    verify(finance, org.mockito.Mockito.times(2)).prepayPayments(eq(List.of(KOL)), any(), any());
+  }
+
+  @Test
+  void shouldAskTheMapperForTheSignedInCreatorOnly() {
+    TenantScope.callCompany(TENANT, () -> service.fundRecords(TENANT, KOL, 1, 20));
+
+    verify(withdrawals).listKolWithdrawals(KOL);
+    verify(finance).prepayPayments(eq(List.of(KOL)), any(), any());
+  }
+
+  private static WithdrawalMapper.KolWithdrawalFundRow withdrawal(
+      long id, String status, Instant submittedAt, Instant paidAt) {
+    return new WithdrawalMapper.KolWithdrawalFundRow(
+        id,
+        "WD-" + id,
+        new BigDecimal("200.00"),
+        "pa***@example.test",
+        status,
+        submittedAt,
+        paidAt);
   }
 
   private static PrepayPaymentRow payment(long id, String amount, Instant paidAt) {

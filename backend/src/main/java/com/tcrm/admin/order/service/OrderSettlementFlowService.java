@@ -36,8 +36,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Review rework (task 76): the recompute set is recovered from the persisted flows ({@code
  * first_pulled_at} later than the caller's last successful checkpoint), never from this round's
- * in-memory state — so a pull that dies mid-way, a page-cap abort or a failed recompute cannot
- * strand an order. The caller must advance its checkpoints only when {@link #pull} returns true.
+ * in-memory state — so a pull that dies mid-way or a page-cap abort cannot strand an order.
+ *
+ * <p>Task 91 (L-023): a recompute that fails for one order no longer blocks the shop's checkpoint.
+ * The failure is written as a retry mark on the order ({@code crm_order.settlement_recompute_
+ * failures}) in its own transaction, the other orders are unaffected, and the next round recomputes
+ * the marked orders plus the orders with new flows. The caller advances its checkpoints whenever
+ * {@link #pull} returns true; a failed Weidian pull still throws, so the checkpoints stay.
  */
 @Service
 public class OrderSettlementFlowService {
@@ -91,13 +96,14 @@ public class OrderSettlementFlowService {
 
   /**
    * Pulls both query types for the time range and recomputes the commission facts of every order
-   * whose flows were first pulled after {@code sinceCheckpoint} (null = everything). The caller
-   * holds the per-shop settlement lock and the company tenant scope.
+   * whose flows were first pulled after {@code sinceCheckpoint} (null = everything) and of every
+   * order carrying a retry mark. The caller holds the per-shop settlement lock and the company
+   * tenant scope.
    *
-   * @return true only when the pull and every recompute succeeded; a false return (or a thrown
-   *     error) tells the caller to leave the checkpoints in place so the next round retries both
-   *     the pull and the recompute — the recompute set recovers from the persisted flows, not from
-   *     this round's in-memory state (review rework, task 76)
+   * @return true when the pull completed and every failed recompute was recorded as a retry mark,
+   *     so the caller may advance its checkpoints; false only when a failure could not be recorded
+   *     (the checkpoints must then stay, the recompute set recovers from the persisted flows). A
+   *     failed Weidian pull throws and never reaches the recompute (review rework, task 76)
    */
   public boolean pull(long shopId, Instant start, Instant end, Instant sinceCheckpoint) {
     for (String queryType : QUERY_TYPES) {
@@ -250,32 +256,88 @@ public class OrderSettlementFlowService {
 
   /**
    * Re-publishes the commission facts of every order whose matched flows were first pulled after
-   * {@code sinceCheckpoint}, recovering the set from the persisted flows (review rework, task 76):
-   * a pull that dies mid-way, a page-cap abort or a failed recompute all leave the checkpoint in
-   * place, so the next round finds these orders here even though their fingerprints are no longer
-   * new. Each order commits (or fails) independently; any failure makes the whole pull unsuccessful
-   * so the checkpoints stay.
+   * {@code sinceCheckpoint}, recovering the set from the persisted flows (review rework, task 76),
+   * together with the orders carrying a retry mark from an earlier failed recompute (task 91,
+   * L-023). Each order commits (or fails) independently. A failure is recorded as a retry mark and
+   * does not make the pull unsuccessful; only a failure that cannot be recorded does, because then
+   * nothing would remember the order once the checkpoint moves on.
    */
   private boolean recomputeSince(long shopId, Instant sinceCheckpoint) {
     Instant since = sinceCheckpoint == null ? Instant.EPOCH : sinceCheckpoint;
-    boolean allOk = true;
-    for (Long orderId : flows.listMatchedOrderIdsSince(shopId, since)) {
+    Set<Long> marked = new LinkedHashSet<>(orders.listSettlementRecomputePending(shopId));
+    Set<Long> targets = new LinkedHashSet<>(marked);
+    targets.addAll(flows.listMatchedOrderIdsSince(shopId, since));
+    boolean allRecorded = true;
+    for (Long orderId : targets) {
       try {
-        recomputeOne(orderId);
+        recomputeOne(orderId, marked.contains(orderId));
       } catch (RuntimeException error) {
-        allOk = false;
-        LOG.error(
-            "settlement basis recompute failed for shop {} order {}: the pull checkpoint stays,"
-                + " it retries next round",
-            shopId,
-            orderId,
-            error);
+        allRecorded &= recordFailure(shopId, orderId, error);
       }
     }
-    return allOk;
+    return allRecorded;
   }
 
-  private void recomputeOne(long orderId) {
+  /**
+   * Writes the retry mark of a failed recompute in a fresh transaction (the failed one rolled back)
+   * and logs the order number with the failure count; the stack trace is logged on the first
+   * failure only, so an order that keeps failing costs one short line per round. No personal data
+   * is logged.
+   *
+   * @return false when the mark itself could not be written
+   */
+  private boolean recordFailure(long shopId, long orderId, RuntimeException error) {
+    Integer count;
+    try {
+      count =
+          tx.execute(
+              status -> {
+                orders.markSettlementRecomputeFailed(orderId);
+                return orders.settlementRecomputeFailures(orderId);
+              });
+    } catch (RuntimeException markError) {
+      LOG.error(
+          "settlement basis recompute failed for shop {} order {} and its retry mark could not be"
+              + " written: the pull checkpoint stays",
+          shopId,
+          orderId,
+          markError);
+      return false;
+    }
+    logFailure(shopId, orderId, count, error);
+    return true;
+  }
+
+  /** Log only; a failing lookup of the order number never changes the outcome of the pull. */
+  private void logFailure(long shopId, long orderId, Integer count, RuntimeException error) {
+    String orderNo = null;
+    try {
+      OrderDO row = orders.selectById(orderId);
+      orderNo = row == null ? null : row.getWeidianOrderId();
+    } catch (RuntimeException lookupError) {
+      LOG.debug("order number lookup for the failure log failed", lookupError);
+    }
+    if (count != null && count > 1) {
+      LOG.error(
+          "settlement basis recompute failed again for shop {} order {} ({}), failure count {}: {}",
+          shopId,
+          orderId,
+          orderNo,
+          count,
+          error.getClass().getName());
+    } else {
+      LOG.error(
+          "settlement basis recompute failed for shop {} order {} ({}), failure count {}: the"
+              + " checkpoint advances, only this order retries next round",
+          shopId,
+          orderId,
+          orderNo,
+          count,
+          error);
+    }
+  }
+
+  private void recomputeOne(long orderId, boolean marked) {
     tx.executeWithoutResult(
         status -> {
           OrderDO order =
@@ -288,6 +350,9 @@ public class OrderSettlementFlowService {
               order.getShopId(), order.getWeidianOrderId(), order.getId(), clock.instant());
           List<OrderItemDO> lines = listItems(order.getId());
           commissionSync.sync(order, lines);
+          if (marked) {
+            orders.clearSettlementRecomputeFailed(orderId);
+          }
         });
   }
 

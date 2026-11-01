@@ -14,6 +14,7 @@ import com.tcrm.admin.KolMvcSupport;
 import com.tcrm.admin.order.service.KolOrderDTO;
 import com.tcrm.admin.order.service.KolOrderFilterDTO;
 import com.tcrm.admin.order.service.KolOrderService;
+import com.tcrm.admin.order.service.KolOrderSummaryDTO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.PageResult;
@@ -102,6 +103,59 @@ class KolOrderControllerTest {
         .andExpect(jsonPath("$.data.total").value("0"));
 
     verify(orders).page(new KolOrderFilterDTO(null, null, null, "1234", "Widget", null, 1, 20));
+  }
+
+  @Test
+  void shouldRequireKolTokenForTheSummary() throws Exception {
+    mvc.perform(get("/kol-api/orders/summary")).andExpect(status().isUnauthorized());
+    verifyNoInteractions(orders);
+  }
+
+  @Test
+  void shouldForwardTheListFiltersToTheSummaryAndReturnStringAmounts() throws Exception {
+    when(orders.summary(any()))
+        .thenReturn(
+            new KolOrderSummaryDTO(
+                new java.math.BigDecimal("235.00"),
+                new java.math.BigDecimal("130.00"),
+                new java.math.BigDecimal("30.00"),
+                new java.math.BigDecimal("68.00")));
+
+    mvc.perform(
+            get("/kol-api/orders/summary")
+                .param("payFrom", "2026-10-01T00:00:00Z")
+                .param("payTo", "2026-11-01T00:00:00Z")
+                .param("orderNo", "1234")
+                .param("productName", "Widget")
+                .param("settlementStatus", "FROZEN")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("235.00"))
+        .andExpect(jsonPath("$.data.settledCny").value("130.00"))
+        .andExpect(jsonPath("$.data.pendingCny").value("30.00"))
+        .andExpect(jsonPath("$.data.refundedCny").value("68.00"));
+
+    verify(orders)
+        .summary(
+            new KolOrderFilterDTO(
+                Instant.parse("2026-10-01T00:00:00Z"),
+                Instant.parse("2026-11-01T00:00:00Z"),
+                null,
+                "1234",
+                "Widget",
+                "FROZEN",
+                1,
+                1));
+  }
+
+  @Test
+  void shouldRejectAnUnknownSettlementStatusOnTheSummary() throws Exception {
+    mvc.perform(
+            get("/kol-api/orders/summary")
+                .param("settlementStatus", "MYSTERY")
+                .header(KolMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(orders);
   }
 
   @Test
