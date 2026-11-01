@@ -21,32 +21,36 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Creator-facing commission overview and fund records (task 62, requirement 11.02, design §6.3).
- * The KOL identity comes from the login; occupied stays zero until task 63 stores withdrawal
- * applications.
+ * The KOL identity comes from the login; the available figure is the one 可提现 computation shared
+ * with the application check (L-033): wallet money minus occupations, capped by the released rows.
  */
 @Service
 public class KolCommissionService {
   private final CommissionItemStateMapper states;
   private final CommissionFinanceQueryMapper finance;
   private final WithdrawalMapper withdrawals;
+  private final WithdrawalFundingSource funding;
   private final Clock clock;
 
   @Autowired
   public KolCommissionService(
       CommissionItemStateMapper states,
       CommissionFinanceQueryMapper finance,
-      WithdrawalMapper withdrawals) {
-    this(states, finance, withdrawals, Clock.systemUTC());
+      WithdrawalMapper withdrawals,
+      WithdrawalFundingSource funding) {
+    this(states, finance, withdrawals, funding, Clock.systemUTC());
   }
 
   KolCommissionService(
       CommissionItemStateMapper states,
       CommissionFinanceQueryMapper finance,
       WithdrawalMapper withdrawals,
+      WithdrawalFundingSource funding,
       Clock clock) {
     this.states = states;
     this.finance = finance;
     this.withdrawals = withdrawals;
+    this.funding = funding;
     this.clock = clock;
   }
 
@@ -114,11 +118,16 @@ public class KolCommissionService {
           BigDecimal balance = balances.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
           BigDecimal commission = commissionPaid.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
           BigDecimal prepay = prepayPaid.getOrDefault(kolId, BigDecimal.ZERO.setScale(2));
+          // 可提现 (L-033): the shared available computation, not the raw wallet remainder.
+          BigDecimal available = funding.availableCny(kolId, balance, occupied).setScale(2);
+          // Frozen display keeps the equation: blocked released money stays visible as frozen.
+          BigDecimal frozenDisplay =
+              frozen.add(funding.frozenShortfallCny(kolId, balance, occupied)).setScale(2);
           OverviewMoney money =
               new OverviewMoney(
                   estimated,
-                  frozen,
-                  balance.subtract(occupied),
+                  frozenDisplay,
+                  available,
                   occupied,
                   commission.add(prepay),
                   deducted.getOrDefault(kolId, BigDecimal.ZERO.setScale(2)),

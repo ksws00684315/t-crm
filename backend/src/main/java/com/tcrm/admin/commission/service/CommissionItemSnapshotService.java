@@ -50,6 +50,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   private final CommissionItemRevisionMapper revisions;
   private final CommissionRuleVersionMapper ruleVersions;
   private final CommissionWalletService wallet;
+  private final WithdrawalPauseService pauses;
   private final KolApi kols;
   private final com.tcrm.admin.shared.CurrentTenantResolver currentTenant;
   private final Clock clock;
@@ -60,9 +61,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionItemRevisionMapper revisions,
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
+      WithdrawalPauseService pauses,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant) {
-    this(states, revisions, ruleVersions, wallet, kols, currentTenant, Clock.systemUTC());
+    this(states, revisions, ruleVersions, wallet, pauses, kols, currentTenant, Clock.systemUTC());
   }
 
   CommissionItemSnapshotService(
@@ -70,6 +72,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       CommissionItemRevisionMapper revisions,
       CommissionRuleVersionMapper ruleVersions,
       CommissionWalletService wallet,
+      WithdrawalPauseService pauses,
       KolApi kols,
       com.tcrm.admin.shared.CurrentTenantResolver currentTenant,
       Clock clock) {
@@ -77,6 +80,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     this.revisions = revisions;
     this.ruleVersions = ruleVersions;
     this.wallet = wallet;
+    this.pauses = pauses;
     this.kols = kols;
     this.currentTenant = currentTenant;
     this.clock = clock;
@@ -91,6 +95,13 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     Instant now = clock.instant();
     Map<Long, PayTimeRule> kolRates = new HashMap<>();
     RuleSnapshot rule = ruleEffectiveAt(order.payTime());
+    // Lock — once, up front, in one ascending order — every active application holding any line
+    // of this order (the lines a later full sync drops are still live rows at this point). The
+    // transaction is per order, so this covers every pause/resume below; payment takes
+    // application → wallet, and this must never hold the wallet lock of line 1 while waiting for
+    // the application lock of line 2.
+    pauses.prelockForItems(states.findIdsByOrder(order.orderId()));
+    List<Long> stale = states.findStaleIdsByOrder(order.orderId(), itemIds(items));
     for (ItemSourceDTO item : items) {
       long tenantId = currentTenant();
       CommissionItemStateDO row = states.lockByOrderItemId(item.orderItemId());
@@ -106,13 +117,15 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       String version = fingerprint + REVISION_SEPARATOR + (revisionNo(row.getSourceVersion()) + 1);
       applyRevision(tenantId, row, order, item, rate, rule, version, now);
     }
-    deleteStaleRows(order, items, now);
+    states.deleteStaleByOrder(order.orderId(), itemIds(items), now);
+    // A dropped line can no longer block payment: lift the pauses it was holding.
+    for (Long itemStateId : stale) {
+      pauses.resumeForItem(itemStateId);
+    }
   }
 
-  /** Snapshots of item lines dropped by a later full sync stop counting (logical delete). */
-  private void deleteStaleRows(OrderSourceDTO order, List<ItemSourceDTO> items, Instant now) {
-    List<Long> itemIds = items.stream().map(ItemSourceDTO::orderItemId).toList();
-    states.deleteStaleByOrder(order.orderId(), itemIds, now);
+  private static List<Long> itemIds(List<ItemSourceDTO> items) {
+    return items.stream().map(ItemSourceDTO::orderItemId).toList();
   }
 
   private void applyRevision(
@@ -124,6 +137,12 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       RuleSnapshot rule,
       String version,
       Instant now) {
+    // The line's blocked state (after-sales, or occupations including PAID outrunning its
+    // released money) drives the withdrawal pause linkage: the previous value is read before the
+    // revision, the new one after the write, both through the shared SQL predicate. All holding
+    // applications were locked at the start of this transaction, so applying the flip here cannot
+    // deadlock with the payment registration.
+    boolean wasBlocked = row.getId() != null && pauses.isItemBlocked(row.getId());
     CommissionSettlementRules.Result result =
         CommissionSettlementRules.evaluate(
             new CommissionSettlementRules.Inputs(
@@ -200,6 +219,22 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       states.insert(row);
     } else {
       states.updateById(row);
+    }
+    // Refund pause linkage (ADR-032 §6 退款阻断联动, owner decision 2026-11-01): pause the
+    // applications occupying this line while it blocks; lift them only when every allocated line
+    // is unblocked — a refund that concluded with the occupations no longer covered by the
+    // released money keeps the application paused until it is rejected or withdrawn. Runs in the
+    // revision transaction, so every sync path shares one write; an unchanged fingerprint never
+    // gets here, which keeps repeated syncs from writing duplicate history.
+    if (row.getId() != null) {
+      boolean blocked = pauses.isItemBlocked(row.getId());
+      if (blocked != wasBlocked) {
+        if (blocked) {
+          pauses.pauseForItem(row.getId());
+        } else {
+          pauses.resumeForItem(row.getId());
+        }
+      }
     }
 
     CommissionItemRevisionDO revision = new CommissionItemRevisionDO();

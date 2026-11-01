@@ -132,6 +132,13 @@ async function submit() {
   >
     <div v-if="withdrawal" data-test="payment-dialog">
       <el-alert :title="t('finance.externalNote')" type="warning" :closable="false" />
+      <el-alert
+        v-if="withdrawal.paused"
+        :title="t('finance.refundPause')"
+        type="warning"
+        :closable="false"
+        data-test="payment-paused"
+      />
       <el-descriptions :column="1" border
         ><el-descriptions-item :label="t('finance.approvedCny')"
           >{{ withdrawal.amount }} CNY</el-descriptions-item
@@ -203,9 +210,14 @@ async function submit() {
       ><el-button :disabled="busy" @click="emit('update:modelValue', false)">{{
         t("finance.cancel")
       }}</el-button
-      ><el-button type="primary" :loading="busy" data-test="pay-submit" @click="submit">{{
-        t("finance.confirm")
-      }}</el-button></template
+      ><el-button
+        type="primary"
+        :loading="busy"
+        :disabled="withdrawal?.paused === true"
+        data-test="pay-submit"
+        @click="submit"
+        >{{ t("finance.confirm") }}</el-button
+      ></template
     >
   </el-dialog>
 </template>

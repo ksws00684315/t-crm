@@ -8,7 +8,6 @@ import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -25,25 +24,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommissionWalletService {
   private final CommissionWalletMapper wallets;
   private final KolApi kols;
-  private final SystemConfigApi configs;
   private final Clock clock;
 
   @Autowired
-  public CommissionWalletService(
-      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs) {
-    this(wallets, kols, configs, Clock.systemUTC());
+  public CommissionWalletService(CommissionWalletMapper wallets, KolApi kols) {
+    this(wallets, kols, Clock.systemUTC());
   }
 
-  CommissionWalletService(
-      CommissionWalletMapper wallets, KolApi kols, SystemConfigApi configs, Clock clock) {
+  CommissionWalletService(CommissionWalletMapper wallets, KolApi kols, Clock clock) {
     this.wallets = wallets;
     this.kols = kols;
-    this.configs = configs;
     this.clock = clock;
   }
-
-  public record Balance(
-      String availableCny, String minimumWithdrawalCny, boolean withdrawalEligible) {}
 
   public record CreditCommand(
       long tenantId,
@@ -157,9 +149,11 @@ public class CommissionWalletService {
 
   /**
    * Money a paid withdrawal takes out of the wallet (task 63): one negative COMMISSION_WITHDRAWAL
-   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. The balance may
-   * go negative only if a prepay deduction raced in between approval and payment; that state is
-   * recovered by later commission credits like any other deduction.
+   * entry keyed by {@code WITHDRAWAL:<id>}, so a payment replay never posts twice. A balance
+   * smaller than the payment amount is refused inside the wallet lock (owner decision 2026-11-01:
+   * 付款时钱包余额不足即拒绝,余额等于金额允许) — a payment can no longer drive the wallet negative; a negative balance
+   * can only come from later clawbacks or prepay deductions and is recovered by later commission
+   * credits like any other deduction.
    */
   @Transactional(rollbackFor = Exception.class)
   public BigDecimal postWithdrawalDebit(
@@ -188,6 +182,11 @@ public class CommissionWalletService {
           if (existing != null) {
             return existing;
           }
+          if (balance.compareTo(amount) < 0) {
+            // The payment transaction rolls back: the application stays PENDING_PAYMENT, the
+            // balance is untouched, and finance can retry once the wallet refills or reject.
+            throw new BusinessException(ErrorCode.WITHDRAWAL_INSUFFICIENT_AVAILABLE);
+          }
           BigDecimal next = balance.subtract(amount).setScale(2, RoundingMode.UNNECESSARY);
           wallets.insertLedger(
               IdWorker.getId(),
@@ -204,23 +203,6 @@ public class CommissionWalletService {
           wallets.updateBalance(kolId, next, now());
           return next;
         });
-  }
-
-  @Transactional(readOnly = true)
-  public Balance balance(long tenantId, long kolId, BigDecimal minimumWithdrawalCny) {
-    BigDecimal available = currentBalance(tenantId, kolId);
-    BigDecimal minimum = minimumWithdrawalCny.setScale(2, RoundingMode.UNNECESSARY);
-    return new Balance(
-        money(available),
-        money(minimum),
-        available.signum() >= 0 && available.compareTo(minimum) >= 0);
-  }
-
-  /** Balance and configured withdrawal threshold for the future withdrawal application flow. */
-  @Transactional(readOnly = true)
-  public Balance withdrawalEligibility(long tenantId, long kolId) {
-    BigDecimal minimum = BigDecimal.valueOf(configs.getInt("commission.minimum-withdrawal-cny"));
-    return balance(tenantId, kolId, minimum);
   }
 
   @Transactional(readOnly = true)
@@ -356,9 +338,5 @@ public class CommissionWalletService {
 
   private static Instant truncate(Instant value) {
     return value.truncatedTo(ChronoUnit.MILLIS);
-  }
-
-  private static String money(BigDecimal value) {
-    return value.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
   }
 }

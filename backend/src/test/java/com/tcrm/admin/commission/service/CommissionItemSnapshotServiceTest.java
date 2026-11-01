@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -43,18 +44,23 @@ class CommissionItemSnapshotServiceTest {
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionRuleVersionMapper ruleVersions = mock(CommissionRuleVersionMapper.class);
   private final CommissionWalletService wallet = mock(CommissionWalletService.class);
+  private final WithdrawalPauseService pauses = mock(WithdrawalPauseService.class);
   private final KolApi kols = mock(KolApi.class);
   private final com.tcrm.admin.shared.CurrentTenantResolver tenantResolver = () -> TENANT;
   private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
   private final CommissionItemSnapshotService service =
       new CommissionItemSnapshotService(
-          states, revisions, ruleVersions, wallet, kols, tenantResolver, clock);
+          states, revisions, ruleVersions, wallet, pauses, kols, tenantResolver, clock);
 
   @BeforeEach
   void prepare() {
     when(ruleVersions.findEffectiveAt(any())).thenReturn(null);
     when(kols.rateEffectiveAt(anyLong(), any())).thenReturn(null);
     when(states.deleteStaleByOrder(anyLong(), anyCollection(), any())).thenReturn(0);
+    when(states.findStaleIdsByOrder(anyLong(), anyCollection())).thenReturn(List.of());
+    // No occupations anywhere: the block state then follows the after-sales flag alone.
+    lenient().when(pauses.isItemBlocked(anyLong())).thenReturn(false);
+    lenient().when(states.findIdsByOrder(anyLong())).thenReturn(List.of());
   }
 
   @Test
@@ -303,6 +309,105 @@ class CommissionItemSnapshotServiceTest {
     verify(states).deleteStaleByOrder(eq(5001L), eq(List.of(9001L)), eq(NOW));
   }
 
+  @Test
+  void shouldPauseWithdrawalsWhenLineEntersAfterSales_andResumeWhenItLeaves() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+
+    // The predicate is read before the revision (unblocked) and after the write (blocked).
+    when(pauses.isItemBlocked(row.getId())).thenReturn(false, true);
+    syncAfterSales(true);
+    verify(pauses).pauseForItem(row.getId());
+    verify(pauses, never()).resumeForItem(anyLong());
+
+    // The pause wrote its flag, so the row now reads as blocked; only clearing it lifts.
+    when(pauses.isItemBlocked(row.getId())).thenReturn(true, false);
+    syncAfterSales(false);
+    verify(pauses).resumeForItem(row.getId());
+  }
+
+  @Test
+  void shouldPauseWhenOccupationsOutrunTheReleasedMoney_withoutAfterSales() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    // The refund already concluded (after-sales false), but the clawback cut the release (15.00
+    // → 0.00) below the occupation (15.00 held): the shared predicate reads unblocked before the
+    // revision and blocked after it, and the holding application is paused — with the prelock
+    // pass up front, ahead of the wallet write.
+    when(states.findIdsByOrder(5001L)).thenReturn(List.of(row.getId()));
+    when(pauses.isItemBlocked(row.getId())).thenReturn(false, true);
+    // The line's money was released (the unit test has no release job): the clawback below now
+    // cuts a real released amount, exactly like the refund chain on a live stack.
+    row.setReleasedCommissionCny(new BigDecimal("15.00"));
+    syncLine(
+        withRefund(
+            item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), new BigDecimal("100.00")));
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses, wallet);
+    order.verify(pauses).prelockForItems(List.of(row.getId()));
+    order
+        .verify(wallet)
+        .postCommissionAdjustment(anyLong(), anyLong(), anyLong(), any(), any(), any());
+    order.verify(pauses).pauseForItem(row.getId());
+    verify(pauses, never()).resumeForItem(anyLong());
+  }
+
+  @Test
+  void shouldPrelockEveryApplicationOnce_beforeAnyWalletWriteOnMultiLineOrders() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    // Two released lines of one order, each already holding 15.00 of occupations: one sync
+    // refunds both in full. The applications of BOTH lines must be locked in a single up-front
+    // pass, before the first wallet write — per-line prelocking would take wallet → application
+    // on line 2 and can deadlock with the payment registration.
+    when(states.lockByOrderItemId(9001L)).thenReturn(releasedRow(7001L, 9001L));
+    when(states.lockByOrderItemId(9002L)).thenReturn(releasedRow(7002L, 9002L));
+    when(states.findIdsByOrder(5001L)).thenReturn(List.of(7001L, 7002L));
+    when(pauses.isItemBlocked(7001L)).thenReturn(false, true);
+    when(pauses.isItemBlocked(7002L)).thenReturn(false, true);
+    var refunded =
+        withRefund(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), new BigDecimal("100.00"));
+    var refunded2 =
+        withRefund(item(9002L, KOL_A, 1, new BigDecimal("100.00"), null), new BigDecimal("100.00"));
+    TenantScope.runCompany(
+        TENANT, () -> service.syncOrderItems(order(), List.of(refunded, refunded2)));
+    // The one prelock pass precedes the FIRST wallet write; with every application already
+    // locked, the per-line wallet write and pause below can never interleave with a payment.
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses, wallet);
+    order.verify(pauses).prelockForItems(List.of(7001L, 7002L));
+    order
+        .verify(wallet, org.mockito.Mockito.times(1))
+        .postCommissionAdjustment(anyLong(), anyLong(), anyLong(), any(), any(), any());
+    verify(pauses).pauseForItem(7001L);
+    verify(pauses).pauseForItem(7002L);
+    verify(pauses, org.mockito.Mockito.times(1)).prelockForItems(anyCollection());
+  }
+
+  @Test
+  void shouldNotRepeatPauseLinkageWhenRepeatedSyncChangesNothing() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    firstRevision(new BigDecimal("100.00"));
+    syncAfterSales(true);
+    org.mockito.Mockito.clearInvocations(pauses);
+    // Same fingerprint as the stored revision: the sync skips the line entirely, so no duplicate
+    // PAUSED history or calls.
+    syncAfterSales(true);
+    verify(pauses, never()).pauseForItem(anyLong());
+    verify(pauses, never()).resumeForItem(anyLong());
+  }
+
+  @Test
+  void shouldResumePausesHeldByLinesDroppedFromAFullSync() {
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    firstRevision(new BigDecimal("100.00"));
+    when(states.findStaleIdsByOrder(eq(5001L), anyCollection())).thenReturn(List.of(7001L));
+    when(states.findIdsByOrder(5001L)).thenReturn(List.of(7001L));
+    // The next sync only carries line 9002, so line 9001's snapshot goes stale and can no longer
+    // block: the pause it held must lift, with the application locked in the up-front pass.
+    syncLine(item(9002L, KOL_A, 1, new BigDecimal("50.00"), null));
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses);
+    order.verify(pauses).prelockForItems(List.of(7001L));
+    order.verify(pauses).resumeForItem(7001L);
+  }
+
   /** Registers line 9001 and makes later syncs of the test find the row it created. */
   private CommissionItemStateDO firstRevision(BigDecimal basis) {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
@@ -390,6 +495,24 @@ class CommissionItemSnapshotServiceTest {
         item.completedTime(),
         afterSales,
         item.basisCheckReason());
+  }
+
+  /** A stored, verified line that already released 15.00 (fixed ids for two-line tests). */
+  private static CommissionItemStateDO releasedRow(long id, long itemId) {
+    CommissionItemStateDO row = new CommissionItemStateDO();
+    row.setId(id);
+    row.setTenantId(TENANT);
+    row.setOrderId(5001L);
+    row.setOrderItemId(itemId);
+    row.setKolId(KOL_A);
+    row.setSourceKey("ORDER_ITEM:" + itemId);
+    row.setSettlementState("UNKNOWN");
+    row.setVerified(true);
+    row.setAfterSales(false);
+    row.setAccruedCommissionCny(new BigDecimal("15.00"));
+    row.setReleasedCommissionCny(new BigDecimal("15.00"));
+    row.setReleaseBasis(CommissionSettlementRules.RELEASE_UNSETTLED);
+    return row;
   }
 
   private static CommissionItemStateDO verifiedRow(

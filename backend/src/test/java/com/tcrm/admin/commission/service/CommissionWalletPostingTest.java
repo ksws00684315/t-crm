@@ -13,7 +13,6 @@ import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
-import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -41,8 +40,7 @@ class CommissionWalletPostingTest {
   private List<ResultSet> balances = List.of();
   private final CommissionWalletMapper wallets = mock(CommissionWalletMapper.class, this::answer);
   private final CommissionWalletService service =
-      new CommissionWalletService(
-          wallets, kols, mock(SystemConfigApi.class), Clock.fixed(TIME, ZoneOffset.UTC));
+      new CommissionWalletService(wallets, kols, Clock.fixed(TIME, ZoneOffset.UTC));
 
   @BeforeEach
   void prepare() {
@@ -186,10 +184,6 @@ class CommissionWalletPostingTest {
     when(rs.getBigDecimal(1)).thenReturn(new BigDecimal("200.00"));
     balances = List.of(rs);
     assertThat(service.currentBalance(11, 22)).isEqualByComparingTo("200");
-    assertThat(service.balance(11, 22, new BigDecimal("200")).withdrawalEligible()).isTrue();
-    assertThat(service.balance(11, 22, new BigDecimal("201")).withdrawalEligible()).isFalse();
-    when(rs.getBigDecimal(1)).thenReturn(new BigDecimal("-1.00"));
-    assertThat(service.balance(11, 22, BigDecimal.ZERO).withdrawalEligible()).isFalse();
   }
 
   private static CommissionWalletService.CreditCommand command(String amount) {

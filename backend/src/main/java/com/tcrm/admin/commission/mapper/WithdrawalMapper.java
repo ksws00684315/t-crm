@@ -55,6 +55,113 @@ public interface WithdrawalMapper {
   @Select("SELECT id FROM crm_commission_withdrawal WHERE id = #{id} FOR UPDATE")
   Long lockById(@Param("id") long id);
 
+  /**
+   * Active applications holding this item state, ascending id so the pause linkage always locks in
+   * one order (the refund-block reverse lookup index). {@code paused} picks the side to process.
+   */
+  @Select(
+      """
+      SELECT DISTINCT w.id
+      FROM crm_commission_withdrawal w
+      JOIN crm_commission_withdrawal_allocation a ON a.withdrawal_id = w.id
+      WHERE a.item_state_id = #{itemStateId}
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND w.paused = #{paused}
+      ORDER BY w.id
+      """)
+  List<Long> findActiveIdsByItemState(
+      @Param("itemStateId") long itemStateId, @Param("paused") boolean paused);
+
+  /**
+   * Refund pause of one locked application (ADR-032 §6 退款阻断联动). Status and pause state are
+   * re-checked here because the lock wait may outlast the caller's snapshot of the row.
+   */
+  @Update(
+      """
+      UPDATE crm_commission_withdrawal
+      SET paused = TRUE, pause_reason = #{reason}, update_time = #{now}
+      WHERE id = #{id}
+        AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND paused = FALSE
+      """)
+  int pause(@Param("id") long id, @Param("reason") String reason, @Param("now") Instant now);
+
+  /** Lifts the refund pause of one locked application; 0 when it left the active set meanwhile. */
+  @Update(
+      """
+      UPDATE crm_commission_withdrawal
+      SET paused = FALSE, pause_reason = NULL, update_time = #{now}
+      WHERE id = #{id}
+        AND status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+        AND paused = TRUE
+      """)
+  int resume(@Param("id") long id, @Param("now") Instant now);
+
+  /**
+   * The blocked-line predicate, written once and shared by {@link #countBlockedItems} and {@link
+   * #isItemBlocked}: the line sits in an unconcluded refund, or its occupations (including PAID,
+   * the same scope as the row leftover) outrun its released money — paying would push the wallet
+   * negative (ADR-032 §6 退款阻断联动, 2026-11-01 owner decision). A logically deleted line cannot trip
+   * the after-sales half, but its over-occupation still counts — conservative, and the occupations
+   * of a dropped line are real money.
+   */
+  String BLOCKED_LINE =
+      " ((s.is_deleted = FALSE AND s.after_sales = TRUE)"
+          + " OR COALESCE(o.occupied_cny, 0) > s.released_commission_cny) ";
+
+  /** Occupations (funding statuses, including PAID) grouped per line, for {@link #BLOCKED_LINE}. */
+  String OCCUPATION_JOIN =
+      " LEFT JOIN ("
+          + "SELECT a2.order_item_id, SUM(a2.occupied_cny) AS occupied_cny"
+          + " FROM crm_commission_withdrawal_allocation a2"
+          + " JOIN crm_commission_withdrawal w2 ON w2.id = a2.withdrawal_id"
+          + " WHERE w2.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT', 'PAID')"
+          + " GROUP BY a2.order_item_id"
+          + ") o ON o.order_item_id = s.order_item_id ";
+
+  /**
+   * Allocated lines of the application that still block payment. The payment registration re-runs
+   * this under the application lock, so a pause missed by a concurrent sync still cannot be paid.
+   */
+  @Select(
+      "SELECT count(*) FROM crm_commission_withdrawal_allocation a"
+          + " JOIN crm_commission_item_state s ON s.id = a.item_state_id"
+          + OCCUPATION_JOIN
+          + " WHERE a.withdrawal_id = #{withdrawalId} AND "
+          + BLOCKED_LINE)
+  long countBlockedItems(@Param("withdrawalId") long withdrawalId);
+
+  /**
+   * The blocked-line predicate for one item state — the per-line condition of {@link
+   * #countBlockedItems}. Null when the row is gone.
+   */
+  @Select(
+      "SELECT "
+          + BLOCKED_LINE
+          + " FROM crm_commission_item_state s"
+          + OCCUPATION_JOIN
+          + " WHERE s.id = #{itemStateId}")
+  Boolean isItemBlocked(@Param("itemStateId") long itemStateId);
+
+  /**
+   * Active applications holding any of these item states, deduplicated and ordered once — the one
+   * ascending lock order for a whole order's revision transaction (a multi-line order must not lock
+   * the wallet of line 1 and only then the applications of line 2).
+   */
+  @Select(
+      """
+      <script>
+      SELECT DISTINCT w.id
+      FROM crm_commission_withdrawal w
+      JOIN crm_commission_withdrawal_allocation a ON a.withdrawal_id = w.id
+      WHERE a.item_state_id IN
+      <foreach collection='itemStateIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+        AND w.status IN ('PENDING_REVIEW', 'PENDING_PAYMENT')
+      ORDER BY w.id
+      </script>
+      """)
+  List<Long> findActiveIdsByItemStates(@Param("itemStateIds") Collection<Long> itemStateIds);
+
   @Select("SELECT status FROM crm_commission_withdrawal WHERE id = #{id}")
   String statusOf(@Param("id") long id);
 
@@ -77,7 +184,10 @@ public interface WithdrawalMapper {
       """)
   int insert(@Param("row") WithdrawalWrite.Insert row);
 
-  /** Review decision: approve moves to PENDING_PAYMENT, reject to REJECTED. */
+  /**
+   * Review decision: approve moves to PENDING_PAYMENT, reject to REJECTED. A rejection also clears
+   * the refund pause — the pause only blocks payment and a rejected task is terminal.
+   */
   @Update(
       """
       UPDATE crm_commission_withdrawal
@@ -85,6 +195,8 @@ public interface WithdrawalMapper {
           review_note = #{row.reviewNote,jdbcType=VARCHAR},
           reviewer_id = #{row.reviewerId},
           reviewed_at = #{row.now},
+          paused = CASE WHEN #{row.next} = 'REJECTED' THEN FALSE ELSE paused END,
+          pause_reason = CASE WHEN #{row.next} = 'REJECTED' THEN NULL ELSE pause_reason END,
           update_by = #{row.reviewerId},
           update_time = #{row.now}
       WHERE id = #{row.id} AND status = #{row.current}
@@ -96,6 +208,8 @@ public interface WithdrawalMapper {
       """
       UPDATE crm_commission_withdrawal
       SET status = 'WITHDRAWN',
+          paused = FALSE,
+          pause_reason = NULL,
           update_by = #{row.kolId},
           update_time = #{row.now}
       WHERE id = #{row.id} AND status = 'PENDING_REVIEW' AND kol_id = #{row.kolId}
@@ -467,7 +581,7 @@ public interface WithdrawalMapper {
       """
       <script>
       SELECT id, kol_id, application_no, 'COMMISSION' AS type,
-             status, amount_cny AS amount, create_time AS created_at
+             status, paused, amount_cny AS amount, create_time AS created_at
       FROM crm_commission_withdrawal
       <where>
         <if test="q.applicationNo != null">AND application_no = #{q.applicationNo}</if>
@@ -506,7 +620,7 @@ public interface WithdrawalMapper {
       """
       <script>
       SELECT id, kol_id, prepay_no AS application_no, 'PREPAY' AS type, status,
-             amount_cny AS amount, create_time AS created_at
+             FALSE AS paused, amount_cny AS amount, create_time AS created_at
       FROM crm_prepay
       <where>
         <if test="q.applicationNo != null">AND prepay_no = #{q.applicationNo}</if>

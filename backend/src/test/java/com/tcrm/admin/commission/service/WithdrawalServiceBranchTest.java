@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -104,6 +105,14 @@ class WithdrawalServiceBranchTest {
     when(wallets.lockBalance(KOL)).thenReturn(new BigDecimal("500.00"));
     when(withdrawals.sumActiveOccupied(KOL)).thenReturn(BigDecimal.ZERO);
     when(funding.frozenCny(KOL)).thenReturn(new BigDecimal("0.00"));
+    when(funding.availableCny(eq(KOL), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              BigDecimal balance = invocation.getArgument(1);
+              BigDecimal occupied = invocation.getArgument(2);
+              return balance.subtract(occupied);
+            });
+    when(funding.frozenShortfallCny(eq(KOL), any(), any())).thenReturn(BigDecimal.ZERO);
     when(funding.estimatedCny(KOL)).thenReturn(new BigDecimal("0.00"));
     when(funding.unverifiedCount(KOL)).thenReturn(0L);
     when(funding.configVersion(KOL)).thenReturn(0);
@@ -344,7 +353,14 @@ class WithdrawalServiceBranchTest {
         .thenReturn(
             List.of(
                 new FinanceTaskRow(
-                    3L, KOL, "PP1", "PREPAY", "WAITING_DETAILS", new BigDecimal("70.00"), NOW)));
+                    3L,
+                    KOL,
+                    "PP1",
+                    "PREPAY",
+                    "WAITING_DETAILS",
+                    false,
+                    new BigDecimal("70.00"),
+                    NOW)));
     // type=PREPAY skips the withdrawal branch entirely
     var page =
         service.financeTasks(

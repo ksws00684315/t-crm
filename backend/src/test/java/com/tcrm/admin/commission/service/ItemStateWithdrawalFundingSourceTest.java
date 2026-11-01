@@ -107,6 +107,78 @@ class ItemStateWithdrawalFundingSourceTest {
   }
 
   @Test
+  void shouldReadRowLevelAllocatableFromTheAggregate() {
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("30.00"))));
+    assertThat(source.allocatableByKol(List.of(KOL))).containsEntry(KOL, new BigDecimal("30.00"));
+  }
+
+  @Test
+  void shouldReadRowLevelAllocatableAsZeroWithoutRows() {
+    when(states.aggregateAllocatableByKol(anyCollection(), any())).thenReturn(List.of());
+    assertThat(source.allocatableByKol(List.of(KOL))).isEmpty();
+    assertThat(source.allocatableByKol(List.of())).isEmpty();
+  }
+
+  /** L-033: 可提现 is the wallet remainder capped by the unoccupied released rows. */
+  @Test
+  void shouldCapTheAvailableFigureAtTheRowLevelAllocatable() {
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("30.00"))));
+    // Wallet 120.00 free, rows only fund 30.00 (the released line sits in an open refund).
+    assertThat(source.availableCny(KOL, new BigDecimal("120.00"), BigDecimal.ZERO))
+        .isEqualByComparingTo("30.00");
+    // Negative wallet stays negative (unrecovered prepay): the row level never inflates it.
+    assertThat(source.availableCny(KOL, new BigDecimal("-10.00"), BigDecimal.ZERO))
+        .isEqualByComparingTo("-10.00");
+  }
+
+  @Test
+  void shouldReportTheBlockedReleasedMoneyAsFrozenShortfall() {
+    // L-033 equation: the blocked line's released money is neither available nor occupied, so it
+    // shows up as frozen: shortfall = wallet remainder − row-level allocatable.
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("2.17"))));
+    assertThat(source.frozenShortfallCny(KOL, new BigDecimal("6.50"), BigDecimal.ZERO))
+        .isEqualByComparingTo("4.33");
+    // Fully occupied wallet: nothing unaccounted, no shortfall.
+    assertThat(source.frozenShortfallCny(KOL, new BigDecimal("2.17"), new BigDecimal("2.17")))
+        .isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldComputeBatchFrozenShortfallForListPages() {
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("2.17"))));
+    var shortfall =
+        source.frozenShortfallByKol(
+            List.of(KOL), java.util.Map.of(KOL, new BigDecimal("6.50")), java.util.Map.of());
+    assertThat(shortfall.get(KOL)).isEqualByComparingTo("4.33");
+  }
+
+  @Test
+  void shouldComputeBatchAvailableForListPages() {
+    long other = 33L;
+    when(states.aggregateAllocatableByKol(anyCollection(), any()))
+        .thenReturn(
+            List.of(
+                new CommissionItemStateMapper.KolAllocatableRow(KOL, new BigDecimal("30.00")),
+                new CommissionItemStateMapper.KolAllocatableRow(other, new BigDecimal("500.00"))));
+    var available =
+        source.availableByKol(
+            List.of(KOL, other),
+            java.util.Map.of(KOL, new BigDecimal("120.00"), other, new BigDecimal("80.00")),
+            java.util.Map.of(other, new BigDecimal("20.00")));
+    assertThat(available.get(KOL)).isEqualByComparingTo("30.00");
+    // min(80.00 − 20.00, 500.00) = 60.00: the wallet remainder stays binding.
+    assertThat(available.get(other)).isEqualByComparingTo("60.00");
+  }
+
+  @Test
   void shouldReportTheSettlementConfigVersion_fromTheRuleConfig() {
     assertThat(source.configVersion(KOL)).isEqualTo(3);
   }

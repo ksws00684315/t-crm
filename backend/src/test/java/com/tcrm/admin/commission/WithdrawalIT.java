@@ -139,6 +139,55 @@ class WithdrawalIT {
     jdbc.update("DELETE FROM crm_kol WHERE tenant_id = ? AND id = ?", tenantId, kol);
   }
 
+  /** 驳回与撤回都清掉退款暂停(负责人 2026-11-01:暂停的单只能驳回后重申,不留脏标志)。 */
+  @Test
+  @Transactional
+  void shouldClearTheRefundPause_whenRejectedOrWithdrawn() {
+    long operator = operatorId();
+    kolId = createKol(operator);
+    long rejectedId = 9000000000000091L;
+    long withdrawnId = 9000000000000092L;
+    try (var ignored = TenantScope.openCompany(TENANT_ID)) {
+      for (long id : new long[] {rejectedId, withdrawnId}) {
+        jdbc.update(
+            "INSERT INTO crm_commission_withdrawal (id, tenant_id, kol_id, application_no,"
+                + " request_id, request_fingerprint, amount_cny, status, paused, pause_reason,"
+                + " account_type, account_cipher, account_masked, account_currency, account_holder,"
+                + " actor_id, create_time, update_time)"
+                + " VALUES (?, ?, ?, ?, gen_random_uuid(), ?, 300.00, 'PENDING_REVIEW', TRUE,"
+                + " 't90 blocked: refund', 'PAYPAL', 'v1:t90cipher', 'a***@example.test', 'USD',"
+                + " 'T90 Creator', ?, now(), now())",
+            id,
+            TENANT_ID,
+            kolId,
+            "W20261101PA" + String.format("%02d", id % 100),
+            "e".repeat(64),
+            kolId);
+      }
+      withdrawals.review(
+          superAdmin(operator), rejectedId, "REJECT", "t90 refund shortfall, reapply");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT paused FROM crm_commission_withdrawal WHERE id = ?",
+                  Boolean.class,
+                  rejectedId))
+          .isFalse();
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT pause_reason FROM crm_commission_withdrawal WHERE id = ?",
+                  String.class,
+                  rejectedId))
+          .isNull();
+      withdrawals.withdraw(kol(kolId), withdrawnId);
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT paused FROM crm_commission_withdrawal WHERE id = ?",
+                  Boolean.class,
+                  withdrawnId))
+          .isFalse();
+    }
+  }
+
   @Test
   @Transactional
   void shouldCompleteApplyReviewPayment_andBookTheWallet() {

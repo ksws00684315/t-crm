@@ -554,6 +554,14 @@ final class ChainWorld {
         "{\"decision\":\"APPROVE\"}");
   }
 
+  /** Pre-payment rejection (needs withdrawal:pay), e.g. a refund-paused task. */
+  void rejectWithdrawal(long withdrawalId, String note) throws Exception {
+    putOk(
+        "/admin-api/commission/withdrawals/" + withdrawalId + "/review",
+        financeToken,
+        "{\"decision\":\"REJECT\",\"note\":\"" + note + "\"}");
+  }
+
   void pay(long withdrawalId, String amount) throws Exception {
     MvcResult uploaded =
         mvc.perform(
@@ -580,6 +588,37 @@ final class ChainWorld {
             + "\",\"method\":\"PAYPAL\",\"voucher\":\""
             + fileId
             + "\"}");
+  }
+
+  /** Payment registration answered as {@code HTTP errorCode}, so a paused task can be asserted. */
+  String payWithdrawalOutcome(long withdrawalId, String amount) throws Exception {
+    MvcResult uploaded =
+        mvc.perform(
+                multipart("/admin-api/files")
+                    .file(new MockMultipartFile("file", "t79.png", "image/png", PNG))
+                    .param("bizType", "WITHDRAWAL_VOUCHER")
+                    .header(ADMIN, financeToken))
+            .andExpect(status().isOk())
+            .andReturn();
+    String fileId =
+        json.readTree(uploaded.getResponse().getContentAsString()).at("/data/fileId").asString();
+    String paidAt = java.time.OffsetDateTime.now(ZoneOffset.UTC).toString();
+    return outcome(
+        put("/admin-api/commission/withdrawals/" + withdrawalId + "/payment")
+            .header(ADMIN, financeToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                "{\"idempotencyKey\":\""
+                    + UUID.randomUUID()
+                    + "\",\"amountCny\":\""
+                    + amount
+                    + "\",\"actualAmount\":\""
+                    + amount
+                    + "\",\"actualCurrency\":\"CNY\",\"paidAt\":\""
+                    + paidAt
+                    + "\",\"method\":\"PAYPAL\",\"voucher\":\""
+                    + fileId
+                    + "\"}"));
   }
 
   JsonNode withdrawal(String token, long withdrawalId) throws Exception {
