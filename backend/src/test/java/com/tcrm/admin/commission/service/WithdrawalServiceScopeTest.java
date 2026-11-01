@@ -481,34 +481,35 @@ class WithdrawalServiceScopeTest {
     var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
     when(withdrawals.count(any())).thenReturn(1L);
     when(withdrawals.page(any())).thenReturn(List.of(head("PAID")));
-    when(withdrawals.findRow(anyLong()))
+    when(withdrawals.findRowsByIds(anyList()))
         .thenReturn(
-            new WithdrawalRow(
-                ID,
-                KOL,
-                "W1",
-                UUID.fromString(UUID_TEXT),
-                "f".repeat(64),
-                55L,
-                new BigDecimal("400.00"),
-                "PAID",
-                false,
-                null,
-                44L,
-                "USDT",
-                cipherText(),
-                "cr***@example.com",
-                null,
-                "TRC20",
-                "Creator Name",
-                null,
-                "creator note",
-                "review note",
-                "finance note",
-                6L,
-                NOW,
-                KOL,
-                NOW));
+            List.of(
+                new WithdrawalRow(
+                    ID,
+                    KOL,
+                    "W1",
+                    UUID.fromString(UUID_TEXT),
+                    "f".repeat(64),
+                    55L,
+                    new BigDecimal("400.00"),
+                    "PAID",
+                    false,
+                    null,
+                    44L,
+                    "USDT",
+                    cipherText(),
+                    "cr***@example.com",
+                    null,
+                    "TRC20",
+                    "Creator Name",
+                    null,
+                    "creator note",
+                    "review note",
+                    "finance note",
+                    6L,
+                    NOW,
+                    KOL,
+                    NOW)));
     var page = service.page(payer, new Filter(null, null, null, null, null, 1, 20));
     var row = page.items().getFirst();
     // payer sees the finance note; every ternary takes its populated branch
@@ -523,21 +524,12 @@ class WithdrawalServiceScopeTest {
     var viewer = staff(6L, DataScope.ALL, Set.of("data:export", "withdrawal:review"));
     when(withdrawals.count(any())).thenReturn(1L);
     when(withdrawals.page(any())).thenReturn(List.of(head("PAID")));
-    when(withdrawals.findRow(anyLong())).thenReturn(row("PAID", false));
-    when(withdrawals.findPayment(anyLong()))
+    when(withdrawals.findRowsByIds(anyList())).thenReturn(List.of(row("PAID", false)));
+    when(withdrawals.findPaymentsByIds(anyList()))
         .thenReturn(
-            new WithdrawalRows.PaymentRow(
-                new BigDecimal("400.00"),
-                new BigDecimal("56.00"),
-                "USD",
-                NOW,
-                "paypal",
-                "rate",
-                "7.14",
-                88L,
-                7L,
-                "Payer",
-                "PAYMENT"));
+            List.of(
+                new WithdrawalMapper.BatchPaymentRow(
+                    ID, new BigDecimal("400.00"), new BigDecimal("56.00"), "USD", NOW)));
     var csv = service.export(viewer, new Filter(null, null, null, null, null, 1, 20));
     var text = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
     // the CSV carries the account type, the actual amount and its currency
@@ -730,14 +722,14 @@ class WithdrawalServiceScopeTest {
             null,
             KOL,
             NOW);
-    when(withdrawals.findRow(anyLong())).thenReturn(paid);
+    when(withdrawals.findRowsByIds(anyList())).thenReturn(List.of(paid));
     var page = service.page(payer, new Filter(null, null, null, null, null, 1, 20));
     assertThat(page.items().getFirst().bdId()).isNull();
     assertThat(page.items().getFirst().bdName()).isNull();
     assertThat(page.items().getFirst().financeNote()).isEqualTo("finance note");
     // a commission:view viewer on a paused row: finance note hidden, paused flag visible
     var paused = row("PENDING_PAYMENT", true);
-    when(withdrawals.findRow(anyLong())).thenReturn(paused);
+    when(withdrawals.findRowsByIds(anyList())).thenReturn(List.of(paused));
     var hidden =
         service.page(
             staff(8L, DataScope.ALL, Set.of("commission:view")),

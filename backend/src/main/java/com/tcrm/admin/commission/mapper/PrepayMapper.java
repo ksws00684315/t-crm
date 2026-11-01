@@ -11,7 +11,9 @@ import com.tcrm.admin.commission.model.PrepayPaymentRow;
 import com.tcrm.admin.commission.model.PrepayRecipientRow;
 import com.tcrm.admin.commission.model.PrepayWrite;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Insert;
@@ -212,6 +214,18 @@ public interface PrepayMapper {
       """)
   PrepayPaymentRow findPayment(@Param("id") long id);
 
+  /** Batch {@link #findPayment} for the CSV export; one payment per prepay (task 97). */
+  @Select(
+      """
+      <script>
+      SELECT prepay_id, pay_amount_cny, pay_time, pay_method
+      FROM crm_prepay_payment
+      WHERE prepay_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<ExportPaymentRow> findExportPaymentsByIds(@Param("ids") Collection<Long> ids);
+
   @Select(
       """
       SELECT p.pay_amount_cny AS posted, l.id AS ledger_id
@@ -243,6 +257,25 @@ public interface PrepayMapper {
 
   @Select("SELECT payout_account_masked FROM crm_prepay WHERE id = #{id}")
   String maskedAccount(@Param("id") long id);
+
+  /** Batch {@link #maskedAccount} for the CSV export (task 97). */
+  @Select(
+      """
+      <script>
+      SELECT id, payout_account_masked
+      FROM crm_prepay
+      WHERE id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<MaskedAccountRow> maskedAccountsByIds(@Param("ids") Collection<Long> ids);
+
+  /** Payment facts of one prepay, keyed for the batch export read (task 97). */
+  record ExportPaymentRow(
+      long prepayId, BigDecimal payAmountCny, Instant payTime, String payMethod) {}
+
+  /** Masked payout account of one prepay, keyed for the batch export read (task 97). */
+  record MaskedAccountRow(long id, String payoutAccountMasked) {}
 
   @Select(
       """

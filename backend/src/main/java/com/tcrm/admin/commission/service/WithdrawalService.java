@@ -555,7 +555,17 @@ public class WithdrawalService {
               new WithdrawalPageQuery(
                   null, kolId, null, null, null, null, size, (long) (page - 1) * size);
           Long total = withdrawals.count(query);
-          List<KolRow> rows = withdrawals.page(query).stream().map(head -> toKolRow(head)).toList();
+          List<WithdrawalRow.Head> heads = withdrawals.page(query);
+          if (heads.isEmpty()) {
+            return new PageResult<>(List.of(), total == null ? 0L : total, page, size);
+          }
+          List<Long> ids = heads.stream().map(WithdrawalRow.Head::id).toList();
+          Map<Long, WithdrawalRow> fullById = rowsByIds(ids);
+          Map<Long, WithdrawalMapper.BatchPaymentRow> paymentById = paymentsByIds(ids);
+          List<KolRow> rows =
+              heads.stream()
+                  .map(head -> toKolRow(head, fullById.get(head.id()), paymentById.get(head.id())))
+                  .toList();
           return new PageResult<>(rows, total == null ? 0L : total, page, size);
         });
   }
@@ -839,13 +849,15 @@ public class WithdrawalService {
     Map<Long, String> bdNames =
         namesById(
             kolById.values().stream().map(KolRefDTO::bdUserId).filter(Objects::nonNull).toList());
+    Map<Long, WithdrawalRow> fullById =
+        rowsByIds(heads.stream().map(WithdrawalRow.Head::id).toList());
     boolean financeVisible = financeVisible(user);
     List<AdminRow> rows =
         heads.stream()
             .map(
                 head -> {
                   KolRefDTO kol = kolById.get(head.kolId());
-                  WithdrawalRow full = withdrawals.findRow(head.id());
+                  WithdrawalRow full = fullById.get(head.id());
                   return new AdminRow(
                       head.id(),
                       head.applicationNo(),
@@ -1154,11 +1166,11 @@ public class WithdrawalService {
   }
 
   /**
-   * CSV export of the withdrawal list: data:export AND the list permission. Not read-only: the
-   * audit row for the export is written in the same transaction, and a readOnly transaction rejects
-   * that INSERT when no outer transaction exists (production 500, task 73 browser run).
+   * CSV export of the withdrawal list: data:export AND the list permission. Runs without a wrapping
+   * transaction: each page reads on its own connection and the audit row auto-commits (task 97 —
+   * the export loop must not hold one long transaction over up to 100k rows; a readOnly transaction
+   * would also reject the audit INSERT, production 500, task 73).
    */
-  @Transactional(rollbackFor = Exception.class)
   public byte[] export(AccountDTO user, Filter filter) {
     requireTenant(user);
     if (user.role() != Role.SUPER_ADMIN && !user.permissions().contains("data:export")) {
@@ -1214,9 +1226,15 @@ public class WithdrawalService {
   }
 
   private void appendExportRows(StringBuilder csv, List<AdminRow> rows) {
+    if (rows.isEmpty()) {
+      return;
+    }
+    List<Long> ids = rows.stream().map(AdminRow::id).toList();
+    Map<Long, WithdrawalRow> fullById = rowsByIds(ids);
+    Map<Long, WithdrawalMapper.BatchPaymentRow> paymentById = paymentsByIds(ids);
     for (AdminRow row : rows) {
-      WithdrawalRow full = withdrawals.findRow(row.id());
-      WithdrawalRows.PaymentRow payment = withdrawals.findPayment(row.id());
+      WithdrawalRow full = fullById.get(row.id());
+      WithdrawalMapper.BatchPaymentRow payment = paymentById.get(row.id());
       String[] fields = {
         row.applicationNo(),
         row.kolCode() == null ? "" : row.kolCode(),
@@ -1661,9 +1679,8 @@ public class WithdrawalService {
         row.operatorRole());
   }
 
-  private KolRow toKolRow(WithdrawalRow.Head head) {
-    WithdrawalRow row = withdrawals.findRow(head.id());
-    WithdrawalRows.PaymentRow payment = withdrawals.findPayment(head.id());
+  private KolRow toKolRow(
+      WithdrawalRow.Head head, WithdrawalRow row, WithdrawalMapper.BatchPaymentRow payment) {
     return new KolRow(
         head.id(),
         head.applicationNo(),
@@ -1677,6 +1694,25 @@ public class WithdrawalService {
         payment == null ? null : money(payment.actualAmount()),
         payment == null ? null : payment.actualCurrency(),
         row == null ? null : accountView(row, true));
+  }
+
+  /** Batch full rows keyed by id; one query per page instead of one per row (task 97). */
+  private Map<Long, WithdrawalRow> rowsByIds(List<Long> ids) {
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    return withdrawals.findRowsByIds(ids).stream()
+        .collect(Collectors.toMap(WithdrawalRow::id, row -> row));
+  }
+
+  /** Batch payment facts keyed by withdrawal id; one query per page (task 97). */
+  private Map<Long, WithdrawalMapper.BatchPaymentRow> paymentsByIds(List<Long> ids) {
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    return withdrawals.findPaymentsByIds(ids).stream()
+        .collect(
+            Collectors.toMap(WithdrawalMapper.BatchPaymentRow::withdrawalId, payment -> payment));
   }
 
   private void insertHistory(
