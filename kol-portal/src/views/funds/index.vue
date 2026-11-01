@@ -424,6 +424,11 @@ onMounted(load);
       <template #title
         ><h2>{{ t("funds.recordsTitle") }}</h2></template
       >
+      <template #toolbar
+        ><span v-if="!failure" class="records-total">{{
+          t("table.total", { total })
+        }}</span></template
+      >
       <template #cell-appliedAt="{ row }">{{ formatInstant(row.appliedAt) }}</template>
       <template #cell-applicationNo="{ row }"><CopyText :value="row.applicationNo" /></template>
       <template #cell-type="{ row }">{{ recordType(row.type) }}</template>
@@ -657,6 +662,9 @@ h1 {
 .progress-card {
   display: grid;
   gap: var(--tcrm-space-3);
+}
+.records-total {
+  color: var(--tcrm-color-text-secondary);
 }
 .progress-card h2,
 .records-table h2 {

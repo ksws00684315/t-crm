@@ -34,10 +34,12 @@ function withdraw() {
       </div>
       <ul class="income-list">
         <li class="income-list__row">
-          <span class="dot dot--commission" aria-hidden="true" />
-          <div class="income-list__text">
-            <span class="tcrm-role-section">{{ t("home.incomeCommission") }}</span>
-            <span class="caption">{{ t("home.incomeCommissionCaption") }}</span>
+          <div class="income-list__head">
+            <span class="dot dot--commission" aria-hidden="true" />
+            <div class="income-list__text">
+              <span class="tcrm-role-section">{{ t("home.incomeCommission") }}</span>
+              <span class="caption">{{ t("home.incomeCommissionCaption") }}</span>
+            </div>
           </div>
           <strong
             class="tcrm-amount-detail income-list__amount"
@@ -47,10 +49,12 @@ function withdraw() {
           /></strong>
         </li>
         <li class="income-list__row">
-          <span class="dot dot--prepay" aria-hidden="true" />
-          <div class="income-list__text">
-            <span class="tcrm-role-section">{{ t("home.incomePrepay") }}</span>
-            <span class="caption">{{ t("home.incomePrepayCaption") }}</span>
+          <div class="income-list__head">
+            <span class="dot dot--prepay" aria-hidden="true" />
+            <div class="income-list__text">
+              <span class="tcrm-role-section">{{ t("home.incomePrepay") }}</span>
+              <span class="caption">{{ t("home.incomePrepayCaption") }}</span>
+            </div>
           </div>
           <strong class="tcrm-amount-detail income-list__amount" data-test="income-prepay"
             ><AmountText :value="money(figures.prepayPaid)"
@@ -100,7 +104,8 @@ function withdraw() {
 }
 .income-card {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  /* 2:3, except that the band never gets narrower than its amount (no break inside the number). */
+  grid-template-columns: minmax(min-content, 2fr) minmax(0, 3fr);
   align-items: center;
   gap: var(--tcrm-space-5);
   padding: var(--tcrm-space-4);
@@ -121,6 +126,15 @@ function withdraw() {
   color: var(--tcrm-color-primary-text);
   overflow-wrap: break-word;
 }
+@media (min-width: 768px) {
+  .income-band__amount {
+    white-space: nowrap;
+  }
+  /* Chrome still breaks at <wbr> under nowrap, so the break hints are dropped here. */
+  .income-band__amount :deep(wbr) {
+    display: none;
+  }
+}
 .income-list {
   display: grid;
   min-width: 0;
@@ -138,9 +152,16 @@ function withdraw() {
 .income-list__row + .income-list__row {
   border-top: 1px solid var(--tcrm-color-border);
 }
-.income-list__text {
+.income-list__head {
   display: flex;
   flex: 1 1 14em;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+  min-width: 0;
+}
+.income-list__text {
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
@@ -157,6 +178,7 @@ function withdraw() {
   color: var(--tcrm-color-text-secondary);
 }
 .dot {
+  flex: none;
   width: var(--tcrm-space-3);
   height: var(--tcrm-space-3);
   border-radius: 50%;
@@ -205,7 +227,9 @@ function withdraw() {
   /* On a phone the button always sits under the amount. */
   .withdraw-card {
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: flex-start;
+    align-content: flex-start;
   }
   .income-card {
     grid-template-columns: minmax(0, 1fr);

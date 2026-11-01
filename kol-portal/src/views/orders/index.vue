@@ -299,6 +299,10 @@ onMounted(() => {
       @update:page="pageChanged"
       @refresh="refresh"
     >
+      <!-- A failed load must not read "0 in total". -->
+      <template #toolbar
+        ><span v-if="!error" class="orders-total">{{ t("table.total", { total }) }}</span></template
+      >
       <template #cell-orderNo="{ row }"><CopyText :value="row.orderNo" /></template>
       <template #cell-product="{ row }"
         ><span class="product-cell">{{ productLabel(row) }}</span></template
@@ -411,6 +415,9 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.orders-total {
+  color: var(--tcrm-color-text-secondary);
 }
 .summary {
   display: flex;
