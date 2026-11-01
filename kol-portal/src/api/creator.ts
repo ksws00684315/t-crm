@@ -16,14 +16,19 @@ const demoFunds: FundSummary = {
   asOf: "2026-10-24T08:00:00Z"
 };
 const demoDaily = [
-  ["10-18", "4200", "390"],
-  ["10-19", "5600", "720"],
-  ["10-20", "4800", "540"],
-  ["10-21", "8200", "980"],
-  ["10-22", "7400", "860"],
-  ["10-23", "9100", "1170"],
-  ["10-24", "9300", "1300"]
-].map(([date, salesCny, commissionCny]) => ({ date: `2026-${date}`, salesCny, commissionCny }));
+  ["10-18", "4200", "390", 12],
+  ["10-19", "5600", "720", 18],
+  ["10-20", "4800", "540", 14],
+  ["10-21", "8200", "980", 26],
+  ["10-22", "7400", "860", 22],
+  ["10-23", "9100", "1170", 30],
+  ["10-24", "9300", "1300", 28]
+].map(([date, salesCny, commissionCny, orderCount]) => ({
+  date: `2026-${date}`,
+  salesCny: String(salesCny),
+  commissionCny: String(commissionCny),
+  orderCount: Number(orderCount)
+}));
 const demoOrders: CreatorOrder[] = [
   {
     orderNo: "ST-20261024-0091",
@@ -126,24 +131,17 @@ const demoOrders: CreatorOrder[] = [
     ]
   }
 ];
-const demoFundPage: FundRecordPage = {
-  items: [
-    {
-      id: "w-42",
-      type: "COMMISSION",
-      appliedAt: "2026-10-23T08:00:00Z",
-      applicationNo: "WD-20261023-0042",
-      amount: "800.00",
-      currency: "CNY",
-      maskedRecipient: "PayPal · a***@mail.com",
-      receivedAt: null,
-      publicStatus: "PENDING_REVIEW",
-      sourceId: "42"
-    }
-  ],
-  total: 1,
-  page: 1,
-  size: 20
+const demoPrepayRecord: FundRecord = {
+  id: "p-7",
+  type: "PREPAY",
+  appliedAt: "2026-10-20T08:00:00Z",
+  applicationNo: "PP-20261020-0007",
+  amount: "500.00",
+  currency: "CNY",
+  maskedRecipient: "PayPal · a***@mail.com",
+  receivedAt: "2026-10-21T08:00:00Z",
+  publicStatus: "PAID",
+  sourceId: "7"
 };
 let demoWithdrawalPage = {
   items: [
@@ -180,7 +178,21 @@ export interface CreatorAnalyticsOverview {
   withdrawnCny: string;
   withdrawingCny: string;
   frozenCny: string;
-  daily: { date: string; salesCny: string; commissionCny: string }[];
+  daily: { date: string; salesCny: string; commissionCny: string; orderCount: number }[];
+}
+
+/** Cumulative sales of the signed-in creator, before refunds; unlike the overview it has no range. */
+export interface CreatorSalesTotal {
+  salesCny: string;
+  asOf: string;
+}
+
+/** Sales summary under the same filters as the order list (task 92). */
+export interface CreatorOrderSummary {
+  salesCny: string;
+  settledCny: string;
+  pendingCny: string;
+  refundedCny: string;
 }
 
 export interface FundSummary {
@@ -261,13 +273,27 @@ export function getCreatorAnalytics(params: { from: string; to: string }) {
     });
   return http
     .request<
-      Omit<CreatorAnalyticsOverview, "paidOrderCount"> & { paidOrderCount: string | number }
+      Omit<CreatorAnalyticsOverview, "paidOrderCount" | "daily"> & {
+        paidOrderCount: string | number;
+        daily: (Omit<CreatorAnalyticsOverview["daily"][number], "orderCount"> & {
+          orderCount: string | number;
+        })[];
+      }
     >({
       method: "GET",
       url: "/analytics/overview",
       params
     })
-    .then(overview => ({ ...overview, paidOrderCount: Number(overview.paidOrderCount) }));
+    .then(overview => ({
+      ...overview,
+      paidOrderCount: Number(overview.paidOrderCount),
+      daily: overview.daily.map(day => ({ ...day, orderCount: Number(day.orderCount) }))
+    }));
+}
+
+export function getSalesTotal(): Promise<CreatorSalesTotal> {
+  if (isDemoMode) return Promise.resolve({ salesCny: "158600.00", asOf: demoFunds.asOf });
+  return http.request<CreatorSalesTotal>({ method: "GET", url: "/analytics/sales-total" });
 }
 
 export function getFundSummary() {
@@ -312,7 +338,33 @@ export function getFundSummary() {
 }
 
 export function getFundRecords(params: { page: number; size: number }) {
-  if (isDemoMode) return Promise.resolve({ ...demoFundPage, page: params.page, size: params.size });
+  if (isDemoMode) {
+    // Newest application first: every withdrawal in any status plus the paid advance.
+    const all = [
+      ...demoWithdrawalPage.items.map((item): FundRecord => ({
+        id: item.id,
+        type: "COMMISSION",
+        appliedAt: item.createdAt,
+        applicationNo: item.applicationNo,
+        amount: item.amount,
+        currency: item.currency,
+        maskedRecipient: item.account
+          ? `${item.account.accountType} · ${item.account.account}`
+          : null,
+        receivedAt: null,
+        publicStatus: item.status,
+        sourceId: item.id
+      })),
+      demoPrepayRecord
+    ].sort((a, b) => String(b.appliedAt).localeCompare(String(a.appliedAt)));
+    const start = (params.page - 1) * params.size;
+    return Promise.resolve({
+      items: all.slice(start, start + params.size),
+      total: all.length,
+      page: params.page,
+      size: params.size
+    });
+  }
   return http.request<FundRecordPage>({ method: "GET", url: "/fund-records", params });
 }
 
@@ -545,4 +597,43 @@ export function getCreatorOrders(params: CreatorOrderQuery) {
     });
   }
   return http.request<CreatorOrderPage>({ method: "GET", url: "/orders", params });
+}
+
+export type CreatorOrderFilter = Omit<CreatorOrderQuery, "page" | "size">;
+
+/** Same filters as {@link getCreatorOrders} without paging; the amounts follow the list rows. */
+export function getCreatorOrderSummary(params: CreatorOrderFilter): Promise<CreatorOrderSummary> {
+  if (isDemoMode) {
+    const zero = (): bigint => 0n;
+    let sales = zero();
+    let settled = zero();
+    let pending = zero();
+    let refunded = zero();
+    for (const order of demoOrders.filter(
+      order =>
+        (!params.orderNo || order.orderNo.toLowerCase().includes(params.orderNo.toLowerCase())) &&
+        (!params.productName ||
+          order.items.some(item =>
+            item.itemName.toLowerCase().includes(params.productName!.toLowerCase())
+          )) &&
+        (!params.settlementStatus || order.settlementStatus === params.settlementStatus)
+    )) {
+      for (const item of order.items) {
+        const pay = moneyCents(item.payAmount);
+        const refund = moneyCents(item.refundAmount);
+        sales += pay;
+        refunded += refund;
+        if (["WITHDRAWABLE", "WITHDRAWING", "WITHDRAWN"].includes(item.settlementStatus ?? ""))
+          settled += pay - refund;
+        else if (item.settlementStatus === "FROZEN") pending += pay - refund;
+      }
+    }
+    return Promise.resolve({
+      salesCny: centsMoney(sales),
+      settledCny: centsMoney(settled),
+      pendingCny: centsMoney(pending),
+      refundedCny: centsMoney(refunded)
+    });
+  }
+  return http.request<CreatorOrderSummary>({ method: "GET", url: "/orders/summary", params });
 }

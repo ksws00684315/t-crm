@@ -34,9 +34,11 @@ export function localDateRangeToUtc(fromDate: string, throughDate: string): [str
 }
 
 export function formatMoney(amount: string, locale: string): string {
-  const formatted = Number(amount).toLocaleString(locale, {
+  const value = Number(amount);
+  const formatted = Math.abs(value).toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
-  return "¥" + formatted;
+  // The sign leads the symbol ("-¥5.00"), so a negative amount reads as one group.
+  return (value < 0 ? "-¥" : "¥") + formatted;
 }
