@@ -248,23 +248,13 @@ class WithdrawalServiceVisibilityTest {
                     "PENDING_REVIEW",
                     KOL,
                     NOW)));
-    when(withdrawals.findRow(ID)).thenReturn(row("PAID", KOL));
-    when(withdrawals.findPayment(ID))
+    when(withdrawals.findRowsByIds(anyList()))
+        .thenReturn(List.of(row("PAID", KOL), withId(row("PENDING_REVIEW", KOL), ID + 1)));
+    when(withdrawals.findPaymentsByIds(anyList()))
         .thenReturn(
-            new WithdrawalRows.PaymentRow(
-                new BigDecimal("400.00"),
-                new BigDecimal("400.00"),
-                "CNY",
-                NOW,
-                "bank",
-                null,
-                null,
-                88L,
-                7L,
-                "Payer",
-                "PAYMENT"));
-    when(withdrawals.findRow(ID + 1)).thenReturn(row("PENDING_REVIEW", KOL));
-    when(withdrawals.findPayment(ID + 1)).thenReturn(null);
+            List.of(
+                new WithdrawalMapper.BatchPaymentRow(
+                    ID, new BigDecimal("400.00"), new BigDecimal("400.00"), "CNY", NOW)));
     var page = service.pageKol(COMPANY, KOL, 1, 20);
     assertThat(page.items()).hasSize(2);
     // paid row: payment time and actuals surface, account is masked for the list
@@ -283,8 +273,9 @@ class WithdrawalServiceVisibilityTest {
     var viewer = staff(6L, DataScope.ALL, Set.of("data:export", "withdrawal:review"));
     when(withdrawals.count(any())).thenReturn(1L);
     when(withdrawals.page(any())).thenReturn(List.of(head("PENDING_REVIEW")));
-    when(withdrawals.findRow(anyLong())).thenReturn(rowWithNullReview("PENDING_REVIEW", null));
-    when(withdrawals.findPayment(anyLong())).thenReturn(null);
+    when(withdrawals.findRowsByIds(anyList()))
+        .thenReturn(List.of(rowWithNullReview("PENDING_REVIEW", null)));
+    when(withdrawals.findPaymentsByIds(anyList())).thenReturn(List.of());
     var csv = service.export(viewer, new Filter(null, null, null, null, null, 1, 20));
     var text = new String(csv, java.nio.charset.StandardCharsets.UTF_8);
     // payment-less rows export quoted-empty payment columns; the account stays masked
@@ -523,6 +514,35 @@ class WithdrawalServiceVisibilityTest {
         null,
         kolId,
         NOW);
+  }
+
+  private static WithdrawalRow withId(WithdrawalRow row, long id) {
+    return new WithdrawalRow(
+        id,
+        row.kolId(),
+        row.applicationNo(),
+        row.requestId(),
+        row.fingerprint(),
+        row.previousId(),
+        row.amountCny(),
+        row.status(),
+        row.paused(),
+        row.pauseReason(),
+        row.accountId(),
+        row.accountType(),
+        row.accountCipher(),
+        row.accountMasked(),
+        row.accountCurrency(),
+        row.accountNetwork(),
+        row.accountHolder(),
+        row.accountQrFileId(),
+        row.note(),
+        row.reviewNote(),
+        row.financeNote(),
+        row.reviewerId(),
+        row.reviewedAt(),
+        row.actorId(),
+        row.createTime());
   }
 
   private static WithdrawalRow rowWithNullReview(String status, Long reviewer) {

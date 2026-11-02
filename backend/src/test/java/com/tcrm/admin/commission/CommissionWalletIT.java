@@ -290,6 +290,37 @@ class CommissionWalletIT {
     }
   }
 
+  /**
+   * The prepay export writes its audit row after the CSV is built. Production calls it with no
+   * outer transaction, so a readOnly service transaction rejected that INSERT with SQLState 25006
+   * and the endpoint answered 500 (main; the same defect task 73 fixed for withdrawals). An empty
+   * result set is enough to reproduce it, so this case seeds nothing and runs without
+   * {@code @Transactional} to keep the read-only flag visible.
+   */
+  @Test
+  void shouldAuditThePrepayExport_withoutAReadOnlyTransaction() {
+    long operator =
+        jdbc.queryForObject("SELECT id FROM sys_user WHERE username = ?", Long.class, "bootstrap");
+    try {
+      byte[] csv =
+          prepays.export(
+              superAdmin(operator), new PrepayService.Filter("no-such", null, null, 1, 100));
+      assertThat(new String(csv, java.nio.charset.StandardCharsets.UTF_8)).contains("预付编号");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM sys_oper_log WHERE module = 'Prepay'"
+                      + " AND action = 'Export tasks' AND user_id = ?",
+                  Long.class,
+                  operator))
+          .isEqualTo(1L);
+    } finally {
+      jdbc.update(
+          "DELETE FROM sys_oper_log WHERE module = 'Prepay' AND action = 'Export tasks'"
+              + " AND user_id = ?",
+          operator);
+    }
+  }
+
   private static AccountDTO superAdmin(long id) {
     return new AccountDTO(
         id,

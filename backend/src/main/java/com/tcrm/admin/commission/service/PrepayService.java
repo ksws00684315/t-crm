@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -764,7 +765,11 @@ public class PrepayService {
     return new PageResult<>(rows, total == null ? 0L : total, filter.page(), filter.size());
   }
 
-  @Transactional(readOnly = true)
+  /**
+   * CSV export of the prepay list. Runs without a wrapping transaction: each page reads on its own
+   * connection and the audit row auto-commits (task 97 — the export loop must not hold one long
+   * transaction, and a readOnly transaction would reject the audit INSERT, cf. task 73).
+   */
   public byte[] export(AccountDTO user, Filter filter) {
     requireTenant(user);
     // data:export AND the same list permission gate as page()/detail (design §4.12 / API table).
@@ -884,8 +889,21 @@ public class PrepayService {
   }
 
   private void appendExportRows(StringBuilder csv, List<PrepayRow> rows) {
+    if (rows.isEmpty()) {
+      return;
+    }
+    List<Long> ids = rows.stream().map(PrepayRow::id).toList();
+    Map<Long, PrepayMapper.ExportPaymentRow> paymentById =
+        prepays.findExportPaymentsByIds(ids).stream()
+            .collect(Collectors.toMap(PrepayMapper.ExportPaymentRow::prepayId, payment -> payment));
+    Map<Long, String> maskedById =
+        prepays.maskedAccountsByIds(ids).stream()
+            .collect(
+                Collectors.toMap(
+                    PrepayMapper.MaskedAccountRow::id,
+                    row -> row.payoutAccountMasked() == null ? "" : row.payoutAccountMasked()));
     for (PrepayRow row : rows) {
-      PrepayPaymentRow payment = prepays.findPayment(row.id());
+      PrepayMapper.ExportPaymentRow payment = paymentById.get(row.id());
       String[] fields = {
         row.prepayNo(),
         row.kolCode(),
@@ -896,7 +914,7 @@ public class PrepayService {
         payment == null ? "" : money(payment.payAmountCny()),
         payment == null ? "" : payment.payTime().toString(),
         payment == null ? "" : payment.payMethod(),
-        maskedAccount(row.id())
+        maskedById.getOrDefault(row.id(), "")
       };
       for (int index = 0; index < fields.length; index++) {
         if (index > 0) {
@@ -906,11 +924,6 @@ public class PrepayService {
       }
       csv.append("\r\n");
     }
-  }
-
-  private String maskedAccount(long id) {
-    String masked = prepays.maskedAccount(id);
-    return masked == null ? "" : masked;
   }
 
   private static String csvCell(String raw) {

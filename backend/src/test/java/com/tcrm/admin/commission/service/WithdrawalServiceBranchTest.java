@@ -15,7 +15,6 @@ import com.tcrm.admin.commission.mapper.WithdrawalFreezeMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.model.FinanceTaskRow;
 import com.tcrm.admin.commission.model.WithdrawalRow;
-import com.tcrm.admin.commission.model.WithdrawalRows;
 import com.tcrm.admin.commission.service.WithdrawalFundingSource.FundingRow;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
@@ -246,21 +245,12 @@ class WithdrawalServiceBranchTest {
             List.of(
                 new WithdrawalRow.Head(
                     ID, KOL, "CW1", new BigDecimal("250.00"), "REJECTED", KOL, NOW)));
-    when(withdrawals.findRow(anyLong())).thenReturn(row("REJECTED"));
-    when(withdrawals.findPayment(anyLong()))
+    when(withdrawals.findRowsByIds(anyList())).thenReturn(List.of(row("REJECTED")));
+    when(withdrawals.findPaymentsByIds(anyList()))
         .thenReturn(
-            new WithdrawalRows.PaymentRow(
-                new BigDecimal("250.00"),
-                new BigDecimal("35.00"),
-                "USD",
-                NOW,
-                "PAYPAL",
-                null,
-                "rate 7.1",
-                88L,
-                6L,
-                "Test",
-                "PAYMENT"));
+            List.of(
+                new WithdrawalMapper.BatchPaymentRow(
+                    ID, new BigDecimal("250.00"), new BigDecimal("35.00"), "USD", NOW)));
     var page = service.pageKol(COMPANY, KOL, 1, 20);
     assertThat(page.total()).isEqualTo(1);
     assertThat(page.items().getFirst().rejectReason()).isEqualTo("wrong account");

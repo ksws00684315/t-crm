@@ -52,6 +52,22 @@ public interface WithdrawalMapper {
       """)
   WithdrawalRow findRow(@Param("id") long id);
 
+  /** Batch {@link #findRow} for list pages and export; callers key the result by id. */
+  @Select(
+      """
+      <script>
+      SELECT id, kol_id, application_no, request_id, request_fingerprint, previous_id, amount_cny,
+             status, paused, pause_reason, account_id, account_type, account_cipher,
+             account_masked, account_currency, account_network, account_holder,
+             account_qr_file_id, note, review_note, finance_note, reviewer_id, reviewed_at,
+             actor_id, create_time
+      FROM crm_commission_withdrawal
+      WHERE id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<WithdrawalRow> findRowsByIds(@Param("ids") Collection<Long> ids);
+
   @Select("SELECT id FROM crm_commission_withdrawal WHERE id = #{id} FOR UPDATE")
   Long lockById(@Param("id") long id);
 
@@ -544,6 +560,18 @@ public interface WithdrawalMapper {
       """)
   WithdrawalRows.PaymentRow findPayment(@Param("id") long id);
 
+  /** Batch {@link #findPayment} for list pages and export; one payment per withdrawal. */
+  @Select(
+      """
+      <script>
+      SELECT withdrawal_id, amount_cny, actual_amount, actual_currency, paid_at
+      FROM crm_commission_withdrawal_payment
+      WHERE withdrawal_id IN
+      <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+      </script>
+      """)
+  List<BatchPaymentRow> findPaymentsByIds(@Param("ids") Collection<Long> ids);
+
   @Insert(
       """
       INSERT INTO crm_commission_withdrawal_outbox (
@@ -755,4 +783,12 @@ public interface WithdrawalMapper {
       String actualCurrency,
       Instant paidAt,
       Long voucherFileId) {}
+
+  /** Payment facts of one withdrawal, keyed for the batch list/export reads. */
+  record BatchPaymentRow(
+      long withdrawalId,
+      BigDecimal amountCny,
+      BigDecimal actualAmount,
+      String actualCurrency,
+      Instant paidAt) {}
 }

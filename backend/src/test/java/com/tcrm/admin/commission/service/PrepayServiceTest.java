@@ -46,6 +46,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1189,10 +1190,11 @@ class PrepayServiceTest {
       case "latestApproval" -> historyOrNull(dataFor(APPROVAL_SQL));
       case "timeline" -> dataFor(TIMELINE_SQL).stream().map(this::history).toList();
       case "findPayment" -> paymentOrNull(dataFor(PAYMENT_SQL));
+      case "findExportPaymentsByIds" -> exportPayments(invocation.getArgument(0));
+      case "maskedAccountsByIds" -> maskedAccounts(invocation.getArgument(0));
       case "findDeduction" -> deductionOrNull(dataFor(DEDUCTION_SQL));
       case "sumRecovered" -> new BigDecimal("100.00");
       case "findRecipient" -> recipientOrNull(dataFor(RECIPIENT_SQL));
-      case "maskedAccount" -> textOrNull(dataFor(MASKED_SQL));
       case "paidKolId" -> idOrNull(dataFor(KOL_FILE_SQL), "1");
       case "findFingerprint" -> textOrNull(dataFor(FINGERPRINT_SQL));
       case "lockById" -> 1L;
@@ -1458,6 +1460,33 @@ class PrepayServiceTest {
     }
     Object value = data.getFirst().get("1");
     return value == null ? null : value.toString();
+  }
+
+  /** The payment fixture repurposed for the batch export read: one row per requested id. */
+  private List<PrepayMapper.ExportPaymentRow> exportPayments(Collection<Long> ids) {
+    List<Map<String, Object>> data = dataFor(PAYMENT_SQL);
+    if (data.isEmpty()) {
+      return List.of();
+    }
+    Map<String, Object> row = data.getFirst();
+    return ids.stream()
+        .map(
+            id ->
+                new PrepayMapper.ExportPaymentRow(
+                    id,
+                    (BigDecimal) row.get("pay_amount_cny"),
+                    instant(row.get("pay_time")),
+                    (String) row.get("pay_method")))
+        .toList();
+  }
+
+  /** The masked-account fixture repurposed for the batch export read. */
+  private List<PrepayMapper.MaskedAccountRow> maskedAccounts(Collection<Long> ids) {
+    String masked = textOrNull(dataFor(MASKED_SQL));
+    if (masked == null) {
+      return List.of();
+    }
+    return ids.stream().map(id -> new PrepayMapper.MaskedAccountRow(id, masked)).toList();
   }
 
   private static Long idOrNull(List<Map<String, Object>> data) {
