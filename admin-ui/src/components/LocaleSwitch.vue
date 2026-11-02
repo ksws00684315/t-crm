@@ -18,7 +18,6 @@ function select(value: LocaleId): void {
     :model-value="localeStore.locale"
     :aria-label="t('common.language')"
     class="locale-switch"
-    size="small"
     @update:model-value="select"
   >
     <el-option v-for="id in SUPPORTED_LOCALES" :key="id" :value="id" :label="t(`locale.${id}`)" />

@@ -92,12 +92,6 @@ body {
   }
 }
 
-@media (min-width: 1440px) and (min-height: 900px) {
-  #app .order-list-page .list-search {
-    padding: var(--tcrm-space-4);
-  }
-}
-
 @media (max-width: 767px) {
   :root {
     --tcrm-control-height: var(--tcrm-control-height-mobile);

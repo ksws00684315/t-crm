@@ -66,8 +66,11 @@ describe("shared frontend visual tokens", () => {
       "tcrm-space-6",
       "tcrm-control-height",
       "tcrm-control-height-mobile",
+      "tcrm-tag-min-height",
+      "tcrm-focus-width",
       "tcrm-table-header-height",
       "tcrm-font-sans",
+      "el-button-outline-color",
       "tcrm-font-size-body",
       "tcrm-line-height-body",
       "tcrm-font-size-title",
@@ -82,6 +85,24 @@ describe("shared frontend visual tokens", () => {
       expect(tokenValue(portalCss, token), `${token} must match both apps`).toBe(
         tokenValue(css, token)
       );
+    }
+  });
+
+  it("routes button and input focus outlines through the primary colour", () => {
+    expect(tokenValue(css, "el-button-outline-color")).toBe("var(--tcrm-color-primary)");
+    expect(tokenValue(css, "tcrm-focus-width")).toBe("2px");
+    for (const source of [css, portalCss]) {
+      expect(source).toContain(".el-input__wrapper:focus-within");
+      expect(source).toContain("outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary)");
+    }
+  });
+
+  it("gives standalone tags the 28px box while table tags stay compact", () => {
+    expect(tokenValue(css, "tcrm-tag-min-height")).toBe("28px");
+    for (const source of [css, portalCss]) {
+      expect(source).toContain(".el-tag:not(.el-table .el-tag):not(.el-select .el-tag)");
+      expect(source).toContain("min-height: var(--tcrm-tag-min-height)");
+      expect(source).toContain("padding-inline: var(--tcrm-space-2)");
     }
   });
 

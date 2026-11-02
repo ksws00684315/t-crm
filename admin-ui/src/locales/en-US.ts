@@ -575,7 +575,8 @@ const enUS: MessageSchema = {
     closeRight: "Close right",
     closeAll: "Close all",
     refresh: "Refresh current page",
-    more: "Tab actions"
+    more: "Tab actions",
+    label: "Page tabs"
   },
   password: {
     old: "Current password",

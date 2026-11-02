@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
-defineProps<{ title: string }>();
+withDefaults(defineProps<{ title: string; brand?: boolean }>(), { brand: false });
 </script>
 
 <template>
   <main class="auth-shell">
     <div class="auth-shell__bar"><LocaleSwitch /></div>
     <el-card class="auth-shell__card" shadow="never">
-      <h1>{{ title }}</h1>
+      <h1 class="auth-shell__title" :class="{ 'auth-shell__title--brand': brand }">{{ title }}</h1>
       <slot />
     </el-card>
   </main>

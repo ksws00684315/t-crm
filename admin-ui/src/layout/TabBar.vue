@@ -16,6 +16,51 @@ const tabs = useTabsStore();
 const localeStore = useLocaleStore();
 const scroller = ref<HTMLElement | null>(null);
 const menu = ref<{ x: number; y: number; path: string } | null>(null);
+const keyFocus = ref<string | null>(null);
+
+const tabStop = computed(() => {
+  if (keyFocus.value && tabs.tabs.some(tab => tab.path === keyFocus.value)) return keyFocus.value;
+  if (tabs.tabs.some(tab => tab.path === route.path)) return route.path;
+  return tabs.tabs[0]?.path ?? "";
+});
+
+function tabIndexFor(path: string): number {
+  return path === tabStop.value ? 0 : -1;
+}
+
+function onKeydown(event: KeyboardEvent, index: number): void {
+  if (event.target !== event.currentTarget) return;
+  const items = tabs.tabs;
+  if (!items.length) return;
+  let next = index;
+  switch (event.key) {
+    case "ArrowRight":
+      next = (index + 1) % items.length;
+      break;
+    case "ArrowLeft":
+      next = (index - 1 + items.length) % items.length;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = items.length - 1;
+      break;
+    case "Enter":
+    case " ":
+      event.preventDefault();
+      void router.push(items[index].path);
+      return;
+    default:
+      return;
+  }
+  event.preventDefault();
+  keyFocus.value = items[next].path;
+  void nextTick(() => {
+    const nodes = scroller.value?.querySelectorAll<HTMLElement>('[data-test="tab"]');
+    nodes?.[next]?.focus();
+  });
+}
 
 const titles = computed(() => {
   void localeStore.locale;
@@ -78,6 +123,7 @@ function onDocumentClick(): void {
 watch(
   () => route.path,
   async () => {
+    keyFocus.value = null;
     await nextTick();
     const current = scroller.value?.querySelector(".is-active");
     if (current && typeof current.scrollIntoView === "function") {
@@ -92,15 +138,27 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
 
 <template>
   <div class="tabs">
-    <div ref="scroller" class="tabs__scroll" data-test="tab-scroll" @wheel="onWheel">
+    <div
+      ref="scroller"
+      class="tabs__scroll"
+      role="tablist"
+      aria-orientation="horizontal"
+      :aria-label="t('tabs.label')"
+      data-test="tab-scroll"
+      @wheel="onWheel"
+    >
       <div
-        v-for="tab in tabs.tabs"
+        v-for="(tab, index) in tabs.tabs"
         :key="tab.path"
         class="tabs__item"
         :class="{ 'is-active': tab.path === route.path }"
+        role="tab"
+        :aria-selected="tab.path === route.path"
+        :tabindex="tabIndexFor(tab.path)"
         data-test="tab"
         :data-path="tab.path"
         @click="router.push(tab.path)"
+        @keydown="onKeydown($event, index)"
         @auxclick="onAux($event, tab.path, tab.affix)"
         @contextmenu.prevent="openMenu($event, tab.path)"
       >
@@ -146,7 +204,9 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
 .tabs {
   display: flex;
   align-items: stretch;
+  flex: 0 0 auto;
   height: 40px;
+  min-height: 40px;
   background: var(--tcrm-color-card);
   border-bottom: 1px solid var(--tcrm-color-border);
 }
@@ -159,6 +219,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   padding: var(--tcrm-space-1) var(--tcrm-space-2) 0;
 }
 .tabs__item {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--tcrm-space-1);
@@ -173,9 +234,23 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   white-space: nowrap;
 }
 .tabs__item.is-active {
-  color: var(--tcrm-color-text);
+  color: var(--tcrm-color-primary-text);
+  font-weight: 600;
   background: var(--tcrm-color-page);
   border-color: var(--tcrm-color-border);
+}
+.tabs__item.is-active::after {
+  content: "";
+  position: absolute;
+  right: var(--tcrm-space-2);
+  bottom: 0;
+  left: var(--tcrm-space-2);
+  height: 2px;
+  border-radius: var(--tcrm-radius-tag);
+  background: var(--tcrm-color-primary);
+}
+.tabs__item:focus-visible {
+  outline-offset: -2px;
 }
 .tabs__close,
 .tabs__more,

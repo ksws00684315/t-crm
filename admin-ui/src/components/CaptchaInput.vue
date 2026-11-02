@@ -99,6 +99,7 @@ onBeforeUnmount(() => {
     <button
       type="button"
       class="captcha__image"
+      :class="{ 'is-failed': failed && !image }"
       :title="t('captcha.refresh')"
       :aria-label="t('captcha.refresh')"
       :disabled="loading"
@@ -106,7 +107,9 @@ onBeforeUnmount(() => {
       @click="refresh"
     >
       <img v-if="image" :src="image" :alt="t('captcha.imageAlt')" data-test="captcha-image" />
-      <span v-else-if="failed" class="captcha__failed">{{ t("captcha.loadFailed") }}</span>
+      <span v-else-if="failed" class="captcha__failed" data-test="captcha-failed">{{
+        t("captcha.loadFailed")
+      }}</span>
     </button>
   </div>
 </template>
@@ -114,6 +117,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .captcha {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--tcrm-space-2);
   width: 100%;
 }
@@ -140,15 +144,22 @@ onBeforeUnmount(() => {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 1px;
 }
+.captcha__image.is-failed {
+  flex: 1 0 100%;
+  width: 100%;
+  overflow: visible;
+  white-space: nowrap;
+}
 .captcha__image img {
   display: block;
   width: 96px;
   height: 32px;
 }
 .captcha__failed {
-  padding: 0 4px;
+  padding: 0 var(--tcrm-space-1);
   font-size: var(--tcrm-font-size-body);
-  line-height: 22px;
+  line-height: var(--tcrm-line-height-body);
   color: var(--el-color-danger);
+  white-space: nowrap;
 }
 </style>

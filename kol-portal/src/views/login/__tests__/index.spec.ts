@@ -26,6 +26,7 @@ describe("login page", () => {
   it("renders English by default", async () => {
     const wrapper = await mountPage();
     expect(wrapper.find("h1").text()).toBe("SparkTrack Creator");
+    expect(wrapper.find("h1").classes()).toContain("auth-shell__title--brand");
     expect(wrapper.text()).toContain("Email");
     expect(wrapper.text()).toContain("Password");
     expect(wrapper.text()).toContain("Sign in");

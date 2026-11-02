@@ -556,7 +556,8 @@ const zhCN = {
     closeRight: "关闭右侧",
     closeAll: "关闭全部",
     refresh: "刷新当前页",
-    more: "标签操作"
+    more: "标签操作",
+    label: "页面页签"
   },
   password: {
     old: "原密码",
