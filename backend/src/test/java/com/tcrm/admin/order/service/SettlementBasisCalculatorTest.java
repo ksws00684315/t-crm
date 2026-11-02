@@ -266,6 +266,140 @@ class SettlementBasisCalculatorTest {
   }
 
   @Test
+  void shouldMoveTruncatedGapToLinesWithRemainingBasis() {
+    // L-035. Three lines pay 40.00 / 30.00 / 30.00 (order pay 100.00). Line 9001 is already fully
+    // refunded in the CRM (40.00, C = 40.00) and the flows show 52.00, so the gap is 12.00. The
+    // pay-ratio first pass would give 9001 4.80, but its basis is used up; the truncated 4.80 goes
+    // to the lines that still have basis (2.40 each). The total stays exactly F - C = 12.00.
+    List<OrderItemDO> lines =
+        List.of(item(9001L, 101L, "40.00"), item(9002L, 101L, "30.00"), item(9003L, 101L, "30.00"));
+    lines.get(0).setRefundAmount(new BigDecimal("40.00"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-5200", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("100.00"), lines, flows);
+
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("0.00");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("6.00");
+    assertThat(outcome.lineExtraRefund().get(9003L)).isEqualByComparingTo("6.00");
+    assertThat(extraTotal(outcome)).isEqualByComparingTo("12.00");
+    assertThat(outcome.refundGapUnallocated()).isEqualByComparingTo("0.00");
+    assertThat(outcome.refundGap()).isTrue();
+  }
+
+  @Test
+  void shouldRedistributeAcrossRoundsWhenSeveralLinesRunOut() {
+    // Lines pay 10.00 / 10.00 / 80.00 (order pay 100.00); CRM refunded 10.00 on 9001 and 9.50 on
+    // 9002 (C = 19.50), the flows show 59.50, so the gap is 40.00. First pass by pay ratio: 4.00,
+    // 4.00, 32.00. 9001 has 0.00 left, 9002 has 0.50 left (truncated 3.50), 9003 absorbs the rest:
+    // 9001 0.00, 9002 0.50, 9003 39.50. The tail line is the only one with room.
+    List<OrderItemDO> lines =
+        List.of(item(9001L, 101L, "10.00"), item(9002L, 101L, "10.00"), item(9003L, 101L, "80.00"));
+    lines.get(0).setRefundAmount(new BigDecimal("10.00"));
+    lines.get(1).setRefundAmount(new BigDecimal("9.50"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-5950", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("100.00"), lines, flows);
+
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("0.00");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("0.50");
+    assertThat(outcome.lineExtraRefund().get(9003L)).isEqualByComparingTo("39.50");
+    assertThat(extraTotal(outcome)).isEqualByComparingTo("40.00");
+    assertThat(outcome.refundGapUnallocated()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldKeepEveryLineBasisNonNegativeAndRecordWhatNoLineCanTake() {
+    // Lines pay 4.00 / 2.00 (order pay 6.00); the CRM refunded 1.00 on 9001. The flows show 10.00,
+    // so the gap is 9.00 but only 3.00 + 2.00 = 5.00 of basis is left. Every line is netted to
+    // exactly zero (never negative), and the 4.00 nobody can absorb is reported, not invented.
+    List<OrderItemDO> lines = items(1);
+    lines.get(0).setRefundAmount(new BigDecimal("1.00"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-1000", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), lines, flows);
+
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("3.00");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("2.00");
+    assertThat(outcome.refundGapUnallocated()).isEqualByComparingTo("4.00");
+    // basis - CRM refund - extra == 0 on every line, so the commission engine floors nothing.
+    assertThat(
+            outcome
+                .lineBasis()
+                .get(9001L)
+                .subtract(lines.get(0).getRefundAmount())
+                .subtract(outcome.lineExtraRefund().get(9001L)))
+        .isEqualByComparingTo("0.00");
+    assertThat(
+            outcome
+                .lineBasis()
+                .get(9002L)
+                .subtract(BigDecimal.ZERO)
+                .subtract(outcome.lineExtraRefund().get(9002L)))
+        .isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldRoundTheRedistributionToTheCentWithTheTailOnTheLargestPayLine() {
+    // Lines pay 1.00 / 2.00 / 3.00 (order pay 6.00); 9003 is fully refunded in the CRM (3.00).
+    // The flows show 3.10, so the gap is 0.10. The first pass gives 0.02 / 0.03 / 0.05 (tail on the
+    // largest pay); 9003 has no room, so 0.05 moves to 9001 and 9002 by pay ratio 1 : 2 -> 0.02 +
+    // 0.03 (the tail goes to the larger line). Total exactly 0.10.
+    List<OrderItemDO> lines = items3();
+    lines.get(2).setRefundAmount(new BigDecimal("3.00"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-310", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome = SettlementBasisCalculator.compute(order("6.00"), lines, flows);
+
+    assertThat(outcome.lineExtraRefund().get(9003L)).isEqualByComparingTo("0.00");
+    assertThat(extraTotal(outcome)).isEqualByComparingTo("0.10");
+    assertThat(outcome.lineExtraRefund().get(9001L)).isEqualByComparingTo("0.04");
+    assertThat(outcome.lineExtraRefund().get(9002L)).isEqualByComparingTo("0.06");
+  }
+
+  @Test
+  void shouldKeepAllocationFailedWhenTheGapMeetsAnOrderWithoutLinePay() {
+    // Existing rule kept: a non-zero gap cannot be split when every line pay is zero.
+    OrderItemDO zeroA = item(9001L, 101L, "0.00");
+    OrderItemDO zeroB = item(9002L, 101L, "0.00");
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-100", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome outcome =
+        SettlementBasisCalculator.compute(order("0.00"), List.of(zeroA, zeroB), flows);
+
+    assertThat(outcome.reason()).isEqualTo("ALLOCATION_FAILED");
+  }
+
+  @Test
+  void shouldGiveIdenticalOutcomesOnRepeatedComputation() {
+    // The commission fingerprint is built from these numbers: recomputing the same facts must give
+    // the same lines in the same order (task 83: no new revision for an unchanged order).
+    List<OrderItemDO> lines =
+        List.of(item(9001L, 101L, "40.00"), item(9002L, 101L, "30.00"), item(9003L, 101L, "30.00"));
+    lines.get(0).setRefundAmount(new BigDecimal("40.00"));
+    List<OrderSettlementFlowDO> flows =
+        List.of(
+            flow("支出", "退款", "-5200", INCOME_TIME, SettlementBasisCalculator.QUERY_INCOME_DETAIL));
+
+    BasisOutcome first = SettlementBasisCalculator.compute(order("100.00"), lines, flows);
+    BasisOutcome second =
+        SettlementBasisCalculator.compute(order("100.00"), List.copyOf(lines), flows);
+
+    assertThat(second.lineExtraRefund().toString()).isEqualTo(first.lineExtraRefund().toString());
+    assertThat(second.lineBasis().toString()).isEqualTo(first.lineBasis().toString());
+    assertThat(second.refundGapUnallocated()).isEqualTo(first.refundGapUnallocated());
+  }
+
+  @Test
   void shouldNotNetFlowsWhenCrmRefundsExceedFlows() {
     // The CRM record is ahead of the flows (flow refund not yet arrived): the CRM refund alone
     // stands, nothing extra is netted and no gap is flagged.
@@ -401,6 +535,10 @@ class SettlementBasisCalculatorTest {
                         INCOME_TIME,
                         SettlementBasisCalculator.QUERY_INCOME_DETAIL))))
         .isNull();
+  }
+
+  private static BigDecimal extraTotal(BasisOutcome outcome) {
+    return outcome.lineExtraRefund().values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
   private static OrderDO order(String payAmount) {

@@ -72,9 +72,9 @@ class KolAnalyticsServiceTest {
     assertThat(overview.daily())
         .containsExactly(
             new KolAnalyticsOverviewDTO.Day(
-                "2026-10-01", new BigDecimal("100.50"), new BigDecimal("0.00")),
+                "2026-10-01", new BigDecimal("100.50"), new BigDecimal("0.00"), 1L),
             new KolAnalyticsOverviewDTO.Day(
-                "2026-10-02", new BigDecimal("49.50"), new BigDecimal("0.00")));
+                "2026-10-02", new BigDecimal("49.50"), new BigDecimal("0.00"), 1L));
     assertThat(overview.asOf()).isNotNull();
 
     var query = ArgumentCaptor.forClass(Wrapper.class);
@@ -193,7 +193,28 @@ class KolAnalyticsServiceTest {
     assertThat(overview.daily())
         .containsExactly(
             new KolAnalyticsOverviewDTO.Day(
-                "2026-10-01", new BigDecimal("100.50"), new BigDecimal("0.00")));
+                "2026-10-01", new BigDecimal("100.50"), new BigDecimal("0.00"), 1L));
+  }
+
+  @Test
+  void shouldTakeTheCumulativeSalesFromTheSqlAggregateOfTheSignedInCreator() {
+    when(items.sumAttributedPayAmount(700L)).thenReturn(new BigDecimal("12345678.9"));
+
+    var total = service.salesTotal();
+
+    assertThat(total.salesCny()).isEqualTo(new BigDecimal("12345678.90"));
+    assertThat(total.asOf()).isNotNull();
+    verify(items).sumAttributedPayAmount(700L);
+    // The aggregate never reads rows into memory.
+    verify(orders, org.mockito.Mockito.never()).selectList(any());
+    verify(items, org.mockito.Mockito.never()).selectList(any());
+  }
+
+  @Test
+  void shouldReturnZeroCumulativeSales_whenThereIsNoOrder() {
+    when(items.sumAttributedPayAmount(700L)).thenReturn(null);
+
+    assertThat(service.salesTotal().salesCny()).isEqualTo(new BigDecimal("0.00"));
   }
 
   private static KolAccountDTO kol() {

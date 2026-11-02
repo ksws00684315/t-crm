@@ -3,6 +3,7 @@ package com.tcrm.admin.order.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.order.model.KolItemSalesRow;
 import com.tcrm.admin.order.model.OrderItemDO;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -58,6 +59,27 @@ public interface OrderItemMapper extends BaseMapper<OrderItemDO> {
       missingPayAmount = value;
     }
   }
+
+  /**
+   * Cumulative pay amount of one creator's own lines on attributed, paid orders (workbench total
+   * sales). One SQL aggregate, no row is read into memory; the tenant predicate for both tables
+   * comes from the tenant interceptor. Same basis as the workbench overview: the creator's own
+   * lines, {@code ATTRIBUTED} orders, pay amount before refunds. Orders without a pay time are
+   * unpaid and excluded.
+   */
+  @Select(
+      """
+      SELECT COALESCE(SUM(i.pay_amount), 0)
+        FROM crm_order_item i
+        JOIN crm_order o ON o.id = i.order_id
+       WHERE o.kol_id = #{kolId}
+         AND o.attribution_status = 'ATTRIBUTED'
+         AND o.pay_time IS NOT NULL
+         AND o.is_deleted = FALSE
+         AND i.kol_id = #{kolId}
+         AND i.is_deleted = FALSE
+      """)
+  BigDecimal sumAttributedPayAmount(@Param("kolId") long kolId);
 
   /**
    * Sales of the given mappings in one grouped query. Paid quantity and pay amount count PAID,

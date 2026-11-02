@@ -69,6 +69,7 @@ public class KolAnalyticsService {
                 .lt(OrderDO::getPayTime, to.toInstant()));
     BigDecimal sales = BigDecimal.ZERO;
     Map<String, BigDecimal> byDay = new TreeMap<>();
+    Map<String, Long> ordersByDay = new HashMap<>();
     ZoneOffset bucket = from.getOffset();
     if (!range.isEmpty()) {
       List<Long> orderIds = range.stream().map(OrderDO::getId).toList();
@@ -80,8 +81,9 @@ public class KolAnalyticsService {
       for (OrderDO order : range) {
         BigDecimal amount = money(perOrder.getOrDefault(order.getId(), BigDecimal.ZERO));
         sales = sales.add(amount);
-        byDay.merge(
-            order.getPayTime().atZone(bucket).toLocalDate().toString(), amount, BigDecimal::add);
+        String day = order.getPayTime().atZone(bucket).toLocalDate().toString();
+        byDay.merge(day, amount, BigDecimal::add);
+        ordersByDay.merge(day, 1L, Long::sum);
       }
     }
     // Commission accrual of the creator's lines, grouped by the order's pay date (task 62 via the
@@ -120,7 +122,8 @@ public class KolAnalyticsService {
           new KolAnalyticsOverviewDTO.Day(
               day.getKey(),
               money(day.getValue()),
-              money(commissionByDay.getOrDefault(day.getKey(), BigDecimal.ZERO))));
+              money(commissionByDay.getOrDefault(day.getKey(), BigDecimal.ZERO)),
+              ordersByDay.getOrDefault(day.getKey(), 0L)));
     }
     return new KolAnalyticsOverviewDTO(
         Instant.now(),
@@ -131,6 +134,17 @@ public class KolAnalyticsService {
         money(withdrawing),
         money(currentFrozen(kol.id())),
         daily);
+  }
+
+  /**
+   * Cumulative sales of the signed-in creator, aggregated in SQL so the 366-day cap of {@link
+   * #overview} does not apply. Same basis as the overview: own lines, attributed paid orders, pay
+   * amount before refunds.
+   */
+  public KolSalesTotalDTO salesTotal() {
+    KolAccountDTO kol = current.kol();
+    BigDecimal total = orderItems.sumAttributedPayAmount(kol.id());
+    return new KolSalesTotalDTO(money(total == null ? BigDecimal.ZERO : total), Instant.now());
   }
 
   /** Current frozen commission: accrued but not yet released, over all live rows (as of now). */

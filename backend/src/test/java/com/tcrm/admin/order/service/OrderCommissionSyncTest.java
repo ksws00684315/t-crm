@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.order.api.OrderItemsCommissionEvent;
 import com.tcrm.admin.order.mapper.OrderMapper;
@@ -188,6 +189,115 @@ class OrderCommissionSyncTest {
         .executeWithoutResult(
             status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "60.00"))));
     verify(orders, never()).update(org.mockito.ArgumentMatchers.isNull(), any(Wrapper.class));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldClearSettledTimeWhenConfirmationBecomesIncomeMismatch() {
+    // L-038: the order was confirmed (settled_time set); the goods income now differs from the pay
+    // amount. The confirmation no longer holds, so the stale time is cleared on crm_order. The
+    // lines were never released from it: the facts already say UNSETTLED with no time.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString()))
+        .thenReturn(
+            List.of(
+                flow(
+                    "收入", "货款收入", "5000", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL)));
+    OrderDO order = order(SETTLED);
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "60.00"))));
+    ArgumentCaptor<Wrapper<OrderDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).update(org.mockito.ArgumentMatchers.isNull(), update.capture());
+    assertThat(((LambdaUpdateWrapper<OrderDO>) update.getValue()).getSqlSet())
+        .contains("settled_time");
+    assertThat(((LambdaUpdateWrapper<OrderDO>) update.getValue()).getParamNameValuePairs().values())
+        .containsNull();
+    assertThat(order.getSettledTime()).isNull();
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    OrderItemsCommissionEvent.ItemFacts facts = captor.getValue().items().getFirst();
+    assertThat(facts.basisCheckReason()).isEqualTo("INCOME_MISMATCH");
+    assertThat(facts.settlementState()).isEqualTo("UNSETTLED");
+    assertThat(facts.settlementTime()).isNull();
+    assertThat(facts.basisCny()).isEqualByComparingTo("60.00");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldKeepSettledTimeWhenThisRoundHasNoIncomeFlows() {
+    // L-038: no INCOME_DETAIL flow is a round without settlement data, not an invalid
+    // confirmation: the time stays, only the basis reason may be refreshed.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    OrderDO order = order(SETTLED);
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "60.00"))));
+    assertThat(order.getSettledTime()).isEqualTo(SETTLED);
+    ArgumentCaptor<Wrapper<OrderDO>> update = ArgumentCaptor.forClass(Wrapper.class);
+    verify(orders).update(org.mockito.ArgumentMatchers.isNull(), update.capture());
+    assertThat(((LambdaUpdateWrapper<OrderDO>) update.getValue()).getSqlSet())
+        .doesNotContain("settled_time");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldKeepSettledTimeWhenBasisCannotBeComputed() {
+    // L-038: MULTIPLE_KOLS / ALLOCATION_FAILED say nothing about the settlement confirmation.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString()))
+        .thenReturn(
+            List.of(
+                flow(
+                    "收入", "货款收入", "5000", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL)));
+    OrderDO order = order(SETTLED);
+    TestTransactions.template()
+        .executeWithoutResult(
+            status ->
+                sync.sync(
+                    order,
+                    List.of(
+                        item(9001L, 101L, 1, null, "30.00"), item(9002L, 202L, 1, null, "30.00"))));
+    assertThat(order.getSettledTime()).isEqualTo(SETTLED);
+    assertThat(order.getCommissionBasisReason()).isEqualTo("MULTIPLE_KOLS");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldKeepSettledTimeForOrderClosedAfterPayment() {
+    // L-038: the zero-basis shortcut says nothing about the confirmation, so the time stays.
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    OrderDO order = order(SETTLED);
+    order.setOrderStatus("CLOSED");
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "60.00"))));
+    assertThat(order.getSettledTime()).isEqualTo(SETTLED);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldCapRefundGapAtTheLineBasisWhenNoLineCanTakeMore() {
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString()))
+        .thenReturn(
+            List.of(
+                flow("收入", "货款收入", "600", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL),
+                flow("支出", "退款", "-1000", SETTLED, SettlementBasisCalculator.QUERY_INCOME_DETAIL)));
+    OrderDO order = order(SETTLED);
+    order.setPayAmount(new BigDecimal("6.00"));
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, "6.00"))));
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    // The line takes everything it has left (6.00 of the 10.00 gap); the basis is never negative.
+    assertThat(captor.getValue().items().getFirst().successfulRefundCny())
+        .isEqualByComparingTo("6.00");
   }
 
   @Test

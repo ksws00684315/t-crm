@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { getCreatorOrders, type CreatorOrder, type SettlementStatus } from "@/api/creator";
+import { formatInstant } from "@/utils/format";
+import {
+  getCreatorOrders,
+  getCreatorOrderSummary,
+  type CreatorOrder,
+  type CreatorOrderSummary,
+  type SettlementStatus
+} from "@/api/creator";
+import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
-import { formatInstant } from "@/utils/format";
 import {
   formatMoney,
   localDateRangeToUtc,
@@ -28,6 +35,10 @@ const size = ref(20);
 const loading = ref(false);
 const error = ref(false);
 const expanded = ref(new Set<number>());
+const summary = ref<CreatorOrderSummary | null>(null);
+const summaryLoading = ref(false);
+const summaryFailed = ref(false);
+let summaryRequest = 0;
 const statusOptions: SettlementStatus[] = [
   "WITHDRAWN",
   "FROZEN",
@@ -38,15 +49,19 @@ const statusOptions: SettlementStatus[] = [
 ];
 const columns = computed<DataColumn[]>(() => [
   { key: "orderNo", align: "left" as const, label: t("orders.orderNo"), minWidth: 150 },
-  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 220 },
+  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 150 },
   { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
-  { key: "payTime", label: t("orders.payTime"), minWidth: 170 },
+  { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
   { key: "commission", label: t("orders.commissionAmount"), minWidth: 120, amount: true },
   { key: "settlementStatus", label: t("orders.settlementStatus"), minWidth: 130 }
 ]);
 function money(value: string) {
   return formatMoney(value, locale.value);
+}
+function dateLabel(value: string) {
+  const text = formatInstant(value);
+  return text === "-" ? "—" : text;
 }
 function productLabel(row: CreatorOrder) {
   return (
@@ -100,17 +115,46 @@ function toggle(index: number) {
   else next.add(index);
   expanded.value = next;
 }
+/** The filters shared by the list and the summary, so both always cover the same orders. */
+function currentFilter() {
+  const [payFrom, payTo] = localDateRangeToUtc(...dates.value);
+  return {
+    payFrom,
+    payTo,
+    ...(orderNo.value.trim() ? { orderNo: orderNo.value.trim() } : {}),
+    ...(productName.value.trim() ? { productName: productName.value.trim() } : {}),
+    ...(status.value ? { settlementStatus: status.value } : {})
+  };
+}
+const summaryCards = computed(() => [
+  { key: "total", label: "orders.summaryTotal", amount: summary.value?.salesCny },
+  { key: "settled", label: "orders.summarySettled", amount: summary.value?.settledCny },
+  { key: "pending", label: "orders.summaryPending", amount: summary.value?.pendingCny },
+  { key: "refunded", label: "orders.summaryRefunded", amount: summary.value?.refundedCny }
+]);
+async function loadSummary() {
+  const current = ++summaryRequest;
+  summaryLoading.value = true;
+  summaryFailed.value = false;
+  try {
+    const result = await getCreatorOrderSummary(currentFilter());
+    if (current !== summaryRequest) return;
+    summary.value = result;
+  } catch {
+    if (current !== summaryRequest) return;
+    // Never show zeros for figures that did not load.
+    summary.value = null;
+    summaryFailed.value = true;
+  } finally {
+    if (current === summaryRequest) summaryLoading.value = false;
+  }
+}
 async function load() {
   loading.value = true;
   error.value = false;
   try {
-    const [payFrom, payTo] = localDateRangeToUtc(...dates.value);
     const result = await getCreatorOrders({
-      payFrom,
-      payTo,
-      ...(orderNo.value.trim() ? { orderNo: orderNo.value.trim() } : {}),
-      ...(productName.value.trim() ? { productName: productName.value.trim() } : {}),
-      ...(status.value ? { settlementStatus: status.value } : {}),
+      ...currentFilter(),
       page: page.value,
       size: size.value
     });
@@ -137,6 +181,11 @@ function updateCustom(value: [Date, Date] | null) {
 function search() {
   page.value = 1;
   void load();
+  void loadSummary();
+}
+function refresh() {
+  void load();
+  void loadSummary();
 }
 function reset() {
   range.value = 30;
@@ -151,7 +200,10 @@ function pageChanged(value: number) {
   page.value = value;
   void load();
 }
-onMounted(load);
+onMounted(() => {
+  void load();
+  void loadSummary();
+});
 </script>
 
 <template>
@@ -199,6 +251,31 @@ onMounted(load);
         ></el-form-item>
       </template>
     </ListSearch>
+    <section class="summary" :aria-busy="summaryLoading" data-test="orders-summary">
+      <div v-if="summaryFailed" class="summary__failed" role="alert" data-test="summary-failed">
+        <span>{{ t("orders.summaryFailed") }}</span>
+        <el-button data-test="summary-retry" @click="loadSummary">{{
+          t("orders.summaryRetry")
+        }}</el-button>
+      </div>
+      <div v-else class="summary__cards">
+        <div
+          v-for="card in summaryCards"
+          :key="card.key"
+          class="summary-card"
+          :class="`summary-card--${card.key}`"
+          :data-test="`summary-${card.key}`"
+        >
+          <span>{{ t(card.label) }}</span>
+          <strong class="tcrm-role-section" :data-test="`summary-${card.key}-amount`"
+            ><AmountText v-if="card.amount != null" :value="money(card.amount)" /><template v-else
+              >—</template
+            ></strong
+          >
+        </div>
+      </div>
+      <p class="summary__note" data-test="summary-note">{{ t("orders.summaryNote") }}</p>
+    </section>
     <el-alert
       v-if="error"
       type="error"
@@ -220,14 +297,21 @@ onMounted(load);
       :page="page"
       :size="size"
       @update:page="pageChanged"
-      @refresh="load"
+      @refresh="refresh"
     >
+      <!-- A comment-only slot falls back to DataTable's "0 in total". Keep a real element. -->
+      <template #toolbar>
+        <span v-if="!error" class="orders-total">{{ t("table.total", { total }) }}</span>
+        <span v-else />
+      </template>
       <template #cell-orderNo="{ row }"><CopyText :value="row.orderNo" /></template>
       <template #cell-product="{ row }"
         ><span class="product-cell">{{ productLabel(row) }}</span></template
       >
       <template #cell-payAmount="{ row }">{{ money(row.payAmount) }}</template>
-      <template #cell-payTime="{ row }">{{ formatInstant(row.payTime) }}</template>
+      <template #cell-payTime="{ row }"
+        ><span class="pay-time">{{ dateLabel(row.payTime) }}</span></template
+      >
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
       >
@@ -265,7 +349,7 @@ onMounted(load);
           }}</span>
         </button>
         <div v-if="expanded.has(index)" class="order-card__details">
-          <span>{{ t("orders.payTime") }}: {{ formatInstant(order.payTime) }}</span>
+          <span>{{ t("orders.payTime") }}: {{ dateLabel(order.payTime) }}</span>
           <span>{{ t("orders.commissionRate") }}: {{ rate(order) }}</span>
           <span
             >{{ t("orders.commissionAmount") }}:
@@ -335,6 +419,66 @@ h1 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.orders-total {
+  color: var(--tcrm-color-text-secondary);
+}
+.pay-time {
+  white-space: nowrap;
+}
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-2);
+}
+.summary__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-2);
+}
+.summary-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--tcrm-space-2);
+  min-width: 0;
+  padding: var(--tcrm-space-2) var(--tcrm-space-3);
+  border-radius: var(--tcrm-radius-control);
+}
+.summary-card strong {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+.summary-card--total {
+  background: var(--tcrm-color-order-band);
+  color: var(--tcrm-color-primary-text);
+}
+.summary-card--settled {
+  background: var(--tcrm-color-success-bg);
+  color: var(--tcrm-color-success);
+}
+.summary-card--pending {
+  background: var(--tcrm-color-warning-bg);
+  color: var(--tcrm-color-warning);
+}
+.summary-card--refunded {
+  background: var(--tcrm-color-danger-bg);
+  color: var(--tcrm-color-danger);
+}
+.summary__failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  padding: var(--tcrm-space-2) var(--tcrm-space-3);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--tcrm-color-danger-bg);
+  color: var(--tcrm-color-danger);
+}
+.summary__note {
+  margin: 0;
+  color: var(--tcrm-color-text-secondary);
+}
 .order-cards,
 .orders-pager {
   display: none;
@@ -363,6 +507,9 @@ h1 {
   border-top: 1px solid var(--tcrm-color-border);
 }
 @media (max-width: 767px) {
+  .summary__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .orders-page {
     height: auto;
     min-height: 0;
@@ -382,6 +529,11 @@ h1 {
   .product-cell {
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 479px) {
+  .summary__cards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

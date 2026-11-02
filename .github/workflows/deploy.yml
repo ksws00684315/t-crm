@@ -2,6 +2,7 @@ name: Deploy
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: ['deploy/**', 'backend/Dockerfile', 'redirect/Dockerfile', 'backend/src/main/resources/application*.yml', 'redirect/src/main/resources/application*.yml', '.dockerignore', '.github/workflows/deploy.yml']
   push:
     branches: [main]
@@ -11,6 +12,8 @@ permissions:
 jobs:
   deploy-templates:
     name: Compose files and Dockerfiles
+    # Skip draft PRs; still run on push/schedule (no pull_request payload)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

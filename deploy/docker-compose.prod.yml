@@ -1,6 +1,7 @@
 # PRODUCTION TEMPLATE (single 4-core / 8 GB host, design document section 10).
 # Review every value before use. Run from the repository root:
 #   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+# First deployment: create the data volumes once (docker volume create tcrm_pgdata tcrm_redisdata).
 # Only Nginx publishes ports (80/443); PostgreSQL, Redis, crm-admin and crm-redirect are reachable
 # only inside the compose network. Memory limits follow the design: PostgreSQL 2G, Redis 1.5G,
 # crm-admin 2G, crm-redirect 512M, the rest is left for Nginx and the operating system.
@@ -9,9 +10,17 @@ name: tcrm
 x-restart: &restart
   restart: unless-stopped
 
+# Rotate container logs (json-file keeps them until the container is removed): 5 x 50 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 50m
+      max-file: "5"
+
 services:
   nginx:
-    <<: *restart
+    <<: [*restart, *logging]
     image: nginx:1.30.5-alpine
     ports:
       - "80:80"
@@ -35,7 +44,7 @@ services:
     mem_limit: 256m
 
   crm-admin:
-    <<: *restart
+    <<: [*restart, *logging]
     build:
       context: ..
       dockerfile: backend/Dockerfile
@@ -106,7 +115,7 @@ services:
     mem_limit: 2g
 
   crm-redirect:
-    <<: *restart
+    <<: [*restart, *logging]
     build:
       context: ..
       dockerfile: redirect/Dockerfile
@@ -145,13 +154,45 @@ services:
     mem_limit: 512m
 
   postgres:
-    <<: *restart
-    image: postgres:17.11
+    <<: [*restart, *logging]
+    # PostgreSQL 17.11 plus a pinned pgBackRest (ADR-037 decision 5). Built here for now; task 95
+    # replaces "build:" with an image pulled from the registry.
+    build:
+      context: ./postgres
+    image: tcrm-postgres:17.11
+    # A real init as PID 1 is REQUIRED for archive-async: pgBackRest's background push process is
+    # orphaned and re-parented to PID 1. When that is the postmaster, its non-zero exit (any archive
+    # error, e.g. S3 unreachable) is taken for a crashed backend and restarts the whole server.
+    init: true
     environment:
       POSTGRES_DB: ${TCRM_DB_NAME:-tcrm}
-      POSTGRES_USER: ${TCRM_DB_USERNAME}
-      POSTGRES_PASSWORD: ${TCRM_DB_PASSWORD}
+      # Superuser, used only for administration (initdb script, backups); crm-admin never gets it.
+      POSTGRES_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      POSTGRES_PASSWORD: ${TCRM_DB_SUPERUSER_PASSWORD}
+      # Application account and its password; initdb/01-app-role.sh creates the account (not a
+      # superuser) and makes it the owner of the database. Used on first start of an empty data volume only.
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
       TZ: UTC
+      # pgBackRest (deploy/postgres/pgbackrest.conf holds the fixed settings, these are the environment
+      # specific ones; ADR-037 decision 5). Access keys or an instance role: with an instance role set
+      # PGBACKREST_REPO1_S3_KEY_TYPE=auto and leave PGBACKREST_REPO1_S3_KEY / _KEY_SECRET out of .env
+      # (not even empty: an EMPTY PGBACKREST_* variable makes pgBackRest fail, hence the pass-through
+      # form without a value, which passes nothing when the variable is not defined). The passphrase
+      # and the bucket have no default: archiving fails loudly (pgbackrest check) when they are missing.
+      PGBACKREST_PG1_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      PGBACKREST_PG1_DATABASE: ${TCRM_DB_NAME:-tcrm}
+      PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-s3}
+      PGBACKREST_REPO1_PATH: ${PGBACKREST_REPO1_PATH:-/pgbackrest}
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS}
+      PGBACKREST_REPO1_S3_BUCKET: ${PGBACKREST_REPO1_S3_BUCKET}
+      PGBACKREST_REPO1_S3_REGION: ${PGBACKREST_REPO1_S3_REGION:-us-west-2}
+      PGBACKREST_REPO1_S3_ENDPOINT: ${PGBACKREST_REPO1_S3_ENDPOINT:-s3.${PGBACKREST_REPO1_S3_REGION:-us-west-2}.amazonaws.com}
+      PGBACKREST_REPO1_S3_KEY_TYPE: ${PGBACKREST_REPO1_S3_KEY_TYPE:-shared}
+      PGBACKREST_REPO1_S3_KEY:
+      PGBACKREST_REPO1_S3_KEY_SECRET:
+    # PostgreSQL shared memory (parallel queries, dynamic shared memory); Docker's 64 MB default is too small.
+    shm_size: 256m
     command:
       - postgres
       - -c
@@ -159,8 +200,17 @@ services:
       # Slow query log threshold from the design document (100 ms).
       - -c
       - log_min_duration_statement=100
+      # Continuous WAL archiving through pgBackRest (credentials come from the PGBACKREST_* environment,
+      # never from this command line). archive_timeout bounds the data loss window to about 5 minutes.
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300
+      - -c
+      - archive_command=pgbackrest --stanza=tcrm archive-push %p
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
     expose:
       - "5432"
     healthcheck:
@@ -171,7 +221,7 @@ services:
     mem_limit: 2g
 
   redis:
-    <<: *restart
+    <<: [*restart, *logging]
     image: redis:7.4.5
     # Streams and the link index live here, so nothing may be evicted (noeviction); maxmemory leaves
     # headroom below the 1.5G container limit for fork/replication buffers. Authentication is mandatory.
@@ -206,6 +256,12 @@ networks:
       config:
         - subnet: 172.30.0.0/24
 
+# Data volumes are created by hand once (docker volume create tcrm_pgdata tcrm_redisdata) and are
+# external, so "docker compose down -v" cannot delete them (ADR-037; deploy/README.md).
 volumes:
   pgdata:
+    external: true
+    name: tcrm_pgdata
   redisdata:
+    external: true
+    name: tcrm_redisdata

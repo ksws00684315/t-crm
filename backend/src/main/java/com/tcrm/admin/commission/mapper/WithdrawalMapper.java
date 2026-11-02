@@ -654,24 +654,28 @@ public interface WithdrawalMapper {
       """)
   Long countPrepayTasks(@Param("q") FinanceTaskQuery query);
 
-  /** Paid withdrawals of one creator for the fund records page (11.02, task 63). */
+  /**
+   * Every withdrawal application of one creator for the fund records page (11.02, task 92), in any
+   * status. {@code paid_at} is only set once the payment is registered.
+   */
   @Select(
       """
-      SELECT w.id AS withdrawal_id, w.application_no, w.amount_cny, w.account_masked,
+      SELECT w.id AS withdrawal_id, w.application_no, w.amount_cny, w.account_masked, w.status,
              w.create_time AS submitted_at, p.paid_at
       FROM crm_commission_withdrawal w
-      JOIN crm_commission_withdrawal_payment p ON p.withdrawal_id = w.id
-      WHERE w.kol_id = #{kolId} AND w.status = 'PAID'
+      LEFT JOIN crm_commission_withdrawal_payment p ON p.withdrawal_id = w.id
+      WHERE w.kol_id = #{kolId}
       ORDER BY w.create_time DESC, w.id DESC
       """)
-  List<KolPaidWithdrawalRow> listKolPaidWithdrawals(@Param("kolId") long kolId);
+  List<KolWithdrawalFundRow> listKolWithdrawals(@Param("kolId") long kolId);
 
-  /** One paid withdrawal row of the creator's fund records. */
-  record KolPaidWithdrawalRow(
+  /** One withdrawal application row of the creator's fund records. */
+  record KolWithdrawalFundRow(
       long withdrawalId,
       String applicationNo,
       BigDecimal amountCny,
       String accountMasked,
+      String status,
       java.time.Instant submittedAt,
       java.time.Instant paidAt) {}
 

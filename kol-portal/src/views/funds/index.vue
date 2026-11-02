@@ -1,35 +1,40 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { ArrowRight } from "@element-plus/icons-vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   getFundRecords,
   getFundSummary,
   getWithdrawalAccounts,
   getWithdrawalConditions,
-  getWithdrawals,
   submitWithdrawal,
   withdrawWithdrawal,
   type FundRecord,
   type FundSummary,
   type WithdrawalAccountOption,
-  type WithdrawalConditions,
-  type WithdrawalRecord
+  type WithdrawalConditions
 } from "@/api/creator";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { uploadQrFile } from "@/api/payout-account";
-import { ApiError } from "@/utils/http/error";
-import { checkQrFile } from "@/utils/payout-account";
 import { formatInstant } from "@/utils/format";
+import { ApiError } from "@/utils/http/error";
+import { moneyCents } from "@/utils/money";
+import { checkQrFile } from "@/utils/payout-account";
 import { formatMoney } from "@/utils/orders";
 import { randomUuid } from "@/utils/uuid";
+import { isNegativeAmount, workspaceFigures } from "@/utils/workspace";
 
 defineOptions({ name: "FundsPage" });
 const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const summary = ref<FundSummary | null>(null);
-const records = ref<FundRecord[]>([]);
-const withdrawals = ref<WithdrawalRecord[]>([]);
+const records = ref<(FundRecord & { rowKey: string })[]>([]);
 const accounts = ref<WithdrawalAccountOption[]>([]);
 const conditions = ref<WithdrawalConditions | null>(null);
 const loading = ref(false);
@@ -58,78 +63,72 @@ const form = reactive({
 });
 const manualAccount = computed(() => form.payoutAccountId === "manual");
 const money = (value: string) => formatMoney(value, locale.value);
-const columns = computed<DataColumn[]>(() => [
-  { key: "appliedAt", label: t("funds.appliedAt"), minWidth: 170 },
-  { key: "applicationNo", align: "left" as const, label: t("funds.applicationNo"), minWidth: 160 },
-  { key: "type", label: t("funds.type"), minWidth: 120 },
-  { key: "amount", label: t("funds.amount"), minWidth: 130, amount: true },
-  { key: "recipient", align: "left" as const, label: t("funds.recipient"), minWidth: 170 },
-  { key: "receivedAt", label: t("funds.receivedAt"), minWidth: 170 }
-]);
-const commissionParts = computed(() =>
-  summary.value
+/** Column floors per language (规范 11 §2): long English labels get more room, nothing wraps. */
+const columns = computed<DataColumn[]>(() => {
+  const zh = locale.value === "zh-CN";
+  return [
+    { key: "appliedAt", label: t("funds.appliedAt"), minWidth: zh ? 180 : 200 },
+    {
+      key: "applicationNo",
+      align: "left" as const,
+      label: t("funds.applicationNo"),
+      minWidth: 210
+    },
+    { key: "type", label: t("funds.type"), minWidth: zh ? 110 : 200 },
+    { key: "amount", label: t("funds.amount"), minWidth: 130, amount: true },
+    { key: "status", label: t("funds.statusLabel"), minWidth: zh ? 190 : 250 },
+    { key: "recipient", align: "left" as const, label: t("funds.recipient"), minWidth: 200 },
+    { key: "receivedAt", label: t("funds.receivedAt"), minWidth: zh ? 180 : 200 },
+    { key: "actions", label: t("common.actions"), width: zh ? 110 : 150 }
+  ];
+});
+const figures = computed(() => (summary.value ? workspaceFigures(summary.value) : null));
+/** The four steps of a commission, left to right (task 92 section 4.1). */
+type StepKey = "frozen" | "withdrawable" | "withdrawing" | "withdrawn";
+const steps = computed<{ key: StepKey; tone: string; amount: string }[]>(() =>
+  figures.value
     ? [
-        { key: "withdrawn", amount: summary.value.withdrawnCny },
-        { key: "currentAvailable", amount: summary.value.availableCny },
-        { key: "frozen", amount: summary.value.frozenCny },
-        { key: "withdrawing", amount: summary.value.withdrawingCny }
+        { key: "frozen", tone: "warning", amount: figures.value.frozen },
+        { key: "withdrawable", tone: "success", amount: figures.value.available },
+        { key: "withdrawing", tone: "neutral", amount: figures.value.occupied },
+        { key: "withdrawn", tone: "neutral", amount: figures.value.commissionPaid }
       ]
     : []
 );
-const incomeComposition = computed(() => {
-  if (!summary.value) return null;
-  const total = cents(summary.value.totalIncomeCny);
-  const commission = cents(summary.value.commissionIncomeCny);
-  const prepay = cents(summary.value.receivedPrepayCny);
-  if (total <= 0n || commission < 0n || prepay < 0n || commission + prepay !== total) return null;
-  const percent = (part: bigint) => Number((part * 1000n + total / 2n) / total) / 10;
-  return {
-    commissionWidth: `${percent(commission)}%`,
-    prepayWidth: `${percent(prepay)}%`,
-    commissionPercent: `${percent(commission).toLocaleString(locale.value, {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    })}%`,
-    prepayPercent: `${percent(prepay).toLocaleString(locale.value, {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    })}%`
-  };
+const stepText = {
+  frozen: ["funds.stepFrozen", "funds.stepFrozenCaption"],
+  withdrawable: ["funds.stepWithdrawable", "funds.stepWithdrawableCaption"],
+  withdrawing: ["funds.stepWithdrawing", "funds.stepWithdrawingCaption"],
+  withdrawn: ["funds.stepWithdrawn", "funds.stepWithdrawnCaption"]
+} as const;
+const prepayNote = computed(() => {
+  if (!summary.value) return "";
+  const deducted = moneyCents(summary.value.prepayDeductionCny);
+  const pending = moneyCents(summary.value.prepayOutstandingCny);
+  if (deducted === 0n && pending === 0n) return "";
+  return t("funds.prepayNote", {
+    deducted: money(summary.value.prepayDeductionCny),
+    pending: money(summary.value.prepayOutstandingCny)
+  });
 });
-function summaryMoney(value: string) {
-  return amountLabel(value, "CNY");
-}
-function amountLabel(value: string, currency: string) {
-  return `${Number(value).toLocaleString(locale.value, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })} ${currency}`;
-}
-function cents(value: string) {
-  const [whole, fraction = ""] = value.split(".");
-  const unsigned = BigInt(whole.replace("-", "")) * 100n + BigInt(fraction.padEnd(2, "0"));
-  return value.startsWith("-") ? -unsigned : unsigned;
-}
 async function load() {
   loading.value = true;
   failure.value = false;
   try {
-    const [summaryResult, history, withdrawalsPage] = await Promise.all([
+    const [summaryResult, history] = await Promise.all([
       getFundSummary(),
-      getFundRecords({ page: page.value, size: size.value }),
-      getWithdrawals({ page: 1, size: 50 })
+      getFundRecords({ page: page.value, size: size.value })
     ]);
     summary.value = summaryResult.fundSummary;
-    records.value = history.items;
+    records.value = history.items.map(item => ({ ...item, rowKey: `${item.type}-${item.id}` }));
     total.value = Number(history.total);
-    withdrawals.value = withdrawalsPage.items;
   } catch {
     failure.value = true;
   } finally {
     loading.value = false;
   }
 }
-async function openApply(previousId = "") {
+async function openApply(previousId = "", previousAmount = "") {
   if (limitsLoading.value || submitting.value || qrUploading.value) return;
   applyError.value = "";
   conditions.value = null;
@@ -158,9 +157,8 @@ async function openApply(previousId = "") {
     conditions.value = limits;
     accounts.value = options;
     form.payoutAccountId = options.find(option => option.id)?.id ?? "manual";
-    const rejected = withdrawals.value.find(item => item.id === previousId);
     form.previousId = previousId;
-    form.amount = rejected?.amount ?? "";
+    form.amount = previousAmount;
   } catch (error) {
     applyError.value = errorMessage(error, "funds.loadFailed");
   } finally {
@@ -262,7 +260,7 @@ async function submit() {
     submitting.value = false;
   }
 }
-async function cancelWithdrawal(item: WithdrawalRecord) {
+async function cancelWithdrawal(item: { id: string }) {
   try {
     await ElMessageBox.confirm(t("funds.withdrawConfirm"), t("funds.withdrawAction"), {
       type: "warning"
@@ -289,25 +287,78 @@ function sizeChanged(value: number) {
 function recordType(value: FundRecord["type"]) {
   return value === "PREPAY" ? t("funds.prepay") : t("funds.withdrawal");
 }
+function recordAmount(row: FundRecord) {
+  // Commission and advance records are CNY; any other currency keeps its code instead of a yen sign.
+  return row.currency === "CNY"
+    ? money(row.amount)
+    : `${Number(row.amount).toLocaleString(locale.value, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })} ${row.currency}`;
+}
+function statusLabel(value: string) {
+  return t(`funds.status.${value}`, value);
+}
+/** Waiting statuses use the warning colour, paid the success colour, rejected the danger colour. */
+function statusType(value: string): "warning" | "success" | "danger" | "info" {
+  if (value === "PENDING_REVIEW" || value === "PENDING_PAYMENT") return "warning";
+  if (value === "PAID") return "success";
+  if (value === "REJECTED") return "danger";
+  return "info";
+}
+function canCancel(row: FundRecord) {
+  return row.type === "COMMISSION" && row.publicStatus === "PENDING_REVIEW";
+}
+function canReapply(row: FundRecord) {
+  return row.type === "COMMISSION" && row.publicStatus === "REJECTED";
+}
+function rowActions(row: FundRecord): RowAction[] {
+  return [
+    {
+      key: "cancel",
+      label: t("funds.rowWithdraw"),
+      type: "danger",
+      testId: "cancel-withdrawal",
+      hidden: !canCancel(row),
+      onClick: () => void cancelWithdrawal(row)
+    },
+    {
+      key: "reapply",
+      label: t("funds.resubmit"),
+      testId: "resubmit-withdrawal",
+      hidden: !canReapply(row),
+      onClick: () => void openApply(row.id, row.amount)
+    }
+  ];
+}
+function hasActions(row: FundRecord) {
+  return canCancel(row) || canReapply(row);
+}
 const conditionBlockMessage = computed(() => {
   if (conditions.value?.withdrawalFrozen) return t("funds.withdrawalFrozen");
   if (conditions.value && conditions.value.unverifiedCount > 0)
     return t("funds.unverifiedBlocked", { count: conditions.value.unverifiedCount });
   return t("funds.cannotApply");
 });
+/** The workspace links here with ?apply=1: open the dialog once and drop the parameter. */
+watch(
+  () => route.query.apply,
+  value => {
+    if (value !== "1") return;
+    void openApply();
+    const rest = { ...route.query };
+    delete rest.apply;
+    void router.replace({ query: rest });
+  },
+  { immediate: true }
+);
 onMounted(load);
 </script>
 
 <template>
   <section class="funds-page">
     <header class="page-heading">
-      <div>
-        <h1>{{ t("funds.title") }}</h1>
-        <p>{{ t("funds.summaryHint") }}</p>
-      </div>
-      <el-button type="primary" data-test="apply-withdrawal" @click="openApply()">{{
-        t("funds.apply")
-      }}</el-button>
+      <h1>{{ t("funds.title") }}</h1>
     </header>
     <el-alert
       v-if="failure"
@@ -318,230 +369,137 @@ onMounted(load);
     />
     <el-skeleton v-if="loading && !summary" :rows="4" animated />
     <template v-else-if="summary">
-      <section class="summary-card">
-        <section class="income-overview" :aria-label="t('funds.incomeComposition')">
-          <div class="income-total">
-            <span class="income-total__eyebrow">{{ t("funds.totalIncome") }}</span>
-            <strong class="income-total__amount">{{ summaryMoney(summary.totalIncomeCny) }}</strong>
-            <span class="income-total__caption">{{ t("funds.incomeReceived") }}</span>
-          </div>
-          <div class="income-sources">
-            <div class="income-source">
-              <span class="income-source__dot income-source__dot--commission" aria-hidden="true" />
-              <span class="income-source__label">{{ t("funds.commissionIncome") }}</span>
-              <strong>{{ summaryMoney(summary.commissionIncomeCny) }}</strong>
-              <span class="income-source__percent">{{
-                incomeComposition?.commissionPercent ?? "—"
-              }}</span>
-            </div>
-            <div class="income-source">
-              <span class="income-source__dot income-source__dot--prepay" aria-hidden="true" />
-              <span class="income-source__label">{{ t("funds.prepayIncome") }}</span>
-              <strong>{{ summaryMoney(summary.receivedPrepayCny) }}</strong>
-              <span class="income-source__percent">{{
-                incomeComposition?.prepayPercent ?? "—"
-              }}</span>
-            </div>
-            <div
-              v-if="incomeComposition"
-              class="income-composition-bar"
-              role="img"
-              :aria-label="t('funds.incomeFormula')"
+      <section class="progress-card" aria-labelledby="progress-title" data-test="progress-card">
+        <h2 id="progress-title">{{ t("funds.progressTitle") }}</h2>
+        <ol class="progress-steps">
+          <template v-for="(step, index) in steps" :key="step.key">
+            <li
+              class="progress-step"
+              :class="`progress-step--${step.tone}`"
+              :data-test="`step-${step.key}`"
             >
-              <span
-                class="income-composition-bar__commission"
-                :style="{ width: incomeComposition.commissionWidth }"
-              />
-              <span
-                class="income-composition-bar__prepay"
-                :style="{ width: incomeComposition.prepayWidth }"
-              />
-            </div>
-            <p class="income-sources__caption">{{ t("funds.incomeFormula") }}</p>
-          </div>
-        </section>
-        <div class="commission-overview-heading">
-          <h2>{{ t("funds.commissionOverview") }}</h2>
-          <span>{{ t("funds.amountCurrency") }}</span>
-        </div>
-        <div class="commission-cards" :aria-label="t('funds.commissionBreakdown')">
-          <dl class="commission-metric">
-            <dt>{{ t("funds.estimatedCommission") }}</dt>
-            <dd>{{ summaryMoney(summary.estimatedCommissionCny) }}</dd>
-          </dl>
-          <dl
-            v-for="part in commissionParts"
-            :key="part.key"
-            class="commission-metric"
-            :data-state="part.key"
-          >
-            <dt :data-state="part.key">
-              <span
-                v-if="part.key !== 'currentAvailable'"
-                class="commission-metric__dot"
-                :data-state="part.key"
-                aria-hidden="true"
-              />
-              <span class="commission-metric__label">{{ t(`funds.${part.key}`) }}</span>
-              <span v-if="part.key === 'currentAvailable'" class="available-badge">
-                {{ t("funds.availableBadge") }}
+              <span class="progress-step__label">
+                <span class="progress-step__dot" aria-hidden="true" />
+                {{ t(stepText[step.key][0]) }}
               </span>
-            </dt>
-            <dd
-              :class="[
-                { negative: part.amount.startsWith('-') },
-                { 'commission-metric__amount--available': part.key === 'currentAvailable' }
-              ]"
-            >
-              {{ summaryMoney(part.amount) }}
-            </dd>
-          </dl>
-        </div>
-        <div class="funds-note">
-          <span class="funds-note__icon" aria-hidden="true">i</span>
-          <div class="funds-note__content">
-            <strong>{{ t("funds.fundsNote") }}</strong>
-            <p>{{ t("funds.incomeHint") }}</p>
-            <div class="funds-note__details">
-              <span>
-                {{ t("funds.totalCommission") }}：<strong>{{
-                  summaryMoney(summary.totalCommissionCny)
-                }}</strong>
-                <span class="funds-note__calculation">({{ t("funds.commissionTotalParts") }})</span>
-              </span>
-              <span>
-                {{ t("funds.prepayDeduction") }}：
-                <strong :class="{ negative: Number(summary.prepayDeductionCny) > 0 }">
-                  {{
-                    summaryMoney(
-                      Number(summary.prepayDeductionCny) > 0
-                        ? `-${summary.prepayDeductionCny}`
-                        : "0.00"
-                    )
-                  }}
-                </strong>
-              </span>
-            </div>
-          </div>
-        </div>
+              <strong
+                class="tcrm-amount-detail progress-step__amount"
+                :class="{ negative: isNegativeAmount(step.amount) }"
+                :data-test="`step-${step.key}-amount`"
+                ><AmountText :value="money(step.amount)"
+              /></strong>
+              <span class="progress-step__caption">{{ t(stepText[step.key][1]) }}</span>
+            </li>
+            <li v-if="index < steps.length - 1" class="progress-arrow" aria-hidden="true">
+              <el-icon :size="16"><ArrowRight /></el-icon>
+            </li>
+          </template>
+        </ol>
+        <p v-if="prepayNote" class="progress-note" data-test="prepay-note">{{ prepayNote }}</p>
       </section>
-      <el-card shadow="never" class="records-card">
-        <div class="section-heading">
-          <h2>{{ t("funds.history") }}</h2>
-          <el-button link type="primary" @click="$router.push('/payout-accounts')">{{
-            t("funds.manageAccounts")
-          }}</el-button>
-        </div>
-        <DataTable
-          table-id="fund-records"
-          class="records-table"
-          :rows="records"
-          :columns="columns"
-          :loading="loading"
-          :total="total"
-          :paged="total > 0 && !failure"
-          :page="page"
-          :size="size"
-          @update:page="pageChanged"
-          @update:size="sizeChanged"
-          @refresh="load"
-        >
-          <template #cell-appliedAt="{ row }">{{ formatInstant(row.appliedAt) }}</template>
-          <template #cell-applicationNo="{ row }"
-            ><span class="application-no">{{ row.applicationNo || "—" }}</span></template
-          >
-          <template #cell-type="{ row }"
-            ><el-tag :type="row.type === 'PREPAY' ? 'warning' : 'primary'">{{
-              recordType(row.type)
-            }}</el-tag></template
-          >
-          <template #cell-amount="{ row }"
-            ><span data-test="fund-record-amount">{{
-              amountLabel(row.amount, row.currency)
-            }}</span></template
-          >
-          <template #cell-recipient="{ row }">{{ row.maskedRecipient || "—" }}</template>
-          <template #cell-receivedAt="{ row }">{{ formatInstant(row.receivedAt) }}</template>
-          <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
-          <template #empty
-            ><div v-if="!failure" class="empty-state">{{ t("funds.empty") }}</div>
-            <span v-else
-          /></template>
-        </DataTable>
-        <div class="fund-record-cards" :aria-busy="loading">
-          <article
-            v-for="record in records"
-            :key="record.id"
-            class="fund-record-card"
-            data-test="fund-record-card"
-          >
-            <dl>
-              <dt>{{ t("funds.applicationNo") }}</dt>
-              <dd><CopyText :value="record.applicationNo" /></dd>
-              <dt>{{ t("funds.type") }}</dt>
-              <dd>
-                <el-tag :type="record.type === 'PREPAY' ? 'warning' : 'primary'">{{
-                  recordType(record.type)
-                }}</el-tag>
-              </dd>
-              <dt>{{ t("funds.appliedAt") }}</dt>
-              <dd>{{ formatInstant(record.appliedAt) }}</dd>
-              <dt>{{ t("funds.amount") }}</dt>
-              <dd class="fund-record-amount">{{ amountLabel(record.amount, record.currency) }}</dd>
-              <dt>{{ t("funds.recipient") }}</dt>
-              <dd>{{ record.maskedRecipient || "—" }}</dd>
-              <dt>{{ t("funds.receivedAt") }}</dt>
-              <dd>{{ formatInstant(record.receivedAt) }}</dd>
-            </dl>
-          </article>
-          <el-empty
-            v-if="!records.length && !loading && !failure"
-            :description="t('funds.empty')"
-          />
-        </div>
-        <el-pagination
-          v-if="total > 0 && !failure"
-          class="fund-records-pager"
-          :current-page="page"
-          :page-size="size"
-          :total="total"
-          layout="prev, pager, next"
-          @current-change="pageChanged"
-        />
-      </el-card>
-      <el-card shadow="never" class="withdrawals-card">
-        <div class="section-heading">
-          <h2>{{ t("funds.withdrawalHistory") }}</h2>
-          <RouterLink to="/payout-accounts">{{ t("funds.manageAccounts") }}</RouterLink>
-        </div>
-        <div v-if="withdrawals.length" class="withdrawal-list">
-          <div v-for="item in withdrawals" :key="item.id" class="withdrawal-row">
-            <span>{{ item.applicationNo }}</span
-            ><strong>{{ amountLabel(item.amount, item.currency) }}</strong
-            ><el-tag>{{ t(`funds.status.${item.status}`, item.status) }}</el-tag
-            ><span>{{ formatInstant(item.createdAt) }}</span>
-            <el-button
-              v-if="item.status === 'PENDING_REVIEW'"
-              link
-              type="danger"
-              @click="cancelWithdrawal(item)"
-            >
-              {{ t("funds.withdrawAction") }}
-            </el-button>
-            <el-button
-              v-if="item.status === 'REJECTED'"
-              link
-              type="primary"
-              data-test="resubmit-withdrawal"
-              @click="openApply(item.id)"
-            >
-              {{ t("funds.resubmit") }}
-            </el-button>
-          </div>
-        </div>
-        <el-empty v-else :description="t('funds.noWithdrawals')" />
-      </el-card>
     </template>
+    <section class="action-card" data-test="action-card">
+      <el-button type="primary" data-test="apply-withdrawal" @click="openApply()">{{
+        t("funds.apply")
+      }}</el-button>
+      <el-button data-test="manage-accounts" @click="router.push('/payout-accounts')">{{
+        t("funds.manageAccounts")
+      }}</el-button>
+    </section>
+    <DataTable
+      table-id="fund-records"
+      class="records-table"
+      row-key="rowKey"
+      :rows="records"
+      :columns="columns"
+      :loading="loading"
+      :total="total"
+      :paged="total > 0 && !failure"
+      :page="page"
+      :size="size"
+      @update:page="pageChanged"
+      @update:size="sizeChanged"
+      @refresh="load"
+    >
+      <template #title
+        ><h2>{{ t("funds.recordsTitle") }}</h2></template
+      >
+      <!-- A comment-only slot falls back to DataTable's "0 in total". Keep a real element. -->
+      <template #toolbar>
+        <span v-if="!failure" class="records-total">{{ t("table.total", { total }) }}</span>
+        <span v-else />
+      </template>
+      <template #cell-appliedAt="{ row }">{{ formatInstant(row.appliedAt) }}</template>
+      <template #cell-applicationNo="{ row }"><CopyText :value="row.applicationNo" /></template>
+      <template #cell-type="{ row }">{{ recordType(row.type) }}</template>
+      <template #cell-amount="{ row }"
+        ><span data-test="fund-record-amount">{{ recordAmount(row) }}</span></template
+      >
+      <template #cell-status="{ row }"
+        ><el-tag :type="statusType(row.publicStatus)" data-test="fund-record-status">{{
+          statusLabel(row.publicStatus)
+        }}</el-tag></template
+      >
+      <template #cell-recipient="{ row }">{{ row.maskedRecipient || "—" }}</template>
+      <template #cell-receivedAt="{ row }">{{ formatInstant(row.receivedAt) }}</template>
+      <template #actions="{ row }">
+        <RowActions v-if="hasActions(row)" :actions="rowActions(row)" />
+        <span v-else>-</span>
+      </template>
+      <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
+      <template #empty
+        ><div v-if="!failure" class="empty-state">{{ t("funds.empty") }}</div>
+        <span v-else
+      /></template>
+    </DataTable>
+    <div class="fund-record-cards" :aria-busy="loading">
+      <h2 class="fund-record-cards__title">{{ t("funds.recordsTitle") }}</h2>
+      <article
+        v-for="record in records"
+        :key="record.rowKey"
+        class="fund-record-card"
+        data-test="fund-record-card"
+      >
+        <dl>
+          <dt>{{ t("funds.applicationNo") }}</dt>
+          <dd><CopyText :value="record.applicationNo" /></dd>
+          <dt>{{ t("funds.type") }}</dt>
+          <dd>{{ recordType(record.type) }}</dd>
+          <dt>{{ t("funds.statusLabel") }}</dt>
+          <dd>
+            <el-tag :type="statusType(record.publicStatus)">{{
+              statusLabel(record.publicStatus)
+            }}</el-tag>
+          </dd>
+          <dt>{{ t("funds.appliedAt") }}</dt>
+          <dd>{{ formatInstant(record.appliedAt) }}</dd>
+          <dt>{{ t("funds.amount") }}</dt>
+          <dd class="fund-record-amount">{{ recordAmount(record) }}</dd>
+          <dt>{{ t("funds.recipient") }}</dt>
+          <dd>{{ record.maskedRecipient || "—" }}</dd>
+          <dt>{{ t("funds.receivedAt") }}</dt>
+          <dd>{{ formatInstant(record.receivedAt) }}</dd>
+        </dl>
+        <RowActions
+          v-if="hasActions(record)"
+          class="fund-record-card__actions"
+          :actions="rowActions(record)"
+        />
+        <span v-else class="fund-record-card__actions" data-test="fund-card-action-placeholder"
+          >-</span
+        >
+      </article>
+      <el-empty v-if="!records.length && !loading && !failure" :description="t('funds.empty')" />
+      <el-pagination
+        v-if="total > 0 && !failure"
+        class="fund-records-pager"
+        :current-page="page"
+        :page-size="size"
+        :total="total"
+        layout="prev, pager, next"
+        @current-change="pageChanged"
+      />
+    </div>
     <el-dialog
       v-model="applyVisible"
       :title="t('funds.applyTitle')"
@@ -681,10 +639,11 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   gap: var(--tcrm-space-4);
+  height: 100%;
+  min-height: 720px;
   min-width: 0;
 }
-.page-heading,
-.section-heading {
+.page-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -696,248 +655,102 @@ h1 {
   line-height: var(--tcrm-line-height-title);
   font-weight: 600;
 }
-.page-heading p {
-  margin: var(--tcrm-space-1) 0 0;
-  color: var(--tcrm-color-text-secondary);
-}
-.summary-card {
-  display: grid;
-  gap: var(--tcrm-space-5);
-}
-.income-overview {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  align-items: center;
-  gap: var(--tcrm-space-6);
-  padding: var(--tcrm-space-6);
+.progress-card,
+.action-card {
+  padding: var(--tcrm-space-4);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
   background: var(--tcrm-color-card);
 }
-.income-total {
+.progress-card {
+  display: grid;
+  gap: var(--tcrm-space-3);
+}
+.records-total {
+  color: var(--tcrm-color-text-secondary);
+}
+.progress-card h2,
+.records-table h2 {
+  margin: 0;
+}
+.progress-steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--tcrm-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.progress-step {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: var(--tcrm-space-2);
-  min-height: 144px;
-  padding: var(--tcrm-space-5);
+  gap: var(--tcrm-space-1);
+  min-width: 0;
+  padding: var(--tcrm-space-3) var(--tcrm-space-4);
+  border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-muted);
+  background: var(--tcrm-color-card);
 }
-.income-total__eyebrow {
-  color: var(--tcrm-color-text);
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  font-weight: 600;
+.progress-step--success {
+  border-color: var(--tcrm-color-success);
+  background: var(--tcrm-color-success-bg);
 }
-.income-total__amount {
-  color: var(--tcrm-color-primary-text);
-  font-size: var(--tcrm-font-size-title);
-  line-height: var(--tcrm-line-height-title);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+.progress-step--warning {
+  background: var(--tcrm-color-warning-bg);
 }
-.income-total__caption,
-.income-source__percent,
-.income-sources__caption {
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
-}
-.income-sources {
-  display: grid;
-  align-content: center;
-  gap: var(--tcrm-space-2);
-  min-width: 0;
-}
-.income-source {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+.progress-step__label {
+  display: inline-flex;
   align-items: center;
-  gap: var(--tcrm-space-3);
-  min-width: 0;
-  padding: var(--tcrm-space-2) 0;
+  gap: var(--tcrm-space-2);
+  font-weight: 600;
 }
-.income-source + .income-source {
-  border-top: 1px solid var(--tcrm-color-border);
-}
-.income-source__dot,
-.commission-metric__dot {
+.progress-step__dot {
   width: var(--tcrm-space-3);
   height: var(--tcrm-space-3);
-  flex: 0 0 var(--tcrm-space-3);
   border-radius: 50%;
-  background: var(--tcrm-color-primary);
+  background: var(--tcrm-color-text-secondary);
 }
-.income-source__dot--prepay {
-  background: var(--tcrm-color-success);
-}
-.income-source__label {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.income-source strong {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.income-source__percent {
-  min-width: 4ch;
-  text-align: right;
-}
-.income-composition-bar {
-  display: flex;
-  width: 100%;
-  height: var(--tcrm-space-2);
-  overflow: hidden;
-  margin-top: var(--tcrm-space-2);
-  border-radius: var(--tcrm-radius-tag);
-  background: var(--tcrm-color-muted);
-}
-.income-composition-bar__commission {
-  min-width: 0;
-  background: var(--tcrm-color-primary);
-}
-.income-composition-bar__prepay {
-  min-width: 0;
-  background: var(--tcrm-color-success);
-}
-.income-sources__caption {
-  margin: var(--tcrm-space-1) 0 0;
-}
-.commission-overview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tcrm-space-3);
-}
-.commission-overview-heading h2 {
-  margin: 0;
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  font-weight: 600;
-}
-.commission-overview-heading > span {
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
-}
-.commission-cards {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--tcrm-space-3);
-}
-.commission-metric {
-  display: grid;
-  align-content: space-between;
-  gap: var(--tcrm-space-3);
-  min-width: 0;
-  margin: 0;
-  padding: var(--tcrm-space-4);
-  border: 1px solid var(--tcrm-color-border);
-  border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-card);
-}
-.commission-metric[data-state="currentAvailable"] {
-  border-color: var(--tcrm-color-primary);
-  background: var(--tcrm-color-muted);
-}
-.commission-metric dt {
-  display: flex;
-  align-items: center;
-  gap: var(--tcrm-space-2);
-  min-height: var(--tcrm-line-height-body);
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
-  overflow-wrap: anywhere;
-}
-.commission-metric__dot[data-state="withdrawn"] {
-  background: var(--tcrm-color-success);
-}
-.commission-metric__dot[data-state="frozen"] {
+.progress-step--warning .progress-step__dot {
   background: var(--tcrm-color-warning);
 }
-.commission-metric__dot[data-state="withdrawing"] {
-  background: var(--tcrm-color-primary);
+.progress-step--success .progress-step__dot {
+  background: var(--tcrm-color-success);
 }
-.available-badge {
-  margin-left: auto;
-  padding: 0 var(--tcrm-space-2);
-  border: 1px solid var(--tcrm-color-primary);
-  border-radius: var(--tcrm-radius-tag);
-  color: var(--tcrm-color-primary-text);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
-  white-space: nowrap;
+.progress-step__amount {
+  overflow-wrap: break-word;
 }
-.commission-metric dd {
-  margin: 0;
-  color: var(--tcrm-color-text);
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+.progress-step--success .progress-step__amount:not(.negative) {
+  color: var(--tcrm-color-success);
 }
-.commission-metric__amount--available:not(.negative) {
-  color: var(--tcrm-color-primary-text);
+.progress-step__caption {
+  color: var(--tcrm-color-text-secondary);
 }
-.funds-note {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--tcrm-space-3);
-  padding: var(--tcrm-space-4);
-  border: 1px solid var(--tcrm-color-border);
-  border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-card);
+.progress-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--tcrm-color-text-secondary);
 }
-.funds-note__icon {
-  display: grid;
-  place-items: center;
-  width: var(--tcrm-space-6);
-  height: var(--tcrm-space-6);
-  border-radius: 50%;
-  background: var(--tcrm-color-muted);
-  color: var(--tcrm-color-primary-text);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
-  font-weight: 600;
+/* The icon is 16px (规范 13 §4.5); the global type reset would otherwise shrink it to the body size. */
+.progress-arrow :deep(.el-icon),
+.progress-arrow :deep(svg) {
+  width: 16px;
+  height: 16px;
 }
-.funds-note__content {
-  display: grid;
-  gap: var(--tcrm-space-2);
-  min-width: 0;
-}
-.funds-note__content > strong {
-  color: var(--tcrm-color-text);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
-}
-.funds-note__content p {
+.progress-note {
   margin: 0;
   color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
 }
-.funds-note__details {
+.action-card {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-3) var(--tcrm-space-5);
-  padding-top: var(--tcrm-space-2);
-  border-top: 1px solid var(--tcrm-color-border);
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-body);
-  line-height: var(--tcrm-line-height-body);
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--tcrm-space-2);
 }
-.funds-note__details strong {
-  color: var(--tcrm-color-text);
-  font-variant-numeric: tabular-nums;
-}
-.funds-note__calculation {
-  margin-left: var(--tcrm-space-1);
-  color: var(--tcrm-color-text-secondary);
+.action-card .el-button {
+  margin: 0;
 }
 .conditions-summary {
   display: grid;
@@ -955,16 +768,7 @@ h1 {
 .negative {
   color: var(--tcrm-color-danger);
 }
-.section-heading h2 {
-  margin: 0;
-  font-size: var(--tcrm-font-size-section);
-  line-height: var(--tcrm-line-height-section);
-}
-.application-no {
-  overflow-wrap: anywhere;
-}
-.fund-record-cards,
-.fund-records-pager {
+.fund-record-cards {
   display: none;
 }
 .fund-record-card {
@@ -988,30 +792,32 @@ h1 {
   text-align: right;
   overflow-wrap: anywhere;
 }
+/* A long status such as "Approved, awaiting payment" wraps inside the card instead of widening the page. */
+.fund-record-card dd .el-tag {
+  max-width: 100%;
+  height: auto;
+  padding-block: var(--tcrm-space-1);
+  white-space: normal;
+}
+.fund-record-card dd :deep(.el-tag__content) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.fund-record-card__actions {
+  display: flex;
+  gap: var(--tcrm-space-3);
+  margin-top: var(--tcrm-space-3);
+}
 .fund-record-amount {
   font-variant-numeric: tabular-nums;
+}
+.fund-record-cards__title {
+  margin: 0;
 }
 .empty-state {
   padding: var(--tcrm-space-6);
   text-align: center;
   color: var(--tcrm-color-text-secondary);
-}
-.withdrawal-list {
-  display: grid;
-}
-.withdrawal-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(100px, auto) minmax(100px, auto) minmax(
-      140px,
-      auto
-    );
-  align-items: center;
-  gap: var(--tcrm-space-3);
-  padding: var(--tcrm-space-3) 0;
-  border-bottom: 1px solid var(--tcrm-color-border);
-}
-.withdrawal-row:last-child {
-  border-bottom: 0;
 }
 .account-link {
   margin-top: var(--tcrm-space-2);
@@ -1022,60 +828,25 @@ h1 {
 small {
   color: var(--tcrm-color-text-secondary);
 }
-/* A long document with cards above and below, so this card cannot take the page's leftover height.
-   DataTable caps itself from the card, so the card keeps a height the rows cannot pull down. */
-@media (min-width: 768px) {
-  .records-card {
-    height: 560px;
-  }
-  .records-card :deep(.el-card__body) {
-    box-sizing: border-box;
-    height: 100%;
-  }
+.fund-records-pager {
+  display: none;
 }
 @media (max-width: 1279px) {
-  .commission-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .progress-steps {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
-@media (max-width: 1023px) {
-  .income-overview {
-    grid-template-columns: 1fr;
-    padding: var(--tcrm-space-5);
-  }
-  .income-total {
-    min-height: auto;
+  .progress-arrow {
+    justify-content: center;
+    transform: rotate(90deg);
   }
 }
 @media (max-width: 767px) {
-  .commission-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--tcrm-space-2);
+  .funds-page {
+    height: auto;
+    min-height: 0;
   }
-  .commission-metric {
-    padding: var(--tcrm-space-3);
-  }
-  .commission-metric dt {
-    align-items: flex-start;
-  }
-  .commission-metric__dot {
-    margin-top: var(--tcrm-space-1);
-  }
-  .commission-metric[data-state="currentAvailable"] dt {
-    display: grid;
-    justify-items: start;
-    gap: var(--tcrm-space-1);
-  }
-  .commission-metric[data-state="currentAvailable"] .available-badge {
-    margin-left: 0;
-  }
-  .income-source {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .income-source__percent {
-    display: none;
-  }
-  .funds-note {
+  .progress-card,
+  .action-card {
     padding: var(--tcrm-space-3);
   }
   .records-table {
@@ -1089,9 +860,6 @@ small {
     display: flex;
     justify-content: center;
     margin-top: var(--tcrm-space-3);
-  }
-  .withdrawal-row {
-    grid-template-columns: 1fr auto;
   }
 }
 </style>
