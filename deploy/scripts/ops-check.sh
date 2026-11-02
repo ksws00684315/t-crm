@@ -8,8 +8,9 @@
 # within the last 5 minutes; a fresh data volume may make postgres exit once and restart — that is
 # self-healing and shows up as one "restarted" alert plus a recovery, not a permanent failure,
 # legacy L-061), the public certificate ($TCRM_CERT_DIR/public.pem, <= 20 days left), the newest
-# pgBackRest backup (older than 26 hours) and WAL archiving progress (no progress for 15 minutes,
-# pg_stat_archiver), the newest logical backup (.dump.gpg older than 26 hours), ERROR lines in the
+# pgBackRest backup (older than 26 hours) and WAL archiving stall (pending .ready segments with no
+# archive progress for 15 minutes — idle databases with no pending WAL do not alert), the newest
+# logical backup (.dump.gpg older than 26 hours), ERROR lines in the
 # crm-admin / crm-redirect logs since the previous run, and the capacity WARNs of the backend
 # (Redis memory, click stream backlog — logger ClickStreamMonitor).
 #
@@ -103,6 +104,26 @@ cert_level() { # <days_left> <min_days> -> ok|alert
 # Freshness: alert when the age strictly exceeds the maximum.
 age_level() { # <age_minutes> <max_minutes> -> ok|alert
   if [ "$1" -gt "$2" ]; then printf 'alert'; else printf 'ok'; fi
+}
+
+# WAL stall: alert only when there is at least one pending .ready segment AND archiving has made
+# no progress (never archived, or last_archived older than max_minutes). An idle database produces
+# no WAL, so last_archived_time alone would false-alarm every quiet night.
+wal_stall_level() { # <ready_count> <last_archived_epoch> <now_epoch> <max_minutes> -> ok|alert
+  local ready="$1" last="$2" now="$3" max_min="$4"
+  case "$ready" in ''|*[!0-9]*) printf 'ok'; return ;; esac
+  [ "$ready" -gt 0 ] || { printf 'ok'; return; }
+  if [ -z "$last" ] || [ "$last" = "0" ]; then
+    printf 'alert'
+    return
+  fi
+  age_level $(( (now - last) / 60 )) "$max_min"
+}
+
+# Signature for dedup: strip digits so 72%→73% stays the same signature, but warn→CRITICAL or an
+# extra service name changes it and forces an immediate resend.
+alert_signature() {
+  printf '%s' "$1" | tr -d '0-9'
 }
 
 # Logger token of one Spring Boot console line, "unknown" when the shape does not match. Real
@@ -256,48 +277,56 @@ file_mtime() {
 
 dispatch() { # <message>: webhook (Feishu custom bot) or stdout when no webhook is configured
   if [ -n "$ALERT_WEBHOOK" ]; then
-    local payload
+    local payload response
     payload="$(printf '{"msg_type":"text","content":{"text":"%s"}}' "$(json_escape "$1")")"
-    curl -fsS -m "$CURL_TIMEOUT" -H 'Content-Type: application/json' \
-      -d "$payload" "$ALERT_WEBHOOK" > /dev/null 2>&1 ||
+    # Feishu returns HTTP 200 even when keyword/sign checks fail; inspect body "code":0.
+    if ! response=$(curl -fsS -m "$CURL_TIMEOUT" -H 'Content-Type: application/json' \
+      -d "$payload" "$ALERT_WEBHOOK" 2>/dev/null); then
       echo "ops-check: alert webhook send failed" >&2
+    elif [ -n "$response" ] && [[ "$response" == *'"code":'* ]] && [[ "$response" != *'"code":0'* ]]; then
+      echo "ops-check: alert webhook rejected: $response" >&2
+    fi
   else
     printf '%s\n' "$1"
   fi
 }
 
-write_state() { # <file> <firing> <last_sent_epoch> <last_text>
+write_state() { # <file> <firing> <last_sent_epoch> <last_text> <signature>
   local tmp
   tmp="$1.tmp"
   {
     printf 'FIRING=%q\n' "$2"
     printf 'LAST=%q\n' "$3"
     printf 'TEXT=%q\n' "$4"
+    printf 'SIG=%q\n' "$5"
   } > "$tmp" && mv -f "$tmp" "$1"
 }
 
-# One alert key per call. Firing=true sends on the first occurrence and repeats at most once per
-# hour while the condition persists; firing=false sends exactly one recovery notice.
+# One alert key per call. Firing=true sends on the first occurrence, when the signature of the
+# alert text changes (upgrade / new fault in the same key), or at most once per hour while the
+# signature stays the same; firing=false sends exactly one recovery notice.
 notify() { # <key> <0|1> <text>
   local key="$1" firing="$2" text="$3"
   local state_file="$STATE_DIR/$key.state"
-  local now_ FIRING=0 LAST=0 TEXT=""
+  local now_ FIRING=0 LAST=0 TEXT="" SIG="" sig
   if [ -f "$state_file" ]; then
     # shellcheck source=/dev/null
     . "$state_file"
   fi
   now_=$(now_epoch)
+  sig=$(alert_signature "$text")
   if [ "$firing" = "1" ]; then
-    if [ "$FIRING" != "1" ] || [ $((now_ - LAST)) -ge "$ALERT_REPEAT_SECONDS" ]; then
+    if [ "$FIRING" != "1" ] || [ "$sig" != "${SIG:-}" ] || \
+      [ $((now_ - LAST)) -ge "$ALERT_REPEAT_SECONDS" ]; then
       dispatch "ALERT $key: $text"
-      write_state "$state_file" 1 "$now_" "$text"
+      write_state "$state_file" 1 "$now_" "$text" "$sig"
     else
-      # Still firing and sent recently: keep the send time, remember the latest text for recovery.
-      write_state "$state_file" 1 "$LAST" "$text"
+      # Still firing, same signature, sent recently: keep the send time, remember latest text.
+      write_state "$state_file" 1 "$LAST" "$text" "$sig"
     fi
   elif [ "$FIRING" = "1" ]; then
     dispatch "RECOVERED $key: ${TEXT:-was alerting} — OK now"
-    write_state "$state_file" 0 "$now_" ""
+    write_state "$state_file" 0 "$now_" "" ""
   fi
 }
 
@@ -313,12 +342,28 @@ alert() { # <key> <text> — one alert record appended to the run's alert file, 
   printf '%s\t%s\n' "$1" "$2" >> "$ALERTS_FILE"
 }
 
-# Local filesystems from df -kP, one "mount<TAB>percent" line per row, pseudo file systems and
-# macOS runtime volumes removed (on the Linux production host only real data mounts remain).
-df_usage_lines() {
-  df -kP 2>/dev/null | awk '
+# Filter df -kP output (with header) to one "mount<TAB>percent" line per real data mount.
+# Drops pseudo FS, macOS runtime volumes, Ubuntu snap loop/squashfs mounts (/dev/loop*, /snap/...).
+# Exposed for tests that feed a fixed sample (do not rely on the host's live df alone).
+filter_df_usage() {
+  awk '
     NR > 1 && $1 !~ /^(tmpfs|devtmpfs|udev|shm|none|overlay|devfs|map[- ])/ &&
-    $6 !~ /^\/(System|private\/var\/vm|dev|Library\/Developer)/ { pct = $5; sub(/%/, "", pct); print $6 "\t" pct }'
+    $1 !~ /^\/dev\/loop/ &&
+    $6 !~ /^\/(System|private\/var\/vm|dev|Library\/Developer)/ &&
+    $6 !~ /^\/snap(\/|$)/ {
+      pct = $5; sub(/%/, "", pct); print $6 "\t" pct
+    }'
+}
+
+# Local filesystems from df -kP. On Linux prefer excluding squashfs (Ubuntu snap); macOS has no
+# -x and falls back to the same awk filters.
+df_usage_lines() {
+  local df_out
+  if df_out=$(df -kP -x squashfs 2>/dev/null); then
+    printf '%s\n' "$df_out" | filter_df_usage
+  else
+    df -kP 2>/dev/null | filter_df_usage
+  fi
 }
 
 memory_available_percent() {
@@ -425,15 +470,22 @@ check_pgbackrest() {
     [ "$(age_level "$age_min" $((BACKUP_MAX_AGE_HOURS * 60)))" = "alert" ] &&
       alert pgbackrest "latest pgBackRest backup is $((age_min / 60))h old (> $BACKUP_MAX_AGE_HOURS h)"
   fi
+  # Stall = pending .ready segments AND no archive progress. Idle DB (ready=0) must not alert.
+  local ready_count
+  ready_count="$("${COMPOSE[@]}" exec -T postgres psql -U "${TCRM_DB_SUPERUSER_USERNAME:-postgres}" \
+    -d "${TCRM_DB_NAME:-tcrm}" -Atc \
+    "select count(*) from pg_ls_archive_statusdir() where name like '%.ready'" 2>/dev/null | tail -1)"
   last="$("${COMPOSE[@]}" exec -T postgres psql -U "${TCRM_DB_SUPERUSER_USERNAME:-postgres}" \
     -d "${TCRM_DB_NAME:-tcrm}" -Atc \
     "select coalesce(extract(epoch from last_archived_time)::bigint, 0) from pg_stat_archiver" 2>/dev/null | tail -1)"
-  if [ -z "$last" ] || [ "$last" = "0" ]; then
-    alert pgbackrest "WAL archiving: nothing archived yet (or the archive query failed)"
-  else
-    age_min=$(( (NOW - last) / 60 ))
-    [ "$(age_level "$age_min" "$WAL_MAX_AGE_MINUTES")" = "alert" ] &&
-      alert pgbackrest "WAL archive idle for $age_min min (> $WAL_MAX_AGE_MINUTES min)"
+  case "$ready_count" in ''|*[!0-9]*) ready_count=0 ;; esac
+  if [ "$(wal_stall_level "$ready_count" "${last:-0}" "$NOW" "$WAL_MAX_AGE_MINUTES")" = "alert" ]; then
+    if [ -z "$last" ] || [ "$last" = "0" ]; then
+      alert pgbackrest "WAL archiving: $ready_count pending segment(s), nothing archived yet (or the archive query failed)"
+    else
+      age_min=$(( (NOW - last) / 60 ))
+      alert pgbackrest "WAL archive stalled: $ready_count pending, idle for $age_min min (> $WAL_MAX_AGE_MINUTES min)"
+    fi
   fi
   return 0
 }
@@ -503,7 +555,10 @@ main() {
     if [ -n "$text" ]; then
       notify "$key" 1 "$text"
       fired=$((fired + 1))
-      printf 'ALERT %s: %s\n' "$key" "$text"
+      # notify→dispatch already prints when webhook is empty; mirror to cron log only when set.
+      if [ -n "$ALERT_WEBHOOK" ]; then
+        printf 'ALERT %s: %s\n' "$key" "$text"
+      fi
     else
       notify "$key" 0 ""
     fi

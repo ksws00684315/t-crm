@@ -33,6 +33,18 @@ expect alert "$(cert_level 3 20)" "certificate near expiry alerts"
 expect ok "$(age_level 1560 1560)" "age at the maximum is ok"
 expect alert "$(age_level 1561 1560)" "age past the maximum alerts"
 
+# WAL stall: pending .ready required; idle (ready=0) never alerts.
+expect ok "$(wal_stall_level 0 0 1000000 15)" "idle with never-archived is ok"
+expect ok "$(wal_stall_level 0 1 1000000 15)" "idle with old last_archived is ok"
+expect alert "$(wal_stall_level 1 0 1000000 15)" "pending and never archived alerts"
+expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15)" "pending and stalled alerts"
+expect ok "$(wal_stall_level 2 $((1000000 - 10 * 60)) 1000000 15)" "pending but recent archive is ok"
+
+expect "disk usage % on / CRITICAL (>= %)"   "$(alert_signature "disk usage 86% on / CRITICAL (>= 85%)")" "signature strips digits"
+expect "$(alert_signature "disk usage 72% on / (>= 70%)")"   "$(alert_signature "disk usage 73% on / (>= 70%)")" "numeric-only change keeps signature"
+[ "$(alert_signature "disk usage 72% on / (>= 70%)")" !=   "$(alert_signature "disk usage 86% on / CRITICAL (>= 85%)")" ] ||
+  fail "warn vs CRITICAL must change signature"
+
 # --- time parsing (GNU and BSD date formats) -----------------------------
 
 # 2026-01-02T03:04:05Z in both input shapes must give the same epoch (1767323045).
@@ -107,26 +119,39 @@ SENT="$WORK/sent.log"
 : > "$SENT"
 dispatch() { printf '%s\n' "$1" >> "$SENT"; }
 
-notify disk 1 "disk 71% on /"
-notify disk 1 "disk 72% on /"      # same state, within the hour: no repeat
+notify disk 1 "disk usage 71% on / (>= 70%)"
+notify disk 1 "disk usage 72% on / (>= 70%)"  # same signature, within the hour: no repeat
 [ "$(grep -c . "$SENT")" = "1" ] || fail "dedup: expected 1 send, got $(grep -c . "$SENT")"
 
-# Simulate an hour-old state: the next occurrence must repeat.
-write_state "$STATE_DIR/disk.state" 1 "$(( $(now_epoch) - 3601 ))" "disk 71% on /"
-notify disk 1 "disk 73% on /"
-[ "$(grep -c . "$SENT")" = "2" ] || fail "repeat after the hour missing"
+# Signature change within the hour (warn → CRITICAL) must send immediately.
+notify disk 1 "disk usage 86% on / CRITICAL (>= 85%)"
+[ "$(grep -c . "$SENT")" = "2" ] || fail "signature upgrade (warn→CRITICAL) must send"
+grep -q 'CRITICAL' "$SENT" || fail "CRITICAL text missing after signature change"
+
+# Simulate an hour-old state: the next occurrence must repeat even with same signature.
+write_state "$STATE_DIR/disk.state" 1 "$(( $(now_epoch) - 3601 ))"   "disk usage 86% on / CRITICAL (>= 85%)" "$(alert_signature "disk usage 86% on / CRITICAL (>= 85%)")"
+notify disk 1 "disk usage 87% on / CRITICAL (>= 85%)"
+[ "$(grep -c . "$SENT")" = "3" ] || fail "repeat after the hour missing"
 
 notify disk 0 ""
-[ "$(grep -c . "$SENT")" = "3" ] || fail "recovery notice missing"
-grep -q '^RECOVERED disk: disk 73% on / — OK now$' "$SENT" || fail "recovery text wrong: $(cat "$SENT")"
+[ "$(grep -c . "$SENT")" = "4" ] || fail "recovery notice missing"
+grep -q '^RECOVERED disk: disk usage 87% on / CRITICAL (>= 85%) — OK now$' "$SENT" ||   fail "recovery text wrong: $(cat "$SENT")"
 notify disk 0 ""
-[ "$(grep -c . "$SENT")" = "3" ] || fail "duplicate recovery notice"
+[ "$(grep -c . "$SENT")" = "4" ] || fail "duplicate recovery notice"
+
+# Container: adding another failed service changes the signature → immediate send.
+: > "$SENT"
+notify container 1 "redis: health=unhealthy"
+notify container 1 "redis: health=unhealthy; postgres: status=exited"
+[ "$(grep -c . "$SENT")" = "2" ] || fail "new fault in same key must send (got $(grep -c . "$SENT"))"
+grep -q 'postgres: status=exited' "$SENT" || fail "postgres fault missing from resend"
 
 # State survives text with quotes, spaces and unicode.
 notify memory 1 'mem 9% (< 10%) "quote" 中文'
 # shellcheck disable=SC1091
 . "$STATE_DIR/memory.state"
 [ "$FIRING" = "1" ] || fail "memory state firing"
+[ -n "${SIG:-}" ] || fail "memory state missing SIG"
 notify memory 0 ""
 grep -q 'quote" 中文' "$SENT" || fail "recovery lost the stored text"
 
@@ -149,6 +174,28 @@ grep -q 'url=http://hook.invalid/feishu' "$CURL_LOG" || fail "webhook URL not us
 grep -q 'content":{"text":"msg with \\"quotes\\""}' "$CURL_LOG" ||
   fail "payload shape wrong: $(cat "$CURL_LOG")"
 
+# --- df filter (fixed Ubuntu sample; do not rely on the host's live df) -----
+
+DF_SAMPLE="$(cat <<'EOF'
+Filesystem     1024-blocks    Used Available Capacity Mounted on
+/dev/root         30315248 8123456  22176376      27% /
+tmpfs              3918848       0   3918848       0% /dev/shm
+/dev/loop0           55552   55552         0     100% /snap/amazon-ssm-agent/9881
+/dev/loop1           74688   74688         0     100% /snap/core22/1663
+/dev/nvme0n1p15     106858    6212    100646       6% /boot/efi
+overlay           30315248 8123456  22176376      27% /var/lib/docker/overlay2/abc/merged
+EOF
+)"
+DF_OUT="$(printf '%s\n' "$DF_SAMPLE" | filter_df_usage)"
+printf '%s\n' "$DF_OUT" | grep -q $'^/\t27$' || fail "root mount missing from filtered df: $DF_OUT"
+printf '%s\n' "$DF_OUT" | grep -q $'^/boot/efi\t6$' || fail "boot/efi missing from filtered df"
+case "$DF_OUT" in
+  */snap/*) fail "snap mount leaked into filtered df: $DF_OUT" ;;
+  */dev/shm*) fail "tmpfs leaked into filtered df: $DF_OUT" ;;
+  *overlay*) fail "overlay leaked into filtered df: $DF_OUT" ;;
+esac
+[ "$(printf '%s\n' "$DF_OUT" | grep -c .)" = "2" ] || fail "unexpected filtered df rows: $DF_OUT"
+
 # --- environment sanity (host specific, must at least be numeric) ----------
 
 case "$(memory_available_percent)" in
@@ -157,6 +204,9 @@ esac
 while IFS=$'\t' read -r mount pct; do
   case "$pct" in
     ''|*[!0-9]*) fail "df usage not numeric for $mount: $pct" ;;
+  esac
+  case "$mount" in
+    /snap|/*/snap/*) fail "live df_usage_lines still includes snap: $mount" ;;
   esac
 done < <(df_usage_lines)
 
