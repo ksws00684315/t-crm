@@ -1,0 +1,520 @@
+#!/usr/bin/env bash
+# Host-side monitoring for the production stack (ADR-037 decision 8, design document section 10
+# "availability" and "observability"). Install in the host cron, every 5 minutes:
+#   */5 * * * * /opt/tcrm/deploy/scripts/ops-check.sh >> /var/log/tcrm-ops-check.log 2>&1
+#
+# Checked every run (thresholds overridable, see below): disk usage (>= 70% warn, >= 85% critical),
+# available memory (< 10% of total), the five Compose services (not running, unhealthy, or restarted
+# within the last 5 minutes; a fresh data volume may make postgres exit once and restart — that is
+# self-healing and shows up as one "restarted" alert plus a recovery, not a permanent failure,
+# legacy L-061), the public certificate ($TCRM_CERT_DIR/public.pem, <= 20 days left), the newest
+# pgBackRest backup (older than 26 hours) and WAL archiving progress (no progress for 15 minutes,
+# pg_stat_archiver), the newest logical backup (.dump.gpg older than 26 hours), ERROR lines in the
+# crm-admin / crm-redirect logs since the previous run, and the capacity WARNs of the backend
+# (Redis memory, click stream backlog — logger ClickStreamMonitor).
+#
+# Privacy: log CONTENT never leaves the host. Alerts carry the level, logger names, counts and
+# traceIds only, never message bodies (personal data must not reach third parties).
+#
+#   TCRM_ENV_FILE / TCRM_COMPOSE_FILE   locate the stack (defaults: deploy/.env, prod compose file)
+#   TCRM_ALERT_WEBHOOK_URL              Feishu custom bot webhook; empty = alerts to stdout only
+#   TCRM_HEARTBEAT_URL                  pinged once per run (Healthchecks.io style); empty = skip;
+#                                       the external service alerts when the pings stop
+#   TCRM_OPS_STATE_DIR                  alert state (dedup + recovery), default deploy/ops-state
+#   TCRM_CERT_DIR / TCRM_BACKUP_DIR     same values as in deploy/.env (certificate / backup dir)
+#   TCRM_OPS_SERVICES                   services to watch (default "nginx crm-admin crm-redirect
+#                                       postgres redis")
+# Threshold overrides (mainly for testing; defaults are the production values):
+#   TCRM_OPS_DISK_WARN_PERCENT=70       TCRM_OPS_DISK_CRIT_PERCENT=85
+#   TCRM_OPS_MEM_MIN_AVAIL_PERCENT=10   TCRM_OPS_CERT_MIN_DAYS=20
+#   TCRM_OPS_BACKUP_MAX_AGE_HOURS=26    TCRM_OPS_WAL_MAX_AGE_MINUTES=15
+#   TCRM_OPS_RESTART_WINDOW_MINUTES=5   TCRM_OPS_ALERT_REPEAT_HOURS=1
+#
+# The script always exits 0 (alerting is the channel, cron must not mail); a run that dies anyway
+# is detected by the heartbeat service. The judgment logic lives in the functions below so tests
+# can source this file (deploy/scripts/test-ops-check.sh).
+set -uo pipefail
+
+DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+CURL_TIMEOUT=10
+# Keys of every possible alert, in report order; recovery notices key off this list.
+ALL_KEYS="disk memory container cert pgbackrest backup applog capacity"
+
+# ---------------------------------------------------------------- helpers
+
+now_epoch() { date +%s; }
+
+# Seconds since the epoch for the date strings this script meets: openssl's notAfter
+# ("Nov 30 12:00:00 2026 GMT") and Docker's StartedAt ("2026-11-02T10:00:00Z", fractions removed).
+# GNU date first (Linux production host), BSD formats as the fallback (macOS verification).
+parse_epoch() {
+  local value="$1" out=""
+  out=$(date -u -d "$value" +%s 2>/dev/null) && [ -n "$out" ] && printf '%s' "$out" && return 0
+  out=$(date -u -j -f '%b %d %H:%M:%S %Y %Z' "$value" +%s 2>/dev/null) &&
+    [ -n "$out" ] && printf '%s' "$out" && return 0
+  out=$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$value" +%s 2>/dev/null) &&
+    [ -n "$out" ] && printf '%s' "$out" && return 0
+  out=$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "$value" +%s 2>/dev/null) &&
+    [ -n "$out" ] && printf '%s' "$out" && return 0
+  return 1
+}
+
+# "2026-11-02T10:00:00.123456789Z" -> "2026-11-02T10:00:00Z" (fraction dropped, zone kept).
+strip_fraction() {
+  local value="$1"
+  if [[ "$value" =~ ^([^.]*)\.[0-9]+(Z|[+-][0-9]{2}:?[0-9]{2})?$ ]]; then
+    printf '%s%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  else
+    printf '%s' "$value"
+  fi
+}
+
+json_escape() { # <text> escaped for use inside a JSON string literal
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
+}
+
+# --------------------------------------------------- pure judgment functions
+
+# Disk: warn at the warn threshold or above, critical at the critical threshold or above.
+disk_level() { # <use_percent> <warn_percent> <crit_percent> -> ok|warn|crit
+  if [ "$1" -ge "$3" ]; then printf 'crit'
+  elif [ "$1" -ge "$2" ]; then printf 'warn'
+  else printf 'ok'
+  fi
+}
+
+# Memory: alert when available percent is STRICTLY below the minimum.
+mem_level() { # <available_percent> <min_percent> -> ok|alert
+  if [ "$1" -lt "$2" ]; then printf 'alert'; else printf 'ok'; fi
+}
+
+# Certificate: alert when the remaining days are at or below the minimum.
+cert_level() { # <days_left> <min_days> -> ok|alert
+  if [ "$1" -le "$2" ]; then printf 'alert'; else printf 'ok'; fi
+}
+
+# Freshness: alert when the age strictly exceeds the maximum.
+age_level() { # <age_minutes> <max_minutes> -> ok|alert
+  if [ "$1" -gt "$2" ]; then printf 'alert'; else printf 'ok'; fi
+}
+
+# Logger token of one Spring Boot console line, "unknown" when the shape does not match. Real
+# shape (Spring Boot 4, correlation renders empty brackets on non-request threads):
+#   date  LEVEL 1 --- [app] [thread] [traceId] logger : message
+line_logger() {
+  local logger
+  logger=$(printf '%s\n' "$1" | sed -n '
+    s/.* --- \[[^]]*\][[:space:]]*\[[^]]*\][[:space:]]*\[[^]]*\][[:space:]][[:space:]]*\([^[:space:]][^[:space:]]*\)[[:space:]][[:space:]]*:.*/\1/p')
+  if [ -z "$logger" ]; then
+    # Fallback for a line without the [app] [thread] group (older correlation position).
+    logger=$(printf '%s\n' "$1" | sed -n \
+      's/.* --- \[[^]]*\][[:space:]][[:space:]]*\([^[:space:]][^[:space:]]*\)[[:space:]][[:space:]]*:.*/\1/p')
+  fi
+  printf '%s' "${logger:-unknown}"
+}
+
+# traceId from the correlation brackets (the third [...] after "---"; single spaces between the
+# groups in the real format), empty when absent.
+line_trace_id() {
+  printf '%s' "$1" | sed -n 's/^.* --- \[[^]]*\] \[[^]]*\] \[\([^]]*\)\].*/\1/p'
+}
+
+# Increments "name:count name:count" lists (bash 3.2 compatible: no associative arrays).
+bump_count() { # <list> <item> -> updated list on stdout
+  local list="$1" item="$2" entry name count out="" found=0
+  for entry in $list; do
+    name=${entry%:*}
+    count=${entry##*:}
+    if [ "$name" = "$item" ]; then
+      count=$((count + 1))
+      found=1
+    fi
+    out="$out $name:$count"
+  done
+  [ "$found" -eq 0 ] && out="$out $item:1"
+  printf '%s' "${out# }"
+}
+
+add_unique() { # <space-separated list> <item> -> list with the item added once
+  case " $1 " in
+    *" $2 "*) printf '%s' "$1" ;;
+    *) printf '%s %s' "$1" "$2" | sed 's/^ //' ;;
+  esac
+}
+
+# Reads log lines on stdin, prints one summary line per kind found (tab separated):
+#   applog<TAB>count<TAB>logger:count logger:count<TAB>trace1 trace2
+#   capacity<TAB>click-backlog<TAB>count<TAB>logger
+#   capacity<TAB>redis-memory<TAB>count<TAB>logger
+# An app log line is a Spring Boot console line (date, level, [traceId], pid --- [thread] logger
+# : message). Message bodies are dropped here — only these tokens ever leave the host.
+classify_log_lines() {
+  local line logger trace
+  local err_count=0 err_loggers="" err_traces=""
+  local backlog_count=0 backlog_logger="" memory_count=0 memory_logger=""
+  while IFS= read -r line; do
+    case "$line" in
+      *[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T*' ERROR '*' --- '*)
+        err_count=$((err_count + 1))
+        logger=$(line_logger "$line")
+        err_loggers=$(bump_count "$err_loggers" "$logger")
+        trace=$(line_trace_id "$line")
+        case "$trace" in '') ;; *) err_traces=$(add_unique "$err_traces" "$trace") ;; esac
+        ;;
+      *' WARN '*)
+        case "$line" in
+          *'Click stream backlog at'*)
+            backlog_count=$((backlog_count + 1))
+            backlog_logger=$(line_logger "$line")
+            ;;
+          *'Redis used_memory at'*)
+            memory_count=$((memory_count + 1))
+            memory_logger=$(line_logger "$line")
+            ;;
+        esac
+        ;;
+    esac
+  done
+  [ "$err_count" -gt 0 ] && printf 'applog\t%s\t%s\t%s\n' "$err_count" "$err_loggers" "$err_traces"
+  [ "$backlog_count" -gt 0 ] &&
+    printf 'capacity\tclick-backlog\t%s\t%s\n' "$backlog_count" "$backlog_logger"
+  [ "$memory_count" -gt 0 ] &&
+    printf 'capacity\tredis-memory\t%s\t%s\n' "$memory_count" "$memory_logger"
+  return 0
+}
+
+# ------------------------------------------------------------- environment
+
+load_config() {
+  local env_file="${TCRM_ENV_FILE:-$DEPLOY_DIR/.env}"
+  # Values already set by the caller win over the env file (the verification triggers per-run
+  # overrides this way; in production nothing is preset and the env file decides).
+  local saved
+  saved=$(preserve_caller_env TCRM_ENV_FILE TCRM_COMPOSE_FILE TCRM_ALERT_WEBHOOK_URL \
+    TCRM_HEARTBEAT_URL TCRM_OPS_STATE_DIR TCRM_CERT_DIR TCRM_BACKUP_DIR TCRM_OPS_SERVICES \
+    TCRM_OPS_DISK_WARN_PERCENT TCRM_OPS_DISK_CRIT_PERCENT TCRM_OPS_MEM_MIN_AVAIL_PERCENT \
+    TCRM_OPS_CERT_MIN_DAYS TCRM_OPS_BACKUP_MAX_AGE_HOURS TCRM_OPS_WAL_MAX_AGE_MINUTES \
+    TCRM_OPS_RESTART_WINDOW_MINUTES TCRM_OPS_ALERT_REPEAT_HOURS)
+  if [ -f "$env_file" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "$env_file"
+    set +a
+  fi
+  eval "$saved"
+  ENV_FILE="$env_file"
+  COMPOSE_FILE="${TCRM_COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}"
+  ALERT_WEBHOOK="${TCRM_ALERT_WEBHOOK_URL:-}"
+  HEARTBEAT_URL="${TCRM_HEARTBEAT_URL:-}"
+  STATE_DIR="${TCRM_OPS_STATE_DIR:-$DEPLOY_DIR/ops-state}"
+  CERT_DIR="${TCRM_CERT_DIR:-./certs}"
+  case "$CERT_DIR" in /*) ;; *) CERT_DIR="$DEPLOY_DIR/$CERT_DIR" ;; esac
+  BACKUP_DIR="${TCRM_BACKUP_DIR:-$DEPLOY_DIR/backups}"
+  SERVICES="${TCRM_OPS_SERVICES:-nginx crm-admin crm-redirect postgres redis}"
+  DISK_WARN_PERCENT="${TCRM_OPS_DISK_WARN_PERCENT:-70}"
+  DISK_CRIT_PERCENT="${TCRM_OPS_DISK_CRIT_PERCENT:-85}"
+  MEM_MIN_AVAIL_PERCENT="${TCRM_OPS_MEM_MIN_AVAIL_PERCENT:-10}"
+  CERT_MIN_DAYS="${TCRM_OPS_CERT_MIN_DAYS:-20}"
+  BACKUP_MAX_AGE_HOURS="${TCRM_OPS_BACKUP_MAX_AGE_HOURS:-26}"
+  WAL_MAX_AGE_MINUTES="${TCRM_OPS_WAL_MAX_AGE_MINUTES:-15}"
+  RESTART_WINDOW_MINUTES="${TCRM_OPS_RESTART_WINDOW_MINUTES:-5}"
+  ALERT_REPEAT_HOURS="${TCRM_OPS_ALERT_REPEAT_HOURS:-1}"
+  ALERT_REPEAT_SECONDS=$((ALERT_REPEAT_HOURS * 3600))
+  NOW=$(now_epoch)
+}
+
+compose_cmd() {
+  COMPOSE=(docker compose -f "$COMPOSE_FILE")
+  [ -f "$ENV_FILE" ] && COMPOSE+=(--env-file "$ENV_FILE")
+  return 0
+}
+
+# export statements re-applying the caller's values of the given names, after the env file was
+# sourced (bash 3.2 compatible: no nameref).
+preserve_caller_env() {
+  local name
+  for name in "$@"; do
+    if [ -n "${!name+x}" ]; then
+      printf 'export %s=%q\n' "$name" "${!name}"
+    fi
+  done
+}
+
+# Modification time as seconds since the epoch (GNU stat first, BSD stat as the fallback).
+file_mtime() {
+  stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
+}
+
+# ------------------------------------------------------- alerting and state
+
+dispatch() { # <message>: webhook (Feishu custom bot) or stdout when no webhook is configured
+  if [ -n "$ALERT_WEBHOOK" ]; then
+    local payload
+    payload="$(printf '{"msg_type":"text","content":{"text":"%s"}}' "$(json_escape "$1")")"
+    curl -fsS -m "$CURL_TIMEOUT" -H 'Content-Type: application/json' \
+      -d "$payload" "$ALERT_WEBHOOK" > /dev/null 2>&1 ||
+      echo "ops-check: alert webhook send failed" >&2
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+write_state() { # <file> <firing> <last_sent_epoch> <last_text>
+  local tmp
+  tmp="$1.tmp"
+  {
+    printf 'FIRING=%q\n' "$2"
+    printf 'LAST=%q\n' "$3"
+    printf 'TEXT=%q\n' "$4"
+  } > "$tmp" && mv -f "$tmp" "$1"
+}
+
+# One alert key per call. Firing=true sends on the first occurrence and repeats at most once per
+# hour while the condition persists; firing=false sends exactly one recovery notice.
+notify() { # <key> <0|1> <text>
+  local key="$1" firing="$2" text="$3"
+  local state_file="$STATE_DIR/$key.state"
+  local now_ FIRING=0 LAST=0 TEXT=""
+  if [ -f "$state_file" ]; then
+    # shellcheck source=/dev/null
+    . "$state_file"
+  fi
+  now_=$(now_epoch)
+  if [ "$firing" = "1" ]; then
+    if [ "$FIRING" != "1" ] || [ $((now_ - LAST)) -ge "$ALERT_REPEAT_SECONDS" ]; then
+      dispatch "ALERT $key: $text"
+      write_state "$state_file" 1 "$now_" "$text"
+    else
+      # Still firing and sent recently: keep the send time, remember the latest text for recovery.
+      write_state "$state_file" 1 "$LAST" "$text"
+    fi
+  elif [ "$FIRING" = "1" ]; then
+    dispatch "RECOVERED $key: ${TEXT:-was alerting} — OK now"
+    write_state "$state_file" 0 "$now_" ""
+  fi
+}
+
+send_heartbeat() {
+  [ -n "$HEARTBEAT_URL" ] || return 0
+  curl -fsS -m "$CURL_TIMEOUT" "$HEARTBEAT_URL" > /dev/null 2>&1 ||
+    echo "ops-check: heartbeat send failed" >&2
+}
+
+# ------------------------------------------------------------------ checks
+
+alert() { # <key> <text> — one alert record appended to the run's alert file, KEY<TAB>TEXT
+  printf '%s\t%s\n' "$1" "$2" >> "$ALERTS_FILE"
+}
+
+# Local filesystems from df -kP, one "mount<TAB>percent" line per row, pseudo file systems and
+# macOS runtime volumes removed (on the Linux production host only real data mounts remain).
+df_usage_lines() {
+  df -kP 2>/dev/null | awk '
+    NR > 1 && $1 !~ /^(tmpfs|devtmpfs|udev|shm|none|overlay|devfs|map[- ])/ &&
+    $6 !~ /^\/(System|private\/var\/vm|dev|Library\/Developer)/ { pct = $5; sub(/%/, "", pct); print $6 "\t" pct }'
+}
+
+memory_available_percent() {
+  if [ -r /proc/meminfo ]; then
+    awk '/^MemTotal:/ { total = $2 } /^MemAvailable:/ { avail = $2 }
+         END { if (total > 0) printf "%d", avail * 100 / total }' /proc/meminfo
+  else
+    # macOS fallback (best effort for local verification): free + inactive + speculative pages.
+    local page total free inactive speculative
+    page=$(pagesize)
+    total=$(sysctl -n hw.memsize)
+    free=$(vm_stat | awk '/Pages free/ { gsub(/\./, "", $3); print $3 }')
+    inactive=$(vm_stat | awk '/Pages inactive/ { gsub(/\./, "", $3); print $3 }')
+    speculative=$(vm_stat | awk '/Pages speculative/ { gsub(/\./, "", $3); print $3 }')
+    printf '%s' $(( (free + inactive + speculative) * page * 100 / total ))
+  fi
+}
+
+check_disk() {
+  local mount pct level
+  while IFS=$'\t' read -r mount pct; do
+    [ -n "$mount" ] || continue
+    level=$(disk_level "$pct" "$DISK_WARN_PERCENT" "$DISK_CRIT_PERCENT")
+    case "$level" in
+      warn) alert disk "disk usage ${pct}% on $mount (>= ${DISK_WARN_PERCENT}%)" ;;
+      crit) alert disk "disk usage ${pct}% on $mount CRITICAL (>= ${DISK_CRIT_PERCENT}%)" ;;
+    esac
+  done < <(df_usage_lines)
+}
+
+check_memory() {
+  local pct
+  pct=$(memory_available_percent)
+  if [ -z "$pct" ]; then
+    alert memory "available memory: could not read memory info"
+    return
+  fi
+  [ "$(mem_level "$pct" "$MEM_MIN_AVAIL_PERCENT")" = "alert" ] &&
+    alert memory "available memory ${pct}% (< ${MEM_MIN_AVAIL_PERCENT}%)"
+  return 0
+}
+
+check_containers() {
+  local svc ids id info status rest health started started_epoch problems
+  compose_cmd
+  for svc in $SERVICES; do
+    ids="$("${COMPOSE[@]}" ps --all -q "$svc" 2>/dev/null)"
+    if [ -z "$ids" ]; then
+      alert container "$svc: no container (missing or stopped)"
+      continue
+    fi
+    problems=""
+    for id in $ids; do
+      info="$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.State.StartedAt}}' "$id" 2>/dev/null)"
+      if [ -z "$info" ]; then
+        problems="$problems inspect-failed"
+        continue
+      fi
+      status=${info%%|*}
+      rest=${info#*|}
+      health=${rest%%|*}
+      started=${rest#*|}
+      [ "$status" != "running" ] && problems="$problems status=$status"
+      [ "$health" = "unhealthy" ] && problems="$problems health=unhealthy"
+      started_epoch=$(parse_epoch "$(strip_fraction "$started")") || started_epoch=""
+      if [ -n "$started_epoch" ] &&
+        [ $((NOW - started_epoch)) -lt $((RESTART_WINDOW_MINUTES * 60)) ]; then
+        problems="$problems restarted-within-${RESTART_WINDOW_MINUTES}m"
+      fi
+    done
+    [ -n "$problems" ] && alert container "$svc:$problems"
+  done
+  return 0
+}
+
+check_cert() {
+  local cert="$CERT_DIR/public.pem" end epoch days
+  if [ ! -f "$cert" ]; then
+    alert cert "public certificate missing: $cert"
+    return
+  fi
+  end="$(openssl x509 -noout -enddate -in "$cert" 2>/dev/null)"
+  end=${end#notAfter=}
+  epoch=$(parse_epoch "$end") || epoch=""
+  if [ -z "$epoch" ]; then
+    alert cert "public certificate: could not read the expiry date of $cert"
+    return
+  fi
+  days=$(( (epoch - NOW) / 86400 ))
+  [ "$(cert_level "$days" "$CERT_MIN_DAYS")" = "alert" ] &&
+    alert cert "public certificate expires in $days days (<= $CERT_MIN_DAYS)"
+  return 0
+}
+
+check_pgbackrest() {
+  compose_cmd
+  local info stop last age_min
+  info="$("${COMPOSE[@]}" exec -T -u postgres postgres pgbackrest --stanza=tcrm info --output=json 2>/dev/null)"
+  stop="$(printf '%s' "$info" | grep -o '"stop":[0-9]\{1,\}' | cut -d: -f2 | sort -n | tail -1)"
+  if [ -z "$stop" ]; then
+    alert pgbackrest "pgBackRest: no backup found (stanza missing, repository empty, or postgres unreachable)"
+  else
+    age_min=$(( (NOW - stop) / 60 ))
+    [ "$(age_level "$age_min" $((BACKUP_MAX_AGE_HOURS * 60)))" = "alert" ] &&
+      alert pgbackrest "latest pgBackRest backup is $((age_min / 60))h old (> $BACKUP_MAX_AGE_HOURS h)"
+  fi
+  last="$("${COMPOSE[@]}" exec -T postgres psql -U "${TCRM_DB_SUPERUSER_USERNAME:-postgres}" \
+    -d "${TCRM_DB_NAME:-tcrm}" -Atc \
+    "select coalesce(extract(epoch from last_archived_time)::bigint, 0) from pg_stat_archiver" 2>/dev/null | tail -1)"
+  if [ -z "$last" ] || [ "$last" = "0" ]; then
+    alert pgbackrest "WAL archiving: nothing archived yet (or the archive query failed)"
+  else
+    age_min=$(( (NOW - last) / 60 ))
+    [ "$(age_level "$age_min" "$WAL_MAX_AGE_MINUTES")" = "alert" ] &&
+      alert pgbackrest "WAL archive idle for $age_min min (> $WAL_MAX_AGE_MINUTES min)"
+  fi
+  return 0
+}
+
+check_logical_backup() {
+  local file newest=0 mtime age_min
+  for file in "$BACKUP_DIR"/tcrm-*.dump.gpg; do
+    [ -e "$file" ] || continue
+    mtime=$(file_mtime "$file") || mtime=0
+    [ "$mtime" -gt "$newest" ] && newest=$mtime
+  done
+  if [ "$newest" -eq 0 ]; then
+    alert backup "no .dump.gpg logical backup found in $BACKUP_DIR"
+    return
+  fi
+  age_min=$(( (NOW - newest) / 60 ))
+  [ "$(age_level "$age_min" $((BACKUP_MAX_AGE_HOURS * 60)))" = "alert" ] &&
+    alert backup "latest logical backup is $((age_min / 60))h old (> $BACKUP_MAX_AGE_HOURS h)"
+  return 0
+}
+
+check_app_logs() {
+  compose_cmd
+  local svc logs f1 f2 f3 f4 message
+  for svc in crm-admin crm-redirect; do
+    logs="$("${COMPOSE[@]}" logs --since "$SINCE" "$svc" 2>/dev/null)"
+    [ -n "$logs" ] || continue
+    while IFS=$'\t' read -r f1 f2 f3 f4; do
+      case "$f1" in
+        applog)
+          message="$svc: $f2 ERROR log line(s) since the last check (loggers: $f3"
+          [ -n "$f4" ] && message="$message; traceIds: $f4"
+          alert applog "$message)"
+          ;;
+        capacity)
+          alert capacity "$svc: $f2 capacity WARN x$f3 (logger $f4)"
+          ;;
+      esac
+    done < <(printf '%s\n' "$logs" | classify_log_lines)
+  done
+  return 0
+}
+
+# -------------------------------------------------------------------- main
+
+main() {
+  load_config
+  mkdir -p "$STATE_DIR"
+  ALERTS_FILE="$STATE_DIR/run.alerts"
+  : > "$ALERTS_FILE"
+  # Overlap beats gaps: the next scan starts at this run's begin, so anything logged while this
+  # run is scanning is seen again (dedup makes that harmless).
+  SINCE=$(cat "$STATE_DIR/lastrun" 2>/dev/null || printf '%s' $((NOW - 300)))
+
+  check_disk
+  check_memory
+  check_containers
+  check_cert
+  check_pgbackrest
+  check_logical_backup
+  check_app_logs
+  printf '%s' "$NOW" > "$STATE_DIR/lastrun"
+
+  local key text fired=0
+  for key in $ALL_KEYS; do
+    text="$(awk -F'\t' -v k="$key" '$1 == k { if (s != "") s = s "; "; s = s $2 } END { print s }' "$ALERTS_FILE")"
+    if [ -n "$text" ]; then
+      notify "$key" 1 "$text"
+      fired=$((fired + 1))
+      printf 'ALERT %s: %s\n' "$key" "$text"
+    else
+      notify "$key" 0 ""
+    fi
+  done
+  rm -f "$ALERTS_FILE"
+  send_heartbeat
+  [ "$fired" -eq 0 ] && echo "ops-check: all checks passed"
+  return 0
+}
+
+# Run only when executed, so the functions above can be sourced by tests.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi
