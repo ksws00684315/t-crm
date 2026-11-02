@@ -13,7 +13,7 @@ for day in 20261005 20261004 20261003 20261002 20261001 20260930 20260929 202609
 done
 
 actual="$(expired_backups "$dir" 20261005 | xargs -n1 basename | sort)"
-expected="$(printf 'tcrm-%sT030000Z.dump\n' 20260801 20260830 20260906 20260919 20260926 | sort)"
+expected="$(printf 'tcrm-%sT030000Z.dump.gpg\n' 20260801 20260830 20260906 20260919 20260926 | sort)"
 if [ "$actual" != "$expected" ]; then
   printf 'unexpected expiry list\n--- expected\n%s\n--- actual\n%s\n' "$expected" "$actual" >&2
   exit 1
