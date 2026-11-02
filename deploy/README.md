@@ -9,6 +9,7 @@
 | `nginx/` | 四个站点（`t.`、`kol.`、`admin.`、`upload.`）的配置模板、TLS 与安全响应头片段、Cloudflare 回源 IP 段与回源认证 CA；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
 | `postgres/initdb/` | 生产 PostgreSQL 首次初始化脚本：创建非超级用户的应用账号并设为库的 owner |
 | `scripts/renew-public-cert.sh` | 申请与续期 `admin.`、`upload.` 的 Let's Encrypt 公开证书（DNS-01），放到证书目录并重载 Nginx |
+| `scripts/ops-check.sh` | 主机监控检查（host cron 每 5 分钟）：磁盘、内存、容器、公开证书、备份、应用日志、容量告警；告警走 Webhook，心跳供外部探活（见「监控告警」） |
 | `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `scripts/local-infra.sh` | 本地共享中间件的启动、停止、备份、恢复与维护命令 |
 | `backup/pg-backup.sh` | 每日加密 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 S3） |
@@ -214,7 +215,7 @@ deploy/scripts/local-infra.sh psql
 1. 在 Cloudflare 创建 API 令牌，权限只给本域名所在 Zone 的「Zone → DNS → Edit」，写入仓库**之外**的文件（例如 `/etc/tcrm/cloudflare.ini`，权限 600，属主为运行脚本的用户）：`dns_cloudflare_api_token = <令牌>`。令牌不进 `.env`、不进日志；脚本发现文件权限不是 600 会拒绝运行。
 2. 在 `deploy/.env` 设置 `TCRM_CERTBOT_CLOUDFLARE_INI`（上述文件的路径）和 `TCRM_CERTBOT_EMAIL`（接收到期提醒）。
 3. 首次申请：在 `up` 之前以能运行 docker 的用户（通常是 root）执行 `deploy/scripts/renew-public-cert.sh`。证书状态和 Let's Encrypt 账号保存在 `deploy/certbot/`（已被 Git 忽略，和密钥一起备份）。
-4. 续期：host cron 每天一次，例如 `17 4 * * * /opt/tcrm/deploy/scripts/renew-public-cert.sh >> /var/log/tcrm-cert.log 2>&1`。certbot 距到期不足 30 天才会真正续期，其余时候脚本输出「certificate unchanged」。续期失败时脚本非零退出，旧证书继续使用到过期，日志里能看到原因；上线后应在监控里加证书到期检查（任务 96）。
+4. 续期：host cron 每天一次，例如 `17 4 * * * /opt/tcrm/deploy/scripts/renew-public-cert.sh >> /var/log/tcrm-cert.log 2>&1`。certbot 距到期不足 30 天才会真正续期，其余时候脚本输出「certificate unchanged」。续期失败时脚本非零退出，旧证书继续使用到过期，日志里能看到原因；证书剩余有效期由 `ops-check.sh` 每次运行检查（见「监控告警」）。
 5. 脚本的离线测试：`bash deploy/scripts/test-renew-public-cert.sh`（用桩替换 docker，验证文件落位、权限、重载顺序和令牌不进输出）。真实申请需要真实域名和 Cloudflare 令牌，上线前在服务器上完成并记录。
 
 ### AWS 主机与防火墙（ADR-037）
@@ -232,7 +233,7 @@ deploy/scripts/local-infra.sh psql
 
 | 层次 | 内容 | 频率与保留 | 位置 |
 |---|---|---|---|
-| 1. pgBackRest | 全量 + 差异备份，加 WAL 连续归档；客户端加密（aes-256-cbc），S3 只看到密文 | WAL 持续归档（`archive_timeout=300`，空闲时最多 5 分钟切换一次）；周日全量、其余日差异；保留 4 个全量（约四周） | S3，路径 `PGBACKREST_REPO1_PATH`（默认 `/pgbackrest`） |
+| 1. pgBackRest | 全量 + 差异备份，加 WAL 连续归档；客户端加密（aes-256-cbc），S3 只看到密文 | WAL 持续归档（`archive_timeout=300`：有写入时最多约 5 分钟切段；**完全空闲时不会切段**）；周日全量、其余日差异；保留 4 个全量（约四周） | S3，路径 `PGBACKREST_REPO1_PATH`（默认 `/pgbackrest`） |
 | 2. 逻辑备份 | `pg_dump` 自定义格式，`gpg` 对称加密（AES256），只保留 `.dump.gpg` | 每日 03:00；7 日 + 4 周（周日） | 本机 `TCRM_BACKUP_DIR`；S3 `<前缀>/daily/`、`<前缀>/weekly/` |
 | 3. S3 防护 | 跨区域复制、Object Lock、生命周期规则（`daily/` 7 日、`weekly/` 28 日） | 由负责人在 AWS 控制台配置（负责人操作清单），仓库不创建 | S3 |
 | 4. 云快照 | 只用于恢复主机系统环境，**不是**数据备份 | 按需 | EC2 / Lightsail |
@@ -267,11 +268,11 @@ deploy/scripts/local-infra.sh psql
    0 3 * * * /opt/tcrm/deploy/backup/pg-backup.sh >> /var/log/tcrm-backup.log 2>&1
    ```
 
-   两个脚本失败时都非零退出；告警接入由任务 96 完成。
+   两个脚本失败时都非零退出；备份是否按时产出由 `ops-check.sh` 检查（见「监控告警」）。
 
 ### S3 不可用时
 
-WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：积压超过 4 GiB 后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据盘不会被写满、数据库继续可写。数据盘要为此预留空间：最坏情况下 `pg_wal` 约为 4 GiB 队列加 PostgreSQL 自身的 `max_wal_size`（默认 1 GiB）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。监控 `archive_command` 失败和 `pg_wal` 大小是任务 96 的内容。
+WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：积压超过 4 GiB 后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据盘不会被写满、数据库继续可写。数据盘要为此预留空间：最坏情况下 `pg_wal` 约为 4 GiB 队列加 PostgreSQL 自身的 `max_wal_size`（默认 1 GiB）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。WAL 归档是否停止由 `ops-check.sh` 监控（查 `pg_stat_archiver`，见「监控告警」）；归档缺口本身无法自动弥补，只能靠恢复后立即重做全量。
 
 ### 恢复
 
@@ -322,6 +323,65 @@ gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.
    - 后台能启动，Flyway 严格模式校验通过（日志出现 `Successfully validated ... migrations` 和 `Schema "public" is up to date`）；
    - 登录超管，重建链接索引，抽查一条推广链接能跳转；钱包核对日志没有 `mismatched creators`。
 5. 把耗时、丢失窗口、核对结果记入演练记录；S3 连通、跨区域复制和 Object Lock 的实际效果也在这次演练里确认。
+
+## 监控告警（任务 96，ADR-037 决定 8）
+
+不部署 Prometheus、Grafana。监控由两层组成：外部探测（第三方拨测服务）发现「外部看起来不可用」，主机检查脚本（`deploy/scripts/ops-check.sh`）发现「主机内部在劣化」。仓库不创建任何真实监控服务，本节的账号、机器人、令牌都由负责人在上线前创建（负责人操作清单）。
+
+### 主机检查脚本（ops-check.sh）
+
+host cron 每 5 分钟运行一次（建议与备份脚本同一 crontab）：
+
+```
+*/5 * * * * /opt/tcrm/deploy/scripts/ops-check.sh >> /var/log/tcrm-ops-check.log 2>&1
+```
+
+| 检查 | 告警条件 | 默认阈值 |
+|---|---|---|
+| 磁盘 | 本地文件系统使用率过高 | ≥ 70% 告警，≥ 85% 标记严重 |
+| 内存 | 可用内存不足 | < 10% |
+| 容器 | 五个 Compose 服务（nginx、crm-admin、crm-redirect、postgres、redis）任一非 running、unhealthy，或 5 分钟内重启过 | 窗口 5 分钟 |
+| 公开证书 | `TCRM_CERT_DIR/public.pem`（`admin.`、`upload.` 的 Let's Encrypt 证书）剩余有效期 | ≤ 20 天 |
+| pgBackRest | 最新备份过旧；或存在待归档 `.ready` 段且归档无进展（`pg_ls_archive_statusdir` + `pg_stat_archiver`） | 备份 > 26 小时；有 `.ready` 且无进展 > 15 分钟（库空闲、无待归档段时不告警） |
+| 逻辑备份 | 最新 `.dump.gpg` 过旧（`TCRM_BACKUP_DIR`） | > 26 小时 |
+| 应用日志 | 上次检查以来 crm-admin、crm-redirect 出现 ERROR | — |
+| 容量告警 | 日志里出现 Redis 内存（`Redis used_memory`）或点击积压（`Click stream backlog`）的 WARN（后台每分钟检查，见「资源与 Redis 容量」） | — |
+
+行为约定：
+
+- **告警只发到 Webhook，日志内容不出主机**：告警文本只含级别、logger 名、次数和 traceId，不含消息正文，个人信息不会流向第三方。Webhook 是飞书自定义机器人格式（`{"msg_type":"text",…}`），`TCRM_ALERT_WEBHOOK_URL` 为空时只输出到标准输出。
+- **飞书机器人配置**：自定义机器人不要开签名校验；若启用关键词，至少放行 `ALERT` 与 `RECOVERED`（脚本用这两个前缀）。飞书在关键词/签名失败时仍返回 HTTP 200 且 `code≠0`，脚本会检查响应体里的 `"code":0`，失败写 stderr，不把这次当成送达。
+- **去重与恢复**：同一告警**签名不变**时最多每小时重复一次；签名取「告警文本去掉数字」，因此 72%→73% 不重发，但 warn→CRITICAL、同类里多出一个故障服务会立即重发。恢复时发一条 `RECOVERED` 通知。状态文件在 `TCRM_OPS_STATE_DIR`（默认 `deploy/ops-state/`，不入库）。
+- **心跳**：每次运行结束请求一次 `TCRM_HEARTBEAT_URL`（Healthchecks.io 风格）；脚本或主机挂了、ping 停了，由该外部服务告警——这是脚本自身故障的唯一发现手段。
+- 阈值可用 `TCRM_OPS_*` 环境变量覆盖（见 `.env.example`），只为测试设计，生产保持默认。
+- 全新数据卷首次启动时 postgres 可能退出一次再自动重启（遗留 L-061）：表现为一条「5 分钟内重启过」的告警和随后的恢复通知，不是持续故障；持续出现才需要排查。
+- **发版重启**：每次 `release.sh` 会重启容器，下一轮检查通常会发一对「5 分钟内重启过」告警和随后的恢复通知，属预期，不必当故障排查。
+- 磁盘检查会排除 `/dev/loop*` 与 `/snap/`（Ubuntu snap 只读挂载常年 100%，否则会持续 CRITICAL）。
+
+### 外部探测（负责人创建）
+
+用任意拨测服务（如 UptimeRobot）对以下地址建探测，全部走公网域名、间隔 5 分钟、失败即通知：
+
+| 探测 | 地址 | 判定 |
+|---|---|---|
+| 跳转服务 | `https://t.<域名>/healthz` | HTTP 200 |
+| 管理端 | `https://admin.<域名>` | HTTP 200/302（登录页或跳转） |
+| 达人端 | `https://kol.<域名>` | HTTP 200 |
+| 心跳 | Healthchecks.io 类服务分配的 URL，填入 `TCRM_HEARTBEAT_URL` | 未按期 ping 时告警 |
+
+`upload.<域名>` 不建拨测：300 MB 上传不适合探测请求，证书到期已由主机检查覆盖。
+
+### 告警处理指引
+
+| 告警 | 先做什么 |
+|---|---|
+| disk | 清理日志与镜像（`docker system df` 定位）；≥ 85% 会很快写满 WAL 和备份，立即处理 |
+| memory | `free -m`、`docker stats` 找出占用者；持续低于 10% 说明 4 核 8G 规划到顶，按「资源与 Redis 容量」评估扩容 |
+| container | `docker compose ps`、`docker compose logs <服务>`；crm-admin 反复重启先看是否 Flyway 严格模式拒绝（见「发布与回滚」第 9 项） |
+| cert | 重跑 `deploy/scripts/renew-public-cert.sh`，失败原因看 `/var/log/tcrm-cert.log`；连续失败检查 Cloudflare API 令牌 |
+| pgbackrest | 备份过旧：手动 `deploy/backup/pgbackrest-backup.sh`；WAL stalled（有 `.ready` 且无进展）：S3 连通性与凭证，按「S3 不可用时」处理，恢复后立即做全量；库完全空闲且无 `.ready` 时不会告警 |
+| backup | 手动 `deploy/backup/pg-backup.sh` 看报错（gpg、口令文件权限、磁盘） |
+| applog / capacity | 登录管理端按 traceId 查操作日志；Redis 内存或点击积压 WARN 按上表阈值安排扩容，不要等 ERROR |
 
 ## 邮件服务（Resend）
 
