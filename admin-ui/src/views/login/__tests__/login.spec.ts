@@ -57,6 +57,11 @@ describe("login page", () => {
     vi.mocked(authApi.createCaptcha).mockReset();
   });
 
+  it("keeps the login card flat like the creator portal", async () => {
+    const { wrapper } = await mountLogin();
+    expect(wrapper.findComponent({ name: "ElCard" }).props("shadow")).toBe("never");
+  });
+
   it("does not call the API when the form is invalid", async () => {
     const { wrapper } = await mountLogin();
     await fill(wrapper, "a", "");

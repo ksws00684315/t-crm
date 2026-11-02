@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { mount } from "@vue/test-utils";
+import ElementPlus from "element-plus";
+import { createPinia, setActivePinia } from "pinia";
 import { describe, expect, it } from "vitest";
+import { i18n } from "@/locales";
+import AuthShell from "../AuthShell.vue";
 
 /**
  * Style assertions on the component source: scoped styles are not applied in jsdom, so the
@@ -14,6 +19,22 @@ function ruleBody(selector: string): string {
   if (start < 0) return "";
   return source.slice(start, source.indexOf("}", start) + 1);
 }
+
+describe("AuthShell title role", () => {
+  function mountShell(brand: boolean) {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    return mount(AuthShell, {
+      props: { title: "SparkTrack Creator", brand },
+      global: { plugins: [ElementPlus, i18n, pinia] }
+    });
+  }
+
+  it("marks the title as the system name only when the page asks for it", () => {
+    expect(mountShell(true).get("h1").classes()).toContain("auth-shell__title--brand");
+    expect(mountShell(false).get("h1").classes()).not.toContain("auth-shell__title--brand");
+  });
+});
 
 describe("AuthShell links", () => {
   it("separates the sign-up, forgot and back-to-login links with a token gap", () => {

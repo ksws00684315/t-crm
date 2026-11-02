@@ -92,6 +92,8 @@ const { t } = useI18n();
   --el-menu-active-color: var(--tcrm-color-primary-text);
   --el-menu-text-color: var(--tcrm-color-text-secondary);
   --el-menu-item-height: 40px;
+  /* Element Plus resolves calc(56px - 6px) at :root, so the inherited value must be overridden. */
+  --el-menu-sub-item-height: 40px;
 }
 .side:not(.is-collapsed) .side__menu :deep(.el-menu-item),
 .side:not(.is-collapsed) .side__menu :deep(.el-sub-menu__title) {
@@ -128,8 +130,6 @@ const { t } = useI18n();
 }
 .side__badge {
   margin-left: auto;
-  transform: scale(0.9);
-  transform-origin: right center;
 }
 .is-collapsed .side__badge {
   display: none;

@@ -35,4 +35,11 @@ describe("LocaleSwitch", () => {
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("en-US");
     expect(document.documentElement.lang).toBe("en-US");
   });
+
+  it("uses the default 32px control size instead of the small one", async () => {
+    const wrapper = mountSwitch();
+    await nextTick();
+    expect(wrapper.findComponent(ElSelect).props("size")).toBeUndefined();
+    expect(wrapper.find(".el-select").classes()).not.toContain("el-select--small");
+  });
 });
