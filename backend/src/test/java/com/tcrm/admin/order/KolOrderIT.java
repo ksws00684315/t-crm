@@ -119,6 +119,7 @@ class KolOrderIT {
     sync.setScheduled(false);
     for (String table :
         List.of(
+            "crm_commission_item_state",
             "crm_order_item",
             "crm_order",
             "crm_kol_auth_token",
@@ -217,7 +218,8 @@ class KolOrderIT {
         .andExpect(jsonPath("$.data.daily.length()").value(1))
         .andExpect(jsonPath("$.data.daily[0].date").value("2026-10-15"))
         .andExpect(jsonPath("$.data.daily[0].salesCny").value("150.00"))
-        .andExpect(jsonPath("$.data.daily[0].commissionCny").value("0.00"));
+        .andExpect(jsonPath("$.data.daily[0].commissionCny").value("0.00"))
+        .andExpect(jsonPath("$.data.daily[0].orderCount").value(1));
   }
 
   @Test
@@ -235,6 +237,135 @@ class KolOrderIT {
                 .param("to", "2026-10-17T00:00:00Z")
                 .header(KOL_TOKEN, token))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void shouldSumTheCumulativeSalesOfTheSignedInCreatorOnly() throws Exception {
+    // Excluded for kolA: another creator's line on the shared order 1001, the unpaid order 1003,
+    // the other company's order 1004, and an unattributed order carrying the creator's id.
+    jdbc.update(
+        "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,kol_id,attribution_status,"
+            + "order_status,raw_status,order_time,pay_time,total_amount,pay_amount,freight,"
+            + "discount,source,last_sync_time,create_time,update_time,is_deleted)"
+            + " VALUES(1006,1,10,'W99000106',?,'UNMATCHED','PAID','10',now(),now(),999,999,0,0,"
+            + "1,now(),now(),now(),false)",
+        kolA);
+    item(2010, 1006, 1L, kolA, "Unattributed", "999.00");
+    // A second paid, attributed order with a partial refund: the total stays before refunds.
+    order(1007, 1L, "W99000107", kolA, "COMPLETED", PAY_B);
+    item(2011, 1007, 1L, kolA, "Refunded Widget", "200.00");
+    jdbc.update("UPDATE crm_order_item SET refund_amount = 50.00 WHERE id = 2011");
+    String tokenA = kolLogin("a@example.test");
+    String tokenB = kolLogin("b@example.test");
+
+    mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, tokenA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("350.00"))
+        .andExpect(jsonPath("$.data.asOf").isNotEmpty());
+    // kolB's 70.00 line sits on kolA's order, so only order 1002 counts for kolB.
+    mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, tokenB))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("30.00"));
+    mvc.perform(get("/kol-api/analytics/sales-total")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void shouldReturnZeroCumulativeSales_whenTheCreatorHasNoPaidOrder() throws Exception {
+    jdbc.update("DELETE FROM crm_order_item WHERE kol_id = ?", kolB);
+    jdbc.update("DELETE FROM crm_order WHERE kol_id = ?", kolB);
+    String tokenB = kolLogin("b@example.test");
+
+    mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, tokenB))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("0.00"));
+  }
+
+  @Test
+  void shouldSummariseOrdersByLineStatusWithTheListFilters() throws Exception {
+    // Order 1007: three own lines. Settled 100-20, frozen 40-10, unverified 60 (no state row).
+    order(1007, 1L, "W99000107", kolA, "COMPLETED", PAY_B);
+    item(2011, 1007, 1L, kolA, "Settled Widget", "100.00");
+    item(2012, 1007, 1L, kolA, "Frozen Widget", "40.00");
+    item(2013, 1007, 1L, kolA, "Unverified Widget", "60.00");
+    jdbc.update("UPDATE crm_order_item SET refund_amount = 20.00 WHERE id = 2011");
+    jdbc.update("UPDATE crm_order_item SET refund_amount = 10.00 WHERE id = 2012");
+    commissionState(3011, 1007, 2011, kolA, "10.00", "10.00");
+    commissionState(3012, 1007, 2012, kolA, "4.00", "0.00");
+    // Order 1001 (kolA lines 100 + 50) has no commission state: unverified.
+    String token = kolLogin("a@example.test");
+
+    mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("350.00"))
+        .andExpect(jsonPath("$.data.settledCny").value("80.00"))
+        .andExpect(jsonPath("$.data.pendingCny").value("30.00"))
+        .andExpect(jsonPath("$.data.refundedCny").value("30.00"));
+    // The summary follows the list filters: product name, order number and status.
+    mvc.perform(
+            get("/kol-api/orders/summary").param("productName", "frozen").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        // The order matches, and its three own lines all count (same scope as the list rows).
+        .andExpect(jsonPath("$.data.salesCny").value("200.00"));
+    mvc.perform(get("/kol-api/orders/summary").param("orderNo", "0101").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("150.00"))
+        .andExpect(jsonPath("$.data.settledCny").value("0.00"));
+    mvc.perform(
+            get("/kol-api/orders/summary")
+                .param("settlementStatus", "WITHDRAWABLE")
+                .header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("200.00"))
+        .andExpect(jsonPath("$.data.settledCny").value("80.00"));
+    mvc.perform(
+            get("/kol-api/orders/summary")
+                .param("payFrom", "2026-10-16T00:00:00Z")
+                .param("payTo", "2026-10-17T00:00:00Z")
+                .header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("200.00"));
+    mvc.perform(
+            get("/kol-api/orders/summary")
+                .param("settlementStatus", "MYSTERY")
+                .header(KOL_TOKEN, token))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void shouldKeepTheOrderSummaryOwnAndInCompany() throws Exception {
+    // kolB owns order 1002 only; its 70.00 line on kolA's order 1001 does not count.
+    String tokenB = kolLogin("b@example.test");
+    mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, tokenB))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("30.00"))
+        .andExpect(jsonPath("$.data.settledCny").value("0.00"))
+        .andExpect(jsonPath("$.data.pendingCny").value("0.00"))
+        .andExpect(jsonPath("$.data.refundedCny").value("0.00"));
+    // Unpaid order 1003 and the other company's order 1004 never count for kolA.
+    String tokenA = kolLogin("a@example.test");
+    mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, tokenA))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("150.00"));
+    mvc.perform(get("/kol-api/orders/summary")).andExpect(status().isUnauthorized());
+  }
+
+  private void commissionState(
+      long id, long orderId, long itemId, long kolId, String accrued, String released) {
+    boolean releasedLine = new BigDecimal(released).signum() > 0;
+    jdbc.update(
+        "INSERT INTO crm_commission_item_state(id,tenant_id,order_id,order_item_id,kol_id,"
+            + "source_key,settlement_state,verified,accrued_commission_cny,"
+            + "released_commission_cny,release_basis,is_deleted,create_time,update_time)"
+            + " VALUES(?,1,?,?,?,?,?,TRUE,?,?,?,FALSE,now(),now())",
+        id,
+        orderId,
+        itemId,
+        kolId,
+        "it-" + id,
+        releasedLine ? "CONFIRMED" : "UNSETTLED",
+        new BigDecimal(accrued),
+        new BigDecimal(released),
+        releasedLine ? "CONFIRMED" : "UNSETTLED");
   }
 
   private long activatedKol(long tenantId, String email) {

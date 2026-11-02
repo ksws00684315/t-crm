@@ -1,5 +1,9 @@
 # Rendered by the nginx image: ${TCRM_DOMAIN} is substituted at container start (NGINX_ENVSUBST_FILTER=^TCRM_).
 # Sites:  t.<domain> redirect service | kol.<domain> creator portal | admin.<domain> admin console
+#         upload.<domain> promo-sheet upload (grey cloud)
+# Certificates (ADR-037): t., kol. = Cloudflare origin certificate (tls.conf); admin., upload. = public
+# Let's Encrypt certificate (tls-public.conf). t., kol., admin. require the Cloudflare client
+# certificate (Authenticated Origin Pulls); upload. does not.
 
 server_tokens off;
 
@@ -12,6 +16,11 @@ limit_req_zone $binary_remote_addr zone=tcrm_external:10m rate=120r/m;
 # Redirect rate limit. Loose on purpose so shared mobile egress (CGNAT) is not blocked.
 # Cloudflare rate limiting is the primary defense; this zone is the origin fallback.
 limit_req_zone $binary_remote_addr zone=tcrm_redirect:10m rate=30r/s;
+
+# Docker's embedded DNS. Upstreams are resolved at request time (variable proxy_pass), so a rebuilt
+# crm-admin / crm-redirect with a new IP is picked up within 10 s without a reload, and Nginx still
+# starts when an upstream container is down (requests to it get 502, other sites keep working).
+resolver 127.0.0.11 valid=10s ipv6=off;
 
 include /etc/nginx/snippets/cloudflare-real-ip.conf;
 
@@ -34,14 +43,16 @@ server {
     listen 443 ssl;
     http2 on;
     server_name t.${TCRM_DOMAIN};
+    set $crm_redirect_upstream http://crm-redirect:8081;
     include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/cloudflare-origin-pull.conf;
     include /etc/nginx/snippets/security-headers.conf;
 
     location /t/ {
         limit_req zone=tcrm_redirect burst=60 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-redirect:8081;
+        proxy_pass $crm_redirect_upstream;
     }
 
     # Links written by the customer's sheet script: /i/{copied Weidian item ID} (ADR-019).
@@ -49,12 +60,12 @@ server {
         limit_req zone=tcrm_redirect burst=60 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-redirect:8081;
+        proxy_pass $crm_redirect_upstream;
     }
 
     location = /healthz {
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-redirect:8081;
+        proxy_pass $crm_redirect_upstream;
         access_log off;
     }
 
@@ -68,7 +79,9 @@ server {
     listen 443 ssl;
     http2 on;
     server_name kol.${TCRM_DOMAIN};
+    set $crm_admin_upstream http://crm-admin:8080;
     include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/cloudflare-origin-pull.conf;
     include /etc/nginx/snippets/security-headers-web.conf;
 
     root /usr/share/nginx/sites/kol;
@@ -76,7 +89,7 @@ server {
 
     location /kol-api/ {
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location /assets/ {
@@ -99,7 +112,9 @@ server {
     listen 443 ssl;
     http2 on;
     server_name admin.${TCRM_DOMAIN};
-    include /etc/nginx/snippets/tls.conf;
+    set $crm_admin_upstream http://crm-admin:8080;
+    include /etc/nginx/snippets/tls-public.conf;
+    include /etc/nginx/snippets/cloudflare-origin-pull.conf;
     include /etc/nginx/snippets/security-headers-web.conf;
 
     root /usr/share/nginx/sites/admin;
@@ -113,33 +128,33 @@ server {
     location ~ ^/admin-api/commission/prepays/[0-9]+/application-details$ {
         client_max_body_size 51m;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location = /admin-api/auth/login {
         limit_req zone=tcrm_login burst=5 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location = /admin-api/auth/captchas {
         limit_req zone=tcrm_captcha burst=30 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location /admin-api/external/ {
         limit_req zone=tcrm_external burst=40 nodelay;
         limit_req_status 429;
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location /admin-api/ {
         include /etc/nginx/snippets/proxy.conf;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location /assets/ {
@@ -161,13 +176,16 @@ server {
 # The admin console's main domain sits behind the Cloudflare proxy, whose free plan rejects
 # request bodies above roughly 100MB. The 300MB promo-sheet workbook therefore goes to this
 # dedicated sub-domain, which the owner adds in Cloudflare as "DNS only" (grey cloud, not
-# proxied). Same certificate and upstream as the other sites; nothing but the upload endpoint
+# proxied). It serves the public Let's Encrypt certificate (tls-public.conf; the Cloudflare origin
+# certificate is not trusted by browsers) and does NOT require the Cloudflare client certificate,
+# because browsers connect to it directly. Same upstream as admin.; nothing but the upload endpoint
 # (and the CORS preflight the browser sends before it) is served here.
 server {
     listen 443 ssl;
     http2 on;
     server_name upload.${TCRM_DOMAIN};
-    include /etc/nginx/snippets/tls.conf;
+    set $crm_admin_upstream http://crm-admin:8080;
+    include /etc/nginx/snippets/tls-public.conf;
     include /etc/nginx/snippets/security-headers.conf;
 
     location ~ ^/admin-api/kol/kols/[0-9]+/promo-sheet-uploads$ {
@@ -180,7 +198,7 @@ server {
         include /etc/nginx/snippets/proxy-headers.conf;
         proxy_connect_timeout 5s;
         proxy_read_timeout 300s;
-        proxy_pass http://crm-admin:8080;
+        proxy_pass $crm_admin_upstream;
     }
 
     location / {

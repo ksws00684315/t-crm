@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getCreatorAnalytics,
+  getCreatorOrderSummary,
+  getFundRecords,
   getFundSummary,
+  getSalesTotal,
   getWithdrawalConditions,
   getWithdrawals,
   submitWithdrawal
@@ -154,5 +157,69 @@ describe("fund summary presentation contract", () => {
       to: "2026-10-26T00:00:00+08:00"
     });
     expect(result.paidOrderCount).toBe(12);
+  });
+});
+
+describe("workspace and order summary requests (task 92)", () => {
+  it("requests the cumulative sales without any range", async () => {
+    vi.mocked(http.request).mockResolvedValue({
+      salesCny: "12345678.90",
+      asOf: "2026-11-01T00:00:00Z"
+    });
+    await expect(getSalesTotal()).resolves.toEqual({
+      salesCny: "12345678.90",
+      asOf: "2026-11-01T00:00:00Z"
+    });
+    expect(http.request).toHaveBeenCalledWith({ method: "GET", url: "/analytics/sales-total" });
+  });
+
+  it("turns the daily order counts into numbers", async () => {
+    vi.mocked(http.request).mockResolvedValue({
+      asOf: "2026-11-01T00:00:00Z",
+      salesCny: "10.00",
+      paidOrderCount: "2",
+      commissionCny: "1.00",
+      withdrawnCny: "0.00",
+      withdrawingCny: "0.00",
+      frozenCny: "0.00",
+      daily: [{ date: "2026-10-31", salesCny: "10.00", commissionCny: "1.00", orderCount: "2" }]
+    });
+    const overview = await getCreatorAnalytics({
+      from: "2026-10-31T00:00:00+08:00",
+      to: "2026-11-01T00:00:00+08:00"
+    });
+    expect(overview.paidOrderCount).toBe(2);
+    expect(overview.daily[0].orderCount).toBe(2);
+  });
+
+  it("requests the order summary with the list filters and no paging", async () => {
+    vi.mocked(http.request).mockResolvedValue({
+      salesCny: "1.00",
+      settledCny: "0.00",
+      pendingCny: "0.00",
+      refundedCny: "0.00"
+    });
+    const filter = {
+      payFrom: "2026-10-01T00:00:00.000Z",
+      payTo: "2026-11-01T00:00:00.000Z",
+      orderNo: "12",
+      settlementStatus: "FROZEN" as const
+    };
+    await getCreatorOrderSummary(filter);
+    expect(http.request).toHaveBeenCalledWith({
+      method: "GET",
+      url: "/orders/summary",
+      params: filter
+    });
+  });
+
+  it("requests the fund records page by page", async () => {
+    vi.mocked(http.request).mockResolvedValue({ items: [], total: 0, page: 2, size: 20 });
+    await getFundRecords({ page: 2, size: 20 });
+    expect(http.request).toHaveBeenCalledWith({
+      method: "GET",
+      url: "/fund-records",
+      params: { page: 2, size: 20 }
+    });
   });
 });

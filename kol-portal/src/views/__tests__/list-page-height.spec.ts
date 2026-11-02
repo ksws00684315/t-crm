@@ -21,17 +21,12 @@ describe("desktop list pages give DataTable a parent height that does not follow
   it.each([
     ["items", ".items-page", "420px"],
     ["orders", ".orders-page", "420px"],
+    ["funds", ".funds-page", "720px"],
     ["income/prepay", ".prepay-results", "0"]
   ])("%s fills the content area and stays content height on phones", (view, selector, floor) => {
     const css = style(view);
     expect(rule(css, selector)).toContain("height: 100%");
     expect(rule(css, selector)).toContain(`min-height: ${floor}`);
     expect(rule(after(css, "@media (max-width: 767px)"), selector)).toContain("height: auto");
-  });
-
-  it("funds keeps a stable record card under its summary, on desktop only", () => {
-    const desktop = after(style("funds"), "@media (min-width: 768px)");
-    expect(rule(desktop, ".records-card")).toContain("height: 560px");
-    expect(rule(desktop, ".records-card :deep(.el-card__body)")).toContain("height: 100%");
   });
 });

@@ -19,6 +19,10 @@ import Account from "@/views/account/index.vue";
 import Layout from "@/layout/index.vue";
 
 vi.mock("@/utils/demo-mode", () => ({ isDemoMode: true }));
+// The layout renders the workspace, whose chart needs a canvas that jsdom does not have.
+vi.mock("@/utils/echarts", () => ({
+  createChart: () => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })
+}));
 vi.mock("@/api/auth", () => ({
   login: vi.fn(),
   loginDemo: vi.fn(),
@@ -320,6 +324,8 @@ describe("account and logout", () => {
   it.each([false, true])("clears local state after logout (server fails: %s)", async fails => {
     if (fails) vi.mocked(api.logout).mockRejectedValue(failure("COMMON_INTERNAL_ERROR", 500));
     else vi.mocked(api.logout).mockResolvedValue(null);
+    // The workspace behind the layout refreshes the profile for the commission rate.
+    vi.mocked(api.getMe).mockResolvedValue(kol);
     const { wrapper, router, store } = await page(Layout, "/");
     store.acceptSession(session);
     await nextTick();

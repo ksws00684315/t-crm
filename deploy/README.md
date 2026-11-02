@@ -6,10 +6,16 @@
 | `docker-compose.dev.yml` | 本地共享中间件：PostgreSQL 17.11、Redis 7.4.5 |
 | `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis |
 | `docker-compose.preview.yml` | 本地预览：与生产相同的五个服务，只绑定 `127.0.0.1:8890/8891/8892` |
-| `nginx/` | 三个站点的配置模板、安全响应头、Cloudflare 回源 IP 段；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
+| `nginx/` | 四个站点（`t.`、`kol.`、`admin.`、`upload.`）的配置模板、TLS 与安全响应头片段、Cloudflare 回源 IP 段与回源认证 CA；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
+| `postgres/initdb/` | 生产 PostgreSQL 首次初始化脚本：创建非超级用户的应用账号并设为库的 owner |
+| `scripts/renew-public-cert.sh` | 申请与续期 `admin.`、`upload.` 的 Let's Encrypt 公开证书（DNS-01），放到证书目录并重载 Nginx |
 | `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `scripts/local-infra.sh` | 本地共享中间件的启动、停止、备份、恢复与维护命令 |
-| `backup/pg-backup.sh` | 每日 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 R2） |
+| `backup/pg-backup.sh` | 每日加密 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 S3） |
+| `backup/pgbackrest-backup.sh` | pgBackRest 定时备份（周日全量、其余日差异，结束前 `check`） |
+| `backup/restore-pitr.sh` | 时间点 / 最新点恢复脚本（需输入 `yes`） |
+| `backup/iam-policy.example.json` | 备份写入身份的 IAM 最小权限策略示例 |
+| `postgres/` | 带 pgBackRest 的 PostgreSQL 镜像（Dockerfile、`pgbackrest.conf`）与初始化脚本 |
 | `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
 
@@ -98,7 +104,7 @@ deploy/scripts/local-infra.sh psql
 
 迁移会备份旧 PostgreSQL 与 Redis 数据，把 `.env.preview` 中的数据库凭证、加密主密钥、IP 哈希盐和管理员配置迁入 `.env.local`，停止旧预览容器，将旧数据卷复制到共享中间件卷并启动共享中间件。核对达人、用户数和主要页面无误前，保留旧卷；不要对旧预览执行 `down -v`。
 
-`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。预览 Compose 挂载整个 `nginx/preview/` 目录（而非单文件）：git 更新该文件（换 inode）后 `preview.sh up` 结尾的 `nginx -s reload` 仍能读到新配置（L-012）。生产模板变更后要同步改预览配置。任务 26 的推广表上传已同步：上传地址由「系统配置」的 `url.upload` 运行时决定，默认空值走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
+`deploy/nginx/preview/preview.conf` 的 `location` 与反向代理规则（含登录限流）须与生产模板 `deploy/nginx/templates/default.conf.template` 保持同步。预览 Compose 挂载整个 `nginx/preview/` 目录（而非单文件）：git 更新该文件（换 inode）后 `preview.sh up` 结尾的 `nginx -s reload` 仍能读到新配置（L-012）。生产模板变更后要同步改预览配置。上游运行时解析（`resolver` 加变量 `proxy_pass`，任务 93）已同步到预览配置；`preview.sh up` 结尾的 `nginx -s reload` 保留，对 IP 变化已不是必需。任务 26 的推广表上传已同步：上传地址由「系统配置」的 `url.upload` 运行时决定，默认空值走管理端同源 `:8890`，该路径单独放开到 300 MB。17b 的 `/admin-api/external/` 限流由 17b 合并时同步。
 
 预览的内存限制小于生产模板，只适合本机。Redis 仍要求密码，并且 `maxmemory-policy` 为 `noeviction`。
 
@@ -129,20 +135,143 @@ deploy/scripts/local-infra.sh psql
 
 ## 生产部署（模板，使用前逐项审阅）
 
-1. 域名：Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>` 到服务器；SSL/TLS 模式用 Full (strict)，把 Cloudflare 源站证书放到 `TCRM_CERT_DIR`（`origin.pem`、`origin.key`）。**另加一条 `upload.<域名>` 的 A 记录并设为「仅 DNS」（灰云，不代理）**：推广表上传（任务 26）最大 300 MB，超过 Cloudflare 免费计划约 100 MB 的请求体上限，必须绕过代理直连源站；源站证书需覆盖 `upload.<域名>`（SAN 里加一条，或单独签发）。
+1. 域名与证书（ADR-037 决定 3、4）：
+   - Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>`，三者**走代理（橙云）**，SSL/TLS 模式用 Full (strict)。`t.`、`kol.` 使用 Cloudflare 源站证书：放到 `TCRM_CERT_DIR` 的 `origin.pem`、`origin.key`。
+   - **另加一条 `upload.<域名>` 的 A 记录并设为「仅 DNS」（灰云，不代理）**：推广表上传（任务 26）最大 300 MB，超过 Cloudflare 免费计划约 100 MB 的请求体上限，必须绕过代理直连源站。浏览器直连该域名，**不信任 Cloudflare 源站证书**，所以 `upload.` 与 `admin.` 一样使用 Let's Encrypt 公开证书（`public.pem`、`public.key`，由 `scripts/renew-public-cert.sh` 生成，见下文「公开证书的申请与续期」）。`admin.` 将来若经实测改为灰云，不用换证书。
+   - 在 Cloudflare 打开 Authenticated Origin Pulls（SSL/TLS → 源服务器），Nginx 对 `t.`、`kol.`、`admin.` 校验 Cloudflare 的客户端证书，直连源站 IP 的请求会被拒绝（细节见「Nginx 说明」）。`upload.` 灰云直连，不校验。
 2. 填写 `deploy/.env`（`TCRM_DOMAIN`、数据库、`TCRM_REDIS_PASSWORD`（生产必填）、首次平台管理员、跳转回退地址、IP 哈希盐、中转链接地址 `TCRM_LINK_BASE_URL` 等）。首次启动用这两个变量创建平台管理员；登录后在平台管理里为默认公司创建超级管理员。升级已有库时，该用户名不能与任何已有用户冲突。`TCRM_LINK_BASE_URL` 必填，应为 `https://t.<域名>`（https、不带末尾斜杠），后台据此生成 `https://t.<域名>/t/{达人编号}/{原商品编码}`；缺失或格式不对时后台启动失败。
    微店接入还要求设置 `TCRM_SECRET_KEY` 和 `TCRM_ADMIN_BASE_URL`。使用 `openssl rand -base64 32` 生成主密钥，作为 32 字节 Base64 值保存于受控的部署密钥库，并单独备份；不要写入仓库。丢失主密钥意味着已保存的凭证全部要重新录入。`TCRM_ADMIN_BASE_URL` 必须是无末尾斜杠的 HTTPS 后台地址（例如 `https://admin.example.com`）；将该域名登记为微店开放平台的回调域名。缺失或格式错误时后台启动失败。
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
    商品源表（ADR-021）不需要新的环境变量，但要求后端能直连 `oauth2.googleapis.com` 与 `sheets.googleapis.com`（服务器部署在海外）。客户需在自己的 Google Cloud 项目中创建服务账号、启用 Google Sheets API、下载 JSON 密钥；超管在管理端「商品 → 商品源表」上传密钥（私钥加密保存，依赖 `TCRM_SECRET_KEY`），再把每张源表分享给页面上显示的服务账号邮箱（查看者）。
 3. 构建前端静态文件：`deploy/scripts/build-static.sh`（需要 Node.js 与 pnpm），输出到 `TCRM_STATIC_DIR`（默认 `deploy/www`）。
-4. 启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`。
-5. 备份：用 cron 每天 03:00 执行 `deploy/backup/pg-backup.sh`；上线前做一次恢复演练（命令见脚本头部）。
+4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时 `up` 会报找不到卷。先生成公开证书（下文），再启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`（postgres 镜像暂在本机构建，含写死版本的 pgBackRest，任务 95 改为拉取镜像）；首次启动后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份（没有 `public.pem` 时 Nginx 起不来）。
+5. 备份（ADR-037）：按下文「备份与恢复」配置 pgBackRest 与每日加密逻辑备份，上线前做一次完整恢复演练。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
-8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`TCRM_CERT_DIR` 的证书覆盖该子域名；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
+8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`public.pem` 覆盖 `upload.<域名>`（用 `openssl s_client -connect upload.<域名>:443 -servername upload.<域名> </dev/null | openssl x509 -noout -issuer -subject` 确认签发者是 Let's Encrypt，而不是 Cloudflare 源站证书）；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
 
 9. 版本一致性检查（#106）：生产模板为 `crm-admin` 固定设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS=""`（严格模式）。数据库结构版本比镜像新（典型场景：发布后回滚到旧镜像，或「先发库、后发镜像」顺序颠倒）时，后台**启动即失败**，日志中 Flyway 报「applied migration not resolved locally」，随后一条 ERROR 说明「数据库结构比镜像新，请部署包含全部已应用迁移的镜像」。本机开发与预览共用同一个数据库、且各分支迁移版本不同，**不要**在 `docker-compose.dev.yml` / `docker-compose.preview.yml` 中设置该变量（默认 `*:future`，仅告警）。
    应急回滚方法：确认业务上确实要用旧镜像启动时，临时设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'` 后 `docker compose ... up -d crm-admin`；此时旧镜像不认识的枚举值在列表中显示为 `—`（任务 73 容错），仅新增功能不可用。事后恢复严格模式并尽快部署不低于库版本的镜像。
+
+10. 数据库账号分离（ADR-037）：生产 PostgreSQL 的超级用户 `TCRM_DB_SUPERUSER_USERNAME` / `TCRM_DB_SUPERUSER_PASSWORD` 只用于管理和备份；后台使用 `TCRM_DB_USERNAME`，它由 `postgres/initdb/01-app-role.sh` 在**首次初始化空数据卷**时创建，没有超级用户权限，是库 `TCRM_DB_NAME` 的 owner，Flyway 用它建表。初始化脚本只在数据卷为空时执行：已有数据的卷不会补建账号，也不会改变现有账号。两个用户名必须不同，密码各自独立。
+11. 首次启动并以平台管理员成功登录后，从 `deploy/.env` 删除 `TCRM_BOOTSTRAP_ADMIN_PASSWORD`（用户名可保留），再 `docker compose ... up -d crm-admin` 让配置生效；系统里已有平台管理员时，后台不再需要这两个变量。
+12. 日志与共享内存：所有容器使用 `json-file` 日志并轮转（每个服务最多 5 个、每个 50 MB）；PostgreSQL 的 `shm_size` 为 256 MB。
+
+### 公开证书的申请与续期
+
+`scripts/renew-public-cert.sh` 用写死版本的 `certbot/dns-cloudflare` 镜像，通过 DNS-01 为 `admin.<域名>`、`upload.<域名>` 申请同一张证书，成功后把完整证书链写为 `$TCRM_CERT_DIR/public.pem`、私钥写为 `public.key`（权限 600），有变化时执行 `nginx -t` 和 `nginx -s reload`。
+
+1. 在 Cloudflare 创建 API 令牌，权限只给本域名所在 Zone 的「Zone → DNS → Edit」，写入仓库**之外**的文件（例如 `/etc/tcrm/cloudflare.ini`，权限 600，属主为运行脚本的用户）：`dns_cloudflare_api_token = <令牌>`。令牌不进 `.env`、不进日志；脚本发现文件权限不是 600 会拒绝运行。
+2. 在 `deploy/.env` 设置 `TCRM_CERTBOT_CLOUDFLARE_INI`（上述文件的路径）和 `TCRM_CERTBOT_EMAIL`（接收到期提醒）。
+3. 首次申请：在 `up` 之前以能运行 docker 的用户（通常是 root）执行 `deploy/scripts/renew-public-cert.sh`。证书状态和 Let's Encrypt 账号保存在 `deploy/certbot/`（已被 Git 忽略，和密钥一起备份）。
+4. 续期：host cron 每天一次，例如 `17 4 * * * /opt/tcrm/deploy/scripts/renew-public-cert.sh >> /var/log/tcrm-cert.log 2>&1`。certbot 距到期不足 30 天才会真正续期，其余时候脚本输出「certificate unchanged」。续期失败时脚本非零退出，旧证书继续使用到过期，日志里能看到原因；上线后应在监控里加证书到期检查（任务 96）。
+5. 脚本的离线测试：`bash deploy/scripts/test-renew-public-cert.sh`（用桩替换 docker，验证文件落位、权限、重载顺序和令牌不进输出）。真实申请需要真实域名和 Cloudflare 令牌，上线前在服务器上完成并记录。
+
+### AWS 主机与防火墙（ADR-037）
+
+- **防火墙以云安全组为准**。Docker 发布端口（`80:80`、`443:443`）通过自己的 iptables 规则转发，**不受 `ufw` / `firewalld` 的规则限制**，不要把 ufw 当作防线。
+- 安全组入站只开 80、443（任意来源，`upload.` 灰云需要直连）和 SSH（限制为负责人的固定来源 IP，不要对 `0.0.0.0/0` 开放）。PostgreSQL、Redis、后台、跳转服务没有发布端口，不要为它们开放任何入站规则。
+- `upload.` 直连会暴露源站 IP，安全组无法只放行 Cloudflare 回源段；`t.`、`kol.`、`admin.` 由 Nginx 的回源认证拒绝绕过 Cloudflare 的请求。
+- `/etc/docker/daemon.json` 建议设置 `{"live-restore": true}`（修改后 `systemctl reload docker`）：升级或重启 Docker 守护进程时，容器继续运行。该文件属主机配置，不在仓库内。
+
+## 备份与恢复
+
+依据 [ADR-037](../docs/06-架构决策/ADR-037-生产部署拓扑与AWS备份容灾.md) 决定 5、6。恢复目标是**建议值，待客户确认**（待确认清单第 35 项）：最多丢失约 5 分钟数据，整机故障 2 小时内恢复。
+
+### 备份层次
+
+| 层次 | 内容 | 频率与保留 | 位置 |
+|---|---|---|---|
+| 1. pgBackRest | 全量 + 差异备份，加 WAL 连续归档；客户端加密（aes-256-cbc），S3 只看到密文 | WAL 持续归档（`archive_timeout=300`，空闲时最多 5 分钟切换一次）；周日全量、其余日差异；保留 4 个全量（约四周） | S3，路径 `PGBACKREST_REPO1_PATH`（默认 `/pgbackrest`） |
+| 2. 逻辑备份 | `pg_dump` 自定义格式，`gpg` 对称加密（AES256），只保留 `.dump.gpg` | 每日 03:00；7 日 + 4 周（周日） | 本机 `TCRM_BACKUP_DIR`；S3 `<前缀>/daily/`、`<前缀>/weekly/` |
+| 3. S3 防护 | 跨区域复制、Object Lock、生命周期规则（`daily/` 7 日、`weekly/` 28 日） | 由负责人在 AWS 控制台配置（负责人操作清单），仓库不创建 | S3 |
+| 4. 云快照 | 只用于恢复主机系统环境，**不是**数据备份 | 按需 | EC2 / Lightsail |
+| Redis | 只在本机保留 AOF，**不做异地备份** | 持续 | 本机数据卷 |
+
+两层数据库备份互为补充：pgBackRest 负责按时间点恢复，逻辑备份用于跨版本迁移、单库取回，以及 pgBackRest 仓库本身出问题时的兜底。
+
+**Redis 不做异地备份的理由**：Redis 里是可重建的数据。链接索引由数据库重建（每天 04:30 UTC 自动全量重建，丢失后超管点「重建链接索引」立即恢复）；登录会话丢失只需重新登录；未消费的点击流是仅有的损失，量小且只影响统计。需要永久保存的业务数据都在 PostgreSQL。因此不为 Redis 增加备份和恢复流程。
+
+**主密钥和备份口令必须与备份分开存放**。以下三项分别保存在受控的密钥库（如密码管理器），不放在主机的备份目录、S3 桶或仓库里，也不要只保存在被备份的这台主机上：`PGBACKREST_REPO1_CIPHER_PASS`（丢失则 pgBackRest 的所有备份无法读取）、`TCRM_BACKUP_PASSPHRASE_FILE` 的内容（丢失则所有 `.dump.gpg` 无法解密）、`TCRM_SECRET_KEY`（数据库里的微店等凭证用它加密，丢失则恢复后凭证全部要重新录入）。备份与密钥放在一起，加密就失去意义。
+
+### 配置与首次启用
+
+1. 在 `deploy/.env` 填写 `.env.example`「Backup and restore」一节：`PGBACKREST_REPO1_S3_BUCKET`、`PGBACKREST_REPO1_CIPHER_PASS`（`openssl rand -base64 32` 生成）、区域；凭证二选一：**实例角色**（`PGBACKREST_REPO1_S3_KEY_TYPE=auto`，不写访问密钥那两行）或**访问密钥**（`KEY_TYPE=shared` 并设置 `PGBACKREST_REPO1_S3_KEY`、`PGBACKREST_REPO1_S3_KEY_SECRET`）。可选变量要么注释掉要么删除，**不能留空**：pgBackRest 对空的 `PGBACKREST_*` 变量直接报错。密钥和口令只经环境变量传入，不写进 `command`、`pgbackrest.conf` 或镜像；`pg_stat_activity`、PostgreSQL 日志和 pgBackRest 日志里都没有口令（pgBackRest 自己的日志把它显示为 `<redacted>`）。
+2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
+3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：
+
+   ```bash
+   cd /opt/tcrm   # 仓库根目录
+   PB="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -u postgres postgres pgbackrest --stanza=tcrm"
+   $PB stanza-create
+   $PB check                                  # 确认 WAL 能归档到 S3
+   deploy/backup/pgbackrest-backup.sh full
+   $PB info                                   # 查看备份集和 WAL 范围
+   ```
+
+4. 逻辑备份需要主机装有 `gpg` 和 AWS CLI。口令文件放在仓库之外，权限 600：`install -m 600 /dev/null /etc/tcrm/backup.pass`，再写入随机口令（`openssl rand -base64 32 > /etc/tcrm/backup.pass`），路径写进 `TCRM_BACKUP_PASSPHRASE_FILE`。脚本发现权限不是 600 会拒绝运行。
+5. 定时任务（主机 crontab，时间为主机时钟，建议主机用 UTC）：
+
+   ```
+   0 2 * * * /opt/tcrm/deploy/backup/pgbackrest-backup.sh >> /var/log/tcrm-pgbackrest.log 2>&1
+   0 3 * * * /opt/tcrm/deploy/backup/pg-backup.sh >> /var/log/tcrm-backup.log 2>&1
+   ```
+
+   两个脚本失败时都非零退出；告警接入由任务 96 完成。
+
+### S3 不可用时
+
+WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：积压超过 4 GiB 后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据盘不会被写满、数据库继续可写。数据盘要为此预留空间：最坏情况下 `pg_wal` 约为 4 GiB 队列加 PostgreSQL 自身的 `max_wal_size`（默认 1 GiB）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。监控 `archive_command` 失败和 `pg_wal` 大小是任务 96 的内容。
+
+### 恢复
+
+**pgBackRest 时间点恢复**（整库）：
+
+```bash
+deploy/backup/restore-pitr.sh latest                          # 最新已归档点，最多丢失约 5 分钟
+deploy/backup/restore-pitr.sh "2026-11-01 08:30:00"           # 指定时间点，未带时区时按 UTC
+deploy/backup/restore-pitr.sh --overwrite "2026-11-01 08:30:00"  # 数据目录非空时必须显式加
+```
+
+脚本先打印目标项目、目标时间和将被覆盖的内容，输入 `yes` 才继续；数据目录非空而没有 `--overwrite` 时拒绝。随后停止 crm-admin、crm-redirect、postgres（站点不可用），用一次性容器执行 `pgbackrest restore`，启动 postgres 等待回放结束，再启动应用。结束时打印必须人工完成的事：
+
+1. 登录超管，在「对应关系」页点击「重建链接索引」（Redis 没有被恢复）；
+2. 核对钱包核对日志：`docker compose ... logs crm-admin | grep "wallet reconciliation"`，出现 `mismatched creators` 时逐个达人核对余额与台账；
+3. 核对恢复点之后发生的人工操作（人工归因、提现付款、预付）。它们无法从微店补拉，要按业务记录补录；
+4. 立即做一次全量备份（恢复产生新的时间线）；
+5. 管理员和达人需要重新登录。
+
+主机崩溃后数据卷还在、但 PostgreSQL 没有正常关闭时，数据目录里会残留 `postmaster.pid`，pgBackRest 会拒绝恢复（提示 `unable to restore while PostgreSQL is running`）。确认 postgres 容器已停止后，手动删除这个文件再重新执行脚本。
+
+整机丢失时：按「生产部署」在新主机上准备 `.env`（同样的 `TCRM_SECRET_KEY`、`PGBACKREST_*`）和一个**空**数据卷，启动 Compose 之前不要初始化数据库；执行 `restore-pitr.sh latest`（空数据卷不需要 `--overwrite`），其余同上。
+
+**逻辑备份恢复**（取回某个 `.dump.gpg`；对象归属应用账号，恢复到空库，用管理超级用户）：
+
+```bash
+# 从 S3 取回（本机的备份在 TCRM_BACKUP_DIR 里）
+aws s3 cp --region us-west-2 s3://<桶>/<前缀>/daily/tcrm-<时间>.dump.gpg .
+# 解密后直接送入 pg_restore，明文只在管道里
+gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.pass \
+    --decrypt tcrm-<时间>.dump.gpg \
+  | docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T postgres \
+      sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+```
+
+### 恢复演练（上线前一次，此后每季度一次）
+
+在**另一台**主机或独立的 Compose 项目上做，不要动生产数据卷：
+
+1. 准备与生产相同的 `.env`（`PGBACKREST_*`、`TCRM_SECRET_KEY`），数据卷为空。
+2. 执行 `deploy/backup/restore-pitr.sh latest`，再试一次指定时间点；记录从开始到后台可登录的总耗时（对照 2 小时目标）和实际丢失的数据量（对照约 5 分钟目标）。
+3. 另取最近一个 `.dump.gpg` 走一遍逻辑备份恢复，确认解密口令有效。
+4. 核对项，与生产对照（SQL 在恢复出的库里执行）：
+   - 达人：`select count(*) from crm_kol;`
+   - 订单：`select count(*), max(create_time) from crm_order;`
+   - 钱包余额：`select count(*), sum(balance_cny) from crm_commission_wallet;`
+   - 提现记录：`select count(*), max(create_time) from crm_commission_withdrawal;`
+   - 后台能启动，Flyway 严格模式校验通过（日志出现 `Successfully validated ... migrations` 和 `Schema "public" is up to date`）；
+   - 登录超管，重建链接索引，抽查一条推广链接能跳转；钱包核对日志没有 `mismatched creators`。
+5. 把耗时、丢失窗口、核对结果记入演练记录；S3 连通、跨区域复制和 Object Lock 的实际效果也在这次演练里确认。
 
 ## 邮件服务（Resend）
 
@@ -175,7 +304,10 @@ deploy/scripts/local-infra.sh psql
 
 - `t.<域名>` 只转发 `/t/…`、`/i/…`（客户表格脚本写入的按复制商品 ID 中转链接，ADR-019）与 `/healthz` 到 crm-redirect，其余返回 404。`/t/` 与 `/i/` 共用同一限速区，按客户端 IP 限速 30 次/秒、突发 60，超出返回 429；`/healthz` 不限速。阈值偏松，是为了不误伤移动网络中大量用户共用出口 IP（CGNAT）的情况。边缘层（Cloudflare 频率限制规则）是主要防线，Nginx 限速是源站兜底；阈值可按实际流量调整。
 - `kol.<域名>` / `admin.<域名>`：静态资源 + 单页应用回退；`/kol-api/`、`/admin-api/` 转发到 crm-admin；登录接口有 10 次/分钟（突发 5）的频率限制；登录验证码签发接口 `/admin-api/auth/captchas` 有 120 次/分钟（突发 30）的频率限制，后台另按每 IP 每分钟 120 张限制（`crm.auth.captcha.issue-per-minute`，ADR-017）。
-- **推广表上传子域名（任务 26，ADR-024；负责人 2026-10-18 决定）**：上传走独立的 `upload.<域名>`，在 Cloudflare 中设为「仅 DNS」不代理（免费计划的代理会拒绝约 100 MB 以上的请求体）。该 server 只放行 `POST /admin-api/kol/kols/{id}/promo-sheet-uploads`（含浏览器先发的 CORS 预检 OPTIONS），`client_max_body_size 300m`、`proxy_read_timeout 300s`；其它路径一律 404。`admin.<域名>` 保持 `client_max_body_size 21m` 默认（导入 20 MB + 表单开销），不再为上传放宽。后端侧 Spring multipart 上限同为 300 MB（`file-size-threshold` 极小，先落临时文件），各接口仍在代码层校验各自业务上限：Excel 导入 20 MB、业务图片 2 MB、推广表 300 MB。管理端从系统配置读取 `url.upload` 并在运行时选择上传域名；默认空值回退当前域名。跨域上传要求 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端源。
+- **证书（ADR-037）**：`t.`、`kol.` 用 `snippets/tls.conf`（Cloudflare 源站证书 `origin.pem` / `origin.key`），`admin.`、`upload.` 用 `snippets/tls-public.conf`（Let's Encrypt `public.pem` / `public.key`）；协议与会话参数共用 `snippets/tls-common.conf`。
+- **回源认证（Authenticated Origin Pulls，ADR-037 决定 4）**：`t.`、`kol.`、`admin.` 三个 server 引用 `snippets/cloudflare-origin-pull.conf`（`ssl_client_certificate` + `ssl_verify_client on`），没有 Cloudflare 客户端证书的请求在 TLS 握手后被拒绝（返回 400）；`upload.` 不引用。CA 文件 `snippets/cloudflare-origin-pull-ca.pem` 是 Cloudflare 公布的公开证书，来源和下载日期写在文件头，Cloudflare 更换 CA 时更新。这只能证明请求来自 Cloudflare（共享证书，不证明来自本账号）。**若 `admin.` 经实测改为灰云，删除 `admin.` server 里对 `cloudflare-origin-pull.conf` 的这一行引用**；不设开关。未知主机名由默认 server 以 `ssl_reject_handshake` 拒绝，不受影响。
+- **上游运行时解析（ADR-037）**：模板声明 `resolver 127.0.0.11 valid=10s ipv6=off;`（Docker 内置 DNS），每个 server 用 `set $crm_admin_upstream http://crm-admin:8080;`（跳转站点为 `$crm_redirect_upstream`）保存上游，所有 `proxy_pass` 使用该变量且不带 URI，原请求路径原样转发。效果：crm-admin 重建、IP 变化后最多 10 秒自动恢复，不用 reload；crm-admin 没在运行时 Nginx 仍能启动，`t.` 跳转照常，管理端接口返回 502。新增反代 location 时同样使用变量。
+- **推广表上传子域名（任务 26，ADR-024；负责人 2026-10-18 决定）**：上传走独立的 `upload.<域名>`，在 Cloudflare 中设为「仅 DNS」不代理（免费计划的代理会拒绝约 100 MB 以上的请求体）。该 server 使用公开证书（浏览器不信任 Cloudflare 源站证书），不要求 Cloudflare 客户端证书；它只放行 `POST /admin-api/kol/kols/{id}/promo-sheet-uploads`（含浏览器先发的 CORS 预检 OPTIONS），`client_max_body_size 300m`、`proxy_read_timeout 300s`；其它路径一律 404。`admin.<域名>` 保持 `client_max_body_size 21m` 默认（导入 20 MB + 表单开销），不再为上传放宽。后端侧 Spring multipart 上限同为 300 MB（`file-size-threshold` 极小，先落临时文件），各接口仍在代码层校验各自业务上限：Excel 导入 20 MB、业务图片 2 MB、推广表 300 MB。管理端从系统配置读取 `url.upload` 并在运行时选择上传域名；默认空值回退当前域名。跨域上传要求 `TCRM_CORS_ALLOWED_ORIGINS` 包含管理端源。
 - 响应头（规范 06）：`X-Content-Type-Options`、`Referrer-Policy`、HSTS（一年）、`X-Frame-Options`，两个前端另加 `Content-Security-Policy`。
 - 客户端 IP：本模板用 `proxy.conf` 把转发给应用的 `X-Forwarded-For`、`CF-Connecting-IP`、`X-Real-IP` **一律重写为 `$remote_addr`**，客户端自带的转发头到不了应用（这是防伪造的实际手段）。`cloudflare-real-ip.conf` 的 `set_real_ip_from` 只决定对哪些对端采用 `CF-Connecting-IP` 来解析 `$remote_addr`，**并不限制谁可以连上 Nginx**。compose 网络固定 `172.30.0.0/24`，生产中 `crm-admin` / `crm-redirect` 的 `TCRM_TRUSTED_PROXIES` 已写死为该网段。
 - `${TCRM_DOMAIN}` 由 nginx 镜像在启动时替换（`NGINX_ENVSUBST_FILTER=^TCRM_`）。

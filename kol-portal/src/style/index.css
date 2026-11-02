@@ -97,6 +97,46 @@ body {
   line-height: var(--tcrm-line-height-body) !important;
 }
 
+/*
+ * Text roles of the workspace and funds pages (规范 13 §2, task 92). `#app *` above pins every
+ * descendant to the body size, so a larger role has to be restated here, on the element and on
+ * everything inside it (Element Plus wraps button text in a span).
+ */
+#app .tcrm-amount-primary,
+#app .tcrm-amount-primary * {
+  font-size: var(--tcrm-font-size-amount-primary) !important;
+  line-height: var(--tcrm-line-height-amount-primary) !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#app .tcrm-amount-detail,
+#app .tcrm-amount-detail * {
+  font-size: var(--tcrm-font-size-amount-detail) !important;
+  line-height: var(--tcrm-line-height-amount-detail) !important;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#app .tcrm-role-section,
+#app .tcrm-role-section * {
+  font-size: var(--tcrm-font-size-section) !important;
+  line-height: var(--tcrm-line-height-section) !important;
+  font-weight: 600;
+}
+
+/* The workspace "Withdraw" button is the owner's large-button exception (规范 13 §1.3). */
+#app .el-button.tcrm-button-large {
+  height: var(--tcrm-control-height-large);
+  padding: 0 var(--tcrm-control-padding-large);
+}
+
+#app .tcrm-button-large,
+#app .tcrm-button-large * {
+  font-size: var(--tcrm-font-size-section) !important;
+  line-height: var(--tcrm-line-height-section) !important;
+}
+
 #app h1 {
   font-size: var(--tcrm-font-size-title) !important;
   font-weight: 600;

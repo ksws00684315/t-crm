@@ -8,6 +8,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface OrderMapper extends BaseMapper<OrderDO> {
@@ -31,6 +32,42 @@ public interface OrderMapper extends BaseMapper<OrderDO> {
       </script>
       """)
   List<KolLastPayRow> lastAttributedPayTimes(@Param("kolIds") Collection<Long> kolIds);
+
+  /**
+   * Orders of one shop whose last settlement commission recompute failed (task 91, L-023). The
+   * tenant predicate comes from the interceptor.
+   */
+  @Select(
+      """
+      SELECT id FROM crm_order
+       WHERE shop_id = #{shopId}
+         AND settlement_recompute_failures > 0
+         AND is_deleted = FALSE
+       ORDER BY id
+      """)
+  List<Long> listSettlementRecomputePending(@Param("shopId") long shopId);
+
+  /** Adds one failure to the order's recompute mark (task 91, L-023). */
+  @Update(
+      """
+      UPDATE crm_order
+         SET settlement_recompute_failures = settlement_recompute_failures + 1
+       WHERE id = #{orderId}
+      """)
+  int markSettlementRecomputeFailed(@Param("orderId") long orderId);
+
+  /** Failure count of the order's recompute mark; 0 when unmarked (task 91, L-023). */
+  @Select("SELECT settlement_recompute_failures FROM crm_order WHERE id = #{orderId}")
+  Integer settlementRecomputeFailures(@Param("orderId") long orderId);
+
+  /** Clears the recompute mark after a successful recompute (task 91, L-023). */
+  @Update(
+      """
+      UPDATE crm_order
+         SET settlement_recompute_failures = 0
+       WHERE id = #{orderId} AND settlement_recompute_failures > 0
+      """)
+  int clearSettlementRecomputeFailed(@Param("orderId") long orderId);
 
   /** Mapper row for {@link #lastAttributedPayTimes}. */
   class KolLastPayRow {
