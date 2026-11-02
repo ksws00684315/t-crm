@@ -45,6 +45,7 @@ STAGE="init"
 STAGE_KIND="prepare" # prepare | admin | redirect | switch | record
 REPORTED=0
 FIRST_DEPLOY=0
+ENV_TMP=""
 
 log() { printf '%s\n' "$*"; }
 step() { STAGE="$1"; printf '\n==> %s\n' "$1"; }
@@ -77,17 +78,22 @@ env_get() {
   printf '%s' "$value"
 }
 
-# Writes TCRM_VERSION=<version> into the env file in place (keeps owner and mode).
+# Writes TCRM_VERSION=<version> into the env file atomically: the new content goes to a temporary file
+# in the SAME directory (same file system, same owner and mode as the original), then mv replaces the
+# file in one step. A failure (full disk, kill) leaves the original untouched; the temporary file holds
+# every secret of .env, so it is removed on every failure path (ENV_TMP, also cleaned by on_exit).
 env_set_version() {
-  local version="$1" tmp
-  tmp="$(mktemp)"
+  local version="$1"
+  ENV_TMP="$(mktemp "$ENV_FILE.XXXXXX")" || return 1
+  cp -p "$ENV_FILE" "$ENV_TMP" || { rm -f "$ENV_TMP"; return 1; }
   if grep -q '^TCRM_VERSION=' "$ENV_FILE"; then
-    awk -v v="$version" '/^TCRM_VERSION=/ { print "TCRM_VERSION=" v; next } { print }' "$ENV_FILE" > "$tmp"
+    awk -v v="$version" '/^TCRM_VERSION=/ { print "TCRM_VERSION=" v; next } { print }' "$ENV_FILE" > "$ENV_TMP" \
+      || { rm -f "$ENV_TMP"; return 1; }
   else
-    { cat "$ENV_FILE"; printf 'TCRM_VERSION=%s\n' "$version"; } > "$tmp"
+    { cat "$ENV_FILE" && printf 'TCRM_VERSION=%s\n' "$version"; } > "$ENV_TMP" || { rm -f "$ENV_TMP"; return 1; }
   fi
-  cat "$tmp" > "$ENV_FILE"
-  rm -f "$tmp"
+  mv -f "$ENV_TMP" "$ENV_FILE" || { rm -f "$ENV_TMP"; return 1; }
+  ENV_TMP=""
 }
 
 # ---- helpers --------------------------------------------------------------------------------------------
@@ -253,6 +259,7 @@ report_failure() { # <message>
 on_exit() {
   local rc=$?
   trap - EXIT
+  [ -z "$ENV_TMP" ] || rm -f "$ENV_TMP"
   if [ "$rc" -ne 0 ] && [ "$REPORTED" -ne 1 ]; then
     report_failure "命令失败（退出码 $rc）"
   fi
@@ -364,9 +371,28 @@ backup_database() { # <env version for compose>
   TCRM_VERSION="$1" TCRM_ENV_FILE="$ENV_FILE" TCRM_COMPOSE_FILE="$COMPOSE_FILE" "$BACKUP_COMMAND"
 }
 
+# A release trace: the "current" link exists or the release log holds a successful release.
+has_release_trace() {
+  if [ -L "$(static_dir)/current" ]; then
+    return 0
+  fi
+  if [ -f "$RELEASE_LOG" ] && grep -q ' result=ok' "$RELEASE_LOG"; then
+    return 0
+  fi
+  return 1
+}
+
+# First deployment = no postgres container AND no release trace. An already released host whose
+# containers are gone (docker compose down) is NOT a first deployment: it has data to back up.
+is_first_deploy() {
+  [ -z "$(container_any_id postgres)" ] && ! has_release_trace
+}
+
 check_backup_prerequisites() {
   local file
-  [ -z "$(container_any_id postgres)" ] && return 0
+  if is_first_deploy; then
+    return 0
+  fi
   command -v gpg > /dev/null 2>&1 || die_early "缺少 gpg：pg-backup.sh 需要它加密备份（deploy/README.md「备份与恢复」）"
   file="$(env_get TCRM_BACKUP_PASSPHRASE_FILE)"
   [ -s "$file" ] || die_early "TCRM_BACKUP_PASSPHRASE_FILE 指向的文件不存在或为空：$file"
@@ -505,9 +531,11 @@ cmd_deploy() {
   check_env
   check_backup_prerequisites
   PREVIOUS_VERSION="$(env_get TCRM_VERSION)"
-  if [ -z "$(container_any_id postgres)" ]; then
+  if is_first_deploy; then
     FIRST_DEPLOY=1
     PREVIOUS_VERSION="" # an unreleased host: TCRM_VERSION in .env is only the .env.example placeholder
+  elif [ -z "$(container_id postgres)" ]; then
+    die_early "这台主机已经发布过，但 postgres 没有运行：没有备份不能发布。先启动数据库（docker compose -f $COMPOSE_FILE --env-file $ENV_FILE up -d --no-deps postgres redis），确认健康后重新执行。环境未改动。"
   fi
   log "发布 ${PREVIOUS_VERSION:-（首次）} -> $version"
   mkdir -p "$(static_dir)/releases"

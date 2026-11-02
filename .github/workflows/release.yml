@@ -69,9 +69,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # provenance/sbom attestations are off on purpose: they would give two builds of identical content
-      # different digests, and release.sh restarts crm-redirect only when its image digest changed.
-      # The registry cache makes a rebuild of unchanged sources reproduce the same image.
+      # release.sh restarts crm-redirect only when its image ID differs from the running one, so two
+      # builds of identical sources must give the same image ID. That needs: provenance and sbom off
+      # (attestations differ per build), and NO per-release label in the image config. The
+      # org.opencontainers.image.revision and .version labels change on every tag, so they are left
+      # off crm-redirect and crm-postgres (only the fixed "source" label stays); crm-admin and
+      # crm-static change on every release anyway and keep them. The registry cache keeps the layers.
       - name: Build and push crm-admin
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -100,8 +103,6 @@ jobs:
           tags: ${{ steps.meta.outputs.namespace }}/crm-redirect:${{ steps.meta.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.namespace }}/crm-redirect:buildcache
           cache-to: type=registry,ref=${{ steps.meta.outputs.namespace }}/crm-redirect:buildcache,mode=max
       # PostgreSQL with the pinned pgBackRest. PGDG keeps old package versions for a limited time, so
@@ -117,8 +118,6 @@ jobs:
           tags: ${{ steps.meta.outputs.namespace }}/crm-postgres:${{ steps.meta.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
           cache-from: type=registry,ref=${{ steps.meta.outputs.namespace }}/crm-postgres:buildcache
           cache-to: type=registry,ref=${{ steps.meta.outputs.namespace }}/crm-postgres:buildcache,mode=max
       - name: Build and push crm-static
