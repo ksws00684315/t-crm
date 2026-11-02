@@ -255,10 +255,7 @@ public interface PrepayMapper {
       """)
   PrepayRecipientRow findRecipient(@Param("id") long id);
 
-  @Select("SELECT payout_account_masked FROM crm_prepay WHERE id = #{id}")
-  String maskedAccount(@Param("id") long id);
-
-  /** Batch {@link #maskedAccount} for the CSV export (task 97). */
+  /** Batch masked payout accounts of the CSV export (task 97). */
   @Select(
       """
       <script>

@@ -1195,7 +1195,6 @@ class PrepayServiceTest {
       case "findDeduction" -> deductionOrNull(dataFor(DEDUCTION_SQL));
       case "sumRecovered" -> new BigDecimal("100.00");
       case "findRecipient" -> recipientOrNull(dataFor(RECIPIENT_SQL));
-      case "maskedAccount" -> textOrNull(dataFor(MASKED_SQL));
       case "paidKolId" -> idOrNull(dataFor(KOL_FILE_SQL), "1");
       case "findFingerprint" -> textOrNull(dataFor(FINGERPRINT_SQL));
       case "lockById" -> 1L;
