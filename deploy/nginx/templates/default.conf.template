@@ -24,6 +24,10 @@ resolver 127.0.0.11 valid=10s ipv6=off;
 
 include /etc/nginx/snippets/cloudflare-real-ip.conf;
 
+# Static files: /usr/share/nginx/sites is the host's TCRM_STATIC_DIR; "current" is a relative symlink to
+# releases/<version> that deploy/scripts/release.sh switches atomically (the mount is the parent
+# directory on purpose, see docker-compose.prod.yml). No Nginx restart or reload is needed to publish.
+
 # Plain HTTP only redirects.
 server {
     listen 80 default_server;
@@ -84,7 +88,7 @@ server {
     include /etc/nginx/snippets/cloudflare-origin-pull.conf;
     include /etc/nginx/snippets/security-headers-web.conf;
 
-    root /usr/share/nginx/sites/kol;
+    root /usr/share/nginx/sites/current/kol;
     client_max_body_size 20m;
 
     location /kol-api/ {
@@ -117,7 +121,7 @@ server {
     include /etc/nginx/snippets/cloudflare-origin-pull.conf;
     include /etc/nginx/snippets/security-headers-web.conf;
 
-    root /usr/share/nginx/sites/admin;
+    root /usr/share/nginx/sites/current/admin;
     # Imports accept files up to 20MB (spec 06); the extra 1MB covers multipart overhead. The
     # 300MB promo-sheet upload does NOT go through this site: it has its own upload.<domain>
     # server below, because the Cloudflare proxy in front of this domain rejects bodies above

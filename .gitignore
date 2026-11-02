@@ -39,3 +39,6 @@ deploy/local-backups/
 # Customer samples kept locally only (too large for GitHub, or duplicates of the tracked zip)
 docs/00-需求/客户补充资料-1015/测试专用【达人名称A】.xlsx
 docs/00-需求/客户补充资料-1015/prod5(2)/
+
+# Release history written by deploy/scripts/release.sh on the production host
+deploy/releases.log
