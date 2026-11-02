@@ -35,6 +35,7 @@ const emit = defineEmits<{ (event: "update:modelValue", value: boolean): void }>
 
 const title = computed(() => t("tenantAdmin.title", { name: props.tenant?.name ?? "" }));
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<TenantAdminVO[]>([]);
 
 function asAdmin(row: object): TenantAdminVO {
@@ -92,9 +93,11 @@ const resetRules: FormRules = { password: [rule(validateNewPassword)] };
 async function load() {
   if (!props.tenant) return;
   loading.value = true;
+  loadFailed.value = false;
   try {
     rows.value = await listTenantAdmins(props.tenant.id);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -214,8 +217,10 @@ async function submitReset() {
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="rows.length"
       :paged="false"
+      @retry="load"
     >
       <template #cell-email="{ row }"><CopyText :value="asAdmin(row).email" /></template>
       <template #cell-status="{ row }">

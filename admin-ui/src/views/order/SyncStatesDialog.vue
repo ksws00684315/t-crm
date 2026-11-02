@@ -44,9 +44,11 @@ const abilities = computed(() => orderAbilities(useUserStore().user));
  */
 const activeTab = ref("states");
 const loading = ref(false);
+const loadFailed = ref(false);
 const shops = ref<OrderSyncStateVO[]>([]);
 const syncing = ref<string | null>(null);
 const failuresLoading = ref(false);
+const failuresFailed = ref(false);
 const failures = ref<SyncFailureVO[] | null>(null);
 const cleaning = ref(false);
 let startedAny = false;
@@ -141,9 +143,11 @@ const failureColumns = computed<DataColumn[]>(() => [
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     shops.value = await listSyncStates();
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -153,6 +157,7 @@ async function load() {
 async function loadFailures() {
   if (failures.value) return;
   failuresLoading.value = true;
+  failuresFailed.value = false;
   try {
     failures.value = await listSyncFailures();
     // L-003: show the failure shops as "name (code)". The failure VO carries no code, so map it
@@ -167,6 +172,7 @@ async function loadFailures() {
       shopCodes.value = new Map();
     }
   } catch (error) {
+    failuresFailed.value = true;
     notifyError(error);
   } finally {
     failuresLoading.value = false;
@@ -287,6 +293,8 @@ function close() {
           :total="stateRows.length"
           :paged="false"
           :loading="loading"
+          :failed="loadFailed"
+          @retry="load"
         >
           <template #cell-shopName="{ row }">
             <span data-test="sync-shop">{{ asState(row).shopName }}</span>
@@ -367,6 +375,8 @@ function close() {
           :total="(failures ?? []).length"
           :paged="false"
           :loading="failuresLoading"
+          :failed="failuresFailed"
+          @retry="loadFailures"
         >
           <template #cell-shopName="{ row }">{{ failureShopText(asFailure(row)) }}</template>
           <template #cell-kind="{ row }">{{ failureKindText(asFailure(row).kind) }}</template>

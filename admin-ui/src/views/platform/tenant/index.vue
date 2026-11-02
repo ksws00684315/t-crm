@@ -17,6 +17,7 @@ defineOptions({ name: "PlatformTenantPage" });
 
 const { t } = useI18n();
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<TenantVO[]>([]);
 const formVisible = ref(false);
 const editingTenant = ref<TenantVO | null>(null);
@@ -50,9 +51,11 @@ const columns = computed<DataColumn[]>(() => [
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     rows.value = await listTenants();
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -136,9 +139,11 @@ onMounted(load);
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="rows.length"
       :paged="false"
       @refresh="load"
+      @retry="load"
     >
       <template #cell-tenantCode="{ row }"><CopyText :value="asTenant(row).tenantCode" /></template>
       <template #cell-status="{ row }">

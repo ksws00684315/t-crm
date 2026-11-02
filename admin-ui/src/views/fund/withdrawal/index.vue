@@ -64,7 +64,7 @@ const columns = computed<DataColumn[]>(() =>
           : key === "kolIdentity"
             ? 175
             : key === "createdAt"
-              ? 165
+              ? { "zh-CN": 165, "en-US": 200 }
               : 145,
     amount: key === "amount",
     align: key === "applicationNo" || key === "kolIdentity" ? ("left" as const) : undefined

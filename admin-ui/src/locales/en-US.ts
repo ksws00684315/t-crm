@@ -539,6 +539,8 @@ const enUS: MessageSchema = {
     fullscreen: "Table full screen",
     exitFullscreen: "Exit table full screen",
     empty: "No data",
+    loadFailed: "Failed to load. Please try again.",
+    retry: "Retry",
     emptyFiltered: "No matching data · {n} filters applied",
     clearFilters: "Clear filters",
     export: "Export",

@@ -59,11 +59,12 @@ const { t, te } = useI18n();
 
 const loading = ref(false);
 const saving = ref(false);
+const recordsFailed = ref(false);
 const templates = ref<LinkTemplateVO[]>([]);
 const records = ref<PromotionRecordVO[]>([]);
 const recordsTotal = ref(0);
 const recordsPage = ref(1);
-const recordsSize = 10;
+const recordsSize = ref(10);
 const formRef = ref<FormInstance>();
 const activeTab = ref("config");
 const incompleteAlert = ref("");
@@ -177,11 +178,12 @@ async function loadAll() {
   const id = props.kol?.id;
   if (!id) return;
   loading.value = true;
+  recordsFailed.value = false;
   try {
     const [config, templateList, recordPage] = await Promise.all([
       getPromotionConfig(id),
       listLinkTemplates().catch(() => [] as LinkTemplateVO[]),
-      listPromotionRecords(id, { page: 1, size: recordsSize })
+      listPromotionRecords(id, { page: 1, size: recordsSize.value })
     ]);
     templates.value = templateList;
     form.percent = rateToPercent(config.defaultRate);
@@ -197,6 +199,7 @@ async function loadAll() {
     recordsTotal.value = Number(recordPage.total);
     recordsPage.value = 1;
   } catch (error) {
+    recordsFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -207,11 +210,13 @@ async function loadRecords(page: number) {
   const id = props.kol?.id;
   if (!id) return;
   try {
-    const result = await listPromotionRecords(id, { page, size: recordsSize });
+    const result = await listPromotionRecords(id, { page, size: recordsSize.value });
     records.value = result.items;
     recordsTotal.value = Number(result.total);
     recordsPage.value = page;
+    recordsFailed.value = false;
   } catch (error) {
+    recordsFailed.value = true;
     notifyError(error);
   }
 }
@@ -278,6 +283,10 @@ async function save() {
 
 function onRecordsPage(page: number): void {
   void loadRecords(page);
+}
+
+function onRecordsSize(size: number): void {
+  recordsSize.value = size;
 }
 </script>
 
@@ -354,10 +363,13 @@ function onRecordsPage(page: number): void {
             table-id="kol-commission-records"
             :rows="records"
             :columns="recordColumns"
+            :failed="recordsFailed"
             :total="recordsTotal"
             :page="recordsPage"
             :size="recordsSize"
             @update:page="onRecordsPage"
+            @update:size="onRecordsSize"
+            @retry="loadRecords(recordsPage)"
           >
             <template #cell-version="{ row }">{{ asRecord(row).versionNo ?? "-" }}</template>
             <template #cell-effective="{ row }">{{

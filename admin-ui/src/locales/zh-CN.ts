@@ -520,6 +520,8 @@ const zhCN = {
     fullscreen: "表格全屏",
     exitFullscreen: "退出表格全屏",
     empty: "暂无数据",
+    loadFailed: "加载失败，请重试",
+    retry: "重试",
     emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
     clearFilters: "清除筛选",
     export: "导出",

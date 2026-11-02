@@ -26,6 +26,7 @@ const JOB_STATUSES = ["processing", "completed", "partial_failed", "failed"] as 
 const { t } = useI18n();
 const route = useRoute();
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<CopyJobVO[]>([]);
 const total = ref(0);
 const query = reactive({
@@ -38,6 +39,7 @@ const query = reactive({
 
 const detailVisible = ref(false);
 const detailLoading = ref(false);
+const detailFailed = ref(false);
 const detailJob = ref<CopyJobVO | null>(null);
 const detailRows = ref<CopyJobItemVO[]>([]);
 const detailTotal = ref(0);
@@ -89,7 +91,12 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "jobCode", align: "left" as const, label: t("copyJob.jobCode"), minWidth: 180 },
+  {
+    key: "jobCode",
+    align: "left" as const,
+    label: t("copyJob.jobCode"),
+    minWidth: { "zh-CN": 190, "en-US": 210 }
+  },
   { key: "targetChannel", label: t("copyJob.targetChannel"), width: 110 },
   { key: "status", label: t("copyJob.status"), width: 110 },
   // R-01 (browser-measured, assets/task-59/measurements-{zh,en}.md): three nowrap tags need
@@ -125,8 +132,9 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 140,
     defaultHidden: true
   },
-  // View items: zh canvas 56px, en 98px, +24px headroom (task 59 R-11 measurements).
-  { key: "actions", label: t("common.actions"), width: px(84, 128) }
+  // View items: zh canvas 56px, en 98px, +24px headroom; task 100 U-007 measured 14px of extra
+  // truncation on the Chinese view label at 1280, so the floor keeps one more word.
+  { key: "actions", label: t("common.actions"), width: px(100, 144) }
 ]);
 
 const itemColumns = computed<DataColumn[]>(() => [
@@ -170,11 +178,13 @@ function listParams() {
 
 async function load(): Promise<void> {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page = await listCopyJobs(listParams());
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -209,6 +219,7 @@ async function loadItems(): Promise<void> {
   const job = detailJob.value;
   if (!job) return;
   detailLoading.value = true;
+  detailFailed.value = false;
   try {
     const page = await listCopyJobItems(job.id, {
       page: detailQuery.page,
@@ -217,6 +228,7 @@ async function loadItems(): Promise<void> {
     detailRows.value = page.items;
     detailTotal.value = Number(page.total);
   } catch (error) {
+    detailFailed.value = true;
     notifyError(error);
   } finally {
     detailLoading.value = false;
@@ -327,12 +339,14 @@ onMounted(() => {
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="query.page"
       :size="query.size"
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
+      @retry="load"
     >
       <template #cell-jobCode="{ row }">
         <CopyText :value="asJob(row).jobCode" />
@@ -400,11 +414,13 @@ onMounted(() => {
         :rows="detailRows"
         :columns="itemColumns"
         :loading="detailLoading"
+        :failed="detailFailed"
         :total="detailTotal"
         :page="detailQuery.page"
         :size="detailQuery.size"
         @update:page="onDetailPage"
         @update:size="onDetailSize"
+        @retry="loadItems"
       >
         <template #cell-sourceChannel="{ row }">{{
           channelText(asItem(row).sourceChannel)
