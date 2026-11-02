@@ -53,6 +53,7 @@ const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const canSyncOrders = computed(() => access.value.can("order:manage"));
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<ShopVO[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -165,6 +166,7 @@ function asShop(row: object): ShopVO {
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const result = await pageShops({
       shopCode: applied.value.shopCode || undefined,
@@ -176,6 +178,7 @@ async function load() {
     rows.value = result.items;
     total.value = Number(result.total);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -578,10 +581,12 @@ onMounted(() => {
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="page"
       :size="size"
       @refresh="load"
+      @retry="load"
       @update:page="
         (value: number) => {
           page = value;

@@ -109,4 +109,39 @@ describe("commission dialog, 10-20 supplement", () => {
     );
     wrapper.unmount();
   });
+
+  it("reloads the change records with the selected page size", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1500",
+      platforms: [],
+      inviteCode: "OLD",
+      jumpTemplateId: "7",
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    wrapper.findComponent({ name: "ElTabs" }).vm.$emit("update:modelValue", "records");
+    await flushPromises();
+    vi.mocked(promotionApi.listPromotionRecords).mockClear();
+
+    wrapper.findComponent({ name: "ElPagination" }).vm.$emit("size-change", 50);
+    await flushPromises();
+    expect(promotionApi.listPromotionRecords).toHaveBeenCalledTimes(1);
+    expect(promotionApi.listPromotionRecords).toHaveBeenCalledWith("1", { page: 1, size: 50 });
+    wrapper.unmount();
+  });
 });

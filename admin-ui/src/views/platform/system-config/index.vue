@@ -19,6 +19,7 @@ const localeStore = useLocaleStore();
 
 const items = ref<SystemConfigItem[]>([]);
 const loading = ref(false);
+const loadFailed = ref(false);
 const draftKeyword = ref("");
 const appliedKeyword = ref("");
 const editing = ref<SystemConfigItem | null>(null);
@@ -26,10 +27,12 @@ const dialogOpen = ref(false);
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const groups = await getSystemConfigs();
     items.value = groups.flatMap(group => group.items);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -147,8 +150,10 @@ onMounted(load);
       :rows="filtered"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="filtered.length"
       :paged="false"
+      @retry="load"
     >
       <template #cell-key="{ row }">
         <span class="config-key"><CopyText :value="asItem(row).key" /></span>

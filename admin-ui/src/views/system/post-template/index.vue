@@ -26,6 +26,7 @@ const { t, locale } = useI18n();
 const TEMPLATES: PostTemplate[] = ["BD", "OPERATOR", "FINANCE"];
 
 const loading = ref(false);
+const loadFailed = ref(false);
 const catalog = ref<PermissionItemVO[]>([]);
 /** Local working copies; saving writes one card at a time. */
 const drafts = reactive<Record<string, { dataScope: DataScope; permissions: string[] }>>({});
@@ -64,6 +65,7 @@ const scopeOptions = computed(() => [
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const [templates, permissionCatalog] = await Promise.all([
       listPostTemplates(),
@@ -78,6 +80,7 @@ async function load() {
       isDefault[template.postTemplate] = template.isDefault;
     }
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -225,8 +228,8 @@ function asModule(row: object): PermissionModule {
           :disabled="!!savingFor"
         />
       </el-tabs>
-      <template v-if="activeDraft">
-        <fieldset class="scope-panel" :disabled="loading || !!savingFor">
+      <template v-if="activeDraft || loadFailed">
+        <fieldset v-if="activeDraft" class="scope-panel" :disabled="loading || !!savingFor">
           <legend class="sr-only">{{ t("postTemplate.dataScope") }}</legend>
           <span class="scope-label" aria-hidden="true">{{ t("postTemplate.dataScope") }}</span>
           <el-radio-group
@@ -247,11 +250,13 @@ function asModule(row: object): PermissionModule {
           data-test="permission-matrix"
           :rows="permissionModules"
           :columns="columns"
+          :failed="loadFailed"
           :total="permissionModules.length"
           row-key="group"
           plain
           :paged="false"
           :fixed-columns="false"
+          @retry="load"
         >
           <template #cell-module="{ row }">
             <div class="permission-module">

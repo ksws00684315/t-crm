@@ -26,15 +26,21 @@ import {
 
 defineOptions({ name: "DataTable" });
 
+/** Header text grows in English, so a column floor can differ per locale. */
+export type ColumnMinWidth =
+  number | string | { "zh-CN": number | string; "en-US": number | string };
+
 export interface DataColumn {
   key: string;
   label: string;
   prop?: string;
   width?: number | string;
-  minWidth?: number | string;
+  minWidth?: ColumnMinWidth;
   amount?: boolean;
   /** Long content is left aligned; short content is centered by default. */
   align?: "left" | "center";
+  /** Form controls supply their own focus handling and per-control descriptions. */
+  interactive?: boolean;
   /** Keeps the previous overflow tooltip on long remark and request columns. */
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
@@ -47,6 +53,8 @@ const props = withDefaults(
     rows: readonly object[];
     columns: DataColumn[];
     loading?: boolean;
+    /** The last request failed: show a failure message and a retry entry instead of an empty table. */
+    failed?: boolean;
     total: number;
     page?: number;
     size?: number;
@@ -75,6 +83,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    failed: false,
     page: 1,
     size: 20,
     paged: true,
@@ -93,6 +102,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   "update:page": [page: number];
   "update:size": [size: number];
+  retry: [];
   refresh: [];
   clearFilters: [];
   export: [];
@@ -126,7 +136,7 @@ function canSelect(row: object): boolean {
 
 defineExpose({ clearSelection });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const fullscreen = ref(false);
 
 /**
@@ -310,9 +320,17 @@ const visibleColumns = computed(() =>
  * so its buttons stay on the card's right edge instead of drifting into a stretched cell.
  */
 const isFlexColumn = (column: DataColumn) => column.key !== "actions";
+
+function resolveWidth(value: ColumnMinWidth | undefined): number | string | undefined {
+  if (value && typeof value === "object") {
+    return value[locale.value === "en-US" ? "en-US" : "zh-CN"];
+  }
+  return value;
+}
+
 const columnWidth = (column: DataColumn) => (isFlexColumn(column) ? undefined : column.width);
 const columnMinWidth = (column: DataColumn) =>
-  isFlexColumn(column) ? (column.minWidth ?? column.width) : column.minWidth;
+  resolveWidth(isFlexColumn(column) ? (column.minWidth ?? column.width) : column.minWidth);
 
 const hiddenCount = computed(
   () =>
@@ -528,14 +546,16 @@ function canMove(index: number, delta: -1 | 1): boolean {
           "
           :align="column.align ?? 'center'"
           :header-align="column.align ?? 'center'"
-          :show-overflow-tooltip="column.tooltip ?? column.align === 'left'"
+          :show-overflow-tooltip="
+            column.key === 'actions' ? false : (column.tooltip ?? !column.interactive)
+          "
           :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
             </template>
-            <AccessibleCell v-else-if="column.align === 'left'">
+            <AccessibleCell v-else-if="column.align === 'left' && !column.interactive">
               <slot :name="`cell-${column.key}`" :row="row">
                 {{ cellText(row, column) }}
               </slot>
@@ -548,7 +568,11 @@ function canMove(index: number, delta: -1 | 1): boolean {
           </template>
         </el-table-column>
         <template #empty>
-          <slot name="empty">
+          <div v-if="failed" class="data-table__empty">
+            <p>{{ t("table.loadFailed") }}</p>
+            <el-button @click="emit('retry')">{{ t("table.retry") }}</el-button>
+          </div>
+          <slot v-else name="empty">
             <div class="data-table__empty">
               <p v-if="filterCount > 0">{{ t("table.emptyFiltered", { n: filterCount }) }}</p>
               <p v-else>{{ t("table.empty") }}</p>
@@ -664,10 +688,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table__tools {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: var(--tcrm-space-1);
 }
 .data-table__total {
+  flex-shrink: 0;
   color: var(--tcrm-color-text-secondary);
+  white-space: nowrap;
 }
 .data-table__body {
   flex: 1 1 auto;
@@ -727,7 +755,40 @@ function canMove(index: number, delta: -1 | 1): boolean {
   border-radius: 3px;
 }
 .data-table :deep(.el-table-fixed-column--right.is-first-column) {
-  box-shadow: inset 10px 0 8px -8px color-mix(in srgb, var(--tcrm-color-text) 16%, transparent);
+  box-shadow:
+    inset 18px 0 12px -12px color-mix(in srgb, var(--tcrm-color-text) 22%, transparent),
+    inset 1px 0 0 var(--tcrm-color-table-border);
+}
+/* The pinned action column covers whatever scrolls beneath it. While columns stay hidden to the
+   right, fade the covered strip and mark it with an ellipsis so a clipped amount cannot read as a
+   complete value. */
+.data-table
+  :deep(.el-table.is-scrolling-left .el-table-fixed-column--right.is-first-column)::before,
+.data-table
+  :deep(.el-table.is-scrolling-middle .el-table-fixed-column--right.is-first-column)::before {
+  content: "…";
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  left: -24px;
+  width: 24px;
+  overflow: hidden;
+  color: var(--tcrm-color-text-secondary);
+  background: linear-gradient(to right, transparent, var(--tcrm-color-card) 70%);
+}
+.data-table
+  :deep(
+    .el-table .el-table__header-wrapper th.el-table-fixed-column--right.is-first-column
+  )::before {
+  background: linear-gradient(to right, transparent, var(--tcrm-color-table-header) 70%);
+}
+.data-table
+  :deep(
+    .el-table.is-legacy-order
+      .el-table__header-wrapper
+      th.el-table-fixed-column--right.is-first-column
+  )::before {
+  background: linear-gradient(to right, transparent, var(--tcrm-color-muted) 70%);
 }
 .data-table :deep(.el-table .el-table__cell) {
   padding-block: var(--tcrm-space-4);

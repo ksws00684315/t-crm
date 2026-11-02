@@ -510,6 +510,116 @@ describe("DataTable expand rows", () => {
   });
 });
 
+describe("DataTable failure state", () => {
+  it("shows the failure copy and a retry entry instead of an empty result", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "failure",
+        rows: [],
+        columns,
+        total: 0,
+        failed: true,
+        filterCount: 2
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.text()).toContain(i18n.global.t("table.loadFailed"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("table.emptyFiltered"));
+    const retry = wrapper
+      .findAll("button")
+      .find(button => button.text() === i18n.global.t("table.retry"));
+    expect(retry).toBeTruthy();
+    await retry!.trigger("click");
+    expect(wrapper.emitted("retry")).toHaveLength(1);
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable column floors", () => {
+  it("resolves a locale-specific minimum width from the active language", async () => {
+    const previous = i18n.global.locale.value;
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "locale-width",
+        rows: [],
+        columns: [
+          { key: "code", label: "编号", minWidth: { "zh-CN": 120, "en-US": 160 } },
+          { key: "actions", label: "操作" }
+        ],
+        total: 0
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ElTableColumn" }).props("minWidth")).toBe(120);
+    i18n.global.locale.value = "en-US";
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ElTableColumn" }).props("minWidth")).toBe(160);
+    i18n.global.locale.value = previous;
+    wrapper.unmount();
+  });
+
+  it("enables overflow tooltips for non-interactive data columns only", () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "tooltip-default",
+        rows: [],
+        columns: [
+          { key: "code", label: "编号" },
+          { key: "name", label: "名称", align: "left" },
+          { key: "raw", label: "原始", interactive: true },
+          { key: "actions", label: "操作" }
+        ],
+        total: 0
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(
+      wrapper
+        .findAllComponents({ name: "ElTableColumn" })
+        .map(column => column.props("showOverflowTooltip"))
+    ).toEqual([true, true, false, false]);
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable full screen", () => {
+  it("caps a full-screen table by the card height instead of the page behind it", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const wrapper = mount(DataTable, {
+      attachTo: host,
+      props: {
+        tableId: "admin-fullscreen-rows",
+        rows: Array.from({ length: 6 }, (_, index) => ({ id: String(index), code: String(index) })),
+        columns,
+        total: 6
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    try {
+      const parent = wrapper.element.parentElement as HTMLElement;
+      Object.defineProperty(parent, "clientHeight", { value: 360, configurable: true });
+      Object.defineProperty(wrapper.element, "clientHeight", { value: 800, configurable: true });
+      const toolbar = wrapper.get(".data-table__toolbar").element;
+      const pager = wrapper.get(".data-table__pager").element;
+      Object.defineProperty(toolbar, "offsetHeight", { value: 40, configurable: true });
+      Object.defineProperty(pager, "offsetHeight", { value: 40, configurable: true });
+      const header = wrapper.get(".el-table__header-wrapper").element;
+      Object.defineProperty(header, "offsetHeight", { value: 40, configurable: true });
+      await wrapper.get(`[aria-label="${i18n.global.t("table.fullscreen")}"]`).trigger("click");
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await nextTick();
+      expect(wrapper.classes()).toContain("is-fullscreen");
+      expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBe(720);
+    } finally {
+      wrapper.unmount();
+      host.remove();
+    }
+  });
+});
+
 describe("DataTable interactive cells", () => {
   it("leaves custom form focus handling to the slot while retaining left alignment", async () => {
     const wrapper = mount(DataTable, {

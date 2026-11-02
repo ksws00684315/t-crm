@@ -37,6 +37,7 @@ const kolTools = computed(() => kolAbilities(me.user));
 const exportAllowed = computed(() => canExport(me.user));
 const rebuilding = ref(false);
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<KolItemVO[]>([]);
 const total = ref(0);
 const shops = ref<ShopOptionVO[]>([]);
@@ -91,7 +92,12 @@ const columns = computed<DataColumn[]>(() => [
   { key: "targetShop", align: "left" as const, label: t("mapping.targetShop"), minWidth: 160 },
   { key: "targetChannel", label: t("mapping.targetChannel"), minWidth: 110 },
   { key: "targetItemId", align: "left" as const, label: t("mapping.targetItemId"), minWidth: 160 },
-  { key: "targetItemUrl", align: "left" as const, label: t("mapping.targetItemUrl"), width: 90 },
+  {
+    key: "targetItemUrl",
+    align: "left" as const,
+    label: t("mapping.targetItemUrl"),
+    minWidth: { "zh-CN": 130, "en-US": 150 }
+  },
   { key: "sourceItemId", align: "left" as const, label: t("mapping.sourceItemId"), minWidth: 150 },
   { key: "sourceChannel", label: t("mapping.sourceChannel"), minWidth: 110 },
   { key: "currentRate", label: t("mapping.currentRate"), minWidth: 140 },
@@ -266,6 +272,7 @@ const { exporting, exportCsv } = useListExport<KolItemVO>({
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page = await listKolItems({
       page: query.page,
@@ -275,6 +282,7 @@ async function load() {
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -459,6 +467,7 @@ onMounted(() => {
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="query.page"
       :size="query.size"
@@ -469,6 +478,7 @@ onMounted(() => {
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
+      @retry="load"
       @clear-filters="reset"
     >
       <template #cell-linkCode="{ row }">

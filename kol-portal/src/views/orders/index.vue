@@ -200,6 +200,9 @@ function pageChanged(value: number) {
   page.value = value;
   void load();
 }
+function changeSize(value: number) {
+  size.value = value;
+}
 onMounted(() => {
   void load();
   void loadSummary();
@@ -297,6 +300,7 @@ onMounted(() => {
       :page="page"
       :size="size"
       @update:page="pageChanged"
+      @update:size="changeSize"
       @refresh="refresh"
     >
       <!-- A comment-only slot falls back to DataTable's "0 in total". Keep a real element. -->

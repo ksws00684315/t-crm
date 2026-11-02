@@ -16,6 +16,7 @@ defineOptions({ name: "SystemLinkTemplatePage" });
 
 const { t } = useI18n();
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<LinkTemplateVO[]>([]);
 const query = ref("");
 const appliedQuery = ref("");
@@ -90,9 +91,11 @@ function reset() {
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     rows.value = await listLinkTemplates();
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -155,9 +158,11 @@ onMounted(() => void load());
       :rows="visibleRows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="visibleRows.length"
       :paged="false"
       @refresh="load"
+      @retry="load"
     >
       <template #cell-createTime="{ row }">{{
         formatInstantToMinute(asTemplate(row).createTime)

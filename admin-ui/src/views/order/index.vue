@@ -41,6 +41,7 @@ interface GroupedOrderRow {
 }
 
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<OrderVO[]>([]);
 const total = ref(0);
 const shops = ref<OrderSyncStateVO[]>([]);
@@ -265,6 +266,7 @@ const detailOrderId = ref<string | null>(null);
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page: PageResult<OrderVO> = await listOrders({
       page: query.page,
@@ -276,6 +278,7 @@ async function load() {
   } catch (error) {
     rows.value = [];
     total.value = 0;
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -450,6 +453,7 @@ onMounted(() => {
       :rows="tableRows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="query.page"
       :size="query.size"
@@ -461,6 +465,7 @@ onMounted(() => {
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
+      @retry="load"
       @clear-filters="reset"
     >
       <template #cell-product="{ row }">

@@ -31,6 +31,7 @@ const canManage = computed(() => accessOf(me.user).can("kol:copy-token"));
 const STATUSES: CopyTokenDisplayStatus[] = ["ACTIVE", "EXHAUSTED", "EXPIRED", "REVOKED"];
 
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<CopyTokenVO[]>([]);
 const total = ref(0);
 const createVisible = ref(false);
@@ -148,6 +149,7 @@ async function load() {
     return;
   }
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page = await listCopyTokens({
       page: query.page,
@@ -160,6 +162,7 @@ async function load() {
     rows.value = page.items;
     total.value = Number(page.total);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -345,6 +348,7 @@ onMounted(() => {
       :columns="columns"
       :rows="rows"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="query.page"
       :size="query.size"
@@ -352,6 +356,7 @@ onMounted(() => {
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
+      @retry="load"
       @clear-filters="reset"
     >
       <template #cell-hint="{ row }">

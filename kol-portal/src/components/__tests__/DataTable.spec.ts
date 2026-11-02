@@ -370,3 +370,90 @@ describe("DataTable expand rows", () => {
     wrapper.unmount();
   });
 });
+
+describe("DataTable failure state", () => {
+  it("shows the failure copy and a retry entry instead of an empty result", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "failure",
+        rows: [],
+        columns,
+        total: 0,
+        failed: true,
+        filterCount: 2
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.text()).toContain(i18n.global.t("table.loadFailed"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("table.emptyFiltered"));
+    const retry = wrapper
+      .findAll("button")
+      .find(button => button.text() === i18n.global.t("table.retry"));
+    expect(retry).toBeTruthy();
+    await retry!.trigger("click");
+    expect(wrapper.emitted("retry")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("keeps the page empty slot for non-failure states", async () => {
+    const wrapper = mount(DataTable, {
+      props: { tableId: "custom-empty", rows: [], columns, total: 0 },
+      slots: { empty: '<p data-test="custom-empty">nothing yet</p>' },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(true);
+    await wrapper.setProps({ failed: true });
+    expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable column floors", () => {
+  it("resolves a locale-specific minimum width from the active language", async () => {
+    const previous = i18n.global.locale.value;
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "locale-width",
+        rows: [],
+        columns: [
+          { key: "code", label: "编号", minWidth: { "zh-CN": 120, "en-US": 160 } },
+          { key: "actions", label: "操作" }
+        ],
+        total: 0
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ElTableColumn" }).props("minWidth")).toBe(120);
+    i18n.global.locale.value = "en-US";
+    await nextTick();
+    expect(wrapper.findComponent({ name: "ElTableColumn" }).props("minWidth")).toBe(160);
+    i18n.global.locale.value = previous;
+    wrapper.unmount();
+  });
+
+  it("enables overflow tooltips for non-interactive data columns only", () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "tooltip-default",
+        rows: [],
+        columns: [
+          { key: "code", label: "编号" },
+          { key: "name", label: "名称", align: "left" },
+          { key: "raw", label: "原始", interactive: true },
+          { key: "actions", label: "操作" }
+        ],
+        total: 0
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(
+      wrapper
+        .findAllComponents({ name: "ElTableColumn" })
+        .map(column => column.props("showOverflowTooltip"))
+    ).toEqual([true, true, false, false]);
+    wrapper.unmount();
+  });
+});

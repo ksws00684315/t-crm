@@ -38,6 +38,7 @@ const me = useUserStore();
 const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const exportAllowed = computed(() => canExport(me.user));
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<UserVO[]>([]);
 const total = ref(0);
 const query = reactive<{
@@ -76,7 +77,7 @@ const columns = computed<DataColumn[]>(() => [
   // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this
   // wide placed next to the fixed actions column would sit under it until the user scrolls.
   { key: "departure", label: t("departure.column"), width: px(210, 250) },
-  { key: "permissions", label: t("user.permissionCount"), width: 92 },
+  { key: "permissions", label: t("user.permissionCount"), minWidth: { "zh-CN": 92, "en-US": 120 } },
   { key: "dataScope", label: t("user.dataScope"), width: 92 },
   { key: "status", label: t("common.status"), width: 80 },
   { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
@@ -253,6 +254,7 @@ function batchStatus(target: 0 | 1): void {
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page = await listUsers({
       page: query.page,
@@ -264,6 +266,7 @@ async function load() {
     // One request per BD row; the table shows at once and the counts fill in as they arrive.
     void loadKolCounts(page.items);
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -440,6 +443,7 @@ onMounted(load);
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :failed="loadFailed"
       :total="total"
       :page="query.page"
       :size="query.size"
@@ -453,6 +457,7 @@ onMounted(load);
       @update:page="onPage"
       @update:size="onSize"
       @refresh="load"
+      @retry="load"
       @clear-filters="reset"
     >
       <template #batch>
