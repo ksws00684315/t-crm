@@ -32,6 +32,10 @@ jobs:
         run: python3 deploy/scripts/check-compose-env.py
       - name: Backup retention rule
         run: bash deploy/backup/test-retention.sh
+      - name: Ops check rules (task 96)
+        run: bash deploy/scripts/test-ops-check.sh
+      - name: Public certificate renewal stub test (legacy L-059)
+        run: bash deploy/scripts/test-renew-public-cert.sh
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build backend image

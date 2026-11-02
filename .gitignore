@@ -42,3 +42,6 @@ docs/00-需求/客户补充资料-1015/prod5(2)/
 
 # Release history written by deploy/scripts/release.sh on the production host
 deploy/releases.log
+
+# Alert state written by deploy/scripts/ops-check.sh on the production host (task 96)
+deploy/ops-state/
