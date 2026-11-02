@@ -4,7 +4,7 @@
 |---|---|
 | `.env.example` | 全部环境变量（名称与 backend / redirect 实际使用的一致）；复制为 `deploy/.env` 后填写，`.env` 不入库 |
 | `docker-compose.dev.yml` | 本地共享中间件：PostgreSQL 17.11、Redis 7.4.5 |
-| `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis |
+| `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis；应用与数据库镜像从仓库拉取，不在服务器构建 |
 | `docker-compose.preview.yml` | 本地预览：与生产相同的五个服务，只绑定 `127.0.0.1:8890/8891/8892` |
 | `nginx/` | 四个站点（`t.`、`kol.`、`admin.`、`upload.`）的配置模板、TLS 与安全响应头片段、Cloudflare 回源 IP 段与回源认证 CA；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
 | `postgres/initdb/` | 生产 PostgreSQL 首次初始化脚本：创建非超级用户的应用账号并设为库的 owner |
@@ -16,7 +16,10 @@
 | `backup/restore-pitr.sh` | 时间点 / 最新点恢复脚本（需输入 `yes`） |
 | `backup/iam-policy.example.json` | 备份写入身份的 IAM 最小权限策略示例 |
 | `postgres/` | 带 pgBackRest 的 PostgreSQL 镜像（Dockerfile、`pgbackrest.conf`）与初始化脚本 |
-| `scripts/build-static.sh` | 构建两个前端并生成 Nginx 静态目录（含四份第三方许可声明） |
+| `scripts/build-static.sh` | 构建两个前端并生成静态目录（含四份第三方许可声明）；发布流程在 CI 中运行它，本地预览也用它 |
+| `scripts/release.sh` | 生产发布与回滚：`deploy <版本>`、`rollback <版本>`、`status`（见「发布与回滚」） |
+| `static/Dockerfile` | 静态产物镜像（`FROM scratch`），由发布流程构建，`release.sh` 从中解出前端文件 |
+| `../.github/workflows/release.yml` | 版本标签触发：构建 crm-admin、crm-redirect、crm-postgres、crm-static（linux/amd64）并推送到 GHCR |
 | `../backend/Dockerfile`、`../redirect/Dockerfile` | 多阶段构建；运行镜像为 JRE 21，非 root 用户；构建上下文是仓库根目录 |
 
 ## 本地共享中间件与开发
@@ -143,19 +146,66 @@ deploy/scripts/local-infra.sh psql
    微店接入还要求设置 `TCRM_SECRET_KEY` 和 `TCRM_ADMIN_BASE_URL`。使用 `openssl rand -base64 32` 生成主密钥，作为 32 字节 Base64 值保存于受控的部署密钥库，并单独备份；不要写入仓库。丢失主密钥意味着已保存的凭证全部要重新录入。`TCRM_ADMIN_BASE_URL` 必须是无末尾斜杠的 HTTPS 后台地址（例如 `https://admin.example.com`）；将该域名登记为微店开放平台的回调域名。缺失或格式错误时后台启动失败。
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
    商品源表（ADR-021）不需要新的环境变量，但要求后端能直连 `oauth2.googleapis.com` 与 `sheets.googleapis.com`（服务器部署在海外）。客户需在自己的 Google Cloud 项目中创建服务账号、启用 Google Sheets API、下载 JSON 密钥；超管在管理端「商品 → 商品源表」上传密钥（私钥加密保存，依赖 `TCRM_SECRET_KEY`），再把每张源表分享给页面上显示的服务账号邮箱（查看者）。
-3. 构建前端静态文件：`deploy/scripts/build-static.sh`（需要 Node.js 与 pnpm），输出到 `TCRM_STATIC_DIR`（默认 `deploy/www`）。
-4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时 `up` 会报找不到卷。先生成公开证书（下文），再启动：`docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build`（postgres 镜像暂在本机构建，含写死版本的 pgBackRest，任务 95 改为拉取镜像）；首次启动后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份（没有 `public.pem` 时 Nginx 起不来）。
+3. 镜像仓库与版本（ADR-037 决定 7）：镜像由 GitHub Actions 构建并推送到 GHCR，服务器不安装 Node.js、Maven，也不构建任何镜像。在 `deploy/.env` 设置 `TCRM_IMAGE_REGISTRY`（例如 `ghcr.io/ksws00684315`，小写、无末尾斜杠）。镜像为私有时，服务器用只有 `read:packages` 权限的令牌登录一次：`echo <令牌> | docker login ghcr.io -u <GitHub 用户名> --password-stdin`（令牌不写进仓库和 `.env`，凭证由 Docker 保存在登录用户的 `~/.docker/config.json`）。`TCRM_VERSION` 由发布脚本维护，首次不用改。
+4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时发布会报找不到卷。先生成公开证书（下文），并把源站证书放进 `TCRM_CERT_DIR`（没有证书文件时发布脚本拒绝启动 Nginx），再把仓库切到要发布的版本标签并发布：`git fetch --tags && git checkout v1.0.0 && deploy/scripts/release.sh deploy 1.0.0`。首次发布没有 postgres 容器，脚本跳过备份，并启动 postgres、redis、crm-admin、crm-redirect 和 Nginx。随后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份。之后每次发布见「发布与回滚」。
 5. 备份（ADR-037）：按下文「备份与恢复」配置 pgBackRest 与每日加密逻辑备份，上线前做一次完整恢复演练。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
 7. 上线检查：**生产环境禁止开启 `crm.mail.log-links`**（该开关会在日志中记录收件人与邮件链接，仅限本机开发排查使用，默认关闭）。
 8. 上线检查（任务 26）：`upload.<域名>` 的 DNS 记录已创建且 Cloudflare 状态为「仅 DNS」；`public.pem` 覆盖 `upload.<域名>`（用 `openssl s_client -connect upload.<域名>:443 -servername upload.<域名> </dev/null | openssl x509 -noout -issuer -subject` 确认签发者是 Let's Encrypt，而不是 Cloudflare 源站证书）；系统配置中的 `url.upload` 已设为 `https://upload.<域名>`（默认空值上传会走管理端同源，Cloudflare 会拒绝超过约 100 MB 的请求体）；`TCRM_CORS_ALLOWED_ORIGINS` 包含 `https://admin.<域名>`（跨域上传的预检与正式请求需要）。
 
-9. 版本一致性检查（#106）：生产模板为 `crm-admin` 固定设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS=""`（严格模式）。数据库结构版本比镜像新（典型场景：发布后回滚到旧镜像，或「先发库、后发镜像」顺序颠倒）时，后台**启动即失败**，日志中 Flyway 报「applied migration not resolved locally」，随后一条 ERROR 说明「数据库结构比镜像新，请部署包含全部已应用迁移的镜像」。本机开发与预览共用同一个数据库、且各分支迁移版本不同，**不要**在 `docker-compose.dev.yml` / `docker-compose.preview.yml` 中设置该变量（默认 `*:future`，仅告警）。
-   应急回滚方法：确认业务上确实要用旧镜像启动时，临时设置 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'` 后 `docker compose ... up -d crm-admin`；此时旧镜像不认识的枚举值在列表中显示为 `—`（任务 73 容错），仅新增功能不可用。事后恢复严格模式并尽快部署不低于库版本的镜像。
+9. 版本一致性检查（#106）：生产模板通过 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS`（`.env` 未设置时为空，即严格模式）控制 `crm-admin`。数据库结构版本比镜像新（典型场景：发布后回滚到旧镜像，或「先发库、后发镜像」顺序颠倒）时，后台**启动即失败**，日志中 Flyway 报「applied migration not resolved locally」，随后一条 ERROR 说明「数据库结构比镜像新，请部署包含全部已应用迁移的镜像」。本机开发与预览共用同一个数据库、且各分支迁移版本不同，**不要**在 `docker-compose.dev.yml` / `docker-compose.preview.yml` 中设置该变量（默认 `*:future`，仅告警）。
+   应急回滚方法：确认业务上确实要用旧镜像启动时，在 `deploy/.env` 临时加一行 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'`，再执行 `deploy/scripts/release.sh rollback <版本>`；此时旧镜像不认识的枚举值在列表中显示为 `—`（任务 73 容错），仅新增功能不可用。事后删除该行，并尽快用 `release.sh deploy` 发布不低于库版本的镜像（脚本重建 `crm-admin`，恢复严格模式）。发布脚本从不修改这个变量。
 
 10. 数据库账号分离（ADR-037）：生产 PostgreSQL 的超级用户 `TCRM_DB_SUPERUSER_USERNAME` / `TCRM_DB_SUPERUSER_PASSWORD` 只用于管理和备份；后台使用 `TCRM_DB_USERNAME`，它由 `postgres/initdb/01-app-role.sh` 在**首次初始化空数据卷**时创建，没有超级用户权限，是库 `TCRM_DB_NAME` 的 owner，Flyway 用它建表。初始化脚本只在数据卷为空时执行：已有数据的卷不会补建账号，也不会改变现有账号。两个用户名必须不同，密码各自独立。
-11. 首次启动并以平台管理员成功登录后，从 `deploy/.env` 删除 `TCRM_BOOTSTRAP_ADMIN_PASSWORD`（用户名可保留），再 `docker compose ... up -d crm-admin` 让配置生效；系统里已有平台管理员时，后台不再需要这两个变量。
+11. 首次启动并以平台管理员成功登录后，从 `deploy/.env` 删除 `TCRM_BOOTSTRAP_ADMIN_PASSWORD`（用户名可保留），再 `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --no-deps crm-admin` 让配置生效（务必带 `--no-deps`，原因见「发布与回滚」）；系统里已有平台管理员时，后台不再需要这两个变量。
 12. 日志与共享内存：所有容器使用 `json-file` 日志并轮转（每个服务最多 5 个、每个 50 MB）；PostgreSQL 的 `shm_size` 为 256 MB。
+
+### 发布与回滚
+
+依据 ADR-037 决定 2、7。镜像由 GitHub Actions 构建一次，服务器只拉取；前端不单独起容器，由同一个 Nginx 用 `current` 软链接切换。
+
+**前提与限制**
+
+- **单实例发布有 30～60 秒的管理端中断**：`crm-admin` 被替换到健康为止，管理端和达人端的接口（`/admin-api/`、`/kol-api/`）返回 502；静态页面和 `t.<域名>` 跳转不受影响。**发布选在低峰期。**
+- `crm-redirect` 只在镜像摘要变化时才重启；它重启时跳转短暂不可用。只改后台的版本不重启它。工作流关闭了 provenance 和 SBOM 附加物，并使用注册表构建缓存，没有改动的 `redirect/` 源码重新构建得到相同的镜像摘要。
+- **标签指向的提交必须已在 `main` 上并通过 `main` 的检查**。发布工作流不重复跑测试，只检查提交是 `main` 的祖先。
+- 服务器需要：Docker 与 Compose 插件、`gpg`（发布前备份用 `pg-backup.sh`，口令文件 `TCRM_BACKUP_PASSPHRASE_FILE`，权限必须是 600，见「备份与恢复」）、对 GHCR 的读取权限（`read:packages` 令牌）。`deploy/.env` 必填项发布前由脚本检查。
+- Compose 文件、Nginx 配置和脚本来自服务器上的仓库，镜像里只有应用：**发布前先把仓库切到同一个标签**（`git fetch --tags && git checkout v<版本>`）。
+- 同一个版本号不要重复打标签或重新推送：脚本发现 `releases/<版本>/` 已经解出就不再替换。
+
+**发布一个版本**
+
+1. 在 `main` 打标签并推送：`git tag v1.0.1 && git push origin v1.0.1`。`Release` 工作流构建并推送 `linux/amd64` 镜像（标签为不带 `v` 的版本号）：
+
+   | 镜像 | 内容 |
+   |---|---|
+   | `<TCRM_IMAGE_REGISTRY>/crm-admin:1.0.1` | 后台 |
+   | `<TCRM_IMAGE_REGISTRY>/crm-redirect:1.0.1` | 跳转服务 |
+   | `<TCRM_IMAGE_REGISTRY>/crm-postgres:1.0.1` | PostgreSQL 17.11 + 写死版本的 pgBackRest（`deploy/postgres/Dockerfile`，PGDG 只保留较新的版本，所以只在发布流程里构建一次） |
+   | `<TCRM_IMAGE_REGISTRY>/crm-static:1.0.1` | 两个前端的静态文件（含 `licenses/`），`FROM scratch`，不运行 |
+
+   工作流也可以在 GitHub 页面手动运行，运行时选择标签作为 ref；不在标签上运行会失败。
+
+2. 在服务器上：`git fetch --tags && git checkout v1.0.1 && deploy/scripts/release.sh deploy 1.0.1`。脚本依次：
+   1. 检查 `.env` 必填项、`gpg` 与口令文件；记录当前版本（`.env` 的 `TCRM_VERSION`）；
+   2. 拉取四个镜像，把静态镜像解出到 `$TCRM_STATIC_DIR/releases/1.0.1/`（只读取、不改动线上，所以放在备份之前：拉取失败时不产生任何变更，备份与更新之间的间隔最短）；
+   3. 运行 `deploy/backup/pg-backup.sh`，**失败即中止**（首次部署没有数据库，跳过）；
+   4. 更新 `crm-admin` 并等待健康。**不健康时前端不切换**，脚本报错退出；
+   5. 仅当 `crm-redirect` 镜像摘要变化时更新它；
+   6. 原子切换 `current`（临时链接 + `mv -T`），Nginx 不重启、不重载；
+   7. 把 `TCRM_VERSION` 写回 `.env`，在 `deploy/releases.log`（已被 Git 忽略）追加记录，只保留最近 5 个静态版本（正在使用的和上一个版本不会被删）。
+
+   任一步失败，脚本停止并打印当前状态和下一步建议，**不自动回滚数据库**。`crm-admin` 被替换后失败时，线上管理端接口不可用，按建议重新执行 `release.sh deploy <上一个版本>` 恢复。发布和回滚都不碰 PostgreSQL、Redis、Nginx 容器。
+3. `deploy/scripts/release.sh status` 随时查看：当前版本、各容器的镜像与摘要、`current` 指向、最近的发布记录。
+
+**目录布局**：`TCRM_STATIC_DIR` 下是 `releases/<版本>/admin`、`releases/<版本>/kol` 和相对软链接 `current -> releases/<版本>`。生产 Compose 挂载的是 `TCRM_STATIC_DIR` 这个**父目录**（Docker 绑定挂载在挂载时解析软链接，直接挂载 `current` 会永远停在第一个版本），Nginx 的 `root` 是 `/usr/share/nginx/sites/current/{admin,kol}`。切换时已经打开的页面如果在切换后才懒加载旧版本的资源，会得到 404，刷新即可。
+
+**回滚**：`deploy/scripts/release.sh rollback 1.0.0` 切回该版本的镜像和静态目录（镜像或静态目录不在本机时从仓库取回）。回滚不自动备份，也不动数据库；回滚前如需备份先手动运行 `deploy/backup/pg-backup.sh`。
+
+- 目标版本与当前版本的数据库结构兼容（没有新迁移）时，回滚直接成功。
+- 当前数据库已经执行了目标版本不认识的迁移时，Flyway 严格模式（第 9 项）让旧镜像**启动即失败**。脚本检测到后打印原因和下面的应急方法，管理端接口保持不可用，**脚本不会修改 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS`，也不改数据库**。两条出路：`release.sh deploy <较新的版本>` 立刻恢复服务；或确实要用旧镜像时，按第 9 项在 `.env` 临时加 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'`，重新执行 `release.sh rollback <版本>`，事后删除该行并发布不低于库版本的镜像。
+
+**发布之后的 Compose 命令**：生产 Compose 的三个镜像标签都是 `${TCRM_VERSION}`，而发布脚本只更新需要更新的服务。`.env` 里的版本变化后，没有变化内容的 `crm-postgres` 容器仍是旧标签创建的，此时不带 `--no-deps` 的 `docker compose up -d <服务>` 会因为标签不同而**重建 PostgreSQL，并连带重启依赖它的 crm-admin**。要在发布之外重建某个服务，一律用 `up -d --no-deps <服务>`。`release.sh` 发现新版本的 `crm-postgres` 镜像与运行中的不同时，只打印提示，不重启数据库；需要升级 pgBackRest 或 PostgreSQL 补丁版本时，在低峰期手动 `up -d --no-deps postgres`（数据库约中断十几秒）。
 
 ### 公开证书的申请与续期
 
