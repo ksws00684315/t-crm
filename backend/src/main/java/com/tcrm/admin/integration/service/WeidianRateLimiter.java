@@ -10,6 +10,7 @@ import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
+import org.redisson.api.RateLimiterConfig;
 import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;
@@ -26,8 +27,16 @@ public class WeidianRateLimiter {
   }
 
   public void acquire(String appKey) {
+    int qps = configs.getInt("weidian.qps");
     RRateLimiter limiter = redis.getRateLimiter("weidian:api:qps:" + digest(appKey));
-    limiter.setRate(RateType.OVERALL, configs.getInt("weidian.qps"), 1, RateIntervalUnit.SECONDS);
+    // trySetRate keeps the existing window. Calling setRate on every acquire (the previous
+    // behaviour) refilled permits and let five concurrent callers finish in ~10 ms (L-067).
+    if (!limiter.trySetRate(RateType.OVERALL, qps, 1, RateIntervalUnit.SECONDS)) {
+      RateLimiterConfig cfg = limiter.getConfig();
+      if (cfg.getRate() != qps || cfg.getRateInterval() != 1_000L) {
+        limiter.setRate(RateType.OVERALL, qps, 1, RateIntervalUnit.SECONDS);
+      }
+    }
     if (!limiter.tryAcquire(1, 10, TimeUnit.SECONDS)) {
       throw new BusinessException(ErrorCode.WEIDIAN_RATE_LIMITED);
     }

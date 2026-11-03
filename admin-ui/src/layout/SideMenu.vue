@@ -24,6 +24,7 @@ const { t } = useI18n();
       :default-active="active"
       :collapse="collapse"
       :collapse-transition="false"
+      popper-class="side-menu-popper"
       router
       class="side__menu"
       @select="emit('select')"
@@ -133,5 +134,19 @@ const { t } = useI18n();
 }
 .is-collapsed .side__badge {
   display: none;
+}
+</style>
+
+<style>
+/* Collapsed submenu popper mounts under body and misses .side__menu variables (L-097). */
+.side-menu-popper.el-menu--popup,
+.el-menu--popup.side-menu-popper {
+  --el-menu-item-height: 40px;
+  --el-menu-sub-item-height: 40px;
+}
+.side-menu-popper.el-menu--popup .el-menu-item,
+.el-menu--popup.side-menu-popper .el-menu-item {
+  height: 40px;
+  line-height: 40px;
 }
 </style>

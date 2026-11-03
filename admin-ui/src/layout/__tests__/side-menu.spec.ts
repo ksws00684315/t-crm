@@ -38,6 +38,7 @@ describe("SideMenu badge (task 102 U-057)", () => {
     const global = readFileSync(resolve(__dirname, "../../style/index.css"), "utf8");
     const menuStart = global.indexOf("#app .side__menu .el-menu-item *");
     const menuBlock = global.slice(menuStart, global.indexOf("}", menuStart));
-    expect(menuBlock).toContain("font-size: var(--tcrm-font-size-menu) !important");
+    expect(menuBlock).toContain("font-size: var(--tcrm-font-size-menu)");
+    expect(menuBlock).not.toContain("!important");
   });
 });

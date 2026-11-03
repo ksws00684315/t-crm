@@ -34,16 +34,22 @@ expect ok "$(age_level 1560 1560)" "age at the maximum is ok"
 expect alert "$(age_level 1561 1560)" "age past the maximum alerts"
 
 # WAL stall: pending .ready required; idle (ready=0) never alerts.
+# L-078: when last_archived is set, also require last_failed > last_archived.
 expect ok "$(wal_stall_level 0 0 1000000 15)" "idle with never-archived is ok"
 expect ok "$(wal_stall_level 0 1 1000000 15)" "idle with old last_archived is ok"
 expect alert "$(wal_stall_level 1 0 1000000 15)" "pending and never archived alerts"
-expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15)" "pending and stalled alerts"
-expect ok "$(wal_stall_level 2 $((1000000 - 10 * 60)) 1000000 15)" "pending but recent archive is ok"
+expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 $((1000000 - 1)))" "pending stalled with newer failure alerts"
+expect ok "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 0)" "stale archive without failure is ok (idle first write)"
+expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 "")" "failed query (empty) falls back to pre-L-078: pending + stale archive alerts"
+expect ok "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 $((1000000 - 20 * 60)))" "failure older than last archive is ok"
+expect ok "$(wal_stall_level 2 $((1000000 - 10 * 60)) 1000000 15 $((1000000 - 1)))" "pending but recent archive is ok"
 
 expect "disk usage % on / CRITICAL (>= %)"   "$(alert_signature "disk usage 86% on / CRITICAL (>= 85%)")" "signature strips digits"
 expect "$(alert_signature "disk usage 72% on / (>= 70%)")"   "$(alert_signature "disk usage 73% on / (>= 70%)")" "numeric-only change keeps signature"
 [ "$(alert_signature "disk usage 72% on / (>= 70%)")" !=   "$(alert_signature "disk usage 86% on / CRITICAL (>= 85%)")" ] ||
   fail "warn vs CRITICAL must change signature"
+# L-077: traceIds must not change the signature.
+expect "$(alert_signature "crm-admin: 3 ERROR (loggers: x; traceIds: abc def)")"   "$(alert_signature "crm-admin: 3 ERROR (loggers: x; traceIds: xyz new)")"   "traceIds tail ignored in signature"
 
 # --- time parsing (GNU and BSD date formats) -----------------------------
 
@@ -209,5 +215,29 @@ while IFS=$'\t' read -r mount pct; do
     /snap|/*/snap/*) fail "live df_usage_lines still includes snap: $mount" ;;
   esac
 done < <(df_usage_lines)
+
+
+# L-076: Feishu body code≠0 is not a delivery — LAST must stay so the next run retries.
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/ops-check.sh"
+ALERT_WEBHOOK="http://hook.invalid/feishu-reject"
+CURL_TIMEOUT=5
+curl() { printf '{"code":19021,"msg":"sign match fail"}\n'; }
+rm -f "$STATE_DIR/disk.state"
+SENT="$WORK/sent-reject.txt"; : > "$SENT"
+# Wrap dispatch to also record attempts while keeping return code.
+_orig_dispatch=$(declare -f dispatch)
+eval "$_orig_dispatch"
+notify disk 1 "disk usage 72% on / (>= 70%)"
+# shellcheck disable=SC1091
+. "$STATE_DIR/disk.state"
+[ "$FIRING" = "1" ] || fail "rejected webhook should still mark firing"
+[ "${LAST:-0}" = "0" ] || fail "rejected webhook must not record LAST (got $LAST)"
+# A successful delivery afterwards should send and stamp LAST.
+curl() { printf '{"code":0,"msg":"success"}\n'; }
+notify disk 1 "disk usage 72% on / (>= 70%)"
+# shellcheck disable=SC1091
+. "$STATE_DIR/disk.state"
+[ "${LAST:-0}" -gt 0 ] || fail "successful webhook should record LAST"
 
 echo "ops-check: all tests passed"

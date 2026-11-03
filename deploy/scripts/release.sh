@@ -2,8 +2,13 @@
 # Release, update and roll back the production Compose stack from registry images (ADR-037 decision 7).
 # Run on the production host, from any directory, as a user that may run docker:
 #
-#   release.sh deploy <version>     e.g. 1.0.1 (a leading "v" is accepted)
-#   release.sh rollback <version>   switch images and front end back to an earlier version
+#   release.sh deploy <version> [--postgres <pg-version>]
+#       e.g. 1.0.1 (a leading "v" is accepted). --postgres updates TCRM_POSTGRES_VERSION and
+#       pulls that crm-postgres tag; omitted = leave the database image alone (L-070/L-073).
+#       A first deployment (no postgres container yet, TCRM_POSTGRES_VERSION not pinned) also
+#       pre-pulls the crm-postgres tag it is about to pin, so a pull failure surfaces in the pull
+#       step instead of inside "compose up" after the release has already started changing things.
+#   release.sh rollback <version>   switch app/front end only — never pulls or changes postgres
 #   release.sh status               current version, running images, "current" link, release history
 #
 # deploy: check .env -> pull images -> extract the static files to releases/<version>/ -> pg-backup.sh
@@ -21,6 +26,7 @@
 #   TCRM_RELEASE_HEALTH_TIMEOUT    seconds to wait for crm-admin / crm-redirect (default 300)
 #   TCRM_RELEASE_KEEP              static versions to keep (default 5)
 #   TCRM_RELEASE_BACKUP_COMMAND    backup program (default deploy/backup/pg-backup.sh)
+#   TCRM_RELEASE_LOCK_DIR          mkdir lock directory (default deploy/.release.lock)
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +36,11 @@ RELEASE_LOG="${TCRM_RELEASE_LOG:-$DEPLOY_DIR/releases.log}"
 HEALTH_TIMEOUT="${TCRM_RELEASE_HEALTH_TIMEOUT:-300}"
 KEEP_RELEASES="${TCRM_RELEASE_KEEP:-5}"
 BACKUP_COMMAND="${TCRM_RELEASE_BACKUP_COMMAND:-$DEPLOY_DIR/backup/pg-backup.sh}"
+LOCK_DIR="${TCRM_RELEASE_LOCK_DIR:-$DEPLOY_DIR/.release.lock}"
+LOCK_HELD=0
 VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
+UPDATE_POSTGRES_VERSION="" # set by deploy --postgres <ver>; empty = do not touch postgres
+POSTGRES_PIN_WRITTEN=""    # set by ensure_postgres_version_pinned; first deploy pre-pulls this crm-postgres tag
 
 # Variables without a default in docker-compose.prod.yml (and TCRM_BACKUP_PASSPHRASE_FILE for pg-backup.sh).
 REQUIRED_ENV="TCRM_IMAGE_REGISTRY TCRM_DOMAIN TCRM_DB_USERNAME TCRM_DB_PASSWORD TCRM_DB_SUPERUSER_USERNAME \
@@ -53,9 +63,10 @@ step() { STAGE="$1"; printf '\n==> %s\n' "$1"; }
 usage() {
   cat >&2 << 'EOF'
 用法：
-  release.sh deploy <版本>      发布（例如 1.0.1）
-  release.sh rollback <版本>    回滚到较早的版本（只切换镜像和前端，不回滚数据库）
-  release.sh status             显示当前版本、运行中的镜像、current 指向和发布记录
+  release.sh deploy <版本> [--postgres <数据库镜像版本>]
+                            发布应用与前端；加 --postgres 才更新并拉取 crm-postgres
+  release.sh rollback <版本>  回滚到较早的版本（只切换应用镜像和前端，不拉、不改数据库镜像）
+  release.sh status           显示当前版本、运行中的镜像、current 指向和发布记录
 EOF
   exit 2
 }
@@ -78,23 +89,24 @@ env_get() {
   printf '%s' "$value"
 }
 
-# Writes TCRM_VERSION=<version> into the env file atomically: the new content goes to a temporary file
-# in the SAME directory (same file system, same owner and mode as the original), then mv replaces the
-# file in one step. A failure (full disk, kill) leaves the original untouched; the temporary file holds
-# every secret of .env, so it is removed on every failure path (ENV_TMP, also cleaned by on_exit).
-env_set_version() {
-  local version="$1"
+# Writes KEY=VALUE into the env file atomically (same-directory mktemp + mv). The temporary file
+# holds every secret of .env, so it is removed on every failure path (ENV_TMP, also cleaned by on_exit).
+env_set_key() {
+  local key="$1" value="$2"
   ENV_TMP="$(mktemp "$ENV_FILE.XXXXXX")" || return 1
   cp -p "$ENV_FILE" "$ENV_TMP" || { rm -f "$ENV_TMP"; return 1; }
-  if grep -q '^TCRM_VERSION=' "$ENV_FILE"; then
-    awk -v v="$version" '/^TCRM_VERSION=/ { print "TCRM_VERSION=" v; next } { print }' "$ENV_FILE" > "$ENV_TMP" \
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    awk -v k="$key" -v v="$value" 'index($0, k "=") == 1 { print k "=" v; next } { print }' "$ENV_FILE" > "$ENV_TMP" \
       || { rm -f "$ENV_TMP"; return 1; }
   else
-    { cat "$ENV_FILE" && printf 'TCRM_VERSION=%s\n' "$version"; } > "$ENV_TMP" || { rm -f "$ENV_TMP"; return 1; }
+    { cat "$ENV_FILE" && printf '%s=%s\n' "$key" "$value"; } > "$ENV_TMP" || { rm -f "$ENV_TMP"; return 1; }
   fi
   mv -f "$ENV_TMP" "$ENV_FILE" || { rm -f "$ENV_TMP"; return 1; }
   ENV_TMP=""
 }
+
+env_set_version() { env_set_key TCRM_VERSION "$1"; }
+
 
 # ---- helpers --------------------------------------------------------------------------------------------
 
@@ -157,7 +169,7 @@ require_tools() {
   docker compose version > /dev/null 2>&1 || die_early "缺少 Docker Compose 插件"
   docker info > /dev/null 2>&1 || die_early "Docker 没有在运行或当前用户无权使用"
   [ -f "$COMPOSE_FILE" ] || die_early "找不到 Compose 文件：$COMPOSE_FILE"
-  [ -f "$ENV_FILE" ] || die_early "找不到 $ENV_FILE，请先按 .env.example 创建"
+  [ -f "$ENV_FILE" ] || die_early "找不到 ${ENV_FILE}，请先按 .env.example 创建"
 }
 
 die_early() {
@@ -194,9 +206,9 @@ print_state() {
   for service in crm-admin crm-redirect postgres redis nginx; do
     id="$(container_any_id "$service")"
     if [ -n "$id" ]; then
-      log "  $service：$(docker inspect --format '{{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$id" 2> /dev/null)"
+      log "  ${service}：$(docker inspect --format '{{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$id" 2> /dev/null)"
     else
-      log "  $service：没有容器"
+      log "  ${service}：没有容器"
     fi
   done
   link="$static/current"
@@ -238,13 +250,13 @@ report_failure() { # <message>
         log "  crm-admin 已被替换但没有恢复健康，前端仍指向 $(current_target)，.env 版本未更新。"
         log "  1. 查看日志：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE logs --tail=200 crm-admin"
         if [ -n "$PREVIOUS_VERSION" ] && [ "$PREVIOUS_VERSION" != "$TARGET_VERSION" ]; then
-          log "  2. 回到上一个版本：release.sh deploy $PREVIOUS_VERSION（数据库不会自动回滚）"
+          log "  2. 回到上一个版本：release.sh deploy ${PREVIOUS_VERSION}（数据库不会自动回滚）"
         fi
         ;;
       redirect)
-        log "  crm-admin 已是 $TARGET_VERSION，但 crm-redirect 没有恢复健康，前端仍指向 $(current_target)。"
+        log "  crm-admin 已是 ${TARGET_VERSION}，但 crm-redirect 没有恢复健康，前端仍指向 $(current_target)。"
         log "  查看日志：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE logs --tail=200 crm-redirect，"
-        log "  修复后重新执行 release.sh $ACTION $TARGET_VERSION。"
+        log "  修复后重新执行 release.sh $ACTION ${TARGET_VERSION}。"
         ;;
       switch | record)
         log "  镜像已更新。重新执行 release.sh $ACTION $TARGET_VERSION 完成前端切换和记录（各步骤可重复执行）。"
@@ -257,11 +269,17 @@ report_failure() { # <message>
 }
 
 on_exit() {
+  # Capture the real exit status BEFORE releasing the lock (rmdir would overwrite $?).
   local rc=$?
+  # L-071: drop the release lock only if this process created it (never steal another's).
+  if [ "$LOCK_HELD" -eq 1 ]; then
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    LOCK_HELD=0
+  fi
   trap - EXIT
   [ -z "$ENV_TMP" ] || rm -f "$ENV_TMP"
   if [ "$rc" -ne 0 ] && [ "$REPORTED" -ne 1 ]; then
-    report_failure "命令失败（退出码 $rc）"
+    report_failure "命令失败（退出码 ${rc}）"
   fi
   exit "$rc"
 }
@@ -302,18 +320,44 @@ wait_healthy() {
     fi
     sleep 2
   done
-  log "$service 在 ${HEALTH_TIMEOUT} 秒内没有变为健康"
+  # L-072: distinguish "still migrating" from "already exited".
+  id="$(container_any_id "$service")"
+  if [ -n "$id" ]; then
+    status="$(docker inspect --format '{{.State.Status}}' "$id" 2> /dev/null || true)"
+  else
+    status=""
+  fi
+  if [ "$status" = "running" ]; then
+    log "$service 在 ${HEALTH_TIMEOUT} 秒内没有变为健康，但容器仍在运行（迁移可能还没跑完）。"
+    log "      可先查看日志，或把 TCRM_RELEASE_HEALTH_TIMEOUT（当前 ${HEALTH_TIMEOUT}，默认 300）调大后重跑；"
+    log "      不要在容器还在跑时当成已失败去砍进程。"
+  else
+    log "$service 在 ${HEALTH_TIMEOUT} 秒内没有变为健康，且容器状态为 ${status:-不存在}：发布失败。"
+    log "      查看日志后修复，再重跑；必要时调大 TCRM_RELEASE_HEALTH_TIMEOUT（当前 ${HEALTH_TIMEOUT}，默认 300）。"
+  fi
   return 1
 }
 
 # ---- steps ----------------------------------------------------------------------------------------------
 
-pull_images() { # <version>
+pull_images() { # <app-version>
   local name
-  for name in crm-admin crm-redirect crm-postgres crm-static; do
+  for name in crm-admin crm-redirect crm-static; do
     log "拉取 $(image_ref "$name" "$1")"
     docker pull --quiet "$(image_ref "$name" "$1")" > /dev/null || return 1
   done
+  # L-070/L-073: pull crm-postgres only when deploy --postgres was given; rollback never pulls it.
+  if [ -n "$UPDATE_POSTGRES_VERSION" ]; then
+    log "拉取 $(image_ref crm-postgres "$UPDATE_POSTGRES_VERSION")（显式 --postgres）"
+    docker pull --quiet "$(image_ref crm-postgres "$UPDATE_POSTGRES_VERSION")" > /dev/null || return 1
+  fi
+  # 首次发布：ensure_postgres_version_pinned 刚把 crm-postgres:<pin> 写进 .env，而主机上还没有
+  # 任何 postgres 容器（含已停止的）。compose up 时才隐式拉取就太晚了，这里提前显式拉取同一 tag，
+  # 让拉取失败发生在任何改动之前。已部署过的主机（postgres 容器存在，哪怕停止）不拉、不重建数据库。
+  if [ -n "$POSTGRES_PIN_WRITTEN" ] && [ -z "$(container_any_id postgres)" ]; then
+    log "拉取 $(image_ref crm-postgres "$POSTGRES_PIN_WRITTEN")（首次发布，预拉取数据库镜像）"
+    docker pull --quiet "$(image_ref crm-postgres "$POSTGRES_PIN_WRITTEN")" > /dev/null || return 1
+  fi
 }
 
 # Extracts the static image into releases/<version>/ (skipped when a complete copy exists).
@@ -436,6 +480,35 @@ update_redirect() { # <version>
   [ "$REDIRECT_RESULT" = "started" ] || REDIRECT_RESULT="restarted"
 }
 
+
+# L-074: keep previous release asset files the new build does not ship, so open tabs can still
+# lazy-load the old chunk. Only the immediate previous version; never overwrite same-named files.
+preserve_previous_assets() { # <new_version>
+  local static prev new site from to
+  static="$(static_dir)"
+  prev="$(current_target)"
+  new="$1"
+  [ -n "$prev" ] || return 0
+  [ "$prev" != "$new" ] || return 0
+  [ -d "$static/releases/$prev" ] || return 0
+  [ -d "$static/releases/$new" ] || return 0
+  for site in admin kol; do
+    from="$static/releases/$prev/$site/assets"
+    to="$static/releases/$new/$site/assets"
+    [ -d "$from" ] || continue
+    mkdir -p "$to"
+    # portable: no mapfile; copy missing files only
+    find "$from" -type f -print | while IFS= read -r f; do
+      rel="${f#"$from"/}"
+      if [ ! -e "$to/$rel" ]; then
+        mkdir -p "$to/$(dirname "$rel")"
+        cp -p "$f" "$to/$rel"
+      fi
+    done
+  done
+  log "已把上一版 releases/$prev 中新版本没有的 assets 补进 releases/$new"
+}
+
 # Atomic switch: write the link under a temporary name, then rename it over "current".
 switch_current() { # <version>
   local static tmp
@@ -469,15 +542,17 @@ prune_releases() {
   done
 }
 
-notice_postgres_image() { # <version>
-  local id wanted running
+notice_postgres_image() {
+  local id wanted running pg_ver
   id="$(container_id postgres)"
   [ -n "$id" ] || return 0
-  wanted="$(image_id_of_ref "$(image_ref crm-postgres "$1")")"
+  pg_ver="$(env_get TCRM_POSTGRES_VERSION)"
+  [ -n "$pg_ver" ] || return 0
+  wanted="$(image_id_of_ref "$(image_ref crm-postgres "$pg_ver")")"
   running="$(image_id_of_container "$id")"
-  if [ "$wanted" != "$running" ]; then
-    log "提示：crm-postgres:$1 与运行中的数据库镜像不同（$(short "$running") -> $(short "$wanted")）。本脚本不重启数据库；"
-    log "      需要升级时在低峰期手动执行：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE up -d --no-deps postgres"
+  if [ -n "$wanted" ] && [ "$wanted" != "$running" ]; then
+    log "提示：.env 中 TCRM_POSTGRES_VERSION=$pg_ver 与运行中的数据库镜像不同（$(short "$running") -> $(short "$wanted")）。"
+    log "      日常发布不重启数据库；低峰期手动：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE up -d --no-deps postgres"
   fi
 }
 
@@ -501,6 +576,7 @@ apply_version() { # <version>
   update_redirect "$version" || fail "crm-redirect 没有恢复健康"
   step "切换前端 current -> releases/$version"
   STAGE_KIND="switch"
+  preserve_previous_assets "$version"
   switch_current "$version"
   if [ -z "$(container_id nginx)" ]; then
     check_nginx_prerequisites || fail "缺少证书文件（origin.pem、origin.key、public.pem、public.key），Nginx 未启动。先按 README 生成证书。"
@@ -509,10 +585,14 @@ apply_version() { # <version>
   step "写入 .env 和发布记录"
   STAGE_KIND="record"
   env_set_version "$version"
+  if [ -n "$UPDATE_POSTGRES_VERSION" ]; then
+    env_set_key TCRM_POSTGRES_VERSION "$UPDATE_POSTGRES_VERSION"
+    log "已写入 TCRM_POSTGRES_VERSION=${UPDATE_POSTGRES_VERSION}（数据库容器需低峰期手动 up -d --no-deps postgres）"
+  fi
   admin_id="$(image_id_of_container "$(container_id crm-admin)")"
   record "ok" "admin=$(short "$admin_id") redirect=$REDIRECT_RESULT"
   prune_releases
-  notice_postgres_image "$version"
+  notice_postgres_image
 }
 
 REDIRECT_RESULT="unchanged"
@@ -524,11 +604,44 @@ prepare_images() { # <version>
   extract_static "$1" || fail "静态文件解出失败"
 }
 
+# The version a host without TCRM_POSTGRES_VERSION gets pinned to (L-073): the current TCRM_VERSION,
+# or the deploy target on a host whose .env has no version yet. pull_images pulls exactly this tag
+# on a first release, so both places agree on the pinned version.
+postgres_pin_version() {
+  local pin
+  pin="$(env_get TCRM_VERSION)"
+  [ -n "$pin" ] || pin="$TARGET_VERSION"
+  printf '%s' "$pin"
+}
+
+# Pin TCRM_POSTGRES_VERSION in .env once so later TCRM_VERSION bumps cannot recreate postgres (L-073).
+ensure_postgres_version_pinned() {
+  local pin
+  if [ -n "$(env_get TCRM_POSTGRES_VERSION)" ]; then
+    return 0
+  fi
+  pin="$(postgres_pin_version)"
+  env_set_key TCRM_POSTGRES_VERSION "$pin"
+  POSTGRES_PIN_WRITTEN="$pin" # 首次发布时 pull_images 据此预拉取 crm-postgres
+  log "已写入 TCRM_POSTGRES_VERSION=${pin}（兼容旧主机；日常发布不再改动）"
+}
+
+# L-069: surface an emergency Flyway ignore left in .env so strict mode is not silently off.
+warn_flyway_ignore_if_set() { # <when>
+  local patterns
+  patterns="$(env_get TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS)"
+  [ -n "$patterns" ] || return 0
+  log "!!!!!!!! 注意（$1）：.env 仍设置 TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS=$patterns"
+  log "!!!!!!!! Flyway 严格模式处于关闭状态；应急回滚结束后应删除该变量。"
+}
+
 cmd_deploy() {
   local version="$1"
   ACTION="deploy"
   TARGET_VERSION="$version"
   check_env
+  ensure_postgres_version_pinned
+  warn_flyway_ignore_if_set "发布开始"
   check_backup_prerequisites
   PREVIOUS_VERSION="$(env_get TCRM_VERSION)"
   if is_first_deploy; then
@@ -548,6 +661,7 @@ cmd_deploy() {
   fi
   apply_version "$version"
   step "完成"
+  warn_flyway_ignore_if_set "发布结束"
   cmd_status
 }
 
@@ -555,10 +669,12 @@ cmd_rollback() {
   local version="$1"
   ACTION="rollback"
   TARGET_VERSION="$version"
+  UPDATE_POSTGRES_VERSION="" # L-070: rollback never pulls or rewrites the postgres image tag
   check_env
+  ensure_postgres_version_pinned
   PREVIOUS_VERSION="$(env_get TCRM_VERSION)"
   [ -n "$PREVIOUS_VERSION" ] || die_early "回滚需要 .env 中已有 TCRM_VERSION（尚未发布过任何版本）"
-  log "回滚 $PREVIOUS_VERSION -> $version（只切换镜像和前端，不改动数据库，不自动备份）"
+  log "回滚 ${PREVIOUS_VERSION} -> ${version}（只切换应用镜像和前端，不拉、不改数据库镜像，不自动备份）"
   [ -n "$(container_id postgres)" ] || die_early "postgres 没有运行，无法回滚"
   mkdir -p "$(static_dir)/releases"
   prepare_images "$version"
@@ -594,15 +710,26 @@ cmd_status() {
   done
   if [ -f "$RELEASE_LOG" ]; then
     log ""
-    log "最近的发布记录（$RELEASE_LOG）："
+    log "最近的发布记录（${RELEASE_LOG}）："
     while IFS= read -r line; do log "  $line"; done < <(tail -n 5 "$RELEASE_LOG")
   fi
+}
+
+acquire_release_lock() {
+  # L-071: mkdir is atomic on macOS and Linux; on_exit removes the directory only if we created it.
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    die_early "另一个 release.sh 正在运行（锁目录 ${LOCK_DIR} 已存在）。确认无并发后再删掉该目录重试。"
+  fi
+  LOCK_HELD=1
 }
 
 main() {
   local command="${1:-}"
   case "$command" in
-    deploy | rollback)
+    deploy)
+      [ "$#" -ge 2 ] || usage
+      ;;
+    rollback)
       [ "$#" -eq 2 ] || usage
       ;;
     status)
@@ -615,7 +742,25 @@ main() {
   case "$command" in
     deploy | rollback)
       local version="${2#v}"
+      shift 2
+      UPDATE_POSTGRES_VERSION=""
+      if [ "$command" = "deploy" ]; then
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --postgres)
+              [ "$#" -ge 2 ] || die_early "--postgres 需要一个版本号"
+              UPDATE_POSTGRES_VERSION="${2#v}"
+              check_version "$UPDATE_POSTGRES_VERSION"
+              shift 2
+              ;;
+            *) usage ;;
+          esac
+        done
+      elif [ "$#" -gt 0 ]; then
+        usage
+      fi
       check_version "$version"
+      acquire_release_lock
       "cmd_$command" "$version"
       ;;
     status) cmd_status ;;

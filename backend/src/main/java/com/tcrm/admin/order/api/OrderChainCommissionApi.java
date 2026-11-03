@@ -71,8 +71,8 @@ public interface OrderChainCommissionApi {
    *     never recomputed from the KOL's current rate
    * @param netCommissionCny accumulated net commission; null while the line is unverified or has no
    *     snapshot (unknown, distinct from a real zero)
-   * @param releaseBasis CONFIRMED / FALLBACK / UNSETTLED / AFTER_SALES / UNVERIFIED; null when the
-   *     line has no snapshot
+   * @param releaseBasis CONFIRMED / FALLBACK (freeze days prefer confirmation) / UNSETTLED /
+   *     AFTER_SALES / UNVERIFIED; null when the line has no snapshot
    * @param occupiedCny occupation total of {@link #OCCUPYING_STATUSES} applications; rejected and
    *     withdrawn allocations never count
    * @param withdrawals every allocation of the line, whatever the application state, so the UI can

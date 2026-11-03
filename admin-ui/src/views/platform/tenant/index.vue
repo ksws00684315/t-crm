@@ -44,8 +44,8 @@ const columns = computed<DataColumn[]>(() => [
     tooltip: true
   },
   { key: "createdAt", label: t("common.createdAt"), width: 180 },
-  // Edit / Admins / Disable via RowActions (R-10): zh canvas 84 / en 180 + gaps, padding, headroom.
-  { key: "actions", label: t("common.actions"), width: px(128, 184) }
+  // Edit / Admins / Disable via RowActions (R-10 / L-103): zh label at ~128px truncates; use 152/208 (labels+gaps+pad+headroom).
+  { key: "actions", label: t("common.actions"), width: px(152, 208) }
 ]);
 
 async function load() {
@@ -139,11 +139,18 @@ onMounted(load);
       @refresh="load"
       @retry="load"
     >
-      <template #toolbar>
+      <template #title>
         <h1 class="tenant-page__title">{{ t("route.tenants") }}</h1>
-        <div class="tenant-page__actions">
+      </template>
+      <template #toolbar>
+        <div class="tenant-page__toolbar-main">
           <span class="data-table__total">{{ t("table.total", { total: rows.length }) }}</span>
-          <el-button type="primary" data-test="create-tenant" @click="openCreate">
+          <el-button
+            type="primary"
+            class="tenant-page__create"
+            data-test="create-tenant"
+            @click="openCreate"
+          >
             {{ t("tenant.create") }}
           </el-button>
         </div>
@@ -169,9 +176,14 @@ onMounted(load);
 .tenant-page__title {
   margin: 0;
 }
-.tenant-page__actions {
+.tenant-page__toolbar-main {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: var(--tcrm-space-3);
+  min-width: 0;
+}
+.tenant-page__create {
+  margin-left: auto;
 }
 </style>

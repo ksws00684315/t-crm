@@ -52,17 +52,17 @@ describe("creator profile validation", () => {
     expect(identity.get('[data-test="identity-code"]').text()).toBe("t60_creator");
     expect(wrapper.get('[data-test="profile-name"]').element).toBeInstanceOf(HTMLInputElement);
   });
-  it("keeps email and system ID read-only without the disabled look", async () => {
+  it("shows email and system ID as plain CopyText (L-101)", async () => {
     await page();
-    // The first two form items are email and system ID; Element Plus selects also carry readonly.
-    const fields = wrapper.findAll(".form-grid > .el-form-item").slice(0, 2);
-    expect(fields).toHaveLength(2);
-    for (const field of fields) {
-      const input = field.get("input");
-      expect(input.attributes("readonly")).toBeDefined();
-      expect(input.attributes("disabled")).toBeUndefined();
-      expect(field.classes()).not.toContain("is-disabled");
-    }
+    // L-101: email / system ID are CopyText, not read-only inputs (other fields may use inputs).
+    const emailItem = wrapper.get('[data-test="profile-email"]');
+    const systemItem = wrapper.get('[data-test="profile-system-id"]');
+    expect(emailItem.find("input").exists()).toBe(false);
+    expect(systemItem.find("input").exists()).toBe(false);
+    expect(emailItem.get('[data-test="value"]').text()).toBe("t60_creator@example.test");
+    expect(systemItem.get('[data-test="value"]').text()).toBe("t60_creator");
+    expect(emailItem.find('[data-test="copy"]').exists()).toBe(true);
+    expect(systemItem.find('[data-test="copy"]').exists()).toBe(true);
   });
 
   it("makes the title the top of the page, with the identity right below it in the first card", async () => {

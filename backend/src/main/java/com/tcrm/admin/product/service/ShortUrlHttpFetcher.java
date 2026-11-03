@@ -65,11 +65,10 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
     boolean tls = "https".equalsIgnoreCase(uri.getScheme());
     int port = uri.getPort() > 0 ? uri.getPort() : (tls ? 443 : 80);
     long deadline = System.nanoTime() + totalDeadlineMs * 1_000_000L;
-    try (Socket socket = tls ? tlsFactory.createSocket() : new Socket()) {
-      // One watchdog covers every blocking phase of the fetch: connect, TLS handshake and header
-      // read (PR #142 review — the per-read timeout alone let a whitelisted server that trickles
-      // handshake bytes hold the request thread). Closing the socket unblocks whichever phase is
-      // waiting; the runner converts the resulting SocketException into the deadline error.
+    // Always own a plain TCP socket: SSLSocket.close() during a stalled handshake can block for
+    // tens of seconds (L-058 / CI 93 s). The watchdog force-closes this TCP peer with SO_LINGER 0
+    // so startHandshake unblocks near the deadline even when the TLS layer refuses to close.
+    try (Socket tcp = new Socket()) {
       AtomicBoolean finished = new AtomicBoolean();
       Thread watchdog =
           Thread.ofVirtual()
@@ -82,24 +81,20 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
                       return;
                     }
                     if (!finished.get()) {
-                      try {
-                        socket.close();
-                      } catch (IOException e) {
-                        // The deadline passed; the fetch aborts on its own socket error anyway.
-                        LOG.debug("short-url watchdog close failed after the deadline", e);
-                      }
+                      forceClose(tcp);
                     }
                   });
       try {
-        socket.connect(new InetSocketAddress(address, port), CONNECT_TIMEOUT_MS);
-        // The connected peer must be the validated address; anything else means the DNS answer
-        // changed between validation and connection, so refuse to talk to it.
-        if (!address.equals(socket.getInetAddress())) {
+        tcp.connect(new InetSocketAddress(address, port), CONNECT_TIMEOUT_MS);
+        if (!address.equals(tcp.getInetAddress())) {
           throw new IOException("Connected address does not match the validated one");
         }
-        socket.setSoTimeout(READ_TIMEOUT_MS);
+        tcp.setSoTimeout(READ_TIMEOUT_MS);
+        Socket socket = tcp;
         if (tls) {
-          startHandshake((SSLSocket) socket, uri.getHost());
+          SSLSocket ssl = (SSLSocket) tlsFactory.createSocket(tcp, uri.getHost(), port, true);
+          startHandshake(ssl, uri.getHost());
+          socket = ssl;
         }
         writeRequest(socket.getOutputStream(), uri, head);
         return readResponse(socket, deadline);
@@ -112,6 +107,20 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
         finished.set(true);
         watchdog.interrupt();
       }
+    }
+  }
+
+  /** RST the TCP peer so a blocked TLS handshake cannot outlive the total deadline (L-058). */
+  private static void forceClose(Socket tcp) {
+    try {
+      tcp.setSoLinger(true, 0);
+    } catch (IOException e) {
+      LOG.trace("setSoLinger before force-close failed; still closing", e);
+    }
+    try {
+      tcp.close();
+    } catch (IOException e) {
+      LOG.debug("short-url watchdog close failed after the deadline", e);
     }
   }
 

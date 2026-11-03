@@ -106,6 +106,11 @@ public class OrderCommissionSync {
         successfulRefund(item, basis),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),
+        // L-052 (owner 2026-11-03): completedTime is the Weidian trade-completion time. Neither
+        // vdian.order.get 2.0 nor vdian.order.list.get 1.6 returns such a field (task 75 live
+        // probe 2026-10-28), so it stays null instead of inferring from receive_time; the
+        // FALLBACK branch stays unused until a real source exists (design §5: the time is never
+        // inferred when the API does not provide it).
         /* completedTime */ null,
         afterSalesItems.contains(item.getId()),
         basis.reason());

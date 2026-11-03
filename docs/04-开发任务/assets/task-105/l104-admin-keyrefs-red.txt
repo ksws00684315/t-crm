@@ -1,0 +1,12 @@
+# L-104 admin key-refs RED (keys stripped: user.permissionRequired; also caught import.xlsxOrCsv before fix)
+# Command: pnpm exec vitest run src/locales/__tests__/key-refs.spec.ts
+
+ FAIL  src/locales/__tests__/key-refs.spec.ts > locale key references (L-104) > every static t()/ $t() key exists in zh-CN and en-US
+AssertionError: expected [ … ] to deeply equal []
++ [
++   "import.xlsxOrCsv (from components/ImportDialog.vue)",
++   "user.permissionRequired (from views/system/post-template/index.vue)",
++ ]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)

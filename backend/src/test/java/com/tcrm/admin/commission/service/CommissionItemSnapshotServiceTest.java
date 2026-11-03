@@ -426,6 +426,48 @@ class CommissionItemSnapshotServiceTest {
     order.verify(pauses).resumeForItem(7001L);
   }
 
+  @Test
+  void shouldPrelockSoftDeletedLineIdsSoRevivedOccupationsStaySafe() {
+    // L-054: a soft-deleted snapshot still holds withdrawal occupations. findIdsByOrder must
+    // return it (mapper no longer filters is_deleted) so the up-front prelock covers that
+    // application before the revived line writes the wallet.
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    when(states.lockByOrderItemId(9001L)).thenReturn(null);
+    // 7999 = soft-deleted prior line of the same order, still occupying a holding application.
+    when(states.findIdsByOrder(5001L)).thenReturn(List.of(7999L));
+    TenantScope.runCompany(
+        TENANT,
+        () ->
+            service.syncOrderItems(
+                order(), List.of(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null))));
+    org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses, wallet);
+    order.verify(pauses).prelockForItems(List.of(7999L));
+    // New insert has no released money yet — wallet may be never called; prelock still ran first.
+    verify(pauses).prelockForItems(List.of(7999L));
+  }
+
+  @Test
+  void shouldRunPauseLinkageAfterInsertWithoutNullIdGuard() {
+    // L-054: applyRevision always assigns an id before pause linkage; the always-true
+    // row.getId() != null guard is gone — a new insert that flips to blocked still pauses.
+    whenRateAtPayTime(KOL_A, "0.1500", 3);
+    when(states.lockByOrderItemId(9001L)).thenReturn(null);
+    // New insert: wasBlocked short-circuits on null id, so isItemBlocked is only read once after
+    // write.
+    when(pauses.isItemBlocked(anyLong())).thenReturn(true);
+    TenantScope.runCompany(
+        TENANT,
+        () ->
+            service.syncOrderItems(
+                order(),
+                List.of(
+                    withAfterSales(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), true))));
+    ArgumentCaptor<CommissionItemStateDO> inserted =
+        ArgumentCaptor.forClass(CommissionItemStateDO.class);
+    verify(states).insert(inserted.capture());
+    verify(pauses).pauseForItem(inserted.getValue().getId());
+  }
+
   /** Registers line 9001 and makes later syncs of the test find the row it created. */
   private CommissionItemStateDO firstRevision(BigDecimal basis) {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);

@@ -43,7 +43,7 @@ const financeNote = computed(
   () =>
     detail.value?.financeNote ||
     detail.value?.payment?.financeNote ||
-    detail.value?.history.find(event => event.action === "PENDING_PAYMENT")?.note ||
+    detail.value?.history.find(event => event.action === "PAID")?.note ||
     "—"
 );
 const columns = computed<DataColumn[]>(() => [
