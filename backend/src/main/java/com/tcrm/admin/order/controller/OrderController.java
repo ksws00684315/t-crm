@@ -67,6 +67,7 @@ public class OrderController {
   /** SUPER_ADMIN only; 409 existing rate/unpaid state, 404 foreign order or line. */
   @PostMapping("/orders/{id}/rate-supplements")
   @SaCheckRole("SUPER_ADMIN")
+  @AuditLog(module = "ORDER", action = "Supplement order commission rate")
   public R<Void> supplementRate(
       @PathVariable @Positive Long id, @Valid @RequestBody OrderRateSupplementRequest request) {
     orders.supplementRate(id, request.orderItemId(), request.rate(), request.reason());

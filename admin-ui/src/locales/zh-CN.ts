@@ -1516,6 +1516,7 @@ const zhCN = {
       "Reset post template": "恢复岗位模板默认值",
       "Self register": "达人自助注册",
       "Manual KOL cleanup": "手动清理达人",
+      "Supplement order commission rate": "补录订单佣金比例",
       OTHER: "其他操作"
     }
   },

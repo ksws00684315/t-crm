@@ -1558,6 +1558,7 @@ const enUS: MessageSchema = {
       "Reset post template": "Reset post template",
       "Self register": "Creator self-register",
       "Manual KOL cleanup": "Manual creator cleanup",
+      "Supplement order commission rate": "Supplement order commission rate",
       OTHER: "Other"
     }
   },
