@@ -56,5 +56,17 @@ if [ -d "$LOCK_DIR" ]; then
   exit 1
 fi
 echo "release-lock: after unlock, lock message absent (rc=$rc2) OK"
+
+# Regression (rework E2E 2026-11-03): an unbraced "$var" directly followed by a multibyte
+# character crashes macOS bash 3.2 under UTF-8 locales (the byte is parsed as part of the
+# variable name -> "unbound variable"), and release.sh declares bash 3.2 compatibility. CI's
+# Linux bash 5 cannot reproduce it (and BSD grep lacks -P), so assert the pattern with perl.
+hits="$(perl -ne 'print "$ARGV:$.: $_" if /\$[A-Za-z_][A-Za-z_0-9]*[^\x00-\x7F]/' "$RELEASE" || true)"
+if [ -n "$hits" ]; then
+  echo "FAIL: unbraced \$var directly followed by a multibyte char (bash 3.2 + UTF-8 crash):" >&2
+  printf '%s\n' "$hits" >&2
+  exit 1
+fi
+echo "release-lock: no unbraced var before multibyte char in release.sh OK"
 echo "release-lock: all tests passed"
 rm -f "$out" "$out2"

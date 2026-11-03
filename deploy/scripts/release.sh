@@ -202,9 +202,9 @@ print_state() {
   for service in crm-admin crm-redirect postgres redis nginx; do
     id="$(container_any_id "$service")"
     if [ -n "$id" ]; then
-      log "  $service：$(docker inspect --format '{{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$id" 2> /dev/null)"
+      log "  ${service}：$(docker inspect --format '{{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}-{{end}}' "$id" 2> /dev/null)"
     else
-      log "  $service：没有容器"
+      log "  ${service}：没有容器"
     fi
   done
   link="$static/current"
@@ -246,7 +246,7 @@ report_failure() { # <message>
         log "  crm-admin 已被替换但没有恢复健康，前端仍指向 $(current_target)，.env 版本未更新。"
         log "  1. 查看日志：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE logs --tail=200 crm-admin"
         if [ -n "$PREVIOUS_VERSION" ] && [ "$PREVIOUS_VERSION" != "$TARGET_VERSION" ]; then
-          log "  2. 回到上一个版本：release.sh deploy $PREVIOUS_VERSION（数据库不会自动回滚）"
+          log "  2. 回到上一个版本：release.sh deploy ${PREVIOUS_VERSION}（数据库不会自动回滚）"
         fi
         ;;
       redirect)
@@ -275,7 +275,7 @@ on_exit() {
   trap - EXIT
   [ -z "$ENV_TMP" ] || rm -f "$ENV_TMP"
   if [ "$rc" -ne 0 ] && [ "$REPORTED" -ne 1 ]; then
-    report_failure "命令失败（退出码 $rc）"
+    report_failure "命令失败（退出码 ${rc}）"
   fi
   exit "$rc"
 }
@@ -576,7 +576,7 @@ apply_version() { # <version>
   env_set_version "$version"
   if [ -n "$UPDATE_POSTGRES_VERSION" ]; then
     env_set_key TCRM_POSTGRES_VERSION "$UPDATE_POSTGRES_VERSION"
-    log "已写入 TCRM_POSTGRES_VERSION=$UPDATE_POSTGRES_VERSION（数据库容器需低峰期手动 up -d --no-deps postgres）"
+    log "已写入 TCRM_POSTGRES_VERSION=${UPDATE_POSTGRES_VERSION}（数据库容器需低峰期手动 up -d --no-deps postgres）"
   fi
   admin_id="$(image_id_of_container "$(container_id crm-admin)")"
   record "ok" "admin=$(short "$admin_id") redirect=$REDIRECT_RESULT"
@@ -602,7 +602,7 @@ ensure_postgres_version_pinned() {
   pin="$(env_get TCRM_VERSION)"
   [ -n "$pin" ] || pin="$TARGET_VERSION"
   env_set_key TCRM_POSTGRES_VERSION "$pin"
-  log "已写入 TCRM_POSTGRES_VERSION=$pin（兼容旧主机；日常发布不再改动）"
+  log "已写入 TCRM_POSTGRES_VERSION=${pin}（兼容旧主机；日常发布不再改动）"
 }
 
 # L-069: surface an emergency Flyway ignore left in .env so strict mode is not silently off.
@@ -653,7 +653,7 @@ cmd_rollback() {
   ensure_postgres_version_pinned
   PREVIOUS_VERSION="$(env_get TCRM_VERSION)"
   [ -n "$PREVIOUS_VERSION" ] || die_early "回滚需要 .env 中已有 TCRM_VERSION（尚未发布过任何版本）"
-  log "回滚 $PREVIOUS_VERSION -> $version（只切换应用镜像和前端，不拉、不改数据库镜像，不自动备份）"
+  log "回滚 ${PREVIOUS_VERSION} -> ${version}（只切换应用镜像和前端，不拉、不改数据库镜像，不自动备份）"
   [ -n "$(container_id postgres)" ] || die_early "postgres 没有运行，无法回滚"
   mkdir -p "$(static_dir)/releases"
   prepare_images "$version"
