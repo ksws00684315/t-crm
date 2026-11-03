@@ -29,6 +29,7 @@ const detail = ref<PrepayResult | null>(null);
 const detailVisible = ref(false);
 const { busy, errorText, submit } = useSubmission();
 const downloadState = useSubmission();
+const tableFailed = ref(false);
 let generation = 0;
 const columns = computed<DataColumn[]>(() => {
   const english = locale.value === "en-US";
@@ -36,7 +37,7 @@ const columns = computed<DataColumn[]>(() => {
     key: "prepayNo",
     align: "left" as const,
     label: t("prepay.number"),
-    minWidth: 180
+    minWidth: { "zh-CN": 180, "en-US": 200 }
   };
   if (tab.value === "ledger")
     return [
@@ -94,6 +95,7 @@ function paymentActions(row: PrepayResult): RowAction[] {
 async function load() {
   if (busy.value) return;
   const request = ++generation;
+  tableFailed.value = false;
   await submit(async () => {
     rows.value = [];
     ledger.value = [];
@@ -112,6 +114,7 @@ async function load() {
       }
     }
   });
+  if (request === generation) tableFailed.value = Boolean(errorText.value);
 }
 async function open(row: PrepayResult) {
   detail.value = null;
@@ -173,12 +176,14 @@ onMounted(load);
       :row-key="tab === 'payments' ? 'id' : 'entryId'"
       :columns="columns"
       :loading="busy"
+      :failed="tableFailed"
       :total="total"
       :page="page"
       :size="size"
       @update:page="turn"
       @update:size="changeSize"
       @refresh="load"
+      @retry="load"
     >
       <template #title>
         <h1>{{ t("prepay.title") }}</h1>

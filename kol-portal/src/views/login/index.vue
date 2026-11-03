@@ -78,7 +78,7 @@ function chooseCompany() {
 </script>
 
 <template>
-  <AuthShell :title="`${siteName}${t('app.titleSuffix')}`">
+  <AuthShell :title="`${siteName}${t('app.titleSuffix')}`" brand>
     <el-alert
       v-if="route.query.reset === 'success'"
       type="success"

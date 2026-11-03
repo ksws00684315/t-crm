@@ -40,6 +40,7 @@ const isSuperAdmin = computed(() => accessOf(me.user).isSuperAdmin);
 const isBd = computed(() => accessOf(me.user).isOwnScope);
 
 const loading = ref(false);
+const loadFailed = ref(false);
 const rows = ref<KolVO[]>([]);
 const total = ref(0);
 const cleanupRemaining = ref<Record<string, number>>({});
@@ -69,6 +70,7 @@ const chips = computed<SearchChip[]>(() => {
 
 async function load() {
   loading.value = true;
+  loadFailed.value = false;
   try {
     const page = await listKols({
       page: query.page,
@@ -84,6 +86,7 @@ async function load() {
       ? await getCleanupRemaining(configured).catch(() => ({}))
       : {};
   } catch (error) {
+    loadFailed.value = true;
     notifyError(error);
   } finally {
     loading.value = false;
@@ -166,9 +169,19 @@ const columns = computed<DataColumn[]>(() => [
     width: px(160, 176),
     tooltip: true
   },
-  { key: "rate", label: t("kol.defaultRate"), width: px(80, 104), amount: true },
+  {
+    key: "rate",
+    label: t("kol.defaultRate"),
+    minWidth: { "zh-CN": 80, "en-US": 120 },
+    amount: true
+  },
   // en datetime "10/20/2026, 00:15" measured 138px of content; 136 clipped it (task 59).
-  { key: "inviteTime", label: t("kol.inviteTime"), width: px(146, 142), tooltip: true },
+  {
+    key: "inviteTime",
+    label: t("kol.inviteTime"),
+    minWidth: { "zh-CN": 160, "en-US": 170 },
+    tooltip: true
+  },
   {
     key: "inviter",
     align: "left" as const,
@@ -378,6 +391,7 @@ onMounted(() => {
           :rows="rows"
           :columns="columns"
           :loading="loading"
+          :failed="loadFailed"
           :total="total"
           :page="query.page"
           :size="query.size"
@@ -385,6 +399,7 @@ onMounted(() => {
           @update:page="onPage"
           @update:size="onSize"
           @refresh="load"
+          @retry="load"
           @clear-filters="reset"
         >
           <template #cell-kol="{ row }"

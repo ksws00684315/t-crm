@@ -97,11 +97,13 @@ describe("items page", () => {
     expect(wrapper.find('[data-test="items-empty-mobile"]').exists()).toBe(false);
   });
 
-  it("hides the desktop empty copy and the pager when loading fails", async () => {
+  it("shows the table failure copy with a retry and hides the pagers when loading fails", async () => {
     vi.mocked(getKolItems).mockRejectedValue(new Error("network"));
     const wrapper = await mountPage();
     expect(wrapper.find('[data-test="items-empty"]').exists()).toBe(false);
-    expect(wrapper.find(".data-table__empty").exists()).toBe(false);
+    const empty = wrapper.get(".data-table__empty");
+    expect(empty.text()).toContain(enUS.table.loadFailed);
+    expect(empty.text()).toContain(enUS.table.retry);
     expect(wrapper.find(".data-table__pager").exists()).toBe(false);
     expect(wrapper.find(".items-pager").exists()).toBe(false);
   });

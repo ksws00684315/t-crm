@@ -46,6 +46,7 @@
   --tcrm-control-height-mobile: 44px;
   --tcrm-control-height-large: 40px;
   --tcrm-control-padding-large: 20px;
+  --tcrm-tag-min-height: 28px;
   --tcrm-focus-width: 2px;
   --tcrm-radius-card: 12px;
   --tcrm-radius-control: 8px;
@@ -136,6 +137,20 @@
   --el-tag-border-radius: var(--tcrm-radius-tag);
 }
 
+/*
+ * Standalone status tags use the 28px box; table cells keep their own 24px compact tag, and tags
+ * inside a select stay at 24px so the 32px control does not grow.
+ */
+.el-tag:not(.el-table .el-tag):not(.el-select .el-tag) {
+  min-height: var(--tcrm-tag-min-height);
+  padding-inline: var(--tcrm-space-2);
+}
+
+.el-button {
+  /* Element Plus re-declares this on .el-button, so a :root override would never reach it. */
+  --el-button-outline-color: var(--tcrm-color-primary);
+}
+
 .el-button,
 .el-input__wrapper,
 .el-select__wrapper {
@@ -145,4 +160,11 @@
 .el-input__wrapper,
 .el-select__wrapper {
   box-shadow: 0 0 0 1px var(--tcrm-color-input-border) inset;
+}
+
+/* Element Plus removes the inner input outline; restore a keyboard-visible ring on the wrapper. */
+.el-input__wrapper:focus-within,
+.el-select__wrapper:focus-within {
+  outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary);
+  outline-offset: 0;
 }

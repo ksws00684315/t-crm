@@ -543,6 +543,8 @@ const enUS: MessageSchema = {
     fullscreen: "Table full screen",
     exitFullscreen: "Exit table full screen",
     empty: "No data",
+    loadFailed: "Failed to load. Please try again.",
+    retry: "Retry",
     emptyFiltered: "No matching data · {n} filters applied",
     clearFilters: "Clear filters",
     export: "Export",
@@ -579,7 +581,8 @@ const enUS: MessageSchema = {
     closeRight: "Close right",
     closeAll: "Close all",
     refresh: "Refresh current page",
-    more: "Tab actions"
+    more: "Tab actions",
+    label: "Page tabs"
   },
   password: {
     old: "Current password",

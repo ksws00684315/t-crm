@@ -258,6 +258,19 @@ describe("sales summary cards (task 92 section 4.4)", () => {
     wrapper.unmount();
   });
 
+  it("reloads with the new page size after changing it", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({ items: [order], total: 60, page: 1, size: 50 });
+    const wrapper = await mountPage();
+    vi.mocked(getCreatorOrders).mockClear();
+    wrapper.findComponent({ name: "ElPagination" }).vm.$emit("size-change", 50);
+    await flushPromises();
+    expect(getCreatorOrders).toHaveBeenCalledTimes(1);
+    expect(getCreatorOrders).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, size: 50 })
+    );
+    wrapper.unmount();
+  });
+
   it("does not show a zero total when the order list fails to load", async () => {
     vi.mocked(getCreatorOrders).mockRejectedValue(new Error("down"));
     const wrapper = await mountPage();

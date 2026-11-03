@@ -112,7 +112,13 @@ onMounted(loadItems);
       </template>
     </ListSearch>
 
-    <el-alert v-if="error" type="error" :title="t('items.loadFailed')" :closable="false" />
+    <el-alert
+      v-if="error"
+      class="items-alert"
+      type="error"
+      :title="t('items.loadFailed')"
+      :closable="false"
+    />
 
     <DataTable
       table-id="kol-items"
@@ -120,6 +126,7 @@ onMounted(loadItems);
       :rows="items"
       :columns="columns"
       :loading="loading"
+      :failed="error"
       :total="total"
       :paged="total > 0 && !error"
       :page="page"
@@ -128,6 +135,7 @@ onMounted(loadItems);
       @update:page="changePage"
       @update:size="changeSize"
       @refresh="loadItems"
+      @retry="loadItems"
     >
       <template #cell-item="{ row }">
         <div class="item-name">
@@ -151,13 +159,12 @@ onMounted(loadItems);
       <template #actions="{ row }">
         <RowActions :actions="rowActions(row)" />
       </template>
-      <!-- On failure a real element replaces the copy: a comment-only slot would fall back to DataTable's generic empty text. -->
+      <!-- DataTable renders its own failure block; the slot only carries the non-failure empty copy. -->
       <template #empty>
-        <div v-if="!error" class="empty-state" data-test="items-empty">
+        <div class="empty-state" data-test="items-empty">
           <p>{{ t("items.empty") }}</p>
           <p class="empty-hint">{{ t("items.emptyHint") }}</p>
         </div>
-        <span v-else />
       </template>
     </DataTable>
 
@@ -337,10 +344,16 @@ onMounted(loadItems);
 .item-card__copy:hover {
   background: var(--el-color-primary-light-9);
 }
+.items-alert {
+  display: none;
+}
 @media (max-width: 767px) {
   .items-page {
     height: auto;
     min-height: 0;
+  }
+  .items-alert {
+    display: flex;
   }
   .items-page .items-table {
     display: none;

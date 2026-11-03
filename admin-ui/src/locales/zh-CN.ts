@@ -522,6 +522,8 @@ const zhCN = {
     fullscreen: "表格全屏",
     exitFullscreen: "退出表格全屏",
     empty: "暂无数据",
+    loadFailed: "加载失败，请重试",
+    retry: "重试",
     emptyFiltered: "没有符合条件的数据 · 已应用 {n} 个筛选条件",
     clearFilters: "清除筛选",
     export: "导出",
@@ -558,7 +560,8 @@ const zhCN = {
     closeRight: "关闭右侧",
     closeAll: "关闭全部",
     refresh: "刷新当前页",
-    more: "标签操作"
+    more: "标签操作",
+    label: "页面页签"
   },
   password: {
     old: "原密码",

@@ -36,6 +36,7 @@ const size = ref(readPageSize("prepay-tasks", 20));
 const rows = ref<PrepayRow[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const loadFailed = ref(false);
 const exporting = ref(false);
 const detailId = ref<string | null>(null);
 const visible = ref(false);
@@ -77,6 +78,7 @@ let sequence = 0;
 async function load() {
   const request = ++sequence;
   loading.value = true;
+  loadFailed.value = false;
   try {
     const result = await listPrepays({ ...params(), page: page.value, size: size.value });
     if (request === sequence) {
@@ -87,6 +89,7 @@ async function load() {
     if (request === sequence) {
       rows.value = [];
       total.value = 0;
+      loadFailed.value = true;
       notifyError(error);
     }
   } finally {
@@ -228,10 +231,12 @@ onMounted(load);
       :page="page"
       :size="size"
       :loading="loading"
+      :failed="loadFailed"
       :filter-count="chips.length"
       :exportable="abilities.export"
       :exporting="exporting"
       @refresh="load"
+      @retry="load"
       @clear-filters="reset"
       @export="exportRows"
       @update:page="

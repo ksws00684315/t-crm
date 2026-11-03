@@ -143,6 +143,13 @@ body {
   line-height: var(--tcrm-line-height-title) !important;
 }
 
+/* The login page shows the system name, not a page title, so it uses the shared brand tier. */
+#app .auth-shell__title--brand {
+  font-size: var(--tcrm-font-size-brand) !important;
+  font-weight: 600;
+  line-height: var(--tcrm-line-height-brand) !important;
+}
+
 #app .shell__brand {
   font-size: var(--tcrm-font-size-brand) !important;
   font-weight: 600;

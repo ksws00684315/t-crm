@@ -58,7 +58,15 @@ const columns = computed<DataColumn[]>(() =>
     prop: key,
     label: t(`finance.${key}`),
     minWidth:
-      key === "businessAt" ? 200 : key === "orderNo" ? 210 : locale.value === "en-US" ? 180 : 140,
+      key === "businessAt"
+        ? 200
+        : key === "orderNo"
+          ? 210
+          : key === "weidianWithdrawable"
+            ? { "zh-CN": 160, "en-US": 190 }
+            : locale.value === "en-US"
+              ? 180
+              : 140,
     amount: ["payment", "refund", "weidianWithdrawable", "commission"].includes(key),
     tooltip: true
   }))

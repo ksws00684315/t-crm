@@ -1,11 +1,16 @@
 name: OSV Scanner
 
 on:
+  # The scan reads only dependency manifests and lockfiles, so pull requests and pushes trigger
+  # it only when one of them (or the scanner setup) changes. The weekly schedule catches
+  # advisories published after the last dependency change.
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['**/pom.xml', '**/package.json', '**/pnpm-lock.yaml', '**/pnpm-workspace.yaml', '**/.npmrc', 'osv-scanner.toml', '.github/workflows/osv-scanner.yml']
   push:
     branches: [main]
+    paths: ['**/pom.xml', '**/package.json', '**/pnpm-lock.yaml', '**/pnpm-workspace.yaml', '**/.npmrc', 'osv-scanner.toml', '.github/workflows/osv-scanner.yml']
   schedule:
     - cron: '17 3 * * 1'
 

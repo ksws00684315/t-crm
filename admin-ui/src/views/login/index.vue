@@ -65,7 +65,7 @@ async function submit() {
 
 <template>
   <div class="login">
-    <el-card class="login__card" shadow="always">
+    <el-card class="login__card" shadow="never">
       <h1 class="login__title">{{ siteName }} {{ t("login.titleSuffix") }}</h1>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
         <el-form-item :label="t('login.username')" prop="username">

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -95,5 +97,52 @@ describe("CaptchaInput", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(authApi.createCaptcha).toHaveBeenCalledTimes(1);
     wrapper.unmount();
+  });
+
+  it("keeps the failure message whole and retries from the full-width box", async () => {
+    vi.mocked(authApi.createCaptcha).mockRejectedValueOnce(new Error("offline"));
+    const wrapper = mountCaptcha();
+    await flushPromises();
+
+    const retry = wrapper.get("[data-test=captcha-refresh]");
+    const failed = wrapper.get("[data-test=captcha-failed]");
+    expect(retry.classes()).toContain("is-failed");
+    expect(failed.text()).toBe(i18n.global.t("captcha.loadFailed"));
+    expect(failed.element.closest("button")).toBe(retry.element);
+    expect(wrapper.find("[data-test=captcha-image]").exists()).toBe(false);
+
+    await retry.trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test=captcha-failed]").exists()).toBe(false);
+    expect(wrapper.get("[data-test=captcha-image]").attributes("src")).toContain("base64,1");
+    wrapper.unmount();
+  });
+});
+
+describe("CaptchaInput failure layout", () => {
+  const source = readFileSync(resolve(__dirname, "../CaptchaInput.vue"), "utf8");
+  const scoped = source.slice(
+    source.indexOf("<style scoped>") + "<style scoped>".length,
+    source.indexOf("</style>")
+  );
+
+  function declarationsFor(selector: string): string {
+    const index = scoped.indexOf(selector);
+    expect(index, `${selector} must stay in the captcha stylesheet`).toBeGreaterThanOrEqual(0);
+    return scoped.slice(index, scoped.indexOf("}", index));
+  }
+
+  it("wraps the failed box onto its own full-width row so the text is not clipped", () => {
+    expect(declarationsFor(".captcha {")).toContain("flex-wrap: wrap");
+    const failed = declarationsFor(".captcha__image.is-failed");
+    expect(failed).toContain("flex: 1 0 100%");
+    expect(failed).toContain("overflow: visible");
+    expect(failed).toContain("white-space: nowrap");
+  });
+
+  it("keeps the failure text at the body size and on one line", () => {
+    const text = declarationsFor(".captcha__failed");
+    expect(text).toContain("font-size: var(--tcrm-font-size-body)");
+    expect(text).toContain("white-space: nowrap");
   });
 });
