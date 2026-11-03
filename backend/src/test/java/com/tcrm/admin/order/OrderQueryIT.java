@@ -290,7 +290,7 @@ class OrderQueryIT {
   }
 
   @Test
-  void shouldReturnOrderDetailWithMerchantAmountsAndUnitPrice() throws Exception {
+  void shouldBlankGoodsAndTotalAmountWithoutHistoricalPrice() throws Exception {
     mapping(1, 100, "90", "https://img.example/p1.png", PAID.minusSeconds(1), null);
     long orderId = save("1000", PAID, line("90", "1"));
     mvc.perform(get("/admin-api/order/orders/" + orderId).header("X-Admin-Token", admin))
@@ -300,8 +300,9 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.merchantNo").value("10"))
         .andExpect(jsonPath("$.data.source").value("API"))
         .andExpect(jsonPath("$.data.itemAmount").value(org.hamcrest.Matchers.nullValue()))
-        // Goods amount needs the historical unit price; the source order total does not.
-        .andExpect(jsonPath("$.data.totalAmount").value("10.00"))
+        // Without a historical unit price both the goods amount and the displayed order total are
+        // blank; the source order total is a paid figure, not a goods total (task 107).
+        .andExpect(jsonPath("$.data.totalAmount").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.payTime").value(PAID.toString()))
         .andExpect(jsonPath("$.data.items[0].imageUrl").value("https://img.example/p1.png"))
         .andExpect(jsonPath("$.data.items[0].unitPrice").value(org.hamcrest.Matchers.nullValue()))

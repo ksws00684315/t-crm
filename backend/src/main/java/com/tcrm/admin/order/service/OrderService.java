@@ -296,6 +296,10 @@ public class OrderService {
     var shop = order.getShopId() == null ? null : shops.findShop(order.getShopId());
     var linesKols = kolNames(lines);
     var images = productImages(lines);
+    // Task 107: the goods amount and the displayed order total share one basis — historical
+    // unit price times quantity, and any missing line price blanks both. The source order's
+    // total is not reused: OrderNormalizer writes Weidian's total into total_amount and
+    // pay_amount alike, so it is the paid figure (freight in, discounts applied), not goods.
     BigDecimal itemAmount =
         lines.isEmpty()
                 || lines.stream()
@@ -330,7 +334,7 @@ public class OrderService {
         order.getLastSyncTime(),
         order.getCreateTime(),
         itemAmount,
-        order.getTotalAmount(),
+        itemAmount,
         order.getPayAmount(),
         order.getFreight(),
         lines.stream()

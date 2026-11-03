@@ -801,8 +801,8 @@ class OrderServiceTest {
     assertThat(detail.source()).isEqualTo("API");
     assertThat(detail.refundStatus()).isEqualTo("NONE");
     assertThat(detail.itemAmount()).isNull();
-    // A missing line price blanks the goods amount only; the merchant's own order total stands.
-    assertThat(detail.totalAmount()).isEqualByComparingTo("12.50");
+    // A missing line price blanks the goods amount and the order total alike (task 107).
+    assertThat(detail.totalAmount()).isNull();
     assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("12.50");
     assertThat(detail.items()).hasSize(1);
     assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
@@ -833,8 +833,10 @@ class OrderServiceTest {
     var detail = service.detail(10L);
     // 10*2 + 20*1 = 40 goods; freight 5 and merchant discount 2 do not change it.
     assertThat(detail.itemAmount()).isEqualByComparingTo("40.00");
-    // The order total is the merchant's figure, never rebuilt from the historical line prices.
-    assertThat(detail.totalAmount()).isEqualByComparingTo("48.00");
+    // The displayed order total shares the goods basis and must not reuse the source order total
+    // (48.00 = 43.00 paid + 5.00 freight, i.e. a paid figure), per task 107.
+    assertThat(detail.totalAmount()).isEqualByComparingTo("40.00");
+    assertThat(detail.totalAmount()).isNotEqualByComparingTo("48.00");
     assertThat(detail.payAmount()).isEqualByComparingTo("43.00");
     assertThat(detail.freight()).isEqualByComparingTo("5.00");
     assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("10.00");

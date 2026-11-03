@@ -9,8 +9,9 @@ import java.util.List;
  *
  * @param merchantNo the shop's Weidian shop id shown to the operator
  * @param itemAmount sum of verified historical unit sale prices times quantities; null when missing
- * @param totalAmount total reported by the source order (Weidian). Independent of the historical
- *     unit prices: a missing line price never blanks the merchant's own order total
+ * @param totalAmount same basis as {@code itemAmount} — the goods total the order detail displays.
+ *     Never taken from the source order total, which is the paid amount (freight included,
+ *     discounts applied); a missing line price blanks both
  * @param source API or IMPORT (1 / 2 of {@code crm_order.source})
  * @param lastSyncTime last write of this order, sync or import
  */
