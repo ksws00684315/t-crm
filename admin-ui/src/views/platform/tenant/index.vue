@@ -44,7 +44,7 @@ const columns = computed<DataColumn[]>(() => [
     tooltip: true
   },
   { key: "createdAt", label: t("common.createdAt"), width: 180 },
-  // Edit / Admins / Disable via RowActions (R-10 / L-103): zh≈128 truncates 停用; use 152/208 (labels+gaps+pad+headroom).
+  // Edit / Admins / Disable via RowActions (R-10 / L-103): zh label at ~128px truncates; use 152/208 (labels+gaps+pad+headroom).
   { key: "actions", label: t("common.actions"), width: px(152, 208) }
 ]);
 

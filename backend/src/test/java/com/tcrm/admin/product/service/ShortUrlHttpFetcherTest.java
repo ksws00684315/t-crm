@@ -100,7 +100,7 @@ class ShortUrlHttpFetcherTest {
                             try {
                               client.getInputStream().readAllBytes();
                             } catch (Exception ignored) {
-                              // Client closed.
+                              return; // Client closed.
                             }
                           },
                           "short-url-drip-drain");
@@ -166,7 +166,7 @@ class ShortUrlHttpFetcherTest {
                             try {
                               client.getInputStream().readAllBytes();
                             } catch (Exception ignored) {
-                              // Client closed after the deadline abort.
+                              return; // Client closed after the deadline abort.
                             }
                           },
                           "short-url-handshake-drain");

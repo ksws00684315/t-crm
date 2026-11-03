@@ -278,9 +278,13 @@ function scheduleMeasure(): void {
 }
 
 onMounted(async () => {
-  narrowMedia = window.matchMedia("(max-width: 767px)");
-  syncNarrowViewport();
-  narrowMedia.addEventListener("change", syncNarrowViewport);
+  if (typeof window.matchMedia === "function") {
+    narrowMedia = window.matchMedia("(max-width: 767px)");
+    syncNarrowViewport();
+    if (typeof narrowMedia.addEventListener === "function") {
+      narrowMedia.addEventListener("change", syncNarrowViewport);
+    }
+  }
 
   await nextTick();
   measureHeights();
@@ -296,7 +300,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  narrowMedia?.removeEventListener("change", syncNarrowViewport);
+  if (narrowMedia && typeof narrowMedia.removeEventListener === "function") {
+    narrowMedia.removeEventListener("change", syncNarrowViewport);
+  }
   narrowMedia = null;
 
   resizeObserver?.disconnect();

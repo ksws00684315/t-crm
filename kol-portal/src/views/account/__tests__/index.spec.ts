@@ -54,15 +54,15 @@ describe("creator profile validation", () => {
   });
   it("shows email and system ID as plain CopyText (L-101)", async () => {
     await page();
-    expect(wrapper.find("input[readonly]").exists()).toBe(false);
-    expect(wrapper.get('[data-test="profile-email"] [data-test="value"]').text()).toBe(
-      "t60_creator@example.test"
-    );
-    expect(wrapper.get('[data-test="profile-system-id"] [data-test="value"]').text()).toBe(
-      "t60_creator"
-    );
-    expect(wrapper.get('[data-test="profile-email"] [data-test="copy"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="profile-system-id"] [data-test="copy"]').exists()).toBe(true);
+    // L-101: email / system ID are CopyText, not read-only inputs (other fields may use inputs).
+    const emailItem = wrapper.get('[data-test="profile-email"]');
+    const systemItem = wrapper.get('[data-test="profile-system-id"]');
+    expect(emailItem.find("input").exists()).toBe(false);
+    expect(systemItem.find("input").exists()).toBe(false);
+    expect(emailItem.get('[data-test="value"]').text()).toBe("t60_creator@example.test");
+    expect(systemItem.get('[data-test="value"]').text()).toBe("t60_creator");
+    expect(emailItem.find('[data-test="copy"]').exists()).toBe(true);
+    expect(systemItem.find('[data-test="copy"]').exists()).toBe(true);
   });
 
   it("makes the title the top of the page, with the identity right below it in the first card", async () => {

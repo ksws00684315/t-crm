@@ -115,7 +115,7 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
     try {
       tcp.setSoLinger(true, 0);
     } catch (IOException e) {
-      // Still attempt close below.
+      LOG.trace("setSoLinger before force-close failed; still closing", e);
     }
     try {
       tcp.close();

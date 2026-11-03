@@ -111,7 +111,10 @@ describe("shared frontend visual tokens", () => {
     expect(styles).toContain("#app *,");
     expect(styles).toContain(".el-overlay *");
     expect(styles).toContain(".el-popper *");
-    expect(styles).toContain("font-size: var(--tcrm-font-size-body) !important");
+    // L-089: keep typeface !important on overlays; size/line-height inherit (no font-size !important).
+    expect(styles).toContain("font-family: var(--tcrm-font-sans) !important");
+    expect(styles).toContain("font-size: var(--tcrm-font-size-body)");
+    expect(styles).not.toMatch(/font-size:\s*var\(--tcrm-font-size-body\)\s*!important/);
   });
 
   it("declares no numeric font-size outside tokens.css in either app", () => {
