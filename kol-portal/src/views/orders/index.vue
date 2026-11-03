@@ -13,12 +13,8 @@ import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch from "@/components/ListSearch.vue";
-import {
-  formatMoney,
-  localDateRangeToUtc,
-  recentLocalDateRange,
-  type OrderRangeDays
-} from "@/utils/orders";
+import { formatMoney, sumDecimals } from "@/utils/money";
+import { localDateRangeToUtc, recentLocalDateRange, type OrderRangeDays } from "@/utils/orders";
 
 defineOptions({ name: "OrdersPage" });
 const { t, locale } = useI18n();
@@ -57,7 +53,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "settlementStatus", label: t("orders.settlementStatus"), minWidth: 130 }
 ]);
 function money(value: string) {
-  return formatMoney(value, locale.value);
+  return formatMoney(value, "CNY");
 }
 function dateLabel(value: string) {
   const text = formatInstant(value);
@@ -71,10 +67,7 @@ function productLabel(row: CreatorOrder) {
   );
 }
 function commission(row: CreatorOrder) {
-  const values = row.items
-    .map(item => item.commissionAmount)
-    .filter((value): value is string => value != null);
-  return values.length ? values.reduce((sum, value) => sum + Number(value), 0).toFixed(2) : null;
+  return sumDecimals(row.items.map(item => item.commissionAmount));
 }
 function rate(row: CreatorOrder) {
   const values = [
@@ -271,7 +264,7 @@ onMounted(() => {
         >
           <span>{{ t(card.label) }}</span>
           <strong class="tcrm-role-section" :data-test="`summary-${card.key}-amount`"
-            ><AmountText v-if="card.amount != null" :value="money(card.amount)" /><template v-else
+            ><AmountText v-if="card.amount != null" :value="card.amount" /><template v-else
               >—</template
             ></strong
           >

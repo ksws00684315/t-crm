@@ -12,12 +12,13 @@ import {
 } from "@/api/payout-account";
 import { translate } from "@/locales";
 import { copyText } from "@/utils/copy";
+import { formatInstant } from "@/utils/format";
 import { useSubmission } from "@/utils/useSubmission";
 import PayoutAccountDialog from "./PayoutAccountDialog.vue";
 
 defineOptions({ name: "PayoutAccountsPage" });
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 
 const accounts = ref<PayoutAccountVO[]>([]);
 const loadRequest = useSubmission();
@@ -130,18 +131,6 @@ async function copyAccount(account: PayoutAccountVO) {
   if (copied) ElMessage.success(t("payoutAccounts.copied"));
 }
 
-function formatTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(locale.value, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
-}
-
 function onSaved() {
   ElMessage.success(t("payoutAccounts.submitted"));
   void load();
@@ -220,7 +209,7 @@ load();
             <dd>{{ account.holderName }}</dd>
           </template>
           <dt>{{ t("payoutAccounts.submittedAt") }}</dt>
-          <dd>{{ formatTime(account.lastSubmittedAt) }}</dd>
+          <dd data-test="submitted-at">{{ formatInstant(account.lastSubmittedAt) }}</dd>
         </dl>
 
         <div class="payout__actions">

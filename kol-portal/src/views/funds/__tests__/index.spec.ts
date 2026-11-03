@@ -119,6 +119,12 @@ async function submit(amount = "250.00") {
   await wrapper.get('[data-test="submit-withdrawal"]').trigger("click");
   await flushPromises();
 }
+/** Element Plus debounces the visible error state by 100 ms. */
+async function settleErrors() {
+  await flushPromises();
+  await new Promise(resolve => setTimeout(resolve, 120));
+  await flushPromises();
+}
 
 describe("creator fund records list states", () => {
   it("hides the empty copy and the pager when loading fails", async () => {
@@ -137,6 +143,62 @@ describe("creator fund records list states", () => {
     expect(wrapper.text()).toContain(enUS.funds.empty);
     expect(wrapper.find(".data-table__pager").exists()).toBe(false);
     expect(wrapper.find(".fund-records-pager").exists()).toBe(false);
+  });
+});
+
+describe("funds page title and masked accounts (task 104)", () => {
+  it("puts the only page title at the top of the first card and drops the table title", async () => {
+    await page({ realTable: true });
+    const card = wrapper.get('[data-test="progress-card"]');
+    expect(card.element.firstElementChild?.tagName).toBe("H1");
+    expect(wrapper.findAll("h1")).toHaveLength(1);
+    expect(wrapper.find(".data-table__page-title").exists()).toBe(false);
+    expect(wrapper.find('[data-test="progress-card"]').text()).not.toContain(
+      enUS.funds.recordsTitle
+    );
+  });
+
+  it("explains a masked recipient instead of offering a copy action", async () => {
+    vi.mocked(api.getFundRecords).mockResolvedValue({
+      items: [record()],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    await page({ realTable: true });
+    const recipient = wrapper.get('[data-test="fund-record-recipient"]');
+    expect(recipient.text()).toBe("PayPal · p***@example.test");
+    const cell = recipient.element.closest("td");
+    expect(cell?.querySelector('[data-test="copy"]')).toBeNull();
+  });
+});
+
+describe("withdrawal field validation (task 104)", () => {
+  it("shows an amount error under the field instead of a page-level alert", async () => {
+    await page();
+    await apply();
+    await submit("100.00");
+    await settleErrors();
+    const field = wrapper.get('[data-test="withdrawal-amount-field"]');
+    expect(field.text()).toContain("¥200.00");
+    expect(field.classes()).toContain("is-error");
+    expect(wrapper.find(".el-dialog .el-alert").exists()).toBe(false);
+  });
+
+  it("shows a recipient error under the field when no account is selected", async () => {
+    await page();
+    await apply();
+    const recipient = wrapper
+      .findAllComponents(ElSelect)
+      .find(select => select.attributes("data-test") === "withdrawal-recipient");
+    if (!recipient) throw new Error("Recipient selector was not rendered");
+    recipient.vm.$emit("update:modelValue", "");
+    await flushPromises();
+    await submit("250.00");
+    await settleErrors();
+    const field = wrapper.get('[data-test="withdrawal-recipient-field"]');
+    expect(field.text()).toContain(enUS.funds.accountRequired);
+    expect(field.classes()).toContain("is-error");
   });
 });
 
@@ -162,10 +224,10 @@ describe("creator withdrawal application", () => {
       size: 20
     });
     await page();
-    expect(wrapper.get('[data-test="fund-record-amount"]').text()).toBe("100.00 USD");
+    expect(wrapper.get('[data-test="fund-record-amount"]').text()).toBe("$100.00");
     const card = wrapper.get('[data-test="fund-record-card"]');
     expect(card.text()).toContain("P1");
-    expect(card.text()).toContain("100.00 USD");
+    expect(card.text()).toContain("$100.00");
   });
 
   it("resets history to the first page when changing page size", async () => {
@@ -272,7 +334,7 @@ describe("creator withdrawal application", () => {
     await flushPromises();
     await wrapper.get('[data-test="withdrawal-account"]').setValue("T1234567890");
     await wrapper.get('[data-test="withdrawal-holder"]').setValue("Creator");
-    const input = wrapper.get('[data-test="withdrawal-qr"]');
+    const input = wrapper.get('[data-test="withdrawal-qr"] input[type="file"]');
     const file = new File(["png"], "t60-qr.png", { type: "image/png" });
     Object.defineProperty(input.element, "files", { value: [file] });
     await input.trigger("change");
@@ -388,10 +450,11 @@ describe("withdrawal actions and the ?apply=1 link (task 92 sections 4.2, 4.3)",
     expect(wrapper.findAll('[data-test="apply-withdrawal"]')).toHaveLength(1);
   });
 
-  it("keeps the withdrawal actions when the overview fails to load", async () => {
+  it("keeps the page title and the withdrawal actions when the overview fails to load", async () => {
     vi.mocked(api.getFundSummary).mockRejectedValue(new Error("down"));
     await page();
-    expect(wrapper.find('[data-test="progress-card"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="progress-card"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="progress-card"]').get("h1").text()).toBe(enUS.funds.title);
     expect(wrapper.find('[data-test="apply-withdrawal"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="manage-accounts"]').exists()).toBe(true);
   });

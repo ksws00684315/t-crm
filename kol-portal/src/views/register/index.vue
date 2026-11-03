@@ -245,7 +245,7 @@ watch(code, () => {
             id="register-whatsapp"
             v-model="whatsapp"
             autocomplete="tel"
-            placeholder="+15551234567"
+            :placeholder="t('register.phonePlaceholder')"
             :disabled="busy"
           />
         </el-form-item>
