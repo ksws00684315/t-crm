@@ -32,6 +32,8 @@ jobs:
         run: python3 deploy/scripts/check-compose-env.py
       - name: Backup retention rule
         run: bash deploy/backup/test-retention.sh
+      - name: Backup credentials refresh rules (task 106)
+        run: bash deploy/backup/test-refresh-s3-credentials.sh
       - name: Ops check rules (task 96)
         run: bash deploy/scripts/test-ops-check.sh
       - name: Public certificate renewal stub test (legacy L-059)

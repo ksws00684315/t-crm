@@ -9,7 +9,10 @@
 # self-healing and shows up as one "restarted" alert plus a recovery, not a permanent failure,
 # legacy L-061), the public certificate ($TCRM_CERT_DIR/public.pem, <= 20 days left), the newest
 # pgBackRest backup (older than 26 hours) and WAL archiving stall (pending .ready segments with no
-# archive progress for 15 minutes — idle databases with no pending WAL do not alert), the newest
+# archive progress for 15 minutes — idle databases with no pending WAL do not alert), the pgBackRest
+# S3 credentials fragment (task 106: missing or not refreshed for over 60 minutes; only checked when
+# TCRM_PGBACKREST_CREDS_DIR is set and the repository type is not posix — posix has no credentials
+# file), the newest
 # logical backup (.dump.gpg older than 26 hours), ERROR lines in the
 # crm-admin / crm-redirect logs since the previous run, and the capacity WARNs of the backend
 # (Redis memory, click stream backlog — logger ClickStreamMonitor).
@@ -23,13 +26,15 @@
 #                                       the external service alerts when the pings stop
 #   TCRM_OPS_STATE_DIR                  alert state (dedup + recovery), default deploy/ops-state
 #   TCRM_CERT_DIR / TCRM_BACKUP_DIR     same values as in deploy/.env (certificate / backup dir)
+#   TCRM_PGBACKREST_CREDS_DIR           same value as in deploy/.env (pgBackRest credentials dir)
 #   TCRM_OPS_SERVICES                   services to watch (default "nginx crm-admin crm-redirect
 #                                       postgres redis")
 # Threshold overrides (mainly for testing; defaults are the production values):
 #   TCRM_OPS_DISK_WARN_PERCENT=70       TCRM_OPS_DISK_CRIT_PERCENT=85
 #   TCRM_OPS_MEM_MIN_AVAIL_PERCENT=10   TCRM_OPS_CERT_MIN_DAYS=20
 #   TCRM_OPS_BACKUP_MAX_AGE_HOURS=26    TCRM_OPS_WAL_MAX_AGE_MINUTES=15
-#   TCRM_OPS_RESTART_WINDOW_MINUTES=5   TCRM_OPS_ALERT_REPEAT_HOURS=1
+#   TCRM_OPS_CREDS_MAX_AGE_MINUTES=60   TCRM_OPS_RESTART_WINDOW_MINUTES=5
+#   TCRM_OPS_ALERT_REPEAT_HOURS=1
 #
 # The script always exits 0 (alerting is the channel, cron must not mail); a run that dies anyway
 # is detected by the heartbeat service. The judgment logic lives in the functions below so tests
@@ -40,7 +45,11 @@ DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 CURL_TIMEOUT=10
 # Keys of every possible alert, in report order; recovery notices key off this list.
-ALL_KEYS="disk memory container cert pgbackrest backup applog capacity"
+ALL_KEYS="disk memory container cert pgbackrest creds backup applog capacity"
+
+# File name of the pgBackRest credentials fragment inside $TCRM_PGBACKREST_CREDS_DIR, written by
+# deploy/backup/refresh-s3-credentials.sh (task 106, L-107). Same constant there.
+CREDS_FILE_NAME="s3-credentials.conf"
 
 # ---------------------------------------------------------------- helpers
 
@@ -235,9 +244,10 @@ load_config() {
   local saved
   saved=$(preserve_caller_env TCRM_ENV_FILE TCRM_COMPOSE_FILE TCRM_ALERT_WEBHOOK_URL \
     TCRM_HEARTBEAT_URL TCRM_OPS_STATE_DIR TCRM_CERT_DIR TCRM_BACKUP_DIR TCRM_OPS_SERVICES \
+    TCRM_PGBACKREST_CREDS_DIR PGBACKREST_REPO1_TYPE \
     TCRM_OPS_DISK_WARN_PERCENT TCRM_OPS_DISK_CRIT_PERCENT TCRM_OPS_MEM_MIN_AVAIL_PERCENT \
     TCRM_OPS_CERT_MIN_DAYS TCRM_OPS_BACKUP_MAX_AGE_HOURS TCRM_OPS_WAL_MAX_AGE_MINUTES \
-    TCRM_OPS_RESTART_WINDOW_MINUTES TCRM_OPS_ALERT_REPEAT_HOURS)
+    TCRM_OPS_CREDS_MAX_AGE_MINUTES TCRM_OPS_RESTART_WINDOW_MINUTES TCRM_OPS_ALERT_REPEAT_HOURS)
   if [ -f "$env_file" ]; then
     set -a
     # shellcheck source=/dev/null
@@ -253,6 +263,8 @@ load_config() {
   CERT_DIR="${TCRM_CERT_DIR:-./certs}"
   case "$CERT_DIR" in /*) ;; *) CERT_DIR="$DEPLOY_DIR/$CERT_DIR" ;; esac
   BACKUP_DIR="${TCRM_BACKUP_DIR:-$DEPLOY_DIR/backups}"
+  # Empty when unset: the credential check is skipped (a posix repository has no S3 credentials, L-107).
+  CREDS_DIR="${TCRM_PGBACKREST_CREDS_DIR:-}"
   SERVICES="${TCRM_OPS_SERVICES:-nginx crm-admin crm-redirect postgres redis}"
   DISK_WARN_PERCENT="${TCRM_OPS_DISK_WARN_PERCENT:-70}"
   DISK_CRIT_PERCENT="${TCRM_OPS_DISK_CRIT_PERCENT:-85}"
@@ -260,6 +272,7 @@ load_config() {
   CERT_MIN_DAYS="${TCRM_OPS_CERT_MIN_DAYS:-20}"
   BACKUP_MAX_AGE_HOURS="${TCRM_OPS_BACKUP_MAX_AGE_HOURS:-26}"
   WAL_MAX_AGE_MINUTES="${TCRM_OPS_WAL_MAX_AGE_MINUTES:-15}"
+  CREDS_MAX_AGE_MINUTES="${TCRM_OPS_CREDS_MAX_AGE_MINUTES:-60}"
   RESTART_WINDOW_MINUTES="${TCRM_OPS_RESTART_WINDOW_MINUTES:-5}"
   ALERT_REPEAT_HOURS="${TCRM_OPS_ALERT_REPEAT_HOURS:-1}"
   ALERT_REPEAT_SECONDS=$((ALERT_REPEAT_HOURS * 3600))
@@ -522,6 +535,26 @@ check_pgbackrest() {
   return 0
 }
 
+# pgBackRest S3 credentials fragment (task 106, L-107): alert when the file is missing or was not
+# refreshed by the host script recently. Skipped when the directory is not configured, or when the
+# repository type is posix — a posix repository runs without an S3 credentials file. Compose still
+# REQUIRES TCRM_PGBACKREST_CREDS_DIR (it is the mount source), so a posix deployment has the
+# variable set with a deliberately empty directory; the repository type decides, not the variable.
+check_backup_creds() {
+  [ -n "$CREDS_DIR" ] || return 0
+  [ "${PGBACKREST_REPO1_TYPE:-s3}" != "posix" ] || return 0
+  local file="$CREDS_DIR/$CREDS_FILE_NAME" mtime age_min
+  if [ ! -f "$file" ]; then
+    alert creds "备份凭证未刷新: credentials file missing: $file"
+    return
+  fi
+  mtime=$(file_mtime "$file") || mtime=0
+  age_min=$(( (NOW - mtime) / 60 ))
+  [ "$(age_level "$age_min" "$CREDS_MAX_AGE_MINUTES")" = "alert" ] &&
+    alert creds "备份凭证未刷新: credentials file last refreshed $age_min min ago (> $CREDS_MAX_AGE_MINUTES min)"
+  return 0
+}
+
 check_logical_backup() {
   local file newest=0 mtime age_min
   for file in "$BACKUP_DIR"/tcrm-*.dump.gpg; do
@@ -577,6 +610,7 @@ main() {
   check_containers
   check_cert
   check_pgbackrest
+  check_backup_creds
   check_logical_backup
   check_app_logs
   printf '%s' "$NOW" > "$STATE_DIR/lastrun"
