@@ -1543,7 +1543,7 @@ const enUS: MessageSchema = {
       "Self register": "Creator self-register",
       "Manual KOL cleanup": "Manual creator cleanup",
       OTHER: "Other"
-    },
+    }
   },
   /** Task 15b: payout account review. */
   payout: {

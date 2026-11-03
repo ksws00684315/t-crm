@@ -101,7 +101,6 @@ describe("DataTable", () => {
     wrapper.unmount();
   });
 
-
   it("drops the right fixed action column below 768px (L-100)", async () => {
     const listeners: Array<(ev: MediaQueryListEvent) => void> = [];
     const media = {

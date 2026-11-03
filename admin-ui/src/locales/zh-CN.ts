@@ -1504,7 +1504,7 @@ const zhCN = {
       "Self register": "达人自助注册",
       "Manual KOL cleanup": "手动清理达人",
       OTHER: "其他操作"
-    },
+    }
   },
   payout: {
     kol: "达人",

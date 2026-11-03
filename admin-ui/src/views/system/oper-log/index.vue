@@ -39,7 +39,6 @@ const applied = ref<OperLogQuery & { module: string; keyword: string; operator: 
   operator: ""
 });
 
-
 /** Explicit Chinese summaries from writers stay as-is; action-code summaries go through locales (L-094). */
 function formatSummary(row: { action?: string | null; summary?: string | null }): string {
   const action = row.action?.trim() || "";

@@ -150,4 +150,3 @@ const { t } = useI18n();
   line-height: 40px;
 }
 </style>
-
