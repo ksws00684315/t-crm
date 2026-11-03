@@ -40,6 +40,7 @@ expect ok "$(wal_stall_level 0 1 1000000 15)" "idle with old last_archived is ok
 expect alert "$(wal_stall_level 1 0 1000000 15)" "pending and never archived alerts"
 expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 $((1000000 - 1)))" "pending stalled with newer failure alerts"
 expect ok "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 0)" "stale archive without failure is ok (idle first write)"
+expect alert "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 "")" "failed query (empty) falls back to pre-L-078: pending + stale archive alerts"
 expect ok "$(wal_stall_level 2 $((1000000 - 16 * 60)) 1000000 15 $((1000000 - 20 * 60)))" "failure older than last archive is ok"
 expect ok "$(wal_stall_level 2 $((1000000 - 10 * 60)) 1000000 15 $((1000000 - 1)))" "pending but recent archive is ok"
 

@@ -110,16 +110,23 @@ age_level() { # <age_minutes> <max_minutes> -> ok|alert
 # no progress (never archived, or last_archived older than max_minutes). An idle database produces
 # no WAL, so last_archived_time alone would false-alarm every quiet night.
 # L-078: also require last_failed_time > last_archived_time so a first write after a long idle
-# (ready>0, stale last_archived, no new failure) does not false-alarm.
+# (ready>0, stale last_archived, no new failure) does not false-alarm. An EMPTY last_failed_epoch
+# means the last_failed_time query itself failed and must not enjoy that exemption (failed==0 would
+# mask a stalled archiver forever): it falls back to the pre-L-078 judgment, pending segments and
+# last_archived age only.
 wal_stall_level() { # <ready_count> <last_archived_epoch> <now_epoch> <max_minutes> [<last_failed_epoch>] -> ok|alert
-  local ready="$1" last="$2" now="$3" max_min="$4" failed="${5:-0}"
+  local ready="$1" last="$2" now="$3" max_min="$4" failed="${5-}"
   case "$ready" in ''|*[!0-9]*) printf 'ok'; return ;; esac
   [ "$ready" -gt 0 ] || { printf 'ok'; return; }
   if [ -z "$last" ] || [ "$last" = "0" ]; then
     printf 'alert'
     return
   fi
-  case "$failed" in ''|*[!0-9]*) failed=0 ;; esac
+  if [ -z "$failed" ]; then
+    age_level $(( (now - last) / 60 )) "$max_min" # 查询失败：回退到 L-078 之前的判断
+    return
+  fi
+  case "$failed" in *[!0-9]*) failed=0 ;; esac
   if [ "$failed" -eq 0 ] || [ "$failed" -le "$last" ]; then
     printf 'ok'
     return
@@ -502,7 +509,9 @@ check_pgbackrest() {
     -d "${TCRM_DB_NAME:-tcrm}" -Atc \
     "select coalesce(extract(epoch from last_failed_time)::bigint, 0) from pg_stat_archiver" 2>/dev/null | tail -1)"
   case "$ready_count" in ''|*[!0-9]*) ready_count=0 ;; esac
-  if [ "$(wal_stall_level "$ready_count" "${last:-0}" "$NOW" "$WAL_MAX_AGE_MINUTES" "${failed:-0}")" = "alert" ]; then
+  # $failed 传原值：查询失败时输出为空，wal_stall_level 据此回退到 L-078 之前的判断，
+  # 不能用 ${failed:-0} 把「查询失败」吞成「没有失败」。
+  if [ "$(wal_stall_level "$ready_count" "${last:-0}" "$NOW" "$WAL_MAX_AGE_MINUTES" "$failed")" = "alert" ]; then
     if [ -z "$last" ] || [ "$last" = "0" ]; then
       alert pgbackrest "WAL archiving: $ready_count pending segment(s), nothing archived yet (or the archive query failed)"
     else

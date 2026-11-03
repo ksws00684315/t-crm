@@ -5,6 +5,9 @@
 #   release.sh deploy <version> [--postgres <pg-version>]
 #       e.g. 1.0.1 (a leading "v" is accepted). --postgres updates TCRM_POSTGRES_VERSION and
 #       pulls that crm-postgres tag; omitted = leave the database image alone (L-070/L-073).
+#       A first deployment (no postgres container yet, TCRM_POSTGRES_VERSION not pinned) also
+#       pre-pulls the crm-postgres tag it is about to pin, so a pull failure surfaces in the pull
+#       step instead of inside "compose up" after the release has already started changing things.
 #   release.sh rollback <version>   switch app/front end only — never pulls or changes postgres
 #   release.sh status               current version, running images, "current" link, release history
 #
@@ -37,6 +40,7 @@ LOCK_DIR="${TCRM_RELEASE_LOCK_DIR:-$DEPLOY_DIR/.release.lock}"
 LOCK_HELD=0
 VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
 UPDATE_POSTGRES_VERSION="" # set by deploy --postgres <ver>; empty = do not touch postgres
+POSTGRES_PIN_WRITTEN=""    # set by ensure_postgres_version_pinned; first deploy pre-pulls this crm-postgres tag
 
 # Variables without a default in docker-compose.prod.yml (and TCRM_BACKUP_PASSPHRASE_FILE for pg-backup.sh).
 REQUIRED_ENV="TCRM_IMAGE_REGISTRY TCRM_DOMAIN TCRM_DB_USERNAME TCRM_DB_PASSWORD TCRM_DB_SUPERUSER_USERNAME \
@@ -347,6 +351,13 @@ pull_images() { # <app-version>
     log "拉取 $(image_ref crm-postgres "$UPDATE_POSTGRES_VERSION")（显式 --postgres）"
     docker pull --quiet "$(image_ref crm-postgres "$UPDATE_POSTGRES_VERSION")" > /dev/null || return 1
   fi
+  # 首次发布：ensure_postgres_version_pinned 刚把 crm-postgres:<pin> 写进 .env，而主机上还没有
+  # 任何 postgres 容器（含已停止的）。compose up 时才隐式拉取就太晚了，这里提前显式拉取同一 tag，
+  # 让拉取失败发生在任何改动之前。已部署过的主机（postgres 容器存在，哪怕停止）不拉、不重建数据库。
+  if [ -n "$POSTGRES_PIN_WRITTEN" ] && [ -z "$(container_any_id postgres)" ]; then
+    log "拉取 $(image_ref crm-postgres "$POSTGRES_PIN_WRITTEN")（首次发布，预拉取数据库镜像）"
+    docker pull --quiet "$(image_ref crm-postgres "$POSTGRES_PIN_WRITTEN")" > /dev/null || return 1
+  fi
 }
 
 # Extracts the static image into releases/<version>/ (skipped when a complete copy exists).
@@ -593,15 +604,25 @@ prepare_images() { # <version>
   extract_static "$1" || fail "静态文件解出失败"
 }
 
+# The version a host without TCRM_POSTGRES_VERSION gets pinned to (L-073): the current TCRM_VERSION,
+# or the deploy target on a host whose .env has no version yet. pull_images pulls exactly this tag
+# on a first release, so both places agree on the pinned version.
+postgres_pin_version() {
+  local pin
+  pin="$(env_get TCRM_VERSION)"
+  [ -n "$pin" ] || pin="$TARGET_VERSION"
+  printf '%s' "$pin"
+}
+
 # Pin TCRM_POSTGRES_VERSION in .env once so later TCRM_VERSION bumps cannot recreate postgres (L-073).
 ensure_postgres_version_pinned() {
   local pin
   if [ -n "$(env_get TCRM_POSTGRES_VERSION)" ]; then
     return 0
   fi
-  pin="$(env_get TCRM_VERSION)"
-  [ -n "$pin" ] || pin="$TARGET_VERSION"
+  pin="$(postgres_pin_version)"
   env_set_key TCRM_POSTGRES_VERSION "$pin"
+  POSTGRES_PIN_WRITTEN="$pin" # 首次发布时 pull_images 据此预拉取 crm-postgres
   log "已写入 TCRM_POSTGRES_VERSION=${pin}（兼容旧主机；日常发布不再改动）"
 }
 
