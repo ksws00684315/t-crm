@@ -143,7 +143,7 @@ class OrderChainFinanceIT {
         .andExpect(status().isOk());
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject(
-                "SELECT rate FROM crm_order_rate_supplement WHERE order_item_id = ?",
+                "SELECT rate FROM crm_commission_rate_supplement WHERE order_item_id = ?",
                 BigDecimal.class,
                 item1))
         .isEqualByComparingTo("0.1250");
@@ -161,19 +161,20 @@ class OrderChainFinanceIT {
         .andExpect(status().isConflict());
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM crm_order_rate_supplement WHERE order_item_id = ?",
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
                 Integer.class,
                 item1))
         .isEqualTo(1);
     var auditRow =
         jdbc.queryForMap(
-            "SELECT tenant_id, order_id, order_item_id, kol_id, previous_rate, reason, create_by, create_time FROM crm_order_rate_supplement WHERE order_item_id = ?",
+            "SELECT tenant_id, order_id, order_item_id, kol_id, rate, reason, create_by, create_time FROM crm_commission_rate_supplement WHERE order_item_id = ?",
             item1);
     org.assertj.core.api.Assertions.assertThat(auditRow.get("tenant_id")).isEqualTo(TENANT_ID);
     org.assertj.core.api.Assertions.assertThat(auditRow.get("order_id")).isEqualTo(orderId);
     org.assertj.core.api.Assertions.assertThat(auditRow.get("order_item_id")).isEqualTo(item1);
     org.assertj.core.api.Assertions.assertThat(auditRow.get("kol_id")).isEqualTo(kolB);
-    org.assertj.core.api.Assertions.assertThat(auditRow.get("previous_rate")).isNull();
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("rate"))
+        .isEqualTo(new java.math.BigDecimal("0.1250"));
     org.assertj.core.api.Assertions.assertThat(auditRow.get("reason"))
         .isEqualTo("t185 missing historical rate");
     org.assertj.core.api.Assertions.assertThat(auditRow.get("create_by"))
@@ -203,7 +204,7 @@ class OrderChainFinanceIT {
         .andExpect(status().isConflict());
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM crm_order_rate_supplement WHERE order_item_id = ?",
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
                 Integer.class,
                 item1))
         .isZero();
@@ -275,7 +276,7 @@ class OrderChainFinanceIT {
         .containsExactlyInAnyOrder(200, 409);
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject(
-                "SELECT COUNT(*) FROM crm_order_rate_supplement WHERE order_item_id = ?",
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
                 Integer.class,
                 item1))
         .isEqualTo(1);
@@ -303,7 +304,7 @@ class OrderChainFinanceIT {
           .andExpect(status().isInternalServerError());
       org.assertj.core.api.Assertions.assertThat(
               jdbc.queryForObject(
-                  "SELECT COUNT(*) FROM crm_order_rate_supplement WHERE order_item_id = ?",
+                  "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
                   Integer.class,
                   item1))
           .isZero();
@@ -320,7 +321,7 @@ class OrderChainFinanceIT {
 
   @AfterEach
   void cleanup() {
-    jdbc.update("DELETE FROM crm_order_rate_supplement WHERE order_id = ?", orderId);
+    jdbc.update("DELETE FROM crm_commission_rate_supplement WHERE order_id = ?", orderId);
     for (long kol : List.of(kolA, kolB)) {
       jdbc.update(
           "DELETE FROM crm_commission_withdrawal_payment WHERE tenant_id = ? AND withdrawal_id IN"

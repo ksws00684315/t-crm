@@ -16,14 +16,16 @@ import org.apache.ibatis.annotations.Select;
 public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemRevisionDO> {
 
   @Select(
-      "SELECT rate FROM crm_order_rate_supplement WHERE order_item_id = #{itemId} AND kol_id = #{kolId}")
-  BigDecimal supplementedRate(@Param("itemId") long itemId, @Param("kolId") long kolId);
+      "SELECT rate FROM crm_commission_rate_supplement"
+          + " WHERE tenant_id = #{tenantId} AND order_item_id = #{itemId} AND kol_id = #{kolId}")
+  BigDecimal supplementedRate(
+      @Param("tenantId") long tenantId, @Param("itemId") long itemId, @Param("kolId") long kolId);
 
   @Insert(
       """
-      INSERT INTO crm_order_rate_supplement
-        (id, tenant_id, order_id, order_item_id, kol_id, previous_rate, rate, reason, create_by, create_time)
-      VALUES (#{id}, #{tenantId}, #{orderId}, #{itemId}, #{kolId}, NULL, #{rate}, #{reason}, #{actorId}, #{now})
+      INSERT INTO crm_commission_rate_supplement
+        (id, tenant_id, order_id, order_item_id, kol_id, rate, reason, create_by, create_time)
+      VALUES (#{id}, #{tenantId}, #{orderId}, #{itemId}, #{kolId}, #{rate}, #{reason}, #{actorId}, #{now})
       ON CONFLICT (tenant_id, order_item_id, kol_id) DO NOTHING
       """)
   int insertSupplement(

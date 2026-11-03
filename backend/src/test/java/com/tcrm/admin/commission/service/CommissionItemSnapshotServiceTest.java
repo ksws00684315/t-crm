@@ -66,7 +66,7 @@ class CommissionItemSnapshotServiceTest {
   @Test
   void shouldUseSupplementedRateWithoutReleasing_whenMissingPayTimeRate() {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
-    when(revisions.supplementedRate(9001L, KOL_A)).thenReturn(new BigDecimal("0.1250"));
+    when(revisions.supplementedRate(TENANT, 9001L, KOL_A)).thenReturn(new BigDecimal("0.1250"));
     TenantScope.runCompany(
         TENANT,
         () ->

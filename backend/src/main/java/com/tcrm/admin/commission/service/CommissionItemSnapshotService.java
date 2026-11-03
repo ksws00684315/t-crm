@@ -109,7 +109,7 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
       if (!exists) {
         row = newRow(item, order, now);
       }
-      ResolvedRate rate = resolveRate(order, item, kolRates);
+      ResolvedRate rate = resolveRate(tenantId, order, item, kolRates);
       String fingerprint = fingerprint(order, item, rate, rule);
       if (exists && fingerprint.equals(fingerprintOf(row.getSourceVersion()))) {
         continue;
@@ -279,13 +279,14 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
   }
 
   private ResolvedRate resolveRate(
-      OrderSourceDTO order, ItemSourceDTO item, Map<Long, PayTimeRule> kolRates) {
+      long tenantId, OrderSourceDTO order, ItemSourceDTO item, Map<Long, PayTimeRule> kolRates) {
     // One unified rate per KOL from the promotion config effective at pay time; no product-level
     // override (2026-10-25 decision, ADR-032 §3, design §8.3).
     if (item.kolId() == null || order.payTime() == null) {
       return new ResolvedRate(null, null);
     }
-    BigDecimal supplemented = revisions.supplementedRate(item.orderItemId(), item.kolId());
+    BigDecimal supplemented =
+        revisions.supplementedRate(tenantId, item.orderItemId(), item.kolId());
     if (supplemented != null) {
       return new ResolvedRate(supplemented, null);
     }
