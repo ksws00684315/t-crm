@@ -106,7 +106,8 @@ public class OrderCommissionSync {
         successfulRefund(item, basis),
         settlementState,
         lineBasis == null ? order.getSettledTime() : basis.settlementTime(),
-        /* completedTime */ null,
+        // L-052: trade completion = confirm-receipt time; drives FALLBACK ahead of CONFIRMED.
+        order.getReceiveTime(),
         afterSalesItems.contains(item.getId()),
         basis.reason());
   }

@@ -165,7 +165,9 @@ public interface CommissionItemStateMapper extends BaseMapper<CommissionItemStat
 
   /** Live snapshot ids of one order, for the up-front application prelock of the pause linkage. */
   @Select(
-      "SELECT id FROM crm_commission_item_state WHERE order_id = #{orderId} AND is_deleted = FALSE")
+      // L-054: include logically deleted rows so a revived line that still holds a withdrawal
+      // occupation is in the prelock set before the revision writes the wallet.
+      "SELECT id FROM crm_commission_item_state WHERE order_id = #{orderId}")
   List<Long> findIdsByOrder(@Param("orderId") long orderId);
 
   /** Snapshots of one order whose item lines a later full sync dropped, for the pause linkage. */

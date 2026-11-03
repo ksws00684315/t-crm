@@ -236,6 +236,72 @@ class CommissionSettlementRulesTest {
     assertThat(CommissionSettlementRules.attributedToKol(10L, 2)).isTrue();
   }
 
+
+  @Test
+  void shouldPreferFreezeDaysOverSettlementConfirmation() {
+    // Owner 2026-11-03 (L-052): completed 11-01, freeze 7 days, confirmed 11-05 → release 11-08.
+    Instant completed = Instant.parse("2026-11-01T00:00:00Z");
+    Instant confirmed = Instant.parse("2026-11-05T00:00:00Z");
+    var result =
+        CommissionSettlementRules.evaluate(
+            inputs(
+                new BigDecimal("100.00"),
+                null,
+                null,
+                10L,
+                1,
+                new BigDecimal("0.1000"),
+                "CONFIRMED",
+                confirmed,
+                completed,
+                false,
+                7));
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_FALLBACK);
+    assertThat(result.releaseAt()).isEqualTo(completed.plusSeconds(7 * 86400L));
+  }
+
+  @Test
+  void shouldReleaseAtSettlementTimeWhenConfirmedWithoutCompletedTime() {
+    var result =
+        CommissionSettlementRules.evaluate(
+            inputs(
+                new BigDecimal("100.00"),
+                null,
+                null,
+                10L,
+                1,
+                new BigDecimal("0.1000"),
+                "CONFIRMED",
+                SETTLED,
+                null,
+                false,
+                null));
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_CONFIRMED);
+    assertThat(result.releaseAt()).isEqualTo(SETTLED);
+  }
+
+  @Test
+  void shouldStayAfterSalesEvenWithCompletedAndConfirmed() {
+    Instant completed = Instant.parse("2026-11-01T00:00:00Z");
+    Instant confirmed = Instant.parse("2026-11-05T00:00:00Z");
+    var result =
+        CommissionSettlementRules.evaluate(
+            inputs(
+                new BigDecimal("100.00"),
+                null,
+                null,
+                10L,
+                1,
+                new BigDecimal("0.1000"),
+                "CONFIRMED",
+                confirmed,
+                completed,
+                true,
+                7));
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertThat(result.releaseAt()).isNull();
+  }
+
   private static CommissionSettlementRules.Inputs inputs(
       BigDecimal basis,
       Boolean includesRefund,

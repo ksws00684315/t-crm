@@ -93,7 +93,19 @@ class ShortUrlHttpFetcherTest {
           new Thread(
               () -> {
                 try (Socket client = drip.accept()) {
-                  client.getInputStream().readAllBytes();
+                  // L-058: drain the request on a side thread; do not block the drip on EOF.
+                  Thread drain =
+                      new Thread(
+                          () -> {
+                            try {
+                              client.getInputStream().readAllBytes();
+                            } catch (Exception ignored) {
+                              // Client closed.
+                            }
+                          },
+                          "short-url-drip-drain");
+                  drain.setDaemon(true);
+                  drain.start();
                   OutputStream out = client.getOutputStream();
                   out.write("HTTP/1.1 200 OK\r\nX-Drip: ".getBytes(StandardCharsets.ISO_8859_1));
                   out.flush();
@@ -146,7 +158,20 @@ class ShortUrlHttpFetcherTest {
           new Thread(
               () -> {
                 try (Socket client = drip.accept()) {
-                  client.getInputStream().readAllBytes();
+                  // L-058: start trickling handshake bytes immediately. A side drain reads the
+                  // ClientHello without making the drip wait for the client to disconnect.
+                  Thread drain =
+                      new Thread(
+                          () -> {
+                            try {
+                              client.getInputStream().readAllBytes();
+                            } catch (Exception ignored) {
+                              // Client closed after the deadline abort.
+                            }
+                          },
+                          "short-url-handshake-drain");
+                  drain.setDaemon(true);
+                  drain.start();
                   OutputStream out = client.getOutputStream();
                   // handshake(0x16), TLS 1.2 (0x03 0x03), length 16384 (the legal record
                   // maximum): the JSSE client now waits for handshake bytes that never finish
@@ -178,8 +203,9 @@ class ShortUrlHttpFetcherTest {
                       false))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("did not complete within 800 ms");
+      // Production budget is 10 s; CI previously hung ~93 s on SSLSocket.close during handshake.
       long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-      assertThat(elapsedMs).isBetween(700L, 3_000L);
+      assertThat(elapsedMs).as("TLS handshake abort must stay near the 800 ms deadline").isBetween(700L, 2_500L);
     }
   }
 

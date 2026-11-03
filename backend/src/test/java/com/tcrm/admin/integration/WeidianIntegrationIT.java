@@ -405,6 +405,8 @@ class WeidianIntegrationIT {
 
   @Test
   void shouldLimitConcurrentRequestsToConfiguredAppQps() throws Exception {
+    // L-067: assert by arrival spacing, not only wall time — setRate-on-every-acquire used to
+    // refill permits so five callers finished in ~14 ms while the ≥1 s check still flaked.
     int workers = 5;
     ExecutorService pool = Executors.newFixedThreadPool(workers);
     CountDownLatch ready = new CountDownLatch(workers);
@@ -425,19 +427,25 @@ class WeidianIntegrationIT {
                 }));
       }
       assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
-      long startedAt = System.nanoTime();
       start.countDown();
       for (Future<?> call : calls) {
         call.get(12, TimeUnit.SECONDS);
       }
-      assertThat(System.nanoTime() - startedAt)
-          .as("five concurrent acquisitions with a two-per-second limit")
-          .isGreaterThanOrEqualTo(TimeUnit.SECONDS.toNanos(1));
     } finally {
       start.countDown();
       pool.shutdownNow();
     }
     assertThat(acquiredAt).hasSize(workers);
+    List<Long> ordered = acquiredAt.stream().sorted().toList();
+    // 2 permits / second: the 3rd acquisition cannot land in the same window as the first two.
+    long gapToThirdMs = (ordered.get(2) - ordered.get(0)) / 1_000_000L;
+    assertThat(gapToThirdMs)
+        .as("third acquire must wait for the next 1 s window under weidian.qps=2")
+        .isGreaterThanOrEqualTo(800L);
+    long spanMs = (ordered.get(4) - ordered.get(0)) / 1_000_000L;
+    assertThat(spanMs)
+        .as("five acquires at 2/s need at least two window boundaries")
+        .isGreaterThanOrEqualTo(1_600L);
   }
 
   @Test

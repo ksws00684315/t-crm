@@ -53,7 +53,7 @@ public record OrderChainDTO(
    *     never accrued — never recomputed from the creator's current rate
    * @param netCommission accumulated net commission; null while the line is unverified or has no
    *     snapshot (unknown, distinct from a real zero)
-   * @param releaseBasis CONFIRMED / FALLBACK / UNSETTLED / AFTER_SALES / UNVERIFIED; null when the
+   * @param releaseBasis CONFIRMED / FALLBACK (freeze days prefer confirmation) / UNSETTLED / AFTER_SALES / UNVERIFIED; null when the
    *     line has no snapshot
    * @param occupiedTotal occupation total of PENDING_REVIEW / PENDING_PAYMENT / PAID applications;
    *     rejected and withdrawn allocations are released and never count
