@@ -51,6 +51,8 @@ public record OrderChainDTO(
    *
    * @param rateSnapshot pay-time rate snapshotted in the latest commission revision; null when
    *     never accrued — never recomputed from the creator's current rate
+   * @param rateSupplemented true when the rate came from a super-admin supplement, not from the
+   *     promotion config effective at pay time
    * @param netCommission accumulated net commission; null while the line is unverified or has no
    *     snapshot (unknown, distinct from a real zero)
    * @param releaseBasis CONFIRMED / FALLBACK (freeze days prefer confirmation) / UNSETTLED /
@@ -62,6 +64,7 @@ public record OrderChainDTO(
    */
   record LineCommissionDTO(
       BigDecimal rateSnapshot,
+      boolean rateSupplemented,
       BigDecimal netCommission,
       String releaseBasis,
       BigDecimal occupiedTotal,

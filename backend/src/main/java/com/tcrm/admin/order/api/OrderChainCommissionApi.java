@@ -69,6 +69,9 @@ public interface OrderChainCommissionApi {
    * @param orderItemId {@code crm_order_item.id}
    * @param rateSnapshot pay-time rate of the line's latest revision; null when never accrued —
    *     never recomputed from the KOL's current rate
+   * @param rateSupplemented true when that rate came from a super-admin supplement rather than the
+   *     promotion config in force at pay time; the UI marks those lines so reconciliation can tell
+   *     the rule apart from an override
    * @param netCommissionCny accumulated net commission; null while the line is unverified or has no
    *     snapshot (unknown, distinct from a real zero)
    * @param releaseBasis CONFIRMED / FALLBACK (freeze days prefer confirmation) / UNSETTLED /
@@ -81,6 +84,7 @@ public interface OrderChainCommissionApi {
   record LineCommissionDTO(
       long orderItemId,
       BigDecimal rateSnapshot,
+      boolean rateSupplemented,
       BigDecimal netCommissionCny,
       String releaseBasis,
       BigDecimal occupiedCny,

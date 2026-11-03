@@ -2,6 +2,7 @@ package com.tcrm.admin.commission.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +14,7 @@ import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper.AllocationOccupationRow;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -29,8 +31,9 @@ class OrderChainCommissionServiceTest {
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionWalletMapper wallet = mock(CommissionWalletMapper.class);
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
+  private final CurrentTenantResolver tenants = mock(CurrentTenantResolver.class);
   private final OrderChainCommissionService service =
-      new OrderChainCommissionService(states, revisions, wallet, withdrawals);
+      new OrderChainCommissionService(states, revisions, wallet, withdrawals, tenants);
 
   @Test
   void shouldSplitFlowsPerAllocation_andCountOnlyOccupyingApplications() {
@@ -210,6 +213,35 @@ class OrderChainCommissionServiceTest {
     assertThat(line.releaseBasis()).isNull();
     assertThat(line.occupiedCny()).isEqualByComparingTo("0.00");
     assertThat(line.withdrawals()).isEmpty();
+  }
+
+  @Test
+  void shouldMarkRateAsSupplementedOnlyWhileItStillMatchesTheSupplement() {
+    when(tenants.currentLoginTenantId()).thenReturn(1L);
+    when(states.listByOrderIds(any()))
+        .thenReturn(List.of(state(50L, 20L, true, "30.00"), state(51L, 21L, true, "20.00")));
+    // Line 20 keeps the supplemented 30%. Line 21 was re-attributed after the supplement, so its
+    // snapshot rate comes from the config: the supplement row must not label it.
+    when(revisions.listLatestByItemStateIds(any()))
+        .thenReturn(List.of(revision(50L, "0.3000"), revision(51L, "0.2000")));
+    when(revisions.listSupplementsByOrderItems(anyLong(), any()))
+        .thenReturn(List.of(supplement(20L, "0.3000"), supplement(21L, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L, 21L));
+
+    assertThat(chain.lines().get(0).rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(chain.lines().get(0).rateSupplemented()).isTrue();
+    assertThat(chain.lines().get(1).rateSnapshot()).isEqualByComparingTo("0.2000");
+    assertThat(chain.lines().get(1).rateSupplemented()).isFalse();
+  }
+
+  private static CommissionItemRevisionMapper.SupplementRow supplement(long itemId, String rate) {
+    var row = new CommissionItemRevisionMapper.SupplementRow();
+    row.setItemId(itemId);
+    row.setRate(dec(rate));
+    return row;
   }
 
   private static CommissionItemStateDO state(

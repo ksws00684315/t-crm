@@ -55,4 +55,39 @@ public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemR
           + " GROUP BY item_state_id) m ON r.item_state_id = m.item_state_id AND r.id = m.max_id"
           + "</script>")
   List<CommissionItemRevisionDO> listLatestByItemStateIds(@Param("ids") Collection<Long> ids);
+
+  /**
+   * Supplemented rates of the given order lines, keyed by line. Used to mark a line's rate as
+   * supplemented: the revision keeps the number but not where it came from, and a missing {@code
+   * config_version} alone cannot tell — records predating versioning have none either.
+   */
+  @Select(
+      "<script>SELECT order_item_id AS itemId, rate FROM crm_commission_rate_supplement"
+          + " WHERE tenant_id = #{tenantId} AND order_item_id IN "
+          + "<foreach collection='itemIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+          + "</script>")
+  List<SupplementRow> listSupplementsByOrderItems(
+      @Param("tenantId") long tenantId, @Param("itemIds") Collection<Long> itemIds);
+
+  /** Mapper row for {@link #listSupplementsByOrderItems()}. */
+  class SupplementRow {
+    private Long itemId;
+    private BigDecimal rate;
+
+    public Long getItemId() {
+      return itemId;
+    }
+
+    public void setItemId(Long value) {
+      itemId = value;
+    }
+
+    public BigDecimal getRate() {
+      return rate;
+    }
+
+    public void setRate(BigDecimal value) {
+      rate = value;
+    }
+  }
 }

@@ -630,11 +630,23 @@ onMounted(load);
           <template #cell-payAmount="{ row }">{{
             formatAmountWithCurrency((row as ChainLineVO).payAmount)
           }}</template>
-          <template #cell-rate="{ row }">{{
-            (row as ChainLineVO).commission?.rateSnapshot == null
-              ? fundsText(null)
-              : formatRate((row as ChainLineVO).commission!.rateSnapshot)
-          }}</template>
+          <template #cell-rate="{ row }"
+            ><span v-if="(row as ChainLineVO).commission?.rateSnapshot == null">{{
+              fundsText(null)
+            }}</span
+            ><span v-else class="chain-rate"
+              >{{ formatRate((row as ChainLineVO).commission!.rateSnapshot)
+              }}<el-tag
+                v-if="(row as ChainLineVO).commission!.rateSupplemented"
+                class="chain-rate__tag"
+                size="small"
+                type="warning"
+                effect="plain"
+                data-test="rate-supplemented"
+                >{{ t("order.chain.rateSupplemented") }}</el-tag
+              ></span
+            ></template
+          >
           <template #cell-commission="{ row }">{{
             fundsText((row as ChainLineVO).commission?.netCommission)
           }}</template>
@@ -735,6 +747,15 @@ onMounted(load);
                         ? t("finance.unverified")
                         : formatRate(line.commission.rateSnapshot)
                     }}
+                    <el-tag
+                      v-if="line.commission.rateSupplemented"
+                      class="chain-rate__tag"
+                      size="small"
+                      type="warning"
+                      effect="plain"
+                      data-test="rate-supplemented"
+                      >{{ t("order.chain.rateSupplemented") }}</el-tag
+                    >
                   </div>
                   <div class="chain-block__text">
                     {{ t("order.chain.kolCommission") }}:
@@ -1047,6 +1068,16 @@ onMounted(load);
 .chain-money {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+/* Rate plus its supplement marker stay on one line, so the marker never wraps under the number. */
+.chain-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  font-variant-numeric: tabular-nums;
+}
+.chain-rate__tag {
+  flex: none;
 }
 .chain-wiring-details > summary {
   cursor: pointer;

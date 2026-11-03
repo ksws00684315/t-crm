@@ -1462,6 +1462,7 @@ const enUS: MessageSchema = {
       },
       commissionBlock: "Commission & withdrawals",
       rateSnapshot: "Rate snapshot",
+      rateSupplemented: "Supplemented",
       releaseBasis: "Release basis",
       occupiedTotal: "Withdrawal hold total",
       applicationNo: "Application no.",

@@ -1426,6 +1426,7 @@ const zhCN = {
       },
       commissionBlock: "佣金与提现",
       rateSnapshot: "比例快照",
+      rateSupplemented: "补录",
       releaseBasis: "释放依据",
       occupiedTotal: "提现占用合计",
       applicationNo: "提现编号",

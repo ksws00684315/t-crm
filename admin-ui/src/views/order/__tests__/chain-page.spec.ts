@@ -127,6 +127,7 @@ const financedChain: OrderChainVO = {
       ...chain.lines[0],
       commission: {
         rateSnapshot: "0.1000",
+        rateSupplemented: false,
         netCommission: "16.00",
         releaseBasis: "CONFIRMED",
         occupiedTotal: "16.00",
@@ -159,6 +160,7 @@ const financedChain: OrderChainVO = {
       ...chain.lines[1],
       commission: {
         rateSnapshot: null,
+        rateSupplemented: false,
         netCommission: null,
         releaseBasis: "UNVERIFIED",
         occupiedTotal: "0.00",
@@ -357,6 +359,33 @@ describe("order chain page (task 40)", () => {
     expect(funds).not.toContain("开发中");
     expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="chain-order-info"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("marks a supplemented rate on the summary row and the line block", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const supplemented: OrderChainVO = {
+      ...financedChain,
+      lines: financedChain.lines.map((line, index) => ({
+        ...line,
+        commission: line.commission
+          ? { ...line.commission, rateSupplemented: index === 0 }
+          : line.commission
+      }))
+    };
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(supplemented);
+    const { wrapper } = await mountPage();
+
+    // Both the product summary row and the commission block of that line carry the marker.
+    const tags = wrapper.findAll('[data-test="rate-supplemented"]');
+    expect(tags).toHaveLength(2);
+    expect(tags[0].text()).toBe("补录");
+
+    // The second line keeps the pay-time config rate, so it must not claim to be supplemented.
+    const lines = wrapper.findAll('[data-test="chain-line"]');
+    expect(lines).toHaveLength(2);
+    expect(lines[1].text()).not.toContain("补录");
+
     wrapper.unmount();
   });
 
