@@ -110,6 +110,17 @@ body {
   font-family: var(--tcrm-font-sans) !important;
 }
 
+/* Native form controls do not inherit font-size; without an author rule they fall back to the
+   browser default (13.3333px) wherever no component class sets one (L-089 follow-up). Keep the
+   specificity below class selectors so Element Plus sized variants (e.g. .el-button--small 12px)
+   and component scoped sizes keep precedence. */
+button,
+input,
+select,
+textarea {
+  font-size: inherit;
+}
+
 #app {
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
@@ -154,7 +165,6 @@ body {
 #app .el-dialog__title,
 #app .el-drawer__title,
 #app .coming-soon__title,
-#app .coming-soon__heading,
 .el-overlay h1,
 .el-overlay h2,
 .el-overlay .el-dialog__title,
