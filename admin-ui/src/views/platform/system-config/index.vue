@@ -175,8 +175,8 @@ onMounted(load);
 /* The page notice is auxiliary text, not body copy. The #app prefix outspecifies the global
    `#app *` body-size rule that also carries !important. */
 #app .config-notice :deep(.el-alert__title) {
-  font-size: var(--tcrm-font-size-help) !important;
-  line-height: var(--tcrm-line-height-help) !important;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
   font-weight: 400;
 }
 

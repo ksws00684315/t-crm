@@ -152,17 +152,22 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         :key="tab.path"
         class="tabs__item"
         :class="{ 'is-active': tab.path === route.path }"
-        role="tab"
-        :aria-selected="tab.path === route.path"
-        :tabindex="tabIndexFor(tab.path)"
-        data-test="tab"
-        :data-path="tab.path"
-        @click="router.push(tab.path)"
-        @keydown="onKeydown($event, index)"
-        @auxclick="onAux($event, tab.path, tab.affix)"
-        @contextmenu.prevent="openMenu($event, tab.path)"
       >
-        <span>{{ title(tab.path) }}</span>
+        <!-- L-099: close is a sibling of role=tab so the tab name excludes the close control. -->
+        <div
+          class="tabs__tab"
+          role="tab"
+          :aria-selected="tab.path === route.path"
+          :tabindex="tabIndexFor(tab.path)"
+          data-test="tab"
+          :data-path="tab.path"
+          @click="router.push(tab.path)"
+          @keydown="onKeydown($event, index)"
+          @auxclick="onAux($event, tab.path, tab.affix)"
+          @contextmenu.prevent="openMenu($event, tab.path)"
+        >
+          <span>{{ title(tab.path) }}</span>
+        </div>
         <button
           v-if="!tab.affix"
           type="button"
@@ -219,6 +224,11 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   padding: var(--tcrm-space-1) var(--tcrm-space-2) 0;
 }
 .tabs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tabs__tab {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -233,13 +243,13 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   cursor: pointer;
   white-space: nowrap;
 }
-.tabs__item.is-active {
+.tabs__item.is-active .tabs__tab {
   color: var(--tcrm-color-primary-text);
   font-weight: 600;
   background: var(--tcrm-color-page);
   border-color: var(--tcrm-color-border);
 }
-.tabs__item.is-active::after {
+.tabs__item.is-active .tabs__tab::after {
   content: "";
   position: absolute;
   right: var(--tcrm-space-2);
@@ -249,8 +259,14 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   border-radius: var(--tcrm-radius-tag);
   background: var(--tcrm-color-primary);
 }
-.tabs__item:focus-visible {
+.tabs__tab:focus-visible {
   outline-offset: -2px;
+}
+.tabs__close {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  color: var(--tcrm-color-text-secondary);
 }
 .tabs__close,
 .tabs__more,

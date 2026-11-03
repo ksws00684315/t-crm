@@ -213,7 +213,9 @@ function close() {
           :placeholder="
             accountType === 'PAYPAL'
               ? t('payoutAccounts.form.accountPaypalHint')
-              : t('payoutAccounts.form.accountUsdtHint')
+              : accountType === 'USDT'
+                ? t('payoutAccounts.form.accountUsdtHint')
+                : t('payoutAccounts.form.accountPlaceholder')
           "
           :disabled="busy"
         />

@@ -535,6 +535,7 @@ onMounted(load);
     >
       <el-alert v-if="applyError" type="error" :closable="false" :title="applyError" />
       <el-form
+        class="apply-form"
         v-loading="limitsLoading"
         :disabled="limitsLoading || submitting"
         label-position="top"
@@ -925,5 +926,12 @@ small {
     justify-content: center;
     margin-top: var(--tcrm-space-3);
   }
+}
+.apply-form :deep(.el-form-item) {
+  margin-bottom: var(--tcrm-space-4);
+}
+.apply-form :deep(.el-form-item__error) {
+  position: static;
+  padding-top: var(--tcrm-space-1);
 }
 </style>

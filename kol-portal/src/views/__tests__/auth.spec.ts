@@ -273,16 +273,17 @@ describe("forgot password", () => {
 });
 
 describe("account and logout", () => {
-  it("loads identity and keeps system ID and email read-only", async () => {
+  it("loads identity and shows email and system ID as CopyText (L-101)", async () => {
     const { wrapper, store } = await page(Account, "/account");
     store.acceptSession(session);
     await flushPromises();
     expect(api.getMe).toHaveBeenCalledOnce();
-    // L-040: read-only without the disabled look, so the values stay selectable.
-    expect((wrapper.get("input[readonly]").element as HTMLInputElement).value).toBe(kol.email);
-    expect((wrapper.findAll("input[readonly]")[1]?.element as HTMLInputElement).value).toBe(
+    // L-101: plain text + CopyText (规范 13 §4.5), not read-only inputs.
+    expect(wrapper.get('[data-test="profile-email"] [data-test="value"]').text()).toBe(kol.email);
+    expect(wrapper.get('[data-test="profile-system-id"] [data-test="value"]').text()).toBe(
       kol.kolCode
     );
+    expect(wrapper.find('[data-test="profile-email"] [data-test="copy"]').exists()).toBe(true);
   });
   it("shows an old-password error and replaces the session after a successful change", async () => {
     vi.mocked(api.changePassword)

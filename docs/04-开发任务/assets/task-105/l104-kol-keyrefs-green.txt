@@ -1,0 +1,5 @@
+# L-104 kol-portal key-refs GREEN after adding account.whatsapp
+# Command: pnpm exec vitest run src/locales/__tests__/key-refs.spec.ts
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)

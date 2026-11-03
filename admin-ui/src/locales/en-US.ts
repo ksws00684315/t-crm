@@ -603,6 +603,7 @@ const enUS: MessageSchema = {
       "Open permission settings from this edit dialog to change this account's permissions and data scope.",
     currentPost: "Current post: {post}",
     selectAll: "Select all",
+    permissionRequired: "Select at least one permission",
     resetTemplate: "Reset from template",
     exclusiveTitle: "Super Admin only. These cannot be granted.",
     exclusiveItems:
@@ -1491,6 +1492,7 @@ const enUS: MessageSchema = {
       "Import failed: the file could not be processed or the task was interrupted. Check the file and upload again.",
     pollFailed:
       "Progress checks failed repeatedly, so refresh stopped. The task is still running. Close this window and check the list later.",
+    xlsxOrCsv: "Only .xlsx or .csv files are supported.",
     xlsxOnly: "Upload an .xlsx Excel file.",
     tooLarge: "The file is larger than 20MB. Split it and upload again.",
     chooseFile: "Choose a file first.",
@@ -1524,7 +1526,24 @@ const enUS: MessageSchema = {
     keywordPlaceholder: "Action name / parameter summary",
     timeRange: "Time range",
     transferFilter: "BD Transfers",
-    resultOption: { SUCCESS: "Success", FAIL: "Fail" }
+    resultOption: { SUCCESS: "Success", FAIL: "Fail" },
+    actionCodes: {
+      "Create BD transfer": "Create BD transfer",
+      "Execute BD transfer": "Execute scheduled transfer",
+      "Cancel BD transfer": "Cancel BD transfer",
+      "Cancel scheduled BD transfer": "Cancel scheduled transfer",
+      Create: "Create",
+      Edit: "Edit",
+      "Change status": "Change status",
+      "Review KOL": "Review creator",
+      "Save promotion config": "Save promotion config",
+      "Set KOL auto cleanup": "Set creator auto cleanup",
+      "Update post template": "Update post template",
+      "Reset post template": "Reset post template",
+      "Self register": "Creator self-register",
+      "Manual KOL cleanup": "Manual creator cleanup",
+      OTHER: "Other"
+    }
   },
   /** Task 15b: payout account review. */
   payout: {

@@ -100,9 +100,8 @@ public final class CommissionSettlementRules {
     if (in.afterSales()) {
       return new Result(true, effective, accrued, RELEASE_AFTER_SALES, null);
     }
-    if (in.settlementTime() != null) {
-      return new Result(true, effective, accrued, RELEASE_CONFIRMED, in.settlementTime());
-    }
+    // Owner 2026-11-03 (L-052): freeze days win over settlement confirmation when completedTime
+    // is present; CONFIRMED only applies when there is no completedTime.
     if (in.completedTime() != null) {
       int days = in.fallbackDays() == null ? DEFAULT_FREEZE_DAYS : Math.max(0, in.fallbackDays());
       return new Result(
@@ -111,6 +110,9 @@ public final class CommissionSettlementRules {
           accrued,
           RELEASE_FALLBACK,
           in.completedTime().plusSeconds(days * 86400L));
+    }
+    if (in.settlementTime() != null) {
+      return new Result(true, effective, accrued, RELEASE_CONFIRMED, in.settlementTime());
     }
     return new Result(true, effective, accrued, RELEASE_UNSETTLED, null);
   }

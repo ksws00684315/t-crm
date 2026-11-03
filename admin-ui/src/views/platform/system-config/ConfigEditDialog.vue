@@ -167,8 +167,8 @@ async function restore(): Promise<void> {
    `.el-overlay *` body-size rule (which carries !important) is the one to outspecify. */
 .el-overlay .config-dialog__hint {
   width: 100%;
-  font-size: var(--tcrm-font-size-help) !important;
-  line-height: var(--tcrm-line-height-help) !important;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
   color: var(--el-text-color-secondary);
 }
 </style>

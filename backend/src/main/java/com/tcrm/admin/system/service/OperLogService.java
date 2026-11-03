@@ -147,23 +147,12 @@ public class OperLogService {
     return actionSummary(row.getAction());
   }
 
+  /**
+   * When requestParams has no explicit Chinese summary, return the action code so the admin UI can
+   * resolve zh/en copy from its locale packs (L-094). Do not hard-code Chinese.
+   */
   private String actionSummary(String action) {
-    return switch (action == null ? "" : action) {
-      case "Create BD transfer" -> "创建达人转移";
-      case "Execute BD transfer" -> "执行预约转移";
-      case "Cancel BD transfer", "Cancel scheduled BD transfer" -> "取消预约转移";
-      case "Create" -> "新增记录";
-      case "Edit" -> "编辑记录";
-      case "Change status" -> "修改状态";
-      case "Review KOL" -> "审核达人";
-      case "Save promotion config" -> "保存推广配置";
-      case "Set KOL auto cleanup" -> "设置达人自动清理";
-      case "Update post template" -> "修改岗位模板";
-      case "Reset post template" -> "恢复岗位模板默认值";
-      case "Self register" -> "达人自助注册";
-      case "Manual KOL cleanup" -> "手动清理达人";
-      default -> hasText(action) ? "其他操作" : "操作记录";
-    };
+    return hasText(action) ? action : "OTHER";
   }
 
   private static boolean hasText(String value) {

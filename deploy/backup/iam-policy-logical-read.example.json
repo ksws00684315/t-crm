@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListLogicalPrefix",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+      "Resource": "arn:aws:s3:::EXAMPLE-TCRM-BACKUP-BUCKET",
+      "Condition": {
+        "StringLikeIfExists": {
+          "s3:prefix": ["logical", "logical/*"]
+        }
+      }
+    },
+    {
+      "Sid": "GetLogicalDumps",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::EXAMPLE-TCRM-BACKUP-BUCKET/logical/*"
+    }
+  ]
+}

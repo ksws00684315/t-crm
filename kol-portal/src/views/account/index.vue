@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CopyText from "@/components/CopyText.vue";
 import NameCode from "@/components/NameCode.vue";
 import { Plus } from "@element-plus/icons-vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
@@ -270,12 +271,12 @@ function savePassword() {
         />
         <el-form label-position="top" @submit.prevent="saveProfile">
           <div class="form-grid">
-            <el-form-item :label="t('account.email')"
-              ><el-input :model-value="session.kol.email" readonly
-            /></el-form-item>
-            <el-form-item :label="t('account.systemId')"
-              ><el-input :model-value="systemId" readonly
-            /></el-form-item>
+            <el-form-item :label="t('account.email')">
+              <CopyText :value="session.kol.email" data-test="profile-email" />
+            </el-form-item>
+            <el-form-item :label="t('account.systemId')">
+              <CopyText :value="systemId" data-test="profile-system-id" />
+            </el-form-item>
             <el-form-item
               :label="t('account.nickname')"
               :error="profileFieldErrors.name ? t(profileFieldErrors.name) : undefined"
@@ -595,5 +596,12 @@ small {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+.form-grid :deep(.el-form-item) {
+  margin-bottom: var(--tcrm-space-4);
+}
+.form-grid :deep(.el-form-item__error) {
+  position: static;
+  padding-top: var(--tcrm-space-1);
 }
 </style>

@@ -160,8 +160,9 @@ services:
   postgres:
     <<: [*restart, *logging]
     # PostgreSQL 17.11 plus a pinned pgBackRest (ADR-037 decision 5), built once by the release
-    # workflow from deploy/postgres/Dockerfile and pulled here. release.sh never restarts the database.
-    image: ${TCRM_IMAGE_REGISTRY:?TCRM_IMAGE_REGISTRY is required (deploy/.env)}/crm-postgres:${TCRM_VERSION:?TCRM_VERSION is required (deploy/.env)}
+    # workflow from deploy/postgres/Dockerfile and pulled here. Tag is TCRM_POSTGRES_VERSION
+    # (falls back to TCRM_VERSION on old hosts); release.sh never restarts the database (L-073).
+    image: ${TCRM_IMAGE_REGISTRY:?TCRM_IMAGE_REGISTRY is required (deploy/.env)}/crm-postgres:${TCRM_POSTGRES_VERSION:-${TCRM_VERSION:?TCRM_VERSION is required (deploy/.env)}}
     # A real init as PID 1 is REQUIRED for archive-async: pgBackRest's background push process is
     # orphaned and re-parented to PID 1. When that is the postmaster, its non-zero exit (any archive
     # error, e.g. S3 unreachable) is taken for a crashed backend and restarts the whole server.

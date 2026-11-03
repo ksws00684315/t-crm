@@ -118,6 +118,9 @@ async function submit() {
   width: 100%;
   max-width: 380px;
 }
+.login__card :deep(.el-card__body) {
+  padding: 16px;
+}
 .login__title {
   margin: 0 0 24px;
   font-size: var(--tcrm-font-size-title);

@@ -101,6 +101,40 @@ describe("DataTable", () => {
     wrapper.unmount();
   });
 
+  it("drops the right fixed action column below 768px (L-100)", async () => {
+    const listeners: Array<(ev: MediaQueryListEvent) => void> = [];
+    const media = {
+      matches: true,
+      media: "(max-width: 767px)",
+      addEventListener: (_: string, cb: (ev: MediaQueryListEvent) => void) => {
+        listeners.push(cb);
+      },
+      removeEventListener: () => undefined
+    } as unknown as MediaQueryList;
+    const original = window.matchMedia;
+    window.matchMedia = () => media;
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "narrow-fixed",
+        rows: [{ id: "1", code: "KOL0001", name: "Ada" }],
+        columns: [
+          { key: "code", label: "编号", width: 120 },
+          { key: "name", label: "名称", minWidth: 100 },
+          { key: "actions", label: "操作", width: 80 }
+        ],
+        total: 1
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    const actions = wrapper
+      .findAllComponents({ name: "ElTableColumn" })
+      .find(column => column.props("label") === "操作");
+    expect(actions?.props("fixed")).toBeUndefined();
+    wrapper.unmount();
+    window.matchMedia = original;
+  });
+
   it("caps a mixed-height list at the last complete row", async () => {
     const host = document.createElement("div");
     document.body.append(host);

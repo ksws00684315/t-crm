@@ -33,7 +33,9 @@ class OperLogServiceTest {
         new OperLogService(logs, users, JsonMapper.builder().build())
             .page(new OperLogQuery(null, null, null, null, null, 2, 20), false);
 
-    assertThat(result.items()).extracting(OperLogDTO::summary).containsExactly("保存推广配置");
+    assertThat(result.items())
+        .extracting(OperLogDTO::summary)
+        .containsExactly("Save promotion config");
     assertThat(result.items().getFirst().success()).isTrue();
     assertThat(result.total()).isEqualTo(21);
     assertThat(result.page()).isEqualTo(2);
