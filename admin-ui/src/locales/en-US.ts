@@ -1525,6 +1525,23 @@ const enUS: MessageSchema = {
     timeRange: "Time range",
     transferFilter: "BD Transfers",
     resultOption: { SUCCESS: "Success", FAIL: "Fail" }
+    actionCodes: {
+      "Create BD transfer": "Create BD transfer",
+      "Execute BD transfer": "Execute scheduled transfer",
+      "Cancel BD transfer": "Cancel BD transfer",
+      "Cancel scheduled BD transfer": "Cancel scheduled transfer",
+      Create: "Create",
+      Edit: "Edit",
+      "Change status": "Change status",
+      "Review KOL": "Review creator",
+      "Save promotion config": "Save promotion config",
+      "Set KOL auto cleanup": "Set creator auto cleanup",
+      "Update post template": "Update post template",
+      "Reset post template": "Reset post template",
+      "Self register": "Creator self-register",
+      "Manual KOL cleanup": "Manual creator cleanup",
+      OTHER: "Other"
+    },
   },
   /** Task 15b: payout account review. */
   payout: {

@@ -16,7 +16,7 @@ defineOptions({ name: "SystemOperLogPage" });
  * filters, the human-readable `summary` column, and the BD-transfer quick filter. BD-transfer
  * records moved here when their own page was removed.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 
 const MODULES = ["KOL", "Product", "Order", "System", "Platform"] as const;
@@ -38,6 +38,18 @@ const applied = ref<OperLogQuery & { module: string; keyword: string; operator: 
   keyword: "",
   operator: ""
 });
+
+
+/** Explicit Chinese summaries from writers stay as-is; action-code summaries go through locales (L-094). */
+function formatSummary(row: { action?: string | null; summary?: string | null }): string {
+  const action = row.action?.trim() || "";
+  const summary = row.summary?.trim() || "";
+  const explicit = summary && summary !== action && summary !== "OTHER";
+  if (explicit) return summary;
+  const code = action || summary || "OTHER";
+  const key = `audit.actionCodes.${code}`;
+  return te(key) ? t(key) : t("audit.actionCodes.OTHER");
+}
 
 function asLog(row: object): OperLogVO {
   return row as OperLogVO;
@@ -271,7 +283,7 @@ onMounted(() => {
     >
       <template #cell-time="{ row }">{{ formatInstant(asLog(row).operTime) }}</template>
       <template #cell-operator="{ row }">{{ asLog(row).operatorName ?? "-" }}</template>
-      <template #cell-summary="{ row }">{{ asLog(row).summary ?? "-" }}</template>
+      <template #cell-summary="{ row }">{{ formatSummary(asLog(row)) }}</template>
       <template #cell-result="{ row }">
         <el-tag :type="asLog(row).success ? 'success' : 'danger'">
           {{ t(`audit.resultOption.${asLog(row).success ? "SUCCESS" : "FAIL"}`) }}

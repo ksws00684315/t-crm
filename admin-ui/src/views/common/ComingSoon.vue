@@ -25,7 +25,7 @@ function backToWorkbench(): void {
   <div class="coming-soon" data-test="coming-soon">
     <el-icon
       class="coming-soon__icon"
-      style="font-size: var(--tcrm-font-size-title) !important"
+      style="font-size: var(--tcrm-font-size-title)"
       aria-hidden="true"
       ><Tools
     /></el-icon>
@@ -53,10 +53,10 @@ function backToWorkbench(): void {
 .coming-soon__icon {
   color: var(--tcrm-color-text-secondary);
 }
-/* Size the svg directly: `#app *` owns font-size, and Element Plus sets the svg width inline. */
+/* Size the svg directly: Element Plus sets the svg width inline. */
 .coming-soon__icon :deep(svg) {
-  width: var(--tcrm-font-size-title) !important;
-  height: var(--tcrm-font-size-title) !important;
+  width: var(--tcrm-font-size-title);
+  height: var(--tcrm-font-size-title);
 }
 .coming-soon__heading {
   margin: 0;

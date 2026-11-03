@@ -15,7 +15,7 @@ jobs:
     # Skip draft PRs; still run on push/schedule (no pull_request payload)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend

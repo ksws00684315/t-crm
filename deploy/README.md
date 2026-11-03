@@ -199,7 +199,7 @@ deploy/scripts/local-infra.sh psql
    任一步失败，脚本停止并打印当前状态和下一步建议，**不自动回滚数据库**。`crm-admin` 被替换后失败时，线上管理端接口不可用，按建议重新执行 `release.sh deploy <上一个版本>` 恢复。发布和回滚都不碰 PostgreSQL、Redis、Nginx 容器。
 3. `deploy/scripts/release.sh status` 随时查看：当前版本、各容器的镜像与摘要、`current` 指向、最近的发布记录。
 
-**目录布局**：`TCRM_STATIC_DIR` 下是 `releases/<版本>/admin`、`releases/<版本>/kol` 和相对软链接 `current -> releases/<版本>`。生产 Compose 挂载的是 `TCRM_STATIC_DIR` 这个**父目录**（Docker 绑定挂载在挂载时解析软链接，直接挂载 `current` 会永远停在第一个版本），Nginx 的 `root` 是 `/usr/share/nginx/sites/current/{admin,kol}`。切换时已经打开的页面如果在切换后才懒加载旧版本的资源，会得到 404，刷新即可。
+**目录布局**：`TCRM_STATIC_DIR` 下是 `releases/<版本>/admin`、`releases/<版本>/kol` 和相对软链接 `current -> releases/<版本>`。生产 Compose 挂载的是 `TCRM_STATIC_DIR` 这个**父目录**（Docker 绑定挂载在挂载时解析软链接，直接挂载 `current` 会永远停在第一个版本），Nginx 的 `root` 是 `/usr/share/nginx/sites/current/{admin,kol}`。切换时会把上一版本 `admin/assets`、`kol/assets` 里新版本没有的文件补进新版本（不覆盖同名文件），已打开页面懒加载旧 chunk 时一般不再 404；若仍异常再刷新。
 
 **回滚**：`deploy/scripts/release.sh rollback 1.0.0` 切回该版本的镜像和静态目录（镜像或静态目录不在本机时从仓库取回）。回滚不自动备份，也不动数据库；回滚前如需备份先手动运行 `deploy/backup/pg-backup.sh`。
 

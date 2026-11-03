@@ -102,43 +102,47 @@ body {
   }
 }
 
-/* Keep typography stable across page-level scoped styles and Element Plus overlays. */
+/* Keep the typeface stable across scoped pages and Element Plus overlays (L-089).
+   Body size/line-height come from `body` / `#app` inheritance and Element CSS variables. */
 #app *,
 .el-overlay *,
 .el-popper * {
   font-family: var(--tcrm-font-sans) !important;
-  font-size: var(--tcrm-font-size-body) !important;
-  line-height: var(--tcrm-line-height-body) !important;
+}
+
+#app {
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
 }
 
 #app h1 {
-  font-size: var(--tcrm-font-size-title) !important;
+  font-size: var(--tcrm-font-size-title);
   font-weight: 600;
-  line-height: var(--tcrm-line-height-title) !important;
+  line-height: var(--tcrm-line-height-title);
 }
 
 #app .login__title,
 #app .side__brand,
 #app .shell__brand {
-  font-size: var(--tcrm-font-size-brand) !important;
+  font-size: var(--tcrm-font-size-brand);
   font-weight: 600;
-  line-height: var(--tcrm-line-height-brand) !important;
+  line-height: var(--tcrm-line-height-brand);
 }
 
 #app .side__menu .el-menu-item,
 #app .side__menu .el-menu-item *,
 #app .side__menu .el-sub-menu__title,
 #app .side__menu .el-sub-menu__title * {
-  font-size: var(--tcrm-font-size-menu) !important;
-  line-height: var(--tcrm-line-height-menu) !important;
+  font-size: var(--tcrm-font-size-menu);
+  line-height: var(--tcrm-line-height-menu);
 }
 
 #app .data-table:not(.is-legacy-order) .el-table .cell,
 #app .data-table:not(.is-legacy-order) .el-table .cell *,
 .el-overlay .data-table:not(.is-legacy-order) .el-table .cell,
 .el-overlay .data-table:not(.is-legacy-order) .el-table .cell * {
-  font-size: var(--tcrm-font-size-table) !important;
-  line-height: var(--tcrm-line-height-table) !important;
+  font-size: var(--tcrm-font-size-table);
+  line-height: var(--tcrm-line-height-table);
 }
 
 #app .data-table:not(.is-legacy-order) .el-table th.el-table__cell,
@@ -150,21 +154,22 @@ body {
 #app .el-dialog__title,
 #app .el-drawer__title,
 #app .coming-soon__title,
+#app .coming-soon__heading,
 .el-overlay h1,
 .el-overlay h2,
 .el-overlay .el-dialog__title,
 .el-overlay .el-drawer__title,
 .el-overlay .el-message-box__title,
 .el-overlay .el-message-box__title > span {
-  font-size: var(--tcrm-font-size-section) !important;
+  font-size: var(--tcrm-font-size-section);
   font-weight: 600;
-  line-height: var(--tcrm-line-height-section) !important;
+  line-height: var(--tcrm-line-height-section);
 }
 
 #app .el-result__title p {
-  font-size: var(--tcrm-font-size-title) !important;
+  font-size: var(--tcrm-font-size-title);
   font-weight: 600;
-  line-height: var(--tcrm-line-height-title) !important;
+  line-height: var(--tcrm-line-height-title);
 }
 
 #app .el-button,
@@ -186,8 +191,8 @@ body {
 #app .error,
 #app .form-help,
 #app .empty-hint {
-  font-size: var(--tcrm-font-size-help) !important;
-  line-height: var(--tcrm-line-height-help) !important;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 
 #app .layout__company-role,
@@ -196,8 +201,8 @@ body {
 #app .layout__kbd,
 .el-overlay .el-form-item__error,
 .el-popper .el-form-item__error {
-  font-size: var(--tcrm-font-size-help) !important;
-  line-height: var(--tcrm-line-height-help) !important;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
   font-weight: 400;
 }
 

@@ -118,6 +118,14 @@ const emit = defineEmits<{
 }>();
 
 const tableRef = ref<TableInstance>();
+
+/** Below 768px, drop the right fixed action column so it scrolls with the table (L-100). */
+const narrowViewport = ref(false);
+let narrowMedia: MediaQueryList | null = null;
+function syncNarrowViewport(): void {
+  narrowViewport.value = !!narrowMedia?.matches;
+}
+
 const selected = ref<object[]>([]);
 
 function resolveSpanMethod(
@@ -270,6 +278,10 @@ function scheduleMeasure(): void {
 }
 
 onMounted(async () => {
+  narrowMedia = window.matchMedia("(max-width: 767px)");
+  syncNarrowViewport();
+  narrowMedia.addEventListener("change", syncNarrowViewport);
+
   await nextTick();
   measureHeights();
   const host = rootEl.value?.parentElement;
@@ -284,6 +296,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  narrowMedia?.removeEventListener("change", syncNarrowViewport);
+  narrowMedia = null;
+
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (measureFrame) cancelAnimationFrame(measureFrame);
@@ -603,7 +618,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
           :fixed="
             fixedColumns
               ? column.key === 'actions'
-                ? 'right'
+                ? narrowViewport
+                  ? undefined
+                  : 'right'
                 : column.key === columns[0]?.key
                   ? 'left'
                   : undefined

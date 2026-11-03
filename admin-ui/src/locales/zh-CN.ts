@@ -1486,6 +1486,23 @@ const zhCN = {
     timeRange: "时间范围",
     transferFilter: "转移记录",
     resultOption: { SUCCESS: "成功", FAIL: "失败" }
+    actionCodes: {
+      "Create BD transfer": "创建达人转移",
+      "Execute BD transfer": "执行预约转移",
+      "Cancel BD transfer": "取消预约转移",
+      "Cancel scheduled BD transfer": "取消预约转移",
+      Create: "新增记录",
+      Edit: "编辑记录",
+      "Change status": "修改状态",
+      "Review KOL": "审核达人",
+      "Save promotion config": "保存推广配置",
+      "Set KOL auto cleanup": "设置达人自动清理",
+      "Update post template": "修改岗位模板",
+      "Reset post template": "恢复岗位模板默认值",
+      "Self register": "达人自助注册",
+      "Manual KOL cleanup": "手动清理达人",
+      OTHER: "其他操作"
+    },
   },
   payout: {
     kol: "达人",

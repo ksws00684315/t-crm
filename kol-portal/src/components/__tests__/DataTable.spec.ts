@@ -90,6 +90,38 @@ describe("DataTable", () => {
     wrapper.unmount();
   });
 
+
+  it("drops the right fixed action column below 768px (L-100)", async () => {
+    const media = {
+      matches: true,
+      media: "(max-width: 767px)",
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined
+    } as unknown as MediaQueryList;
+    const original = window.matchMedia;
+    window.matchMedia = () => media;
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "narrow-fixed",
+        rows: [{ id: "1", code: "KOL0001", name: "Ada" }],
+        columns: [
+          { key: "code", label: "Code", width: 120 },
+          { key: "name", label: "Name", minWidth: 100 },
+          { key: "actions", label: "Actions", width: 80 }
+        ],
+        total: 1
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    const actions = wrapper
+      .findAllComponents({ name: "ElTableColumn" })
+      .find(column => column.props("label") === "Actions");
+    expect(actions?.props("fixed")).toBeUndefined();
+    wrapper.unmount();
+    window.matchMedia = original;
+  });
+
   it("caps a mixed-height list at the last complete row", async () => {
     const host = document.createElement("div");
     document.body.append(host);

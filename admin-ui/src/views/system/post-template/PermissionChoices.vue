@@ -60,8 +60,8 @@ const focused = ref<string | null>(null);
   white-space: normal;
 }
 #app .permission-choice :deep(.el-checkbox__label) {
-  font-size: var(--tcrm-font-size-table) !important;
-  line-height: var(--tcrm-line-height-table) !important;
+  font-size: var(--tcrm-font-size-table);
+  line-height: var(--tcrm-line-height-table);
   white-space: normal;
   overflow-wrap: anywhere;
 }

@@ -436,6 +436,35 @@ update_redirect() { # <version>
   [ "$REDIRECT_RESULT" = "started" ] || REDIRECT_RESULT="restarted"
 }
 
+
+# L-074: keep previous release asset files the new build does not ship, so open tabs can still
+# lazy-load the old chunk. Only the immediate previous version; never overwrite same-named files.
+preserve_previous_assets() { # <new_version>
+  local static prev new site from to
+  static="$(static_dir)"
+  prev="$(current_target)"
+  new="$1"
+  [ -n "$prev" ] || return 0
+  [ "$prev" != "$new" ] || return 0
+  [ -d "$static/releases/$prev" ] || return 0
+  [ -d "$static/releases/$new" ] || return 0
+  for site in admin kol; do
+    from="$static/releases/$prev/$site/assets"
+    to="$static/releases/$new/$site/assets"
+    [ -d "$from" ] || continue
+    mkdir -p "$to"
+    # portable: no mapfile; copy missing files only
+    find "$from" -type f -print | while IFS= read -r f; do
+      rel="${f#"$from"/}"
+      if [ ! -e "$to/$rel" ]; then
+        mkdir -p "$to/$(dirname "$rel")"
+        cp -p "$f" "$to/$rel"
+      fi
+    done
+  done
+  log "已把上一版 releases/$prev 中新版本没有的 assets 补进 releases/$new"
+}
+
 # Atomic switch: write the link under a temporary name, then rename it over "current".
 switch_current() { # <version>
   local static tmp
@@ -501,6 +530,7 @@ apply_version() { # <version>
   update_redirect "$version" || fail "crm-redirect 没有恢复健康"
   step "切换前端 current -> releases/$version"
   STAGE_KIND="switch"
+  preserve_previous_assets "$version"
   switch_current "$version"
   if [ -z "$(container_id nginx)" ]; then
     check_nginx_prerequisites || fail "缺少证书文件（origin.pem、origin.key、public.pem、public.key），Nginx 未启动。先按 README 生成证书。"
