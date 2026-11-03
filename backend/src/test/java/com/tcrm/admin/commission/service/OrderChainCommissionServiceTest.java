@@ -145,7 +145,7 @@ class OrderChainCommissionServiceTest {
   @Test
   void shouldReportUnverifiedWhenLineHasNoSnapshot() {
     // A line the settlement never snapshotted has no state row at all. The order therefore cannot
-    // be reported as verified, and that line exposes no commission amount of its own.
+    // be reported as verified, and that line exposes no commission basis of its own.
     when(states.listByOrderIds(any())).thenReturn(List.of(state(50L, 20L, true, "6.00")));
     when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
     when(wallet.listByItemStates(any())).thenReturn(List.of());
@@ -158,7 +158,9 @@ class OrderChainCommissionServiceTest {
     var missing = chain.lines().get(1);
     assertThat(missing.netCommissionCny()).isNull();
     assertThat(missing.rateSnapshot()).isNull();
-    assertThat(missing.releaseBasis()).isEqualTo("UNVERIFIED");
+    // No snapshot means no release basis at all — distinct from a snapshot that is merely
+    // unverified, which reports UNVERIFIED.
+    assertThat(missing.releaseBasis()).isNull();
     // Only the snapshotted line contributes to the order total.
     assertThat(chain.netCommissionCny()).isEqualByComparingTo("6.00");
   }
