@@ -61,7 +61,18 @@ main() {
     exit 2
   fi
 
-  local compose=(docker compose -f "${TCRM_COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}" --env-file "${TCRM_ENV_FILE:-$DEPLOY_DIR/.env}")
+  # Compose file(s): TCRM_COMPOSE_FILE accepts a colon-separated list (the COMPOSE_FILE convention),
+  # so a verification run can pass "base.yml:override.yml"; production passes a single file and the
+  # behaviour is unchanged (task 106 verification against an independent Compose project).
+  local compose=(docker compose)
+  local file oldifs="$IFS"
+  # shellcheck disable=SC2086 # word splitting on ":" is intended for the file list
+  IFS=':'
+  for file in ${TCRM_COMPOSE_FILE:-$DEPLOY_DIR/docker-compose.prod.yml}; do
+    compose+=(-f "$file")
+  done
+  IFS="$oldifs"
+  compose+=(--env-file "${TCRM_ENV_FILE:-$DEPLOY_DIR/.env}")
   local project
   project="$("${compose[@]}" config | sed -n 's/^name: //p')"
   [ -n "$project" ] || { echo "无法确定 Compose 项目名。" >&2; exit 1; }

@@ -178,11 +178,13 @@ services:
       TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
       TZ: UTC
       # pgBackRest (deploy/postgres/pgbackrest.conf holds the fixed settings, these are the environment
-      # specific ones; ADR-037 decision 5). Access keys or an instance role: with an instance role set
-      # PGBACKREST_REPO1_S3_KEY_TYPE=auto and leave PGBACKREST_REPO1_S3_KEY / _KEY_SECRET out of .env
-      # (not even empty: an EMPTY PGBACKREST_* variable makes pgBackRest fail, hence the pass-through
-      # form without a value, which passes nothing when the variable is not defined). The passphrase
-      # and the bucket have no default: archiving fails loudly (pgbackrest check) when they are missing.
+      # specific ones; ADR-037 decision 5). Credentials are NOT passed here: with IMDSv2 and hop limit
+      # 1 the container cannot read the instance role, so the host refreshes a pgBackRest configuration
+      # fragment (repo1-s3-key-type/key/key-secret/token) in TCRM_PGBACKREST_CREDS_DIR every 15 minutes
+      # (deploy/backup/refresh-s3-credentials.sh), and that directory is mounted read-only below. An
+      # EMPTY PGBACKREST_* variable makes pgBackRest fail, so optional values are passed through
+      # without a default. The passphrase and the bucket have no default: archiving fails loudly
+      # (pgbackrest check) when they are missing.
       PGBACKREST_PG1_USER: ${TCRM_DB_SUPERUSER_USERNAME}
       PGBACKREST_PG1_DATABASE: ${TCRM_DB_NAME:-tcrm}
       PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-s3}
@@ -191,9 +193,6 @@ services:
       PGBACKREST_REPO1_S3_BUCKET: ${PGBACKREST_REPO1_S3_BUCKET}
       PGBACKREST_REPO1_S3_REGION: ${PGBACKREST_REPO1_S3_REGION:-us-west-2}
       PGBACKREST_REPO1_S3_ENDPOINT: ${PGBACKREST_REPO1_S3_ENDPOINT:-s3.${PGBACKREST_REPO1_S3_REGION:-us-west-2}.amazonaws.com}
-      PGBACKREST_REPO1_S3_KEY_TYPE: ${PGBACKREST_REPO1_S3_KEY_TYPE:-shared}
-      PGBACKREST_REPO1_S3_KEY:
-      PGBACKREST_REPO1_S3_KEY_SECRET:
     # PostgreSQL shared memory (parallel queries, dynamic shared memory); Docker's 64 MB default is too small.
     shm_size: 256m
     command:
@@ -203,7 +202,7 @@ services:
       # Slow query log threshold from the design document (100 ms).
       - -c
       - log_min_duration_statement=100
-      # Continuous WAL archiving through pgBackRest (credentials come from the PGBACKREST_* environment,
+      # Continuous WAL archiving through pgBackRest (credentials come from the conf.d mount below,
       # never from this command line). archive_timeout bounds the data loss window to about 5 minutes.
       - -c
       - archive_mode=on
@@ -214,6 +213,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+      # S3 credentials refreshed by the host (deploy/backup/refresh-s3-credentials.sh, L-107). The
+      # WHOLE directory is mounted, never a single file: git replaces a watched file with a new inode
+      # and the container would keep seeing the old content (L-012). pgBackRest reads *.conf from this
+      # directory (its default config-include-path) for every archive/backup/restore command, so a
+      # rotation takes effect without restarting postgres. A posix repository leaves the directory
+      # empty. Local verification points this at its own directory via the environment variable.
+      - ${TCRM_PGBACKREST_CREDS_DIR:?TCRM_PGBACKREST_CREDS_DIR is required (deploy/.env; keep it OUTSIDE the repository; deploy/README.md "Backup and restore")}:/etc/pgbackrest/conf.d:ro
     expose:
       - "5432"
     healthcheck:

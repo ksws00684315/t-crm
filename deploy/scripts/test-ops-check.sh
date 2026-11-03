@@ -174,6 +174,8 @@ ALERT_WEBHOOK="http://hook.invalid/feishu"
 CURL_TIMEOUT=5
 CURL_LOG="$WORK/curl.log"
 : > "$CURL_LOG"
+# Invoked indirectly through dispatch() from the sourced ops-check.sh.
+# shellcheck disable=SC2317
 curl() { printf 'url=%s payload=%s\n' "${@: -1}" "$*" >> "$CURL_LOG"; }
 dispatch 'msg with "quotes"'
 grep -q 'url=http://hook.invalid/feishu' "$CURL_LOG" || fail "webhook URL not used"
@@ -202,6 +204,65 @@ case "$DF_OUT" in
 esac
 [ "$(printf '%s\n' "$DF_OUT" | grep -c .)" = "2" ] || fail "unexpected filtered df rows: $DF_OUT"
 
+# --- backup credentials freshness (task 106) --------------------------------
+
+CREDS_DIR="$WORK/creds"
+mkdir -p "$CREDS_DIR"
+# Values read by check_backup_creds(); NOW would normally be set by load_config().
+# shellcheck disable=SC2034
+CREDS_MAX_AGE_MINUTES=60
+# shellcheck disable=SC2034
+NOW=$(now_epoch)
+ALERTS_FILE="$WORK/t106.alerts"
+
+touch "$CREDS_DIR/s3-credentials.conf"
+: > "$ALERTS_FILE"
+check_backup_creds
+[ -s "$ALERTS_FILE" ] && fail "fresh credentials file must not alert: $(cat "$ALERTS_FILE")"
+
+# Unset directory: the check is skipped entirely (posix repository, L-107).
+CREDS_DIR_BAK="$CREDS_DIR"
+# shellcheck disable=SC2034
+CREDS_DIR=""
+: > "$ALERTS_FILE"
+check_backup_creds
+[ -s "$ALERTS_FILE" ] && fail "unset creds dir must not alert: $(cat "$ALERTS_FILE")"
+# shellcheck disable=SC2034
+CREDS_DIR="$CREDS_DIR_BAK"
+
+# Stale file: 61 minutes old must alert, 59 minutes must not.
+mtime_stamp() { # <minutes_ago> -> stamp for touch -t (GNU and BSD)
+  local epoch="$(( $(now_epoch) - $1 * 60 ))"
+  date -u -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -u -r "$epoch" +%Y%m%d%H%M.%S
+}
+# touch -t interprets the stamp in local time, so force UTC to match the epoch arithmetic.
+TZ=UTC touch -t "$(mtime_stamp 61)" "$CREDS_DIR/s3-credentials.conf"
+: > "$ALERTS_FILE"
+check_backup_creds
+grep -q $'^creds\t备份凭证未刷新: credentials file last refreshed [0-9]* min ago (> 60 min)$' "$ALERTS_FILE" ||
+  fail "stale credentials file must alert: $(cat "$ALERTS_FILE")"
+TZ=UTC touch -t "$(mtime_stamp 59)" "$CREDS_DIR/s3-credentials.conf"
+: > "$ALERTS_FILE"
+check_backup_creds
+[ -s "$ALERTS_FILE" ] && fail "59 min old credentials file must not alert: $(cat "$ALERTS_FILE")"
+
+# Missing file must alert.
+rm -f "$CREDS_DIR/s3-credentials.conf"
+: > "$ALERTS_FILE"
+check_backup_creds
+grep -q $'^creds\t备份凭证未刷新: credentials file missing:' "$ALERTS_FILE" ||
+  fail "missing credentials file must alert: $(cat "$ALERTS_FILE")"
+
+# posix repository (PGBACKREST_REPO1_TYPE=posix): the Compose mount still requires the variable,
+# but the deliberately empty credentials directory must not alert (L-107). The file is still
+# missing from the previous case, so only the repository type can turn this alert off.
+# shellcheck disable=SC2034
+PGBACKREST_REPO1_TYPE=posix
+: > "$ALERTS_FILE"
+check_backup_creds
+[ -s "$ALERTS_FILE" ] && fail "posix repository must not alert on the empty credentials dir: $(cat "$ALERTS_FILE")"
+unset PGBACKREST_REPO1_TYPE
+
 # --- environment sanity (host specific, must at least be numeric) ----------
 
 case "$(memory_available_percent)" in
@@ -220,8 +281,13 @@ done < <(df_usage_lines)
 # L-076: Feishu body code≠0 is not a delivery — LAST must stay so the next run retries.
 # shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/ops-check.sh"
+# ALERT_WEBHOOK and CURL_TIMEOUT are read by the (re-sourced) dispatch(); the curl mock below is
+# invoked indirectly by dispatch().
+# shellcheck disable=SC2034
 ALERT_WEBHOOK="http://hook.invalid/feishu-reject"
+# shellcheck disable=SC2034
 CURL_TIMEOUT=5
+# shellcheck disable=SC2317
 curl() { printf '{"code":19021,"msg":"sign match fail"}\n'; }
 rm -f "$STATE_DIR/disk.state"
 SENT="$WORK/sent-reject.txt"; : > "$SENT"

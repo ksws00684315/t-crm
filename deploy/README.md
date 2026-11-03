@@ -9,7 +9,7 @@
 | `nginx/` | 四个站点（`t.`、`kol.`、`admin.`、`upload.`）的配置模板、TLS 与安全响应头片段、Cloudflare 回源 IP 段与回源认证 CA；`nginx/preview/preview.conf` 是本地预览（仅 HTTP） |
 | `postgres/initdb/` | 生产 PostgreSQL 首次初始化脚本：创建非超级用户的应用账号并设为库的 owner |
 | `scripts/renew-public-cert.sh` | 申请与续期 `admin.`、`upload.` 的 Let's Encrypt 公开证书（DNS-01），放到证书目录并重载 Nginx |
-| `scripts/ops-check.sh` | 主机监控检查（host cron 每 5 分钟）：磁盘、内存、容器、公开证书、备份、应用日志、容量告警；告警走 Webhook，心跳供外部探活（见「监控告警」） |
+| `scripts/ops-check.sh` | 主机监控检查（host cron 每 5 分钟）：磁盘、内存、容器、公开证书、备份、备份凭证、应用日志、容量告警；告警走 Webhook，心跳供外部探活（见「监控告警」） |
 | `scripts/preview.sh` | 本地预览：`up` / `down` / `reset` |
 | `scripts/local-infra.sh` | 本地共享中间件的启动、停止、备份、恢复与维护命令 |
 | `backup/pg-backup.sh` | 每日加密 `pg_dump` 备份脚本模板（保留 7 日 + 4 周，可选上传 S3） |
@@ -247,7 +247,14 @@ deploy/scripts/local-infra.sh psql
 
 ### 配置与首次启用
 
-1. 在 `deploy/.env` 填写 `.env.example`「Backup and restore」一节：`PGBACKREST_REPO1_S3_BUCKET`、`PGBACKREST_REPO1_CIPHER_PASS`（`openssl rand -base64 32` 生成）、区域；凭证二选一：**实例角色**（`PGBACKREST_REPO1_S3_KEY_TYPE=auto`，不写访问密钥那两行）或**访问密钥**（`KEY_TYPE=shared` 并设置 `PGBACKREST_REPO1_S3_KEY`、`PGBACKREST_REPO1_S3_KEY_SECRET`）。可选变量要么注释掉要么删除，**不能留空**：pgBackRest 对空的 `PGBACKREST_*` 变量直接报错。密钥和口令只经环境变量传入，不写进 `command`、`pgbackrest.conf` 或镜像；`pg_stat_activity`、PostgreSQL 日志和 pgBackRest 日志里都没有口令（pgBackRest 自己的日志把它显示为 `<redacted>`）。
+1. 在 `deploy/.env` 填写 `.env.example`「Backup and restore」一节：`PGBACKREST_REPO1_S3_BUCKET`、`PGBACKREST_REPO1_CIPHER_PASS`（`openssl rand -base64 32` 生成）、区域，以及 `TCRM_PGBACKREST_CREDS_DIR`（必须设在**仓库之外**，例如 `/var/lib/tcrm/pgbackrest-creds`）。可选变量要么注释掉要么删除，**不能留空**：pgBackRest 对空的 `PGBACKREST_*` 变量直接报错。密钥和口令只经环境变量传入，不写进 `command`、`pgbackrest.conf` 或镜像；`pg_stat_activity`、PostgreSQL 日志和 pgBackRest 日志里都没有口令（pgBackRest 自己的日志把它显示为 `<redacted>`）。
+
+   **S3 凭证只有实例角色一种方式**（ADR-037 决定 1）：主机用 EC2 实例角色，不保存访问密钥。postgres 容器**读不到**实例元数据（IMDSv2 强制、hop limit 为 1，容器隔着 Docker 网桥多一跳，L-107），所以凭证由**主机**定时取好写成 pgBackRest 配置片段：`deploy/backup/refresh-s3-credentials.sh` 用 AWS CLI v2 的默认凭证链取临时凭证（必须是带过期时间的实例角色凭证，取不到长期密钥写不进文件；剩余有效期不足 30 分钟时拒绝写入并保留旧文件），写进 `TCRM_PGBACKREST_CREDS_DIR`（属主为镜像内 postgres 用户的 uid 999，权限 600，原子替换）。整个目录以只读方式挂进容器的 `/etc/pgbackrest/conf.d`（pgBackRest 默认的 `config-include-path`；挂整个目录而不是单文件，原因见 L-012）。pgBackRest 每条归档、备份、恢复命令都重新读取该目录，凭证轮换不需要重启 postgres。
+
+   **首次启用顺序**（顺序错了归档会失败）：
+   1. 建目录：`install -d -m 755 /var/lib/tcrm/pgbackrest-creds`（仓库外）。**目录必须是 755，不能收成 700**：目录属主是 root，而容器里的 pgBackRest 以 uid 999（postgres）读取凭证文件，700 会挡掉它对目录的进入权限，归档和备份全部失败；机密性由文件本身保证（600、属主 uid 999，只有 postgres 读得到）。父目录保持默认 755（uid 999 需要一路可穿越）；
+   2. 跑一次刷新脚本：`deploy/backup/refresh-s3-credentials.sh`（失败非零退出，原因在 stderr；脚本会把目录权限校正回 755）；
+   3. 再启动 postgres（凭证目录空着启动也能起来，但首次归档会失败）。
 2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
 3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：
 
@@ -264,11 +271,12 @@ deploy/scripts/local-infra.sh psql
 5. 定时任务（主机 crontab，时间为主机时钟，建议主机用 UTC）：
 
    ```
+   */15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1
    0 2 * * * /opt/tcrm/deploy/backup/pgbackrest-backup.sh >> /var/log/tcrm-pgbackrest.log 2>&1
    0 3 * * * /opt/tcrm/deploy/backup/pg-backup.sh >> /var/log/tcrm-backup.log 2>&1
    ```
 
-   两个脚本失败时都非零退出；备份是否按时产出由 `ops-check.sh` 检查（见「监控告警」）。
+   凭证刷新失败时非零退出并保留旧文件（实例角色凭证有效期约 6 小时，15 分钟一次的刷新足够余量）；刷新是否按时执行由 `ops-check.sh` 检查（见「监控告警」）。备份脚本失败时也非零退出；备份是否按时产出同样由 `ops-check.sh` 检查。
 
 ### S3 不可用时
 
@@ -345,6 +353,7 @@ host cron 每 5 分钟运行一次（建议与备份脚本同一 crontab）：
 | 容器 | 五个 Compose 服务（nginx、crm-admin、crm-redirect、postgres、redis）任一非 running、unhealthy，或 5 分钟内重启过 | 窗口 5 分钟 |
 | 公开证书 | `TCRM_CERT_DIR/public.pem`（`admin.`、`upload.` 的 Let's Encrypt 证书）剩余有效期 | ≤ 20 天 |
 | pgBackRest | 最新备份过旧；或存在待归档 `.ready` 段且归档无进展（`pg_ls_archive_statusdir` + `pg_stat_archiver`） | 备份 > 26 小时；有 `.ready` 且无进展 > 15 分钟（库空闲、无待归档段时不告警） |
+| 备份凭证 | pgBackRest 的 S3 凭证片段（`TCRM_PGBACKREST_CREDS_DIR/s3-credentials.conf`，任务 106）缺失或长时间未刷新；`TCRM_PGBACKREST_CREDS_DIR` 未设置或 `PGBACKREST_REPO1_TYPE=posix` 时不检查（posix 仓库没有凭证文件，而 Compose 仍要求设置该目录变量） | > 60 分钟未刷新或文件缺失 |
 | 逻辑备份 | 最新 `.dump.gpg` 过旧（`TCRM_BACKUP_DIR`） | > 26 小时 |
 | 应用日志 | 上次检查以来 crm-admin、crm-redirect 出现 ERROR | — |
 | 容量告警 | 日志里出现 Redis 内存（`Redis used_memory`）或点击积压（`Click stream backlog`）的 WARN（后台每分钟检查，见「资源与 Redis 容量」） | — |
