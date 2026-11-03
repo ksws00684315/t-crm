@@ -250,8 +250,9 @@ class OrderChainFinanceIT {
     java.util.function.Supplier<Integer> submit =
         () -> {
           try {
-            if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS))
+            if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
               throw new IllegalStateException("Concurrent start timed out");
+            }
             return mvc.perform(
                     post("/admin-api/order/orders/" + orderId + "/rate-supplements")
                         .header("X-Admin-Token", adminToken)
