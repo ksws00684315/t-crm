@@ -86,6 +86,7 @@ public class OrderWriter {
         row.setSkuName(line.getSkuName());
         row.setQuantity(line.getQuantity());
         row.setPayAmount(line.getPayAmount());
+        row.setHistoricalUnitPrice(line.getHistoricalUnitPrice());
         items.updateById(row);
       } else {
         items.insert(line);

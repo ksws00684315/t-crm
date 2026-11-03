@@ -208,10 +208,11 @@ onMounted(load);
         @refresh="load"
         @clear-filters="reset"
       >
+        <template #toolbar><span /></template>
         <template #cell-creator="{ row }"
           ><div class="identity">
             <strong>{{ row.name }}</strong
-            ><CopyText :value="row.code" /><CopyText :value="row.email" /></div
+            ><CopyText :value="row.code" /></div
         ></template>
         <template #cell-sales="{ row }">{{ row.orderCount }} / {{ row.quantity }}</template>
         <template
@@ -225,9 +226,12 @@ onMounted(load);
         <template #cell-paid="{ row }"
           ><div class="paid-cell">
             <strong>{{ formatPrice(row.paid, "CNY") }}</strong
-            ><small
-              >{{ t("finance.commissionPaid") }} {{ formatPrice(row.commissionPaid, "CNY") }}</small
-            ><small>{{ t("finance.prepayPaid") }} {{ formatPrice(row.prepayPaid, "CNY") }}</small>
+            ><small>{{
+              t("finance.paidBreakdown", {
+                commission: Number(row.commissionPaid ?? 0).toFixed(2),
+                prepay: Number(row.prepayPaid ?? 0).toFixed(2)
+              })
+            }}</small>
           </div></template
         >
         <template #cell-lastPaidAt="{ row }">{{ formatInstant(row.lastPaidAt) }}</template>

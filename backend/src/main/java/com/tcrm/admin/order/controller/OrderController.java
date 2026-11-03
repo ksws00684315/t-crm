@@ -1,6 +1,7 @@
 package com.tcrm.admin.order.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.tcrm.admin.order.service.OrderChainDTO;
 import com.tcrm.admin.order.service.OrderDTO;
 import com.tcrm.admin.order.service.OrderDetailDTO;
@@ -61,6 +62,15 @@ public class OrderController {
   @SaCheckPermission("order:view")
   public R<OrderChainDTO> chain(@PathVariable @Positive Long id) {
     return R.ok(orders.chain(id));
+  }
+
+  /** SUPER_ADMIN only; 409 existing rate/unpaid state, 404 foreign order or line. */
+  @PostMapping("/orders/{id}/rate-supplements")
+  @SaCheckRole("SUPER_ADMIN")
+  public R<Void> supplementRate(
+      @PathVariable @Positive Long id, @Valid @RequestBody OrderRateSupplementRequest request) {
+    orders.supplementRate(id, request.orderItemId(), request.rate(), request.reason());
+    return R.ok(null);
   }
 
   /**

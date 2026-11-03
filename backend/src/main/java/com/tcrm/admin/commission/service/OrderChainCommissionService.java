@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
@@ -9,8 +10,11 @@ import com.tcrm.admin.commission.mapper.WithdrawalMapper.AllocationOccupationRow
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -47,6 +51,31 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
+  public void supplementRate(
+      long tenantId,
+      long orderId,
+      long itemId,
+      long kolId,
+      BigDecimal rate,
+      String reason,
+      long actorId) {
+    if (revisions.insertSupplement(
+            IdWorker.getId(),
+            tenantId,
+            orderId,
+            itemId,
+            kolId,
+            rate,
+            reason,
+            actorId,
+            Instant.now())
+        != 1) {
+      throw new BusinessException(ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
+    }
+  }
+
+  @Override
   @Transactional(readOnly = true)
   public OrderCommissionChainDTO chainOfOrder(long orderId, Collection<Long> orderItemIds) {
     List<Long> itemIds = orderItemIds == null ? List.of() : List.copyOf(orderItemIds);
@@ -56,7 +85,9 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
     List<CommissionItemStateDO> rows = states.listByOrderIds(List.of(orderId));
     Map<Long, CommissionItemStateDO> stateByItem = new LinkedHashMap<>();
     BigDecimal net = ZERO;
-    boolean allVerified = true;
+    boolean allVerified =
+        itemIds.stream()
+            .allMatch(id -> rows.stream().anyMatch(row -> id.equals(row.getOrderItemId())));
     for (CommissionItemStateDO row : rows) {
       stateByItem.put(row.getOrderItemId(), row);
       net = net.add(nz(row.getAccruedCommissionCny()));

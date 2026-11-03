@@ -571,6 +571,7 @@ export interface OrderDetailItemVO {
   payAmount: string | null;
   refundAmount: string | null;
   status: string | null;
+  totalAmount?: string | null;
 }
 
 /** `GET /order/orders/{id}` (task 40 §3.2). */

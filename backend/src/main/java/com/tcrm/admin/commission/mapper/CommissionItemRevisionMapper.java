@@ -2,8 +2,11 @@ package com.tcrm.admin.commission.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -11,6 +14,28 @@ import org.apache.ibatis.annotations.Select;
 /** Append-only commission item revisions (task 62). */
 @Mapper
 public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemRevisionDO> {
+
+  @Select(
+      "SELECT rate FROM crm_order_rate_supplement WHERE order_item_id = #{itemId} AND kol_id = #{kolId}")
+  BigDecimal supplementedRate(@Param("itemId") long itemId, @Param("kolId") long kolId);
+
+  @Insert(
+      """
+      INSERT INTO crm_order_rate_supplement
+        (id, tenant_id, order_id, order_item_id, kol_id, previous_rate, rate, reason, create_by, create_time)
+      VALUES (#{id}, #{tenantId}, #{orderId}, #{itemId}, #{kolId}, NULL, #{rate}, #{reason}, #{actorId}, #{now})
+      ON CONFLICT (tenant_id, order_item_id, kol_id) DO NOTHING
+      """)
+  int insertSupplement(
+      @Param("id") long id,
+      @Param("tenantId") long tenantId,
+      @Param("orderId") long orderId,
+      @Param("itemId") long itemId,
+      @Param("kolId") long kolId,
+      @Param("rate") BigDecimal rate,
+      @Param("reason") String reason,
+      @Param("actorId") long actorId,
+      @Param("now") Instant now);
 
   /** All revisions of the item states, oldest first; used to show rate snapshots per line. */
   @Select(

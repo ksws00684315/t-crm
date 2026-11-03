@@ -14,6 +14,19 @@ import java.util.List;
  */
 public interface OrderChainCommissionApi {
 
+  /**
+   * Records an authorized missing rate; caller holds the company order lock and validates
+   * ownership.
+   */
+  void supplementRate(
+      long tenantId,
+      long orderId,
+      long itemId,
+      long kolId,
+      BigDecimal rate,
+      String reason,
+      long actorId);
+
   /** Flow types of {@link FlowDTO#type()}; shop receivables wait for the M0 net-amount hookup. */
   String FLOW_SHOP_RECEIVABLE = "SHOP_RECEIVABLE";
 

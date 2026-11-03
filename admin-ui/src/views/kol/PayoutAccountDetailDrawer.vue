@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { ElDrawer } from "element-plus";
 import NameCode from "@/components/NameCode.vue";
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   downloadPayoutQr,
@@ -21,6 +22,7 @@ defineOptions({ name: "PayoutAccountDetailDrawer" });
 const props = defineProps<{
   modelValue: boolean;
   accountId: string | null;
+  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -32,6 +34,7 @@ const detailRegion = ref<HTMLElement | null>(null);
 const detailColumns = useDescriptionColumns(detailRegion);
 
 const loading = ref(false);
+const failed = ref(false);
 const detail = ref<PayoutAccountDetailVO | null>(null);
 const qrUrl = ref<string | null>(null);
 
@@ -50,10 +53,13 @@ watch(
 
 async function load(id: string): Promise<void> {
   loading.value = true;
+  failed.value = false;
+  detail.value = null;
   try {
     detail.value = await getPayoutAccount(id);
     await loadQr();
   } catch (error) {
+    failed.value = true;
     notifyError(error);
     emit("update:modelValue", false);
   } finally {
@@ -78,17 +84,20 @@ function releaseQr(): void {
   if (qrUrl.value) URL.revokeObjectURL(qrUrl.value);
   qrUrl.value = null;
 }
+onBeforeUnmount(releaseQr);
 </script>
 
 <template>
-  <el-drawer
+  <component
+    :is="embedded ? 'section' : ElDrawer"
     :model-value="modelValue"
     :title="t('payout.detailTitle')"
-    size="640px"
+    size="min(960px, calc(100vw - 24px))"
     @update:model-value="emit('update:modelValue', $event)"
     @closed="releaseQr"
   >
     <div ref="detailRegion" v-loading="loading">
+      <el-alert v-if="failed" type="error" :closable="false" :title="t('kol.fundLoadFailed')" />
       <template v-if="detail">
         <el-alert class="audit-note" type="info" :closable="false" :title="t('payout.auditNote')" />
         <el-descriptions :column="detailColumns" border>
@@ -142,7 +151,7 @@ function releaseQr(): void {
         </el-descriptions>
       </template>
     </div>
-  </el-drawer>
+  </component>
 </template>
 
 <style scoped>

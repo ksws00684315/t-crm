@@ -44,6 +44,43 @@ class OrderControllerTest {
   }
 
   @Test
+  void shouldAllowRateSupplement_whenCompanySuperAdmin() throws Exception {
+    mvc.perform(
+            post("/admin-api/order/orders/10/rate-supplements")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"orderItemId\":\"20\",\"rate\":\"0.1250\",\"reason\":\"missing history\"}"))
+        .andExpect(status().isOk());
+    verify(orders).supplementRate(10L, 20L, new java.math.BigDecimal("0.1250"), "missing history");
+  }
+
+  @Test
+  void shouldRejectRateSupplement_whenStaffEvenWithManagePermission() throws Exception {
+    var token =
+        AdminMvcSupport.actAs(current, 7L, Role.STAFF, DataScope.ALL, Set.of("order:manage"));
+    mvc.perform(
+            post("/admin-api/order/orders/10/rate-supplements")
+                .header(AdminMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orderItemId\":\"20\",\"rate\":\"0.1250\",\"reason\":\"test\"}"))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(orders);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"-0.1", "1.0001", "0.12345"})
+  void shouldRejectRateSupplement_whenRateInvalid(String rate) throws Exception {
+    mvc.perform(
+            post("/admin-api/order/orders/10/rate-supplements")
+                .header(AdminMvcSupport.TOKEN_HEADER, admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orderItemId\":\"20\",\"rate\":\"" + rate + "\",\"reason\":\"test\"}"))
+        .andExpect(status().isBadRequest());
+    verifyNoInteractions(orders);
+  }
+
+  @Test
   void shouldUseDefaultPagination_whenQueryingOrders() throws Exception {
     when(orders.page(any(), eq(false))).thenReturn(new PageResult<>(List.of(), 0, 1, 20));
     mvc.perform(get("/admin-api/order/orders").header(AdminMvcSupport.TOKEN_HEADER, admin()))

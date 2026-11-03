@@ -115,6 +115,10 @@ describe("creator fund dialog (task 82)", () => {
     i18n.global.locale.value = "zh-CN";
     vi.mocked(payoutApi.listPayoutAccounts).mockReset();
     vi.mocked(payoutApi.getPayoutAccount).mockReset();
+    vi.mocked(payoutApi.getPayoutAccount).mockImplementation(async id => ({
+      ...(id === paypal.id ? paypal : usdt),
+      account: id === paypal.id ? "alice@example.com" : "TQ9x-full-account"
+    }));
   });
 
   it("lists the creator's accounts with masked values, default and status", async () => {
@@ -134,8 +138,8 @@ describe("creator fund dialog (task 82)", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain("默认");
     expect(rows[1]?.textContent).not.toContain("默认");
-    // The list shows the masked value only; the full account waits behind 查看完整.
-    expect(document.body.textContent).not.toContain("alice@example.com");
+    // The initial drawer opens the default full account directly.
+    expect(document.body.textContent).toContain("alice@example.com");
     wrapper.unmount();
   });
 
@@ -174,7 +178,7 @@ describe("creator fund dialog (task 82)", () => {
 
   it("titles the dialog with the creator name and code", async () => {
     const wrapper = await openDialog([paypal]);
-    const title = document.body.querySelector(".el-dialog__title")?.textContent ?? "";
+    const title = document.body.querySelector(".el-drawer__title")?.textContent ?? "";
     expect(title).toBe("资金信息 - Alice（KOL-ASD001）");
     wrapper.unmount();
   });
@@ -185,13 +189,13 @@ describe("creator fund dialog (task 82)", () => {
       account: "alice@example.com"
     });
     const wrapper = await openDialog([paypal]);
-    await element("fund-view-101").trigger("click");
     await flushPromises();
 
     expect(payoutApi.getPayoutAccount).toHaveBeenCalledWith("101");
     const drawer = document.body.querySelector<HTMLElement>(".el-drawer");
     expect(drawer).not.toBeNull();
-    expect(drawer?.textContent).toContain("收款账户详情");
+    expect(document.body.querySelectorAll(".el-drawer")).toHaveLength(1);
+    expect(document.body.textContent).not.toContain("查看完整");
     expect(drawer?.textContent).toContain("alice@example.com");
     const buttonTexts = [...(drawer?.querySelectorAll("button") ?? [])].map(
       item => item.textContent?.trim() ?? ""

@@ -298,7 +298,15 @@ describe("order list page (task 40)", () => {
     const productHeaders = [...(dialog?.querySelectorAll("thead th") ?? [])].map(item =>
       item.textContent?.trim()
     );
-    expect(productHeaders).toEqual(["商品", "达人", "数量", "单价", "实付金额", "状态"]);
+    expect(productHeaders).toEqual([
+      "商品",
+      "达人",
+      "数量",
+      "单价",
+      "订单总额",
+      "支付金额",
+      "状态"
+    ]);
     expect(element("filter-order-status").element.closest('[data-test="search-more"]')).toBeNull();
     expect(dialog?.querySelector(".el-dialog__body")?.getAttribute("style") ?? "").not.toContain(
       "overflow-x: scroll"

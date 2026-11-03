@@ -463,13 +463,16 @@ describe("order chain page (task 40)", () => {
     expect(band).not.toContain("订单状态");
     const summary = wrapper.get('[data-test="chain-product-summary"]');
     expect(summary.findAll("thead th").map(item => item.text())).toEqual([
-      "商品名",
+      "商品",
       "状态",
       "所属达人",
+      "单价",
+      "数量",
       "支付金额",
       "佣金比例",
       "达人佣金",
-      "提现占用"
+      "提现占用",
+      "操作"
     ]);
     wrapper.unmount();
   });

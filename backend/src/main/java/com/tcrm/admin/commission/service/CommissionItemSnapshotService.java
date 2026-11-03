@@ -285,6 +285,10 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     if (item.kolId() == null || order.payTime() == null) {
       return new ResolvedRate(null, null);
     }
+    BigDecimal supplemented = revisions.supplementedRate(item.orderItemId(), item.kolId());
+    if (supplemented != null) {
+      return new ResolvedRate(supplemented, null);
+    }
     PayTimeRule cached = kolRates.get(item.kolId());
     if (cached == null) {
       KolPayTimeRateDTO found = kols.rateEffectiveAt(item.kolId(), order.payTime());

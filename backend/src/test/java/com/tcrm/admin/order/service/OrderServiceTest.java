@@ -680,6 +680,90 @@ class OrderServiceTest {
   }
 
   @Test
+  void shouldRejectSupplement_whenNotCompanySuperAdmin() {
+    when(account.role()).thenReturn(com.tcrm.admin.security.api.Role.STAFF);
+    error(
+        () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), "test"),
+        ErrorCode.AUTH_FORBIDDEN);
+    verify(orders, never()).selectOne(any());
+  }
+
+  @Test
+  void shouldSupplementOnlySelectedLine_whenHistoricalRateIsMissing() {
+    prepareSupplement();
+    TestTransactions.template().executeWithoutResult(tx -> service.supplementRate(10L, 20L, new BigDecimal("0.1250"), " missing history "));
+    verify(commissionChain)
+        .supplementRate(1L, 10L, 20L, 100L, new BigDecimal("0.1250"), "missing history", 99L);
+  }
+
+  @Test
+  void shouldRejectSupplement_whenUnpaid() {
+    var order = prepareSupplement();
+    order.setPayTime(null);
+    error(
+        () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), "test"),
+        ErrorCode.ORDER_COMMISSION_RATE_STATE_CONFLICT);
+  }
+
+  @Test
+  void shouldRejectSupplement_whenLineBelongsToAnotherOrder() {
+    prepareSupplement();
+    error(
+        () -> service.supplementRate(10L, 999L, new BigDecimal("0.1"), "test"),
+        ErrorCode.COMMON_NOT_FOUND);
+  }
+
+  @Test
+  void shouldRejectSupplement_whenSnapshotAlreadyHasRate() {
+    prepareSupplement();
+    when(commissionChain.chainOfOrder(10L, List.of(20L)))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                BigDecimal.ZERO,
+                false,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L,
+                        new BigDecimal("0.15"),
+                        null,
+                        "UNVERIFIED",
+                        BigDecimal.ZERO,
+                        List.of())),
+                List.of()));
+    error(
+        () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), "test"),
+        ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
+  }
+
+  @Test
+  void shouldRejectSupplement_whenReasonIsBlank() {
+    prepareSupplement();
+    error(
+        () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), " "),
+        ErrorCode.COMMON_VALIDATION_FAILED);
+  }
+
+  private OrderDO prepareSupplement() {
+    when(account.role()).thenReturn(com.tcrm.admin.security.api.Role.SUPER_ADMIN);
+    when(account.tenantId()).thenReturn(1L);
+    when(account.id()).thenReturn(99L);
+    var order = order(10);
+    order.setPayTime(PAID);
+    when(orders.selectOne(any())).thenReturn(order);
+    var line = item();
+    line.setId(20L);
+    line.setKolId(100L);
+    line.setAttributionType(2);
+    when(items.selectList(any())).thenReturn(List.of(line));
+    when(refunds.selectList(any())).thenReturn(List.of());
+    when(commissionChain.chainOfOrder(10L, List.of(20L)))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                BigDecimal.ZERO, false, List.of(), List.of()));
+    return order;
+  }
+
+  @Test
   void shouldReturnOrderDetailWithLinesAndImages_whenOrderExists() {
     var o = order(10);
     o.setKolId(100L);
@@ -713,11 +797,42 @@ class OrderServiceTest {
     assertThat(detail.merchantNo()).isEqualTo("wd-5");
     assertThat(detail.source()).isEqualTo("API");
     assertThat(detail.refundStatus()).isEqualTo("NONE");
-    assertThat(detail.itemAmount()).isEqualByComparingTo("12.50");
+    assertThat(detail.itemAmount()).isNull();
+    assertThat(detail.totalAmount()).isNull();
+    assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("12.50");
     assertThat(detail.items()).hasSize(1);
     assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
-    assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("6.25");
+    assertThat(detail.items().getFirst().unitPrice()).isNull();
     assertThat(detail.items().getFirst().status()).isEqualTo("PAID");
+  }
+
+  @Test
+  void shouldKeepSourcePaymentSeparateFromHistoricalGoodsAmount() {
+    var order = order(10);
+    order.setPayAmount(new BigDecimal("43.00"));
+    order.setFreight(new BigDecimal("5.00"));
+    when(orders.selectById(10L)).thenReturn(order);
+    var a = item();
+    a.setHistoricalUnitPrice(new BigDecimal("10.00"));
+    a.setQuantity(2);
+    a.setPayAmount(new BigDecimal("19.00"));
+    var b = item();
+    b.setId(21L);
+    b.setHistoricalUnitPrice(new BigDecimal("20.00"));
+    b.setQuantity(1);
+    b.setPayAmount(new BigDecimal("19.00"));
+    when(items.selectList(any())).thenReturn(List.of(a, b));
+    when(refunds.selectList(any())).thenReturn(List.of());
+    when(kols.listByIds(any())).thenReturn(List.of());
+    when(products.listProducts(any())).thenReturn(List.of());
+    var detail = service.detail(10L);
+    // 10*2 + 20*1 = 40 goods; freight 5 and merchant discount 2 do not change it.
+    assertThat(detail.itemAmount()).isEqualByComparingTo("40.00");
+    assertThat(detail.totalAmount()).isEqualByComparingTo("40.00");
+    assertThat(detail.payAmount()).isEqualByComparingTo("43.00");
+    assertThat(detail.freight()).isEqualByComparingTo("5.00");
+    assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("10.00");
+    assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("19.00");
   }
 
   @Test
