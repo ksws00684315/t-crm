@@ -143,6 +143,27 @@ class OrderChainCommissionServiceTest {
   }
 
   @Test
+  void shouldReportUnverifiedWhenLineHasNoSnapshot() {
+    // A line the settlement never snapshotted has no state row at all. The order therefore cannot
+    // be reported as verified, and that line exposes no commission amount of its own.
+    when(states.listByOrderIds(any())).thenReturn(List.of(state(50L, 20L, true, "6.00")));
+    when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L, 21L));
+
+    assertThat(chain.allVerified()).isFalse();
+    assertThat(chain.lines()).hasSize(2);
+    var missing = chain.lines().get(1);
+    assertThat(missing.netCommissionCny()).isNull();
+    assertThat(missing.rateSnapshot()).isNull();
+    assertThat(missing.releaseBasis()).isEqualTo("UNVERIFIED");
+    // Only the snapshotted line contributes to the order total.
+    assertThat(chain.netCommissionCny()).isEqualByComparingTo("6.00");
+  }
+
+  @Test
   void shouldShowFullRefundAsRealZeroWithPairedFlows() {
     // Full refund after release: the credit +10.00 and the clawback −10.00 pair up as flows and
     // the verified line's net commission is a real 0.00, not the unverified null.
