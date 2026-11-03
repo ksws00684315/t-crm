@@ -10,7 +10,7 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   CHANNELS,
@@ -348,7 +348,9 @@ onMounted(() => {
           {{ refundStatusText(asRefund(row).refundStatus) }}
         </el-tag>
       </template>
-      <template #cell-amount="{ row }">{{ asRefund(row).amount }}</template>
+      <template #cell-amount="{ row }">{{
+        formatAmountWithCurrency(asRefund(row).amount)
+      }}</template>
       <template #cell-applyTime="{ row }">{{ formatInstant(asRefund(row).applyTime) }}</template>
       <template #cell-finishTime="{ row }">{{ formatInstant(asRefund(row).finishTime) }}</template>
       <template #actions="{ row }">

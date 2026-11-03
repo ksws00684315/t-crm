@@ -171,7 +171,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: "orders",
             name: "OrderQuery",
-            component: () => import("@/views/order/order-query/index.vue"),
+            component: () => import("@/views/order/index.vue"),
             meta: {
               title: "route.orderQuery",
               permission: "order:view",

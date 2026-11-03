@@ -6,6 +6,7 @@ import FinanceUnavailable from "@/components/FinanceUnavailable.vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { getConfig, saveConfig } from "@/api/commission/finance";
 import type { SettlementConfig } from "@/api/commission/finance-types";
+import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useUserStore } from "@/stores/user";
 import { financeAbilities, financeApiReady, previewContext, validMoney } from "@/utils/finance";
@@ -32,7 +33,9 @@ const columns = computed<DataColumn[]>(() =>
   ["channelCode", "channelName", "releaseBasis", "freezeDays"].map(key => ({
     key,
     label: t(`finance.${key}`),
-    minWidth: key === "releaseBasis" ? 420 : 180
+    minWidth: key === "releaseBasis" ? 420 : 180,
+    align: (["channelCode", "releaseBasis"].includes(key) ? "left" : "center") as "left" | "center",
+    interactive: key === "freezeDays"
   }))
 );
 async function load() {
@@ -75,6 +78,7 @@ onMounted(load);
 <template>
   <FinanceUnavailable v-if="!financeApiReady" />
   <div v-else class="config-page" v-loading="loading" data-test="config-page">
+    <h1 class="config-page__title">{{ t("route.settlementConfig") }}</h1>
     <FinancePreviewNotice />
     <el-result v-if="failed" icon="error" :title="t('finance.loadFailed')"
       ><template #extra
@@ -88,7 +92,7 @@ onMounted(load);
         >
         <el-form ref="form" :model="config" :rules="rules" label-position="top" class="config-form">
           <el-form-item :label="t('finance.accountingCurrency')"
-            ><el-input model-value="CNY" disabled
+            ><CopyText :value="config.currency" data-test="config-currency"
           /></el-form-item>
           <el-form-item :label="t('finance.minimum')" prop="minimum"
             ><el-input
@@ -145,6 +149,9 @@ onMounted(load);
   flex-direction: column;
   gap: var(--tcrm-space-4);
   min-width: 0;
+}
+.config-page__title {
+  margin: 0;
 }
 h2 {
   font-size: var(--tcrm-font-size-section);

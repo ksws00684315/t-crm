@@ -30,6 +30,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => unsubscribe?.());
 const filters = reactive({ orderNo: "", channel: "", shopId: "" });
+const applied = ref({ ...filters });
 const shops = ref<ShopOptionVO[]>([]);
 const rows = ref<Settlement[]>([]);
 const total = ref(0);
@@ -68,6 +69,7 @@ const columns = computed<DataColumn[]>(() =>
               ? 180
               : 140,
     amount: ["payment", "refund", "weidianWithdrawable", "commission"].includes(key),
+    align: (["orderNo", "shop", "creator"].includes(key) ? "left" : "center") as "left" | "center",
     tooltip: true
   }))
 );
@@ -76,11 +78,13 @@ const lineColumns = computed<DataColumn[]>(() =>
     key,
     label: t(`finance.${key}`),
     minWidth: 180,
-    amount: key === "amount"
+    amount: key === "amount",
+    align: (["product", "subject", "creator"].includes(key) ? "left" : "center") as
+      "left" | "center"
   }))
 );
 const chips = computed(() =>
-  Object.entries(filters)
+  Object.entries(applied.value)
     .filter(([, value]) => value)
     .map(([key, value]) => ({
       key,
@@ -106,7 +110,7 @@ async function load() {
   loading.value = true;
   failed.value = false;
   try {
-    const result = await listSettlements({ ...filters, page: page.value, size: size.value });
+    const result = await listSettlements({ ...applied.value, page: page.value, size: size.value });
     rows.value = result.items;
     total.value = Number(result.total);
   } catch (error) {
@@ -119,6 +123,7 @@ async function load() {
   }
 }
 function search() {
+  applied.value = { ...filters };
   page.value = 1;
   void load();
 }

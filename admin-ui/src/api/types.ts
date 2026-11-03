@@ -306,86 +306,6 @@ export interface CopyChannelVO {
   defaultValidMinutes?: number;
 }
 
-/** `ProductVO`. `price` 2 decimals; `rate` fraction 4 decimals or null. */
-export interface ProductVO {
-  id: string;
-  productCode: string;
-  shopId: string;
-  shopName: string | null;
-  weidianShopId: string | null;
-  weidianItemId: string;
-  name: string;
-  category: string | null;
-  imageUrl: string | null;
-  price: string;
-  /** ISO 4217 currency of `price`; CNY unless read from a source sheet (ADR-021). */
-  priceCurrency: string;
-  rate: string | null;
-  status: 0 | 1;
-  createTime: string;
-  updateTime: string;
-}
-
-/** Rows a source-sheet read skipped, by reason, with up to 100 examples. */
-export interface SheetSkippedVO {
-  empty: number;
-  nonWeidian: number;
-  noItemId: number;
-  noShop: number;
-  samples: { row: number; reason: "NON_WEIDIAN" | "NO_ITEM_ID" | "NO_SHOP"; name: string }[];
-}
-
-/** `SheetSourceVO` (ADR-021). Columns are letters; `lastError` is an error code or null. */
-export interface SheetSourceVO {
-  id: string;
-  sourceName: string;
-  spreadsheetId: string;
-  sheetTitle: string;
-  headerRow: number;
-  linkColumn: string;
-  nameColumn: string;
-  priceColumn: string;
-  categoryColumn: string | null;
-  imageColumn: string | null;
-  defaultShopId: string | null;
-  defaultShopName: string | null;
-  priceCurrency: string;
-  status: 0 | 1;
-  lastReadAt: string | null;
-  lastTaskId: string | null;
-  lastRowCount: number | null;
-  lastSkipped: SheetSkippedVO | null;
-  lastError: string | null;
-}
-
-/** Result of `POST /product/sheet-sources/{id}/reads`. */
-export interface SheetReadResultVO {
-  taskId: string;
-  rowCount: number;
-  skipped: SheetSkippedVO;
-}
-
-/** An original product no longer present in the source sheet. */
-export interface SheetMissingVO {
-  productId: string;
-  productCode: string;
-  productName: string;
-  productStatus: 0 | 1;
-  shopId: string;
-  shopName: string | null;
-  weidianItemId: string;
-  sheetRow: number;
-  lastSeenTime: string;
-}
-
-/** Company Google service account; the key itself is never returned. */
-export interface GoogleCredentialVO {
-  configured: boolean;
-  clientEmail: string | null;
-  privateKeyId: string | null;
-  updateTime: string | null;
-}
-
 /** Creator-item list row (task 39). Amounts and ids are strings. Counts are strings too. */
 export interface KolItemVO {
   id: string;
@@ -447,25 +367,6 @@ export interface CopyTokenVO {
 
 export interface CreatedCopyTokenVO extends CopyTokenVO {
   token: string;
-}
-
-export type LinkUnavailableReason = "KOL_DISABLED" | "PRODUCT_OFF_SHELF" | "SHOP_DISABLED";
-
-/**
- * `LinkVO`: one tracking link of a KOL. Click counts cover the last 30 days (strings, 64-bit);
- * valid clicks exclude bots and duplicates.
- */
-export interface LinkVO {
-  kolItemId: string;
-  productCode: string | null;
-  productName: string | null;
-  weidianItemId: string;
-  linkUrl: string | null;
-  targetUrl: string;
-  available: boolean;
-  unavailableReasons: LinkUnavailableReason[];
-  clicks30d: string;
-  validClicks30d: string;
 }
 
 /** Standardized Weidian order status (design §8.1). */
@@ -789,47 +690,4 @@ export interface SyncFailureVO {
   error: string | null;
   taskId: string | null;
   time: string;
-}
-
-/** Why a line sits in the manual pool (task 40 §3.6, OrderService.unmatchedReason). */
-export type UnmatchedReason = "PENDING" | "CONFLICT" | "NO_MAPPING" | "MAPPING_EXPIRED" | "MATCHED";
-
-/** One mapping candidate sharing the line's Weidian item id (task 40 §3.6). */
-export interface EvidenceMappingVO {
-  kolItemId: string;
-  kolId: string | null;
-  kolName: string | null;
-  kolCode: string | null;
-  linkCode: string | null;
-  validFrom: string | null;
-  validTo: string | null;
-  /** Whether `validFrom <= payTime < validTo` (null end = current). */
-  coversPayTime: boolean;
-}
-
-/** The recorded manual decision on this line, if any (task 40 §3.6). */
-export interface EvidenceManualVO {
-  attributionType: ItemAttributionType | null;
-  manualReason: string | null;
-  attributionTime: string | null;
-}
-
-/** `GET /order/unmatched/{orderItemId}/evidence` (task 40 §3.6). */
-export interface MatchEvidenceVO {
-  orderItemId: string;
-  orderId: string;
-  orderNo: string;
-  shopId: string;
-  shopName: string | null;
-  merchantNo: string | null;
-  weidianItemId: string;
-  itemName: string | null;
-  skuName: string | null;
-  payTime: string | null;
-  orderAttributionStatus: AttributionStatus;
-  lineAttributionType: string | null;
-  unmatchedReason: UnmatchedReason;
-  product: { productId: string; productCode: string | null; productName: string | null } | null;
-  mappings: EvidenceMappingVO[];
-  manual: EvidenceManualVO | null;
 }

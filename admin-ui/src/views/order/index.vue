@@ -22,7 +22,7 @@ import { readPageSize } from "@/utils/table-prefs";
 import OrderDetailDrawer from "./OrderDetailDrawer.vue";
 import SyncStatesDialog from "./SyncStatesDialog.vue";
 
-defineOptions({ name: "OrderListPage" });
+defineOptions({ name: "OrderQueryPage" });
 
 const { t } = useI18n();
 const router = useRouter();
@@ -370,14 +370,7 @@ onMounted(() => {
 
 <template>
   <div class="list-page order-list-page">
-    <ListSearch
-      :chips="chips"
-      has-more
-      hide-title
-      @search="search"
-      @reset="reset"
-      @remove="removeChip"
-    >
+    <ListSearch :chips="chips" has-more @search="search" @reset="reset" @remove="removeChip">
       <template #primary>
         <el-form-item :label="t('order.orderId')">
           <el-input

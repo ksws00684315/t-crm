@@ -88,6 +88,7 @@ describe("link template page", () => {
     await nextTick();
     expect(field("template-code").element.disabled).toBe(true);
     await field("template-url").setValue("https://shop.example/new/{PRODUCT_ID}");
+    expect(field("template-url").attributes("title")).toBe("https://shop.example/new/{PRODUCT_ID}");
     await field("template-save").trigger("click");
     await flushPromises();
     expect(templateApi.editLinkTemplate).toHaveBeenCalledWith(row.id, {

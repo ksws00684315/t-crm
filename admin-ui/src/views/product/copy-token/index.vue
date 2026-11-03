@@ -13,6 +13,7 @@ import type { CopyTokenVO, KolVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import NameCode from "@/components/NameCode.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useUserStore } from "@/stores/user";
 import { copyText } from "@/utils/copy";
 import { formatInstant } from "@/utils/format";
@@ -63,11 +64,6 @@ function asRow(row: object): CopyTokenVO {
   return row as CopyTokenVO;
 }
 
-function rowId(row: object): string {
-  const value = (row as Record<string, unknown>)["id"];
-  return value == null ? "" : String(value);
-}
-
 function statusTag(status: CopyTokenDisplayStatus): "success" | "warning" | "info" | "danger" {
   if (status === "ACTIVE") return "success";
   if (status === "EXHAUSTED") return "info";
@@ -106,8 +102,8 @@ const columns = computed<DataColumn[]>(() => {
     { key: "createTime", label: t("common.createdAt"), width: 170 }
   ];
   if (canManage.value) {
-    // Revoke: zh DOM 100px / en canvas 73px + 24px headroom (task 59 R-11 measurements).
-    list.push({ key: "actions", label: t("common.actions"), width: px(124, 104) });
+    // Copy + Revoke: zh DOM 66px / en canvas 83px + gap and cell padding (task 59 measurements).
+    list.push({ key: "actions", label: t("common.actions"), width: px(124, 130) });
   }
   return list;
 });
@@ -223,9 +219,7 @@ async function searchKols(keyword: string) {
   }
 }
 
-function clickReveal(event: Event) {
-  const id = (event.currentTarget as HTMLElement | null)?.getAttribute("data-id");
-  if (!id) return;
+function clickReveal(id: string) {
   void (async () => {
     revealing.value = id;
     try {
@@ -241,9 +235,8 @@ function clickReveal(event: Event) {
   })();
 }
 
-async function clickRevoke(event: Event) {
-  const id = (event.currentTarget as HTMLElement | null)?.getAttribute("data-id");
-  if (!id || !rows.value.some(row => row.id === id && canRevoke(row))) return;
+async function clickRevoke(id: string) {
+  if (!rows.value.some(row => row.id === id && canRevoke(row))) return;
   try {
     await ElMessageBox.confirm(t("copyToken.revokeConfirm"), t("copyToken.revoke"), {
       type: "warning"
@@ -262,6 +255,27 @@ async function clickRevoke(event: Event) {
 
 function canRevoke(row: CopyTokenVO): boolean {
   return row.displayStatus === "ACTIVE";
+}
+
+function rowActions(row: CopyTokenVO): RowAction[] {
+  return [
+    {
+      key: "copy",
+      label: t("common.copy"),
+      testId: "reveal",
+      disabled: revealing.value === row.id,
+      onClick: () => clickReveal(row.id)
+    },
+    {
+      key: "revoke",
+      label: t("copyToken.revoke"),
+      testId: "revoke",
+      type: "danger",
+      disabled: !canRevoke(row),
+      tooltip: canRevoke(row) ? undefined : t("copyToken.revokeDisabled"),
+      onClick: () => void clickRevoke(row.id)
+    }
+  ];
 }
 
 function channelText(channel: string): string {
@@ -360,17 +374,7 @@ onMounted(() => {
       @clear-filters="reset"
     >
       <template #cell-hint="{ row }">
-        <span class="">{{ asRow(row).tokenHint }}</span>
-        <button
-          type="button"
-          class="link-btn"
-          data-test="reveal"
-          :data-id="rowId(row)"
-          :disabled="revealing === rowId(row)"
-          @click="clickReveal"
-        >
-          {{ t("common.copy") }}
-        </button>
+        <span>{{ asRow(row).tokenHint }}</span>
       </template>
       <template #cell-kol="{ row }">
         <NameCode :name="asRow(row).kolName" :code="asRow(row).kolCode" />
@@ -397,16 +401,7 @@ onMounted(() => {
       </template>
       <template #cell-createTime="{ row }">{{ formatInstant(asRow(row).createTime) }}</template>
       <template #actions="{ row }">
-        <button
-          type="button"
-          class="link-btn link-btn--danger"
-          data-test="revoke"
-          :data-id="rowId(row)"
-          :disabled="!canRevoke(asRow(row))"
-          @click="clickRevoke"
-        >
-          {{ t("copyToken.revoke") }}
-        </button>
+        <RowActions :actions="rowActions(asRow(row))" />
       </template>
     </DataTable>
 
@@ -423,25 +418,5 @@ onMounted(() => {
 }
 .kol-code {
   margin-left: 6px;
-}
-.link-btn {
-  margin-left: 6px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--el-color-primary);
-  cursor: pointer;
-}
-.link-btn:disabled {
-  cursor: wait;
-  opacity: 0.6;
-}
-.link-btn--danger {
-  color: var(--el-color-danger);
-}
-.link-btn--danger:disabled {
-  color: var(--tcrm-color-text-secondary);
-  cursor: not-allowed;
-  opacity: 1;
 }
 </style>

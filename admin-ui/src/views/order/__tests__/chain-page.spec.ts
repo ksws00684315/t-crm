@@ -366,7 +366,7 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
 
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("16.00 CNY");
+    expect(funds).toContain("¥16.00");
     // Shop profit is gone from the funds card (task 81, L-024).
     expect(funds).not.toContain("店铺获利");
 
@@ -376,7 +376,7 @@ describe("order chain page (task 40)", () => {
     const first = blocks[0].text();
     expect(first).toContain("佣金与提现");
     expect(first).toContain("10%");
-    expect(first).toContain("16.00 CNY");
+    expect(first).toContain("¥16.00");
     expect(first).toContain("微店确认结算");
     expect(first).toContain("W20261023000001");
     expect(first).toContain("W20261025000002");
@@ -387,7 +387,7 @@ describe("order chain page (task 40)", () => {
     // Line 2 stays unverified: null amounts read 待核实, the known occupation zero reads 0.00 CNY.
     const secondText = blocks[1].text();
     expect(secondText).toContain("待核实");
-    expect(secondText).toContain("0.00 CNY");
+    expect(secondText).toContain("¥0.00");
     expect(secondText).toContain("无提现占用");
 
     // Finance flows: increase for the release credit, decrease for clawback and allocations,
@@ -417,8 +417,14 @@ describe("order chain page (task 40)", () => {
     expect(summary.text()).toContain("Blue / L");
     expect(summary.text()).toContain("Zoe");
     expect(summary.text()).toContain("10%");
-    expect(summary.text()).toContain("16.00 CNY");
+    expect(summary.text()).toContain("¥16.00");
     expect(summary.text()).toContain("待核实");
+    const summaryTable = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(table => table.props("tableId") === "chain-product-summary");
+    expect(
+      summaryTable?.props("columns").find((column: { key: string }) => column.key === "kol")?.align
+    ).toBe("left");
     const flowTable = wrapper
       .findAllComponents({ name: "DataTable" })
       .find(table => table.props("tableId") === "chain-finance-flows");
@@ -454,7 +460,7 @@ describe("order chain page (task 40)", () => {
     const { wrapper } = await mountPage();
     expect(wrapper.findAll(".chain-stages > li")).toHaveLength(6);
     expect(wrapper.get('[data-test="chain-stage-order"]').text()).toContain("2026102100001");
-    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("16.00 CNY");
+    expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("¥16.00");
     expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).toContain("2 条");
     expect(wrapper.get('[data-test="chain-stage-withdrawal"]').text()).not.toContain("3 条");
     expect(wrapper.get('[data-test="chain-stage-finance"]').text()).toContain("待核实");
@@ -615,7 +621,7 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("16.00 CNY");
+    expect(funds).toContain("¥16.00");
     expect(funds).not.toContain("店铺获利");
     expect(funds).not.toContain("当前权限仅展示本人范围商品行");
     expect(wrapper.find('[data-test="chain-flows"]').exists()).toBe(true);
@@ -649,8 +655,8 @@ describe("order chain page (task 40)", () => {
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("180.00 CNY");
-    expect(funds).toContain("20.00 CNY");
+    expect(funds).toContain("¥180.00");
+    expect(funds).toContain("¥20.00");
     wrapper.unmount();
   });
 

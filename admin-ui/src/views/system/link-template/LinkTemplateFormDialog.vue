@@ -132,6 +132,7 @@ async function submit() {
           v-model="form.templateUrl"
           data-test="template-url"
           maxlength="512"
+          :title="form.templateUrl"
           :placeholder="t('linkTemplate.urlPlaceholder')"
         />
       </el-form-item>

@@ -9,12 +9,30 @@ import {
 } from "../format";
 
 describe("formatAmountWithCurrency", () => {
-  it("keeps the backend precision and distinguishes zero from missing money", () => {
-    expect(formatAmountWithCurrency("50.00")).toBe("50.00 CNY");
-    expect(formatAmountWithCurrency("0.00")).toBe("0.00 CNY");
-    expect(formatAmountWithCurrency("-1234567890123456.7890")).toBe("-1234567890123456.7890 CNY");
-    expect(formatAmountWithCurrency("1.25", "USD")).toBe("1.25 USD");
+  it("uses symbol style with thousands separators and keeps backend precision", () => {
+    expect(formatAmountWithCurrency("50.00")).toBe("¥50.00");
+    expect(formatAmountWithCurrency("1234.56")).toBe("¥1,234.56");
+    expect(formatAmountWithCurrency("0.00")).toBe("¥0.00");
+    expect(formatAmountWithCurrency("0")).toBe("¥0");
+    expect(formatAmountWithCurrency("-5.00")).toBe("-¥5.00");
+    expect(formatAmountWithCurrency("-1234567890123456.7890")).toBe("-¥1,234,567,890,123,456.7890");
+    expect(formatAmountWithCurrency("9007199254740993.00")).toBe("¥9,007,199,254,740,993.00");
+  });
+
+  it("follows the business currency and falls back to CNY", () => {
+    expect(formatAmountWithCurrency("1.25", "USD")).toBe("$1.25");
+    expect(formatAmountWithCurrency("18.35", "EUR")).toBe("€18.35");
+    expect(formatAmountWithCurrency("7.5", "GBP")).toBe("£7.5");
+    expect(formatAmountWithCurrency("1200", "JPY")).toBe("1,200 JPY");
+    expect(formatAmountWithCurrency("1200", "AUD")).toBe("1,200 AUD");
+    expect(formatAmountWithCurrency("3.00", null)).toBe("¥3.00");
+    expect(formatAmountWithCurrency("3.00", "")).toBe("¥3.00");
+  });
+
+  it("distinguishes zero from missing money", () => {
     expect(formatAmountWithCurrency(null)).toBe("-");
+    expect(formatAmountWithCurrency(undefined)).toBe("-");
+    expect(formatAmountWithCurrency("")).toBe("-");
   });
 });
 

@@ -97,6 +97,7 @@ onMounted(load);
 
 <template>
   <el-card v-loading="loading" shadow="never" class="resignation">
+    <h1 class="resignation__title">{{ t("route.resignation") }}</h1>
     <el-alert
       v-if="!canResign"
       type="info"
@@ -182,6 +183,9 @@ onMounted(load);
 </template>
 
 <style scoped>
+.resignation__title {
+  margin: 0 0 var(--tcrm-space-4);
+}
 .resignation {
   max-width: 640px;
 }

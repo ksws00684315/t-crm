@@ -169,6 +169,15 @@ describe("creator fund dialog (task 82)", () => {
     await flushPromises();
     expect(element("fund-load-failed").text()).toContain("收款账户加载失败");
     expect(document.body.querySelector('[data-test="fund-empty"]')).toBeNull();
+    vi.mocked(payoutApi.listPayoutAccounts).mockResolvedValue({
+      items: [paypal],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    await element("fund-retry").trigger("click");
+    await flushPromises();
+    expect(payoutApi.listPayoutAccounts).toHaveBeenCalledTimes(2);
     wrapper.unmount();
   });
 

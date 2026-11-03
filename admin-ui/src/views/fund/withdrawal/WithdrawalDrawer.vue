@@ -5,7 +5,7 @@ import { getWithdrawal, getWithdrawalOrders } from "@/api/commission/finance";
 import type { Withdrawal, WithdrawalOrder } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
-import { formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { subscribeNarrow } from "@/utils/sidebar";
 
@@ -143,7 +143,9 @@ watch(
             <small class="identity-id">{{ detail.kolCode }}</small>
           </el-descriptions-item>
           <el-descriptions-item :label="t('finance.withdrawalAmount')"
-            ><strong>{{ detail.amount }} {{ detail.currency }}</strong></el-descriptions-item
+            ><strong>{{
+              formatAmountWithCurrency(detail.amount, detail.currency)
+            }}</strong></el-descriptions-item
           >
           <el-descriptions-item :label="t('finance.assignedBd')">{{
             detail.bdName || "—"
@@ -223,11 +225,15 @@ watch(
               </div>
             </template>
             <template #cell-occupied="{ row }"
-              ><span class="order-money">{{ row.occupied }}</span></template
+              ><span class="order-money">{{
+                formatAmountWithCurrency(row.occupied)
+              }}</span></template
             >
             <template #cell-remainingSnapshot="{ row }"
               ><span class="order-money">{{
-                row.remainingSnapshot ?? t("finance.unverified")
+                row.remainingSnapshot === null
+                  ? t("finance.unverified")
+                  : formatAmountWithCurrency(row.remainingSnapshot)
               }}</span></template
             >
           </DataTable>

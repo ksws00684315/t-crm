@@ -9,7 +9,7 @@ import CommissionTable from "@/components/CommissionTable.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
 import RowActions from "@/components/RowActions.vue";
-import { formatInstant, formatPrice } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant, formatPrice } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { saveBlob } from "@/utils/download";
 import WithdrawalDrawer from "@/views/fund/withdrawal/WithdrawalDrawer.vue";
@@ -122,7 +122,9 @@ const paymentColumns = computed<DataColumn[]>(() =>
               }}</template>
               <template #cell-amountCny="{ row }">{{ formatPrice(row.amountCny, "CNY") }}</template>
               <template #cell-actualAmount="{ row }">{{
-                row.type === "COMMISSION" ? row.actualAmount : "—"
+                row.type === "COMMISSION"
+                  ? formatAmountWithCurrency(row.actualAmount, row.actualCurrency)
+                  : "—"
               }}</template
               ><template #cell-actualCurrency="{ row }">{{
                 row.type === "COMMISSION" ? row.actualCurrency : "—"
@@ -173,8 +175,10 @@ const paymentColumns = computed<DataColumn[]>(() =>
       append-to-body
       ><el-alert v-if="financePreview" :title="t('finance.voucherDemo')" :closable="false" />
       <p>{{ voucherPayment?.sourceNo }}</p>
-      <p>{{ voucherPayment?.actualAmount }} {{ voucherPayment?.actualCurrency }}</p>
-      <p>{{ voucherPayment?.amountCny }} CNY</p>
+      <p>
+        {{ formatAmountWithCurrency(voucherPayment?.actualAmount, voucherPayment?.actualCurrency) }}
+      </p>
+      <p>{{ formatAmountWithCurrency(voucherPayment?.amountCny) }}</p>
       <el-button data-test="income-voucher-download" @click="downloadVoucher">{{
         t("finance.voucherPreview")
       }}</el-button></el-dialog

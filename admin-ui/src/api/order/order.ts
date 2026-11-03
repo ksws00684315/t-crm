@@ -3,7 +3,6 @@ import type { DownloadedFile } from "@/utils/http";
 import type {
   AttributionStatus,
   Channel,
-  MatchEvidenceVO,
   OrderChainVO,
   OrderDetailVO,
   OrderStatus,
@@ -55,13 +54,6 @@ export interface RefundQuery {
   refundType?: RefundType;
 }
 
-/** `PUT /order/orders/{id}/attribution`: exactly one of `kolId` and `nonKol`. */
-export interface AssignAttributionRequest {
-  kolId?: string;
-  nonKol?: boolean;
-  reason: string;
-}
-
 /** Accepted order/refund import (HTTP 202, task 18 contract). */
 export interface OrderImportVO {
   taskId: string;
@@ -69,15 +61,6 @@ export interface OrderImportVO {
 
 export function listOrders(query: OrderQuery): Promise<PageResult<OrderVO>> {
   return http.request<PageResult<OrderVO>>({ method: "get", url: "/order/orders", params: query });
-}
-
-/** The manual matching pool: CONFLICT / UNMATCHED orders with their lines. */
-export function listUnmatchedOrders(query: OrderQuery): Promise<PageResult<OrderVO>> {
-  return http.request<PageResult<OrderVO>>({
-    method: "get",
-    url: "/order/unmatched",
-    params: query
-  });
 }
 
 /** Order detail with merchant info and product rows (task 40 §3.2). */
@@ -120,14 +103,6 @@ export function deleteSyncFailures(olderThanDays: number): Promise<number> {
   });
 }
 
-/** Matching-pool evidence for one order item (task 40 §3.6). */
-export function getMatchEvidence(orderItemId: string): Promise<MatchEvidenceVO> {
-  return http.request<MatchEvidenceVO>({
-    method: "get",
-    url: `/order/unmatched/${orderItemId}/evidence`
-  });
-}
-
 /** 202 once the background worker starts; 409 ORDER_SYNC_RUNNING while the shop lock is held. */
 export function triggerOrderSync(shopId: string, type?: "ORDER" | "REFUND"): Promise<null> {
   return http.request<null>({
@@ -135,21 +110,6 @@ export function triggerOrderSync(shopId: string, type?: "ORDER" | "REFUND"): Pro
     url: "/order/syncs",
     data: { shopId, ...(type ? { type } : {}) }
   });
-}
-
-export function assignOrderAttribution(
-  id: string,
-  request: AssignAttributionRequest
-): Promise<null> {
-  return http.request<null>({
-    method: "put",
-    url: `/order/orders/${id}/attribution`,
-    data: request
-  });
-}
-
-export function reattributeOrder(id: string): Promise<null> {
-  return http.request<null>({ method: "post", url: `/order/orders/${id}/reattribution` });
 }
 
 export function downloadOrderImportTemplate(): Promise<DownloadedFile> {

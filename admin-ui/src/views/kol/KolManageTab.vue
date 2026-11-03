@@ -177,7 +177,7 @@ onMounted(loadBdUsers);
 
 <template>
   <div class="kol-manage" data-test="kol-manage-tab">
-    <el-form class="kol-manage__form" label-width="110px" @submit.prevent>
+    <el-form class="kol-manage__form" label-position="top" @submit.prevent>
       <el-form-item :label="t('bdTransfer.scope')">
         <el-radio-group v-model="form.scope" data-test="transfer-scope">
           <el-radio-button value="bdAll">{{ t("bdTransfer.scopeBdAll") }}</el-radio-button>
