@@ -33,6 +33,25 @@ backup_name() { # <UTC timestamp yyyymmddThhmmssZ>
   printf 'tcrm-%s.dump.gpg' "$1"
 }
 
+
+# UTC day helpers that work on GNU date (Linux) and BSD date (macOS) — L-075.
+utc_ymd_epoch() { # <YYYYMMDD> -> epoch seconds at 00:00:00 UTC
+  local ymd="$1"
+  if date -u -d "$ymd" +%s 2>/dev/null; then
+    return 0
+  fi
+  # BSD date keeps the current clock if the format has no time — pin midnight.
+  date -u -j -f "%Y%m%d%H%M%S" "${ymd}000000" +%s
+}
+
+utc_ymd_dow() { # <YYYYMMDD> -> 1=Mon .. 7=Sun (GNU/BSD %u)
+  local ymd="$1"
+  if date -u -d "$ymd" +%u 2>/dev/null; then
+    return 0
+  fi
+  date -u -j -f "%Y%m%d%H%M%S" "${ymd}000000" +%u
+}
+
 # Prints the files in $1 that retention no longer needs: every dump older than 7 days except the
 # Sunday dumps, which are kept for 28 days. $2 is "today" as yyyymmdd (UTC), injectable for tests.
 expired_backups() {
@@ -42,8 +61,8 @@ expired_backups() {
     stamp="$(basename "$file" .dump.gpg)"
     stamp="${stamp#tcrm-}"
     day="${stamp%%T*}"
-    age_days=$(( ( $(date -u -d "$today" +%s) - $(date -u -d "$day" +%s) ) / 86400 ))
-    dow="$(date -u -d "$day" +%u)" # 7 = Sunday
+    age_days=$(( ( $(utc_ymd_epoch "$today") - $(utc_ymd_epoch "$day") ) / 86400 ))
+    dow="$(utc_ymd_dow "$day")" # 7 = Sunday
     if [ "$age_days" -gt 28 ] || { [ "$age_days" -gt 7 ] && [ "$dow" != "7" ]; }; then
       printf '%s\n' "$file"
     fi

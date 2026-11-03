@@ -206,7 +206,7 @@ deploy/scripts/local-infra.sh psql
 - 目标版本与当前版本的数据库结构兼容（没有新迁移）时，回滚直接成功。
 - 当前数据库已经执行了目标版本不认识的迁移时，Flyway 严格模式（第 9 项）让旧镜像**启动即失败**。脚本检测到后打印原因和下面的应急方法，管理端接口保持不可用，**脚本不会修改 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS`，也不改数据库**。两条出路：`release.sh deploy <较新的版本>` 立刻恢复服务；或确实要用旧镜像时，按第 9 项在 `.env` 临时加 `TCRM_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:future'`，重新执行 `release.sh rollback <版本>`，事后删除该行并发布不低于库版本的镜像。
 
-**发布之后的 Compose 命令**：生产 Compose 的三个镜像标签都是 `${TCRM_VERSION}`，而发布脚本只更新需要更新的服务。`.env` 里的版本变化后，没有变化内容的 `crm-postgres` 容器仍是旧标签创建的，此时不带 `--no-deps` 的 `docker compose up -d <服务>` 会因为标签不同而**重建 PostgreSQL，并连带重启依赖它的 crm-admin**。要在发布之外重建某个服务，一律用 `up -d --no-deps <服务>`。`release.sh` 发现新版本的 `crm-postgres` 镜像与运行中的不同时，只打印提示，不重启数据库；需要升级 pgBackRest 或 PostgreSQL 补丁版本时，在低峰期手动 `up -d --no-deps postgres`（数据库约中断十几秒）。
+**发布之后的 Compose 命令**：`crm-admin` / `crm-redirect` / `crm-static` 用 `${TCRM_VERSION}`；`crm-postgres` 用独立的 `${TCRM_POSTGRES_VERSION}`（未设置时回退到 `TCRM_VERSION`，兼容旧主机）。日常 `release.sh deploy` 只改应用版本，不拉、不改数据库镜像；只有显式 `deploy --postgres <版本>` 才写入并拉取新的 postgres 标签，且仍不自动重启数据库。要在发布之外重建某个服务，一律用 `up -d --no-deps <服务>`。需要升级 pgBackRest 或 PostgreSQL 补丁版本时：`release.sh deploy <当前应用版本> --postgres <新库版本>`，再在低峰期手动 `up -d --no-deps postgres`（数据库约中断十几秒）。
 
 ### 公开证书的申请与续期
 
@@ -272,7 +272,7 @@ deploy/scripts/local-infra.sh psql
 
 ### S3 不可用时
 
-WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：积压超过 4 GiB 后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据盘不会被写满、数据库继续可写。数据盘要为此预留空间：最坏情况下 `pg_wal` 约为 4 GiB 队列加 PostgreSQL 自身的 `max_wal_size`（默认 1 GiB）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。WAL 归档是否停止由 `ops-check.sh` 监控（查 `pg_stat_archiver`，见「监控告警」）；归档缺口本身无法自动弥补，只能靠恢复后立即重做全量。
+WAL 归档失败时，未归档的 WAL 留在数据卷的 `pg_wal` 里。`archive-push-queue-max=4GiB`：**不是硬上限**——只在每轮推送开始时判断，磁盘要到下一个检查点才释放，实测峰值会超出队列约 1 GiB。积压被判定超限后，pgBackRest 对更早的 WAL 直接报告成功并丢弃，保证数据库继续可写。数据盘余量按 `4 GiB + max_wal_size + 突发写入量` 预留（不要只按 4+1 GiB 估算）。异步归档要求容器里有真正的 init 进程（生产模板 postgres 服务已设 `init: true`）：pgBackRest 的后台推送进程会被托管给 1 号进程，若 1 号进程是 postmaster，它把推送失败的非零退出码当成后台进程崩溃，整个数据库会反复重启。**代价是归档出现缺口**：缺口之后的时间点无法恢复，直到下一次全量备份建立新的基线。所以 S3 恢复后要立即执行 `deploy/backup/pgbackrest-backup.sh full`，并用 `pgbackrest ... info` 确认。WAL 归档是否停止由 `ops-check.sh` 监控（查 `pg_stat_archiver`，见「监控告警」）；归档缺口本身无法自动弥补，只能靠恢复后立即重做全量。
 
 ### 恢复
 
@@ -296,10 +296,12 @@ deploy/backup/restore-pitr.sh --overwrite "2026-11-01 08:30:00"  # 数据目录�
 
 整机丢失时：按「生产部署」在新主机上准备 `.env`（同样的 `TCRM_SECRET_KEY`、`PGBACKREST_*`）和一个**空**数据卷，启动 Compose 之前不要初始化数据库；执行 `restore-pitr.sh latest`（空数据卷不需要 `--overwrite`），其余同上。
 
-**逻辑备份恢复**（取回某个 `.dump.gpg`；对象归属应用账号，恢复到空库，用管理超级用户）：
+**逻辑备份恢复**（取回某个 `.dump.gpg`；恢复到空库，用管理超级用户）：
+
+写入身份的 IAM（`backup/iam-policy.example.json`）对 `logical/` **只写不读**，所以上面的 `aws s3 cp` **不能**用备份写入角色，否则会被拒。取回请用单独的只读身份（示例策略见同目录 `iam-policy-logical-read.example.json`）。本机已有的文件在 `TCRM_BACKUP_DIR`，无需 S3。
 
 ```bash
-# 从 S3 取回（本机的备份在 TCRM_BACKUP_DIR 里）
+# 从 S3 取回（使用只读身份 / 配置文件，不要用写入备份的角色）
 aws s3 cp --region us-west-2 s3://<桶>/<前缀>/daily/tcrm-<时间>.dump.gpg .
 # 解密后直接送入 pg_restore，明文只在管道里
 gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.pass \
