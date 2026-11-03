@@ -691,7 +691,9 @@ class OrderServiceTest {
   @Test
   void shouldSupplementOnlySelectedLine_whenHistoricalRateIsMissing() {
     prepareSupplement();
-    TestTransactions.template().executeWithoutResult(tx -> service.supplementRate(10L, 20L, new BigDecimal("0.1250"), " missing history "));
+    TestTransactions.template()
+        .executeWithoutResult(
+            tx -> service.supplementRate(10L, 20L, new BigDecimal("0.1250"), " missing history "));
     verify(commissionChain)
         .supplementRate(1L, 10L, 20L, 100L, new BigDecimal("0.1250"), "missing history", 99L);
   }
