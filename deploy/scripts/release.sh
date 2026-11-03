@@ -34,6 +34,7 @@ HEALTH_TIMEOUT="${TCRM_RELEASE_HEALTH_TIMEOUT:-300}"
 KEEP_RELEASES="${TCRM_RELEASE_KEEP:-5}"
 BACKUP_COMMAND="${TCRM_RELEASE_BACKUP_COMMAND:-$DEPLOY_DIR/backup/pg-backup.sh}"
 LOCK_DIR="${TCRM_RELEASE_LOCK_DIR:-$DEPLOY_DIR/.release.lock}"
+LOCK_HELD=0
 VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
 UPDATE_POSTGRES_VERSION="" # set by deploy --postgres <ver>; empty = do not touch postgres
 
@@ -164,7 +165,7 @@ require_tools() {
   docker compose version > /dev/null 2>&1 || die_early "缺少 Docker Compose 插件"
   docker info > /dev/null 2>&1 || die_early "Docker 没有在运行或当前用户无权使用"
   [ -f "$COMPOSE_FILE" ] || die_early "找不到 Compose 文件：$COMPOSE_FILE"
-  [ -f "$ENV_FILE" ] || die_early "找不到 $ENV_FILE，请先按 .env.example 创建"
+  [ -f "$ENV_FILE" ] || die_early "找不到 ${ENV_FILE}，请先按 .env.example 创建"
 }
 
 die_early() {
@@ -249,9 +250,9 @@ report_failure() { # <message>
         fi
         ;;
       redirect)
-        log "  crm-admin 已是 $TARGET_VERSION，但 crm-redirect 没有恢复健康，前端仍指向 $(current_target)。"
+        log "  crm-admin 已是 ${TARGET_VERSION}，但 crm-redirect 没有恢复健康，前端仍指向 $(current_target)。"
         log "  查看日志：docker compose -f $COMPOSE_FILE --env-file $ENV_FILE logs --tail=200 crm-redirect，"
-        log "  修复后重新执行 release.sh $ACTION $TARGET_VERSION。"
+        log "  修复后重新执行 release.sh $ACTION ${TARGET_VERSION}。"
         ;;
       switch | record)
         log "  镜像已更新。重新执行 release.sh $ACTION $TARGET_VERSION 完成前端切换和记录（各步骤可重复执行）。"
@@ -264,9 +265,13 @@ report_failure() { # <message>
 }
 
 on_exit() {
-  # L-071: always drop the release lock (mkdir lock).
-  rmdir "$LOCK_DIR" 2>/dev/null || true
+  # Capture the real exit status BEFORE releasing the lock (rmdir would overwrite $?).
   local rc=$?
+  # L-071: drop the release lock only if this process created it (never steal another's).
+  if [ "$LOCK_HELD" -eq 1 ]; then
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    LOCK_HELD=0
+  fi
   trap - EXIT
   [ -z "$ENV_TMP" ] || rm -f "$ENV_TMP"
   if [ "$rc" -ne 0 ] && [ "$REPORTED" -ne 1 ]; then
@@ -684,16 +689,17 @@ cmd_status() {
   done
   if [ -f "$RELEASE_LOG" ]; then
     log ""
-    log "最近的发布记录（$RELEASE_LOG）："
+    log "最近的发布记录（${RELEASE_LOG}）："
     while IFS= read -r line; do log "  $line"; done < <(tail -n 5 "$RELEASE_LOG")
   fi
 }
 
 acquire_release_lock() {
-  # L-071: mkdir is atomic on macOS and Linux; on_exit removes the directory.
+  # L-071: mkdir is atomic on macOS and Linux; on_exit removes the directory only if we created it.
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    die_early "另一个 release.sh 正在运行（锁目录 $LOCK_DIR 已存在）。确认无并发后再删掉该目录重试。"
+    die_early "另一个 release.sh 正在运行（锁目录 ${LOCK_DIR} 已存在）。确认无并发后再删掉该目录重试。"
   fi
+  LOCK_HELD=1
 }
 
 main() {
