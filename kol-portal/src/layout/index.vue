@@ -189,7 +189,8 @@ async function signOut() {
 .shell__actions {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
   gap: var(--tcrm-space-3);
 }
 .shell__identity {
@@ -283,6 +284,18 @@ async function signOut() {
     padding: var(--tcrm-space-4);
   }
 }
+@media (max-width: 768px) {
+  .shell__identity :deep(.name-code) {
+    max-width: min(36vw, 200px);
+  }
+  .shell__identity :deep(.name-code__name),
+  .shell__identity :deep(.name-code__code) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
 @media (max-width: 767px) {
   .shell {
     flex-direction: column;

@@ -154,10 +154,11 @@ describe("TabBar keyboard and semantics (task 102 L-088)", () => {
     });
 
     it("marks the selected tab with the primary colour, 600 weight and a 2px indicator", () => {
-      const active = declarationsFor(".tabs__item.is-active {");
+      // L-099: visual chrome lives on .tabs__tab (role=tab); close is a sibling.
+      const active = declarationsFor(".tabs__item.is-active .tabs__tab {");
       expect(active.color).toBe("var(--tcrm-color-primary-text)");
       expect(active["font-weight"]).toBe("600");
-      const indicator = declarationsFor(".tabs__item.is-active::after");
+      const indicator = declarationsFor(".tabs__item.is-active .tabs__tab::after");
       expect(indicator.height).toBe("2px");
       expect(indicator.background).toBe("var(--tcrm-color-primary)");
       expect(indicator.position).toBe("absolute");

@@ -597,4 +597,11 @@ small {
     flex-direction: column;
   }
 }
+.form-grid :deep(.el-form-item) {
+  margin-bottom: var(--tcrm-space-4);
+}
+.form-grid :deep(.el-form-item__error) {
+  position: static;
+  padding-top: var(--tcrm-space-1);
+}
 </style>

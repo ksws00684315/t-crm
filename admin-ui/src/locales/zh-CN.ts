@@ -583,6 +583,7 @@ const zhCN = {
     permissionsSeparate: "在编辑信息弹窗中打开权限设置，可调整此账号的权限和数据范围。",
     currentPost: "当前岗位：{post}",
     selectAll: "全选",
+    permissionRequired: "请至少勾选一项权限",
     resetTemplate: "按模板重置",
     exclusiveTitle: "超管专属，不可授予。",
     exclusiveItems:
@@ -1453,6 +1454,7 @@ const zhCN = {
     failedRows: "导入失败：{failed} 行全部未导入，请下载错误文件查看原因",
     failedFile: "导入失败：文件无法处理或任务被中断，请检查文件后重新上传",
     pollFailed: "进度查询连续失败，已停止刷新；任务仍在后台执行，可关闭后稍后在列表查看",
+    xlsxOrCsv: "只支持 .xlsx 或 .csv 文件。",
     xlsxOnly: "请上传 .xlsx 格式的 Excel 文件",
     tooLarge: "文件超过 20MB，请拆分后再上传",
     chooseFile: "请先选择文件",
@@ -1485,7 +1487,7 @@ const zhCN = {
     keywordPlaceholder: "操作名称 / 参数摘要",
     timeRange: "时间范围",
     transferFilter: "转移记录",
-    resultOption: { SUCCESS: "成功", FAIL: "失败" }
+    resultOption: { SUCCESS: "成功", FAIL: "失败" },
     actionCodes: {
       "Create BD transfer": "创建达人转移",
       "Execute BD transfer": "执行预约转移",
