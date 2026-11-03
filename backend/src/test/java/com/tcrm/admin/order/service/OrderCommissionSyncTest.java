@@ -145,6 +145,26 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void shouldNotPassReceiveTimeAsCompletedTime() {
+    // L-052 (owner 2026-11-03): the Weidian API has no trade-completion field (task 75 probe), so
+    // completedTime stays null even when receive_time is set — an order carrying only
+    // receive_time must not flip the rule to FALLBACK; release stays CONFIRMED at settlement.
+    OrderDO order = order(SETTLED);
+    order.setReceiveTime(Instant.parse("2026-11-05T00:00:00Z"));
+    when(refunds.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    TestTransactions.template()
+        .executeWithoutResult(
+            status -> sync.sync(order, List.of(item(9001L, 101L, 1, null, null))));
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    OrderItemsCommissionEvent.ItemFacts facts = captor.getValue().items().getFirst();
+    assertThat(facts.completedTime()).isNull();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void shouldPublishGoodsIncomeBasisWithSettlementTimeIgnoringFees() {
     // Hand-computed (amounts in fen, the default unit constant): goods income 600 -> 6.00 CNY
     // matches pay 6.00; fee -4 (-0.04 CNY) never enters the basis (task 81). Lines pay 4.00 +
