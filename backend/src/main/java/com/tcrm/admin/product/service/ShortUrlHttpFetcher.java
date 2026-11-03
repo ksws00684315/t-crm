@@ -92,8 +92,7 @@ class ShortUrlHttpFetcher implements ShortUrlResolver.Transport {
         tcp.setSoTimeout(READ_TIMEOUT_MS);
         Socket socket = tcp;
         if (tls) {
-          SSLSocket ssl =
-              (SSLSocket) tlsFactory.createSocket(tcp, uri.getHost(), port, true);
+          SSLSocket ssl = (SSLSocket) tlsFactory.createSocket(tcp, uri.getHost(), port, true);
           startHandshake(ssl, uri.getHost());
           socket = ssl;
         }

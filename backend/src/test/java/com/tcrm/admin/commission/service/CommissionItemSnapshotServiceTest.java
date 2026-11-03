@@ -418,7 +418,10 @@ class CommissionItemSnapshotServiceTest {
     // 7999 = soft-deleted prior line of the same order, still occupying a holding application.
     when(states.findIdsByOrder(5001L)).thenReturn(List.of(7999L));
     TenantScope.runCompany(
-        TENANT, () -> service.syncOrderItems(order(), List.of(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null))));
+        TENANT,
+        () ->
+            service.syncOrderItems(
+                order(), List.of(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null))));
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(pauses, wallet);
     order.verify(pauses).prelockForItems(List.of(7999L));
     // New insert has no released money yet — wallet may be never called; prelock still ran first.
@@ -431,14 +434,16 @@ class CommissionItemSnapshotServiceTest {
     // row.getId() != null guard is gone — a new insert that flips to blocked still pauses.
     whenRateAtPayTime(KOL_A, "0.1500", 3);
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
-    // New insert: wasBlocked short-circuits on null id, so isItemBlocked is only read once after write.
+    // New insert: wasBlocked short-circuits on null id, so isItemBlocked is only read once after
+    // write.
     when(pauses.isItemBlocked(anyLong())).thenReturn(true);
     TenantScope.runCompany(
         TENANT,
         () ->
             service.syncOrderItems(
                 order(),
-                List.of(withAfterSales(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), true))));
+                List.of(
+                    withAfterSales(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null), true))));
     ArgumentCaptor<CommissionItemStateDO> inserted =
         ArgumentCaptor.forClass(CommissionItemStateDO.class);
     verify(states).insert(inserted.capture());

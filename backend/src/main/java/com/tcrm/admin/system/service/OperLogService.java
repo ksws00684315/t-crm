@@ -148,8 +148,8 @@ public class OperLogService {
   }
 
   /**
-   * When requestParams has no explicit Chinese summary, return the action code so the
-   * admin UI can resolve zh/en copy from its locale packs (L-094). Do not hard-code Chinese.
+   * When requestParams has no explicit Chinese summary, return the action code so the admin UI can
+   * resolve zh/en copy from its locale packs (L-094). Do not hard-code Chinese.
    */
   private String actionSummary(String action) {
     return hasText(action) ? action : "OTHER";

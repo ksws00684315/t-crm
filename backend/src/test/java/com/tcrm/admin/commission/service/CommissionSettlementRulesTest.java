@@ -236,7 +236,6 @@ class CommissionSettlementRulesTest {
     assertThat(CommissionSettlementRules.attributedToKol(10L, 2)).isTrue();
   }
 
-
   @Test
   void shouldPreferFreezeDaysOverSettlementConfirmation() {
     // Owner 2026-11-03 (L-052): completed 11-01, freeze 7 days, confirmed 11-05 → release 11-08.

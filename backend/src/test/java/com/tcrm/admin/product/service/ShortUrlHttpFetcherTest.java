@@ -205,7 +205,9 @@ class ShortUrlHttpFetcherTest {
           .hasMessageContaining("did not complete within 800 ms");
       // Production budget is 10 s; CI previously hung ~93 s on SSLSocket.close during handshake.
       long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-      assertThat(elapsedMs).as("TLS handshake abort must stay near the 800 ms deadline").isBetween(700L, 2_500L);
+      assertThat(elapsedMs)
+          .as("TLS handshake abort must stay near the 800 ms deadline")
+          .isBetween(700L, 2_500L);
     }
   }
 

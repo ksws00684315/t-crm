@@ -226,7 +226,8 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     // released money keeps the application paused until it is rejected or withdrawn. Runs in the
     // revision transaction, so every sync path shares one write; an unchanged fingerprint never
     // gets here, which keeps repeated syncs from writing duplicate history.
-    // L-054: id is always assigned above (insert or existing update); drop the always-true null check.
+    // L-054: id is always assigned above (insert or existing update); drop the always-true null
+    // check.
     boolean blocked = pauses.isItemBlocked(row.getId());
     if (blocked != wasBlocked) {
       if (blocked) {
