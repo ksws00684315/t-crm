@@ -3,14 +3,12 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import AmountText from "@/components/AmountText.vue";
-import { formatMoney } from "@/utils/orders";
 import { isNegativeAmount, type WorkspaceFigures } from "@/utils/workspace";
 
 defineOptions({ name: "HomeIncomeSection" });
 const props = defineProps<{ figures: WorkspaceFigures }>();
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const router = useRouter();
-const money = (value: string) => formatMoney(value, locale.value);
 const commissionNegative = computed(() => isNegativeAmount(props.figures.commissionIncome));
 const availableNegative = computed(() => isNegativeAmount(props.figures.available));
 function withdraw() {
@@ -28,7 +26,7 @@ function withdraw() {
           class="tcrm-amount-primary income-band__amount"
           :class="{ negative: isNegativeAmount(figures.totalIncome) }"
           data-test="income-total"
-          ><AmountText :value="money(figures.totalIncome)"
+          ><AmountText :value="figures.totalIncome"
         /></strong>
         <span class="caption">{{ t("home.incomeTotalCaption") }}</span>
       </div>
@@ -45,7 +43,7 @@ function withdraw() {
             class="tcrm-amount-detail income-list__amount"
             :class="{ negative: commissionNegative }"
             data-test="income-commission"
-            ><AmountText :value="money(figures.commissionIncome)"
+            ><AmountText :value="figures.commissionIncome"
           /></strong>
         </li>
         <li class="income-list__row">
@@ -57,7 +55,7 @@ function withdraw() {
             </div>
           </div>
           <strong class="tcrm-amount-detail income-list__amount" data-test="income-prepay"
-            ><AmountText :value="money(figures.prepayPaid)"
+            ><AmountText :value="figures.prepayPaid"
           /></strong>
         </li>
       </ul>
@@ -69,7 +67,7 @@ function withdraw() {
           class="tcrm-amount-primary withdraw-card__amount"
           :class="{ negative: availableNegative }"
           data-test="available-amount"
-          ><AmountText :value="money(figures.available)"
+          ><AmountText :value="figures.available"
         /></strong>
         <span class="caption">{{ t("home.withdrawableCaption") }}</span>
       </div>

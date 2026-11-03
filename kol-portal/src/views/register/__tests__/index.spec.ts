@@ -294,3 +294,16 @@ describe("register page (02.01)", () => {
     expect(registerApi.registerKol).not.toHaveBeenCalled();
   });
 });
+
+describe("register placeholders (task 104)", () => {
+  it("reads the phone placeholder from the language pack in both languages", async () => {
+    const { wrapper } = await page("/register");
+    expect(wrapper.get("#register-whatsapp").attributes("placeholder")).toBe(
+      i18n.global.t("register.phonePlaceholder")
+    );
+    useLocaleStore().setLocale("zh-CN");
+    await flushPromises();
+    expect(wrapper.get("#register-whatsapp").attributes("placeholder")).toBe("+8613800000000");
+    wrapper.unmount();
+  });
+});

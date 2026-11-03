@@ -67,9 +67,9 @@ describe("creator paid prepay projection", () => {
   });
   it("shows the paid amount and negative wallet with no administrative controls", async () => {
     const wrapper = await open();
-    expect(wrapper.getComponent(DataTable).text()).toContain("-100.01 CNY");
-    expect(wrapper.text()).toContain("100.01 CNY");
-    expect(wrapper.text()).toContain("80.01 CNY");
+    expect(wrapper.getComponent(DataTable).text()).toContain("-¥100.01");
+    expect(wrapper.text()).toContain("¥100.01");
+    expect(wrapper.text()).toContain("¥80.01");
     expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="prepay-pay-submit"]').exists()).toBe(false);
     wrapper.unmount();
@@ -98,7 +98,7 @@ describe("creator paid prepay projection", () => {
     const table = wrapper.getComponent(DataTable);
     expect(table.props("tableId")).toBe("kol-prepay-ledger");
     expect(table.props("rowKey")).toBe("entryId");
-    expect(table.text()).toContain("-80.01 CNY");
+    expect(table.text()).toContain("-¥80.01");
     expect(table.findAllComponents(CopyText).some(copy => copy.props("value") === "PP-test")).toBe(
       true
     );
@@ -133,7 +133,7 @@ describe("creator paid prepay projection", () => {
     wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", "ledger");
     await flushPromises();
     const entry = wrapper.getComponent(DataTable);
-    expect(entry.text()).toContain("20.00 CNY");
+    expect(entry.text()).toContain("¥20.00");
     expect(entry.text()).not.toContain(i18n.global.t("prepay.walletUnchanged"));
     wrapper.unmount();
   });

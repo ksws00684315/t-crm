@@ -6,6 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
+import { formatInstant } from "@/utils/format";
 import { ApiError } from "@/utils/http/error";
 import * as api from "@/api/payout-account";
 import type { PayoutAccountVO } from "@/api/payout-account";
@@ -240,6 +241,17 @@ describe("payout accounts page", () => {
     const types = wrapper.findAll('[data-test="type"]');
     expect(types[0]!.text()).toContain("PayPal · EUR");
     expect(types[1]!.text()).toContain("USDT · TRC20");
+    wrapper.unmount();
+  });
+});
+
+describe("payout account timestamps (task 104)", () => {
+  it("formats the submitted time through the shared formatInstant helper", async () => {
+    const wrapper = await page([account({ id: "81" })]);
+    const value = account().lastSubmittedAt;
+    expect(wrapper.get('[data-test="account-81"] [data-test="submitted-at"]').text()).toBe(
+      formatInstant(value)
+    );
     wrapper.unmount();
   });
 });
