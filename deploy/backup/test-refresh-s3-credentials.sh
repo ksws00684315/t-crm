@@ -92,6 +92,14 @@ if grep -q "T106AKIA\|T106wJalr\|T106TOKEN" "$WORK/err.txt"; then
 fi
 [ ! -e "$CREDS_DIR/$CREDS_FILE_NAME.tmp" ] || fail "temp file left behind on failure"
 
+# Directory mode is enforced to 755: uid 999 (postgres inside the container) must be able to
+# traverse it, or every backup fails; a 700 directory from an earlier setup must heal (review of
+# task 106). main() chmods before it calls aws, so the failing run above already did it — make the
+# start state explicitly wrong first to prove the enforcement.
+chmod 700 "$CREDS_DIR"
+( PATH="$STUB:$PATH" TCRM_PGBACKREST_CREDS_DIR="$CREDS_DIR" main ) 2> /dev/null || true
+expect 755 "$(stat -c '%a' "$CREDS_DIR" 2>/dev/null || stat -f '%Lp' "$CREDS_DIR")" "credentials dir mode enforced to 755"
+
 # Missing TCRM_PGBACKREST_CREDS_DIR: refuse.
 if ( PATH="$STUB:$PATH" TCRM_PGBACKREST_CREDS_DIR="" main ) 2> "$WORK/err.txt"; then
   fail "main must refuse without TCRM_PGBACKREST_CREDS_DIR"

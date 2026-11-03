@@ -252,8 +252,8 @@ deploy/scripts/local-infra.sh psql
    **S3 凭证只有实例角色一种方式**（ADR-037 决定 1）：主机用 EC2 实例角色，不保存访问密钥。postgres 容器**读不到**实例元数据（IMDSv2 强制、hop limit 为 1，容器隔着 Docker 网桥多一跳，L-107），所以凭证由**主机**定时取好写成 pgBackRest 配置片段：`deploy/backup/refresh-s3-credentials.sh` 用 AWS CLI v2 的默认凭证链取临时凭证（必须是带过期时间的实例角色凭证，取不到长期密钥写不进文件；剩余有效期不足 30 分钟时拒绝写入并保留旧文件），写进 `TCRM_PGBACKREST_CREDS_DIR`（属主为镜像内 postgres 用户的 uid 999，权限 600，原子替换）。整个目录以只读方式挂进容器的 `/etc/pgbackrest/conf.d`（pgBackRest 默认的 `config-include-path`；挂整个目录而不是单文件，原因见 L-012）。pgBackRest 每条归档、备份、恢复命令都重新读取该目录，凭证轮换不需要重启 postgres。
 
    **首次启用顺序**（顺序错了归档会失败）：
-   1. 建目录：`install -d -m 700 /var/lib/tcrm/pgbackrest-creds`（仓库外）；
-   2. 跑一次刷新脚本：`deploy/backup/refresh-s3-credentials.sh`（失败非零退出，原因在 stderr）；
+   1. 建目录：`install -d -m 755 /var/lib/tcrm/pgbackrest-creds`（仓库外）。**目录必须是 755，不能收成 700**：目录属主是 root，而容器里的 pgBackRest 以 uid 999（postgres）读取凭证文件，700 会挡掉它对目录的进入权限，归档和备份全部失败；机密性由文件本身保证（600、属主 uid 999，只有 postgres 读得到）。父目录保持默认 755（uid 999 需要一路可穿越）；
+   2. 跑一次刷新脚本：`deploy/backup/refresh-s3-credentials.sh`（失败非零退出，原因在 stderr；脚本会把目录权限校正回 755）；
    3. 再启动 postgres（凭证目录空着启动也能起来，但首次归档会失败）。
 2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
 3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：

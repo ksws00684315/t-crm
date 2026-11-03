@@ -41,6 +41,11 @@ TMP_FILE=""
 # wall clock as UTC and applies the offset by hand. Empty output = unparseable.
 expiration_epoch() { # <ISO8601> -> seconds, empty on failure
   local value="$1" out sign="" hh=0 mm=0
+  # An empty value is a FAILURE, never "today": GNU date parses an empty string as midnight
+  # (CI run 41664066100), which would fabricate a plausible expiry and let stale values through.
+  if [ -z "$value" ]; then
+    return 1
+  fi
   out=$(date -u -d "$value" +%s 2>/dev/null) && [ -n "$out" ] && printf '%s' "$out" && return 0
   if [[ "$value" =~ ([+-])([0-9][0-9]):?([0-9][0-9])$ ]]; then
     sign=${BASH_REMATCH[1]}
@@ -111,6 +116,11 @@ main() {
       exit 1
       ;;
   esac
+  # The directory must be traversable by the postgres user inside the container (uid 999), or
+  # pgBackRest cannot open the fragment and every backup fails; the file itself carries the
+  # secrecy (600, owned by uid 999). Enforce the documented 755 so a too-strict directory
+  # (e.g. 700 from an earlier setup) heals itself instead of failing silently at archive time.
+  chmod 755 "$resolved"
 
   # Temporary files of the current run; global so that the EXIT trap can still see them.
   TMP_FILE="$resolved/$CREDS_FILE_NAME.tmp"
