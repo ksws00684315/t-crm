@@ -13,9 +13,9 @@ function open() {
     props: {
       modelValue: true,
       orderId: "10",
-      orderNo: "t185-order",
+      orderNo: "t107-order",
       itemId: "20",
-      itemName: "t185-item"
+      itemName: "t107-item"
     },
     global: { plugins: [ElementPlus, i18n] },
     attachTo: document.body

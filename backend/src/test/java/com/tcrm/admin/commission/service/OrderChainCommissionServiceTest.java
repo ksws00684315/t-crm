@@ -26,6 +26,8 @@ class OrderChainCommissionServiceTest {
   private static final Instant SETTLED = Instant.parse("2026-10-20T00:00:00Z");
   private static final Instant APPLIED = Instant.parse("2026-10-22T00:00:00Z");
   private static final Instant PAID_OUT = Instant.parse("2026-10-23T00:00:00Z");
+  private static final long CREATOR = 100L;
+  private static final long OTHER_CREATOR = 200L;
 
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
@@ -225,7 +227,8 @@ class OrderChainCommissionServiceTest {
     when(revisions.listLatestByItemStateIds(any()))
         .thenReturn(List.of(revision(50L, "0.3000"), revision(51L, "0.2000")));
     when(revisions.listSupplementsByOrderItems(anyLong(), any()))
-        .thenReturn(List.of(supplement(20L, "0.3000"), supplement(21L, "0.3000")));
+        .thenReturn(
+            List.of(supplement(20L, CREATOR, "0.3000"), supplement(21L, CREATOR, "0.3000")));
     when(wallet.listByItemStates(any())).thenReturn(List.of());
     when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
 
@@ -237,20 +240,45 @@ class OrderChainCommissionServiceTest {
     assertThat(chain.lines().get(1).rateSupplemented()).isFalse();
   }
 
-  private static CommissionItemRevisionMapper.SupplementRow supplement(long itemId, String rate) {
+  @Test
+  void shouldNotMarkRateAsSupplemented_whenLineWasReattributedToAnotherCreator() {
+    when(tenants.currentLoginTenantId()).thenReturn(1L);
+    // The line now belongs to another creator but happens to keep the supplemented rate.
+    when(states.listByOrderIds(any()))
+        .thenReturn(List.of(state(50L, 20L, OTHER_CREATOR, true, "30.00")));
+    when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
+    when(revisions.listSupplementsByOrderItems(anyLong(), any()))
+        .thenReturn(List.of(supplement(20L, CREATOR, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L));
+
+    assertThat(chain.lines().getFirst().rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(chain.lines().getFirst().rateSupplemented()).isFalse();
+  }
+
+  private static CommissionItemRevisionMapper.SupplementRow supplement(
+      long itemId, long kolId, String rate) {
     var row = new CommissionItemRevisionMapper.SupplementRow();
     row.setItemId(itemId);
+    row.setKolId(kolId);
     row.setRate(dec(rate));
     return row;
   }
 
   private static CommissionItemStateDO state(
       long id, long orderItemId, boolean verified, String accrued) {
+    return state(id, orderItemId, CREATOR, verified, accrued);
+  }
+
+  private static CommissionItemStateDO state(
+      long id, long orderItemId, long kolId, boolean verified, String accrued) {
     var row = new CommissionItemStateDO();
     row.setId(id);
     row.setOrderId(10L);
     row.setOrderItemId(orderItemId);
-    row.setKolId(100L);
+    row.setKolId(kolId);
     row.setVerified(verified);
     row.setAccruedCommissionCny(dec(accrued));
     row.setReleasedCommissionCny(dec(accrued));

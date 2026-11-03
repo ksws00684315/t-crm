@@ -1279,7 +1279,7 @@ const enUS: MessageSchema = {
     }
   },
   order: {
-    missingHistoricalPrice: "Historical price unavailable",
+    missingHistoricalPrice: "No price",
     rateSupplement: {
       saved: "Rate added",
       title: "Add missing rate",

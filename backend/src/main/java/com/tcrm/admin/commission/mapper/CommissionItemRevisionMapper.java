@@ -57,21 +57,24 @@ public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemR
   List<CommissionItemRevisionDO> listLatestByItemStateIds(@Param("ids") Collection<Long> ids);
 
   /**
-   * Supplemented rates of the given order lines, keyed by line. Used to mark a line's rate as
-   * supplemented: the revision keeps the number but not where it came from, and a missing {@code
-   * config_version} alone cannot tell — records predating versioning have none either.
+   * Supplemented rates of the given order lines, keyed by line and by the creator the supplement
+   * was granted to. Used to mark a line's rate as supplemented: the revision keeps the number but
+   * not where it came from, and a missing {@code config_version} alone cannot tell — records
+   * predating versioning have none either.
    */
   @Select(
-      "<script>SELECT order_item_id AS itemId, rate FROM crm_commission_rate_supplement"
+      "<script>SELECT order_item_id AS itemId, kol_id AS kolId, rate"
+          + " FROM crm_commission_rate_supplement"
           + " WHERE tenant_id = #{tenantId} AND order_item_id IN "
           + "<foreach collection='itemIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
           + "</script>")
   List<SupplementRow> listSupplementsByOrderItems(
       @Param("tenantId") long tenantId, @Param("itemIds") Collection<Long> itemIds);
 
-  /** Mapper row for {@link #listSupplementsByOrderItems()}. */
+  /** Mapper row for {@link #listSupplementsByOrderItems}. */
   class SupplementRow {
     private Long itemId;
+    private Long kolId;
     private BigDecimal rate;
 
     public Long getItemId() {
@@ -80,6 +83,14 @@ public interface CommissionItemRevisionMapper extends BaseMapper<CommissionItemR
 
     public void setItemId(Long value) {
       itemId = value;
+    }
+
+    public Long getKolId() {
+      return kolId;
+    }
+
+    public void setKolId(Long value) {
+      kolId = value;
     }
 
     public BigDecimal getRate() {

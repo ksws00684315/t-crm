@@ -134,7 +134,7 @@ class OrderChainFinanceIT {
                 "rate",
                 "0.1250",
                 "reason",
-                "t185 missing historical rate"));
+                "t107 missing historical rate"));
     mvc.perform(
             post("/admin-api/order/orders/" + orderId + "/rate-supplements")
                 .header("X-Admin-Token", adminToken)
@@ -176,7 +176,7 @@ class OrderChainFinanceIT {
     org.assertj.core.api.Assertions.assertThat(auditRow.get("rate"))
         .isEqualTo(new java.math.BigDecimal("0.1250"));
     org.assertj.core.api.Assertions.assertThat(auditRow.get("reason"))
-        .isEqualTo("t185 missing historical rate");
+        .isEqualTo("t107 missing historical rate");
     org.assertj.core.api.Assertions.assertThat(auditRow.get("create_by"))
         .isEqualTo(
             jdbc.queryForObject(
@@ -200,7 +200,7 @@ class OrderChainFinanceIT {
                             "rate",
                             "0.1250",
                             "reason",
-                            "t185 do not overwrite"))))
+                            "t107 do not overwrite"))))
         .andExpect(status().isConflict());
     org.assertj.core.api.Assertions.assertThat(
             jdbc.queryForObject(
@@ -217,8 +217,8 @@ class OrderChainFinanceIT {
             mvc,
             json,
             PASSWORD,
-            "t185x" + (System.nanoTime() % 100_000_000L),
-            "t185-other-" + UUID.randomUUID().toString().substring(0, 8));
+            "t107x" + (System.nanoTime() % 100_000_000L),
+            "t107-other-" + UUID.randomUUID().toString().substring(0, 8));
     mvc.perform(
             post("/admin-api/order/orders/" + orderId + "/rate-supplements")
                 .header("X-Admin-Token", other.token())
@@ -231,7 +231,7 @@ class OrderChainFinanceIT {
                             "rate",
                             "0.1",
                             "reason",
-                            "t185 isolation"))))
+                            "t107 isolation"))))
         .andExpect(status().isNotFound());
   }
 
@@ -246,7 +246,7 @@ class OrderChainFinanceIT {
                 "rate",
                 "0.1250",
                 "reason",
-                "t185 concurrent"));
+                "t107 concurrent"));
     var start = new java.util.concurrent.CountDownLatch(1);
     java.util.function.Supplier<Integer> submit =
         () -> {
@@ -286,7 +286,7 @@ class OrderChainFinanceIT {
   void shouldRollbackSupplementAudit_whenCommissionRevisionFails() throws Exception {
     jdbc.update("UPDATE crm_order_item SET kol_id = ? WHERE id = ?", kolB, item1);
     jdbc.execute(
-        "ALTER TABLE crm_commission_item_revision ADD CONSTRAINT ck_t185_failure CHECK (rate IS NULL OR rate <> 0.1250)");
+        "ALTER TABLE crm_commission_item_revision ADD CONSTRAINT ck_t107_failure CHECK (rate IS NULL OR rate <> 0.1250)");
     try {
       mvc.perform(
               post("/admin-api/order/orders/" + orderId + "/rate-supplements")
@@ -300,7 +300,7 @@ class OrderChainFinanceIT {
                               "rate",
                               "0.1250",
                               "reason",
-                              "t185 rollback"))))
+                              "t107 rollback"))))
           .andExpect(status().isInternalServerError());
       org.assertj.core.api.Assertions.assertThat(
               jdbc.queryForObject(
@@ -315,7 +315,7 @@ class OrderChainFinanceIT {
                   item1))
           .isZero();
     } finally {
-      jdbc.execute("ALTER TABLE crm_commission_item_revision DROP CONSTRAINT ck_t185_failure");
+      jdbc.execute("ALTER TABLE crm_commission_item_revision DROP CONSTRAINT ck_t107_failure");
     }
   }
 

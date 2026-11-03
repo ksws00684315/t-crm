@@ -61,7 +61,7 @@ const columns = computed<DataColumn[]>(() => [
     label: t("order.line.quantity"),
     width: locale.value.startsWith("en") ? 90 : 65
   },
-  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 110, amount: true },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 140, amount: true },
   { key: "totalAmount", label: t("order.detail.totalAmount"), width: 130, amount: true },
   { key: "payAmount", label: t("order.payAmount"), width: 130, amount: true },
   { key: "status", label: t("common.status"), width: 100 }
