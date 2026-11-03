@@ -300,7 +300,8 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.merchantNo").value("10"))
         .andExpect(jsonPath("$.data.source").value("API"))
         .andExpect(jsonPath("$.data.itemAmount").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.totalAmount").value(org.hamcrest.Matchers.nullValue()))
+        // Goods amount needs the historical unit price; the source order total does not.
+        .andExpect(jsonPath("$.data.totalAmount").value("10.00"))
         .andExpect(jsonPath("$.data.payTime").value(PAID.toString()))
         .andExpect(jsonPath("$.data.items[0].imageUrl").value("https://img.example/p1.png"))
         .andExpect(jsonPath("$.data.items[0].unitPrice").value(org.hamcrest.Matchers.nullValue()))

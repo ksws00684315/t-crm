@@ -330,7 +330,7 @@ public class OrderService {
         order.getLastSyncTime(),
         order.getCreateTime(),
         itemAmount,
-        itemAmount,
+        order.getTotalAmount(),
         order.getPayAmount(),
         order.getFreight(),
         lines.stream()
@@ -478,6 +478,7 @@ public class OrderService {
           line.orderItemId(),
           new OrderChainDTO.LineCommissionDTO(
               line.rateSnapshot(),
+              line.rateSupplemented(),
               line.netCommissionCny(),
               line.releaseBasis(),
               line.occupiedCny(),

@@ -727,6 +727,7 @@ class OrderServiceTest {
                     new OrderChainCommissionApi.LineCommissionDTO(
                         20L,
                         new BigDecimal("0.15"),
+                        false,
                         null,
                         "UNVERIFIED",
                         BigDecimal.ZERO,
@@ -800,7 +801,8 @@ class OrderServiceTest {
     assertThat(detail.source()).isEqualTo("API");
     assertThat(detail.refundStatus()).isEqualTo("NONE");
     assertThat(detail.itemAmount()).isNull();
-    assertThat(detail.totalAmount()).isNull();
+    // A missing line price blanks the goods amount only; the merchant's own order total stands.
+    assertThat(detail.totalAmount()).isEqualByComparingTo("12.50");
     assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("12.50");
     assertThat(detail.items()).hasSize(1);
     assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
@@ -811,6 +813,7 @@ class OrderServiceTest {
   @Test
   void shouldKeepSourcePaymentSeparateFromHistoricalGoodsAmount() {
     var order = order(10);
+    order.setTotalAmount(new BigDecimal("48.00"));
     order.setPayAmount(new BigDecimal("43.00"));
     order.setFreight(new BigDecimal("5.00"));
     when(orders.selectById(10L)).thenReturn(order);
@@ -830,7 +833,8 @@ class OrderServiceTest {
     var detail = service.detail(10L);
     // 10*2 + 20*1 = 40 goods; freight 5 and merchant discount 2 do not change it.
     assertThat(detail.itemAmount()).isEqualByComparingTo("40.00");
-    assertThat(detail.totalAmount()).isEqualByComparingTo("40.00");
+    // The order total is the merchant's figure, never rebuilt from the historical line prices.
+    assertThat(detail.totalAmount()).isEqualByComparingTo("48.00");
     assertThat(detail.payAmount()).isEqualByComparingTo("43.00");
     assertThat(detail.freight()).isEqualByComparingTo("5.00");
     assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("10.00");
@@ -947,6 +951,7 @@ class OrderServiceTest {
                     new OrderChainCommissionApi.LineCommissionDTO(
                         20L,
                         new BigDecimal("0.3000"),
+                        false,
                         new BigDecimal("3.75"),
                         "CONFIRMED",
                         new BigDecimal("3.00"),
