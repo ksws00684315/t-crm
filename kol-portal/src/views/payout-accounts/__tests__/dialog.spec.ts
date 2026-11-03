@@ -101,6 +101,22 @@ describe("payout account dialog", () => {
     expect(api.createPayoutAccount).not.toHaveBeenCalled();
   });
 
+  it("keeps a neutral account placeholder until a type is chosen, then shows the type hint (L-106)", async () => {
+    const wrapper = await openDialog(null);
+    const input = wrapper.get("#payout-account");
+    expect(input.attributes("placeholder")).toBe(
+      i18n.global.t("payoutAccounts.form.accountPlaceholder")
+    );
+    expect(input.attributes("placeholder")).not.toBe(
+      i18n.global.t("payoutAccounts.form.accountUsdtHint")
+    );
+
+    await chooseType(wrapper, "USDT");
+    expect(wrapper.get("#payout-account").attributes("placeholder")).toBe(
+      i18n.global.t("payoutAccounts.form.accountUsdtHint")
+    );
+  });
+
   it("validates the PayPal fields", async () => {
     const wrapper = await openDialog(null);
     await chooseType(wrapper, "PAYPAL");
