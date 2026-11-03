@@ -354,7 +354,7 @@ function lineStatus(line: ChainLineVO): string {
 const summaryColumns = computed<DataColumn[]>(() => [
   { key: "product", align: "left", label: t("order.chain.summaryProduct"), minWidth: 230 },
   { key: "status", label: t("common.status"), minWidth: 100 },
-  { key: "kol", align: "center", label: t("order.chain.summaryKol"), minWidth: 145 },
+  { key: "kol", align: "left", label: t("order.chain.summaryKol"), minWidth: 145 },
   { key: "payAmount", label: t("order.payAmount"), minWidth: 110, amount: true },
   {
     key: "rate",
@@ -447,6 +447,7 @@ onMounted(load);
 
 <template>
   <div v-loading="loading" class="chain-page">
+    <h1 class="chain-page__heading">{{ t("route.orderChain") }}</h1>
     <template v-if="chain">
       <section class="chain-page__card" data-test="chain-funds">
         <h3 class="chain-page__title">{{ t("order.chain.fundsSection") }}</h3>
@@ -874,6 +875,11 @@ onMounted(load);
   gap: var(--tcrm-space-4);
   min-width: 0;
 }
+
+.chain-page__heading {
+  margin: 0;
+}
+
 .chain-page__card {
   padding: var(--tcrm-space-4);
   background: var(--tcrm-color-card);

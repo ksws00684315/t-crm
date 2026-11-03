@@ -207,7 +207,7 @@ describe("refund query page (task 40)", () => {
     expect(
       [...(drawer?.querySelectorAll("thead th") ?? [])].map(item => item.textContent?.trim())
     ).toEqual(["商品", "达人", "数量", "退款金额"]);
-    expect(drawer?.textContent).toContain("20.00 CNY");
+    expect(drawer?.textContent).toContain("¥20.00");
     wrapper.unmount();
   });
 

@@ -17,7 +17,7 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useListExport } from "@/composables/useListExport";
 import { useUserStore } from "@/stores/user";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { importTemplateFileName, MAPPING_IMPORT } from "@/utils/import-types";
 import { canExport, kolAbilities, linkAbilities, productAbilities } from "@/utils/permission";
@@ -534,7 +534,9 @@ onMounted(() => {
       </template>
       <template #cell-currentRate="{ row }">{{ formatRate(asItem(row).currentRate) }}</template>
       <template #cell-salesQuantity="{ row }">{{ asItem(row).salesQuantity }}</template>
-      <template #cell-payAmount="{ row }">{{ asItem(row).payAmount }}</template>
+      <template #cell-payAmount="{ row }">{{
+        formatAmountWithCurrency(asItem(row).payAmount)
+      }}</template>
       <template #cell-status="{ row }">{{ named("statuses", asItem(row).status) }}</template>
       <template #cell-cleanupStatus="{ row }">
         {{ named("cleanups", asItem(row).cleanupStatus) }}

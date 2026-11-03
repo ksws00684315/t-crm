@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CopyText from "@/components/CopyText.vue";
 import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
@@ -165,10 +166,14 @@ async function submit() {
     <NameCode v-if="kol" :name="kol?.name" :code="kol?.kolCode" />
     <el-form ref="formRef" :model="form" :rules="rules" label-width="130px" @submit.prevent>
       <el-form-item :label="t('kol.code')">
-        <el-input :model-value="kol?.kolCode ?? ''" disabled data-test="profile-code" />
+        <div class="readonly-value" data-test="profile-code">
+          <CopyText :value="kol?.kolCode" />
+        </div>
       </el-form-item>
       <el-form-item :label="t('common.email')">
-        <el-input :model-value="kol?.email ?? ''" disabled data-test="profile-email" />
+        <div class="readonly-value" data-test="profile-email">
+          <CopyText :value="kol?.email" />
+        </div>
       </el-form-item>
       <el-form-item :label="t('kol.kolName')" prop="name">
         <el-input v-model="form.name" data-test="profile-name" maxlength="64" />
@@ -214,3 +219,11 @@ async function submit() {
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.readonly-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--tcrm-control-height);
+}
+</style>

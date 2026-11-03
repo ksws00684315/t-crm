@@ -73,7 +73,7 @@ describe("financial drawers and payment registration", () => {
     await flushPromises();
     const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
     expect(text).toContain("t1023_K001");
-    expect(text).toContain("200.00 CNY");
+    expect(text).toContain("¥200.00");
     expect(text).toContain("关联订单（11笔）");
     expect(text).toContain("t1023_WD001");
     expect(text).toContain("t1023_WD010");
@@ -151,7 +151,7 @@ describe("financial drawers and payment registration", () => {
     await flushPromises();
     const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
     expect(text).toContain("t1023_W005");
-    expect(text).toContain("700.00 CNY");
+    expect(text).toContain("¥700.00");
     expect(text).toContain("关联订单（1笔）");
     expect(text).not.toContain("t1023_W001");
     wrapper.unmount();

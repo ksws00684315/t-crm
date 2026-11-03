@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
@@ -58,6 +58,7 @@ const query = reactive({
 });
 
 const applied = ref({ kolId: "", name: "", email: "" });
+const tableRef = ref<InstanceType<typeof DataTable>>();
 
 const chips = computed<SearchChip[]>(() => {
   const list: SearchChip[] = [];
@@ -276,6 +277,7 @@ function rowActions(row: KolVO): RowAction[] {
       label: t("kol.actionEdit"),
       testId: "action-edit",
       disabled: !abilities.value.canWrite,
+      tooltip: abilities.value.canWrite ? undefined : t("kol.disabledNoPermission"),
       onClick: () => openEdit(row)
     },
     {
@@ -283,6 +285,13 @@ function rowActions(row: KolVO): RowAction[] {
       label: t("kol.actionCommission"),
       testId: "action-commission",
       disabled: !(abilities.value.canWrite && row.reviewStatus === "APPROVED" && rowOwned(row)),
+      tooltip: !abilities.value.canWrite
+        ? t("kol.disabledNoPermission")
+        : row.reviewStatus !== "APPROVED"
+          ? t("kol.disabledCommissionApproved")
+          : !rowOwned(row)
+            ? t("kol.disabledNotOwned")
+            : undefined,
       onClick: () => openCommission(row)
     },
     {
@@ -290,6 +299,11 @@ function rowActions(row: KolVO): RowAction[] {
       label: t("kol.actionFund"),
       testId: `action-fund-${row.id}`,
       disabled: !(accessOf(me.user).can("payout-account:review") && rowOwned(row)),
+      tooltip: !accessOf(me.user).can("payout-account:review")
+        ? t("kol.disabledNoPermission")
+        : !rowOwned(row)
+          ? t("kol.disabledNotOwned")
+          : undefined,
       onClick: () => openFund(row)
     },
     {
@@ -298,6 +312,11 @@ function rowActions(row: KolVO): RowAction[] {
       testId: `action-cleanup-${row.id}`,
       danger: row.autoCleanupDays != null,
       disabled: !(abilities.value.canWrite && rowOwned(row)),
+      tooltip: !abilities.value.canWrite
+        ? t("kol.disabledNoPermission")
+        : !rowOwned(row)
+          ? t("kol.disabledNotOwned")
+          : undefined,
       onClick: () => openCleanup(row)
     },
     {
@@ -306,6 +325,11 @@ function rowActions(row: KolVO): RowAction[] {
       testId: `action-freeze-${row.id}`,
       type: row.status === 1 ? "danger" : "success",
       disabled: !(abilities.value.canWrite && rowOwned(row)),
+      tooltip: !abilities.value.canWrite
+        ? t("kol.disabledNoPermission")
+        : !rowOwned(row)
+          ? t("kol.disabledNotOwned")
+          : undefined,
       onClick: () => toggleStatus(row)
     }
   ];
@@ -338,8 +362,17 @@ async function toggleStatus(row: KolVO) {
   }
 }
 
-onMounted(() => {
-  void load();
+/** Narrow viewports start at the first column instead of leaving the creator name out of view. */
+async function resetTableScroll(): Promise<void> {
+  await nextTick();
+  const root = tableRef.value?.$el as HTMLElement | undefined;
+  const wrap = root?.querySelector<HTMLElement>(".el-table__body-wrapper .el-scrollbar__wrap");
+  if (wrap) wrap.scrollLeft = 0;
+}
+
+onMounted(async () => {
+  await load();
+  await resetTableScroll();
 });
 </script>
 
@@ -385,6 +418,7 @@ onMounted(() => {
         </ListSearch>
 
         <DataTable
+          ref="tableRef"
           class="kol-fit"
           table-id="kol"
           fill-available-height

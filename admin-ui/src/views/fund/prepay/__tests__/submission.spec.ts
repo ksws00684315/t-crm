@@ -6,6 +6,7 @@ import * as api from "@/api/commission/prepay";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import { ApiError } from "@/utils/http/error";
+import ApplicationDetailsForm from "../ApplicationDetailsForm.vue";
 import ApplyDialog from "../ApplyDialog.vue";
 import DetailDrawer from "../DetailDrawer.vue";
 vi.mock("@/api/commission/prepay", () => ({
@@ -416,6 +417,23 @@ describe("prepay safe submission", () => {
       expect(api.applyPrepay).not.toHaveBeenCalled();
     }
   });
+  it("uses one column while editing and two columns in read-only mode", () => {
+    const editable = mount(ApplicationDetailsForm, {
+      props: { detail, editable: true, recipientText: null },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(editable.get("form").classes()).toContain("application-grid");
+    expect(editable.get("form").classes()).not.toContain("application-grid--readonly");
+    editable.unmount();
+
+    const readonly = mount(ApplicationDetailsForm, {
+      props: { detail, editable: false, recipientText: null },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    expect(readonly.get("form").classes()).toContain("application-grid--readonly");
+    readonly.unmount();
+  });
+
   it("requires finance details and an explicit deduction choice before approval", async () => {
     useUserStore().user!.permissions = ["prepay:apply"];
     vi.mocked(api.getPrepay).mockResolvedValue({

@@ -181,7 +181,12 @@ const dialogVisible = computed({
 </script>
 
 <template>
-  <el-dialog v-model="dialogVisible" :title="t('promoSheet.title')" width="720px" @open="open">
+  <el-dialog
+    v-model="dialogVisible"
+    :title="t('promoSheet.title')"
+    width="min(720px, calc(100vw - 24px))"
+    @open="open"
+  >
     <div class="promo-sheet">
       <NameCode :name="kolName || kolLabel" :code="kolCode" data-test="promo-target" />
 

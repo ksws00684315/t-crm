@@ -51,21 +51,38 @@ export function formatCodeWithName(
 
 const CURRENCY_SYMBOLS: Record<string, string> = { CNY: "¥", USD: "$", EUR: "€", GBP: "£" };
 
-/** Confirmed order/refund presentation; preserve the server's decimal precision. */
-export function formatAmountWithCurrency(
-  amount: string | null | undefined,
-  currency = "CNY"
-): string {
-  return amount == null || amount === "" ? "-" : `${amount} ${currency}`;
+const AMOUNT_PATTERN = /^([+-]?)(\d*)(?:\.(\d+))?$/;
+
+/** Inserts thousands separators into the integer part without converting to a float. */
+function groupIntegerPart(integerPart: string): string {
+  return integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-/** Display price with its currency: "¥12.50", "$60.00", or "12.50 JPY" without a known symbol. */
+/**
+ * Symbol-style money for both consoles (owner decision 2026-11-02): "¥1,234.56", "-¥5.00",
+ * "1,234 JPY". The symbol follows the business currency; unknown codes use "amount CODE".
+ * Grouping happens on the decimal string so no backend precision is lost to floating point.
+ */
+export function formatAmountWithCurrency(
+  amount: string | null | undefined,
+  currency?: string | null
+): string {
+  if (amount === null || amount === undefined || amount === "") return "-";
+  const text = String(amount).trim();
+  const code = (currency || "CNY").toUpperCase();
+  const match = AMOUNT_PATTERN.exec(text);
+  if (!match) return text;
+  const [, sign = "", rawInteger = "", fraction] = match;
+  const integerPart = groupIntegerPart(rawInteger.replace(/^0+(?=\d)/, "") || "0");
+  const value = fraction === undefined ? integerPart : `${integerPart}.${fraction}`;
+  const symbol = CURRENCY_SYMBOLS[code];
+  return symbol ? `${sign}${symbol}${value}` : `${sign}${value} ${code}`;
+}
+
+/** Kept as a named alias so existing call sites share the same formatting rules. */
 export function formatPrice(
   price: string | null | undefined,
   currency: string | null | undefined
 ): string {
-  if (price === null || price === undefined || price === "") return "-";
-  const code = currency || "CNY";
-  const symbol = CURRENCY_SYMBOLS[code];
-  return symbol ? `${symbol}${price}` : `${price} ${code}`;
+  return formatAmountWithCurrency(price, currency);
 }

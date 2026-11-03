@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n";
 import { getKolItem } from "@/api/product/kol-item";
 import type { KolItemDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
-import { formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { formatRate } from "@/utils/rate";
 
@@ -143,7 +143,7 @@ function label(group: "channels" | "statuses" | "cleanups", value: string | null
           {{ detail.salesQuantity }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.totalPayAmount')">
-          {{ detail.totalPayAmount }}
+          {{ formatAmountWithCurrency(detail.totalPayAmount) }}
         </el-descriptions-item>
         <el-descriptions-item :label="t('mapping.status')">
           <el-tag :type="detail.status === 'ENABLED' ? 'success' : 'info'">{{

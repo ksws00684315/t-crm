@@ -5,6 +5,7 @@ import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { payWithdrawal, uploadWithdrawalVoucher } from "@/api/commission/finance";
 import type { PaymentRegistration, Withdrawal } from "@/api/commission/finance-types";
 import { cents, validMoney } from "@/utils/finance";
+import { formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
 import { randomUuid } from "@/utils/uuid";
@@ -140,8 +141,9 @@ async function submit() {
         data-test="payment-paused"
       />
       <el-descriptions :column="1" border
-        ><el-descriptions-item :label="t('finance.approvedCny')"
-          >{{ withdrawal.amount }} CNY</el-descriptions-item
+        ><el-descriptions-item :label="t('finance.approvedCny')">{{
+          formatAmountWithCurrency(withdrawal.amount, withdrawal.currency)
+        }}</el-descriptions-item
         ><el-descriptions-item :label="t('finance.recipient')"
           >{{ withdrawal.account.type }} · {{ withdrawal.account.account }} ·
           {{ withdrawal.account.currency }} · {{ withdrawal.account.holder }}

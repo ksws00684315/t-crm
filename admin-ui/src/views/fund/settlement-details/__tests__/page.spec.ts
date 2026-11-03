@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as financeApi from "@/api/commission/finance";
 import type { Settlement } from "@/api/commission/finance-types";
 import * as shopApi from "@/api/product/shop";
+import DataTable from "@/components/DataTable.vue";
 import { i18n } from "@/locales";
 import { notifyError } from "@/utils/notify";
 import { saveSession } from "@/utils/session";
@@ -143,6 +144,38 @@ describe("settlement details page", () => {
     expect(text).toContain("微店可提现金额");
     expect(text).not.toContain("店铺获利");
     expect(text).not.toContain("净增减");
+    wrapper.unmount();
+  });
+
+  it("shows applied filters as chips only after the user searches", async () => {
+    signIn(["commission:view", "product:view"]);
+    const wrapper = mount(SettlementDetailsPage, {
+      global: { plugins: [i18n, ElementPlus] }
+    });
+    await flushPromises();
+    await wrapper.get('[data-test="settlement-order"]').setValue("791029213203");
+    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(false);
+    wrapper.findComponent({ name: "ListSearch" }).vm.$emit("search");
+    await flushPromises();
+    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(true);
+    expect(financeApi.listSettlements).toHaveBeenLastCalledWith(
+      expect.objectContaining({ orderNo: "791029213203" })
+    );
+    wrapper.unmount();
+  });
+
+  it("left-aligns long content columns", async () => {
+    const wrapper = mount(SettlementDetailsPage, {
+      global: { plugins: [i18n, ElementPlus] }
+    });
+    await flushPromises();
+    const columns = wrapper.getComponent(DataTable).props("columns") as Array<{
+      key: string;
+      align?: string;
+    }>;
+    for (const key of ["orderNo", "shop", "creator"]) {
+      expect(columns.find(column => column.key === key)?.align).toBe("left");
+    }
     wrapper.unmount();
   });
 

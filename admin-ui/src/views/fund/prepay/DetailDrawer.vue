@@ -18,7 +18,7 @@ import CopyText from "@/components/CopyText.vue";
 import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 import ApplicationDetailsForm from "./ApplicationDetailsForm.vue";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { saveBlob } from "@/utils/download";
 import { notifyError } from "@/utils/notify";
 import { ApiError } from "@/utils/http/error";
@@ -440,9 +440,12 @@ async function submitPayment() {
             <section v-if="detail.payment" class="payment-summary">
               <el-descriptions :column="detailColumns" border>
                 <el-descriptions-item :label="t('prepay.payAmount')"
-                  ><span class="payment-amount"
-                    >{{ detail.payment.payAmountCny }} CNY</span
-                  ></el-descriptions-item
+                  ><span class="payment-amount">{{
+                    formatAmountWithCurrency(
+                      detail.payment.payAmountCny,
+                      detail.payment.payCurrency
+                    )
+                  }}</span></el-descriptions-item
                 >
                 <el-descriptions-item :label="t('prepay.payTime')">{{
                   formatInstant(detail.payment.payTime)
@@ -468,14 +471,17 @@ async function submitPayment() {
                 >
               </el-descriptions>
               <p>
-                {{ t("prepay.balance") }}：<span data-test="prepay-wallet"
-                  >{{ detail.walletBalanceCny }} CNY</span
-                >
+                {{ t("prepay.balance") }}：<span data-test="prepay-wallet">{{
+                  formatAmountWithCurrency(detail.walletBalanceCny)
+                }}</span>
               </p>
               <p v-if="detail.deduction">
-                {{ t("prepay.posted") }} {{ detail.deduction.postedAmountCny }} CNY ·
-                {{ t("prepay.recovered") }} {{ detail.deduction.recoveredAmountCny }} CNY ·
-                {{ t("prepay.remaining") }} {{ detail.deduction.remainingAmountCny }} CNY
+                {{ t("prepay.posted") }}
+                {{ formatAmountWithCurrency(detail.deduction.postedAmountCny) }} ·
+                {{ t("prepay.recovered") }}
+                {{ formatAmountWithCurrency(detail.deduction.recoveredAmountCny) }} ·
+                {{ t("prepay.remaining") }}
+                {{ formatAmountWithCurrency(detail.deduction.remainingAmountCny) }}
               </p>
             </section>
             <section v-else-if="detail.status === 'APPROVED' && abilities.pay">
