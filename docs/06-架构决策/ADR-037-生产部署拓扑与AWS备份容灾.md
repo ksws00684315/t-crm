@@ -8,7 +8,7 @@
 
 ## 决定
 
-1. **拓扑**：单台 AWS 主机上用 Docker Compose 运行 nginx、crm-admin、crm-redirect、postgres、redis。中间件容器化，不使用 K8s，不做主从，不使用 RDS。主机用 EC2（负责人 2026-11-03 确定），4 核 8G 非突发机型，沿用原内存规划。备份等访问 AWS 的操作使用实例角色，主机上不保存 AWS 访问密钥；强制 IMDSv2、hop limit 为 1，容器读不到实例凭证。
+1. **拓扑**：单台 AWS 主机上用 Docker Compose 运行 nginx、crm-admin、crm-redirect、postgres、redis。中间件容器化，不使用 K8s，不做主从，不使用 RDS。主机用 EC2（负责人 2026-11-03 确定），4 核 8G 非突发机型，沿用原内存规划。备份等访问 AWS 的操作使用实例角色，主机上不保存 AWS 访问密钥；强制 IMDSv2、hop limit 为 1，容器读不到实例凭证。pgBackRest 的 S3 凭证由主机定时取实例角色临时凭证，写入只读挂进 postgres 容器的配置目录（任务 106）。
 2. **前端**：不单独起容器，两个前端的静态文件由同一个 Nginx 托管，用 `current` 软链接切换版本，发布前端不重启 Nginx。
 3. **域名与证书**：Cloudflare 继续管 DNS 和代理。`t.`、`kol.` 走代理，用 Cloudflare 源站证书；`admin.` 默认走代理；`upload.` 灰云。`admin.`、`upload.` 使用 Let's Encrypt 公开证书（DNS-01），这样 `admin.` 将来改灰云时无须换证书。
 4. **源站保护**：`upload.` 灰云会暴露源站 IP，安全组无法只放行 Cloudflare 回源段。`t.`、`kol.`、`admin.` 启用 Authenticated Origin Pulls，由 Nginx 校验 Cloudflare 客户端证书。
