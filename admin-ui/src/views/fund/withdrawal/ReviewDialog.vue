@@ -4,7 +4,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "elem
 import { useI18n } from "vue-i18n";
 import { reviewWithdrawal } from "@/api/commission/finance";
 import type { Withdrawal } from "@/api/commission/finance-types";
-import { formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 
 const props = defineProps<{ modelValue: boolean; withdrawal: Withdrawal | null }>();
@@ -16,9 +16,6 @@ const decision = ref<"APPROVE" | "REJECT">("APPROVE");
 const form = reactive({ note: "" });
 const errors = reactive({ note: "" });
 const stage = computed(() => "operationsReview");
-function amountCurrency(amount: string, currency: string) {
-  return `${amount} ${currency}`;
-}
 const rules = computed<FormRules>(() => ({
   note: [
     {
@@ -93,7 +90,7 @@ async function submit(next: "APPROVE" | "REJECT") {
           withdrawal.bdName || "—"
         }}</el-descriptions-item>
         <el-descriptions-item :label="t('finance.amount')">{{
-          amountCurrency(withdrawal.amount, withdrawal.currency)
+          formatAmountWithCurrency(withdrawal.amount, withdrawal.currency)
         }}</el-descriptions-item>
         <el-descriptions-item :label="t('finance.createdAt')">{{
           formatInstant(withdrawal.createdAt)
@@ -107,10 +104,10 @@ async function submit(next: "APPROVE" | "REJECT") {
           withdrawal.note || "—"
         }}</el-descriptions-item>
         <el-descriptions-item :label="t('finance.estimated')">{{
-          withdrawal.estimatedTotal ? amountCurrency(withdrawal.estimatedTotal, "CNY") : "—"
+          withdrawal.estimatedTotal ? formatAmountWithCurrency(withdrawal.estimatedTotal) : "—"
         }}</el-descriptions-item>
         <el-descriptions-item :label="t('finance.available')">{{
-          withdrawal.availableTotal ? amountCurrency(withdrawal.availableTotal, "CNY") : "—"
+          withdrawal.availableTotal ? formatAmountWithCurrency(withdrawal.availableTotal) : "—"
         }}</el-descriptions-item>
       </el-descriptions>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { Tools } from "@element-plus/icons-vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { translate } from "@/locales";
 
 defineOptions({ name: "ComingSoonPage" });
@@ -13,13 +14,26 @@ defineOptions({ name: "ComingSoonPage" });
  */
 const { t } = useI18n();
 const route = useRoute();
+const router = useRouter();
 const title = computed(() => (route.meta.title ? translate(String(route.meta.title)) : ""));
+function backToWorkbench(): void {
+  void router.push("/home");
+}
 </script>
 
 <template>
   <div class="coming-soon" data-test="coming-soon">
-    <h2 class="coming-soon__title">{{ title }}</h2>
+    <el-icon
+      class="coming-soon__icon"
+      style="font-size: var(--tcrm-font-size-title) !important"
+      aria-hidden="true"
+      ><Tools
+    /></el-icon>
+    <h1 class="coming-soon__heading">{{ title }}</h1>
     <p class="coming-soon__text">{{ t("common.comingSoon") }}</p>
+    <el-button data-test="coming-soon-home" @click="backToWorkbench">
+      {{ t("common.backToWorkbench") }}
+    </el-button>
   </div>
 </template>
 
@@ -36,12 +50,16 @@ const title = computed(() => (route.meta.title ? translate(String(route.meta.tit
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
 }
-.coming-soon__title {
+.coming-soon__icon {
+  color: var(--tcrm-color-text-secondary);
+}
+/* Size the svg directly: `#app *` owns font-size, and Element Plus sets the svg width inline. */
+.coming-soon__icon :deep(svg) {
+  width: var(--tcrm-font-size-title) !important;
+  height: var(--tcrm-font-size-title) !important;
+}
+.coming-soon__heading {
   margin: 0;
-  font-size: var(--tcrm-font-size-section);
-  line-height: 24px;
-  font-weight: 600;
-  color: var(--tcrm-color-text);
 }
 .coming-soon__text {
   margin: 0;

@@ -10,6 +10,7 @@ import {
   type PrepayEntry
 } from "@/api/prepay";
 import { useSubmission } from "@/utils/useSubmission";
+import AmountText from "@/components/AmountText.vue";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
@@ -201,17 +202,25 @@ onMounted(load);
         </el-radio-group>
       </template>
       <template #cell-prepayNo="{ row }"><CopyText :value="row.prepayNo" /></template>
-      <template #cell-payAmountCny="{ row }">{{ row.payAmountCny }} CNY</template>
+      <template #cell-payAmountCny="{ row }"
+        ><AmountText :value="row.payAmountCny" :currency="row.payCurrency"
+      /></template>
       <template #cell-payTime="{ row }">{{ formatInstant(row.payTime) }}</template>
-      <template #cell-walletBalanceCny="{ row }">{{ row.walletBalanceCny }} CNY</template>
+      <template #cell-walletBalanceCny="{ row }"
+        ><AmountText :value="row.walletBalanceCny"
+      /></template>
       <template #cell-recovered="{ row }">
-        <template v-if="row.deduction">{{ row.deduction.recoveredAmountCny }} CNY</template>
+        <template v-if="row.deduction"
+          ><AmountText :value="row.deduction.recoveredAmountCny"
+        /></template>
         <span v-else :title="!row.deductFromCommission ? t('prepay.noDeduction') : undefined"
           >—</span
         >
       </template>
       <template #cell-remaining="{ row }">
-        <template v-if="row.deduction">{{ row.deduction.remainingAmountCny }} CNY</template>
+        <template v-if="row.deduction"
+          ><AmountText :value="row.deduction.remainingAmountCny"
+        /></template>
         <span v-else :title="!row.deductFromCommission ? t('prepay.noDeduction') : undefined"
           >—</span
         >
@@ -220,10 +229,12 @@ onMounted(load);
       <template #cell-entryType="{ row }">{{
         row.entryType ? t(`prepay.entry.${row.entryType}`) : "—"
       }}</template>
-      <template #cell-amountCny="{ row }">{{ row.amountCny }} CNY</template>
+      <template #cell-amountCny="{ row }"><AmountText :value="row.amountCny" /></template>
       <template #cell-occurredAt="{ row }">{{ formatInstant(row.occurredAt) }}</template>
       <template #cell-balanceAfterCny="{ row }">
-        <template v-if="row.balanceAfterCny != null">{{ row.balanceAfterCny }} CNY</template>
+        <template v-if="row.balanceAfterCny != null"
+          ><AmountText :value="row.balanceAfterCny"
+        /></template>
         <template v-else-if="row.entryType === 'PREPAY_PAID'">{{
           t("prepay.walletUnchanged")
         }}</template>
@@ -247,17 +258,17 @@ onMounted(load);
           <h2><CopyText :value="row.prepayNo" /></h2>
           <dl>
             <dt>{{ t("prepay.paidAmount") }}</dt>
-            <dd>{{ row.payAmountCny }} CNY</dd>
+            <dd><AmountText :value="row.payAmountCny" :currency="row.payCurrency" /></dd>
             <dt>{{ t("prepay.payTime") }}</dt>
             <dd>{{ formatInstant(row.payTime) }}</dd>
             <dt>{{ t("prepay.payMethod") }}</dt>
             <dd>{{ row.payMethod }}</dd>
             <dt>{{ t("prepay.balance") }}</dt>
-            <dd data-test="prepay-wallet">{{ row.walletBalanceCny }} CNY</dd>
+            <dd data-test="prepay-wallet"><AmountText :value="row.walletBalanceCny" /></dd>
           </dl>
           <p v-if="row.deduction">
-            {{ t("prepay.recovered") }} {{ row.deduction.recoveredAmountCny }} CNY ·
-            {{ t("prepay.remaining") }} {{ row.deduction.remainingAmountCny }} CNY
+            {{ t("prepay.recovered") }} <AmountText :value="row.deduction.recoveredAmountCny" /> ·
+            {{ t("prepay.remaining") }} <AmountText :value="row.deduction.remainingAmountCny" />
           </p>
           <p v-else-if="!row.deductFromCommission">{{ t("prepay.noDeduction") }}</p>
           <RowActions :actions="paymentActions(row)" />
@@ -271,10 +282,13 @@ onMounted(load);
           data-test="prepay-ledger-row"
         >
           <h2><CopyText :value="entry.prepayNo" /></h2>
-          <p>{{ t(`prepay.entry.${entry.entryType}`) }} · {{ entry.amountCny }} CNY</p>
+          <p>
+            {{ t(`prepay.entry.${entry.entryType}`) }} ·
+            <AmountText :value="entry.amountCny" />
+          </p>
           <p>{{ formatInstant(entry.occurredAt) }}</p>
           <p v-if="entry.balanceAfterCny != null">
-            {{ t("prepay.balanceAfter") }} {{ entry.balanceAfterCny }} CNY
+            {{ t("prepay.balanceAfter") }} <AmountText :value="entry.balanceAfterCny" />
           </p>
           <p v-else-if="entry.entryType === 'PREPAY_PAID'">{{ t("prepay.walletUnchanged") }}</p>
         </article></template
@@ -299,14 +313,16 @@ onMounted(load);
         <template v-if="detail"
           ><h2><CopyText :value="detail.prepayNo" /></h2>
           <p>
-            {{ detail.payAmountCny }} CNY · {{ detail.payMethod }} ·
+            <AmountText :value="detail.payAmountCny" :currency="detail.payCurrency" /> ·
+            {{ detail.payMethod }} ·
             {{ formatInstant(detail.payTime) }}
           </p>
-          <p>{{ t("prepay.balance") }} {{ detail.walletBalanceCny }} CNY</p>
+          <p>{{ t("prepay.balance") }} <AmountText :value="detail.walletBalanceCny" /></p>
           <p v-if="detail.deduction">
-            {{ t("prepay.posted") }} {{ detail.deduction.postedAmountCny }} CNY ·
-            {{ t("prepay.recovered") }} {{ detail.deduction.recoveredAmountCny }} CNY ·
-            {{ t("prepay.remaining") }} {{ detail.deduction.remainingAmountCny }} CNY
+            {{ t("prepay.posted") }} <AmountText :value="detail.deduction.postedAmountCny" /> ·
+            {{ t("prepay.recovered") }}
+            <AmountText :value="detail.deduction.recoveredAmountCny" /> ·
+            {{ t("prepay.remaining") }} <AmountText :value="detail.deduction.remainingAmountCny" />
           </p>
           <el-button :disabled="downloadState.busy.value" @click="download(detail.voucherFileId)">{{
             t("prepay.voucher")

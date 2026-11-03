@@ -5,7 +5,6 @@ import { useI18n } from "vue-i18n";
 import { listTenants, updateTenantStatus, type TenantVO } from "@/api/platform/tenant";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
-import ListSearch from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { formatInstant } from "@/utils/format";
@@ -129,11 +128,6 @@ onMounted(load);
 
 <template>
   <div class="list-page">
-    <ListSearch @search="load" @reset="load">
-      <template #actions>
-        <el-button type="primary" @click="openCreate">{{ t("tenant.create") }}</el-button>
-      </template>
-    </ListSearch>
     <DataTable
       table-id="tenants"
       :rows="rows"
@@ -145,6 +139,15 @@ onMounted(load);
       @refresh="load"
       @retry="load"
     >
+      <template #toolbar>
+        <h1 class="tenant-page__title">{{ t("route.tenants") }}</h1>
+        <div class="tenant-page__actions">
+          <span class="data-table__total">{{ t("table.total", { total: rows.length }) }}</span>
+          <el-button type="primary" data-test="create-tenant" @click="openCreate">
+            {{ t("tenant.create") }}
+          </el-button>
+        </div>
+      </template>
       <template #cell-tenantCode="{ row }"><CopyText :value="asTenant(row).tenantCode" /></template>
       <template #cell-status="{ row }">
         <el-tag :type="asTenant(row).status === 1 ? 'success' : 'info'">
@@ -161,3 +164,14 @@ onMounted(load);
     <TenantAdminsDialog v-model="adminsVisible" :tenant="adminsTenant" />
   </div>
 </template>
+
+<style scoped>
+.tenant-page__title {
+  margin: 0;
+}
+.tenant-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-3);
+}
+</style>

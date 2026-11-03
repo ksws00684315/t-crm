@@ -69,6 +69,16 @@ describe("oper-log filters (task 32 §2.3)", () => {
     wrapper.unmount();
   });
 
+  it("shows filter chips only after the search applies them", async () => {
+    const { wrapper } = await mountPage();
+    await wrapper.get('[data-test="filter-keyword"]').setValue("KOL-ASD001");
+    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(false);
+    wrapper.getComponent({ name: "ListSearch" }).vm.$emit("search");
+    await flushPromises();
+    expect(wrapper.find('[data-test="search-chip"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("sends the keyword and operator filters", async () => {
     const { wrapper } = await mountPage("0", []);
     await wrapper.get('[data-test="filter-keyword"]').setValue("KOL-ASD001");

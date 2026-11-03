@@ -49,6 +49,9 @@ describe("platform tenant management", () => {
     expect(wrapper.text()).toContain("North America");
     expect(wrapper.text()).toContain("启用");
     expect(wrapper.text()).toContain("Primary company");
+    expect(wrapper.find(".list-search").exists()).toBe(false);
+    expect(wrapper.get("h1").text()).toBe("公司管理");
+    expect(wrapper.get('[data-test="create-tenant"]').text()).toBe("新建公司");
   });
 
   it("renders the company list in English", async () => {

@@ -110,6 +110,27 @@ describe("commission dialog, 10-20 supplement", () => {
     wrapper.unmount();
   });
 
+  it("marks required fields before any validation error appears", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1500",
+      platforms: [],
+      inviteCode: "OLD",
+      jumpTemplateId: "7",
+      sheetUrl: null,
+      remark: null
+    });
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    expect(wrapper.findAll(".el-form-item.is-required").length).toBeGreaterThanOrEqual(2);
+    wrapper.unmount();
+  });
+
   it("reloads the change records with the selected page size", async () => {
     vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
     vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({

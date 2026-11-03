@@ -80,9 +80,12 @@ const form = reactive({
 });
 
 const rules: FormRules = {
-  percent: [rule(validatePercent)],
+  percent: [{ required: true, ...rule(validatePercent) }],
   sheetUrl: [
-    rule(value => (value.trim() ? validateSheetUrl(value) : t("validation.sheetUrlRequired")))
+    {
+      required: true,
+      ...rule(value => (value.trim() ? validateSheetUrl(value) : t("validation.sheetUrlRequired")))
+    }
   ]
 };
 

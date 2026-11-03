@@ -8,27 +8,23 @@ import { routes } from "@/router/routes";
 import { useUserStore } from "@/stores/user";
 import ComingSoonPage from "@/views/common/ComingSoon.vue";
 import FundPayoutPage from "@/views/fund/payout/index.vue";
-import OrderQueryPage from "@/views/order/order-query/index.vue";
+import OrderListPage from "@/views/order/index.vue";
 import ShopManagementPage from "@/views/product/shop-management/index.vue";
 
 vi.mock("@/api/product/shop", () => ({ listShops: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/product/product", () => ({
-  listProducts: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
   // Order page reads these through the shared import bindings (task 77).
   downloadProductTemplate: vi.fn(),
   uploadProductImport: vi.fn()
 }));
-vi.mock("@/api/product/sheet-source", () => ({ listSheetSources: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/api/order/order", () => ({
   listOrders: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
-  listUnmatchedOrders: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
   listSyncStates: vi.fn().mockResolvedValue([]),
   listSyncFailures: vi.fn().mockResolvedValue([]),
   getOrder: vi.fn(),
   getOrderChain: vi.fn(),
   listRefunds: vi.fn().mockResolvedValue({ items: [], total: "0", page: 1, size: 20 }),
   getRefund: vi.fn(),
-  getMatchEvidence: vi.fn(),
   triggerOrderSync: vi.fn(),
   downloadOrderImportTemplate: vi.fn(),
   uploadOrderImport: vi.fn(),
@@ -89,10 +85,10 @@ describe("merged tab pages (task 32 §2.1)", () => {
     wrapper.unmount();
   });
 
-  it("order query keeps only the order list tab", async () => {
-    const wrapper = await mountPage(OrderQueryPage, "/order/orders");
-    const labels = wrapper.findAll(".el-tabs__item").map(item => item.text());
-    expect(labels).toEqual(["订单列表"]);
+  it("order query mounts the order list directly, without the single-tab shell", async () => {
+    const wrapper = await mountPage(OrderListPage, "/order/orders");
+    expect(wrapper.findAll(".el-tabs__item")).toHaveLength(0);
+    expect(wrapper.get("h1").text()).toBe("订单查询");
     wrapper.unmount();
   });
 
@@ -114,6 +110,8 @@ describe("merged tab pages (task 32 §2.1)", () => {
     await flushPromises();
     expect(wrapper.get('[data-test="coming-soon"]').text()).toContain("店铺表现");
     expect(wrapper.get('[data-test="coming-soon"]').text()).toContain("该功能正在开发中");
+    expect(wrapper.get("h1").text()).toBe("店铺表现");
+    expect(wrapper.get('[data-test="coming-soon-home"]').text()).toBe("回工作台");
     wrapper.unmount();
   });
 });

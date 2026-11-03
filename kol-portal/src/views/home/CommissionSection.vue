@@ -3,7 +3,6 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import AmountText from "@/components/AmountText.vue";
-import { formatMoney } from "@/utils/orders";
 import { isNegativeAmount, type WorkspaceFigures } from "@/utils/workspace";
 
 defineOptions({ name: "HomeCommissionSection" });
@@ -13,9 +12,8 @@ const props = defineProps<{
   /** Commission rate text such as "12%"; null while the account has no rate configured. */
   rateText: string | null;
 }>();
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const router = useRouter();
-const money = (value: string) => formatMoney(value, locale.value);
 
 type CardKey = "settled" | "frozen" | "occupied" | "commissionPaid";
 const cards = computed(() => {
@@ -78,7 +76,7 @@ function go(path: string) {
       <div class="flow__item">
         <span class="flow__label">{{ t("home.sales") }}</span>
         <strong class="tcrm-amount-detail flow__sales" data-test="sales-amount"
-          ><AmountText :value="money(salesCny)"
+          ><AmountText :value="salesCny"
         /></strong>
         <span class="caption">{{ t("home.salesCaption") }}</span>
       </div>
@@ -88,7 +86,7 @@ function go(path: string) {
       <div class="flow__item">
         <span class="flow__label">{{ t("home.estimated") }}</span>
         <strong class="tcrm-amount-detail" data-test="estimated-amount"
-          ><AmountText :value="money(figures.estimatedCommission)"
+          ><AmountText :value="figures.estimatedCommission"
         /></strong>
         <span class="caption">{{ t("home.estimatedCaption") }}</span>
       </div>
@@ -106,7 +104,7 @@ function go(path: string) {
           class="tcrm-amount-detail card__amount"
           :class="{ negative: isNegativeAmount(card.amount) }"
           :data-test="`card-${card.key}-amount`"
-          ><AmountText :value="money(card.amount)"
+          ><AmountText :value="card.amount"
         /></strong>
         <span class="caption">{{ t(card.caption) }}</span>
         <div class="card__action">

@@ -291,7 +291,7 @@ describe("order list page (task 40)", () => {
     const dialog = document.body.querySelector(".order-detail-drawer");
     expect(dialog?.querySelector('[data-test="order-detail"]')).not.toBeNull();
     const dialogText = dialog?.textContent ?? "";
-    for (const expected of ["wd-merchant-1", "115.00 CNY", "60.00 CNY", "Blue / L"]) {
+    for (const expected of ["wd-merchant-1", "¥115.00", "¥60.00", "Blue / L"]) {
       expect(dialogText).toContain(expected);
     }
     expect(dialog?.classList.contains("rtl")).toBe(true);

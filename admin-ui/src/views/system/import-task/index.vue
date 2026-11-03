@@ -13,6 +13,7 @@ import type { TaskStatus, TaskType } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ImportDialog from "@/components/ImportDialog.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
 import { saveBlob } from "@/utils/download";
@@ -183,6 +184,18 @@ function statusTag(status: TaskStatus): "info" | "primary" | "success" | "warnin
   return "info";
 }
 
+function taskActions(row: ImportTaskVO): RowAction[] {
+  return [
+    {
+      key: "download-error",
+      label: t("importTask.errorFile"),
+      testId: "download-error",
+      hidden: !row.hasErrorFile,
+      onClick: () => void downloadError(row)
+    }
+  ];
+}
+
 async function downloadError(row: ImportTaskVO) {
   try {
     const file = await downloadTaskErrorFile(row.id);
@@ -325,14 +338,7 @@ onMounted(() => {
         {{ asTask(row).finishTime ? formatInstant(asTask(row).finishTime) : "-" }}
       </template>
       <template #actions="{ row }">
-        <el-button
-          v-if="asTask(row).hasErrorFile"
-          link
-          type="primary"
-          data-test="download-error"
-          @click="downloadError(asTask(row))"
-          >{{ t("importTask.errorFile") }}</el-button
-        >
+        <RowActions :actions="taskActions(asTask(row))" />
       </template>
     </DataTable>
 

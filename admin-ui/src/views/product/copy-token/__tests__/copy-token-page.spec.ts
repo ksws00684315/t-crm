@@ -96,10 +96,11 @@ describe("Copy token page", () => {
     vi.mocked(copyTokenApi.revealCopyToken).mockResolvedValue({
       token: "TKN-" + "A".repeat(26)
     });
-    const reveal = wrapper.find('[data-test="reveal"]');
-    expect(reveal.exists()).toBe(true);
-    expect(reveal.attributes("data-id")).toBe("1");
-    await reveal.trigger("click");
+    const reveal = wrapper
+      .findAll('[data-test="reveal"]')
+      .find(button => button.element.closest("tr") !== null);
+    expect(reveal).toBeDefined();
+    await reveal!.trigger("click");
     await flushPromises();
     await nextTick();
     expect(copyTokenApi.revealCopyToken).toHaveBeenCalled();
@@ -112,9 +113,11 @@ describe("Copy token page", () => {
     const wrapper = await open();
     vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as never);
     vi.mocked(copyTokenApi.revokeCopyToken).mockResolvedValue(null);
-    const revokeBtn = wrapper.find('[data-test="revoke"]');
-    expect(revokeBtn.exists()).toBe(true);
-    await revokeBtn.trigger("click");
+    const revokeBtn = wrapper
+      .findAll('[data-test="revoke"]')
+      .find(button => button.element.closest("tr") !== null);
+    expect(revokeBtn).toBeDefined();
+    await revokeBtn!.trigger("click");
     await flushPromises();
     await nextTick();
     expect(copyTokenApi.revokeCopyToken).toHaveBeenCalledWith("1");
@@ -128,7 +131,9 @@ describe("Copy token page", () => {
       row({ id: "3", displayStatus: "EXHAUSTED" }),
       row({ id: "4", displayStatus: "EXPIRED" })
     ]);
-    const actions = wrapper.findAll('[data-test="revoke"]');
+    const actions = wrapper
+      .findAll('[data-test="revoke"]')
+      .filter(button => button.element.closest("tr") !== null);
     expect(actions).toHaveLength(4);
     expect(actions[0].attributes("disabled")).toBeUndefined();
     for (const button of actions.slice(1)) {

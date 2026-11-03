@@ -76,6 +76,27 @@ describe("creator order details", () => {
     expect(wrapper.get('[data-test="order-rates"]').text()).toBe("15.00% / 10.00%");
     wrapper.unmount();
   });
+  it("adds item commissions exactly instead of with floats", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({
+      items: [
+        {
+          ...order,
+          items: [
+            { ...order.items[0], commissionAmount: "0.10" },
+            { ...order.items[0], skuName: "Red", commissionAmount: "0.20" }
+          ]
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.find(".orders-table").text()).toContain("¥0.30");
+    expect(wrapper.find(".orders-table").text()).not.toContain("¥0.30000000000000004");
+    wrapper.unmount();
+  });
+
   it("requests the latest 30 local dates and shows the empty state", async () => {
     const wrapper = await mountPage();
     expect(getCreatorOrders).toHaveBeenCalledWith(

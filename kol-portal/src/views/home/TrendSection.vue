@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getCreatorAnalytics, type CreatorAnalyticsOverview } from "@/api/creator";
 import ChartPanel from "@/components/ChartPanel.vue";
-import { formatMoney } from "@/utils/orders";
+import { formatMoney } from "@/utils/money";
 import {
   addDays,
   beijingDate,
@@ -148,14 +148,12 @@ defineExpose({ reload: load });
       <li>
         <span class="swatch swatch--gmv" aria-hidden="true" />
         <span>{{ t("home.gmv") }}</span>
-        <strong data-test="legend-gmv">{{ formatMoney(series.salesTotal, locale) }}</strong>
+        <strong data-test="legend-gmv">{{ formatMoney(series.salesTotal) }}</strong>
       </li>
       <li>
         <span class="swatch swatch--commission" aria-hidden="true" />
         <span>{{ t("home.commission") }}</span>
-        <strong data-test="legend-commission">{{
-          formatMoney(series.commissionTotal, locale)
-        }}</strong>
+        <strong data-test="legend-commission">{{ formatMoney(series.commissionTotal) }}</strong>
       </li>
     </ul>
     <ChartPanel

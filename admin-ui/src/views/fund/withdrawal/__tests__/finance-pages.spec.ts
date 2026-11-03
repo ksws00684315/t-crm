@@ -100,7 +100,7 @@ describe("finance admin pages", () => {
       "操作"
     ]);
     expect(wrapper.get('[data-test="income-page"]').text()).toContain("t1023_K001");
-    expect(wrapper.get('[data-test="income-page"]').text()).toContain("1320.00");
+    expect(wrapper.get('[data-test="income-page"]').text()).toContain("¥1,320.00");
     expect(wrapper.findAll('[data-test="income-ledger"]')).toHaveLength(3);
     i18n.global.locale.value = "en-US";
     await flushPromises();
@@ -278,6 +278,25 @@ describe("finance admin pages", () => {
     expect(panel.text()).not.toContain("finance.");
     wrapper.unmount();
   });
+  it("shows the accounting currency as copyable text and marks long/interactive columns", async () => {
+    const config = createFinanceDemo().getConfig("SUPER_ADMIN", "data");
+    vi.mocked(api.getConfig).mockResolvedValue(config);
+    const wrapper = mount(ConfigPage, { global });
+    await flushPromises();
+    const currency = wrapper.get('[data-test="config-currency"]');
+    expect(currency.text()).toContain(config.currency);
+    expect(currency.find('[data-test="copy"]').exists()).toBe(true);
+    const columns = wrapper.getComponent(DataTable).props("columns") as Array<{
+      key: string;
+      align?: string;
+      interactive?: boolean;
+    }>;
+    expect(columns.find(column => column.key === "channelCode")?.align).toBe("left");
+    expect(columns.find(column => column.key === "releaseBasis")?.align).toBe("left");
+    expect(columns.find(column => column.key === "freezeDays")?.interactive).toBe(true);
+    wrapper.unmount();
+  });
+
   it("keeps all settlement columns, multiple creators and unknown amounts distinct", async () => {
     const wrapper = mount(SettlementPage, { global });
     await flushPromises();

@@ -7,6 +7,7 @@ import * as bdApi from "@/api/system/bd-user";
 import * as bdTransferApi from "@/api/kol/bd-transfer";
 import * as kolApi from "@/api/kol/kol";
 import type { KolVO, Role } from "@/api/types";
+import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { i18n } from "@/locales";
 import { useUserStore } from "@/stores/user";
 import KolPage from "../index.vue";
@@ -380,15 +381,26 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
+  it("explains disabled row actions in a tooltip", async () => {
+    signIn("STAFF", "ALL", []);
+    const wrapper = await mountPage();
+    const actions = wrapper.findAllComponents(RowActions)[0]!.props("actions") as RowAction[];
+    expect(actions.find(action => action.key === "edit")?.tooltip).toBe("无操作权限");
+    expect(actions.find(action => action.key === "commission")?.tooltip).toBe("无操作权限");
+    wrapper.unmount();
+  });
+
   it("shows the review entry only while pending and opens the shared profile dialog", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("1", [{ ...row, reviewStatus: "PENDING" }]);
     await element("review-entry").trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("审核达人 KOL-ASD001");
-    // Email and creator ID are read-only in the dialog.
-    expect(element("profile-email").attributes("disabled")).toBeDefined();
-    expect(element("profile-code").attributes("disabled")).toBeDefined();
+    // Email and creator ID are read-only text with a copy affordance, not disabled inputs.
+    expect(element("profile-email").text()).toContain("alice@example.com");
+    expect(element("profile-code").text()).toContain("KOL-ASD001");
+    expect(element("profile-email").find('[data-test="copy"]').exists()).toBe(true);
+    expect(element("profile-code").find('[data-test="copy"]').exists()).toBe(true);
     wrapper.unmount();
   });
 

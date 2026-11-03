@@ -14,7 +14,7 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { saveBlob } from "@/utils/download";
 import { PREPAY_STATUSES, prepayAbilities } from "@/utils/prepay";
@@ -253,6 +253,9 @@ onMounted(load);
         ><NameCode :name="asRow(row).kolName" :code="asRow(row).kolCode"
       /></template>
       <template #cell-prepayNo="{ row }"><CopyText :value="asRow(row).prepayNo" /></template>
+      <template #cell-amountCny="{ row }">{{
+        formatAmountWithCurrency(asRow(row).amountCny, asRow(row).currency)
+      }}</template>
       <template #cell-applicantName="{ row }"
         >{{ asRow(row).applicantName || t("prepay.historicalPerson") }} ·
         {{ t("prepay.actorRole.BUSINESS") }}</template

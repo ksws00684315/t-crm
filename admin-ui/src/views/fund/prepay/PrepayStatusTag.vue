@@ -13,32 +13,24 @@ const { t } = useI18n();
 .prepay-status-tag {
   border-color: transparent;
 }
-.prepay-status-WAITING_DETAILS {
-  color: #946200;
-  background: #fff4ce;
-}
-.prepay-status-PENDING_OPERATIONS_REVIEW {
-  color: #2456c4;
-  background: #eaf0ff;
-}
-.prepay-status-PENDING_FINANCE_REVIEW {
-  color: #7540b2;
-  background: #f3ebff;
-}
+/* Waiting states, including approved-but-unpaid, share the semantic warning colour. */
+.prepay-status-WAITING_DETAILS,
+.prepay-status-PENDING_OPERATIONS_REVIEW,
+.prepay-status-PENDING_FINANCE_REVIEW,
 .prepay-status-APPROVED {
-  color: #007782;
-  background: #def7f7;
+  color: var(--tcrm-color-warning);
+  background: var(--tcrm-color-warning-bg);
 }
 .prepay-status-PAID {
-  color: #237a44;
-  background: #e6f6ec;
+  color: var(--tcrm-color-success);
+  background: var(--tcrm-color-success-bg);
 }
 .prepay-status-REJECTED {
-  color: #b52c33;
-  background: #ffebed;
+  color: var(--tcrm-color-danger);
+  background: var(--tcrm-color-danger-bg);
 }
 .prepay-status-CANCELLED {
-  color: #59636f;
-  background: #edf0f3;
+  color: var(--tcrm-color-text-secondary);
+  background: var(--tcrm-color-muted);
 }
 </style>

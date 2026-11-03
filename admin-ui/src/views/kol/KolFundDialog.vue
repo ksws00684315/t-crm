@@ -84,6 +84,10 @@ function onPage(page: number): void {
   if (props.kol) void load(props.kol.id);
 }
 
+function retry(): void {
+  if (props.kol) void load(props.kol.id);
+}
+
 function onSize(size: number): void {
   query.size = size;
 }
@@ -116,13 +120,17 @@ function currencyText(row: PayoutAccountRowVO): string {
     data-test="kol-fund-dialog"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <el-alert
-      v-if="loadFailed"
-      type="error"
-      :closable="false"
-      :title="t('kol.fundLoadFailed')"
-      data-test="fund-load-failed"
-    />
+    <div v-if="loadFailed" class="load-failed">
+      <el-alert
+        type="error"
+        :closable="false"
+        :title="t('kol.fundLoadFailed')"
+        data-test="fund-load-failed"
+      />
+      <el-button link type="primary" data-test="fund-retry" @click="retry">
+        {{ t("table.retry") }}
+      </el-button>
+    </div>
     <el-empty
       v-else-if="!loading && rows.length === 0"
       :description="t('kol.fundEmpty')"

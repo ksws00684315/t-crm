@@ -266,6 +266,7 @@ const enUS = {
     amount: "Amount",
     statusLabel: "Status",
     recipient: "Payout account",
+    recipientMaskedHint: "Only a masked account is shown for privacy.",
     receivedAt: "Received time",
     prepay: "Advance",
     withdrawal: "Commission withdrawal",
@@ -395,6 +396,7 @@ const enUS = {
     whatsappInvalid: "Enter a WhatsApp number starting with + and 8–15 digits.",
     phone: "Phone number (optional)",
     phoneInvalid: "Enter a phone number starting with + and 8–15 digits.",
+    phonePlaceholder: "+15551234567",
     platformLabel: "Main platform (optional)",
     platformPlaceholder: "Select a platform",
     platforms: {

@@ -6,6 +6,7 @@ import { savePrepayApplicationDetails, type PrepayDetail } from "@/api/commissio
 import { notifyError } from "@/utils/notify";
 import { serverFieldErrors } from "@/utils/validation";
 import { validPrepayFiles } from "@/utils/prepay";
+import { formatAmountWithCurrency } from "@/utils/format";
 const props = defineProps<{
   detail: PrepayDetail;
   editable: boolean;
@@ -115,10 +116,12 @@ defineExpose({ save });
       :rules="editable ? rules : {}"
       label-position="top"
       :disabled="saving || disabled"
-      class="application-grid"
+      :class="['application-grid', { 'application-grid--readonly': !editable }]"
     >
       <el-form-item :label="t('prepay.amount')"
-        ><div class="read-value amount">{{ detail.amountCny }} CNY</div></el-form-item
+        ><div class="read-value amount">
+          {{ formatAmountWithCurrency(detail.amountCny, detail.currency) }}
+        </div></el-form-item
       >
       <el-form-item
         prop="expectedPayDate"
@@ -218,8 +221,11 @@ defineExpose({ save });
 <style scoped>
 .application-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 24px;
+}
+.application-grid--readonly {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 .application-grid :deep(.el-form-item__content) {
   align-items: flex-start;
@@ -243,7 +249,8 @@ defineExpose({ save });
   line-height: 1.5;
 }
 @media (max-width: 640px) {
-  .application-grid {
+  .application-grid,
+  .application-grid--readonly {
     grid-template-columns: minmax(0, 1fr);
   }
 }

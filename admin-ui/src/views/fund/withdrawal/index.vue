@@ -11,7 +11,7 @@ import ListSearch from "@/components/ListSearch.vue";
 import RowActions from "@/components/RowActions.vue";
 import CopyText from "@/components/CopyText.vue";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
 import { financeAbilities, financeApiReady, previewContext } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import { saveBlob } from "@/utils/download";
@@ -176,9 +176,6 @@ function reviewSaved() {
   reviewOpen.value = false;
   void load();
 }
-function amountCurrency(amount: string, currency: string) {
-  return `${amount} ${currency}`;
-}
 function statusLabel(status: string) {
   return t(`finance.${status}`);
 }
@@ -257,7 +254,9 @@ onMounted(load);
           <div class="creator-name">{{ row.kolName }}</div>
           <small class="creator-id">{{ row.kolCode }}</small>
         </template>
-        <template #cell-amount="{ row }">{{ amountCurrency(row.amount, row.currency) }}</template>
+        <template #cell-amount="{ row }">{{
+          formatAmountWithCurrency(row.amount, row.currency)
+        }}</template>
         <template #cell-status="{ row }">
           <div class="status">
             <el-tag :type="row.status === 'PAID' ? 'success' : 'info'">

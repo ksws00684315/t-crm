@@ -262,6 +262,7 @@ const zhCN: MessageSchema = {
     amount: "金额",
     statusLabel: "状态",
     recipient: "收款账户",
+    recipientMaskedHint: "为保护隐私，此处仅显示遮罩后的收款账户。",
     receivedAt: "到账时间",
     prepay: "预付款",
     withdrawal: "佣金提现",
@@ -389,6 +390,7 @@ const zhCN: MessageSchema = {
     whatsappInvalid: "WhatsApp 须以 + 开头，后接 8～15 位数字。",
     phone: "手机号（选填）",
     phoneInvalid: "手机号须以 + 开头，后接 8～15 位数字。",
+    phonePlaceholder: "+8613800000000",
     platformLabel: "核心社媒平台（选填）",
     platformPlaceholder: "选择平台",
     platforms: {

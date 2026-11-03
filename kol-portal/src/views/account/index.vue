@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { Plus } from "@element-plus/icons-vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { changePassword, getMe, updateMe } from "@/api/auth";
 import {
@@ -14,8 +15,10 @@ import {
 import { useSessionStore } from "@/stores/session";
 import { validPassword } from "@/utils/auth";
 import { formatInstant } from "@/utils/format";
-import { USDT_NETWORKS, type UsdtNetwork } from "@/utils/payout-account";
+import { ApiError } from "@/utils/http/error";
+import { checkQrFile, USDT_NETWORKS, type UsdtNetwork } from "@/utils/payout-account";
 import { useSubmission } from "@/utils/useSubmission";
+import type { UploadFile } from "element-plus";
 
 defineOptions({ name: "AccountPage" });
 const { t } = useI18n();
@@ -38,19 +41,47 @@ const confirm = ref("");
 const profileSaved = ref(false);
 const payoutSaved = ref(false);
 const passwordChanged = ref(false);
+const loadRequest = useSubmission();
 const profileRequest = useSubmission();
 const payoutRequest = useSubmission();
 const passwordRequest = useSubmission();
 const profileBusy = profileRequest.busy;
-const profileValidation = profileRequest.validation;
 const payoutBusy = payoutRequest.busy;
-const payoutValidation = payoutRequest.validation;
 const passwordBusy = passwordRequest.busy;
-const passwordValidation = passwordRequest.validation;
-const profileError = profileRequest.errorText;
-const payoutError = payoutRequest.errorText;
-const passwordError = passwordRequest.errorText;
-const profileLoading = profileRequest.busy;
+const loadError = computed(() => loadRequest.failure.value?.displayMessage ?? "");
+const profileError = computed(() => profileRequest.failure.value?.displayMessage ?? "");
+const payoutError = computed(() => payoutRequest.failure.value?.displayMessage ?? "");
+const passwordError = computed(() => passwordRequest.failure.value?.displayMessage ?? "");
+const profileLoading = loadRequest.busy;
+const qrError = ref("");
+const profileFieldErrors = reactive({ name: "", handle: "" });
+const payoutFieldErrors = reactive({ account: "", holder: "" });
+const passwordFieldErrors = reactive({ oldPassword: "", newPassword: "", confirm: "" });
+watch(
+  () => [profile.name, profile.primaryPlatform, profile.primaryHandle],
+  () => {
+    profileFieldErrors.name = "";
+    profileFieldErrors.handle = "";
+  },
+  { flush: "sync" }
+);
+watch(
+  () => [payout.account, payout.holderName],
+  () => {
+    payoutFieldErrors.account = "";
+    payoutFieldErrors.holder = "";
+  },
+  { flush: "sync" }
+);
+watch(
+  () => [oldPassword.value, newPassword.value, confirm.value],
+  () => {
+    passwordFieldErrors.oldPassword = "";
+    passwordFieldErrors.newPassword = "";
+    passwordFieldErrors.confirm = "";
+  },
+  { flush: "sync" }
+);
 const paypalCurrencies = ["USD", "EUR", "GBP", "CNY"];
 const systemId = computed(() => session.kol?.systemId || session.kol?.kolCode || "—");
 const currentAccount = computed(() =>
@@ -68,7 +99,7 @@ function syncAccount(account?: PayoutAccountVO) {
   selectedAccountId.value = account?.id ?? "";
 }
 function load() {
-  return profileRequest.submit(async () => {
+  return loadRequest.submit(async () => {
     const [me, paymentAccounts] = await Promise.all([getMe(), listPayoutAccounts()]);
     session.updateProfile(me);
     profile.name = me.name;
@@ -95,15 +126,22 @@ function selectAccount(id: string) {
 }
 function saveProfile() {
   profileSaved.value = false;
+  profileRequest.failure.value = null;
+  profileFieldErrors.name = "";
+  profileFieldErrors.handle = "";
   const name = profile.name.trim();
   const primaryPlatform = profile.primaryPlatform.trim();
   const primaryHandle = profile.primaryHandle.trim();
-  if (!name || name.length > 64 || primaryPlatform.length > 32 || primaryHandle.length > 128) {
-    profileRequest.validation.value = "errors.field";
+  if (!name || name.length > 64) {
+    profileFieldErrors.name = "register.nameRequired";
+    return;
+  }
+  if (primaryPlatform.length > 32 || primaryHandle.length > 128) {
+    profileFieldErrors.handle = "errors.field";
     return;
   }
   if (Boolean(primaryPlatform) !== Boolean(primaryHandle)) {
-    profileRequest.validation.value = "register.socialPairRequired";
+    profileFieldErrors.handle = "register.socialPairRequired";
     return;
   }
   return profileRequest.submit(async () => {
@@ -116,21 +154,35 @@ function saveProfile() {
     profileSaved.value = true;
   });
 }
-async function uploadQr(file: File | undefined) {
+async function uploadQr(uploadFile: UploadFile) {
+  const file = uploadFile.raw;
   if (!file) return;
+  qrError.value = "";
+  const check = checkQrFile(file);
+  if (check !== "ok") {
+    qrError.value = t(check === "type" ? "errors.FILE_INVALID" : "errors.FILE_TOO_LARGE");
+    return;
+  }
   qrUploading.value = true;
   try {
     payout.qrFileId = (await uploadQrFile(file)).fileId;
-  } catch {
-    payoutRequest.validation.value = "errors.generic";
+  } catch (error) {
+    qrError.value = error instanceof ApiError ? error.displayMessage : t("errors.generic");
   } finally {
     qrUploading.value = false;
   }
 }
 function savePayout() {
   payoutSaved.value = false;
-  if (!payout.account.trim() || (payout.type === "PAYPAL" && !payout.holderName.trim())) {
-    payoutRequest.validation.value = "errors.field";
+  payoutRequest.failure.value = null;
+  payoutFieldErrors.account = "";
+  payoutFieldErrors.holder = "";
+  if (!payout.account.trim()) {
+    payoutFieldErrors.account = "payoutAccounts.form.accountRange";
+    return;
+  }
+  if (payout.type === "PAYPAL" && !payout.holderName.trim()) {
+    payoutFieldErrors.holder = "payoutAccounts.form.holderRange";
     return;
   }
   return payoutRequest.submit(async () => {
@@ -161,15 +213,23 @@ function savePayout() {
 }
 function savePassword() {
   passwordChanged.value = false;
+  passwordRequest.failure.value = null;
+  passwordFieldErrors.oldPassword = "";
+  passwordFieldErrors.newPassword = "";
+  passwordFieldErrors.confirm = "";
+  if (!validPassword(oldPassword.value)) {
+    passwordFieldErrors.oldPassword = "auth.passwordRule";
+    return;
+  }
+  if (!validPassword(newPassword.value)) {
+    passwordFieldErrors.newPassword = "auth.passwordRule";
+    return;
+  }
+  if (newPassword.value !== confirm.value) {
+    passwordFieldErrors.confirm = "auth.passwordMismatch";
+    return;
+  }
   return passwordRequest.submit(async () => {
-    if (!validPassword(oldPassword.value) || !validPassword(newPassword.value)) {
-      passwordRequest.validation.value = "auth.passwordRule";
-      return;
-    }
-    if (newPassword.value !== confirm.value) {
-      passwordRequest.validation.value = "auth.passwordMismatch";
-      return;
-    }
     session.acceptSession(
       await changePassword({ oldPassword: oldPassword.value, newPassword: newPassword.value })
     );
@@ -183,8 +243,8 @@ function savePassword() {
 
 <template>
   <section class="account-page">
-    <el-alert v-if="profileError" type="error" :closable="false" :title="profileError" show-icon />
-    <el-button v-if="profileError" :loading="profileLoading" @click="load">{{
+    <el-alert v-if="loadError" type="error" :closable="false" :title="loadError" show-icon />
+    <el-button v-if="loadError" :loading="profileLoading" data-test="load-retry" @click="load">{{
       t("account.retry")
     }}</el-button>
     <el-skeleton v-if="profileLoading && !session.kol" :rows="4" animated />
@@ -202,10 +262,11 @@ function savePassword() {
           :title="t('account.profileSaved')"
         />
         <el-alert
-          v-if="profileValidation"
+          v-if="profileError"
           type="error"
           :closable="false"
-          :title="t(profileValidation)"
+          :title="profileError"
+          show-icon
         />
         <el-form label-position="top" @submit.prevent="saveProfile">
           <div class="form-grid">
@@ -215,7 +276,9 @@ function savePassword() {
             <el-form-item :label="t('account.systemId')"
               ><el-input :model-value="systemId" readonly
             /></el-form-item>
-            <el-form-item :label="t('account.nickname')"
+            <el-form-item
+              :label="t('account.nickname')"
+              :error="profileFieldErrors.name ? t(profileFieldErrors.name) : undefined"
               ><el-input
                 v-model="profile.name"
                 maxlength="64"
@@ -234,7 +297,9 @@ function savePassword() {
                   :label="t(`register.platforms.${platform}`)"
                   :value="platform" /></el-select
             ></el-form-item>
-            <el-form-item :label="t('account.primaryHandle')"
+            <el-form-item
+              :label="t('account.primaryHandle')"
+              :error="profileFieldErrors.handle ? t(profileFieldErrors.handle) : undefined"
               ><el-input v-model="profile.primaryHandle" maxlength="128" data-test="profile-handle"
             /></el-form-item>
           </div>
@@ -309,10 +374,11 @@ function savePassword() {
           :title="t('account.payoutSaved')"
         />
         <el-alert
-          v-if="payoutError || payoutValidation"
+          v-if="payoutError"
           type="error"
           :closable="false"
-          :title="payoutError || t(payoutValidation!)"
+          :title="payoutError"
+          show-icon
         />
         <el-form label-position="top" @submit.prevent="savePayout">
           <div class="form-grid">
@@ -342,9 +408,13 @@ function savePassword() {
               :label="
                 payout.type === 'PAYPAL' ? t('account.paypalEmail') : t('account.usdtAddress')
               "
+              :error="payoutFieldErrors.account ? t(payoutFieldErrors.account) : undefined"
               ><el-input v-model="payout.account" maxlength="128"
             /></el-form-item>
-            <el-form-item v-if="payout.type === 'PAYPAL'" :label="t('account.receiverName')"
+            <el-form-item
+              v-if="payout.type === 'PAYPAL'"
+              :label="t('account.receiverName')"
+              :error="payoutFieldErrors.holder ? t(payoutFieldErrors.holder) : undefined"
               ><el-input v-model="payout.holderName" maxlength="64"
             /></el-form-item>
             <el-form-item v-if="payout.type === 'PAYPAL'" :label="t('account.currency')"
@@ -363,14 +433,27 @@ function savePassword() {
                   :label="t(`payoutAccounts.network.${network}`)"
                   :value="network" /></el-select
             ></el-form-item>
-            <el-form-item v-if="payout.type === 'USDT'" :label="t('account.qrCode')"
-              ><input
-                type="file"
+            <el-form-item
+              v-if="payout.type === 'USDT'"
+              :label="t('account.qrCode')"
+              :error="qrError || undefined"
+            >
+              <el-upload
+                :auto-upload="false"
+                :show-file-list="false"
                 accept="image/png,image/jpeg"
                 :disabled="qrUploading"
-                @change="uploadQr(($event.target as HTMLInputElement).files?.[0])"
-              /><small>{{ t("payoutAccounts.form.qrHint") }}</small></el-form-item
-            >
+                data-test="qr-upload"
+                @change="uploadQr"
+              >
+                <el-button :loading="qrUploading" data-test="qr-upload-button">
+                  <el-icon v-if="!qrUploading"><Plus /></el-icon>
+                  {{ t("payoutAccounts.form.qrAdd") }}
+                </el-button>
+              </el-upload>
+              <small>{{ t("payoutAccounts.form.qrHint") }}</small>
+              <el-tag v-if="payout.qrFileId" type="success">{{ t("account.qrUploaded") }}</el-tag>
+            </el-form-item>
           </div>
           <div class="actions">
             <el-button type="primary" :loading="payoutBusy || qrUploading" @click="savePayout">{{
@@ -392,15 +475,20 @@ function savePassword() {
           :title="t('account.passwordChanged')"
         />
         <el-alert
-          v-if="passwordError || passwordValidation"
+          v-if="passwordError"
           type="error"
           :closable="false"
-          :title="passwordError || t(passwordValidation!)"
+          :title="passwordError"
+          show-icon
         />
         <p>{{ t("auth.passwordRule") }}</p>
         <el-form data-test="password-form" label-position="top" @submit.prevent="savePassword">
           <div class="form-grid">
-            <el-form-item :label="t('account.oldPassword')"
+            <el-form-item
+              :label="t('account.oldPassword')"
+              :error="
+                passwordFieldErrors.oldPassword ? t(passwordFieldErrors.oldPassword) : undefined
+              "
               ><el-input
                 v-model="oldPassword"
                 id="old-password"
@@ -408,7 +496,11 @@ function savePassword() {
                 autocomplete="current-password"
                 show-password
             /></el-form-item>
-            <el-form-item :label="t('auth.newPassword')"
+            <el-form-item
+              :label="t('auth.newPassword')"
+              :error="
+                passwordFieldErrors.newPassword ? t(passwordFieldErrors.newPassword) : undefined
+              "
               ><el-input
                 v-model="newPassword"
                 id="new-password"
@@ -416,7 +508,9 @@ function savePassword() {
                 autocomplete="new-password"
                 show-password
             /></el-form-item>
-            <el-form-item :label="t('auth.confirmPassword')"
+            <el-form-item
+              :label="t('auth.confirmPassword')"
+              :error="passwordFieldErrors.confirm ? t(passwordFieldErrors.confirm) : undefined"
               ><el-input
                 v-model="confirm"
                 id="confirm-password"

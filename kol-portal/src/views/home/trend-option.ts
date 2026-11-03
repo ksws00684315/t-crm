@@ -1,5 +1,5 @@
 import type { ChartOption } from "@/utils/echarts";
-import { formatMoney } from "@/utils/orders";
+import { formatMoney } from "@/utils/money";
 import type { TrendGranularity, TrendPoint } from "@/utils/sales-trend";
 
 /** Labels the chart needs, already translated by the page. */
@@ -32,7 +32,7 @@ export function trendOption(
         if (!point) return "";
         const rows = params.map(item => {
           const value = item.seriesName === labels.gmv ? point.salesCny : point.commissionCny;
-          return `${item.marker}${item.seriesName}: ${formatMoney(value, locale)}`;
+          return `${item.marker}${item.seriesName}: ${formatMoney(value)}`;
         });
         return [
           `<strong>${point.key}</strong>`,
