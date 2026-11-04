@@ -6,6 +6,8 @@ public enum ErrorCode {
   COMMON_NOT_FOUND(404, "Not found"),
   COMMON_METHOD_NOT_ALLOWED(405, "Method not allowed"),
   COMMON_UNSUPPORTED_MEDIA_TYPE(415, "Unsupported media type"),
+  ORDER_COMMISSION_RATE_EXISTS(409, "Existing or supplemented rate cannot be overwritten"),
+  ORDER_COMMISSION_RATE_STATE_CONFLICT(409, "Only a paid attributed line can take a rate"),
   COMMON_CONFLICT(409, "Conflicts with existing data"),
   COMMON_INTERNAL_ERROR(500, "Internal server error"),
   SYSTEM_CONFIG_INVALID(400, "Invalid system configuration value"),

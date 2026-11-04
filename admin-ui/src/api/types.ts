@@ -472,6 +472,7 @@ export interface OrderDetailItemVO {
   payAmount: string | null;
   refundAmount: string | null;
   status: string | null;
+  totalAmount?: string | null;
 }
 
 /** `GET /order/orders/{id}` (task 40 §3.2). */
@@ -586,6 +587,8 @@ export interface ChainWithdrawalVO {
  */
 export interface ChainLineCommissionVO {
   rateSnapshot: string | null;
+  /** True when the rate came from a super-admin supplement rather than the pay-time config. */
+  rateSupplemented: boolean;
   netCommission: string | null;
   releaseBasis: string | null;
   occupiedTotal: string;

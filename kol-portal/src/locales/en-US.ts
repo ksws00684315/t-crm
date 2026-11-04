@@ -467,6 +467,10 @@ const enUS = {
     COMMON_NOT_FOUND: "The requested item does not exist.",
     COMMON_METHOD_NOT_ALLOWED: "This action is not supported.",
     COMMON_UNSUPPORTED_MEDIA_TYPE: "This request format is not supported.",
+    ORDER_COMMISSION_RATE_EXISTS:
+      "This line already has a commission rate or was supplemented. Existing rates cannot be overwritten; refresh to view it.",
+    ORDER_COMMISSION_RATE_STATE_CONFLICT:
+      "Only paid order lines with an attributed creator can receive a missing rate.",
     COMMON_CONFLICT: "The data has changed. Please refresh and try again.",
     COMMON_INTERNAL_ERROR: "Something went wrong on our side. Please try again later.",
     AUTH_UNAUTHORIZED: "Your session has expired. Please sign in again.",

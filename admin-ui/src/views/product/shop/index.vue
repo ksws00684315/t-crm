@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { serverFieldErrors } from "@/utils/validation";
 import { Refresh, WarningFilled } from "@element-plus/icons-vue";
 import {
   ElButton,
@@ -88,7 +89,12 @@ const appStatus = ref<WeidianAppVO | null>(null);
 const appFormRef = ref<FormInstance>();
 const appForm = reactive({ appKey: "", appSecret: "" });
 
+const serverErrors = ref<Record<string, string>>({});
 const rules = computed<FormRules>(() => ({
+  weidianShopId: [
+    { required: true, message: t("shop.weidianPlaceholder"), trigger: "blur" },
+    { pattern: /^[0-9]{1,32}$/, message: t("shop.weidianFormat"), trigger: "blur" }
+  ],
   shopName: [{ required: true, message: t("shop.nameRequired"), trigger: "blur" }],
   channel: [{ required: true, message: t("shop.channelRequired"), trigger: "change" }],
   maxItems: [
@@ -123,7 +129,7 @@ const callbackUrlInvalid = computed(() => {
 
 const columns = computed<DataColumn[]>(() => {
   const list: DataColumn[] = [
-    { key: "shopCode", align: "left" as const, label: t("shop.code"), minWidth: 130 },
+    { key: "shopCode", align: "left" as const, label: t("shop.code"), minWidth: 220 },
     {
       key: "shopName",
       align: "left" as const,
@@ -234,6 +240,7 @@ function openEdit(row: ShopVO) {
 }
 
 async function save() {
+  serverErrors.value = {};
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
   saving.value = true;
@@ -255,6 +262,12 @@ async function save() {
     formVisible.value = false;
     await load();
   } catch (error) {
+    serverErrors.value = serverFieldErrors(error, [
+      "shopName",
+      "channel",
+      "weidianShopId",
+      "maxItems"
+    ]);
     notifyError(error);
   } finally {
     saving.value = false;
@@ -601,7 +614,9 @@ onMounted(() => {
         }
       "
     >
-      <template #cell-shopCode="{ row }"><CopyText :value="asShop(row).shopCode" /></template>
+      <template #cell-shopCode="{ row }"
+        ><CopyText class="shop-code-full" :value="asShop(row).shopCode"
+      /></template>
       <template #cell-shopName="{ row }"
         ><NameCode :name="asShop(row).shopName" :code="asShop(row).weidianShopId"
           ><template #code
@@ -780,8 +795,17 @@ onMounted(() => {
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item :label="t('shop.weidianId')">
-          <el-input v-model="form.weidianShopId" maxlength="64" data-test="form-weidian-id" />
+        <el-form-item
+          prop="weidianShopId"
+          :error="serverErrors.weidianShopId"
+          :label="t('shop.weidianId')"
+        >
+          <el-input
+            v-model="form.weidianShopId"
+            maxlength="32"
+            :placeholder="t('shop.weidianPlaceholder')"
+            data-test="form-weidian-id"
+          />
         </el-form-item>
         <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" maxlength="500" data-test="form-remark" />
@@ -879,6 +903,15 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.shop-code-full :deep(.copy-text__value) {
+  overflow: visible;
+  text-overflow: clip;
+}
+.shop-code-full {
+  max-width: none;
+  flex-shrink: 0;
+}
+
 .shop-actions {
   display: inline-flex;
   align-items: center;

@@ -74,6 +74,7 @@ public class OrderNormalizer {
         throw invalid();
       }
       item.setQuantity(quantity);
+      // Task 107: upstream price semantics are unverified; do not invent a historical sale price.
       item.setPayAmount(money(line.totalPrice()));
       item.setRefundAmount(BigDecimal.ZERO.setScale(2));
       item.setAttributionType(0);

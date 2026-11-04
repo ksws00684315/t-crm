@@ -227,6 +227,8 @@ const zhCN = {
     COMMON_NOT_FOUND: "请求的内容不存在",
     COMMON_METHOD_NOT_ALLOWED: "不支持该操作",
     COMMON_UNSUPPORTED_MEDIA_TYPE: "请求格式不受支持",
+    ORDER_COMMISSION_RATE_EXISTS: "该明细已有佣金比例或已完成补录，不可覆盖，请刷新查看。",
+    ORDER_COMMISSION_RATE_STATE_CONFLICT: "仅能补录已付款且已明确关联达人的订单明细。",
     COMMON_CONFLICT: "数据冲突，请刷新后重试",
     COMMON_INTERNAL_ERROR: "服务器开小差了，请稍后重试",
     AUTH_UNAUTHORIZED: "登录已失效，请重新登录",
@@ -1114,8 +1116,9 @@ const zhCN = {
     editTitle: "编辑店铺",
     createTitle: "新增店铺",
     name: "店铺名称",
-    weidianId: "微店店铺标识",
-    weidianPlaceholder: "微店店铺标识",
+    weidianId: "微店店铺ID",
+    weidianPlaceholder: "请输入1～32位纯数字微店店铺ID",
+    weidianFormat: "微店店铺ID须为1～32位纯数字",
     weidianApp: {
       configure: "微店应用配置",
       title: "微店服务型应用配置",
@@ -1242,6 +1245,16 @@ const zhCN = {
     }
   },
   order: {
+    missingHistoricalPrice: "缺失历史售价",
+    rateSupplement: {
+      saved: "比例已补录",
+      title: "补录佣金比例",
+      reason: "补录原因",
+      reasonRequired: "请填写补录原因",
+      confirm: "确认仅为此订单明细补录缺失比例？已有比例不可覆盖。",
+      note: "仅补录当前明细，不代表付款、结算或可提现；缺少计佣依据时仍保持待核实。"
+    },
+
     drawerProduct: "商品",
     shop: "店铺",
     orderId: "订单号",
@@ -1366,7 +1379,7 @@ const zhCN = {
     },
     detail: {
       title: "订单详情",
-      merchantNo: "商户号",
+      merchantNo: "店铺ID",
       itemAmount: "商品金额",
       totalAmount: "订单总额",
       orderTime: "下单时间",
@@ -1379,7 +1392,7 @@ const zhCN = {
       lineRefund: "退款金额"
     },
     chain: {
-      summaryProduct: "商品名",
+      summaryProduct: "商品",
       summaryKol: "所属达人",
       summaryRate: "佣金比例",
       summaryCommission: "达人佣金",
@@ -1413,6 +1426,7 @@ const zhCN = {
       },
       commissionBlock: "佣金与提现",
       rateSnapshot: "比例快照",
+      rateSupplemented: "补录",
       releaseBasis: "释放依据",
       occupiedTotal: "提现占用合计",
       applicationNo: "提现编号",
@@ -1503,6 +1517,7 @@ const zhCN = {
       "Reset post template": "恢复岗位模板默认值",
       "Self register": "达人自助注册",
       "Manual KOL cleanup": "手动清理达人",
+      "Supplement order commission rate": "补录订单佣金比例",
       OTHER: "其他操作"
     }
   },

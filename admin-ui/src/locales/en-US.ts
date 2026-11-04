@@ -227,6 +227,10 @@ const enUS: MessageSchema = {
     COMMON_NOT_FOUND: "The requested item does not exist.",
     COMMON_METHOD_NOT_ALLOWED: "This action is not supported.",
     COMMON_UNSUPPORTED_MEDIA_TYPE: "This request format is not supported.",
+    ORDER_COMMISSION_RATE_EXISTS:
+      "This line already has a commission rate or was supplemented. Existing rates cannot be overwritten; refresh to view it.",
+    ORDER_COMMISSION_RATE_STATE_CONFLICT:
+      "Only paid order lines with an attributed creator can receive a missing rate.",
     COMMON_CONFLICT: "The data conflicts with existing records. Please refresh and try again.",
     COMMON_INTERNAL_ERROR: "Something went wrong on our side. Please try again later.",
     AUTH_UNAUTHORIZED: "Your session has expired. Please sign in again.",
@@ -1144,8 +1148,9 @@ const enUS: MessageSchema = {
     editTitle: "Edit Shop",
     createTitle: "Create Shop",
     name: "Shop Name",
-    weidianId: "Weidian Shop Identifier",
-    weidianPlaceholder: "Weidian shop identifier",
+    weidianId: "Weidian shop ID",
+    weidianPlaceholder: "Enter the 1–32 digit Weidian shop ID",
+    weidianFormat: "Weidian shop ID must contain 1–32 digits",
     weidianApp: {
       configure: "Weidian App Configuration",
       title: "Weidian Service App Configuration",
@@ -1274,6 +1279,17 @@ const enUS: MessageSchema = {
     }
   },
   order: {
+    missingHistoricalPrice: "No price",
+    rateSupplement: {
+      saved: "Rate added",
+      title: "Add missing rate",
+      reason: "Reason",
+      reasonRequired: "Enter a reason",
+      confirm:
+        "Add the missing rate for this order line only? Existing rates cannot be overwritten.",
+      note: "This does not register payment, settlement or withdrawal eligibility. Missing commission evidence remains unverified."
+    },
+
     drawerProduct: "Product",
     shop: "Shop",
     orderId: "Order ID",
@@ -1399,7 +1415,7 @@ const enUS: MessageSchema = {
     },
     detail: {
       title: "Order Detail",
-      merchantNo: "Merchant No.",
+      merchantNo: "Shop ID",
       itemAmount: "Item amount",
       totalAmount: "Order total",
       orderTime: "Ordered at",
@@ -1446,6 +1462,7 @@ const enUS: MessageSchema = {
       },
       commissionBlock: "Commission & withdrawals",
       rateSnapshot: "Rate snapshot",
+      rateSupplemented: "Supplemented",
       releaseBasis: "Release basis",
       occupiedTotal: "Withdrawal hold total",
       applicationNo: "Application no.",
@@ -1542,6 +1559,7 @@ const enUS: MessageSchema = {
       "Reset post template": "Reset post template",
       "Self register": "Creator self-register",
       "Manual KOL cleanup": "Manual creator cleanup",
+      "Supplement order commission rate": "Supplement order commission rate",
       OTHER: "Other"
     }
   },

@@ -138,3 +138,11 @@ export function uploadRefundImport(file: File, dataCutoffTime?: string): Promise
   if (dataCutoffTime) form.append("dataCutoffTime", dataCutoffTime);
   return http.request<OrderImportVO>({ method: "post", url: "/order/refund-imports", data: form });
 }
+
+/** Company super administrator: supplement exactly one missing order-line rate. */
+export function supplementOrderRate(
+  id: string,
+  data: { orderItemId: string; rate: string; reason: string }
+): Promise<null> {
+  return http.request<null>({ method: "post", url: `/order/orders/${id}/rate-supplements`, data });
+}

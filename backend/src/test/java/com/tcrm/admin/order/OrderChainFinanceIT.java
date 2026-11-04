@@ -123,8 +123,205 @@ class OrderChainFinanceIT {
     insertRefund(orderId, item1, "t72-refund-1", "100.00");
   }
 
+  @Test
+  void shouldSupplementMissingRateAndRejectRepeat_withoutPayingWallet() throws Exception {
+    jdbc.update("UPDATE crm_order_item SET kol_id = ? WHERE id = ?", kolB, item1);
+    var body =
+        json.writeValueAsString(
+            Map.of(
+                "orderItemId",
+                String.valueOf(item1),
+                "rate",
+                "0.1250",
+                "reason",
+                "t107 missing historical rate"));
+    mvc.perform(
+            post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                .header("X-Admin-Token", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT rate FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+                BigDecimal.class,
+                item1))
+        .isEqualByComparingTo("0.1250");
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT released_commission_cny FROM crm_commission_item_state WHERE order_item_id = ?",
+                BigDecimal.class,
+                item1))
+        .isEqualByComparingTo("0");
+    mvc.perform(
+            post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                .header("X-Admin-Token", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isConflict());
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+                Integer.class,
+                item1))
+        .isEqualTo(1);
+    var auditRow =
+        jdbc.queryForMap(
+            "SELECT tenant_id, order_id, order_item_id, kol_id, rate, reason, create_by, create_time FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+            item1);
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("tenant_id")).isEqualTo(TENANT_ID);
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("order_id")).isEqualTo(orderId);
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("order_item_id")).isEqualTo(item1);
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("kol_id")).isEqualTo(kolB);
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("rate"))
+        .isEqualTo(new java.math.BigDecimal("0.1250"));
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("reason"))
+        .isEqualTo("t107 missing historical rate");
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("create_by"))
+        .isEqualTo(
+            jdbc.queryForObject(
+                "SELECT id FROM sys_user WHERE username = ?",
+                Long.class,
+                CompanySessions.COMPANY_ADMIN));
+    org.assertj.core.api.Assertions.assertThat(auditRow.get("create_time")).isNotNull();
+  }
+
+  @Test
+  void shouldRejectSupplement_whenPayTimeRateAlreadyExists() throws Exception {
+    mvc.perform(
+            post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                .header("X-Admin-Token", adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "orderItemId",
+                            String.valueOf(item1),
+                            "rate",
+                            "0.1250",
+                            "reason",
+                            "t107 do not overwrite"))))
+        .andExpect(status().isConflict());
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+                Integer.class,
+                item1))
+        .isZero();
+  }
+
+  @Test
+  void shouldRejectSupplementForAnotherCompany() throws Exception {
+    var other =
+        CompanySessions.openCompany(
+            mvc,
+            json,
+            PASSWORD,
+            "t107x" + (System.nanoTime() % 100_000_000L),
+            "t107-other-" + UUID.randomUUID().toString().substring(0, 8));
+    mvc.perform(
+            post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                .header("X-Admin-Token", other.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "orderItemId",
+                            String.valueOf(item1),
+                            "rate",
+                            "0.1",
+                            "reason",
+                            "t107 isolation"))))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void shouldAllowOnlyOneConcurrentSupplement() throws Exception {
+    jdbc.update("UPDATE crm_order_item SET kol_id = ? WHERE id = ?", kolB, item1);
+    String body =
+        json.writeValueAsString(
+            Map.of(
+                "orderItemId",
+                String.valueOf(item1),
+                "rate",
+                "0.1250",
+                "reason",
+                "t107 concurrent"));
+    var start = new java.util.concurrent.CountDownLatch(1);
+    java.util.function.Supplier<Integer> submit =
+        () -> {
+          try {
+            if (!start.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+              throw new IllegalStateException("Concurrent start timed out");
+            }
+            return mvc.perform(
+                    post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                        .header("X-Admin-Token", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+          } catch (Exception e) {
+            throw new IllegalStateException(e);
+          }
+        };
+    var a = java.util.concurrent.CompletableFuture.supplyAsync(submit);
+    var b = java.util.concurrent.CompletableFuture.supplyAsync(submit);
+    start.countDown();
+    org.assertj.core.api.Assertions.assertThat(
+            List.of(
+                a.get(30, java.util.concurrent.TimeUnit.SECONDS),
+                b.get(30, java.util.concurrent.TimeUnit.SECONDS)))
+        .containsExactlyInAnyOrder(200, 409);
+    org.assertj.core.api.Assertions.assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+                Integer.class,
+                item1))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void shouldRollbackSupplementAudit_whenCommissionRevisionFails() throws Exception {
+    jdbc.update("UPDATE crm_order_item SET kol_id = ? WHERE id = ?", kolB, item1);
+    jdbc.execute(
+        "ALTER TABLE crm_commission_item_revision ADD CONSTRAINT ck_t107_failure CHECK (rate IS NULL OR rate <> 0.1250)");
+    try {
+      mvc.perform(
+              post("/admin-api/order/orders/" + orderId + "/rate-supplements")
+                  .header("X-Admin-Token", adminToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      json.writeValueAsString(
+                          Map.of(
+                              "orderItemId",
+                              String.valueOf(item1),
+                              "rate",
+                              "0.1250",
+                              "reason",
+                              "t107 rollback"))))
+          .andExpect(status().isInternalServerError());
+      org.assertj.core.api.Assertions.assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM crm_commission_rate_supplement WHERE order_item_id = ?",
+                  Integer.class,
+                  item1))
+          .isZero();
+      org.assertj.core.api.Assertions.assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM crm_commission_item_state WHERE order_item_id = ?",
+                  Integer.class,
+                  item1))
+          .isZero();
+    } finally {
+      jdbc.execute("ALTER TABLE crm_commission_item_revision DROP CONSTRAINT ck_t107_failure");
+    }
+  }
+
   @AfterEach
   void cleanup() {
+    jdbc.update("DELETE FROM crm_commission_rate_supplement WHERE order_id = ?", orderId);
     for (long kol : List.of(kolA, kolB)) {
       jdbc.update(
           "DELETE FROM crm_commission_withdrawal_payment WHERE tenant_id = ? AND withdrawal_id IN"

@@ -25,6 +25,7 @@ import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -33,7 +34,6 @@ import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -296,11 +296,22 @@ public class OrderService {
     var shop = order.getShopId() == null ? null : shops.findShop(order.getShopId());
     var linesKols = kolNames(lines);
     var images = productImages(lines);
-    var itemAmount =
-        lines.stream()
-            .map(OrderItemDO::getPayAmount)
-            .filter(Objects::nonNull)
-            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+    // Task 107: the goods amount and the displayed order total share one basis — historical
+    // unit price times quantity, and any missing line price blanks both. The source order's
+    // total is not reused: OrderNormalizer writes Weidian's total into total_amount and
+    // pay_amount alike, so it is the paid figure (freight in, discounts applied), not goods.
+    BigDecimal itemAmount =
+        lines.isEmpty()
+                || lines.stream()
+                    .anyMatch(
+                        line -> line.getHistoricalUnitPrice() == null || line.getQuantity() == null)
+            ? null
+            : lines.stream()
+                .map(
+                    line ->
+                        line.getHistoricalUnitPrice()
+                            .multiply(BigDecimal.valueOf(line.getQuantity())))
+                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
     var orderKol =
         order.getKolId() == null ? null : kolById(List.of(order.getKolId())).get(order.getKolId());
     return new OrderDetailDTO(
@@ -323,7 +334,7 @@ public class OrderService {
         order.getLastSyncTime(),
         order.getCreateTime(),
         itemAmount,
-        order.getTotalAmount(),
+        itemAmount,
         order.getPayAmount(),
         order.getFreight(),
         lines.stream()
@@ -341,6 +352,10 @@ public class OrderService {
                       kol == null ? null : kol.name(),
                       line.getQuantity(),
                       unitPrice(line),
+                      line.getHistoricalUnitPrice() == null || line.getQuantity() == null
+                          ? null
+                          : line.getHistoricalUnitPrice()
+                              .multiply(BigDecimal.valueOf(line.getQuantity())),
                       line.getPayAmount(),
                       line.getRefundAmount(),
                       order.getOrderStatus());
@@ -349,14 +364,10 @@ public class OrderService {
   }
 
   /**
-   * Unit price derived from the line: pay amount split over the quantity, half-up at 2 decimals.
+   * Verified historical sale price only; never inferred from payment or a current product price.
    */
   static BigDecimal unitPrice(OrderItemDO line) {
-    if (line.getPayAmount() == null || line.getQuantity() == null || line.getQuantity() <= 0) {
-      return null;
-    }
-    return line.getPayAmount()
-        .divide(BigDecimal.valueOf(line.getQuantity()), 2, RoundingMode.HALF_UP);
+    return line.getHistoricalUnitPrice();
   }
 
   static String sourceName(Integer source) {
@@ -471,6 +482,7 @@ public class OrderService {
           line.orderItemId(),
           new OrderChainDTO.LineCommissionDTO(
               line.rateSnapshot(),
+              line.rateSupplemented(),
               line.netCommissionCny(),
               line.releaseBasis(),
               line.occupiedCny(),
@@ -834,6 +846,46 @@ public class OrderService {
                     row.getTaskId(),
                     row.getCreateTime()))
         .toList();
+  }
+
+  /** Supplements one missing historical rate and republishes the full order atomically. */
+  @Transactional(rollbackFor = Exception.class)
+  public void supplementRate(Long id, Long itemId, BigDecimal rate, String reason) {
+    var user = current.user();
+    if (user.role() != Role.SUPER_ADMIN || user.tenantId() == null) {
+      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    }
+    if (itemId == null
+        || rate == null
+        || rate.signum() < 0
+        || rate.compareTo(BigDecimal.ONE) > 0
+        || rate.stripTrailingZeros().scale() > 4
+        || reason == null
+        || reason.isBlank()
+        || reason.length() > 255) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    var order = locked(id);
+    var lines = lines(id);
+    var target =
+        lines.stream()
+            .filter(line -> itemId.equals(line.getId()))
+            .findFirst()
+            .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_NOT_FOUND));
+    if (order.getPayTime() == null
+        || target.getKolId() == null
+        || !List.of(1, 2).contains(target.getAttributionType())) {
+      throw new BusinessException(ErrorCode.ORDER_COMMISSION_RATE_STATE_CONFLICT);
+    }
+    var historic = kols.rateEffectiveAt(target.getKolId(), order.getPayTime());
+    var snapshot = commissionChain.chainOfOrder(id, List.of(itemId));
+    if ((historic != null && historic.rate() != null)
+        || snapshot.lines().stream().anyMatch(line -> line.rateSnapshot() != null)) {
+      throw new BusinessException(ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
+    }
+    commissionChain.supplementRate(
+        user.tenantId(), id, itemId, target.getKolId(), rate.setScale(4), reason.trim(), user.id());
+    commissionSync.sync(order, lines);
   }
 
   @Transactional(rollbackFor = Exception.class)

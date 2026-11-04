@@ -61,8 +61,9 @@ const columns = computed<DataColumn[]>(() => [
     label: t("order.line.quantity"),
     width: locale.value.startsWith("en") ? 90 : 65
   },
-  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 110, amount: true },
-  { key: "payAmount", label: t("order.actualPaidAmount"), width: 110, amount: true },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 140, amount: true },
+  { key: "totalAmount", label: t("order.detail.totalAmount"), width: 130, amount: true },
+  { key: "payAmount", label: t("order.payAmount"), width: 130, amount: true },
   { key: "status", label: t("common.status"), width: 100 }
 ]);
 </script>
@@ -98,13 +99,22 @@ const columns = computed<DataColumn[]>(() => [
             }}</el-tag></el-descriptions-item
           >
           <el-descriptions-item :label="t('order.detail.itemAmount')">{{
-            formatAmountWithCurrency(detail.itemAmount)
+            detail.itemAmount == null
+              ? t("order.missingHistoricalPrice")
+              : formatAmountWithCurrency(detail.itemAmount)
+          }}</el-descriptions-item>
+          <el-descriptions-item :label="t('order.line.quantity')">{{
+            detail.items.some(item => item.quantity == null)
+              ? "-"
+              : detail.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('order.freight')">{{
             formatAmountWithCurrency(detail.freight)
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('order.detail.totalAmount')">{{
-            formatAmountWithCurrency(detail.totalAmount)
+            detail.totalAmount == null
+              ? t("order.missingHistoricalPrice")
+              : formatAmountWithCurrency(detail.totalAmount)
           }}</el-descriptions-item>
           <el-descriptions-item :label="t('order.payAmount')">{{
             formatAmountWithCurrency(detail.payAmount)
@@ -143,7 +153,16 @@ const columns = computed<DataColumn[]>(() => [
           <template #cell-quantity="{ row }">{{ asLine(row).quantity ?? "-" }}</template>
           <template #cell-unitPrice="{ row }"
             ><span class="drawer-money">{{
-              formatAmountWithCurrency(asLine(row).unitPrice)
+              asLine(row).unitPrice == null
+                ? t("order.missingHistoricalPrice")
+                : formatAmountWithCurrency(asLine(row).unitPrice)
+            }}</span></template
+          >
+          <template #cell-totalAmount="{ row }"
+            ><span class="drawer-money">{{
+              asLine(row).totalAmount == null
+                ? t("order.missingHistoricalPrice")
+                : formatAmountWithCurrency(asLine(row).totalAmount)
             }}</span></template
           >
           <template #cell-payAmount="{ row }"

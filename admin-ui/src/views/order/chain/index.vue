@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RateSupplementDialog from "../RateSupplementDialog.vue";
 import NameCode from "@/components/NameCode.vue";
 import {
   Document,
@@ -50,6 +51,21 @@ const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 
+const rateDialog = ref(false);
+const rateTarget = ref<ChainLineVO | null>(null);
+function canSupplement(line: ChainLineVO): boolean {
+  return (
+    userStore.isSuperAdmin &&
+    !!detail.value?.payTime &&
+    !!lineItem(line)?.kolCode &&
+    !!line.commission &&
+    line.commission.rateSnapshot == null
+  );
+}
+function openSupplement(line: ChainLineVO) {
+  rateTarget.value = line;
+  rateDialog.value = true;
+}
 const loading = ref(false);
 const chain = ref<OrderChainVO | null>(null);
 /** Header context; degrades to the bare chain when the detail call fails. */
@@ -355,6 +371,8 @@ const summaryColumns = computed<DataColumn[]>(() => [
   { key: "product", align: "left", label: t("order.chain.summaryProduct"), minWidth: 230 },
   { key: "status", label: t("common.status"), minWidth: 100 },
   { key: "kol", align: "left", label: t("order.chain.summaryKol"), minWidth: 145 },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), minWidth: 130, amount: true },
+  { key: "quantity", label: t("order.line.quantity"), minWidth: 90 },
   { key: "payAmount", label: t("order.payAmount"), minWidth: 110, amount: true },
   {
     key: "rate",
@@ -362,7 +380,10 @@ const summaryColumns = computed<DataColumn[]>(() => [
     minWidth: locale.value.startsWith("en") ? 150 : 100
   },
   { key: "commission", label: t("order.chain.summaryCommission"), minWidth: 120, amount: true },
-  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true }
+  { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true },
+  ...(userStore.isSuperAdmin
+    ? [{ key: "rateAction", label: t("common.actions"), minWidth: 160 }]
+    : [])
 ]);
 
 /** Product name of a finance flow, matched by its order-item id. */
@@ -448,6 +469,15 @@ onMounted(load);
 <template>
   <div v-loading="loading" class="chain-page">
     <h1 class="chain-page__heading">{{ t("route.orderChain") }}</h1>
+    <RateSupplementDialog
+      v-if="chain && rateTarget"
+      v-model="rateDialog"
+      :order-id="chain.orderId"
+      :order-no="chain.orderNo"
+      :item-id="rateTarget.orderItemId"
+      :item-name="lineName(rateTarget)"
+      @saved="load"
+    />
     <template v-if="chain">
       <section class="chain-page__card" data-test="chain-funds">
         <h3 class="chain-page__title">{{ t("order.chain.fundsSection") }}</h3>
@@ -581,14 +611,42 @@ onMounted(load);
             />
             <span v-else>-</span>
           </template>
+          <template #cell-rateAction="{ row }"
+            ><el-button
+              v-if="canSupplement(row as ChainLineVO)"
+              link
+              type="primary"
+              data-test="rate-supplement"
+              @click="openSupplement(row as ChainLineVO)"
+              >{{ t("order.rateSupplement.title") }}</el-button
+            ></template
+          >
+          <template #cell-unitPrice="{ row }">{{
+            lineItem(row as ChainLineVO)?.unitPrice == null
+              ? t("order.missingHistoricalPrice")
+              : formatAmountWithCurrency(lineItem(row as ChainLineVO)?.unitPrice)
+          }}</template>
+          <template #cell-quantity="{ row }">{{ (row as ChainLineVO).quantity ?? "-" }}</template>
           <template #cell-payAmount="{ row }">{{
             formatAmountWithCurrency((row as ChainLineVO).payAmount)
           }}</template>
-          <template #cell-rate="{ row }">{{
-            (row as ChainLineVO).commission?.rateSnapshot == null
-              ? fundsText(null)
-              : formatRate((row as ChainLineVO).commission!.rateSnapshot)
-          }}</template>
+          <template #cell-rate="{ row }"
+            ><span v-if="(row as ChainLineVO).commission?.rateSnapshot == null">{{
+              fundsText(null)
+            }}</span
+            ><span v-else class="chain-rate"
+              >{{ formatRate((row as ChainLineVO).commission!.rateSnapshot)
+              }}<el-tag
+                v-if="(row as ChainLineVO).commission!.rateSupplemented"
+                class="chain-rate__tag"
+                size="small"
+                type="warning"
+                effect="plain"
+                data-test="rate-supplemented"
+                >{{ t("order.chain.rateSupplemented") }}</el-tag
+              ></span
+            ></template
+          >
           <template #cell-commission="{ row }">{{
             fundsText((row as ChainLineVO).commission?.netCommission)
           }}</template>
@@ -597,7 +655,7 @@ onMounted(load);
           }}</template>
         </DataTable>
 
-        <details class="chain-wiring-details" data-test="chain-wiring-details">
+        <details v-show="false" class="chain-wiring-details" data-test="chain-wiring-details">
           <summary>{{ t("order.chain.wiringDetails") }}</summary>
           <section
             v-for="line in chain.lines"
@@ -689,6 +747,15 @@ onMounted(load);
                         ? t("finance.unverified")
                         : formatRate(line.commission.rateSnapshot)
                     }}
+                    <el-tag
+                      v-if="line.commission.rateSupplemented"
+                      class="chain-rate__tag"
+                      size="small"
+                      type="warning"
+                      effect="plain"
+                      data-test="rate-supplemented"
+                      >{{ t("order.chain.rateSupplemented") }}</el-tag
+                    >
                   </div>
                   <div class="chain-block__text">
                     {{ t("order.chain.kolCommission") }}:
@@ -1001,6 +1068,16 @@ onMounted(load);
 .chain-money {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+/* Rate plus its supplement marker stay on one line, so the marker never wraps under the number. */
+.chain-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  font-variant-numeric: tabular-nums;
+}
+.chain-rate__tag {
+  flex: none;
 }
 .chain-wiring-details > summary {
   cursor: pointer;

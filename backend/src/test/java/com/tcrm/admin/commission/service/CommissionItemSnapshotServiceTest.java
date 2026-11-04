@@ -64,6 +64,24 @@ class CommissionItemSnapshotServiceTest {
   }
 
   @Test
+  void shouldUseSupplementedRateWithoutReleasing_whenMissingPayTimeRate() {
+    when(states.lockByOrderItemId(9001L)).thenReturn(null);
+    when(revisions.supplementedRate(TENANT, 9001L, KOL_A)).thenReturn(new BigDecimal("0.1250"));
+    TenantScope.runCompany(
+        TENANT,
+        () ->
+            service.syncOrderItems(
+                order(), List.of(item(9001L, KOL_A, 1, new BigDecimal("100.00"), null))));
+    var revision = ArgumentCaptor.forClass(CommissionItemRevisionDO.class);
+    verify(revisions).insert(revision.capture());
+    // 100 CNY * 12.5% = 12.50 CNY; existing settlement/freeze rules still apply.
+    assertThat(revision.getValue().getRate()).isEqualByComparingTo("0.1250");
+    assertThat(revision.getValue().getAccruedCny()).isEqualByComparingTo("12.50");
+    verify(wallet, never())
+        .postCommissionAdjustment(anyLong(), anyLong(), anyLong(), any(), any(), any());
+  }
+
+  @Test
   void shouldRegisterUnverifiedRowWithoutBasis() {
     when(states.lockByOrderItemId(9001L)).thenReturn(null);
     TenantScope.runCompany(

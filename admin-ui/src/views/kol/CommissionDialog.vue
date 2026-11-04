@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
@@ -300,7 +299,6 @@ function onRecordsSize(size: number): void {
     width="760px"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <NameCode v-if="kol" :name="kol?.name" :code="kol?.kolCode" />
     <div v-loading="loading">
       <el-tabs v-model="activeTab">
         <el-tab-pane :label="t('promotion.configTab')" name="config">

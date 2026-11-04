@@ -1,4 +1,5 @@
 export default {
+  paidBreakdown: "Commission {commission} CNY · Prepay {prepay} CNY",
   withdrawalDetailTitle: "Withdrawal details",
   withdrawalAmount: "Withdrawal amount",
   operationsNote: "Operations notes",
@@ -8,7 +9,7 @@ export default {
   ordersPerPage: "{count} orders, {size} per page",
   orderSnapshotNote:
     "The remaining snapshot is the amount still available on that order immediately after this application was reserved.",
-  definitions: "Metric definitions",
+  definitions: "Income details",
   unverifiedCount: "{count} unverified records",
   noImage: "No image",
   integratedPreview:
@@ -76,7 +77,7 @@ export default {
   quantity: "Units sold",
   creator: "Creator",
   bd: "Business development",
-  sales: "Sales orders / units",
+  sales: "Orders / items",
   lastPaidAt: "Latest successful payment",
   actions: "Actions",
   ledger: "Ledger",

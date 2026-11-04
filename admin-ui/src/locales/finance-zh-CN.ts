@@ -1,4 +1,5 @@
 export default {
+  paidBreakdown: "佣金{commission}元 预付{prepay}元",
   withdrawalDetailTitle: "提现明细",
   withdrawalAmount: "提现金额",
   operationsNote: "运营备注",
@@ -7,7 +8,7 @@ export default {
   moneyUnit: "金额单位：{currency}",
   ordersPerPage: "共 {count} 笔，每页 {size} 笔",
   orderSnapshotNote: "剩余快照为本次申请占用后，该笔订单当时剩余的可提现金额。",
-  definitions: "统计口径",
+  definitions: "收入明细",
   unverifiedCount: "待核实 {count} 笔",
   noImage: "暂无图片",
   integratedPreview: "演示数据 · 仅当前佣金页面使用模拟数据，操作不会写入真实账务。",
@@ -70,7 +71,7 @@ export default {
   quantity: "售出商品件数",
   creator: "达人",
   bd: "商务",
-  sales: "销售订单数／件数",
+  sales: "订单数／件数",
   lastPaidAt: "最近打款时间",
   actions: "操作",
   ledger: "流水",

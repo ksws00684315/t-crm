@@ -2,6 +2,7 @@ package com.tcrm.admin.commission.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +14,7 @@ import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper.AllocationOccupationRow;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -24,13 +26,16 @@ class OrderChainCommissionServiceTest {
   private static final Instant SETTLED = Instant.parse("2026-10-20T00:00:00Z");
   private static final Instant APPLIED = Instant.parse("2026-10-22T00:00:00Z");
   private static final Instant PAID_OUT = Instant.parse("2026-10-23T00:00:00Z");
+  private static final long CREATOR = 100L;
+  private static final long OTHER_CREATOR = 200L;
 
   private final CommissionItemStateMapper states = mock(CommissionItemStateMapper.class);
   private final CommissionItemRevisionMapper revisions = mock(CommissionItemRevisionMapper.class);
   private final CommissionWalletMapper wallet = mock(CommissionWalletMapper.class);
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
+  private final CurrentTenantResolver tenants = mock(CurrentTenantResolver.class);
   private final OrderChainCommissionService service =
-      new OrderChainCommissionService(states, revisions, wallet, withdrawals);
+      new OrderChainCommissionService(states, revisions, wallet, withdrawals, tenants);
 
   @Test
   void shouldSplitFlowsPerAllocation_andCountOnlyOccupyingApplications() {
@@ -143,6 +148,29 @@ class OrderChainCommissionServiceTest {
   }
 
   @Test
+  void shouldReportUnverifiedWhenLineHasNoSnapshot() {
+    // A line the settlement never snapshotted has no state row at all. The order therefore cannot
+    // be reported as verified, and that line exposes no commission basis of its own.
+    when(states.listByOrderIds(any())).thenReturn(List.of(state(50L, 20L, true, "6.00")));
+    when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L, 21L));
+
+    assertThat(chain.allVerified()).isFalse();
+    assertThat(chain.lines()).hasSize(2);
+    var missing = chain.lines().get(1);
+    assertThat(missing.netCommissionCny()).isNull();
+    assertThat(missing.rateSnapshot()).isNull();
+    // No snapshot means no release basis at all — distinct from a snapshot that is merely
+    // unverified, which reports UNVERIFIED.
+    assertThat(missing.releaseBasis()).isNull();
+    // Only the snapshotted line contributes to the order total.
+    assertThat(chain.netCommissionCny()).isEqualByComparingTo("6.00");
+  }
+
+  @Test
   void shouldShowFullRefundAsRealZeroWithPairedFlows() {
     // Full refund after release: the credit +10.00 and the clawback −10.00 pair up as flows and
     // the verified line's net commission is a real 0.00, not the unverified null.
@@ -189,13 +217,68 @@ class OrderChainCommissionServiceTest {
     assertThat(line.withdrawals()).isEmpty();
   }
 
+  @Test
+  void shouldMarkRateAsSupplementedOnlyWhileItStillMatchesTheSupplement() {
+    when(tenants.currentLoginTenantId()).thenReturn(1L);
+    when(states.listByOrderIds(any()))
+        .thenReturn(List.of(state(50L, 20L, true, "30.00"), state(51L, 21L, true, "20.00")));
+    // Line 20 keeps the supplemented 30%. Line 21 was re-attributed after the supplement, so its
+    // snapshot rate comes from the config: the supplement row must not label it.
+    when(revisions.listLatestByItemStateIds(any()))
+        .thenReturn(List.of(revision(50L, "0.3000"), revision(51L, "0.2000")));
+    when(revisions.listSupplementsByOrderItems(anyLong(), any()))
+        .thenReturn(
+            List.of(supplement(20L, CREATOR, "0.3000"), supplement(21L, CREATOR, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L, 21L));
+
+    assertThat(chain.lines().get(0).rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(chain.lines().get(0).rateSupplemented()).isTrue();
+    assertThat(chain.lines().get(1).rateSnapshot()).isEqualByComparingTo("0.2000");
+    assertThat(chain.lines().get(1).rateSupplemented()).isFalse();
+  }
+
+  @Test
+  void shouldNotMarkRateAsSupplemented_whenLineWasReattributedToAnotherCreator() {
+    when(tenants.currentLoginTenantId()).thenReturn(1L);
+    // The line now belongs to another creator but happens to keep the supplemented rate.
+    when(states.listByOrderIds(any()))
+        .thenReturn(List.of(state(50L, 20L, OTHER_CREATOR, true, "30.00")));
+    when(revisions.listLatestByItemStateIds(any())).thenReturn(List.of(revision(50L, "0.3000")));
+    when(revisions.listSupplementsByOrderItems(anyLong(), any()))
+        .thenReturn(List.of(supplement(20L, CREATOR, "0.3000")));
+    when(wallet.listByItemStates(any())).thenReturn(List.of());
+    when(withdrawals.listAllocationsByOrderItems(any())).thenReturn(List.of());
+
+    var chain = service.chainOfOrder(10L, List.of(20L));
+
+    assertThat(chain.lines().getFirst().rateSnapshot()).isEqualByComparingTo("0.3000");
+    assertThat(chain.lines().getFirst().rateSupplemented()).isFalse();
+  }
+
+  private static CommissionItemRevisionMapper.SupplementRow supplement(
+      long itemId, long kolId, String rate) {
+    var row = new CommissionItemRevisionMapper.SupplementRow();
+    row.setItemId(itemId);
+    row.setKolId(kolId);
+    row.setRate(dec(rate));
+    return row;
+  }
+
   private static CommissionItemStateDO state(
       long id, long orderItemId, boolean verified, String accrued) {
+    return state(id, orderItemId, CREATOR, verified, accrued);
+  }
+
+  private static CommissionItemStateDO state(
+      long id, long orderItemId, long kolId, boolean verified, String accrued) {
     var row = new CommissionItemStateDO();
     row.setId(id);
     row.setOrderId(10L);
     row.setOrderItemId(orderItemId);
-    row.setKolId(100L);
+    row.setKolId(kolId);
     row.setVerified(verified);
     row.setAccruedCommissionCny(dec(accrued));
     row.setReleasedCommissionCny(dec(accrued));

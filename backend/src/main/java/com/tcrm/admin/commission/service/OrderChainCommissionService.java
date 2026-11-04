@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
 import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
@@ -9,8 +10,13 @@ import com.tcrm.admin.commission.mapper.WithdrawalMapper.AllocationOccupationRow
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.CurrentTenantResolver;
+import com.tcrm.admin.shared.ErrorCode;
+import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -34,16 +40,44 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
   private final CommissionItemRevisionMapper revisions;
   private final CommissionWalletMapper wallet;
   private final WithdrawalMapper withdrawals;
+  private final CurrentTenantResolver currentTenant;
 
   public OrderChainCommissionService(
       CommissionItemStateMapper states,
       CommissionItemRevisionMapper revisions,
       CommissionWalletMapper wallet,
-      WithdrawalMapper withdrawals) {
+      WithdrawalMapper withdrawals,
+      CurrentTenantResolver currentTenant) {
     this.states = states;
     this.revisions = revisions;
     this.wallet = wallet;
     this.withdrawals = withdrawals;
+    this.currentTenant = currentTenant;
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public void supplementRate(
+      long tenantId,
+      long orderId,
+      long itemId,
+      long kolId,
+      BigDecimal rate,
+      String reason,
+      long actorId) {
+    if (revisions.insertSupplement(
+            IdWorker.getId(),
+            tenantId,
+            orderId,
+            itemId,
+            kolId,
+            rate,
+            reason,
+            actorId,
+            Instant.now())
+        != 1) {
+      throw new BusinessException(ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
+    }
   }
 
   @Override
@@ -56,13 +90,16 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
     List<CommissionItemStateDO> rows = states.listByOrderIds(List.of(orderId));
     Map<Long, CommissionItemStateDO> stateByItem = new LinkedHashMap<>();
     BigDecimal net = ZERO;
-    boolean allVerified = true;
+    boolean allVerified =
+        itemIds.stream()
+            .allMatch(id -> rows.stream().anyMatch(row -> id.equals(row.getOrderItemId())));
     for (CommissionItemStateDO row : rows) {
       stateByItem.put(row.getOrderItemId(), row);
       net = net.add(nz(row.getAccruedCommissionCny()));
       allVerified = allVerified && Boolean.TRUE.equals(row.getVerified());
     }
     Map<Long, BigDecimal> rateByItem = latestRates(rows);
+    Map<LineKey, BigDecimal> supplementedByItem = supplementedRates(itemIds);
     List<AllocationOccupationRow> allocations = withdrawals.listAllocationsByOrderItems(itemIds);
     List<FlowDTO> flows = new ArrayList<>();
     flows.addAll(ledgerFlows(stateByItem));
@@ -71,7 +108,9 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
         Comparator.comparing(FlowDTO::businessAt, Comparator.nullsLast(Comparator.naturalOrder()))
             .thenComparing(FlowDTO::flowNo));
     List<LineCommissionDTO> lines =
-        itemIds.stream().map(id -> lineOf(id, stateByItem, rateByItem, allocations)).toList();
+        itemIds.stream()
+            .map(id -> lineOf(id, stateByItem, rateByItem, supplementedByItem, allocations))
+            .toList();
     return new OrderCommissionChainDTO(
         net.setScale(2, RoundingMode.UNNECESSARY), allVerified, lines, flows);
   }
@@ -93,10 +132,40 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
     return rateByItem;
   }
 
+  /**
+   * Supplemented rate per line. Empty when no tenant can be resolved: this only drives a display
+   * marker, so it must never fail the whole chain page.
+   */
+  private Map<LineKey, BigDecimal> supplementedRates(List<Long> itemIds) {
+    Long tenantId = TenantScope.companyId();
+    if (tenantId == null) {
+      tenantId = currentTenant.currentLoginTenantId();
+    }
+    if (tenantId == null || itemIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<LineKey, BigDecimal> byLine = new HashMap<>();
+    for (CommissionItemRevisionMapper.SupplementRow row :
+        revisions.listSupplementsByOrderItems(tenantId, itemIds)) {
+      if (row.getItemId() != null && row.getKolId() != null) {
+        byLine.put(new LineKey(row.getItemId(), row.getKolId()), row.getRate());
+      }
+    }
+    return byLine;
+  }
+
+  /**
+   * Order line plus the creator it is attributed to. Supplementation is per creator: the unique key
+   * of the supplement table is {@code (tenant, line, creator)}, and a supplement granted to one
+   * creator must never vouch for a line re-attributed to another.
+   */
+  private record LineKey(long orderItemId, long kolId) {}
+
   private LineCommissionDTO lineOf(
       long orderItemId,
       Map<Long, CommissionItemStateDO> stateByItem,
       Map<Long, BigDecimal> rateByItem,
+      Map<LineKey, BigDecimal> supplementedByItem,
       List<AllocationOccupationRow> allocations) {
     CommissionItemStateDO state = stateByItem.get(orderItemId);
     List<OrderChainCommissionApi.WithdrawalRefDTO> refs = new ArrayList<>();
@@ -120,9 +189,20 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
         state != null && Boolean.TRUE.equals(state.getVerified())
             ? nz(state.getAccruedCommissionCny())
             : null;
+    BigDecimal rate = rateByItem.get(orderItemId);
+    BigDecimal supplemented =
+        state == null || state.getKolId() == null
+            ? null
+            : supplementedByItem.get(new LineKey(orderItemId, state.getKolId()));
+    // The revision keeps the number but not its origin. Compare against the supplement record of
+    // the line's current creator: a line re-attributed afterwards keeps the supplemented rate in
+    // its revision but must not claim the supplement that was granted to the previous creator.
+    boolean rateSupplemented =
+        rate != null && supplemented != null && rate.compareTo(supplemented) == 0;
     return new LineCommissionDTO(
         orderItemId,
-        rateByItem.get(orderItemId),
+        rate,
+        rateSupplemented,
         netCommission,
         state == null ? null : state.getReleaseBasis(),
         occupied.setScale(2, RoundingMode.UNNECESSARY),

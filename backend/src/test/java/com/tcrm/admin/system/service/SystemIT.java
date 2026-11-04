@@ -175,6 +175,7 @@ class SystemIT {
             "crm_commission_item_revision:NO",
             "crm_commission_item_state:NO",
             "crm_commission_ledger:NO",
+            "crm_commission_rate_supplement:NO",
             "crm_commission_recovery:NO",
             "crm_commission_rule_version:NO",
             "crm_commission_wallet:NO",

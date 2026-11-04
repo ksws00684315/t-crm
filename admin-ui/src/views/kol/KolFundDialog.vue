@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { listPayoutAccounts, type PayoutAccountRowVO } from "@/api/commission/payout-account";
 import type { KolVO } from "@/api/types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
-import RowActions, { type RowAction } from "@/components/RowActions.vue";
+
 import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import PayoutAccountDetailDrawer from "./PayoutAccountDetailDrawer.vue";
@@ -29,7 +29,7 @@ const loadFailed = ref(false);
 const rows = ref<PayoutAccountRowVO[]>([]);
 const total = ref(0);
 const query = reactive({ page: 1, size: 20 });
-const detailVisible = ref(false);
+
 const detailId = ref<string | null>(null);
 
 const title = computed(() =>
@@ -45,8 +45,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "currency", label: t("kol.fundCurrency"), minWidth: 96 },
   { key: "default", label: t("kol.fundDefault"), minWidth: 72 },
   { key: "status", label: t("kol.fundStatus"), minWidth: 90 },
-  { key: "updated", label: t("kol.fundUpdatedAt"), minWidth: 150 },
-  { key: "actions", label: t("common.actions"), minWidth: 110 }
+  { key: "updated", label: t("kol.fundUpdatedAt"), minWidth: 150 }
 ]);
 
 watch(
@@ -54,6 +53,8 @@ watch(
   async ([open, kolId]) => {
     if (!open || !kolId) return;
     query.page = 1;
+    rows.value = [];
+    detailId.value = null;
     await load(kolId);
   },
   { immediate: true }
@@ -67,6 +68,7 @@ async function load(kolId: string): Promise<void> {
     const page = await listPayoutAccounts({ kolId, page: query.page, size: query.size });
     rows.value = page.items;
     total.value = Number(page.total);
+    detailId.value = page.items.find(row => row.defaultAccount)?.id ?? page.items[0]?.id ?? null;
   } catch (error) {
     notifyError(error);
     rows.value = [];
@@ -94,17 +96,6 @@ function asRow(row: object): PayoutAccountRowVO {
   return row as PayoutAccountRowVO;
 }
 
-function rowActions(row: PayoutAccountRowVO): RowAction[] {
-  return [
-    {
-      key: "view",
-      label: t("kol.fundViewFull"),
-      testId: `fund-view-${row.id}`,
-      onClick: () => openDetail(row)
-    }
-  ];
-}
-
 function typeText(row: PayoutAccountRowVO): string {
   return t(`payout.typeOption.${row.accountType}`);
 }
@@ -118,18 +109,13 @@ function currencyText(row: PayoutAccountRowVO): string {
   if (row.accountType === "USDT") return "USDT";
   return row.currency || "-";
 }
-
-function openDetail(row: PayoutAccountRowVO): void {
-  detailId.value = row.id;
-  detailVisible.value = true;
-}
 </script>
 
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="modelValue"
     :title="title"
-    width="min(960px, calc(100vw - 24px))"
+    size="min(960px, calc(100vw - 24px))"
     :close-on-click-modal="false"
     data-test="kol-fund-dialog"
     @update:model-value="emit('update:modelValue', $event)"
@@ -182,10 +168,24 @@ function openDetail(row: PayoutAccountRowVO): void {
         </el-tag>
       </template>
       <template #cell-updated="{ row }">{{ formatInstant(asRow(row).lastSubmittedAt) }}</template>
-      <template #actions="{ row }">
-        <RowActions :actions="rowActions(asRow(row))" />
-      </template>
     </DataTable>
-    <PayoutAccountDetailDrawer v-model="detailVisible" :account-id="detailId" />
-  </el-dialog>
+    <el-select
+      v-if="rows.length > 1"
+      v-model="detailId"
+      :aria-label="t('kol.fundAccount')"
+      data-test="fund-account-select"
+      ><el-option
+        v-for="row in rows"
+        :key="row.id"
+        :value="row.id"
+        :label="`${typeText(row)} · ${row.accountMasked}`"
+    /></el-select>
+    <PayoutAccountDetailDrawer
+      v-if="detailId"
+      :key="detailId"
+      :model-value="true"
+      :account-id="detailId"
+      embedded
+    />
+  </el-drawer>
 </template>

@@ -34,6 +34,16 @@ public class OrderItemDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private BigDecimal payAmount;
 
+  private BigDecimal historicalUnitPrice;
+
+  public BigDecimal getHistoricalUnitPrice() {
+    return historicalUnitPrice;
+  }
+
+  public void setHistoricalUnitPrice(BigDecimal value) {
+    historicalUnitPrice = value;
+  }
+
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private BigDecimal refundAmount;
 

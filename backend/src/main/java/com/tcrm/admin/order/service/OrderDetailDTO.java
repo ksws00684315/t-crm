@@ -8,7 +8,10 @@ import java.util.List;
  * Order detail response (task 40 §3.2, row 09.04). Amounts in yuan; times UTC.
  *
  * @param merchantNo the shop's Weidian shop id shown to the operator
- * @param itemAmount sum of the line pay amounts (商品金额)
+ * @param itemAmount sum of verified historical unit sale prices times quantities; null when missing
+ * @param totalAmount same basis as {@code itemAmount} — the goods total the order detail displays.
+ *     Never taken from the source order total, which is the paid amount (freight included,
+ *     discounts applied); a missing line price blanks both
  * @param source API or IMPORT (1 / 2 of {@code crm_order.source})
  * @param lastSyncTime last write of this order, sync or import
  */
@@ -49,6 +52,7 @@ public record OrderDetailDTO(
       String kolName,
       Integer quantity,
       BigDecimal unitPrice,
+      BigDecimal totalAmount,
       BigDecimal payAmount,
       BigDecimal refundAmount,
       String status) {}
