@@ -2,6 +2,7 @@
 
 | 文件 | 用途 |
 |---|---|
+| `RUNBOOK.md` | 生产装机与上线手册：从空白主机到上线检查通过的完整操作顺序（目录规划、`.env` 生产取值、root crontab 整块、上线前核对表、演练记录表） |
 | `.env.example` | 全部环境变量（名称与 backend / redirect 实际使用的一致）；复制为 `deploy/.env` 后填写，`.env` 不入库 |
 | `docker-compose.dev.yml` | 本地共享中间件：PostgreSQL 17.11、Redis 7.4.5 |
 | `docker-compose.prod.yml` | 生产**模板**：nginx、crm-admin、crm-redirect、postgres、redis；应用与数据库镜像从仓库拉取，不在服务器构建 |
@@ -139,6 +140,8 @@ deploy/scripts/local-infra.sh psql
 
 ## 生产部署（模板，使用前逐项审阅）
 
+> 从空白主机装机到上线的**完整操作顺序**（含主机初始化、AWS/Cloudflare 控制台步骤、首次发布与上线检查）见 [`RUNBOOK.md`](RUNBOOK.md)；本节只保留模板相关的要点说明。
+
 1. 域名与证书（ADR-037 决定 3、4）：
    - Cloudflare 解析 `t.<域名>`、`kol.<域名>`、`admin.<域名>`，三者**走代理（橙云）**，SSL/TLS 模式用 Full (strict)。`t.`、`kol.` 使用 Cloudflare 源站证书：放到 `TCRM_CERT_DIR` 的 `origin.pem`、`origin.key`。
    - **另加一条 `upload.<域名>` 的 A 记录并设为「仅 DNS」（灰云，不代理）**：推广表上传（任务 26）最大 300 MB，超过 Cloudflare 免费计划约 100 MB 的请求体上限，必须绕过代理直连源站。浏览器直连该域名，**不信任 Cloudflare 源站证书**，所以 `upload.` 与 `admin.` 一样使用 Let's Encrypt 公开证书（`public.pem`、`public.key`，由 `scripts/renew-public-cert.sh` 生成，见下文「公开证书的申请与续期」）。`admin.` 将来若经实测改为灰云，不用换证书。
@@ -147,7 +150,7 @@ deploy/scripts/local-infra.sh psql
    微店接入还要求设置 `TCRM_SECRET_KEY` 和 `TCRM_ADMIN_BASE_URL`。使用 `openssl rand -base64 32` 生成主密钥，作为 32 字节 Base64 值保存于受控的部署密钥库，并单独备份；不要写入仓库。丢失主密钥意味着已保存的凭证全部要重新录入。`TCRM_ADMIN_BASE_URL` 必须是无末尾斜杠的 HTTPS 后台地址（例如 `https://admin.example.com`）；将该域名登记为微店开放平台的回调域名。缺失或格式错误时后台启动失败。
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
    商品源表（ADR-021）不需要新的环境变量，但要求后端能直连 `oauth2.googleapis.com` 与 `sheets.googleapis.com`（服务器部署在海外）。客户需在自己的 Google Cloud 项目中创建服务账号、启用 Google Sheets API、下载 JSON 密钥；超管在管理端「商品 → 商品源表」上传密钥（私钥加密保存，依赖 `TCRM_SECRET_KEY`），再把每张源表分享给页面上显示的服务账号邮箱（查看者）。
-3. 镜像仓库与版本（ADR-037 决定 7）：镜像由 GitHub Actions 构建并推送到 GHCR，服务器不安装 Node.js、Maven，也不构建任何镜像。在 `deploy/.env` 设置 `TCRM_IMAGE_REGISTRY`（例如 `ghcr.io/ksws00684315`，小写、无末尾斜杠）。镜像为私有时，服务器用只有 `read:packages` 权限的令牌登录一次：`echo <令牌> | docker login ghcr.io -u <GitHub 用户名> --password-stdin`（令牌不写进仓库和 `.env`，凭证由 Docker 保存在登录用户的 `~/.docker/config.json`）。`TCRM_VERSION` 由发布脚本维护，首次不用改。
+3. 镜像仓库与版本（ADR-037 决定 7）：镜像由 GitHub Actions 构建并推送到 GHCR，服务器不安装 Node.js、Maven，也不构建任何镜像。在 `deploy/.env` 设置 `TCRM_IMAGE_REGISTRY`（例如 `ghcr.io/ksws00684315`，小写、无末尾斜杠）。镜像为私有时，服务器用只有 `read:packages` 权限的令牌登录一次：`echo <令牌> | docker login ghcr.io -u <GitHub 用户名> --password-stdin`（令牌不写进仓库和 `.env`，凭证由 Docker 保存在登录用户的 `~/.docker/config.json`）。`TCRM_VERSION` 由发布脚本维护；**首次发布前确认它与本次要发布的版本一致**（`.env.example` 占位值是 `1.0.0`）：首次发布会把 `crm-postgres` 固定到该值并预拉取该镜像，保留占位值而首发其他版本时会去拉不存在的数据库镜像、发布在拉取步中止。
 4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时发布会报找不到卷。先生成公开证书（下文），并把源站证书放进 `TCRM_CERT_DIR`（没有证书文件时发布脚本拒绝启动 Nginx），再把仓库切到要发布的版本标签并发布：`git fetch --tags && git checkout v1.0.0 && deploy/scripts/release.sh deploy 1.0.0`。首次发布没有 postgres 容器，脚本跳过备份，并启动 postgres、redis、crm-admin、crm-redirect 和 Nginx。随后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份。之后每次发布见「发布与回滚」。
 5. 备份（ADR-037）：按下文「备份与恢复」配置 pgBackRest 与每日加密逻辑备份，上线前做一次完整恢复演练。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
@@ -215,7 +218,7 @@ deploy/scripts/local-infra.sh psql
 1. 在 Cloudflare 创建 API 令牌，权限只给本域名所在 Zone 的「Zone → DNS → Edit」，写入仓库**之外**的文件（例如 `/etc/tcrm/cloudflare.ini`，权限 600，属主为运行脚本的用户）：`dns_cloudflare_api_token = <令牌>`。令牌不进 `.env`、不进日志；脚本发现文件权限不是 600 会拒绝运行。
 2. 在 `deploy/.env` 设置 `TCRM_CERTBOT_CLOUDFLARE_INI`（上述文件的路径）和 `TCRM_CERTBOT_EMAIL`（接收到期提醒）。
 3. 首次申请：在 `up` 之前以能运行 docker 的用户（通常是 root）执行 `deploy/scripts/renew-public-cert.sh`。证书状态和 Let's Encrypt 账号保存在 `deploy/certbot/`（已被 Git 忽略，和密钥一起备份）。
-4. 续期：host cron 每天一次，例如 `17 4 * * * /opt/tcrm/deploy/scripts/renew-public-cert.sh >> /var/log/tcrm-cert.log 2>&1`。certbot 距到期不足 30 天才会真正续期，其余时候脚本输出「certificate unchanged」。续期失败时脚本非零退出，旧证书继续使用到过期，日志里能看到原因；证书剩余有效期由 `ops-check.sh` 每次运行检查（见「监控告警」）。
+4. 续期：host cron 每天一次，已并入 [`RUNBOOK.md`](RUNBOOK.md) 的 root crontab 代码块（每天 04:17 UTC；certbot 距到期不足 30 天才会真正续期，其余时候脚本输出「certificate unchanged」）。续期失败时脚本非零退出，旧证书继续使用到过期，日志在 `/var/log/tcrm-cert.log`；证书剩余有效期由 `ops-check.sh` 每次运行检查（见「监控告警」）。
 5. 脚本的离线测试：`bash deploy/scripts/test-renew-public-cert.sh`（用桩替换 docker，验证文件落位、权限、重载顺序和令牌不进输出）。真实申请需要真实域名和 Cloudflare 令牌，上线前在服务器上完成并记录。
 
 ### AWS 主机与防火墙（ADR-037）
@@ -252,8 +255,8 @@ deploy/scripts/local-infra.sh psql
    **S3 凭证只有实例角色一种方式**（ADR-037 决定 1）：主机用 EC2 实例角色，不保存访问密钥。postgres 容器**读不到**实例元数据（IMDSv2 强制、hop limit 为 1，容器隔着 Docker 网桥多一跳，L-107），所以凭证由**主机**定时取好写成 pgBackRest 配置片段：`deploy/backup/refresh-s3-credentials.sh` 用 AWS CLI v2 的默认凭证链取临时凭证（必须是带过期时间的实例角色凭证，取不到长期密钥写不进文件；剩余有效期不足 30 分钟时拒绝写入并保留旧文件），写进 `TCRM_PGBACKREST_CREDS_DIR`（属主为镜像内 postgres 用户的 uid 999，权限 600，原子替换）。整个目录以只读方式挂进容器的 `/etc/pgbackrest/conf.d`（pgBackRest 默认的 `config-include-path`；挂整个目录而不是单文件，原因见 L-012）。pgBackRest 每条归档、备份、恢复命令都重新读取该目录，凭证轮换不需要重启 postgres。
 
    **首次启用顺序**（顺序错了归档会失败）：
-   1. 建目录：`install -d -m 755 /var/lib/tcrm/pgbackrest-creds`（仓库外）。**目录必须是 755，不能收成 700**：目录属主是 root，而容器里的 pgBackRest 以 uid 999（postgres）读取凭证文件，700 会挡掉它对目录的进入权限，归档和备份全部失败；机密性由文件本身保证（600、属主 uid 999，只有 postgres 读得到）。父目录保持默认 755（uid 999 需要一路可穿越）；
-   2. 跑一次刷新脚本：`deploy/backup/refresh-s3-credentials.sh`（失败非零退出，原因在 stderr；脚本会把目录权限校正回 755）；
+   1. 建目录：`install -d -m 755 /var/lib/tcrm/pgbackrest-creds`（仓库外）。**目录必须是 755，不能收成 700**：目录属主是 root，而容器里的 pgBackRest 以 uid 999（postgres）读取凭证文件，700 会挡掉它对目录的进入权限，归档和备份全部失败；机密性由文件本身保证（600、属主 uid 999，只有 postgres 读得到）。父目录保持默认权限即可（bind 挂载的路径由 Docker 守护进程解析，容器不穿越宿主机父目录）；
+   2. 跑一次刷新脚本：`TCRM_PGBACKREST_CREDS_DIR=/var/lib/tcrm/pgbackrest-creds deploy/backup/refresh-s3-credentials.sh`。该脚本只读环境变量、**不加载 `deploy/.env`**（与其他主机脚本不同），目录变量必须像这样行内传入（cron 里同理）；失败非零退出，原因在 stderr；脚本会把目录权限校正回 755；
    3. 再启动 postgres（凭证目录空着启动也能起来，但首次归档会失败）。
 2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
 3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：
@@ -268,13 +271,7 @@ deploy/scripts/local-infra.sh psql
    ```
 
 4. 逻辑备份需要主机装有 `gpg` 和 AWS CLI。口令文件放在仓库之外，权限 600：`install -m 600 /dev/null /etc/tcrm/backup.pass`，再写入随机口令（`openssl rand -base64 32 > /etc/tcrm/backup.pass`），路径写进 `TCRM_BACKUP_PASSPHRASE_FILE`。脚本发现权限不是 600 会拒绝运行。
-5. 定时任务（主机 crontab，时间为主机时钟，建议主机用 UTC）：
-
-   ```
-   */15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1
-   0 2 * * * /opt/tcrm/deploy/backup/pgbackrest-backup.sh >> /var/log/tcrm-pgbackrest.log 2>&1
-   0 3 * * * /opt/tcrm/deploy/backup/pg-backup.sh >> /var/log/tcrm-backup.log 2>&1
-   ```
+5. 定时任务：全部定时任务（凭证刷新、pgBackRest 备份、逻辑备份、证书续期、`ops-check`）统一安装在 root crontab，完整代码块见 [`RUNBOOK.md`](RUNBOOK.md)「定时任务与首次 ops-check」（含逐行注释、`PATH` 设置和凭证刷新的行内变量；凭证刷新脚本不读 `deploy/.env`）。
 
    凭证刷新失败时非零退出并保留旧文件（实例角色凭证有效期约 6 小时，15 分钟一次的刷新足够余量）；刷新是否按时执行由 `ops-check.sh` 检查（见「监控告警」）。备份脚本失败时也非零退出；备份是否按时产出同样由 `ops-check.sh` 检查。
 
@@ -340,11 +337,7 @@ gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.
 
 ### 主机检查脚本（ops-check.sh）
 
-host cron 每 5 分钟运行一次（建议与备份脚本同一 crontab）：
-
-```
-*/5 * * * * /opt/tcrm/deploy/scripts/ops-check.sh >> /var/log/tcrm-ops-check.log 2>&1
-```
+host cron 每 5 分钟运行一次，与备份脚本装在同一个 root crontab 里：cron 行见 [`RUNBOOK.md`](RUNBOOK.md)「定时任务与首次 ops-check」的整块 crontab。
 
 | 检查 | 告警条件 | 默认阈值 |
 |---|---|---|
