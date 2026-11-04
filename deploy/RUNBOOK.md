@@ -6,7 +6,7 @@
 > - 需要负责人在控制台完成的事项见[《生产上线：负责人操作清单》](../docs/04-开发任务/生产上线-负责人操作清单.md)（下称「操作清单」），本文只引用、不复制。
 > - 已定前提（2026-11-04）：Ubuntu 24.04 x86_64 / us-west-2；Session Manager 登录、`sudo -i` 以 root 操作、不开 22 端口；仓库克隆到 `/opt/tcrm`、属主 root、按版本标签检出；定时任务全放 root 的 crontab；主机时区 UTC；证书、静态文件、备份、凭证、状态等数据目录全部在仓库之外、统一放 `/var/lib/tcrm/` 下；`.env.example` 的相对路径默认值保持不变，生产取值见第 8 章。
 > - 本文由任务 108 按仓库现状**静态核对**编写，未在真机执行过；「待真机确认」项见第 17 章演练记录表。
-> - 占位符：`<域名>`（如 `example.com`）、`<域名前缀>`（取域名点号前的部分，用于给桶起名）、`<版本>`（如 `1.0.0`，标签为 `v<版本>`）、`<主备份桶名>`、`<EIP>`、`<GitHub 令牌>`、`<Cloudflare API 令牌>`（后两个在第 5 章生成）。除标注【AWS 控制台】【Cloudflare】【负责人】【浏览器】外，其余步骤都在主机上以 root 执行。
+> - 占位符：`<域名>`（如 `example.com`）、`<域名前缀>`（取域名点号前的部分，用于给桶起名）、`<版本>`（如 `1.0.0`，标签为 `v<版本>`）、`<主备份桶名>`、`<EIP>`。GitHub 与 Cloudflare 两个 API 令牌在第 5 章生成，分别在第 7.4、8.1 节按提示输入（不回显、不进 shell 历史）。除标注【AWS 控制台】【Cloudflare】【负责人】【浏览器】外，其余步骤都在主机上以 root 执行。
 
 ## 0. 目录规划
 
@@ -27,7 +27,7 @@
 
 按操作清单 §1 完成：机型与磁盘（EC2 4 核 8G 非突发、系统盘 gp3 200GB 起、计费告警）、恢复目标（丢约 5 分钟 / 2 小时恢复）、`admin.` 是否走代理。账号用客户名下 AWS / Cloudflare / Resend 账号，根账号开 MFA、日常不用（操作清单开头）。密钥保管方式见操作清单 §5：`TCRM_SECRET_KEY`、`TCRM_IP_HASH_SALT`、两份备份口令、数据库与 Redis 密码、`.env` 全文进密码管理器，**与备份分开存放**。
 
-## 2. AWS：S3 夡份桶与跨区域复制【AWS 控制台】
+## 2. AWS：S3 备份桶与跨区域复制【AWS 控制台】
 
 层次与理由见 README「备份与恢复」的备份层次表；这里只写操作。
 
@@ -39,8 +39,10 @@
    - 创建时 Advanced options → **Object Lock → Enable**（创建后无法补开）；版本控制随之开启；
    - Properties → Object Lock → Default retention：**35 天**；保留模式创建时选定（建议 COMPLIANCE，防勒索改删；此选择由负责人定，定后不可放宽）。
 3. **跨区域复制**：主桶 Management → Replication → Create rule：Scope 选 All objects，目标选副本桶，让控制台自动创建 IAM 角色；Delete marker replication **不勾**（删除不传播）。
-4. **生命周期规则**（主桶 Management → Lifecycle）：前缀 `logical/daily/` 到期 7 天；前缀 `logical/weekly/` 到期 28 天。`pgbackrest/` 前缀不加规则（保留期由 pgBackRest `repo1-retention-full=4` 管理）。
-5. **确认**：两个桶的 Properties 页显示 Versioning enabled（副本桶另显示 Object Lock）；复制规则状态 Enabled。记下主桶名，第 8 章填 `.env`。
+4. **生命周期规则**。注意：版本控制下，「到期」规则只给对象加删除标记，不清理旧版本，所以**每个桶都要另加非当前版本清理规则**，否则存储量只增不减（复制又不传播删除标记，主桶删掉的对象在副本桶会一直保留）：
+   - **主桶**（Management → Lifecycle）：前缀 `logical/daily/` 到期 7 天；前缀 `logical/weekly/` 到期 28 天；再加一条作用于**整个桶**的规则：非当前版本（noncurrent versions）7 天后永久删除。`pgbackrest/` 前缀不加到期规则（备份集保留期由 pgBackRest `repo1-retention-full=4` 管理），pgBackRest 清掉的旧对象同样靠全桶非当前版本规则回收。
+   - **副本桶**：一条作用于整个桶的规则：当前版本 42 天后过期（35 天 Object Lock 保留期 + 7 天余量），非当前版本 1 天后永久删除（仍在 Object Lock 保留期内的版本，S3 自动推迟到保留期满再删）。天数为建议值，待负责人确认（见执行报告 §9）。
+5. **确认**：两个桶的 Properties 页显示 Versioning enabled（副本桶另显示 Object Lock）；复制规则状态 Enabled；生命周期规则齐全——主桶三条（`daily/` 7 天、`weekly/` 28 天、全桶非当前版本 7 天）、副本桶一条（当前 42 天、非当前 1 天）。记下主桶名，第 8 章填 `.env`。
 
 ## 3. AWS：IAM 实例角色【AWS 控制台】
 
@@ -205,7 +207,9 @@ docker volume ls --format '{{.Name}}'   # 期望列出 tcrm_pgdata、tcrm_redisd
 镜像为私有，用第 5 章建的 `read:packages` 令牌登录一次（令牌不进仓库和 `.env`，README「生产部署」第 3 条）：
 
 ```bash
-echo <GitHub 令牌> | docker login ghcr.io -u ksws00684315 --password-stdin
+read -rs TCRM_GH_TOKEN     # 输入第 5 章建的 GitHub 令牌（不回显、不进 shell 历史）
+printf '%s' "$TCRM_GH_TOKEN" | docker login ghcr.io -u ksws00684315 --password-stdin
+unset TCRM_GH_TOKEN
 grep -c ghcr.io /root/.docker/config.json   # 期望 ≥ 1（凭证已保存）
 ```
 
@@ -217,7 +221,9 @@ grep -c ghcr.io /root/.docker/config.json   # 期望 ≥ 1（凭证已保存）
 install -m 600 /dev/null /var/lib/tcrm/secrets/backup.pass
 openssl rand -base64 32 > /var/lib/tcrm/secrets/backup.pass          # pg_dump 加密口令
 install -m 600 /dev/null /var/lib/tcrm/secrets/cloudflare.ini
-printf 'dns_cloudflare_api_token = <Cloudflare API 令牌>\n' > /var/lib/tcrm/secrets/cloudflare.ini
+read -rs TCRM_CF_TOKEN     # 输入第 5 章建的 Cloudflare API 令牌（不回显、不进 shell 历史）
+printf 'dns_cloudflare_api_token = %s\n' "$TCRM_CF_TOKEN" > /var/lib/tcrm/secrets/cloudflare.ini
+unset TCRM_CF_TOKEN
 stat -c '%a' /var/lib/tcrm/secrets/*   # 期望都是 600
 ```
 

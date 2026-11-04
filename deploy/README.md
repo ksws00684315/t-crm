@@ -238,7 +238,7 @@ deploy/scripts/local-infra.sh psql
 |---|---|---|---|
 | 1. pgBackRest | 全量 + 差异备份，加 WAL 连续归档；客户端加密（aes-256-cbc），S3 只看到密文 | WAL 持续归档（`archive_timeout=300`：有写入时最多约 5 分钟切段；**完全空闲时不会切段**）；周日全量、其余日差异；保留 4 个全量（约四周） | S3，路径 `PGBACKREST_REPO1_PATH`（默认 `/pgbackrest`） |
 | 2. 逻辑备份 | `pg_dump` 自定义格式，`gpg` 对称加密（AES256），只保留 `.dump.gpg` | 每日 03:00；7 日 + 4 周（周日） | 本机 `TCRM_BACKUP_DIR`；S3 `<前缀>/daily/`、`<前缀>/weekly/` |
-| 3. S3 防护 | 跨区域复制、Object Lock、生命周期规则（`daily/` 7 日、`weekly/` 28 日） | 由负责人在 AWS 控制台配置（负责人操作清单），仓库不创建 | S3 |
+| 3. S3 防护 | 跨区域复制、Object Lock、生命周期规则（`daily/` 7 日、`weekly/` 28 日；**两个桶都需要非当前版本清理规则**，否则版本控制与复制下的旧版本只增不减，取值见 [`RUNBOOK.md`](RUNBOOK.md) 第 2 章） | 由负责人在 AWS 控制台配置（负责人操作清单），仓库不创建 | S3 |
 | 4. 云快照 | 只用于恢复主机系统环境，**不是**数据备份 | 按需 | EC2 / Lightsail |
 | Redis | 只在本机保留 AOF，**不做异地备份** | 持续 | 本机数据卷 |
 
