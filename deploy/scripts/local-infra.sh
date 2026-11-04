@@ -143,14 +143,23 @@ require_env() {
 # host.docker.internal plus the LOCAL (tunnel) ports from the env file. Credentials travel only in
 # environment variables, never in command arguments.
 
-ext_pg() { # <postgres:17.11 client args...>
-  docker run --rm --add-host "host.docker.internal:host-gateway" \
-    -e "PGPASSWORD=${TCRM_DB_PASSWORD:-}" postgres:17.11 "$@"
+# Credentials travel only through the environment, never through command arguments: the
+# assignment prefixes the docker command and -e takes the bare variable NAME, so the value is
+# inherited from the docker client's own environment and never shows up in its argv (review).
+ext_pg() { # <postgres:17.11 client args...; no stdin attached>
+  PGPASSWORD="${TCRM_DB_PASSWORD:-}" docker run --rm \
+    --add-host "host.docker.internal:host-gateway" -e PGPASSWORD postgres:17.11 "$@"
+}
+
+ext_pg_stdin() { # same client, but forwards stdin (psql import; review: docker run without -i
+  # never passes the host's stdin to the container, so a piped dump would import nothing)
+  PGPASSWORD="${TCRM_DB_PASSWORD:-}" docker run --rm -i \
+    --add-host "host.docker.internal:host-gateway" -e PGPASSWORD postgres:17.11 "$@"
 }
 
 ext_redis() { # <redis:7.4.5 client args...>
-  docker run --rm --add-host "host.docker.internal:host-gateway" \
-    -e "REDISCLI_AUTH=${TCRM_REDIS_PASSWORD:-}" redis:7.4.5 "$@"
+  REDISCLI_AUTH="${TCRM_REDIS_PASSWORD:-}" docker run --rm \
+    --add-host "host.docker.internal:host-gateway" -e REDISCLI_AUTH redis:7.4.5 "$@"
 }
 
 ext_unreachable() { # <service label> <port>
@@ -196,11 +205,19 @@ external_down() {
 external_backup() {
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
-  local stamp pgfile
+  local stamp pgfile tmpfile
   stamp="$(date '+%Y%m%d-%H%M%S')"
   pgfile="$BACKUP_DIR/${PROJECT_OVERRIDE:-tcrm-local}-$stamp.sql.gz"
-  ext_pg pg_dump --no-owner -h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" \
-    -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}" | gzip >"$pgfile"
+  # Dump into a temp file first: an unreachable tunnel makes pg_dump fail while gzip still writes
+  # a normal-looking (nearly empty) .sql.gz, which is worse than no backup at all (review).
+  tmpfile="$(mktemp "${pgfile%.sql.gz}.XXXXXX")"
+  if ! ext_pg pg_dump --no-owner -h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" \
+    -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}" | gzip >"$tmpfile"; then
+    rm -f "$tmpfile"
+    echo "数据库备份失败（pg_dump 未完成），已删除临时文件，未生成 ${pgfile}。" >&2
+    exit 1
+  fi
+  mv "$tmpfile" "$pgfile"
   chmod 600 "$pgfile"
   echo "数据库备份：$pgfile"
   echo "外部模式不备份 Redis：实例与其他应用共用，不能执行 SAVE，也不能导出全部键。"
@@ -209,30 +226,41 @@ external_backup() {
 
 external_restore() { # <backup file>
   local file="$1" server_major
-  # pg_database_owner covers the public schema from PostgreSQL 15 on; with a dedicated
-  # cloud role that owns the database this succeeds (see task 109 report for the permission check).
-  ext_pg psql -v ON_ERROR_STOP=1 -h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" \
-    -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}" \
-    -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+  # Probe the server BEFORE touching any data: the schema drop and the import used to run in
+  # separate steps, so a failed version query left an already-emptied database behind (review).
   server_major="$(ext_pg psql -h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" -U "$TCRM_DB_USERNAME" \
-    -d "${TCRM_DB_NAME:-tcrm}" -Atc 'show server_version' | cut -d. -f1 | tr -d '[:space:]')"
+    -d "${TCRM_DB_NAME:-tcrm}" -Atc 'show server_version' 2>/dev/null | cut -d. -f1 | tr -d '[:space:]')" ||
+    ext_unreachable PostgreSQL "${TCRM_DB_PORT:-5432}"
   [[ "$server_major" =~ ^[0-9]+$ ]] || { echo "无法确定外部 PostgreSQL 主版本：${server_major}。" >&2; exit 1; }
-  local import_args=(-v ON_ERROR_STOP=1 -h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" \
-    -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}")
+  local import_args=(-v ON_ERROR_STOP=1 --single-transaction -h "$EXT_CLIENT_HOST" \
+    -p "${TCRM_DB_PORT:-5432}" -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}")
+  # pg_database_owner covers the public schema from PostgreSQL 15 on, so a role that owns the
+  # database can drop and recreate it (see the task 109 report for the permission check).
+  # DROP/CREATE SCHEMA and the import run in ONE psql session inside a single transaction: a
+  # mid-import failure rolls everything back instead of leaving an emptied or half-imported
+  # database (review).
   if (( server_major < 17 )); then
     # transaction_timeout does not exist before 17; \restrict from the 17 pg_dump is
     # understood by the 17 client, so only this SET line needs filtering.
     echo "外部 PostgreSQL 主版本为 ${server_major}（低于 17），导入时过滤 SET transaction_timeout。"
     if [[ "$file" == *.gz ]]; then
-      gzip -dc "$file" | sed '/^SET transaction_timeout/d' | ext_pg psql "${import_args[@]}"
+      { printf 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\n'
+        gzip -dc "$file" | sed '/^SET transaction_timeout/d'
+      } | ext_pg_stdin psql "${import_args[@]}"
     else
-      sed '/^SET transaction_timeout/d' "$file" | ext_pg psql "${import_args[@]}"
+      { printf 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\n'
+        sed '/^SET transaction_timeout/d' "$file"
+      } | ext_pg_stdin psql "${import_args[@]}"
     fi
   else
     if [[ "$file" == *.gz ]]; then
-      gzip -dc "$file" | ext_pg psql "${import_args[@]}"
+      { printf 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\n'
+        gzip -dc "$file"
+      } | ext_pg_stdin psql "${import_args[@]}"
     else
-      ext_pg psql "${import_args[@]}" <"$file"
+      { printf 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\n'
+        cat "$file"
+      } | ext_pg_stdin psql "${import_args[@]}"
     fi
   fi
   echo "PostgreSQL 已恢复。"
@@ -241,12 +269,13 @@ external_restore() { # <backup file>
 
 external_psql() {
   local conn=(-h "$EXT_CLIENT_HOST" -p "${TCRM_DB_PORT:-5432}" -U "$TCRM_DB_USERNAME" -d "${TCRM_DB_NAME:-tcrm}")
+  # Same credential rule as ext_pg: env prefix plus bare -e name, no value in argv.
   if [ -t 0 ]; then
-    docker run --rm -it --add-host "host.docker.internal:host-gateway" \
-      -e "PGPASSWORD=$TCRM_DB_PASSWORD" postgres:17.11 psql "${conn[@]}"
+    PGPASSWORD="$TCRM_DB_PASSWORD" docker run --rm -it \
+      --add-host "host.docker.internal:host-gateway" -e PGPASSWORD postgres:17.11 psql "${conn[@]}"
   else
-    docker run --rm -i --add-host "host.docker.internal:host-gateway" \
-      -e "PGPASSWORD=$TCRM_DB_PASSWORD" postgres:17.11 psql "${conn[@]}"
+    PGPASSWORD="$TCRM_DB_PASSWORD" docker run --rm -i \
+      --add-host "host.docker.internal:host-gateway" -e PGPASSWORD postgres:17.11 psql "${conn[@]}"
   fi
 }
 
