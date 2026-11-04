@@ -50,7 +50,11 @@ const columns = computed<DataColumn[]>(() => [
   { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
   { key: "commission", label: t("orders.commissionAmount"), minWidth: 120, amount: true },
-  { key: "settlementStatus", label: t("orders.settlementStatus"), minWidth: 130 }
+  {
+    key: "settlementStatus",
+    label: t("orders.settlementStatus"),
+    minWidth: locale.value === "zh-CN" ? 130 : 165
+  }
 ]);
 function money(value: string) {
   return formatMoney(value, "CNY");

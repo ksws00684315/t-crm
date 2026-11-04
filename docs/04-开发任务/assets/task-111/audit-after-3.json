@@ -686,5 +686,389 @@
     "rows": 20,
     "problemCount": 0,
     "problems": []
+  },
+  {
+    "page": "kol-portal / en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 3,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 4,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 1,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts en",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 3,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 4,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 1,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts zh",
+    "role": "kol mila.da10",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 3,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 4,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 1,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts en",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 3,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 4,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 1,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts zh",
+    "role": "kol mila.da10",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 2,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts en",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 2,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts zh",
+    "role": "kol t81_kol",
+    "viewport": 1440,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 2,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts en",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal / zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /orders zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 2,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /items zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /funds zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /income/prepays zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
+  },
+  {
+    "page": "kol-portal /payout-accounts zh",
+    "role": "kol t81_kol",
+    "viewport": 1280,
+    "rows": 0,
+    "problemCount": 0,
+    "problems": []
   }
 ]
