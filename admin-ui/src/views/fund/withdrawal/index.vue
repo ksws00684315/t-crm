@@ -57,15 +57,17 @@ const columns = computed<DataColumn[]>(() =>
     minWidth:
       key === "actions"
         ? locale.value === "en-US"
-          ? 190
+          ? 250
           : 170
         : key === "applicationNo"
           ? 175
           : key === "kolIdentity"
             ? 175
             : key === "createdAt"
-              ? { "zh-CN": 165, "en-US": 200 }
-              : 145,
+              ? { "zh-CN": 175, "en-US": 200 }
+              : key === "status"
+                ? { "zh-CN": 145, "en-US": 180 }
+                : 145,
     amount: key === "amount",
     align: key === "applicationNo" || key === "kolIdentity" ? ("left" as const) : undefined
   }))
@@ -308,6 +310,7 @@ onMounted(load);
   flex-wrap: wrap;
   gap: var(--tcrm-space-1);
   align-items: center;
+  justify-content: center;
 }
 @media (max-width: 767px) {
   .finance-content {

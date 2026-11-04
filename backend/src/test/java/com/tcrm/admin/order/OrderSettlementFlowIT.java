@@ -765,7 +765,10 @@ class OrderSettlementFlowIT {
                 SHOP_ID, INCOME_TIME.minusSeconds(3600), INCOME_TIME.plusSeconds(3600), null));
   }
 
-  /** False means a recompute failed, which also keeps the shop's checkpoint from advancing. */
+  /**
+   * False means the per-order retry mark could not be written. A single recompute failure is marked
+   * on its own and does not keep the shop checkpoint from advancing (task 91).
+   */
   private boolean pullSucceeds() {
     return TenantScope.callCompany(
         TENANT_ID,

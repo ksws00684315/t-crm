@@ -79,9 +79,9 @@ const columns = computed<DataColumn[]>(() => [
   { key: "departure", label: t("departure.column"), width: px(210, 250) },
   { key: "permissions", label: t("user.permissionCount"), minWidth: { "zh-CN": 92, "en-US": 120 } },
   { key: "dataScope", label: t("user.dataScope"), width: 92 },
-  { key: "status", label: t("common.status"), width: 80 },
-  { key: "lastLogin", label: t("user.lastLogin"), width: 170 },
-  { key: "createdAt", label: t("common.createdAt"), width: 170 },
+  { key: "status", label: t("common.status"), width: px(80, 90) },
+  { key: "lastLogin", label: t("user.lastLogin"), width: px(170, 190) },
+  { key: "createdAt", label: t("common.createdAt"), width: px(180, 190) },
   { key: "actions", label: t("common.actions"), width: px(328, 430) }
 ]);
 

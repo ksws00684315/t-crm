@@ -420,7 +420,7 @@ describe("order chain page (task 40)", () => {
     expect(secondText).toContain("无提现占用");
 
     // Finance flows: increase for the release credit, decrease for clawback and allocations,
-    // per-withdrawal numbers with payment times, "－" when no withdrawal is linked.
+    // per-withdrawal numbers with payment times, "-" when no withdrawal is linked.
     const flows = wrapper.find('[data-test="chain-flows"]').text();
     expect(flows).toContain("CL9001");
     expect(flows).toContain("CL9002");
@@ -431,7 +431,8 @@ describe("order chain page (task 40)", () => {
     expect(flows).toContain("减少");
     expect(flows).toContain("W20261023000001");
     expect(flows).toContain("W20261025000002");
-    expect(flows).toContain("－");
+    expect(flows).toContain("-");
+    expect(flows).not.toContain("－");
     expect(flows).toContain("t40 Shop");
     expect(flows).toContain("t40 Item");
     wrapper.unmount();
@@ -621,9 +622,23 @@ describe("order chain page (task 40)", () => {
     const hiddenForNoPermission = noPermission.find('[data-test="chain-commission-hidden"]');
     expect(hiddenForNoPermission.exists()).toBe(true);
     expect(hiddenForNoPermission.text()).toContain("当前账号无佣金查看权限");
+    const summary = noPermission.get('[data-test="chain-product-summary"]');
+    expect(summary.findAll('[data-test="chain-line-commission-hidden"]')).toHaveLength(2);
+    expect(summary.text()).toContain("无权限查看佣金");
     noPermission.unmount();
 
     setActivePinia(createPinia());
+    signIn("STAFF", ["order:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    const { wrapper: leaked } = await mountPage();
+    const leakedSummary = leaked.get('[data-test="chain-product-summary"]');
+    expect(leakedSummary.text()).toContain("无权限查看佣金");
+    expect(leakedSummary.text()).not.toContain("10%");
+    expect(leakedSummary.text()).not.toContain("¥16.00");
+    leaked.unmount();
+
+    setActivePinia(createPinia());
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(chain);
     signIn("STAFF", ["order:view", "commission:view"], "OWN");
     const { wrapper: ownScope } = await mountPage();
     const hiddenForOwnScope = ownScope.find('[data-test="chain-commission-hidden"]');

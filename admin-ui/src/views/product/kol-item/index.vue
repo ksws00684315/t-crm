@@ -105,7 +105,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "payAmount", label: t("mapping.payAmount"), minWidth: 120, amount: true },
   { key: "status", label: t("mapping.status"), width: 90 },
   { key: "cleanupStatus", label: t("mapping.cleanupStatus"), minWidth: 120 },
-  { key: "createTime", label: t("mapping.createTime"), width: 170 },
+  { key: "createTime", label: t("mapping.createTime"), minWidth: { "zh-CN": 170, "en-US": 190 } },
   { key: "actions", label: t("common.actions"), width: 88 }
 ]);
 

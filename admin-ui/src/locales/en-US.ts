@@ -1474,6 +1474,7 @@ const enUS: MessageSchema = {
       incompleteFlows:
         "Financial flow data is incomplete and cannot be displayed. Please contact an administrator.",
       noCommissionPermission: "This account cannot view commission data",
+      commissionHidden: "No permission to view commission",
       copyJob: "Product copy job",
       copyJobTime: "Created at",
       kolItem: "Creator item link",

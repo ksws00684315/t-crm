@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
-import { nextTick } from "vue";
+import { h, nextTick } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
@@ -676,6 +679,60 @@ describe("DataTable interactive cells", () => {
     expect(wrapper.find("input[type=checkbox]").exists()).toBe(true);
     expect(wrapper.get("th").classes()).toContain("is-left");
     expect(wrapper.get("td").classes()).toContain("is-left");
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable centered slot roots", () => {
+  it("shrinks a single flex root in a centered cell and leaves inline siblings and left cells alone", async () => {
+    // Read the rule's selector from the component so a broken selector fails this test.
+    const source = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../DataTable.vue"),
+      "utf8"
+    );
+    const rule = /:deep\(\s*(td\.el-table__cell\.is-center[^)]*\)[^{]*?)\s*\)\s*\{([^}]*)\}/.exec(
+      source
+    );
+    expect(rule).not.toBeNull();
+    const selector = rule![1].replace(/\s+/g, " ");
+    expect(rule![2]).toContain("width: fit-content;");
+
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "center-slot-root",
+        rows: [{ id: "1", status: "paid", tags: "a", name: "Creator" }],
+        total: 1,
+        plain: true,
+        paged: false,
+        columns: [
+          { key: "status", label: "状态", tooltip: false },
+          { key: "tags", label: "标签", tooltip: false },
+          { key: "name", label: "名称", align: "left", tooltip: false },
+          { key: "actions", label: "操作" }
+        ]
+      },
+      slots: {
+        "cell-status": () => h("div", { class: "status-root", style: "display:flex" }, "Paid"),
+        "cell-tags": () => [
+          h("span", { "data-test": "tag-a" }, "A"),
+          " ",
+          h("span", { "data-test": "tag-b" }, "B")
+        ],
+        "cell-name": () => h("div", { class: "left-root", style: "display:flex" }, "Creator"),
+        actions: () => h("div", { class: "actions-cell" }, "View")
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.get(".status-root").element.matches(selector)).toBe(true);
+    expect(wrapper.get('[data-test="tag-a"]').element.matches(selector)).toBe(false);
+    expect(wrapper.get('[data-test="tag-b"]').element.matches(selector)).toBe(false);
+    expect(wrapper.get(".left-root").element.matches(selector)).toBe(false);
+    const actions = wrapper.get(".actions-cell").element;
+    expect(actions.closest("td")?.classList.contains("is-center")).toBe(true);
+    expect(actions.matches(selector)).toBe(false);
     wrapper.unmount();
   });
 });

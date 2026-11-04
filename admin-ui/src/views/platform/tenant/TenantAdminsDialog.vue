@@ -64,8 +64,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "email", align: "left" as const, label: t("common.email"), minWidth: 180 },
   { key: "status", label: t("common.status"), width: 90 },
   { key: "lastLogin", label: t("tenantAdmin.lastLogin"), width: 180 },
-  // Reset password via RowActions (R-10): zh canvas 56 / en 107 + 24px (task 59 measurements).
-  { key: "actions", label: t("common.actions"), width: px(80, 136) }
+  // Reset password via RowActions (R-10): en 107 + 24px (task 59); zh raised to 96 after task 111 overflow audit.
+  { key: "actions", label: t("common.actions"), width: px(96, 136) }
 ]);
 const createVisible = ref(false);
 const joinVisible = ref(false);

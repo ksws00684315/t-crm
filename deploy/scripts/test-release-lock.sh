@@ -68,5 +68,40 @@ if [ -n "$hits" ]; then
   exit 1
 fi
 echo "release-lock: no unbraced var before multibyte char in release.sh OK"
+
+# L-109: an unbound variable under set -u must not exit 0. On bash 3.2 the EXIT trap sees $? as 0;
+# release.sh treats a missing RELEASE_COMPLETED flag as failure and reports it.
+unbound_out="$(mktemp)"
+set +e
+bash -c '
+  set -euo pipefail
+  # shellcheck disable=SC1090
+  source "'"$RELEASE"'"
+  print_state() { :; }
+  record() { return 0; }
+  RELEASE_COMPLETED=0
+  REPORTED=0
+  LOCK_HELD=0
+  ENV_TMP=""
+  STAGE=init
+  STAGE_KIND=prepare
+  ACTION=""
+  TARGET_VERSION=""
+  trap on_exit EXIT
+  printf "%s\n" "$T111_UNBOUND_FOR_L109"
+' >"$unbound_out" 2>&1
+unbound_rc=$?
+set -e
+if [ "$unbound_rc" -eq 0 ]; then
+  echo "FAIL: unbound variable exited 0 (L-109)" >&2
+  cat "$unbound_out" >&2
+  exit 1
+fi
+if ! grep -q '发布中止' "$unbound_out"; then
+  echo "FAIL: unbound variable did not report failure (rc=$unbound_rc):" >&2
+  cat "$unbound_out" >&2
+  exit 1
+fi
+echo "release-lock: unbound variable exits non-zero and reports failure (rc=$unbound_rc) OK"
 echo "release-lock: all tests passed"
 rm -f "$out" "$out2"

@@ -97,9 +97,9 @@ const columns = computed<DataColumn[]>(() => {
     { key: "shop", align: "left" as const, label: t("copyToken.shop"), minWidth: 120 },
     { key: "usage", label: t("copyToken.usage"), width: 110 },
     { key: "validMinutes", label: t("copyToken.validMinutes"), width: 100 },
-    { key: "expiresAt", label: t("copyToken.expiresAt"), width: 170 },
+    { key: "expiresAt", label: t("copyToken.expiresAt"), width: px(170, 180) },
     { key: "status", label: t("common.status"), width: 100 },
-    { key: "createTime", label: t("common.createdAt"), width: 170 }
+    { key: "createTime", label: t("common.createdAt"), width: px(170, 180) }
   ];
   if (canManage.value) {
     // Copy + Revoke: zh DOM 66px / en canvas 83px + gap and cell padding (task 59 measurements).

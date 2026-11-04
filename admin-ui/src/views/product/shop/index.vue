@@ -141,7 +141,7 @@ const columns = computed<DataColumn[]>(() => {
     { key: "source", label: t("shop.source"), width: 100 },
     { key: "copyPool", label: t("shop.copyPool"), minWidth: 160 },
     { key: "productCapacity", label: t("shop.capacity"), minWidth: 140 },
-    { key: "authStatus", label: t("shop.authStatus"), width: 110 },
+    { key: "authStatus", label: t("shop.authStatus"), width: px(110, 130) },
     { key: "authExpiresAt", label: t("shop.authExpiresAt"), minWidth: 160 },
     { key: "apiStatus", label: t("shop.apiStatus"), minWidth: 250 },
     { key: "status", label: t("common.status"), width: 90 }
@@ -921,8 +921,13 @@ onMounted(() => {
   font-weight: 400 !important;
 }
 .inline-status,
-.capacity-cell,
 .api-status-list {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+}
+.capacity-cell {
   display: inline-flex;
   align-items: center;
   gap: var(--tcrm-space-2);

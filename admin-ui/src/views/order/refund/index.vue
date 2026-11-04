@@ -75,8 +75,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "refundType", label: t("order.refund.typeColumn"), width: px(100, 130) },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: px(90, 110) },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
-  { key: "applyTime", label: t("order.refund.applyTime"), width: 170 },
-  { key: "finishTime", label: t("order.refund.finishTime"), width: 170 },
+  { key: "applyTime", label: t("order.refund.applyTime"), width: px(170, 190) },
+  { key: "finishTime", label: t("order.refund.finishTime"), width: px(170, 190) },
   // View: zh canvas 28px / en 57px + 24px headroom (task 59 R-11 measurements).
   { key: "actions", label: t("common.actions"), width: px(70, 84) }
 ]);
