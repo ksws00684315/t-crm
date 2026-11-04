@@ -103,6 +103,7 @@ const columns = computed<DataColumn[]>(() =>
                 ? 190
                 : 140,
     amount: ["estimated", "frozen", "available", "paid"].includes(key),
+    align: key === "creator" ? ("left" as const) : undefined,
     tooltip: ["bd"].includes(key)
   }))
 );

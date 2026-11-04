@@ -25,7 +25,12 @@ const columns = computed<DataColumn[]>(() =>
     key,
     prop: key,
     label: t(`finance.${key}`),
-    minWidth: ["releaseBasis", "businessAt", "product"].includes(key) ? 210 : 160,
+    minWidth:
+      key === "releaseBasis"
+        ? { "zh-CN": 210, "en-US": 250 }
+        : ["businessAt", "product"].includes(key)
+          ? 210
+          : 160,
     amount: ["base", "commission", "adjustment"].includes(key),
     align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
     tooltip: true

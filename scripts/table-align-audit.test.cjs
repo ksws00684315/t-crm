@@ -67,4 +67,21 @@ describe("classifyAlignment", () => {
       []
     );
   });
+
+  it("flags centered content wider than the cell as overflow instead of clipping it", () => {
+    const problems = classifyAlignment({
+      align: "center",
+      contentStart: -18,
+      contentEnd: 118,
+      cellStart: 0,
+      cellEnd: 100,
+      headerAlign: "center",
+      cellAlign: "center"
+    });
+    assert.deepEqual(
+      problems.map(item => item.reason),
+      ["overflow"]
+    );
+    assert.equal(problems[0].deltaPx, 18);
+  });
 });

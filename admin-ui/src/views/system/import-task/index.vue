@@ -113,7 +113,7 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 200,
     tooltip: true
   },
-  { key: "type", label: t("importTask.type"), width: 130 },
+  { key: "type", label: t("importTask.type"), width: px(130, 140) },
   { key: "status", label: t("importTask.status"), width: 100 },
   { key: "totalRows", label: t("importTask.totalRows"), width: 90 },
   { key: "successRows", label: t("importTask.successRows"), width: 90 },
@@ -125,8 +125,8 @@ const columns = computed<DataColumn[]>(() => [
     prop: "operatorName",
     width: 120
   },
-  { key: "submitTime", label: t("importTask.submitTime"), width: 170 },
-  { key: "finishTime", label: t("importTask.finishTime"), width: 170 },
+  { key: "submitTime", label: t("importTask.submitTime"), width: px(180, 190) },
+  { key: "finishTime", label: t("importTask.finishTime"), width: px(180, 190) },
   // Error file: zh DOM 130px / en 166px + 24px headroom (task 59 R-11 measurements).
   { key: "actions", label: t("common.actions"), width: px(154, 190) }
 ]);

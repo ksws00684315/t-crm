@@ -97,9 +97,9 @@ const chips = computed<SearchChip[]>(() => {
 });
 
 const columns = computed<DataColumn[]>(() => [
-  { key: "time", label: t("audit.time"), width: 170 },
+  { key: "time", label: t("audit.time"), minWidth: { "zh-CN": 170, "en-US": 180 } },
   { key: "operator", align: "left" as const, label: t("audit.operator"), width: 130 },
-  { key: "module", label: t("audit.module"), width: 100 },
+  { key: "module", label: t("audit.module"), width: 140 },
   { key: "action", label: t("audit.action"), minWidth: 140 },
   {
     key: "summary",

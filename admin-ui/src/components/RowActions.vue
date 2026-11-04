@@ -65,8 +65,6 @@ function run(action: RowAction): void {
   flex-wrap: nowrap;
   gap: 0 var(--tcrm-space-2);
   align-items: center;
-  justify-content: center;
-  max-width: 100%;
 }
 
 .actions-cell__wrap {

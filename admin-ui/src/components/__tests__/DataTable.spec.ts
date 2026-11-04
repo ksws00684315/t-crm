@@ -685,16 +685,17 @@ describe("DataTable interactive cells", () => {
 
 describe("DataTable centered slot roots", () => {
   it("shrinks a single flex root in a centered cell and leaves inline siblings and left cells alone", async () => {
+    // Read the rule's selector from the component so a broken selector fails this test.
     const source = readFileSync(
       resolve(dirname(fileURLToPath(import.meta.url)), "../DataTable.vue"),
       "utf8"
     );
-    expect(source).toContain("td.el-table__cell.is-center:not(.el-table-column--selection)");
-    expect(source).toContain("> :only-child:not(.actions-cell)");
-    expect(source).toContain("width: fit-content;");
-    expect(source).toContain("max-width: 100%;");
-    expect(source).toContain("margin-inline: auto;");
-    expect(source).toContain("justify-content: center;");
+    const rule = /:deep\(\s*(td\.el-table__cell\.is-center[^)]*\)[^{]*?)\s*\)\s*\{([^}]*)\}/.exec(
+      source
+    );
+    expect(rule).not.toBeNull();
+    const selector = rule![1].replace(/\s+/g, " ");
+    expect(rule![2]).toContain("width: fit-content;");
 
     const wrapper = mount(DataTable, {
       props: {
@@ -706,7 +707,8 @@ describe("DataTable centered slot roots", () => {
         columns: [
           { key: "status", label: "状态", tooltip: false },
           { key: "tags", label: "标签", tooltip: false },
-          { key: "name", label: "名称", align: "left", tooltip: false }
+          { key: "name", label: "名称", align: "left", tooltip: false },
+          { key: "actions", label: "操作" }
         ]
       },
       slots: {
@@ -716,27 +718,21 @@ describe("DataTable centered slot roots", () => {
           " ",
           h("span", { "data-test": "tag-b" }, "B")
         ],
-        "cell-name": () => h("div", { class: "left-root", style: "display:flex" }, "Creator")
+        "cell-name": () => h("div", { class: "left-root", style: "display:flex" }, "Creator"),
+        actions: () => h("div", { class: "actions-cell" }, "View")
       },
       global: { plugins: [ElementPlus, i18n] }
     });
     await nextTick();
     await flushPromises();
 
-    const flexRoot = wrapper.get(".status-root").element;
-    expect(flexRoot.parentElement?.classList.contains("cell")).toBe(true);
-    expect(flexRoot.matches(":only-child")).toBe(true);
-
-    const tagA = wrapper.get('[data-test="tag-a"]').element;
-    const tagB = wrapper.get('[data-test="tag-b"]').element;
-    expect(tagA.parentElement).toBe(tagB.parentElement);
-    expect(tagA.matches(":only-child")).toBe(false);
-    expect(tagA.parentElement?.innerHTML).toContain("</span> <span");
-
-    const leftRoot = wrapper.get(".left-root").element;
-    expect(leftRoot.closest("td")?.classList.contains("is-left")).toBe(true);
-    expect(leftRoot.closest(".accessible-cell")).not.toBeNull();
-    expect(leftRoot.parentElement?.classList.contains("cell")).toBe(false);
+    expect(wrapper.get(".status-root").element.matches(selector)).toBe(true);
+    expect(wrapper.get('[data-test="tag-a"]').element.matches(selector)).toBe(false);
+    expect(wrapper.get('[data-test="tag-b"]').element.matches(selector)).toBe(false);
+    expect(wrapper.get(".left-root").element.matches(selector)).toBe(false);
+    const actions = wrapper.get(".actions-cell").element;
+    expect(actions.closest("td")?.classList.contains("is-center")).toBe(true);
+    expect(actions.matches(selector)).toBe(false);
     wrapper.unmount();
   });
 });

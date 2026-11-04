@@ -296,7 +296,7 @@ public class OrderSettlementFlowService {
                 return orders.settlementRecomputeFailures(orderId);
               });
     } catch (RuntimeException markError) {
-      // Keep the original recompute failure on the mark error (L-171 / issue #171).
+      // Keep the original recompute failure on the mark error (issue #171).
       markError.addSuppressed(error);
       LOG.error(
           "settlement basis recompute failed for shop {} order {} and its retry mark could not be"

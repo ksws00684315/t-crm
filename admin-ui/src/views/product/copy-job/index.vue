@@ -109,8 +109,8 @@ const columns = computed<DataColumn[]>(() => [
     minWidth: 160,
     tooltip: true
   },
-  { key: "createTime", label: t("copyJob.createTime"), width: 170 },
-  { key: "finishTime", label: t("copyJob.finishTime"), width: 170 },
+  { key: "createTime", label: t("copyJob.createTime"), width: px(170, 180) },
+  { key: "finishTime", label: t("copyJob.finishTime"), width: px(170, 180) },
   {
     key: "kol",
     align: "left" as const,

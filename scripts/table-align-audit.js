@@ -7,6 +7,11 @@
  * Content is the union of visible text and leaf widgets (tags, icons, inputs). A
  * stretch flex/grid wrapper is not itself content: text-align does not move it, and
  * counting its box would hide a left-hugging group inside a full-width cell.
+ *
+ * Left-aligned columns may end in an ellipsis, so their content is clipped to the cell
+ * before judging. Centered columns hold short values (dates, states, amounts, actions) that
+ * must not be cut, so their content is never clipped: spilling past the content box is an
+ * "overflow" problem, which means the column is too narrow for that language.
  */
 (function (root, factory) {
   var api = factory();
@@ -28,7 +33,7 @@
    *   headerAlign: string,
    *   cellAlign: string
    * }} sample
-   * @returns {{ reason: "center" | "left" | "direction", deltaPx: number }[]}
+   * @returns {{ reason: "center" | "left" | "direction" | "overflow", deltaPx: number }[]}
    */
   function classifyAlignment(sample) {
     var problems = [];
@@ -37,6 +42,8 @@
     }
     if (sample.contentStart == null || sample.contentEnd == null) return problems;
     if (sample.align === "center") {
+      var spill = Math.max(sample.cellStart - sample.contentStart, sample.contentEnd - sample.cellEnd);
+      if (spill > TOLERANCE_PX) problems.push({ reason: "overflow", deltaPx: roundPx(spill) });
       var contentCenter = (sample.contentStart + sample.contentEnd) / 2;
       var cellCenter = (sample.cellStart + sample.cellEnd) / 2;
       var centerDelta = Math.abs(contentCenter - cellCenter);
@@ -96,15 +103,16 @@
     return { start: start, end: end };
   }
 
-  function unionContent(cell, doc) {
+  function unionContent(cell, doc, clip) {
     var host = cell.querySelector(":scope > .cell") || cell;
-    var clipBox = contentBox(host);
+    var clipBox = clip ? contentBox(host) : { start: -Infinity, end: Infinity };
     var start = Infinity;
     var end = -Infinity;
     var found = false;
     function consider(rect) {
       if (!rect || (rect.width === 0 && rect.height === 0)) return;
-      // Overflow hidden clips glyphs that stick out of the cell. Judge only the visible slice.
+      // A left column may end in an ellipsis: judge only the visible slice. Centered columns pass
+      // an unbounded box so content wider than the cell stays measurable as overflow.
       var left = Math.max(rect.left, clipBox.start);
       var right = Math.min(rect.right, clipBox.end);
       if (right - left <= 0) return;
@@ -172,9 +180,10 @@
   function measureCell(cell, doc) {
     if (!cell || !isShown(cell) || cell.colSpan > 1) return null;
     var box = contentBox(cell.querySelector(":scope > .cell") || cell);
-    var content = unionContent(cell, doc);
+    var align = alignOf(cell);
+    var content = unionContent(cell, doc, align !== "center");
     return {
-      align: alignOf(cell),
+      align: align,
       contentStart: content ? content.start : null,
       contentEnd: content ? content.end : null,
       cellStart: box.start,

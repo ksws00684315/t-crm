@@ -1,0 +1,1066 @@
+[
+  {
+    "page": "/order/orders zh",
+    "problemCount": 0,
+    "rows": 38,
+    "problems": []
+  },
+  {
+    "page": "/order/refunds zh",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  },
+  {
+    "page": "/kol/kols zh",
+    "problemCount": 0,
+    "rows": 11,
+    "problems": []
+  },
+  {
+    "page": "/kol/kol-items zh",
+    "problemCount": 0,
+    "rows": 13,
+    "problems": []
+  },
+  {
+    "page": "/kol/income zh",
+    "problemCount": 0,
+    "rows": 7,
+    "problems": []
+  },
+  {
+    "page": "/fund/payouts zh",
+    "problemCount": 0,
+    "rows": 7,
+    "problems": []
+  },
+  {
+    "page": "/fund/prepays zh",
+    "problemCount": 0,
+    "rows": 6,
+    "problems": []
+  },
+  {
+    "page": "/fund/settlement-details zh",
+    "problemCount": 0,
+    "rows": 19,
+    "problems": []
+  },
+  {
+    "page": "/fund/settlement-config zh",
+    "problemCount": 0,
+    "rows": 1,
+    "problems": []
+  },
+  {
+    "page": "/product/shops zh",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  },
+  {
+    "page": "/product/copy-tokens zh",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  },
+  {
+    "page": "/product/tasks zh",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  },
+  {
+    "page": "/system/users zh",
+    "problemCount": 3,
+    "rows": 14,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "创建时间",
+        "row": "11",
+        "deltaPx": 2.64,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "创建时间",
+        "row": "12",
+        "deltaPx": 2.64,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "创建时间",
+        "row": "13",
+        "deltaPx": 2.64,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/system/post-templates zh",
+    "problemCount": 0,
+    "rows": 6,
+    "problems": []
+  },
+  {
+    "page": "/system/tasks zh",
+    "problemCount": 2,
+    "rows": 9,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "提交时间",
+        "row": "9",
+        "deltaPx": 2.61,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "完成时间",
+        "row": "9",
+        "deltaPx": 2.61,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/system/oper-logs zh",
+    "problemCount": 18,
+    "rows": 20,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "2",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "3",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "4",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "5",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "6",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "7",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "8",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "9",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "12",
+        "deltaPx": 29.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "12",
+        "deltaPx": 14.68,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "13",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "14",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "15",
+        "deltaPx": 29.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "15",
+        "deltaPx": 14.68,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "16",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "17",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "18",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "模块",
+        "row": "19",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/system/link-templates zh",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  },
+  {
+    "page": "/order/orders en",
+    "problemCount": 8,
+    "rows": 38,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "10",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "16",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "28",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "30",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "32",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "34",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "36",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Order Status",
+        "row": "38",
+        "deltaPx": 8.58,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/order/refunds en",
+    "problemCount": 6,
+    "rows": 3,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Applied at",
+        "row": "1",
+        "deltaPx": 5.39,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Applied at",
+        "row": "1",
+        "deltaPx": 2.7,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Succeeded at",
+        "row": "1",
+        "deltaPx": 2.77,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Applied at",
+        "row": "2",
+        "deltaPx": 2.17,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Succeeded at",
+        "row": "2",
+        "deltaPx": 5.19,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Succeeded at",
+        "row": "2",
+        "deltaPx": 2.59,
+        "reason": "center"
+      }
+    ]
+  },
+  {
+    "page": "/kol/kols en",
+    "problemCount": 0,
+    "rows": 11,
+    "problems": []
+  },
+  {
+    "page": "/kol/kol-items en",
+    "problemCount": 19,
+    "rows": 13,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "1",
+        "deltaPx": 3.63,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "2",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "3",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "4",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "5",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "6",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "7",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "8",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "8",
+        "deltaPx": 2.13,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "9",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "9",
+        "deltaPx": 2.13,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "10",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "10",
+        "deltaPx": 2.13,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "11",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "11",
+        "deltaPx": 2.13,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "12",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "12",
+        "deltaPx": 2.13,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "13",
+        "deltaPx": 4.27,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "13",
+        "deltaPx": 2.13,
+        "reason": "center"
+      }
+    ]
+  },
+  {
+    "page": "/kol/income en",
+    "problemCount": 0,
+    "rows": 7,
+    "problems": []
+  },
+  {
+    "page": "/fund/payouts en",
+    "problemCount": 9,
+    "rows": 7,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "1",
+        "deltaPx": 36.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "1",
+        "deltaPx": 18.18,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Status",
+        "row": "2",
+        "deltaPx": 4.14,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "2",
+        "deltaPx": 29.11,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "2",
+        "deltaPx": 14.55,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "3",
+        "deltaPx": 36.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "3",
+        "deltaPx": 18.18,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "4",
+        "deltaPx": 36.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Actions",
+        "row": "4",
+        "deltaPx": 18.18,
+        "reason": "center"
+      }
+    ]
+  },
+  {
+    "page": "/fund/prepays en",
+    "problemCount": 0,
+    "rows": 6,
+    "problems": []
+  },
+  {
+    "page": "/fund/settlement-details en",
+    "problemCount": 0,
+    "rows": 19,
+    "problems": []
+  },
+  {
+    "page": "/fund/settlement-config en",
+    "problemCount": 0,
+    "rows": 1,
+    "problems": []
+  },
+  {
+    "page": "/product/shops en",
+    "problemCount": 2,
+    "rows": 3,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Authorization",
+        "row": "2",
+        "deltaPx": 8.81,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Authorization",
+        "row": "3",
+        "deltaPx": 8.81,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/product/copy-tokens en",
+    "problemCount": 3,
+    "rows": 3,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Expires at",
+        "row": "1",
+        "deltaPx": 2.58,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "1",
+        "deltaPx": 2.73,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "3",
+        "deltaPx": 2.84,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/product/tasks en",
+    "problemCount": 4,
+    "rows": 3,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Finished",
+        "row": "1",
+        "deltaPx": 3.63,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished",
+        "row": "2",
+        "deltaPx": 3.06,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created",
+        "row": "3",
+        "deltaPx": 2.91,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished",
+        "row": "3",
+        "deltaPx": 2.39,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/system/users en",
+    "problemCount": 9,
+    "rows": 14,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Status",
+        "row": "1",
+        "deltaPx": 2.83,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Last sign-in",
+        "row": "7",
+        "deltaPx": 3.84,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Last sign-in",
+        "row": "8",
+        "deltaPx": 3.59,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "11",
+        "deltaPx": 6.34,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "11",
+        "deltaPx": 3.17,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "12",
+        "deltaPx": 6.34,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "12",
+        "deltaPx": 3.17,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "13",
+        "deltaPx": 6.34,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Created at",
+        "row": "13",
+        "deltaPx": 3.17,
+        "reason": "center"
+      }
+    ]
+  },
+  {
+    "page": "/system/post-templates en",
+    "problemCount": 0,
+    "rows": 6,
+    "problems": []
+  },
+  {
+    "page": "/system/tasks en",
+    "problemCount": 19,
+    "rows": 9,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "1",
+        "deltaPx": 2.2,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "1",
+        "deltaPx": 2.2,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "2",
+        "deltaPx": 2.48,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "2",
+        "deltaPx": 2.48,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "3",
+        "deltaPx": 3.52,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "3",
+        "deltaPx": 3.86,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Type",
+        "row": "6",
+        "deltaPx": 4.33,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Type",
+        "row": "6",
+        "deltaPx": 2.16,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "6",
+        "deltaPx": 3.23,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "7",
+        "deltaPx": 4.11,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "7",
+        "deltaPx": 2.05,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "7",
+        "deltaPx": 4.11,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "7",
+        "deltaPx": 2.05,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "8",
+        "deltaPx": 3.44,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "8",
+        "deltaPx": 3.44,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "9",
+        "deltaPx": 6.31,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Submitted at",
+        "row": "9",
+        "deltaPx": 3.16,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "9",
+        "deltaPx": 6.31,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Finished at",
+        "row": "9",
+        "deltaPx": 3.16,
+        "reason": "center"
+      }
+    ]
+  },
+  {
+    "page": "/system/oper-logs en",
+    "problemCount": 19,
+    "rows": 20,
+    "problems": [
+      {
+        "table": "table-1",
+        "column": "Time",
+        "row": "1",
+        "deltaPx": 2.63,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "2",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "3",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "4",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "5",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "6",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "7",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "8",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "9",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "12",
+        "deltaPx": 29.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "12",
+        "deltaPx": 14.68,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "13",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "14",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "15",
+        "deltaPx": 29.36,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "15",
+        "deltaPx": 14.68,
+        "reason": "center"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "16",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "17",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "18",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      },
+      {
+        "table": "table-1",
+        "column": "Module",
+        "row": "19",
+        "deltaPx": 2.47,
+        "reason": "overflow"
+      }
+    ]
+  },
+  {
+    "page": "/system/link-templates en",
+    "problemCount": 0,
+    "rows": 3,
+    "problems": []
+  }
+]

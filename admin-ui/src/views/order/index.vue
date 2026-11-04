@@ -76,7 +76,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "product", align: "left", label: t("order.productInfo"), minWidth: px(360, 380) },
   { key: "kol", align: "center", label: t("order.kol"), minWidth: px(145, 160) },
   { key: "quantity", label: t("order.line.quantity"), width: px(72, 90) },
-  { key: "orderStatus", label: t("order.orderStatus"), width: px(130, 160) },
+  { key: "orderStatus", label: t("order.orderStatus"), width: px(130, 180) },
   {
     key: "payAmount",
     align: "center",

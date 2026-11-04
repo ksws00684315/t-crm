@@ -379,7 +379,13 @@ const summaryColumns = computed<DataColumn[]>(() => [
     label: t("order.chain.summaryRate"),
     minWidth: locale.value.startsWith("en") ? 150 : 100
   },
-  { key: "commission", label: t("order.chain.summaryCommission"), minWidth: 120, amount: true },
+  {
+    key: "commission",
+    label: t("order.chain.summaryCommission"),
+    // Without commission:view the cell shows the full no-permission sentence, never truncated.
+    minWidth: canSeeCommission.value ? 120 : { "zh-CN": 140, "en-US": 290 },
+    amount: true
+  },
   { key: "occupied", label: t("order.chain.withdrawalOccupation"), minWidth: 110, amount: true },
   ...(userStore.isSuperAdmin
     ? [{ key: "rateAction", label: t("common.actions"), minWidth: 160 }]
