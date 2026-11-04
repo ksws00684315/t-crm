@@ -7,7 +7,6 @@ import com.tcrm.admin.task.api.ImportFileDTO;
 import com.tcrm.admin.task.api.ImportTaskApi;
 import com.tcrm.admin.task.api.TaskType;
 import java.time.Instant;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,7 +52,7 @@ public class OrderImportService {
         imports.submitImport(
             TaskType.ORDER_IMPORT,
             OrderImportColumn.headerKeys(),
-            List.of(),
+            OrderImportColumn.legacyHeaderKeys(),
             file,
             () -> {
               awaitTaskId(ready);

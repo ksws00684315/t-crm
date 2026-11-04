@@ -14,6 +14,7 @@ import static com.tcrm.admin.order.service.OrderImportColumn.SKU_ID;
 import static com.tcrm.admin.order.service.OrderImportColumn.SKU_NAME;
 import static com.tcrm.admin.order.service.OrderImportColumn.STATUS;
 import static com.tcrm.admin.order.service.OrderImportColumn.SUB_ORDER_NO;
+import static com.tcrm.admin.order.service.OrderImportColumn.UNIT_PRICE;
 
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -65,6 +66,7 @@ class OrderImportProcessor implements ImportRowProcessor {
   static final String QUANTITY_FORMAT = "import.order.error.quantity-format";
   static final String ITEM_PAY_REQUIRED = "import.order.error.item-pay-required";
   static final String ITEM_PAY_FORMAT = "import.order.error.item-pay-format";
+  static final String UNIT_PRICE_FORMAT = "import.order.error.unit-price-format";
   static final String SYNC_OWNED = "import.order.error.sync-owned";
 
   private final long taskId;
@@ -226,6 +228,14 @@ class OrderImportProcessor implements ImportRowProcessor {
         errors.add(ImportReason.of(ITEM_PAY_FORMAT));
       }
     }
+    String unitPriceText = UNIT_PRICE.of(row);
+    BigDecimal unitPrice = null;
+    if (!unitPriceText.isEmpty()) {
+      unitPrice = OrderImportFields.money(unitPriceText);
+      if (unitPrice == null) {
+        errors.add(ImportReason.of(UNIT_PRICE_FORMAT));
+      }
+    }
     if (!errors.isEmpty() || shop == null || status == null || orderTime == null) {
       return errors;
     }
@@ -264,6 +274,7 @@ class OrderImportProcessor implements ImportRowProcessor {
     item.setSkuName(skuName.isEmpty() ? "" : skuName);
     item.setQuantity(quantity);
     item.setPayAmount(itemPay);
+    item.setHistoricalUnitPrice(unitPrice);
     item.setRefundAmount(BigDecimal.ZERO.setScale(2));
     item.setAttributionType(0);
     writer.save(new OrderPayloadDTO(order, List.of(item)));

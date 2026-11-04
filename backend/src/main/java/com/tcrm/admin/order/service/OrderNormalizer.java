@@ -74,7 +74,8 @@ public class OrderNormalizer {
         throw invalid();
       }
       item.setQuantity(quantity);
-      // Task 107: upstream price semantics are unverified; do not invent a historical sale price.
+      // Weidian records the line's price at order time; missing price stays null (task 110).
+      item.setHistoricalUnitPrice(line.price() == null ? null : money(line.price()));
       item.setPayAmount(money(line.totalPrice()));
       item.setRefundAmount(BigDecimal.ZERO.setScale(2));
       item.setAttributionType(0);

@@ -30,10 +30,14 @@ class OrderNormalizerTest {
   }
 
   static OrderLine line(String id, String raw) {
+    return line(id, raw, new BigDecimal("10"));
+  }
+
+  static OrderLine line(String id, String raw, BigDecimal price) {
     return new OrderLine(
         id,
         "Test item",
-        new BigDecimal("10"),
+        price,
         new BigDecimal("10"),
         BigDecimal.ONE,
         raw == null ? null : JSON.readTree(raw));
@@ -122,6 +126,56 @@ class OrderNormalizerTest {
     assertThat(result.order().getBuyerHash()).isNull();
     assertThat(result.order().getFreight()).isEqualByComparingTo("0");
     assertThat(result.items().getFirst().getSkuId()).isEqualTo("8");
+  }
+
+  @Test
+  void shouldStoreLinePriceAsHistoricalUnitPrice_whenPresent() {
+    var normalizer = new OrderNormalizer("test");
+    var result =
+        normalizer.normalize(
+            1,
+            detail(
+                "100",
+                "pay",
+                PAID,
+                List.of(line("90", "{\"sub_order_id\":\"1\"}", new BigDecimal("41.00")))),
+            PAID);
+    assertThat(result.items().getFirst().getHistoricalUnitPrice()).isEqualByComparingTo("41.00");
+  }
+
+  @Test
+  void shouldRoundLinePriceToTwoDecimals_whenNormalizing() {
+    var normalizer = new OrderNormalizer("test");
+    var result =
+        normalizer.normalize(
+            1,
+            detail(
+                "100",
+                "pay",
+                PAID,
+                List.of(line("90", "{\"sub_order_id\":\"1\"}", new BigDecimal("1.235")))),
+            PAID);
+    assertThat(result.items().getFirst().getHistoricalUnitPrice()).isEqualByComparingTo("1.24");
+  }
+
+  @Test
+  void shouldLeaveHistoricalUnitPriceNull_whenLinePriceIsMissing() {
+    var normalizer = new OrderNormalizer("test");
+    var result =
+        normalizer.normalize(
+            1,
+            detail("100", "pay", PAID, List.of(line("90", "{\"sub_order_id\":\"1\"}", null))),
+            PAID);
+    assertThat(result.items().getFirst().getHistoricalUnitPrice()).isNull();
+  }
+
+  @Test
+  void shouldRejectNegativeLinePrice_whenNormalizing() {
+    var normalizer = new OrderNormalizer("test");
+    var negative = line("90", "{\"sub_order_id\":\"1\"}", new BigDecimal("-1"));
+    assertThatThrownBy(
+            () -> normalizer.normalize(1, detail("100", "pay", PAID, List.of(negative)), PAID))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
