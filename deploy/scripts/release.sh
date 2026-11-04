@@ -38,6 +38,9 @@ KEEP_RELEASES="${TCRM_RELEASE_KEEP:-5}"
 BACKUP_COMMAND="${TCRM_RELEASE_BACKUP_COMMAND:-$DEPLOY_DIR/backup/pg-backup.sh}"
 LOCK_DIR="${TCRM_RELEASE_LOCK_DIR:-$DEPLOY_DIR/.release.lock}"
 LOCK_HELD=0
+# Set only after main() finishes a deploy, rollback or status. bash 3.2 leaves $? as 0 in the
+# EXIT trap when set -u aborts, so on_exit treats a missing flag as failure (L-109).
+RELEASE_COMPLETED=0
 VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+$'
 UPDATE_POSTGRES_VERSION="" # set by deploy --postgres <ver>; empty = do not touch postgres
 POSTGRES_PIN_WRITTEN=""    # set by ensure_postgres_version_pinned; first deploy pre-pulls this crm-postgres tag
@@ -279,6 +282,10 @@ on_exit() {
   fi
   trap - EXIT
   [ -z "$ENV_TMP" ] || rm -f "$ENV_TMP"
+  # L-109: an unbound-variable abort on bash 3.2 enters this trap with $? still 0.
+  if [ "$RELEASE_COMPLETED" -ne 1 ] && [ "$rc" -eq 0 ]; then
+    rc=1
+  fi
   if [ "$rc" -ne 0 ] && [ "$REPORTED" -ne 1 ]; then
     report_failure "命令失败（退出码 ${rc}）"
   fi
@@ -766,6 +773,7 @@ main() {
       ;;
     status) cmd_status ;;
   esac
+  RELEASE_COMPLETED=1
 }
 
 # Run only when executed, so the functions above can be sourced by tests.

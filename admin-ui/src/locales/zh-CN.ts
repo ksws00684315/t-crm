@@ -1437,6 +1437,7 @@ const zhCN = {
       noFlows: "暂无财务流水",
       incompleteFlows: "财务流水数据不完整，暂无法展示，请联系管理员。",
       noCommissionPermission: "当前账号无佣金查看权限",
+      commissionHidden: "无权限查看佣金",
       copyJob: "商品创建任务",
       copyJobTime: "创建时间",
       kolItem: "达人商品链接",

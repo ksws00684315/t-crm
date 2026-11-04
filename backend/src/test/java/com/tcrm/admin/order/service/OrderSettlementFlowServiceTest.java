@@ -9,6 +9,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
@@ -31,6 +34,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -235,10 +239,26 @@ class OrderSettlementFlowServiceTest {
         .sync(any(), any());
     when(orders.markSettlementRecomputeFailed(50L)).thenThrow(new RuntimeException("db down"));
     stubDetail(detail("t76_wd_order_1", "收入", "货款收入", "600"));
+    ListAppender<ILoggingEvent> logs = new ListAppender<>();
+    logs.start();
+    Logger logger = (Logger) LoggerFactory.getLogger(OrderSettlementFlowService.class);
+    logger.addAppender(logs);
+    try {
+      boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
 
-    boolean ok = service(START.plusSeconds(60)).pull(30L, START, END, null);
-
-    assertThat(ok).isFalse();
+      assertThat(ok).isFalse();
+      assertThat(logs.list)
+          .anySatisfy(
+              event -> {
+                assertThat(event.getThrowableProxy()).isNotNull();
+                assertThat(event.getThrowableProxy().getMessage()).contains("db down");
+                assertThat(event.getThrowableProxy().getSuppressed())
+                    .anySatisfy(
+                        suppressed -> assertThat(suppressed.getMessage()).contains("wallet down"));
+              });
+    } finally {
+      logger.detachAppender(logs);
+    }
   }
 
   @Test

@@ -31,6 +31,8 @@ description: 任务改动了管理端或达人端界面、需要做浏览器验�
 
 同时对照规范 10（字体字号以 `docs/03-设计/网页字体字号规范.xlsx` 为准）和规范 11（列表用 `ListSearch`、`DataTable`、`RowActions`、`CopyText`；未实现的显示「开发中」）检查。
 
+涉及表格的任务，在改过的每个页面上再执行对齐实测：读取仓库根目录 `scripts/table-align-audit.js` 的全文，在该页面里执行（浏览器自动化的 `evaluate`，或开发者工具控制台），然后调用 `auditTableAlignment()`。返回的问题数组必须为空才算通过；把每次输出附在执行报告里。抽屉和弹窗里的表要在它们打开、可见时测。
+
 ## 4. 截图与记录
 
 - 放在 `docs/04-开发任务/assets/task-{编号}/`，文件名写明页面、分辨率和语言，例如 `kol-list-1440-zh.png`。

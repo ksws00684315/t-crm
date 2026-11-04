@@ -756,6 +756,20 @@ function canMove(index: number, delta: -1 | 1): boolean {
 .data-table:not(.is-legacy-order) :deep(.el-table td.is-left .name-code__name .el-button) {
   text-align: left;
 }
+/* text-align does not move a block-level flex/grid slot root. Shrink the single element
+   child of a centered cell to its content; inline siblings, left columns, the selection
+   column and row actions are not matched. */
+.data-table
+  :deep(
+    td.el-table__cell.is-center:not(.el-table-column--selection)
+      > .cell
+      > :only-child:not(.actions-cell)
+  ) {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  justify-content: center;
+}
 .data-table :deep(.el-table__header th) {
   background: var(--tcrm-color-table-header);
 }

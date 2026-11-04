@@ -308,6 +308,7 @@ onMounted(load);
   flex-wrap: wrap;
   gap: var(--tcrm-space-1);
   align-items: center;
+  justify-content: center;
 }
 @media (max-width: 767px) {
   .finance-content {

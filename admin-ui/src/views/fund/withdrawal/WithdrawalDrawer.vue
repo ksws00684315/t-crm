@@ -339,7 +339,6 @@ watch(
 }
 .order-money {
   display: block;
-  padding-right: 20px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

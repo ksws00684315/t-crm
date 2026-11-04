@@ -1,6 +1,9 @@
-import { mount } from "@vue/test-utils";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { flushPromises, mount } from "@vue/test-utils";
 import ElementPlus from "element-plus";
-import { nextTick } from "vue";
+import { h, nextTick } from "vue";
 import { beforeEach, describe, expect, it } from "vitest";
 import { i18n } from "@/locales";
 import DataTable from "../DataTable.vue";
@@ -485,6 +488,64 @@ describe("DataTable column floors", () => {
         .findAllComponents({ name: "ElTableColumn" })
         .map(column => column.props("showOverflowTooltip"))
     ).toEqual([true, true, false, false]);
+    wrapper.unmount();
+  });
+});
+
+describe("DataTable centered slot roots", () => {
+  it("shrinks a single flex root in a centered cell and leaves inline siblings and left cells alone", async () => {
+    const source = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../DataTable.vue"),
+      "utf8"
+    );
+    expect(source).toContain("td.el-table__cell.is-center:not(.el-table-column--selection)");
+    expect(source).toContain("> :only-child:not(.actions-cell)");
+    expect(source).toContain("width: fit-content;");
+    expect(source).toContain("max-width: 100%;");
+    expect(source).toContain("margin-inline: auto;");
+    expect(source).toContain("justify-content: center;");
+
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "center-slot-root",
+        rows: [{ id: "1", status: "paid", tags: "a", name: "Creator" }],
+        total: 1,
+        plain: true,
+        paged: false,
+        columns: [
+          { key: "status", label: "状态", tooltip: false },
+          { key: "tags", label: "标签", tooltip: false },
+          { key: "name", label: "名称", align: "left", tooltip: false }
+        ]
+      },
+      slots: {
+        "cell-status": () => h("div", { class: "status-root", style: "display:flex" }, "Paid"),
+        "cell-tags": () => [
+          h("span", { "data-test": "tag-a" }, "A"),
+          " ",
+          h("span", { "data-test": "tag-b" }, "B")
+        ],
+        "cell-name": () => h("div", { class: "left-root", style: "display:flex" }, "Creator")
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    await flushPromises();
+
+    const flexRoot = wrapper.get(".status-root").element;
+    expect(flexRoot.parentElement?.classList.contains("cell")).toBe(true);
+    expect(flexRoot.matches(":only-child")).toBe(true);
+
+    const tagA = wrapper.get('[data-test="tag-a"]').element;
+    const tagB = wrapper.get('[data-test="tag-b"]').element;
+    expect(tagA.parentElement).toBe(tagB.parentElement);
+    expect(tagA.matches(":only-child")).toBe(false);
+    expect(tagA.parentElement?.innerHTML).toContain("</span> <span");
+
+    const leftRoot = wrapper.get(".left-root").element;
+    expect(leftRoot.closest("td")?.classList.contains("is-left")).toBe(true);
+    expect(leftRoot.closest(".accessible-cell")).not.toBeNull();
+    expect(leftRoot.parentElement?.classList.contains("cell")).toBe(false);
     wrapper.unmount();
   });
 });

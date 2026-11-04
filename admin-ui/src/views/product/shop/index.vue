@@ -927,6 +927,11 @@ onMounted(() => {
   align-items: center;
   gap: var(--tcrm-space-2);
 }
+.inline-status,
+.api-status-list {
+  display: flex;
+  justify-content: center;
+}
 .api-status-list {
   flex-wrap: wrap;
 }

@@ -116,7 +116,7 @@ const recordColumns = computed<DataColumn[]>(() => [
   { key: "version", label: t("promotion.version"), width: 85 },
   { key: "effective", label: t("promotion.effectiveTime"), width: 170 },
   { key: "operator", align: "left" as const, label: t("promotion.recordOperator"), width: 120 },
-  { key: "changes", label: t("promotion.recordChanges"), minWidth: 280 }
+  { key: "changes", align: "left" as const, label: t("promotion.recordChanges"), minWidth: 280 }
 ]);
 
 function asRecord(row: object): PromotionRecordVO {

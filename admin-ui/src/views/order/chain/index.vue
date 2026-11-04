@@ -631,7 +631,8 @@ onMounted(load);
             formatAmountWithCurrency((row as ChainLineVO).payAmount)
           }}</template>
           <template #cell-rate="{ row }"
-            ><span v-if="(row as ChainLineVO).commission?.rateSnapshot == null">{{
+            ><span v-if="!canSeeCommission">-</span
+            ><span v-else-if="(row as ChainLineVO).commission?.rateSnapshot == null">{{
               fundsText(null)
             }}</span
             ><span v-else class="chain-rate"
@@ -647,12 +648,22 @@ onMounted(load);
               ></span
             ></template
           >
-          <template #cell-commission="{ row }">{{
-            fundsText((row as ChainLineVO).commission?.netCommission)
-          }}</template>
-          <template #cell-occupied="{ row }">{{
-            fundsText((row as ChainLineVO).commission?.occupiedTotal)
-          }}</template>
+          <template #cell-commission="{ row }"
+            ><span
+              v-if="!canSeeCommission"
+              class="chain-no-permission"
+              data-test="chain-line-commission-hidden"
+              >{{ t("order.chain.commissionHidden") }}</span
+            ><template v-else>{{
+              fundsText((row as ChainLineVO).commission?.netCommission)
+            }}</template></template
+          >
+          <template #cell-occupied="{ row }"
+            ><span v-if="!canSeeCommission">-</span
+            ><template v-else>{{
+              fundsText((row as ChainLineVO).commission?.occupiedTotal)
+            }}</template></template
+          >
         </DataTable>
 
         <details v-show="false" class="chain-wiring-details" data-test="chain-wiring-details">
@@ -892,7 +903,7 @@ onMounted(load);
           >
           <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
           <template #cell-transferredAt="{ row }">{{ formatInstant(row.transferredAt) }}</template>
-          <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "－" }}</template>
+          <template #cell-withdrawalNo="{ row }">{{ row.withdrawalNo ?? "-" }}</template>
         </DataTable>
         <div v-if="flowsView === 'empty'" class="chain-ledger-empty">
           {{ t("order.chain.noFlows") }}
@@ -1121,6 +1132,11 @@ onMounted(load);
   font-size: var(--tcrm-font-size-section);
 }
 .chain-fund-card--pending > strong {
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-body);
+  font-weight: 400;
+}
+.chain-no-permission {
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-body);
   font-weight: 400;

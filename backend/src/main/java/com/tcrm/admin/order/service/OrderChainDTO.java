@@ -91,7 +91,7 @@ public record OrderChainDTO(
    * @param transferredAt money movement time: the registered withdrawal payment time, null before
    *     payment
    * @param withdrawalNo the linked withdrawal application number; null on non-withdrawal flows (UI
-   *     shows「－」)
+   *     shows "-")
    */
   record FlowDTO(
       String flowNo,
