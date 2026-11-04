@@ -68,6 +68,33 @@ docker volume rm tcrm-local_pgdata tcrm-local_redisdata
 
 多个本地后台进程共用数据库时，系统配置缓存按进程维护；在一个后台修改后会立即刷新该进程和跳转服务的 Redis 回退地址，其他后台进程需重启后读取新值。生产按单后台实例部署，不受此限制。
 
+### 外部中间件模式（任务 109）
+
+`.env.local` 的 `TCRM_LOCAL_INFRA_MODE` 决定中间件来源：`docker`（缺省或空值，即上面的本机 Compose 项目）或 `external`（本机之外的实例，例如云主机上的 PostgreSQL 16 与 Redis 7.2，经本机 SSH 隧道访问）。现有的 `.env.local` 不写这一项也照常按 `docker` 工作；`local-infra.sh up` 新生成的文件固定写 `TCRM_LOCAL_INFRA_MODE=docker`。
+
+两种地址是分开的：
+
+- **本机地址**：`.env.local` 里的 `TCRM_DB_HOST`、`TCRM_DB_PORT`、`TCRM_REDIS_HOST`、`TCRM_REDIS_PORT`，供本机直接运行的后端和跳转服务使用。外部模式下它们是**本机能连上的地址**（即隧道端口）；缺 `HOST` 时按 `localhost` 处理。
+- **容器地址**：预览 Compose 里的 `TCRM_PREVIEW_DB_HOST` / `TCRM_PREVIEW_DB_PORT` / `TCRM_PREVIEW_REDIS_HOST` / `TCRM_PREVIEW_REDIS_PORT`，默认 `tcrm-postgres:5432`、`tcrm-redis:6379`（指向本机 Compose 项目）。外部模式下 `preview.sh up` 在 `.env.local` 未写这四项时自动按 `host.docker.internal` 加 `TCRM_DB_PORT`、`TCRM_REDIS_PORT` 传入；写了就以 `.env.local` 为准。
+
+外部模式下各子命令的行为：
+
+| 子命令 | 外部模式行为 |
+|---|---|
+| `up` | 不创建任何中间件容器；确保 `TCRM_LOCAL_INFRA_NETWORK` 网络存在（不存在才创建），再用写死版本的临时客户端容器（`postgres:17.11`、`redis:7.4.5`）经 `host.docker.internal` 和本机端口做连通性检查（PostgreSQL `select 1`、Redis `PING`）。连不上时报错退出，提示确认本机到外部中间件的隧道或网络 |
+| `status` | 输出连通性和 PostgreSQL `server_version`、Redis `redis_version`，不输出密码和连接串 |
+| `down` | 什么也不做，提示「外部中间件不由本脚本管理」，退出码 0 |
+| `backup` | 只备份数据库（`pg_dump --no-owner`），文件命名、权限与 docker 模式一致 |
+| `restore <文件>` | yes 确认后先 `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` 再导入；服务器主版本低于 17 时过滤 `SET transaction_timeout`；不碰 Redis |
+| `psql` | 用 `postgres:17.11` 临时容器交互连接 |
+| `migrate-from-preview` | 拒绝执行，外部模式不适用 |
+
+外部模式**不备份、不恢复 Redis**：云端实例与其他应用共用（对方键带 `edict:` 等前缀），不能对它执行 `SAVE`，也不能导出全部键。恢复数据库后，链接索引用管理端「重建链接索引」（`POST /admin-api/link/index-rebuilds`）恢复，所有会话需要重新登录。
+
+到外部中间件的隧道（例如 SSH 端口转发）是**本机的前提条件**，由负责人的本机管理，不由仓库管理，仓库中也不写死任何隧道服务名或主机名。
+
+L-108：`up` 只在环境文件不存在、且当前不在 git 工作树中、也没有同项目的 `pgdata`/`redisdata` 数据卷时才生成新配置；否则拒绝并提示改用主目录的 `deploy/.env.local`（`TCRM_LOCAL_ENV_FILE=/主目录/deploy/.env.local`）。在任务工作树里运行脚本时，始终用 `TCRM_LOCAL_ENV_FILE` 指向主目录的文件。
+
 ## 本地预览
 
 只用于在本机查看**当前工作目录**的源码，不用于任何服务器。从源码构建并启动管理端、达人端、后台和跳转服务，共用本地共享中间件的 PostgreSQL 与 Redis。
