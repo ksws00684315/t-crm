@@ -154,6 +154,7 @@ class OrderImportIT {
                 "Item A",
                 "Red",
                 "1",
+                "10.00",
                 "10.00"),
             List.of(
                 "100",
@@ -169,6 +170,7 @@ class OrderImportIT {
                 "Item B",
                 "Blue",
                 "1",
+                "10.00",
                 "10.00"),
             List.of(
                 "100",
@@ -202,6 +204,12 @@ class OrderImportIT {
                 Long.class,
                 order.get("id")))
         .isEqualTo(2L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_order_item WHERE order_id=? AND historical_unit_price=10.00",
+                Long.class,
+                order.get("id")))
+        .isEqualTo(2L);
 
     // Re-import the same file: still two lines, no duplicates.
     String again = submit("/admin-api/order/order-imports", orderWorkbook(rows), "o2.xlsx");
@@ -225,6 +233,35 @@ class OrderImportIT {
     mvc.perform(get("/admin-api/order/unmatched").header(TOKEN, admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("2"));
+  }
+
+  @Test
+  void shouldAcceptLegacyFourteenColumnTemplate_withoutUnitPrice() throws Exception {
+    List<List<String>> rows =
+        List.of(
+            List.of(
+                "100",
+                "7200",
+                "",
+                "已付款",
+                "2026-10-16 12:00:00",
+                "2026-10-16 12:01:00",
+                "10.00",
+                "0",
+                "9003",
+                "s3",
+                "Legacy item",
+                "",
+                "1",
+                "10.00"));
+    String taskId =
+        submit("/admin-api/order/order-imports", legacyOrderWorkbook(rows), "legacy.xlsx");
+    assertThat(awaitTask(taskId).path("status").asText()).isEqualTo("SUCCESS");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT historical_unit_price FROM crm_order_item WHERE weidian_item_id='9003'",
+                java.math.BigDecimal.class))
+        .isNull();
   }
 
   @Test
@@ -647,6 +684,11 @@ class OrderImportIT {
 
   private static byte[] orderWorkbook(List<List<String>> rows) {
     return workbook(com.tcrm.admin.TestTemplates.render(OrderImportColumn.headerKeys()), rows);
+  }
+
+  private static byte[] legacyOrderWorkbook(List<List<String>> rows) {
+    return workbook(
+        com.tcrm.admin.TestTemplates.render(OrderImportColumn.legacyHeaderKeys()), rows);
   }
 
   private static byte[] refundWorkbook(List<List<String>> rows) {

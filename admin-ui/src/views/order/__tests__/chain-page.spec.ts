@@ -512,6 +512,23 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
+  it("shows a formatted unit price and marks a missing one explicitly (task 110)", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...orderDetail,
+      items: orderDetail.items.map(item =>
+        item.id === "301" ? { ...item, unitPrice: null } : item
+      )
+    });
+    const { wrapper } = await mountPage();
+    const rows = wrapper
+      .get('[data-test="chain-product-summary"]')
+      .findAll("tbody tr")
+      .map(row => row.findAll("td")[3]?.text());
+    expect(rows).toEqual(["缺失历史售价", "¥60.00"]);
+    wrapper.unmount();
+  });
+
   it.each([
     ["completed", "已完成", "success"],
     ["failed", "失败", "danger"],

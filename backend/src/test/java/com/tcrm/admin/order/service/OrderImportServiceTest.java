@@ -36,8 +36,8 @@ class OrderImportServiceTest {
 
     when(imports.submitImport(
             eq(TaskType.ORDER_IMPORT),
-            anyList(),
-            anyList(),
+            eq(OrderImportColumn.headerKeys()),
+            eq(OrderImportColumn.legacyHeaderKeys()),
             any(),
             any(),
             anyInt(),
@@ -52,8 +52,8 @@ class OrderImportServiceTest {
     verify(imports)
         .submitImport(
             eq(TaskType.ORDER_IMPORT),
-            anyList(),
-            anyList(),
+            eq(OrderImportColumn.headerKeys()),
+            eq(OrderImportColumn.legacyHeaderKeys()),
             any(ImportFileDTO.class),
             any(),
             anyInt(),

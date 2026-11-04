@@ -210,7 +210,7 @@ class OrderIT {
         BigDecimal.TEN,
         BigDecimal.TEN,
         BigDecimal.ONE,
-        json.readTree("{\"sub_order_id\":\"" + sub + "\",\"sku_id\":\"0\"}"));
+        json.readTree("{\"sub_order_id\":\"" + sub + "\",\"sku_id\":\"0\",\"price\":\"10.00\"}"));
   }
 
   private WeidianBusinessApi.OrderDetailResponse detail(
@@ -278,6 +278,12 @@ class OrderIT {
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order", Integer.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order_item", Integer.class))
         .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT historical_unit_price FROM crm_order_item WHERE order_id=?",
+                BigDecimal.class,
+                id))
+        .isEqualByComparingTo("10.00");
     assertThat(jdbc.queryForObject("SELECT kol_id FROM crm_order WHERE id=?", Long.class, id))
         .isEqualTo(100);
     assertThat(jdbc.queryForObject("SELECT bd_user_id FROM crm_order WHERE id=?", Long.class, id))

@@ -139,6 +139,75 @@ class OrderWriterTest {
   }
 
   @Test
+  void shouldKeepStoredUnitPrice_whenIncomingPriceIsMissing() {
+    var existing = order();
+    existing.setSource(1);
+    var old = item(20, "sub", "sku");
+    old.setHistoricalUnitPrice(new BigDecimal("5.55"));
+    var line = item(99, "sub", "sku");
+    line.setQuantity(1);
+    line.setPayAmount(new BigDecimal("10.00"));
+    when(orders.selectOne(any())).thenReturn(existing);
+    when(items.selectList(any())).thenReturn(List.of(old));
+
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(order(), List.of(line)));
+            });
+
+    assertThat(old.getHistoricalUnitPrice()).isEqualByComparingTo("5.55");
+    verify(items, never()).insert(any(OrderItemDO.class));
+  }
+
+  @Test
+  void shouldOverwriteStoredUnitPrice_whenIncomingPriceIsPresent() {
+    var existing = order();
+    existing.setSource(1);
+    var old = item(20, "sub", "sku");
+    old.setHistoricalUnitPrice(new BigDecimal("5.55"));
+    var line = item(99, "sub", "sku");
+    line.setQuantity(1);
+    line.setPayAmount(new BigDecimal("10.00"));
+    line.setHistoricalUnitPrice(new BigDecimal("8.88"));
+    when(orders.selectOne(any())).thenReturn(existing);
+    when(items.selectList(any())).thenReturn(List.of(old));
+
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(order(), List.of(line)));
+            });
+
+    assertThat(old.getHistoricalUnitPrice()).isEqualByComparingTo("8.88");
+  }
+
+  @Test
+  void shouldKeepImportedUnitPrice_whenApiTakeoverHasNoPrice() {
+    var existing = order();
+    existing.setSource(2);
+    var old = item(20, "sub", "sku");
+    old.setHistoricalUnitPrice(new BigDecimal("5.55"));
+    var line = item(99, "sub", "sku");
+    line.setQuantity(1);
+    line.setPayAmount(new BigDecimal("10.00"));
+    var next = order();
+    next.setId(null);
+    next.setTenantId(null);
+    next.setSource(1);
+    when(orders.selectOne(any())).thenReturn(existing);
+    when(items.selectList(any())).thenReturn(List.of(old));
+
+    TestTransactions.template()
+        .executeWithoutResult(
+            txStatus -> {
+              writer.save(new OrderPayloadDTO(next, List.of(line)));
+            });
+
+    assertThat(old.getHistoricalUnitPrice()).isEqualByComparingTo("5.55");
+  }
+
+  @Test
   void shouldFindByShopAndRemoteOrder_whenLookingUpExistingOrder() {
     when(orders.selectOne(any())).thenReturn(order());
     assertThat(writer.find(5, "100").getId()).isEqualTo(10L);

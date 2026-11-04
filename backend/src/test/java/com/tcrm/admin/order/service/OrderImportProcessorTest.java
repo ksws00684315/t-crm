@@ -134,6 +134,43 @@ class OrderImportProcessorTest {
   }
 
   @Test
+  void shouldStoreOptionalUnitPrice_andLeaveItNullWhenMissing() {
+    when(writer.find(10L, "5001")).thenReturn(null);
+    List<String> priced = validPaid();
+    priced.set(OrderImportColumn.UNIT_PRICE.ordinal(), "12.50");
+    assertThat(processor.process(priced)).isEmpty();
+    assertThat(processor.process(validPaid())).isEmpty();
+    ArgumentCaptor<OrderPayloadDTO> cap = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer, org.mockito.Mockito.times(2)).save(cap.capture());
+    assertThat(cap.getAllValues().get(0).items().getFirst().getHistoricalUnitPrice())
+        .isEqualByComparingTo("12.50");
+    assertThat(cap.getAllValues().get(1).items().getFirst().getHistoricalUnitPrice()).isNull();
+  }
+
+  @Test
+  void shouldRejectInvalidUnitPrice() {
+    when(writer.find(10L, "5001")).thenReturn(null);
+    for (String invalid : List.of("-1", "1.235", "100000000000000")) {
+      List<String> cells = validPaid();
+      cells.set(OrderImportColumn.UNIT_PRICE.ordinal(), invalid);
+      assertThat(processor.process(cells))
+          .extracting(ImportReason::key)
+          .containsExactly(OrderImportProcessor.UNIT_PRICE_FORMAT);
+    }
+    verify(writer, never()).save(any());
+  }
+
+  @Test
+  void shouldAcceptLegacyFourteenColumnRow_withoutUnitPrice() {
+    when(writer.find(10L, "5001")).thenReturn(null);
+    List<String> legacy = new ArrayList<>(validPaid().subList(0, 14));
+    assertThat(processor.process(legacy)).isEmpty();
+    ArgumentCaptor<OrderPayloadDTO> cap = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer).save(cap.capture());
+    assertThat(cap.getValue().items().getFirst().getHistoricalUnitPrice()).isNull();
+  }
+
+  @Test
   void shouldReuseStableSubOrder_whenSameFileOrderReappears() {
     when(writer.find(eq(10L), eq("5001"))).thenReturn(null);
     assertThat(processor.process(validPaid())).isEmpty();

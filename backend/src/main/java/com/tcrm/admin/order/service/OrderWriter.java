@@ -86,7 +86,11 @@ public class OrderWriter {
         row.setSkuName(line.getSkuName());
         row.setQuantity(line.getQuantity());
         row.setPayAmount(line.getPayAmount());
-        row.setHistoricalUnitPrice(line.getHistoricalUnitPrice());
+        // A missing incoming price never clears a stored one, so a field-less sync keeps the
+        // imported price. When API sync takes over an imported order, a present API price wins.
+        if (line.getHistoricalUnitPrice() != null) {
+          row.setHistoricalUnitPrice(line.getHistoricalUnitPrice());
+        }
         items.updateById(row);
       } else {
         items.insert(line);
