@@ -9,7 +9,7 @@ description: 任务改动了管理端或达人端界面、需要做浏览器验�
 
 ## 1. 启动
 
-- 中间件：连接本机共享的 PostgreSQL / Redis（Compose 项目 `tcrm-local`，端口 55432 / 46391）。连接信息在**主目录**的 `deploy/.env.local`，只读，不复制进工作树、不修改。
+- 中间件：连接共享的 PostgreSQL / Redis（本机访问端口 55432 / 46391）。中间件形态由 `deploy/.env.local` 的 `TCRM_LOCAL_INFRA_MODE` 决定：`docker` 为本机 Compose 项目（`tcrm-local`），`external` 为外部实例（例如云主机上的服务，经本机隧道访问，任务 109）。连接信息在**主目录**的 `deploy/.env.local`，只读，不复制进工作树、不修改；工作树里运行脚本时用 `TCRM_LOCAL_ENV_FILE` 指向它。
 - 后台：在工作树的 `backend/` 下，导出 `deploy/.env.local` 的变量后用 dev profile 启动（命令见 `deploy/README.md`「本地共享中间件与开发」），`TCRM_ADMIN_PORT` 用任务分配的端口。
 - 前端：`admin-ui/`、`kol-portal/` 用各自的 Vite 命令，端口用任务分配的。负责人在用 18081、8848、8849、8890～8892，不得占用。
 - **不得**停止、删除、重建共享中间件，不得 `down -v`，不得另起 `docker-compose.dev.yml` 项目，不得动 `tcrm-preview`。

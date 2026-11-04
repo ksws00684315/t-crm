@@ -1,7 +1,8 @@
 # LOCAL PREVIEW ONLY. Not for any server.
 # From the repository root:
 #   deploy/scripts/preview.sh up
-# PostgreSQL and Redis are provided by the shared local-infra project. Nginx is the only published
+# PostgreSQL and Redis are provided by the shared local-infra project, or by external middleware
+# reached through TCRM_PREVIEW_* variables (task 109). Nginx is the only published
 # port, bound to 127.0.0.1. Backend services join both the preview and shared middleware networks.
 # Memory limits are smaller than production so a local Docker VM can run this next to other stacks.
 # Redis still requires a password and uses noeviction.
@@ -42,16 +43,18 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       TCRM_ADMIN_PORT: "8080"
-      TCRM_DB_HOST: tcrm-postgres
+      # Defaults point at the shared local-infra containers; external middleware overrides these
+      # with host.docker.internal and the host tunnel ports (task 109).
+      TCRM_DB_HOST: ${TCRM_PREVIEW_DB_HOST:-tcrm-postgres}
       # Inside the compose network PostgreSQL always listens on 5432.
-      TCRM_DB_PORT: "5432"
+      TCRM_DB_PORT: "${TCRM_PREVIEW_DB_PORT:-5432}"
       TCRM_DB_NAME: ${TCRM_DB_NAME:-tcrm}
       TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
       TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
       SPRING_FLYWAY_OUT_OF_ORDER: ${SPRING_FLYWAY_OUT_OF_ORDER:-true}
       SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS: ${SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS:-*:missing,*:future}
-      TCRM_REDIS_HOST: tcrm-redis
-      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_HOST: ${TCRM_PREVIEW_REDIS_HOST:-tcrm-redis}
+      TCRM_REDIS_PORT: "${TCRM_PREVIEW_REDIS_PORT:-6379}"
       TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
       TCRM_BOOTSTRAP_ADMIN_USERNAME: ${TCRM_BOOTSTRAP_ADMIN_USERNAME:-}
       TCRM_BOOTSTRAP_ADMIN_PASSWORD: ${TCRM_BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -72,6 +75,10 @@ services:
       TCRM_TRUSTED_PROXIES: ${TCRM_PREVIEW_SUBNET:-172.30.0.0/24}
       TCRM_CLIENT_IP_HEADERS: ${TCRM_CLIENT_IP_HEADERS:-}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    # Resolvable on Docker Desktop natively; the host-gateway mapping keeps it working on Linux
+    # so external middleware can be reached through the host's tunnel ports (task 109).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8080"
     networks:
@@ -100,8 +107,8 @@ services:
       dockerfile: redirect/Dockerfile
     environment:
       TCRM_REDIRECT_PORT: "8081"
-      TCRM_REDIS_HOST: tcrm-redis
-      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_HOST: ${TCRM_PREVIEW_REDIS_HOST:-tcrm-redis}
+      TCRM_REDIS_PORT: "${TCRM_PREVIEW_REDIS_PORT:-6379}"
       TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
       TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
       TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
@@ -110,6 +117,9 @@ services:
       TCRM_CLIENT_IP_HEADERS: ${TCRM_CLIENT_IP_HEADERS:-}
       TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    # See crm-admin: keeps host.docker.internal resolvable on Linux too (task 109).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8081"
     networks:

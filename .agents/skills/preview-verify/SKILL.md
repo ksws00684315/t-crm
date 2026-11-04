@@ -27,13 +27,14 @@ PR 改动了以下任一内容：
    ```
 2. 在工作树根目录起一套**独立**预览，项目名和端口用任务分配的，**不要动负责人的 `tcrm-preview`**：
    ```bash
+   TCRM_LOCAL_ENV_FILE=/主目录/deploy/.env.local \
    TCRM_PREVIEW_PROJECT=tcrm-p{编号} \
    TCRM_PREVIEW_ADMIN_PORT=<分配的端口> \
    TCRM_PREVIEW_KOL_PORT=<分配的端口> \
    TCRM_PREVIEW_REDIRECT_PORT=<分配的端口> \
    deploy/scripts/preview.sh up
    ```
-   网段冲突时加 `TCRM_PREVIEW_SUBNET=<未占用网段>`。
+   网段冲突时加 `TCRM_PREVIEW_SUBNET=<未占用网段>`。中间件由 `deploy/.env.local` 的 `TCRM_LOCAL_INFRA_MODE` 决定：`docker`（本机 Compose 项目）或 `external`（外部实例，`up` 只做连通性检查和网络准备，不创建中间件容器，任务 109）。
 3. 确认后台、跳转服务都能启动，三个入口返回 200；后端健康但验证码返回 502 时重新执行一次 `up`。
 4. 验证完删除自己这套预览：`TCRM_PREVIEW_PROJECT=tcrm-p{编号} deploy/scripts/preview.sh reset`（删除本预览项目的容器和本地镜像，须输入 yes，不改共享数据）。只删自己创建的资源，不执行 `docker system prune`。
 5. 执行报告写明启动命令、三个入口的返回码和清理命令。

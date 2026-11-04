@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build and run a local preview against the shared local-infra middleware.
+# Build and run a local preview against the shared local-infra middleware (docker mode) or an
+# external instance reached through the host's tunnel ports (external mode, task 109).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -52,6 +53,23 @@ cmd_up() {
     command -v "$cmd" >/dev/null 2>&1 || { echo "缺少命令：${cmd}。" >&2; exit 1; }
   done
   TCRM_LOCAL_ENV_FILE="$ENV_FILE" "$ROOT/deploy/scripts/local-infra.sh" up
+  # In external mode the middleware is reached through the host's tunnel ports, not through the
+  # local-infra containers (task 109). Read the env file inside a subshell and import ONLY the
+  # preview middleware variables, so the rest of .env.local (TCRM_SECRET_KEY etc.) is not
+  # exported into this shell and the build steps that run after it (review). Explicit
+  # TCRM_PREVIEW_* values in the env file win: the subshell applies the defaults itself.
+  eval "$(
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+    if [[ "${TCRM_LOCAL_INFRA_MODE:-docker}" == external ]]; then
+      printf 'export TCRM_PREVIEW_DB_HOST=%q\n' "${TCRM_PREVIEW_DB_HOST:-host.docker.internal}"
+      printf 'export TCRM_PREVIEW_DB_PORT=%q\n' "${TCRM_PREVIEW_DB_PORT:-${TCRM_DB_PORT:-5432}}"
+      printf 'export TCRM_PREVIEW_REDIS_HOST=%q\n' "${TCRM_PREVIEW_REDIS_HOST:-host.docker.internal}"
+      printf 'export TCRM_PREVIEW_REDIS_PORT=%q\n' "${TCRM_PREVIEW_REDIS_PORT:-${TCRM_REDIS_PORT:-6379}}"
+    fi
+  )"
   export TCRM_STATIC_DIR="$ROOT/deploy/www-preview"
   "$ROOT/deploy/scripts/build-static.sh"
   compose up -d --build

@@ -124,9 +124,9 @@ git archive --format=tar.gz --prefix=t-crm/ -o t-crm-v{版本}-src.tar.gz v{版�
 
 ### 9.2 共享中间件
 
-自 2026-10-20（任务 35）起，负责人的本地预览、本地开发和所有代理的联调、浏览器验证，共用一套 PostgreSQL 和 Redis，也共用同一个数据库（Compose 项目 `tcrm-local`，端口 55432 / 46391，连接信息在主目录的 `deploy/.env.local`）。
+自 2026-10-20（任务 35）起，负责人的本地预览、本地开发和所有代理的联调、浏览器验证，共用一套 PostgreSQL 和 Redis，也共用同一个数据库。中间件可以是本机 Compose 项目（`tcrm-local`），也可以是外部实例（例如云主机上的 PostgreSQL / Redis，经本机隧道访问），由 `.env.local` 的 `TCRM_LOCAL_INFRA_MODE` 决定（任务 109）；本机访问端口不变（55432 / 46391），连接信息在主目录的 `deploy/.env.local`。
 
-【强制】派发任务前，架构负责人执行 `deploy/scripts/local-infra.sh backup`。
+【强制】派发任务前，架构负责人执行 `deploy/scripts/local-infra.sh backup`（docker、external 两种模式都适用）。
 【强制】代理只读取 `deploy/.env.local`，不得修改；后台和 Vite 使用任务分配的端口，不得占用负责人的端口（以启动说明为准）。
 【强制】测试账号和测试数据统一加任务前缀 `tNN_`（例如用户名 `t34_bd01`、邮箱 `t34_…@example.com`）；收尾时只删除自己创建的数据，并把改过的系统配置恢复默认。
 【强制】不得停止、删除或重建共享中间件的容器和数据卷，不得执行 `down -v`，不得为任务另起 `docker-compose.dev.yml` 项目；不得重建负责人的预览（`tcrm-preview`），除非负责人明确要求。
