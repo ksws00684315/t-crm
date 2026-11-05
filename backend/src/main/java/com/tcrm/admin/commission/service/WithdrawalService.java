@@ -1109,15 +1109,12 @@ public class WithdrawalService {
     for (CommissionItemStateDO state : states) {
       BigDecimal rate = rateByState.get(state.getId());
       if (rate != null) {
-        ratesByOrder
-            .computeIfAbsent(state.getOrderId(), k -> new TreeSet<>())
-            .add(rate);
+        ratesByOrder.computeIfAbsent(state.getOrderId(), k -> new TreeSet<>()).add(rate);
       }
     }
     Map<Long, List<String>> result = new HashMap<>();
     for (var entry : ratesByOrder.entrySet()) {
-      result.put(
-          entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
+      result.put(entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
     }
     return result;
   }
