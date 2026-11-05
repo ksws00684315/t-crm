@@ -2,6 +2,7 @@ package com.tcrm.admin.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -149,8 +151,10 @@ class KolItemQueryIT {
     assertThat(sold.get("sourceItemId").asText()).isEqualTo("80010001");
     assertThat(sold.get("sourceChannel").asText()).isEqualTo("WEIDIAN");
     assertThat(sold.get("currentRate").asText()).isEqualTo("0.1500");
-    assertThat(sold.get("salesQuantity").asText()).isEqualTo("3");
-    assertThat(sold.get("payAmount").asText()).isEqualTo("14.00");
+    // 商品销售额 (task 112): paid + attributed orders, closed-after-payment 9404 included; the
+    // unpaid 9403 and the conflict / unmatched 9406 / 9407 are out: 2+1+3 pieces, 10+4+30.
+    assertThat(sold.get("salesQuantity").asText()).isEqualTo("6");
+    assertThat(sold.get("payAmount").asText()).isEqualTo("44.00");
     assertThat(sold.get("status").asText()).isEqualTo("ENABLED");
     assertThat(sold.get("cleanupStatus").asText()).isEqualTo("FAILED");
 
@@ -178,7 +182,8 @@ class KolItemQueryIT {
 
     JsonNode detail = detail(adminToken, 9301);
     assertThat(detail.get("visitCount").asText()).isEqualTo("1");
-    assertThat(detail.get("totalPayAmount").asText()).isEqualTo("14.00");
+    assertThat(detail.get("totalPayAmount").asText()).isEqualTo("44.00");
+    // Refunds use the same scope: 1.50 + 2.00; the conflict and unmatched 5.00 / 7.00 are out.
     assertThat(detail.get("refundAmount").asText()).isEqualTo("3.50");
     assertThat(detail.get("sourceItemUrl").asText())
         .isEqualTo("https://weidian.com/item.html?itemID=80010001");
@@ -211,6 +216,36 @@ class KolItemQueryIT {
   }
 
   @Test
+  void shouldCountManuallyAttributedOrdersInProductSales() throws Exception {
+    // Task 112: an unmatched order of item 90010001, then attributed by hand to the item's owner.
+    order(9408, 1L, 9101, "8008", null, "PAID", "UNMATCHED");
+    jdbc.update(
+        """
+        INSERT INTO crm_order_item(id, tenant_id, order_id, sub_order_id, weidian_item_id, sku_id,
+          item_name, sku_name, quantity, pay_amount, refund_amount, attribution_type, create_time,
+          update_time)
+        VALUES (9508, 1, 9408, 's1', '90010001', '', 'Item', '', 4, 12.00, 1.00, 0, now(), now())
+        """);
+    mvc.perform(
+            put("/admin-api/order/orders/9408/attribution")
+                .header(TOKEN, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kolId\":\"9111\",\"reason\":\"t112 manual\"}"))
+        .andExpect(status().isOk());
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT kol_item_id FROM crm_order_item WHERE id = 9508", Long.class))
+        .isEqualTo(9301L);
+    JsonNode sold = byId(list(adminToken, "").get("items")).get("9301");
+    assertThat(sold.get("salesQuantity").asText()).isEqualTo("10");
+    assertThat(sold.get("payAmount").asText()).isEqualTo("56.00");
+    JsonNode detail = detail(adminToken, 9301);
+    assertThat(detail.get("totalPayAmount").asText()).isEqualTo("56.00");
+    assertThat(detail.get("refundAmount").asText()).isEqualTo("4.50");
+  }
+
+  @Test
   void shouldUseTheOrderItemIndex() throws Exception {
     String plan =
         explain(
@@ -218,7 +253,8 @@ class KolItemQueryIT {
             SELECT oi.kol_item_id
             FROM crm_order_item oi
             JOIN crm_order o ON o.id = oi.order_id AND o.is_deleted = FALSE
-            WHERE oi.is_deleted = FALSE AND oi.kol_item_id IN (9301)
+            WHERE oi.is_deleted = FALSE AND o.pay_time IS NOT NULL
+              AND o.attribution_status = 'ATTRIBUTED' AND oi.kol_item_id IN (9301)
             GROUP BY oi.kol_item_id
             """);
     assertThat(plan).contains("idx_crm_order_item_kol_item");
@@ -332,6 +368,11 @@ class KolItemQueryIT {
     line(9503, 1L, 9403, "s1", 8, "80.00", "0.00", 9111, 9201L, 9301L);
     order(9404, 1L, 9101, "8004", 9111, "CLOSED");
     line(9504, 1L, 9404, "s1", 3, "30.00", "2.00", 9111, 9201L, 9301L);
+    // Task 112 scope: conflict and unmatched orders never count, even with the item reference.
+    order(9406, 1L, 9101, "8006", null, "PAID", "CONFLICT");
+    line(9506, 1L, 9406, "s1", 5, "500.00", "5.00", 9111, 9201L, 9301L);
+    order(9407, 1L, 9101, "8007", null, "PAID", "UNMATCHED");
+    line(9507, 1L, 9407, "s1", 7, "700.00", "7.00", 9111, 9201L, 9301L);
     order(9405, companyB.tenantId(), 9103, "8005", 9113, "PAID");
     line(9505, companyB.tenantId(), 9405, "s1", 9, "90.00", "9.00", 9113, null, 9306L);
 
@@ -435,18 +476,33 @@ class KolItemQueryIT {
 
   private void order(
       long id, long tenantId, long shopId, String weidianOrderId, long kolId, String status) {
+    order(id, tenantId, shopId, weidianOrderId, kolId, status, "ATTRIBUTED");
+  }
+
+  /** Unpaid orders carry no pay time, the same as the sync writes them. */
+  private void order(
+      long id,
+      long tenantId,
+      long shopId,
+      String weidianOrderId,
+      Long kolId,
+      String status,
+      String attribution) {
     jdbc.update(
         """
         INSERT INTO crm_order(id, tenant_id, shop_id, weidian_order_id, kol_id, attribution_status,
           order_status, raw_status, order_time, pay_time, total_amount, pay_amount, freight, discount,
           source, last_sync_time, create_time, update_time)
-        VALUES (?, ?, ?, ?, ?, 'ATTRIBUTED', ?, ?, now(), now(), 0, 0, 0, 0, 1, now(), now(), now())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(),
+          CASE WHEN ? = 'UNPAID' THEN NULL ELSE now() END, 0, 0, 0, 0, 1, now(), now(), now())
         """,
         id,
         tenantId,
         shopId,
         weidianOrderId,
         kolId,
+        attribution,
+        status,
         status,
         status);
   }

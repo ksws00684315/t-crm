@@ -1,6 +1,6 @@
 export default {
   number: "Prepay number",
-  paidAmount: "Paid amount",
+  paidAmount: "Payment Amount",
   entryType: "Entry type",
   entryAmount: "Entry amount",
   occurredAt: "Entry time",

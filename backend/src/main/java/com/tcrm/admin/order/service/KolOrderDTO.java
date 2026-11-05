@@ -8,7 +8,8 @@ import java.util.List;
  * Masked KOL order summary; excludes every internal order, shop and product identifier. Commission
  * fields come from the commission module through its order.api port (task 62): line-level {@code
  * settlementStatus}, {@code rateSnapshot} and {@code commissionAmount} (null while unverified) and
- * the order-level status as the most active own line (appendix B ladder).
+ * the order-level status as the most active own line (appendix B ladder). {@code payAmount} is the
+ * order pay amount, freight included (task 112: one order belongs to one creator).
  */
 public record KolOrderDTO(
     String orderNo,

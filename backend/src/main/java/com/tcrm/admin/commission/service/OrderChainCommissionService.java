@@ -85,7 +85,7 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
   public OrderCommissionChainDTO chainOfOrder(long orderId, Collection<Long> orderItemIds) {
     List<Long> itemIds = orderItemIds == null ? List.of() : List.copyOf(orderItemIds);
     if (itemIds.isEmpty()) {
-      return new OrderCommissionChainDTO(ZERO, true, List.of(), List.of());
+      return new OrderCommissionChainDTO(ZERO, true, List.of(), List.of(), ZERO);
     }
     List<CommissionItemStateDO> rows = states.listByOrderIds(List.of(orderId));
     Map<Long, CommissionItemStateDO> stateByItem = new LinkedHashMap<>();
@@ -111,8 +111,15 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
         itemIds.stream()
             .map(id -> lineOf(id, stateByItem, rateByItem, supplementedByItem, allocations))
             .toList();
+    BigDecimal commissionable = null;
+    if (allVerified) {
+      commissionable = ZERO;
+      for (LineCommissionDTO line : lines) {
+        commissionable = commissionable.add(nz(line.commissionableCny()));
+      }
+    }
     return new OrderCommissionChainDTO(
-        net.setScale(2, RoundingMode.UNNECESSARY), allVerified, lines, flows);
+        net.setScale(2, RoundingMode.UNNECESSARY), allVerified, lines, flows, commissionable);
   }
 
   /** Pay-time rate of the latest revision per item state; states without revisions stay absent. */
@@ -206,7 +213,20 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
         netCommission,
         state == null ? null : state.getReleaseBasis(),
         occupied.setScale(2, RoundingMode.UNNECESSARY),
-        List.copyOf(refs));
+        List.copyOf(refs),
+        commissionable(state));
+  }
+
+  /**
+   * Commissionable amount of a verified snapshot (task 112): the same effective basis the accrual
+   * multiplies by the rate, so 预估佣金 = 计佣金额 × 佣金比例 holds on screen. Unverified → null.
+   */
+  private static BigDecimal commissionable(CommissionItemStateDO state) {
+    if (state == null || !Boolean.TRUE.equals(state.getVerified())) {
+      return null;
+    }
+    return CommissionSettlementRules.effectiveBasis(
+        state.getBasisCny(), state.getBasisIncludesRefund(), state.getSuccessfulRefundCny());
   }
 
   /**

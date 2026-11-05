@@ -310,7 +310,7 @@ class OrderQueryIT {
         .andExpect(jsonPath("$.data.merchantNo").value("10"))
         .andExpect(jsonPath("$.data.source").value("API"))
         .andExpect(jsonPath("$.data.itemAmount").value("10.00"))
-        .andExpect(jsonPath("$.data.totalAmount").value("10.00"))
+        .andExpect(jsonPath("$.data.orderAmount").value("10.00"))
         .andExpect(jsonPath("$.data.payAmount").value("10.00"))
         .andExpect(jsonPath("$.data.payTime").value(PAID.toString()))
         .andExpect(jsonPath("$.data.items[0].imageUrl").value("https://img.example/p1.png"))
@@ -320,13 +320,38 @@ class OrderQueryIT {
   }
 
   @Test
+  void shouldReturnOrderLevelAmountsWithFreight_inDetailAndChain() throws Exception {
+    // Task 112: goods 10 + freight 5 = order amount 15; paid 14 → discount 1; refund 4 → 10 net.
+    mapping(1, 100, "90", null, PAID.minusSeconds(1), null);
+    long orderId = save("1000", PAID, line("90", "1"));
+    jdbc.update("UPDATE crm_order SET freight=5.00, pay_amount=14.00 WHERE id=?", orderId);
+    long itemId = jdbc.queryForObject("SELECT id FROM crm_order_item", Long.class);
+    refund(1, orderId, itemId, "R1", "SUCCESS", "REFUND_ONLY", "4.00");
+    mvc.perform(get("/admin-api/order/orders/" + orderId).header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.itemAmount").value("10.00"))
+        .andExpect(jsonPath("$.data.freight").value("5.00"))
+        .andExpect(jsonPath("$.data.orderAmount").value("15.00"))
+        .andExpect(jsonPath("$.data.discount").value("1.00"))
+        .andExpect(jsonPath("$.data.payAmount").value("14.00"))
+        .andExpect(jsonPath("$.data.refundAmount").value("4.00"))
+        .andExpect(jsonPath("$.data.netReceived").value("10.00"))
+        .andExpect(jsonPath("$.data.totalAmount").doesNotExist());
+    mvc.perform(get("/admin-api/order/orders/" + orderId + "/chain").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.funds.payAmount").value("14.00"))
+        .andExpect(jsonPath("$.data.funds.refundTotal").value("4.00"));
+  }
+
+  @Test
   void shouldBlankGoodsAndTotalAmountWithoutHistoricalPrice() throws Exception {
     mapping(1, 100, "90", null, PAID.minusSeconds(1), null);
     long orderId = save("1000", PAID, unpricedLine("90", "1"));
     mvc.perform(get("/admin-api/order/orders/" + orderId).header("X-Admin-Token", admin))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.itemAmount").value(org.hamcrest.Matchers.nullValue()))
-        .andExpect(jsonPath("$.data.totalAmount").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.orderAmount").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.discount").value(org.hamcrest.Matchers.nullValue()))
         .andExpect(jsonPath("$.data.items[0].unitPrice").value(org.hamcrest.Matchers.nullValue()));
   }
 

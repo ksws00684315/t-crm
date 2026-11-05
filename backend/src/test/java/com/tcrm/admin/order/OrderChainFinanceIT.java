@@ -503,6 +503,15 @@ class OrderChainFinanceIT {
         .andExpect(jsonPath("$.data.funds.kolCommission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].commission.netCommission").value("120.00"))
         .andExpect(jsonPath("$.data.financeFlows[2].withdrawalNo").value(first.applicationNo()));
+    // Task 112: the order detail carries the same order-level commission through the same port
+    // and gate — line 2 is unverified, so 计佣金额 and 预估佣金 stay null; the accrued rate shows.
+    mvc.perform(get("/admin-api/order/orders/{id}", orderId).header("X-Admin-Token", financeStaff))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.refundAmount").value("100.00"))
+        .andExpect(jsonPath("$.data.netReceived").value("100.00"))
+        .andExpect(jsonPath("$.data.commission.commissionableAmount").value(Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.commission.estimatedCommission").value(Matchers.nullValue()))
+        .andExpect(jsonPath("$.data.commission.rates[0]").value("0.3000"));
 
     // A staff viewer without commission:view gets the wiring but no financial data.
     String orderViewer =
@@ -515,6 +524,10 @@ class OrderChainFinanceIT {
         .andExpect(jsonPath("$.data.financeFlows").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].commission").value(Matchers.nullValue()))
         .andExpect(jsonPath("$.data.lines[0].orderItemId").value(String.valueOf(item1)));
+    mvc.perform(get("/admin-api/order/orders/{id}", orderId).header("X-Admin-Token", orderViewer))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.payAmount").value("200.00"))
+        .andExpect(jsonPath("$.data.commission").value(Matchers.nullValue()));
   }
 
   @Test

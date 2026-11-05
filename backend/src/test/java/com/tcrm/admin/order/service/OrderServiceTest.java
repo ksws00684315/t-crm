@@ -731,8 +731,10 @@ class OrderServiceTest {
                         null,
                         "UNVERIFIED",
                         BigDecimal.ZERO,
-                        List.of())),
-                List.of()));
+                        List.of(),
+                        null)),
+                List.of(),
+                null));
     error(
         () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), "test"),
         ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
@@ -762,7 +764,7 @@ class OrderServiceTest {
     when(commissionChain.chainOfOrder(10L, List.of(20L)))
         .thenReturn(
             new OrderChainCommissionApi.OrderCommissionChainDTO(
-                BigDecimal.ZERO, false, List.of(), List.of()));
+                BigDecimal.ZERO, false, List.of(), List.of(), null));
     return order;
   }
 
@@ -801,8 +803,8 @@ class OrderServiceTest {
     assertThat(detail.source()).isEqualTo("API");
     assertThat(detail.refundStatus()).isEqualTo("NONE");
     assertThat(detail.itemAmount()).isNull();
-    // A missing line price blanks the goods amount and the order total alike (task 107).
-    assertThat(detail.totalAmount()).isNull();
+    // A missing line price blanks the goods amount and the order amount alike (task 107/112).
+    assertThat(detail.orderAmount()).isNull();
     assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("12.50");
     assertThat(detail.items()).hasSize(1);
     assertThat(detail.items().getFirst().imageUrl()).isEqualTo("https://img/a.png");
@@ -833,14 +835,166 @@ class OrderServiceTest {
     var detail = service.detail(10L);
     // 10*2 + 20*1 = 40 goods; freight 5 and merchant discount 2 do not change it.
     assertThat(detail.itemAmount()).isEqualByComparingTo("40.00");
-    // The displayed order total shares the goods basis and must not reuse the source order total
-    // (48.00 = 43.00 paid + 5.00 freight, i.e. a paid figure), per task 107.
-    assertThat(detail.totalAmount()).isEqualByComparingTo("40.00");
-    assertThat(detail.totalAmount()).isNotEqualByComparingTo("48.00");
+    // 订单金额 = 商品总价 + 运费 = 45; 优惠 = 45 − 43 paid = 2 (task 112).
+    assertThat(detail.orderAmount()).isEqualByComparingTo("45.00");
+    assertThat(detail.discount()).isEqualByComparingTo("2.00");
     assertThat(detail.payAmount()).isEqualByComparingTo("43.00");
     assertThat(detail.freight()).isEqualByComparingTo("5.00");
     assertThat(detail.items().getFirst().unitPrice()).isEqualByComparingTo("10.00");
     assertThat(detail.items().getFirst().payAmount()).isEqualByComparingTo("19.00");
+  }
+
+  /** Order 81000000002 shape (task 112): goods 90 + freight 10, the detail arranged for amounts. */
+  private OrderDO amountOrder(String pay, RefundDO... successRefunds) {
+    var order = order(10);
+    order.setPayAmount(new BigDecimal(pay));
+    order.setFreight(new BigDecimal("10.00"));
+    when(orders.selectById(10L)).thenReturn(order);
+    var line = item();
+    line.setHistoricalUnitPrice(new BigDecimal("45.00"));
+    line.setQuantity(2);
+    line.setPayAmount(new BigDecimal("90.00"));
+    when(items.selectList(any())).thenReturn(List.of(line));
+    when(refunds.selectList(any())).thenReturn(List.of(successRefunds));
+    when(kols.listByIds(any())).thenReturn(List.of());
+    when(products.listProducts(any())).thenReturn(List.of());
+    return order;
+  }
+
+  private static RefundDO successRefund(long id, String amount) {
+    var refund = new RefundDO();
+    refund.setId(id);
+    refund.setOrderItemId(20L);
+    refund.setRefundStatus("SUCCESS");
+    refund.setAmount(new BigDecimal(amount));
+    return refund;
+  }
+
+  @Test
+  void shouldComputeOrderLevelAmounts_forGoodsPlusFreightWithoutRefund() {
+    amountOrder("100.00");
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.itemAmount()).isEqualByComparingTo("90.00");
+    assertThat(detail.orderAmount()).isEqualByComparingTo("100.00");
+    assertThat(detail.discount()).isEqualByComparingTo("0.00");
+    assertThat(detail.payAmount()).isEqualByComparingTo("100.00");
+    assertThat(detail.refundAmount()).isEqualByComparingTo("0.00");
+    assertThat(detail.netReceived()).isEqualByComparingTo("100.00");
+  }
+
+  @Test
+  void shouldDeriveDiscount_whenPaidLessThanOrderAmount() {
+    amountOrder("95.00");
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.orderAmount()).isEqualByComparingTo("100.00");
+    assertThat(detail.discount()).isEqualByComparingTo("5.00");
+    assertThat(detail.netReceived()).isEqualByComparingTo("95.00");
+  }
+
+  @Test
+  void shouldDeductDeduplicatedSuccessfulRefunds_fromNetReceived() {
+    // The same refund id twice (one refund spanning two lines) counts once.
+    amountOrder("100.00", successRefund(9L, "30.00"), successRefund(9L, "30.00"));
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.refundAmount()).isEqualByComparingTo("30.00");
+    assertThat(detail.netReceived()).isEqualByComparingTo("70.00");
+  }
+
+  @Test
+  void shouldBlankGoodsOrderAmountAndDiscount_butKeepPayAmount_whenUnitPriceMissing() {
+    amountOrder("100.00");
+    var line = item();
+    line.setQuantity(2);
+    line.setPayAmount(new BigDecimal("90.00"));
+    when(items.selectList(any())).thenReturn(List.of(line));
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.itemAmount()).isNull();
+    assertThat(detail.orderAmount()).isNull();
+    assertThat(detail.discount()).isNull();
+    assertThat(detail.payAmount()).isEqualByComparingTo("100.00");
+    assertThat(detail.netReceived()).isEqualByComparingTo("100.00");
+  }
+
+  @Test
+  void shouldOmitDetailCommission_withoutCommissionPermission() {
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view"));
+
+    var detail = service.detail(10L);
+
+    assertThat(detail.commission()).isNull();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldOmitDetailCommission_fromOwnViewerOnMixedAttribution() {
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(account.ownScope()).thenReturn(true);
+    var mine = item();
+    mine.setKolId(100L);
+    var other = item();
+    other.setId(21L);
+    other.setKolId(101L);
+    when(items.selectList(any())).thenReturn(List.of(mine, other));
+    when(kols.listByBdUserId(7L))
+        .thenReturn(List.of(new KolRefDTO(100L, "KOL0100", "Creator", true, 7L)));
+
+    assertThat(service.detail(10L).commission()).isNull();
+    verify(commissionChain, never()).chainOfOrder(anyLong(), any());
+  }
+
+  @Test
+  void shouldReturnDetailCommissionFromTheChainPort_withCommissionPermission() {
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                new BigDecimal("10.00"),
+                true,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L,
+                        new BigDecimal("0.1000"),
+                        false,
+                        new BigDecimal("10.00"),
+                        "UNSETTLED",
+                        BigDecimal.ZERO,
+                        List.of(),
+                        new BigDecimal("100.00"))),
+                List.of(),
+                new BigDecimal("100.00")));
+
+    var commission = service.detail(10L).commission();
+
+    assertThat(commission.commissionableAmount()).isEqualByComparingTo("100.00");
+    assertThat(commission.rates()).containsExactly(new BigDecimal("0.1000"));
+    assertThat(commission.estimatedCommission()).isEqualByComparingTo("10.00");
+  }
+
+  @Test
+  void shouldShowDetailCommissionAsUnverified_whenAnyLineIsUnverified() {
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                BigDecimal.ZERO, false, List.of(), List.of(), null));
+
+    var commission = service.detail(10L).commission();
+
+    assertThat(commission.commissionableAmount()).isNull();
+    assertThat(commission.estimatedCommission()).isNull();
+    assertThat(commission.rates()).isEmpty();
   }
 
   @Test
@@ -961,11 +1115,8 @@ class OrderServiceTest {
                             new OrderChainCommissionApi.WithdrawalRefDTO(
                                 31L, "W20261016000001", new BigDecimal("3.00"), "PAID", PAID),
                             new OrderChainCommissionApi.WithdrawalRefDTO(
-                                32L,
-                                "W20261016000002",
-                                new BigDecimal("1.00"),
-                                "REJECTED",
-                                null)))),
+                                32L, "W20261016000002", new BigDecimal("1.00"), "REJECTED", null)),
+                        new BigDecimal("12.50"))),
                 List.of(
                     new OrderChainCommissionApi.FlowDTO(
                         20L,
@@ -984,7 +1135,8 @@ class OrderServiceTest {
                         new BigDecimal("3.00"),
                         PAID.plusSeconds(1),
                         PAID.plusSeconds(3600),
-                        "W20261016000001"))));
+                        "W20261016000001")),
+                null));
 
     var chain = service.chain(10L);
 
@@ -1049,7 +1201,7 @@ class OrderServiceTest {
     when(commissionChain.chainOfOrder(eq(10L), any()))
         .thenReturn(
             new OrderChainCommissionApi.OrderCommissionChainDTO(
-                new BigDecimal("0.00"), true, List.of(), List.of()));
+                new BigDecimal("0.00"), true, List.of(), List.of(), new BigDecimal("0.00")));
 
     var chain = service.chain(10L);
 

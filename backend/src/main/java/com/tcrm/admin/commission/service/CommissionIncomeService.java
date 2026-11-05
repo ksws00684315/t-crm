@@ -415,7 +415,7 @@ public class CommissionIncomeService {
               item == null ? null : textOrNull(item.itemName()),
               item == null ? null : textOrNull(item.skuName()),
               item == null || item.productId() == null ? null : images.get(item.productId()),
-              row.getBasisCny() == null ? null : row.getBasisCny().toPlainString(),
+              commissionableText(row),
               rate == null ? null : rate.toPlainString(),
               row.getConfigVersion(),
               row.getRuleVersionId(),
@@ -608,5 +608,16 @@ public class CommissionIncomeService {
       map.put(row.kolId(), nz(row.amountCny()));
     }
     return map;
+  }
+
+  /**
+   * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
+   * accrual is computed from — not the raw source basis. Null when the source has no basis.
+   */
+  private static String commissionableText(CommissionItemStateDO row) {
+    BigDecimal value =
+        CommissionSettlementRules.effectiveBasis(
+            row.getBasisCny(), row.getBasisIncludesRefund(), row.getSuccessfulRefundCny());
+    return value == null ? null : value.toPlainString();
   }
 }

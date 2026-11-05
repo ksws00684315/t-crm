@@ -7,7 +7,7 @@ import type { OrderDetailItemVO, OrderDetailVO } from "@/api/types";
 import CopyText from "@/components/CopyText.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
-import { formatInstant, formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
+import { formatNameWithCode, formatAmountWithCurrency } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   channelText,
@@ -16,6 +16,7 @@ import {
   orderStatusText
 } from "@/utils/order";
 import { i18n, translate } from "@/locales";
+import OrderAmounts from "./OrderAmounts.vue";
 import OrderProductCell from "./OrderProductCell.vue";
 defineOptions({ name: "OrderDetailDrawer" });
 const props = defineProps<{ modelValue: boolean; orderId: string | null }>();
@@ -56,14 +57,13 @@ function lineStatusText(status: string | null | undefined): string {
 const columns = computed<DataColumn[]>(() => [
   { key: "product", align: "left", label: t("order.drawerProduct"), minWidth: 250 },
   { key: "kol", align: "center", label: t("order.kol"), minWidth: 145 },
+  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 140, amount: true },
   {
     key: "quantity",
     label: t("order.line.quantity"),
     width: locale.value.startsWith("en") ? 90 : 65
   },
-  { key: "unitPrice", label: t("order.detail.unitPrice"), width: 140, amount: true },
-  { key: "totalAmount", label: t("order.detail.totalAmount"), width: 130, amount: true },
-  { key: "payAmount", label: t("order.payAmount"), width: 130, amount: true },
+  { key: "totalAmount", label: t("order.amounts.productTotal"), width: 130, amount: true },
   { key: "status", label: t("common.status"), width: 100 }
 ]);
 </script>
@@ -98,38 +98,12 @@ const columns = computed<DataColumn[]>(() => [
               orderRefundStatusText(detail.refundStatus)
             }}</el-tag></el-descriptions-item
           >
-          <el-descriptions-item :label="t('order.detail.itemAmount')">{{
-            detail.itemAmount == null
-              ? t("order.missingHistoricalPrice")
-              : formatAmountWithCurrency(detail.itemAmount)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.line.quantity')">{{
-            detail.items.some(item => item.quantity == null)
-              ? "-"
-              : detail.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.freight')">{{
-            formatAmountWithCurrency(detail.freight)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.detail.totalAmount')">{{
-            detail.totalAmount == null
-              ? t("order.missingHistoricalPrice")
-              : formatAmountWithCurrency(detail.totalAmount)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.payAmount')">{{
-            formatAmountWithCurrency(detail.payAmount)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.detail.orderTime')">{{
-            formatInstant(detail.orderTime)
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="t('order.payTime')">{{
-            formatInstant(detail.payTime)
-          }}</el-descriptions-item>
         </el-descriptions>
+        <OrderAmounts class="drawer-amounts" :detail="detail" :columns="detailColumns" show-times />
         <DataTable
           plain
           class="drawer-products"
-          table-id="order-drawer-products-v2"
+          table-id="order-drawer-products-v3"
           :rows="detail.items"
           :columns="columns"
           :total="detail.items.length"
@@ -165,11 +139,6 @@ const columns = computed<DataColumn[]>(() => [
                 : formatAmountWithCurrency(asLine(row).totalAmount)
             }}</span></template
           >
-          <template #cell-payAmount="{ row }"
-            ><span class="drawer-money">{{
-              formatAmountWithCurrency(asLine(row).payAmount)
-            }}</span></template
-          >
           <template #cell-status="{ row }">{{ lineStatusText(asLine(row).status) }}</template>
         </DataTable>
       </template>
@@ -180,6 +149,7 @@ const columns = computed<DataColumn[]>(() => [
 :deep(.el-descriptions__label) {
   width: 112px;
 }
+.drawer-amounts,
 .drawer-products {
   margin-top: var(--tcrm-space-4);
 }

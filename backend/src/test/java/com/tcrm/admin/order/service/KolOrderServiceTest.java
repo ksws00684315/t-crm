@@ -55,8 +55,11 @@ class KolOrderServiceTest {
   }
 
   @Test
-  void shouldReturnMaskedAttributedOrderAndOnlyOwnItemAmounts() {
+  void shouldReturnMaskedOrderWithOrderPayAmountIncludingFreight() {
+    // Task 112: the order amount is the order pay amount (goods 25 + freight 5 = 30), not the
+    // sum of the creator's lines.
     OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    order.setPayAmount(new BigDecimal("30.00"));
     Page<OrderDO> page = page(order);
     when(orders.selectPage(any(), any())).thenReturn(page);
 
@@ -69,7 +72,7 @@ class KolOrderServiceTest {
                 "1234****9012",
                 order.getPayTime(),
                 "PAID",
-                new BigDecimal("25.00"),
+                new BigDecimal("30.00"),
                 new BigDecimal("5.00"),
                 // No commission snapshot yet: the line and the order are INVALID.
                 com.tcrm.admin.order.api.CommissionOrderStateApi.STATUS_INVALID,

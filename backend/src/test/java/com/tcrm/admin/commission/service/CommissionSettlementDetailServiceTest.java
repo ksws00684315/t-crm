@@ -136,6 +136,9 @@ class CommissionSettlementDetailServiceTest {
     when(kols.listByIds(anyCollection()))
         .thenReturn(List.of(new KolRefDTO(77L, "KOL001", "Kol A", true, 9L)));
     CommissionItemStateDO row = stateRow(5001L, 9001L, 77L, "18.00", "18.00", true, "CONFIRMED");
+    // Source basis 180 not yet net of the confirmed 20 refund: 计佣金额 shows 160 (task 112).
+    row.setBasisIncludesRefund(false);
+    row.setSuccessfulRefundCny(new BigDecimal("20.00"));
     when(states.listByOrderIds(List.of(5001L))).thenReturn(List.of(row));
     CommissionItemRevisionDO revision = new CommissionItemRevisionDO();
     revision.setItemStateId(row.getId());
@@ -158,6 +161,7 @@ class CommissionSettlementDetailServiceTest {
     assertThat(settlement.lines().getFirst().product()).isEqualTo("item");
     assertThat(settlement.lines().getFirst().sku()).isEqualTo("sku");
     assertThat(settlement.lines().getFirst().rate()).isEqualTo("0.1000");
+    assertThat(settlement.lines().getFirst().base()).isEqualTo("160.00");
     assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
     assertThat(settlement.lines().getFirst().subject()).isEqualTo("KOL");
   }

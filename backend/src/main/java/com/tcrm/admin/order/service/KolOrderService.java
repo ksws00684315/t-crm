@@ -116,8 +116,9 @@ public class KolOrderService {
                       lines.stream()
                           .filter(item -> order.getId().equals(item.getOrderId()))
                           .toList();
-                  BigDecimal payAmount = sum(ownItems, true);
-                  BigDecimal refundAmount = sum(ownItems, false);
+                  // Task 112: the order pay amount (freight included), not the sum of own lines.
+                  BigDecimal payAmount = order.getPayAmount();
+                  BigDecimal refundAmount = sum(ownItems);
                   List<CommissionOrderStateApi.ItemCommissionStateDTO> ownStates =
                       ownItems.stream()
                           .map(item -> statesByItem.get(item.getId()))
@@ -317,9 +318,9 @@ public class KolOrderService {
     return orderNo.substring(0, 4) + "****" + orderNo.substring(orderNo.length() - 4);
   }
 
-  private static BigDecimal sum(List<OrderItemDO> items, boolean pay) {
+  private static BigDecimal sum(List<OrderItemDO> items) {
     return items.stream()
-        .map(item -> pay ? item.getPayAmount() : item.getRefundAmount())
+        .map(OrderItemDO::getRefundAmount)
         .filter(value -> value != null)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }

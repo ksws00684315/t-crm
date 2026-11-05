@@ -449,6 +449,8 @@ class CommissionIncomeServiceTest {
     assertThat(line.sku()).isEqualTo("sku");
     assertThat(line.image()).isEqualTo("https://img");
     assertThat(line.rateVersion()).isEqualTo(3);
+    // 计佣金额 (task 112) is the effective basis; no refund here, so it equals the source 100.
+    assertThat(line.base()).isEqualTo("100.00");
     assertThat(detail.income().kolId()).isEqualTo(KOL);
     assertThat(detail.income().name()).isEqualTo("Kol A");
   }

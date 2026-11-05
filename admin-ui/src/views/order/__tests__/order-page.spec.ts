@@ -74,9 +74,13 @@ const detail: OrderDetailVO = {
   lastSyncTime: "2026-10-20T11:00:00Z",
   createTime: "2026-10-20T10:00:05Z",
   itemAmount: "115.00",
-  totalAmount: "125.00",
   payAmount: "120.00",
   freight: "5.00",
+  orderAmount: "120.00",
+  discount: "0.00",
+  refundAmount: "20.00",
+  netReceived: "100.00",
+  commission: null,
   items: [
     {
       id: "301",
@@ -89,6 +93,7 @@ const detail: OrderDetailVO = {
       kolCode: "KOL-ZS01",
       quantity: 2,
       unitPrice: "60.00",
+      totalAmount: "120.00",
       payAmount: "120.00",
       refundAmount: "20.00",
       status: "REFUNDED"
@@ -174,7 +179,7 @@ describe("order list page (task 40)", () => {
     signIn("SUPER_ADMIN", MANAGER);
     const wrapper = await mountPage();
     const labels = wrapper.findAll("th").map(item => item.text());
-    for (const header of ["商品信息", "达人", "数量", "订单状态", "实付金额", "操作"]) {
+    for (const header of ["商品信息", "达人", "件数", "订单状态", "支付金额", "操作"]) {
       expect(labels).toContain(header);
     }
     expect(refundTags().map(tag => tag.textContent)).toEqual(["部分退款成功"]);
@@ -298,19 +303,78 @@ describe("order list page (task 40)", () => {
     const productHeaders = [...(dialog?.querySelectorAll("thead th") ?? [])].map(item =>
       item.textContent?.trim()
     );
-    expect(productHeaders).toEqual([
-      "商品",
-      "达人",
-      "数量",
-      "单价",
-      "订单总额",
-      "支付金额",
-      "状态"
-    ]);
+    expect(productHeaders).toEqual(["商品", "达人", "单价", "件数", "商品总价", "状态"]);
     expect(element("filter-order-status").element.closest('[data-test="search-more"]')).toBeNull();
     expect(dialog?.querySelector(".el-dialog__body")?.getAttribute("style") ?? "").not.toContain(
       "overflow-x: scroll"
     );
+    wrapper.unmount();
+  });
+
+  it("shows the order-level amounts and the commission items in the drawer (task 112)", async () => {
+    signIn("SUPER_ADMIN", MANAGER);
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...detail,
+      commission: {
+        commissionableAmount: null,
+        rates: ["0.1000", "0.1500"],
+        estimatedCommission: null
+      }
+    });
+    const wrapper = await mountPage();
+    rowButtons("action-view")[0].click();
+    await flushPromises();
+    const block = document.body.querySelector('.order-detail-drawer [data-test="order-amounts"]');
+    const labels = [...(block?.querySelectorAll(".el-descriptions__label") ?? [])].map(item =>
+      item.textContent?.trim()
+    );
+    expect(labels).toEqual([
+      "商品总价",
+      "商品数量",
+      "运费",
+      "订单金额",
+      "优惠",
+      "支付金额",
+      "退款金额",
+      "订单实收",
+      "计佣金额",
+      "佣金比例",
+      "预估佣金",
+      "下单时间",
+      "支付时间"
+    ]);
+    const text = block?.textContent ?? "";
+    expect(text).toContain("¥100.00");
+    // Unverified commission reads 待核实; different line rates are all listed.
+    expect(block?.querySelector('[data-test="order-amounts-commissionable"]')?.textContent).toBe(
+      "待核实"
+    );
+    expect(block?.querySelector('[data-test="order-amounts-rate"]')?.textContent).toBe("10%、15%");
+    wrapper.unmount();
+  });
+
+  it("blanks the goods-based amounts without a unit price and hides commission without permission (task 112)", async () => {
+    signIn("STAFF", ["order:view"]);
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...detail,
+      itemAmount: null,
+      orderAmount: null,
+      discount: null,
+      items: detail.items.map(item => ({ ...item, unitPrice: null, totalAmount: null }))
+    });
+    const wrapper = await mountPage();
+    rowButtons("action-view")[0].click();
+    await flushPromises();
+    const dialog = document.body.querySelector(".order-detail-drawer");
+    const block = dialog?.querySelector('[data-test="order-amounts"]');
+    const text = block?.textContent ?? "";
+    expect(text).toContain("缺失历史售价");
+    expect(text).toContain("¥120.00");
+    expect(block?.querySelectorAll('[data-test="order-amounts-commission-hidden"]')).toHaveLength(
+      1
+    );
+    expect(text).toContain("无权限查看佣金");
+    expect(dialog?.querySelector(".drawer-products tbody")?.textContent).toContain("缺失历史售价");
     wrapper.unmount();
   });
 

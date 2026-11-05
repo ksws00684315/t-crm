@@ -43,9 +43,7 @@ describe("financial drawers and payment registration", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
-    expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain(
-      "申请占用"
-    );
+    expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain("提现中");
     expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain("600.00");
     expect(api.getIncome).toHaveBeenCalledWith("102301", {});
     wrapper.unmount();

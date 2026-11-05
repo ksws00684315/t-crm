@@ -2,6 +2,7 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tcrm.admin.order.model.OrderDO;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -12,6 +13,22 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface OrderMapper extends BaseMapper<OrderDO> {
+  /**
+   * Cumulative sales of one creator (workbench total, task 112): Σ order pay amount — freight
+   * included, refunds not deducted — over the creator's attributed, paid orders. One SQL aggregate;
+   * the tenant predicate comes from the tenant interceptor.
+   */
+  @Select(
+      """
+      SELECT COALESCE(SUM(pay_amount), 0)
+        FROM crm_order
+       WHERE kol_id = #{kolId}
+         AND attribution_status = 'ATTRIBUTED'
+         AND pay_time IS NOT NULL
+         AND is_deleted = FALSE
+      """)
+  BigDecimal sumAttributedPayAmount(@Param("kolId") long kolId);
+
   /**
    * Latest ATTRIBUTED pay_time per KOL (task 25a idle cleanup). Empty {@code kolIds} returns an
    * empty list without querying.

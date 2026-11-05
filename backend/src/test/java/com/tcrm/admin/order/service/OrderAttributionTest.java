@@ -164,4 +164,45 @@ class OrderAttributionTest {
     service.manual(o, List.of(i), 2L, "Confirmed different creator");
     assertThat(i.getKolItemId()).isNull();
   }
+
+  @Test
+  void shouldWriteTheChosenCreatorsItem_whenExactlyOneWasValidAtPayTime() {
+    // Task 112: a manual attribution keeps the line on the creator item page (商品销售额).
+    var o = order();
+    var i = line("90");
+    i.setProductId(55L);
+    when(mappings.findAt(eq(1L), eq("90"), eq(o.getPayTime())))
+        .thenReturn(
+            List.of(new KolItemRefDTO(201L, 2L, 10L, 1L), new KolItemRefDTO(301L, 3L, 10L, 1L)));
+
+    service.manual(o, List.of(i), 3L, "Confirmed");
+
+    assertThat(i.getKolItemId()).isEqualTo(301L);
+    // product_id feeds the commission snapshot and is left alone.
+    assertThat(i.getProductId()).isEqualTo(55L);
+  }
+
+  @Test
+  void shouldLeaveKolItemEmpty_whenTheChosenCreatorHasNoValidItem() {
+    var o = order();
+    var i = line("90");
+    match("90", 2L);
+
+    service.manual(o, List.of(i), 3L, "Confirmed");
+
+    assertThat(i.getKolItemId()).isNull();
+  }
+
+  @Test
+  void shouldLeaveKolItemEmpty_whenTheChosenCreatorHasSeveralValidItems() {
+    var o = order();
+    var i = line("90");
+    when(mappings.findAt(eq(1L), eq("90"), any()))
+        .thenReturn(
+            List.of(new KolItemRefDTO(301L, 3L, 10L, 1L), new KolItemRefDTO(302L, 3L, 11L, 1L)));
+
+    service.manual(o, List.of(i), 3L, "Confirmed");
+
+    assertThat(i.getKolItemId()).isNull();
+  }
 }

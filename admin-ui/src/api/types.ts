@@ -331,7 +331,7 @@ export interface KolItemVO {
   createTime: string;
 }
 
-/** Creator-item detail. `totalPayAmount` uses the same paid-order rule as `payAmount`. */
+/** Creator-item detail. `totalPayAmount` (product sales) and `refundAmount` share the `payAmount` scope (task 112). */
 export interface KolItemDetailVO extends KolItemVO {
   sourceItemUrl: string | null;
   visitCount: string;
@@ -497,11 +497,32 @@ export interface OrderDetailVO {
   payTime: string | null;
   lastSyncTime: string | null;
   createTime: string | null;
+  /** Product total: Σ unit price × quantity; null when any line price is missing. */
   itemAmount: string | null;
-  totalAmount: string;
+  /** Paid amount: order pay amount, freight included. */
   payAmount: string;
   freight: string | null;
+  /** Order amount = product total + freight (task 112); null when the product total is null. */
+  orderAmount: string | null;
+  /** Discount = order amount − paid amount; null when the order amount is null. */
+  discount: string | null;
+  /** Refund amount: successful refunds deduplicated by refund id; "0.00" without refunds. */
+  refundAmount: string;
+  /** Net received = paid amount − refund amount. */
+  netReceived: string | null;
+  /** Order-level commission; null without commission:view or outside the OWN coverage. */
+  commission: OrderDetailCommissionVO | null;
   items: OrderDetailItemVO[];
+}
+
+/** Order-level commission block of the order detail (task 112). */
+export interface OrderDetailCommissionVO {
+  /** Commissionable amount; null while any line is unverified (shown as pending verification). */
+  commissionableAmount: string | null;
+  /** Distinct pay-time rate snapshots; empty when nothing accrued. */
+  rates: string[];
+  /** Estimated commission; null while any line is unverified. */
+  estimatedCommission: string | null;
 }
 
 /** `GET /order/refunds` row (task 40 §3.3). */

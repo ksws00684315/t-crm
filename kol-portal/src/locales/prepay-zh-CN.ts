@@ -1,6 +1,6 @@
 export default {
   number: "预付单号",
-  paidAmount: "实付金额",
+  paidAmount: "付款金额",
   entryType: "流水类型",
   entryAmount: "流水金额",
   occurredAt: "入账时间",

@@ -411,7 +411,7 @@ describe("commission progress (task 92 section 4.1)", () => {
     });
     await page();
     expect(wrapper.get('[data-test="prepay-note"]').text()).toBe(
-      "Advances repaid from commission: ¥200.00. Outstanding: ¥300.00."
+      "Advances deducted: ¥200.00. Pending deduction: ¥300.00."
     );
   });
 

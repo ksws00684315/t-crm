@@ -85,7 +85,7 @@ public class OrderAttribution {
 
   public void manual(OrderDO order, List<OrderItemDO> items, Long kolId, String reason) {
     for (var item : items) {
-      item.setKolItemId(null);
+      item.setKolItemId(manualKolItemId(order, item, kolId));
       item.setKolId(kolId);
       item.setAttributionType(kolId == null ? 3 : 2);
       item.setManualReason(reason);
@@ -97,5 +97,29 @@ public class OrderAttribution {
         kolId == null || order.getPayTime() == null
             ? null
             : ownership.bdAt(kolId, order.getPayTime()));
+  }
+
+  /**
+   * Creator item of a manually attributed line (task 112), so the order still counts toward that
+   * item's 商品销售额. Looked up by shop + Weidian item id + pay time with {@link
+   * OrderMappingApi#findAt}, the same lookup automatic attribution uses, then narrowed to the
+   * chosen creator. Written only when exactly one of that creator's items was valid at pay time;
+   * none, several, a non-KOL decision or an unpaid order leave it null. {@code findAt} returns at
+   * most two rows, so if more than two mappings overlap the chosen creator's item may be cut off
+   * and the line stays null — the safe side. Only {@code kol_item_id} is written: {@code
+   * product_id} feeds the commission snapshot and stays as it was.
+   */
+  private Long manualKolItemId(OrderDO order, OrderItemDO item, Long kolId) {
+    if (kolId == null
+        || order.getPayTime() == null
+        || item.getWeidianItemId() == null
+        || item.getWeidianItemId().isBlank()) {
+      return null;
+    }
+    var own =
+        mappings.findAt(order.getShopId(), item.getWeidianItemId(), order.getPayTime()).stream()
+            .filter(mapping -> kolId.equals(mapping.kolId()))
+            .toList();
+    return own.size() == 1 ? own.getFirst().kolItemId() : null;
   }
 }

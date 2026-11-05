@@ -121,10 +121,10 @@ describe("creator order details", () => {
     for (const label of [
       "订单号",
       "商品名及SKU",
-      "订单金额",
+      "支付金额",
       "支付时间",
       "佣金比例",
-      "佣金金额",
+      "预估佣金",
       "订单状态"
     ]) {
       expect(headers).toContain(label);
@@ -134,7 +134,7 @@ describe("creator order details", () => {
     wrapper.unmount();
   });
 
-  it("explains the amount once above the desktop table and on every phone card", async () => {
+  it("shows the order paid amount with no freight note (task 112)", async () => {
     vi.mocked(getCreatorOrders).mockResolvedValue({
       items: [order, order],
       total: 2,
@@ -142,28 +142,17 @@ describe("creator order details", () => {
       size: 20
     });
     const wrapper = await mountPage();
-    const desktopNotes = wrapper.findAll('[data-test="orders-amount-note"]');
-    expect(desktopNotes).toHaveLength(1);
-    expect(desktopNotes[0].text()).toBe(enUS.orders.amountNote);
-    // The note sits directly above the table, not inside any of its rows.
-    expect(desktopNotes[0].element.nextElementSibling).toBe(wrapper.get(".orders-table").element);
-    expect(wrapper.find(".orders-table .amount-note").exists()).toBe(false);
-    const cardNotes = wrapper.findAll(".order-card .amount-note");
-    expect(cardNotes).toHaveLength(2);
-    expect(cardNotes.every(note => note.text() === enUS.orders.amountNote)).toBe(true);
-    wrapper.unmount();
-  });
-
-  it("shows no amount note without data", async () => {
-    const wrapper = await mountPage();
+    // The amount is the order paid amount, freight included, so the old note is gone.
     expect(wrapper.find('[data-test="orders-amount-note"]').exists()).toBe(false);
+    expect(wrapper.find(".amount-note").exists()).toBe(false);
+    expect(wrapper.find(".orders-table").text()).toContain("Paid Amount");
+    expect(wrapper.find(".orders-table").text()).toContain("Estimated Commission");
     wrapper.unmount();
   });
 
-  it("hides the empty copy, the amount note and the pager when loading fails", async () => {
+  it("hides the empty copy and the pager when loading fails", async () => {
     vi.mocked(getCreatorOrders).mockRejectedValue(new Error("network"));
     const wrapper = await mountPage();
-    expect(wrapper.find('[data-test="orders-amount-note"]').exists()).toBe(false);
     expect(wrapper.text()).toContain(enUS.orders.loadFailed);
     expect(wrapper.text()).not.toContain(enUS.orders.empty);
     expect(wrapper.find(".data-table__empty").exists()).toBe(false);

@@ -4,7 +4,7 @@ export default {
   withdrawalAmount: "Withdrawal amount",
   operationsNote: "Operations notes",
   orderProduct: "Product",
-  orderOccupied: "Reserved amount",
+  orderOccupied: "Withdrawing",
   moneyUnit: "Currency: {currency}",
   ordersPerPage: "{count} orders, {size} per page",
   orderSnapshotNote:
@@ -56,21 +56,21 @@ export default {
   PREPAY: "Creator prepayment",
   period: "Date range",
   currentNote:
-    "Estimated commission, frozen commission and available balance are current totals. Paid amount is the CNY book value for the selected period.",
+    "Total commission, frozen and withdrawable are current totals. Paid amount is the CNY book value for the selected period.",
   paidNote:
-    "Paid amount = commission payments + prepayments. Non-deductible paid prepayments are included for display and are not deducted from commission.",
+    "Paid amount = withdrawn + paid prepayments. Non-deductible paid prepayments are included for display and are not deducted from commission.",
   salesNote:
     "Orders are deduplicated by order payment time. Units count valid sales. Payment type limits payments and matching creators only.",
-  estimated: "Estimated commission",
-  frozen: "Frozen commission",
-  available: "Available to withdraw",
+  estimated: "Total Commission",
+  frozen: "Frozen",
+  available: "Withdrawable",
   paid: "Paid amount",
-  commissionPaid: "Commission payments",
+  commissionPaid: "Withdrawn",
   prepayPaid: "Prepayments",
-  occupied: "Reserved by applications",
-  pendingDeduction: "Prepayment pending offset",
-  deducted: "Prepayment offset applied",
-  cumulativePaid: "Lifetime commission paid",
+  occupied: "Withdrawing",
+  pendingDeduction: "Pending Deduction",
+  deducted: "Deducted",
+  cumulativePaid: "Withdrawn",
   periodPaid: "Actual paid in period",
   creators: "Matching creators",
   orders: "Orders in period",
@@ -87,7 +87,7 @@ export default {
   unverifiedNotice:
     "{count} unverified records are excluded from totals. Their commission is unknown, not zero.",
   balanceNote:
-    "Available = estimated commission − frozen − active reservations − lifetime commission payments − applied prepayment offsets. Balances can be negative. Pending offsets are not deducted again.",
+    "Withdrawable = total commission − frozen − withdrawing − withdrawn − deducted. Balances can be negative. Pending deductions are not deducted again.",
   commissionLines: "Commission ledger",
   payments: "Payment records",
   prepayReadOnly:
@@ -97,11 +97,11 @@ export default {
   product: "Product name",
   image: "Product image",
   sku: "SKU",
-  base: "Commission basis",
-  rate: "Commission rate",
+  base: "Commissionable Amount",
+  rate: "Commission Rate",
   rateVersion: "Historical rate version",
   ruleVersion: "Rule version",
-  commission: "Creator commission",
+  commission: "Estimated Commission",
   adjustment: "Refund adjustment",
   releaseBasis: "Release basis",
   businessAt: "Business time",
@@ -116,7 +116,7 @@ export default {
   deduct: "Offset commission",
   yes: "Deductible",
   no: "Non-deductible",
-  actualAmount: "Actual payment amount",
+  actualAmount: "Payment Amount",
   actualCurrency: "Actual payment currency",
   voucher: "Payment voucher",
   voucherPreview: "View demo voucher",
@@ -201,15 +201,15 @@ export default {
   shop: "Shop",
   shopId: "Shop",
   channel: "Channel",
-  payment: "Payment amount",
-  refund: "Successful refunds",
-  weidianWithdrawable: "Weidian withdrawable",
+  payment: "Paid Amount",
+  refund: "Refund Amount",
+  weidianWithdrawable: "Settled Amount",
   accountStatus: "Ledger status",
   POSTED: "Posted",
   FROZEN: "Frozen",
   multiple: "Multiple",
   weidianWithdrawableNote:
-    "Weidian withdrawable = the sum of the Weidian settlement flows, for reconciliation only; it is not the commission basis. Commission accrues from the order pay amount and can be withdrawn after Weidian confirms settlement. Posted is a ledger state; paid is an application payment state.",
+    "Settled amount = the sum of the shop settlement flows, for reconciliation only; it is not the commissionable amount. Commission accrues from the order paid amount and can be withdrawn after Weidian confirms settlement. Posted is a ledger state; paid is an application payment state.",
   settlementDetail: "Order settlement detail",
   amountType: "Amount type",
   direction: "Direction",
@@ -223,11 +223,11 @@ export default {
   resubmit: "Edit and reapply",
   withdrawConfirm: "Withdraw this application and release its reserved amount?",
   thresholdNote:
-    "Minimum {minimum} CNY; available {available} CNY. Frozen commission, reservations, prepayment offsets and incomplete details affect eligibility.",
+    "Minimum {minimum} CNY; withdrawable {available} CNY. Frozen, withdrawing, deducted prepayments and incomplete details affect eligibility.",
   validAmount: "Enter a positive amount with at most two decimal places",
   belowMinimum: "Amount is below the minimum withdrawal threshold",
   insufficient:
-    "Insufficient available balance. Check frozen commission, reservations and prepayment offsets.",
+    "Insufficient withdrawable balance. Check frozen, withdrawing and deducted prepayments.",
   required: "This field is required",
   invalidEmail: "Enter a valid PayPal email",
   invalidAddress: "Enter a valid USDT address and network",
@@ -245,8 +245,7 @@ export default {
   export: "Export filtered results",
   exportNote: "Exports contain demo data within the current permissions and filters only.",
   estimatedHelp:
-    "Confirmed lifetime net commission, including frozen amounts and refund adjustments, before withdrawals and prepayments",
+    "Net commission of all verified orders, frozen included, with refund adjustments (commission reduced by refunds) applied, before withdrawals and prepayments",
   frozenHelp: "Calculated commission that has not met its release conditions",
-  availableHelp:
-    "Balance after frozen amounts, active reservations, lifetime commission payments and applied prepayment offsets"
+  availableHelp: "Balance after frozen, withdrawing, withdrawn and deducted prepayments"
 };

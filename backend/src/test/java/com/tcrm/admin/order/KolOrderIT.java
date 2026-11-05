@@ -162,9 +162,10 @@ class KolOrderIT {
     mvc.perform(get("/kol-api/orders").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value(2))
-        // Unpaid orders have no pay time and sort first; order numbers stay masked.
+        // Unpaid orders have no pay time and sort first; order numbers stay masked. The order
+        // amount is the order pay amount (task 112), not the sum of the creator's lines.
         .andExpect(jsonPath("$.data.items[0].orderNo").value("W990****0103"))
-        .andExpect(jsonPath("$.data.items[0].payAmount").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].payAmount").value("150.00"))
         .andExpect(jsonPath("$.data.items[1].orderNo").value("W990****0101"))
         .andExpect(jsonPath("$.data.items[1].payAmount").value("150.00"))
         .andExpect(jsonPath("$.data.items[1].refundAmount").value("0.00"))
@@ -223,6 +224,28 @@ class KolOrderIT {
   }
 
   @Test
+  void shouldUseTheOrderPayAmountIncludingFreight_inOrdersAndWorkbench() throws Exception {
+    // Task 112: goods 100 + 50 and freight 10 → the creator sees the order pay amount 160.
+    jdbc.update("UPDATE crm_order SET pay_amount = 160.00, freight = 10.00 WHERE id = 1001");
+    String token = kolLogin("a@example.test");
+
+    mvc.perform(get("/kol-api/orders").param("orderNo", "0101").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].payAmount").value("160.00"));
+    mvc.perform(
+            get("/kol-api/analytics/overview")
+                .param("from", "2026-10-15T00:00:00Z")
+                .param("to", "2026-10-17T00:00:00Z")
+                .header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("160.00"))
+        .andExpect(jsonPath("$.data.daily[0].salesCny").value("160.00"));
+    mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.salesCny").value("160.00"));
+  }
+
+  @Test
   void shouldRejectBadAnalyticsRanges() throws Exception {
     String token = kolLogin("a@example.test");
     mvc.perform(
@@ -241,8 +264,8 @@ class KolOrderIT {
 
   @Test
   void shouldSumTheCumulativeSalesOfTheSignedInCreatorOnly() throws Exception {
-    // Excluded for kolA: another creator's line on the shared order 1001, the unpaid order 1003,
-    // the other company's order 1004, and an unattributed order carrying the creator's id.
+    // Task 112: the total sums order pay amounts (150 each here). Excluded for kolA: the unpaid
+    // order 1003, the other company's order 1004, and an unattributed order carrying the id.
     jdbc.update(
         "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,kol_id,attribution_status,"
             + "order_status,raw_status,order_time,pay_time,total_amount,pay_amount,freight,"
@@ -260,12 +283,12 @@ class KolOrderIT {
 
     mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, tokenA))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("350.00"))
+        .andExpect(jsonPath("$.data.salesCny").value("300.00"))
         .andExpect(jsonPath("$.data.asOf").isNotEmpty());
-    // kolB's 70.00 line sits on kolA's order, so only order 1002 counts for kolB.
+    // kolB's line on kolA's order 1001 does not count; kolB's own order 1002 counts in full.
     mvc.perform(get("/kol-api/analytics/sales-total").header(KOL_TOKEN, tokenB))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("30.00"));
+        .andExpect(jsonPath("$.data.salesCny").value("150.00"));
     mvc.perform(get("/kol-api/analytics/sales-total")).andExpect(status().isUnauthorized());
   }
 
