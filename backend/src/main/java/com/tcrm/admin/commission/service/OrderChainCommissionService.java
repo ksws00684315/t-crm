@@ -7,7 +7,6 @@ import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper.ItemLedgerRow;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper.AllocationOccupationRow;
-import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi;
 import com.tcrm.admin.shared.BusinessException;
@@ -134,14 +133,9 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
 
   /** Pay-time rate of the latest revision per item state; states without revisions stay absent. */
   private Map<Long, BigDecimal> latestRates(List<CommissionItemStateDO> rows) {
-    if (rows.isEmpty()) {
-      return Map.of();
-    }
-    List<Long> stateIds = rows.stream().map(CommissionItemStateDO::getId).toList();
-    Map<Long, BigDecimal> rateByState = new HashMap<>();
-    for (CommissionItemRevisionDO revision : revisions.listLatestByItemStateIds(stateIds)) {
-      rateByState.put(revision.getItemStateId(), revision.getRate());
-    }
+    Map<Long, BigDecimal> rateByState =
+        CommissionRateSnapshots.rateByStateId(
+            revisions, rows.stream().map(CommissionItemStateDO::getId).toList());
     Map<Long, BigDecimal> rateByItem = new HashMap<>();
     for (CommissionItemStateDO row : rows) {
       rateByItem.put(row.getOrderItemId(), rateByState.get(row.getId()));

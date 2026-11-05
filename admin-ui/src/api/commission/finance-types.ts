@@ -112,8 +112,8 @@ export interface WithdrawalOrder {
   products: Pick<Allocation, "id" | "image" | "product" | "sku">[];
   /** Order amount = goods total + freight; null when a line misses its price (task 115, B9). */
   orderAmount: string | null;
-  /** Rate snapshot text of the order's commission lines (task 115, B9). */
-  commissionRate: string | null;
+  /** Distinct rate snapshots of the order's commission lines, ascending (task 115, B9). */
+  rates: string[];
   occupied: string;
   remainingSnapshot: string | null;
 }

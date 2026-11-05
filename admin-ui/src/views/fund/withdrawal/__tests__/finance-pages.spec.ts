@@ -111,7 +111,11 @@ describe("finance admin pages", () => {
     expect(wrapper.findAll('[data-test="income-ledger"]')).toHaveLength(3);
     i18n.global.locale.value = "en-US";
     await flushPromises();
-    expect(wrapper.getComponent(DataTable).props("columns")[8].label).toBe("Total paid");
+    const paidColumn = wrapper
+      .getComponent(DataTable)
+      .props("columns")
+      .find((column: { key: string }) => column.key === "paid");
+    expect(paidColumn?.label).toBe("Total paid");
     wrapper.unmount();
   });
   it("queries from the first page, resets filters and handles failures without stale income", async () => {

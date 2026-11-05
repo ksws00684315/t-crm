@@ -704,9 +704,50 @@ class WithdrawalServiceTest {
     assertThat(page.total()).isEqualTo(1);
     var view = page.items().getFirst();
     assertThat(view.orderAmount()).isEqualTo("530.00");
-    assertThat(view.commissionRate()).isEqualTo("0.1000");
+    assertThat(view.rates()).containsExactly("0.1000");
     assertThat(view.occupied()).isEqualTo("350.00");
     assertThat(view.remainingSnapshot()).isEqualTo("50.00");
+  }
+
+  @Test
+  void shouldListEveryDistinctRateSnapshot_whenAnOrderHasMixedRates() {
+    // Task 115 review: lines of one order may carry different rate snapshots; the portal formats
+    // each one, so the port hands over the distinct values instead of a pre-joined string.
+    when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW"));
+    when(withdrawals.countOrderSnapshots(ID)).thenReturn(1L);
+    when(withdrawals.pageOrderSnapshots(ID, 20, 0L))
+        .thenReturn(
+            List.of(
+                new WithdrawalMapper.OrderSnapshotRow(
+                    903L, 1009L, "W99000109", new BigDecimal("90.00"), null)));
+    when(withdrawals.allocationsOfOrder(ID, "W99000109")).thenReturn(List.of());
+    when(orderItems.listOrderAmounts(List.of(1009L)))
+        .thenReturn(
+            List.of(
+                new OrderItemInfoApi.OrderAmountDTO(
+                    1009L, new BigDecimal("60.00"), BigDecimal.ZERO)));
+    var first = new CommissionItemStateDO();
+    first.setId(3021L);
+    first.setOrderId(1009L);
+    first.setKolId(KOL);
+    var second = new CommissionItemStateDO();
+    second.setId(3022L);
+    second.setOrderId(1009L);
+    second.setKolId(KOL);
+    when(itemStates.listByOrderIds(List.of(1009L))).thenReturn(List.of(first, second));
+    var firstRate = new CommissionItemRevisionDO();
+    firstRate.setItemStateId(3021L);
+    firstRate.setRate(new BigDecimal("0.1200"));
+    var secondRate = new CommissionItemRevisionDO();
+    secondRate.setItemStateId(3022L);
+    secondRate.setRate(new BigDecimal("0.1500"));
+    when(itemRevisions.listLatestByItemStateIds(List.of(3021L, 3022L)))
+        .thenReturn(List.of(firstRate, secondRate));
+
+    var page = service.orders(reviewer("commission:view"), ID, 1, 20);
+
+    // Ascending and deduplicated; the same rate on two lines collapses into one entry.
+    assertThat(page.items().getFirst().rates()).containsExactly("0.1200", "0.1500");
   }
 
   @Test
@@ -729,7 +770,7 @@ class WithdrawalServiceTest {
 
     var view = page.items().getFirst();
     assertThat(view.orderAmount()).isNull();
-    assertThat(view.commissionRate()).isNull();
+    assertThat(view.rates()).isEmpty();
     assertThat(view.remainingSnapshot()).isNull();
   }
 

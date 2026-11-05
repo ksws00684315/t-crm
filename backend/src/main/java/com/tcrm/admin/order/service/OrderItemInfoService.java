@@ -7,10 +7,12 @@ import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,8 +76,8 @@ public class OrderItemInfoService implements OrderItemInfoApi {
     if (freightById.isEmpty()) {
       return List.of();
     }
-    // 商品总价 shares the order detail's basis (task 107): historical unit price × quantity per
-    // line, and any missing line price or quantity blanks the whole order.
+    // 商品总价 shares the order detail's exact formula (task 107 basis; extracted in the task 115
+    // review so both call sites can never drift).
     Map<Long, List<OrderItemDO>> linesByOrder =
         items
             .selectList(
@@ -87,24 +89,12 @@ public class OrderItemInfoService implements OrderItemInfoApi {
                         OrderItemDO::getQuantity)
                     .in(OrderItemDO::getOrderId, freightById.keySet()))
             .stream()
-            .collect(java.util.stream.Collectors.groupingBy(OrderItemDO::getOrderId));
-    List<OrderAmountDTO> result = new java.util.ArrayList<>();
+            .collect(Collectors.groupingBy(OrderItemDO::getOrderId));
+    List<OrderAmountDTO> result = new ArrayList<>();
     for (var entry : freightById.entrySet()) {
       List<OrderItemDO> lines = linesByOrder.getOrDefault(entry.getKey(), List.of());
-      BigDecimal itemAmount =
-          lines.isEmpty()
-                  || lines.stream()
-                      .anyMatch(
-                          line ->
-                              line.getHistoricalUnitPrice() == null || line.getQuantity() == null)
-              ? null
-              : lines.stream()
-                  .map(
-                      line ->
-                          line.getHistoricalUnitPrice()
-                              .multiply(BigDecimal.valueOf(line.getQuantity())))
-                  .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
-      result.add(new OrderAmountDTO(entry.getKey(), itemAmount, entry.getValue()));
+      result.add(
+          new OrderAmountDTO(entry.getKey(), OrderService.goodsTotalOf(lines), entry.getValue()));
     }
     return result;
   }

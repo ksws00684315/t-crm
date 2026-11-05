@@ -193,29 +193,30 @@ public class KolOrderService {
     Map<Long, BigDecimal> payByOrder = new HashMap<>();
     for (OrderDO order : candidates) {
       if (order.getPayAmount() != null) {
-        payByOrder.merge(order.getId(), order.getPayAmount(), BigDecimal::add);
+        // Candidate ids are unique, so one put per order is exact (task 115 review).
+        payByOrder.put(order.getId(), order.getPayAmount());
       }
     }
-    Map<Long, List<RefundDO>> refundsByOrder =
-        refunds
-            .selectList(
-                new LambdaQueryWrapper<RefundDO>()
-                    .select(RefundDO::getOrderId, RefundDO::getAmount, RefundDO::getRefundStatus)
-                    .in(RefundDO::getOrderId, orderIds))
-            .stream()
-            .collect(Collectors.groupingBy(RefundDO::getOrderId));
+    Map<Long, List<RefundDO>> refundsByOrder = new HashMap<>();
+    // Refund rows follow the same chunking as the line queries below (task 115 review).
+    for (int from = 0; from < orderIds.size(); from += SUMMARY_CHUNK) {
+      List<Long> chunk = orderIds.subList(from, Math.min(from + SUMMARY_CHUNK, orderIds.size()));
+      for (RefundDO refund :
+          refunds.selectList(
+              new LambdaQueryWrapper<RefundDO>()
+                  .select(RefundDO::getOrderId, RefundDO::getAmount, RefundDO::getRefundStatus)
+                  .in(RefundDO::getOrderId, chunk))) {
+        refundsByOrder.computeIfAbsent(refund.getOrderId(), k -> new ArrayList<>()).add(refund);
+      }
+    }
     BigDecimal orderSales = BigDecimal.ZERO;
     BigDecimal estimatedRefund = BigDecimal.ZERO;
     for (Long orderId : orderIds) {
       BigDecimal pay = payByOrder.getOrDefault(orderId, BigDecimal.ZERO);
       orderSales = orderSales.add(pay);
       List<RefundDO> refundRows = refundsByOrder.getOrDefault(orderId, List.of());
-      boolean unconcluded =
-          refundRows.stream()
-              .anyMatch(
-                  refund ->
-                      "PROCESSING".equals(refund.getRefundStatus())
-                          || "UNKNOWN".equals(refund.getRefundStatus()));
+      // Same unconcluded-refund rule the commission sync uses for after-sales (task 115 review).
+      boolean unconcluded = OrderCommissionSync.hasUnconcludedRefund(refundRows);
       estimatedRefund =
           estimatedRefund.add(
               unconcluded

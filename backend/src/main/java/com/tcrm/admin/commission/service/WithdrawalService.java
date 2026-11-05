@@ -7,7 +7,6 @@ import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalFreezeMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
-import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.FinanceTaskQuery;
@@ -58,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1049,7 +1049,7 @@ public class WithdrawalService {
           for (OrderAmountDTO amount : orderItems.listOrderAmounts(orderIds)) {
             amountsByOrder.put(amount.orderId(), amount);
           }
-          Map<Long, String> ratesByOrder = orderRates(orderIds);
+          Map<Long, List<String>> ratesByOrder = orderRates(orderIds);
           List<OrderView> items = new ArrayList<>();
           for (WithdrawalMapper.OrderSnapshotRow snapshot : snapshots) {
             List<ProductView> products =
@@ -1076,7 +1076,7 @@ public class WithdrawalService {
                     snapshot.orderNo(),
                     products,
                     orderAmount,
-                    ratesByOrder.get(snapshot.orderId()),
+                    ratesByOrder.getOrDefault(snapshot.orderId(), List.of()),
                     money(snapshot.occupiedCny()),
                     snapshot.remainingSnapshotCny() == null
                         ? null
@@ -1087,37 +1087,30 @@ public class WithdrawalService {
   }
 
   /**
-   * Rate snapshots per order (task 115, B9 佣金比例): the latest revision rate of every live commission
-   * snapshot of the order's lines, joined when they differ.
+   * Rate snapshots per order (task 115, B9 佣金比例): the distinct latest revision rates of the order's
+   * commission lines, ascending; the portal formats and joins them, so mixed-rate orders show every
+   * snapshot instead of failing to parse one joined string.
    */
-  private Map<Long, String> orderRates(List<Long> orderIds) {
-    if (orderIds.isEmpty()) {
+  private Map<Long, List<String>> orderRates(List<Long> orderIds) {
+    List<CommissionItemStateDO> states = itemStates.listByOrderIds(orderIds);
+    if (states.isEmpty()) {
       return Map.of();
     }
-    Map<Long, Set<Long>> stateIdsByOrder = new HashMap<>();
-    for (CommissionItemStateDO state : itemStates.listByOrderIds(orderIds)) {
-      stateIdsByOrder
-          .computeIfAbsent(state.getOrderId(), k -> new java.util.HashSet<>())
-          .add(state.getId());
-    }
-    if (stateIdsByOrder.isEmpty()) {
-      return Map.of();
-    }
-    Map<Long, java.util.TreeSet<String>> ratesByOrder = new HashMap<>();
-    for (CommissionItemRevisionDO revision :
-        itemRevisions.listLatestByItemStateIds(
-            stateIdsByOrder.values().stream().flatMap(java.util.Set::stream).toList())) {
-      for (var entry : stateIdsByOrder.entrySet()) {
-        if (entry.getValue().contains(revision.getItemStateId()) && revision.getRate() != null) {
-          ratesByOrder
-              .computeIfAbsent(entry.getKey(), k -> new java.util.TreeSet<>())
-              .add(revision.getRate().toPlainString());
-        }
+    Map<Long, BigDecimal> rateByState =
+        CommissionRateSnapshots.rateByStateId(
+            itemRevisions, states.stream().map(CommissionItemStateDO::getId).toList());
+    Map<Long, TreeSet<String>> ratesByOrder = new HashMap<>();
+    for (CommissionItemStateDO state : states) {
+      BigDecimal rate = rateByState.get(state.getId());
+      if (rate != null) {
+        ratesByOrder
+            .computeIfAbsent(state.getOrderId(), k -> new TreeSet<>())
+            .add(rate.toPlainString());
       }
     }
-    Map<Long, String> result = new HashMap<>();
+    Map<Long, List<String>> result = new HashMap<>();
     for (var entry : ratesByOrder.entrySet()) {
-      result.put(entry.getKey(), String.join(" / ", entry.getValue()));
+      result.put(entry.getKey(), List.copyOf(entry.getValue()));
     }
     return result;
   }
@@ -1128,7 +1121,7 @@ public class WithdrawalService {
       String orderNo,
       List<ProductView> products,
       String orderAmount,
-      String commissionRate,
+      List<String> rates,
       String occupied,
       String remainingSnapshot) {}
 

@@ -130,7 +130,7 @@ describe("WithdrawalDrawer order columns (task 115, B9/B10)", () => {
       orderNo: "t1023_WD001",
       products: [{ id: "1", image: "", product: "商品甲", sku: "SKU-A" }],
       orderAmount: "530.00",
-      commissionRate: "0.1500",
+      rates: ["0.1500"],
       occupied: "350.00",
       remainingSnapshot: "180.00",
       ...overrides
@@ -179,10 +179,16 @@ describe("WithdrawalDrawer order columns (task 115, B9/B10)", () => {
     wrapper.unmount();
   });
 
+  it("joins every distinct rate snapshot with the localized format on mixed-rate orders", async () => {
+    // Task 115 review: rates[] comes per snapshot; the cell formats each instead of parsing.
+    const wrapper = await mountWithOrders([orderFixture({ rates: ["0.1200", "0.1500"] })]);
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain("12% / 15%");
+    wrapper.unmount();
+  });
+
   it("blanks 订单金额 when a line misses its historical price and shows the rate dash", async () => {
-    const wrapper = await mountWithOrders([
-      orderFixture({ orderAmount: null, commissionRate: null })
-    ]);
+    const wrapper = await mountWithOrders([orderFixture({ orderAmount: null, rates: [] })]);
     const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
     expect(text).toContain(i18n.global.t("finance.missingHistoricalPrice"));
     expect(text).toContain("—");

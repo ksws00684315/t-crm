@@ -473,7 +473,7 @@ public class AdminWithdrawalController {
       String orderNo,
       List<ProductVO> products,
       String orderAmount,
-      String commissionRate,
+      List<String> rates,
       String occupied,
       String remainingSnapshot) {
     static WithdrawalOrderVO from(OrderView order) {
@@ -482,7 +482,7 @@ public class AdminWithdrawalController {
           order.orderNo(),
           order.products().stream().map(ProductVO::from).toList(),
           order.orderAmount(),
-          order.commissionRate(),
+          List.copyOf(order.rates()),
           order.occupied(),
           order.remainingSnapshot());
     }

@@ -255,7 +255,7 @@ export function createFinanceDemo() {
         products: items.map(({ id, image, product, sku }) => ({ id, image, product, sku })),
         // Task 115 (1105 sheet B9): the demo shows a priced order amount and one rate snapshot.
         orderAmount: demoOrderAmounts.get(orderNo) ?? null,
-        commissionRate: demoOrderRates.get(orderNo) ?? null,
+        rates: demoOrderRates.has(orderNo) ? [demoOrderRates.get(orderNo)!] : [],
         occupied: sumMoney(items.map(item => item.occupied)),
         remainingSnapshot: snapshots.size === 1 ? [...snapshots][0] : null
       };

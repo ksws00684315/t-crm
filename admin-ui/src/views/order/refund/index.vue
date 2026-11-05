@@ -93,7 +93,7 @@ const columns = computed<DataColumn[]>(() => [
     key: "commissionStatus",
     label: t("order.refund.commissionStatus"),
     // The after-sales tag sits beside the status; both fit without truncation (2026-11-06 audit).
-    width: canSeeCommission.value ? px(170, 210) : px(140, 210)
+    width: px(canSeeCommission.value ? 170 : 140, 210)
   },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
   { key: "applyTime", label: t("order.refund.applyTime"), width: px(170, 190) },

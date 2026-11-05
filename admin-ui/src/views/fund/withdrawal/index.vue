@@ -53,7 +53,9 @@ const columns = computed<DataColumn[]>(() =>
   ["applicationNo", "kolIdentity", "requestedAmount", "status", "createdAt", "actions"].map(
     key => ({
       key,
-      prop: key,
+      // `prop` reads the row field for the tooltip (row.amount); the display slot is keyed by
+      // `key` so the column keeps its requested-amount wording (task 115 review).
+      prop: key === "requestedAmount" ? "amount" : key,
       label: t(`finance.${key}`),
       minWidth:
         key === "actions"

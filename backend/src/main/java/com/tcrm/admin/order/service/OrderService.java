@@ -300,18 +300,7 @@ public class OrderService {
     // unit price times quantity, and any missing line price blanks both. The source order's
     // total is not reused: OrderNormalizer writes Weidian's total into total_amount and
     // pay_amount alike, so it is the paid figure (freight in, discounts applied), not goods.
-    BigDecimal itemAmount =
-        lines.isEmpty()
-                || lines.stream()
-                    .anyMatch(
-                        line -> line.getHistoricalUnitPrice() == null || line.getQuantity() == null)
-            ? null
-            : lines.stream()
-                .map(
-                    line ->
-                        line.getHistoricalUnitPrice()
-                            .multiply(BigDecimal.valueOf(line.getQuantity())))
-                .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+    BigDecimal itemAmount = goodsTotalOf(lines);
     var orderKol =
         order.getKolId() == null ? null : kolById(List.of(order.getKolId())).get(order.getKolId());
     // Task 112 order-level amounts (amount terms §2), computed here so the UI does no arithmetic:
@@ -382,7 +371,7 @@ public class OrderService {
    */
   private OrderDetailDTO.CommissionDTO detailCommission(
       AccountDTO user, OrderDO order, List<OrderItemDO> lines) {
-    if (!user.effectivePermissions().contains("commission:view") || !ownCoverage(user, lines)) {
+    if (!maySeeCommission(user, ownKolIds(user), lines)) {
       return null;
     }
     var commission =
@@ -509,7 +498,7 @@ public class OrderService {
    */
   private ChainFinance financeBlocks(
       AccountDTO user, OrderDO order, List<OrderItemDO> lines, List<RefundDO> refunds) {
-    if (!user.effectivePermissions().contains("commission:view") || !ownCoverage(user, lines)) {
+    if (!maySeeCommission(user, ownKolIds(user), lines)) {
       return new ChainFinance(null, Map.of(), null);
     }
     var commission =
@@ -564,20 +553,42 @@ public class OrderService {
   }
 
   /**
-   * OWN-scope finance coverage, same basis as the settlement details: at least one line attributed
-   * to the caller's own creators and none attributed to anyone else's; unattributed lines never
-   * block. Non-OWN callers always cover.
+   * Commission visibility gate shared by the order detail, the chain funds and the refund list
+   * (task 115 review, one basis everywhere): {@code commission:view} plus, for OWN scopes, coverage
+   * of the order's lines. Non-OWN callers holding the permission always see the figures.
    */
-  private boolean ownCoverage(AccountDTO user, List<OrderItemDO> lines) {
+  static boolean maySeeCommission(AccountDTO user, Set<Long> ownKolIds, List<OrderItemDO> lines) {
+    return user.effectivePermissions().contains("commission:view")
+        && (!user.ownScope() || coversOwnLines(ownKolIds, lines));
+  }
+
+  /** The caller's own creator ids; empty for non-OWN scopes, whose coverage never blocks. */
+  private Set<Long> ownKolIds(AccountDTO user) {
     if (!user.ownScope()) {
-      return true;
+      return Set.of();
     }
-    Set<Long> ownKolIds =
-        kols.listByBdUserId(user.id()).stream()
-            .map(KolRefDTO::id)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-    return coversOwnLines(ownKolIds, lines);
+    return kols.listByBdUserId(user.id()).stream()
+        .map(KolRefDTO::id)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * 商品总价 of one order's lines (amount terms §2): historical unit price × quantity per line, summed;
+   * any missing price or quantity blanks the whole order (task 107 basis). Shared by the order
+   * detail and the order-item info port (task 115 review).
+   */
+  static BigDecimal goodsTotalOf(List<OrderItemDO> lines) {
+    return lines.isEmpty()
+            || lines.stream()
+                .anyMatch(
+                    line -> line.getHistoricalUnitPrice() == null || line.getQuantity() == null)
+        ? null
+        : lines.stream()
+            .map(
+                line ->
+                    line.getHistoricalUnitPrice().multiply(BigDecimal.valueOf(line.getQuantity())))
+            .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
   }
 
   /**

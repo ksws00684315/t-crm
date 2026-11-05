@@ -169,6 +169,8 @@ public class KolPromotionService {
     if (rateOnly) {
       query
           .eq(KolPromotionRecordDO::getChangeType, PromotionChangeType.CONFIG.name())
+          // Constant SQL fragment on JSONB columns: no parameters, nothing concatenated, so the
+          // 数据库规范 04 §65 no-concatenation rule is met (task 115 review).
           .apply("before_json->'defaultRate' IS DISTINCT FROM after_json->'defaultRate'");
     }
     var result = records.selectPage(new Page<>(page, size), query);

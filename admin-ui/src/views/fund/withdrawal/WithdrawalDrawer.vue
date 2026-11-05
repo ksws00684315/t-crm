@@ -58,7 +58,7 @@ const columns = computed<DataColumn[]>(() => [
     amount: true,
     tooltip: true
   },
-  { key: "commissionRate", label: t("finance.rate"), minWidth: 110 },
+  { key: "rates", label: t("finance.rate"), minWidth: 110 },
   { key: "actualCommission", label: t("finance.actualCommission"), minWidth: 150 },
   { key: "occupied", label: t("finance.orderOccupied"), minWidth: 140, amount: true },
   {
@@ -225,8 +225,8 @@ watch(
                 ? t("finance.missingHistoricalPrice")
                 : formatAmountWithCurrency(row.orderAmount)
             }}</template>
-            <template #cell-commissionRate="{ row }">{{
-              row.commissionRate == null ? "—" : formatRate(row.commissionRate)
+            <template #cell-rates="{ row }">{{
+              row.rates.length ? row.rates.map(formatRate).join(" / ") : "—"
             }}</template>
             <!-- Actual commission waits for the M0 settlement-flow confirmation (amount terms §6 P1). -->
             <template #cell-actualCommission>{{ t("finance.pendingConfirm") }}</template>

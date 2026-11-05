@@ -20,6 +20,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -247,10 +248,6 @@ public class RefundQueryService {
     if (pageOrders.isEmpty()) {
       return result;
     }
-    if (!user.effectivePermissions().contains("commission:view")) {
-      pageOrders.forEach(order -> result.put(order.getId(), CommissionView.HIDDEN));
-      return result;
-    }
     Map<Long, List<OrderItemDO>> linesByOrder =
         items
             .selectList(
@@ -268,14 +265,13 @@ public class RefundQueryService {
             : Set.of();
     Map<Long, List<Long>> visibleByKol = new HashMap<>();
     for (OrderDO order : pageOrders) {
-      if (user.ownScope()
-          && !OrderService.coversOwnLines(
-              ownKolIds, linesByOrder.getOrDefault(order.getId(), List.of()))) {
+      // One gate for every commission surface (task 115 review): commission:view plus OWN
+      // coverage, decided per order by the shared OrderService helper.
+      if (!OrderService.maySeeCommission(
+          user, ownKolIds, linesByOrder.getOrDefault(order.getId(), List.of()))) {
         result.put(order.getId(), CommissionView.HIDDEN);
       } else if (order.getKolId() != null && order.getPayTime() != null) {
-        visibleByKol
-            .computeIfAbsent(order.getKolId(), k -> new java.util.ArrayList<>())
-            .add(order.getId());
+        visibleByKol.computeIfAbsent(order.getKolId(), k -> new ArrayList<>()).add(order.getId());
       }
     }
     for (var entry : visibleByKol.entrySet()) {

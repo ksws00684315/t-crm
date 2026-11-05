@@ -67,11 +67,21 @@ async function load() {
 }
 
 function showUnread() {
-  void router.replace({ query: { ...route.query, view: "unread" } });
+  // Re-clicking the active view re-runs the query (router.replace with the same query would not
+  // trigger the route watch; task 115 review restored that refresh).
+  if (route.query.view !== "unread") {
+    void router.replace({ query: { ...route.query, view: "unread" } });
+  } else {
+    void load();
+  }
 }
 
 function showAll() {
-  void router.replace({ query: { ...route.query, view: "all" } });
+  if (route.query.view !== "all") {
+    void router.replace({ query: { ...route.query, view: "all" } });
+  } else {
+    void load();
+  }
 }
 
 async function markAll() {
