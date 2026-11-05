@@ -1277,7 +1277,6 @@ const zhCN = {
     payTime: "支付时间",
     orderStatus: "订单状态",
     payAmount: "支付金额",
-    refundTotal: "退款金额",
     kol: "达人",
     kolCode: "达人编号",
     kolKeyword: "达人编号/姓名",

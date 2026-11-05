@@ -115,7 +115,11 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
     if (allVerified) {
       commissionable = ZERO;
       for (LineCommissionDTO line : lines) {
-        commissionable = commissionable.add(nz(line.commissionableCny()));
+        if (line.commissionableCny() == null) {
+          commissionable = null;
+          break;
+        }
+        commissionable = commissionable.add(line.commissionableCny());
       }
     }
     return new OrderCommissionChainDTO(

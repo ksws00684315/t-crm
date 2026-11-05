@@ -77,7 +77,7 @@ const enUS = {
     loginStatus: "Account status",
     relationStatus: "Cooperation status",
     rateEffectiveAt: "Rate effective from",
-    commissionRate: "Commission rate",
+    commissionRate: "Commission Rate",
     ratePending: "Pending configuration",
     status: {
       PENDING: "Under review",

@@ -851,7 +851,7 @@ const enUS: MessageSchema = {
     recordChanges: "Changes",
     recordRemark: "Remark",
     field: {
-      defaultRate: "Commission rate",
+      defaultRate: "Commission Rate",
       platforms: "Agent platforms",
       platformAddress: "Platform address",
       inviteCode: "Invitation code",
@@ -1312,7 +1312,6 @@ const enUS: MessageSchema = {
     payTime: "Paid at",
     orderStatus: "Order Status",
     payAmount: "Paid Amount",
-    refundTotal: "Refund Amount",
     kol: "Creator",
     kolCode: "Creator code",
     kolKeyword: "Creator code or name",
@@ -1407,7 +1406,7 @@ const enUS: MessageSchema = {
       orderNo: "Order No.",
       typeColumn: "Refund type",
       statusColumn: "Refund status",
-      amount: "Refund amount",
+      amount: "Refund Amount",
       applyTime: "Applied at",
       finishTime: "Succeeded at",
       detailTitle: "Refund Detail",
@@ -1434,7 +1433,7 @@ const enUS: MessageSchema = {
       image: "Image",
       itemName: "Item",
       unitPrice: "Unit Price",
-      lineRefund: "Refund"
+      lineRefund: "Refund Amount"
     },
     chain: {
       summaryProduct: "Product name",

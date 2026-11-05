@@ -227,6 +227,25 @@ class OrderChainCommissionServiceTest {
   }
 
   @Test
+  void shouldBlankTheOrderCommissionable_whenAVerifiedLineHasNoBasis() {
+    // All lines verified, but one has no source basis so its effective basis is null: the order
+    // total must stay null rather than count that line as 0.
+    var withBasis = state(53L, 23L, true, "7.00");
+    withBasis.setBasisCny(dec("100.00"));
+    withBasis.setBasisIncludesRefund(true);
+    var noBasis = state(54L, 24L, true, "0.00");
+    noBasis.setBasisCny(null);
+    when(states.listByOrderIds(any())).thenReturn(List.of(withBasis, noBasis));
+
+    var chain = service.chainOfOrder(10L, List.of(23L, 24L));
+
+    assertThat(chain.allVerified()).isTrue();
+    assertThat(chain.lines().get(0).commissionableCny()).isEqualByComparingTo("100.00");
+    assertThat(chain.lines().get(1).commissionableCny()).isNull();
+    assertThat(chain.commissionableCny()).isNull();
+  }
+
+  @Test
   void shouldFallBackToEmptyBlocks_whenOrderHasNoItemsOrSnapshots() {
     var empty = service.chainOfOrder(10L, List.of());
     assertThat(empty.netCommissionCny()).isEqualByComparingTo("0.00");

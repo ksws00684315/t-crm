@@ -116,7 +116,9 @@ public class KolOrderService {
                       lines.stream()
                           .filter(item -> order.getId().equals(item.getOrderId()))
                           .toList();
-                  // Task 112: the order pay amount (freight included), not the sum of own lines.
+                  // Task 112: payAmount is order-level (freight included) while refundAmount sums
+                  // the KOL's own lines; showing them side by side is valid only because one order
+                  // belongs to one KOL (design §4.6 premise).
                   BigDecimal payAmount = order.getPayAmount();
                   BigDecimal refundAmount = sum(ownItems);
                   List<CommissionOrderStateApi.ItemCommissionStateDTO> ownStates =
