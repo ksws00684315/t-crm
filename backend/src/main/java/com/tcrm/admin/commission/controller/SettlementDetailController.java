@@ -134,7 +134,8 @@ public class SettlementDetailController {
       String direction,
       String subject,
       String kolId,
-      String kol) {
+      String kol,
+      boolean afterSales) {
     static LineVO from(Line line) {
       return new LineVO(
           String.valueOf(line.id()),
@@ -154,7 +155,8 @@ public class SettlementDetailController {
           line.direction(),
           line.subject(),
           line.kolId() == null ? null : String.valueOf(line.kolId()),
-          line.kol());
+          line.kol(),
+          line.afterSales());
     }
   }
 }

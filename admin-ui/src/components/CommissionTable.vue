@@ -30,10 +30,14 @@ const columns = computed<DataColumn[]>(() =>
         ? { "zh-CN": 210, "en-US": 250 }
         : ["businessAt", "product"].includes(key)
           ? 210
-          : 160,
+          : // Room for the after-sales tag next to the amount (task 113).
+            key === "commission"
+            ? 220
+            : 160,
     amount: ["base", "commission", "adjustment"].includes(key),
     align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
-    tooltip: true
+    // The commission cell carries its own after-sales tooltip; no second overflow tooltip.
+    tooltip: key !== "commission"
   }))
 );
 </script>
@@ -56,9 +60,18 @@ const columns = computed<DataColumn[]>(() =>
     <template #cell-rateVersion="{ row }">{{
       row.rateVersion ?? t("finance.unverified")
     }}</template>
-    <template #cell-commission="{ row }">{{
-      row.commission === null ? t("finance.unverified") : formatPrice(row.commission, "CNY")
-    }}</template>
+    <template #cell-commission="{ row }"
+      >{{ row.commission === null ? t("finance.unverified") : formatPrice(row.commission, "CNY")
+      }}<el-tooltip v-if="row.afterSales" :content="t('finance.afterSalesHint')" placement="top"
+        ><el-tag
+          type="warning"
+          size="small"
+          class="commission-after-sales"
+          data-test="commission-after-sales"
+          >{{ t("finance.afterSalesShort") }}</el-tag
+        ></el-tooltip
+      ></template
+    >
     <template #cell-adjustment="{ row }"
       ><span data-test="commission-adjustment">{{
         row.releaseBasis === "UNVERIFIED" || row.adjustment === null
@@ -74,3 +87,9 @@ const columns = computed<DataColumn[]>(() =>
     <template #cell-businessAt="{ row }">{{ formatInstant(row.businessAt) }}</template>
   </DataTable>
 </template>
+
+<style scoped>
+.commission-after-sales {
+  margin-left: var(--tcrm-space-1);
+}
+</style>

@@ -523,6 +523,8 @@ export interface OrderDetailCommissionVO {
   rates: string[];
   /** Estimated commission; null while any line is unverified. */
   estimatedCommission: string | null;
+  /** The order is in after-sales (task 113): unreleased commission counts 0, released is frozen. */
+  afterSales: boolean;
 }
 
 /** `GET /order/refunds` row (task 40 §3.3). */

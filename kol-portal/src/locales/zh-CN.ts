@@ -217,6 +217,8 @@ const zhCN: MessageSchema = {
     settlementStatus: "订单状态",
     split: "分段",
     splitHint: "该订单包含多个结算状态的佣金分段。",
+    afterSales: "售后处理中",
+    afterSalesHint: "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减",
     settlement: {
       WITHDRAWN: "已提现",
       FROZEN: "冻结中",

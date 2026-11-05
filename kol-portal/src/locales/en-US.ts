@@ -220,6 +220,9 @@ const enUS = {
     settlementStatus: "Order status",
     split: "Split",
     splitHint: "This order contains settlement amounts in more than one state.",
+    afterSales: "After-sales",
+    afterSalesHint:
+      "After-sales in progress: no commission is counted for now; released commission stays frozen and is reduced by the refund amount once the refund succeeds",
     settlement: {
       WITHDRAWN: "Withdrawn",
       FROZEN: "Frozen",

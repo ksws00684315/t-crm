@@ -114,12 +114,41 @@ class CommissionOrderStateServiceTest {
   }
 
   @Test
+  void shouldCarryTheAfterSalesFlagOfTheLine() {
+    // Task 113: the portal shows the after-sales hint from this flag.
+    CommissionItemStateDO open = state(9010L, 5010L, KOL, "0.00", "0.00", true);
+    open.setAfterSales(true);
+    CommissionItemStateDO regular = state(9011L, 5011L, KOL, "10.00", "0.00", true);
+    when(states.listByOrderItemIds(List.of(9010L, 9011L))).thenReturn(List.of(open, regular));
+
+    var result = service.listByOrderItemIds(KOL, List.of(9010L, 9011L));
+
+    assertThat(result)
+        .extracting(CommissionOrderStateApi.ItemCommissionStateDTO::afterSales)
+        .containsExactly(true, false);
+  }
+
+  @Test
+  void shouldShowZeroAccrualOfAnOpenRefundAsFrozenNotNoCommission() {
+    // Task 113: an unreleased line counts 0 while the refund is open; it is frozen pending the
+    // refund, not a line without commission.
+    CommissionItemStateDO open = state(9012L, 5012L, KOL, "0.00", "0.00", true);
+    open.setAfterSales(true);
+    when(states.listByOrderItemIds(List.of(9012L))).thenReturn(List.of(open));
+
+    var result = service.listByOrderItemIds(KOL, List.of(9012L));
+
+    assertThat(result.getFirst().settlementStatus())
+        .isEqualTo(CommissionOrderStateApi.STATUS_FROZEN);
+    assertThat(result.getFirst().commissionAmount()).isZero();
+  }
+
+  @Test
   void shouldMapVerifiedZeroCommissionRowToNoCommissionEvenIfReleasedBefore() {
     // Task 81 PR review (2026-10-30): a fully refunded order is verified with zero commission. It
     // is not pending verification, even when its line was released before the refund.
     CommissionItemStateDO refundedOut = state(9004L, 5004L, KOL, "0.00", "0.00", true);
     CommissionItemStateDO refundedAfterRelease = state(9008L, 5008L, KOL, "0.00", "6.50", true);
-    refundedAfterRelease.setAfterSales(true);
     when(states.listByOrderItemIds(List.of(9004L, 9008L)))
         .thenReturn(List.of(refundedOut, refundedAfterRelease));
 

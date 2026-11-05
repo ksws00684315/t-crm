@@ -5,11 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.api.CommissionItemApi.ItemSourceDTO;
@@ -27,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -190,6 +194,102 @@ class CommissionItemSnapshotServiceTest {
     verify(states).updateById(row.capture());
     assertThat(row.getValue().getReleasedCommissionCny()).isEqualByComparingTo("5.00");
     assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("5.00");
+  }
+
+  @Test
+  void shouldZeroUnreleasedAccrualInAfterSales_andRestoreWhenRefundIsRejected() {
+    // Task 113: pay 100, rate 10%, nothing released.
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertFiveLayers(row, "0.00", "0.00", "0.00");
+
+    syncAfterSales(true);
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("0.00");
+    assertThat(row.getReleaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertThat(row.getVerified()).isTrue();
+    assertFiveLayers(row, "0.00", "0.00", "0.00");
+
+    syncAfterSales(false);
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getReleaseBasis()).isNotEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertFiveLayers(row, "0.00", "0.00", "0.00");
+    verifyNoInteractions(wallet);
+  }
+
+  @Test
+  void shouldKeepReleasedAccrualWithoutAnyLedgerEntryInAfterSales() {
+    // Released 10.00, then a refund opens: the released money stays, frozen, no clawback.
+    CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");
+    existing.setSourceVersion("old");
+    when(states.lockByOrderItemId(9001L)).thenReturn(existing);
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    syncAfterSales(true);
+    ArgumentCaptor<CommissionItemStateDO> row =
+        ArgumentCaptor.forClass(CommissionItemStateDO.class);
+    verify(states).updateById(row.capture());
+    assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getValue().getReleasedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getValue().getReleaseBasis())
+        .isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    // Wallet still 10.00 (no entry): 累计 10 = 冻结 10 + 可提现 0 + 提现中 0 + 已提现 0.
+    assertFiveLayers(row.getValue(), "10.00", "0.00", "0.00");
+    verifyNoInteractions(wallet);
+  }
+
+  @Test
+  void shouldTakeTheWalletNegativeOnlyWhenThePartialRefundSucceedsAfterWithdrawal() {
+    // Task 113 §4.1: released 10.00 and withdrawn (paid 10.00, wallet 0.00). The refund opens:
+    // nothing is clawed back. Refund 30 succeeds: accrual 7.00, −3.00 posted, wallet −3.00.
+    CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");
+    existing.setSourceVersion("old");
+    when(states.lockByOrderItemId(9001L)).thenReturn(existing);
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    assertFiveLayers(existing, "0.00", "0.00", "10.00");
+
+    syncAfterSales(true);
+    verifyNoInteractions(wallet);
+    assertThat(existing.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertFiveLayers(existing, "0.00", "0.00", "10.00");
+
+    syncRefund(new BigDecimal("30.00"));
+    ArgumentCaptor<BigDecimal> delta = ArgumentCaptor.forClass(BigDecimal.class);
+    verify(wallet)
+        .postCommissionAdjustment(
+            eq(TENANT),
+            eq(KOL_A),
+            eq(existing.getId()),
+            any(String.class),
+            delta.capture(),
+            eq(NOW));
+    BigDecimal balance = new BigDecimal("0.00").add(delta.getValue());
+    assertThat(balance).isEqualByComparingTo("-3.00");
+    assertThat(existing.getAccruedCommissionCny()).isEqualByComparingTo("7.00");
+    // 累计 7 = 冻结 0 + 可提现 −3 + 提现中 0 + 已提现 10.
+    assertFiveLayers(existing, "-3.00", "0.00", "10.00");
+  }
+
+  @Test
+  void shouldDeductReleasedCommissionOnlyWhenThePartialRefundSucceeds() {
+    // Released 10.00 → refund open (no entry) → refund 30 succeeds → 7.00, clawback −3.00.
+    CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");
+    existing.setSourceVersion("old");
+    when(states.lockByOrderItemId(9001L)).thenReturn(existing);
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    syncAfterSales(true);
+    verifyNoInteractions(wallet);
+    syncRefund(new BigDecimal("30.00"));
+    verify(wallet)
+        .postCommissionAdjustment(
+            eq(TENANT),
+            eq(KOL_A),
+            eq(existing.getId()),
+            any(String.class),
+            eq(new BigDecimal("-3.00")),
+            eq(NOW));
+    assertThat(existing.getAccruedCommissionCny()).isEqualByComparingTo("7.00");
+    assertThat(existing.getReleasedCommissionCny()).isEqualByComparingTo("7.00");
+    assertFiveLayers(existing, "7.00", "0.00", "0.00");
   }
 
   @Test
@@ -466,6 +566,31 @@ class CommissionItemSnapshotServiceTest {
         ArgumentCaptor.forClass(CommissionItemStateDO.class);
     verify(states).insert(inserted.capture());
     verify(pauses).pauseForItem(inserted.getValue().getId());
+  }
+
+  /**
+   * 累计佣金 = 冻结中 + 可提现 + 提现中 + 已提现 (design §4.8.2) for a creator holding only this line, computed
+   * with the real {@link WithdrawalFundingSource} available / frozen-shortfall algorithm. The
+   * allocatable amount follows the funding SQL: released, not in after-sales, minus every
+   * occupation including paid ones.
+   */
+  private static void assertFiveLayers(
+      CommissionItemStateDO row, String balance, String activeOccupied, String paid) {
+    BigDecimal wallet = new BigDecimal(balance);
+    BigDecimal occupied = new BigDecimal(activeOccupied);
+    BigDecimal withdrawn = new BigDecimal(paid);
+    BigDecimal accrued = row.getAccruedCommissionCny();
+    BigDecimal released = row.getReleasedCommissionCny();
+    BigDecimal allocatable =
+        Boolean.TRUE.equals(row.getAfterSales())
+            ? BigDecimal.ZERO.setScale(2)
+            : released.subtract(occupied).subtract(withdrawn).max(BigDecimal.ZERO.setScale(2));
+    WithdrawalFundingSource funding = mock(WithdrawalFundingSource.class, CALLS_REAL_METHODS);
+    doReturn(Map.of(KOL_A, allocatable)).when(funding).allocatableByKol(any());
+    BigDecimal available = funding.availableCny(KOL_A, wallet, occupied);
+    BigDecimal frozen =
+        accrued.subtract(released).add(funding.frozenShortfallCny(KOL_A, wallet, occupied));
+    assertThat(frozen.add(available).add(occupied).add(withdrawn)).isEqualByComparingTo(accrued);
   }
 
   /** Registers line 9001 and makes later syncs of the test find the row it created. */

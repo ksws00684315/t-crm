@@ -18,6 +18,7 @@ const order: CreatorOrder = {
   orderStatus: "PAID",
   settlementStatus: "WITHDRAWABLE",
   payAmount: "128.00",
+  afterSales: false,
   refundAmount: "8.00",
   items: [
     {
@@ -74,6 +75,38 @@ describe("creator order details", () => {
     });
     const wrapper = await mountPage();
     expect(wrapper.get('[data-test="order-rates"]').text()).toBe("15.00% / 10.00%");
+    wrapper.unmount();
+  });
+  it("explains a zero commission while the order is in after-sales (task 113)", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({
+      items: [
+        {
+          ...order,
+          settlementStatus: "NO_COMMISSION",
+          afterSales: true,
+          items: [
+            { ...order.items[0], commissionAmount: "0.00", settlementStatus: "NO_COMMISSION" }
+          ]
+        }
+      ],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.find(".orders-table").text()).toContain("¥0.00");
+    expect(wrapper.get('[data-test="order-after-sales"]').text()).toBe("After-sales");
+    wrapper.unmount();
+  });
+  it("shows no after-sales tag once the refund concludes", async () => {
+    vi.mocked(getCreatorOrders).mockResolvedValue({
+      items: [{ ...order, afterSales: false }],
+      total: 1,
+      page: 1,
+      size: 20
+    });
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="order-after-sales"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it("adds item commissions exactly instead of with floats", async () => {

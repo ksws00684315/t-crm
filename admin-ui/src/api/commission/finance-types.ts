@@ -68,7 +68,8 @@ export interface CommissionLine {
   businessAt: string;
   direction: "CREDIT" | "DEBIT";
   subject: string;
-  kol: string;
+  kol: string; /** The order is in after-sales (task 113), verified or not: the line shows the hint. */
+  afterSales: boolean;
 }
 export interface Payment {
   withdrawalId?: string;

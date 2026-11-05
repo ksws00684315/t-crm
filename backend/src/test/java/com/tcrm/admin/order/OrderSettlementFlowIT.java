@@ -413,6 +413,65 @@ class OrderSettlementFlowIT {
   }
 
   @Test
+  void shouldZeroUnreleasedAccrualWhileRefundIsOpenAndRestoreWhenRejected() throws Exception {
+    // Task 113 (定稿 §2.1): confirmed but not released yet (accrual 0.40 / 0.20). An open refund on
+    // line A puts the whole order in after-sales: both lines accrue 0, nothing is posted.
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+
+    long refundId = insertRefund(itemA, "PROCESSING");
+    syncOrderFromDb();
+    for (long item : new long[] {itemA, itemB}) {
+      assertThat(itemField(item, "after_sales")).isEqualTo(true);
+      assertThat(itemField(item, "verified")).isEqualTo(true);
+      assertThat(itemField(item, "release_basis")).isEqualTo("AFTER_SALES");
+      assertThat(itemField(item, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.00"));
+    }
+    assertThat(orderField("commission_basis_reason")).isNull();
+    // The release job leaves after-sales lines alone.
+    releaseJob.releaseDue();
+    assertThat(walletBalanceOrZero()).isEqualByComparingTo("0.00");
+
+    // Rejected (CLOSED, the standard status RefundDictionary maps rejections to after M0): the
+    // regular rule applies again and the release follows the original basis.
+    setRefundStatus(refundId, "CLOSED");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemA, "release_basis")).isEqualTo("CONFIRMED");
+    releaseJob.releaseDue();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+    assertThat(adjustmentCount()).isZero();
+  }
+
+  @Test
+  void shouldKeepReleasedAccrualFrozenWhileRefundIsOpenAndDeductOnlyOnSuccess() throws Exception {
+    // Released 0.40 / 0.20, then a refund opens on line A: nothing is clawed back.
+    stubIncomeDetail(incomeRow("600"));
+    assertThat(pullSucceeds()).isTrue();
+    releaseJob.releaseDue();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+
+    long refundId = insertRefund(itemA, "UNKNOWN");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.40"));
+    assertThat(itemField(itemB, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemB, "release_basis")).isEqualTo("AFTER_SALES");
+    assertThat(adjustmentCount()).isZero();
+    assertThat(walletBalance()).isEqualByComparingTo("0.60");
+
+    // The refund of 2.00 on line A succeeds: (4.00 − 2.00) × 10% = 0.20, so 0.20 is clawed back.
+    setRefundStatus(refundId, "SUCCESS");
+    setItemRefund(itemA, "2.00");
+    syncOrderFromDb();
+    assertThat(itemField(itemA, "accrued_commission_cny")).isEqualTo(new BigDecimal("0.20"));
+    assertThat(itemField(itemA, "after_sales")).isEqualTo(false);
+    assertThat(adjustmentCount()).isEqualTo(1);
+    assertThat(walletBalance()).isEqualByComparingTo("0.40");
+  }
+
+  @Test
   void shouldPostEveryWalletChangeOnceWhenRefundFlipsFingerprintBack() throws Exception {
     stubIncomeDetail(incomeRow("600"));
     assertThat(pullSucceeds()).isTrue();

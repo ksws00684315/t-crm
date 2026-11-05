@@ -667,6 +667,16 @@ final class ChainWorld {
         orderId());
   }
 
+  /** The creator's wallet balance; a missing wallet row reads as zero. */
+  BigDecimal walletBalance() {
+    List<BigDecimal> balances =
+        jdbc.queryForList(
+            "SELECT balance_cny FROM crm_commission_wallet WHERE kol_id = ?",
+            BigDecimal.class,
+            kolId);
+    return balances.isEmpty() ? BigDecimal.ZERO : balances.getFirst();
+  }
+
   List<Map<String, Object>> ledger() {
     return jdbc.queryForList(
         "SELECT entry_type, amount_cny FROM crm_commission_ledger WHERE kol_id = ?"

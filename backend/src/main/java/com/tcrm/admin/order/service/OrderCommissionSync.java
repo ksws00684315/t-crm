@@ -13,10 +13,8 @@ import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.order.service.SettlementBasisCalculator.BasisOutcome;
 import com.tcrm.admin.shared.TransactionalEvents;
 import java.math.BigDecimal;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -56,7 +54,7 @@ public class OrderCommissionSync {
     if (order == null || items == null || items.isEmpty()) {
       return;
     }
-    Set<Long> afterSalesItems = afterSalesItems(order.getId());
+    boolean afterSales = hasUnconcludedRefund(order.getId());
     List<OrderSettlementFlowDO> flows =
         settlementFlows.listByRemoteOrderId(order.getShopId(), order.getWeidianOrderId());
     BasisOutcome basis = SettlementBasisCalculator.compute(order, items, flows);
@@ -77,14 +75,14 @@ public class OrderCommissionSync {
     }
     persistOutcome(order, basis);
     List<OrderItemsCommissionEvent.ItemFacts> facts =
-        items.stream().map(item -> toFacts(order, item, basis, afterSalesItems)).toList();
+        items.stream().map(item -> toFacts(order, item, basis, afterSales)).toList();
     TransactionalEvents.publish(
         events,
         new OrderItemsCommissionEvent(order.getId(), order.getShopId(), order.getPayTime(), facts));
   }
 
   private OrderItemsCommissionEvent.ItemFacts toFacts(
-      OrderDO order, OrderItemDO item, BasisOutcome basis, Set<Long> afterSalesItems) {
+      OrderDO order, OrderItemDO item, BasisOutcome basis, boolean afterSales) {
     BigDecimal lineBasis = basis.lineBasis().get(item.getId());
     String settlementState;
     if (order.getPayTime() == null) {
@@ -112,7 +110,7 @@ public class OrderCommissionSync {
         // FALLBACK branch stays unused until a real source exists (design §5: the time is never
         // inferred when the API does not provide it).
         /* completedTime */ null,
-        afterSalesItems.contains(item.getId()),
+        afterSales,
         basis.reason());
   }
 
@@ -163,22 +161,21 @@ public class OrderCommissionSync {
   }
 
   /**
-   * Items with an unconcluded refund block release (PROCESSING / UNKNOWN, §8.4). A successful
-   * refund is already netted from the basis, so it no longer blocks (task 81 PR review,
-   * 2026-10-30).
+   * Whether the order is in after-sales: any refund row of the order is unconcluded (PROCESSING /
+   * UNKNOWN, §8.4), whether or not it maps to a single line. One order belongs to one creator, so
+   * the whole order is judged at once (task 113, 定稿 §2.1, owner 2026-11-05): every line blocks
+   * release and new withdrawal occupation, and unreleased commission counts 0 until the refund
+   * concludes. A successful refund is already netted from the basis, so it no longer blocks (task
+   * 81 PR review, 2026-10-30); CLOSED never blocks. Until M0 maps the real Weidian raw values,
+   * every raw status other than 10 is UNKNOWN (design §8.1a).
    */
-  private Set<Long> afterSalesItems(long orderId) {
-    List<RefundDO> rows =
-        refunds.selectList(
+  private boolean hasUnconcludedRefund(long orderId) {
+    return !refunds
+        .selectList(
             new LambdaQueryWrapper<RefundDO>()
-                .select(RefundDO::getOrderItemId)
+                .select(RefundDO::getId)
                 .eq(RefundDO::getOrderId, orderId)
-                .in(RefundDO::getRefundStatus, "PROCESSING", "UNKNOWN")
-                .isNotNull(RefundDO::getOrderItemId));
-    Set<Long> ids = new HashSet<>();
-    for (RefundDO row : rows) {
-      ids.add(row.getOrderItemId());
-    }
-    return ids;
+                .in(RefundDO::getRefundStatus, "PROCESSING", "UNKNOWN"))
+        .isEmpty();
   }
 }

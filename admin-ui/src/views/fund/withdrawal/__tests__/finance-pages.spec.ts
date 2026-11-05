@@ -348,6 +348,40 @@ describe("finance admin pages", () => {
     expect(wrapper.get('[data-test="commission-adjustment"]').text()).toBe("待核实");
     wrapper.unmount();
   });
+  it("tags an after-sales commission line with the reason (task 113)", async () => {
+    const demo = createFinanceDemo();
+    const incomeId = demo.listIncome("SUPER_ADMIN", "data", {}).items[0]!.id;
+    const demoLines = demo.incomeDetail("SUPER_ADMIN", "data", incomeId, {}).lines;
+    const wrapper = mount(CommissionTable, {
+      global,
+      props: {
+        rows: [
+          {
+            ...demoLines[0],
+            releaseBasis: "AFTER_SALES",
+            commission: "0.00",
+            base: "0.00",
+            afterSales: true
+          },
+          // An unverified line of an order in after-sales still carries the hint (PR #206).
+          {
+            ...demoLines[0],
+            id: `${demoLines[0].id}-u`,
+            releaseBasis: "UNVERIFIED",
+            commission: null,
+            afterSales: true
+          },
+          { ...demoLines[0], id: `${demoLines[0].id}-b`, releaseBasis: "CONFIRMED" }
+        ],
+        tableId: "after-sales-line"
+      }
+    });
+    await flushPromises();
+    const tags = wrapper.findAll('[data-test="commission-after-sales"]');
+    expect(tags).toHaveLength(2);
+    expect(tags[0].text()).toBe("售后处理中");
+    wrapper.unmount();
+  });
   it.each([ConfigPage, SettlementPage, TasksPage])(
     "presents API errors and stops loading for %s",
     async component => {

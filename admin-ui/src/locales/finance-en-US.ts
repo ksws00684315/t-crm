@@ -84,6 +84,9 @@ export default {
   view: "View",
   refresh: "Refresh",
   unverified: "Needs verification",
+  afterSalesShort: "After-sales",
+  afterSalesHint:
+    "After-sales in progress: no commission is counted for now; released commission stays frozen and is reduced by the refund amount once the refund succeeds",
   unverifiedNotice:
     "{count} unverified records are excluded from totals. Their commission is unknown, not zero.",
   balanceNote:

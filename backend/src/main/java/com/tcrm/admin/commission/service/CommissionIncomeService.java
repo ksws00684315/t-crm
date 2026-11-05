@@ -152,7 +152,8 @@ public class CommissionIncomeService {
       String direction,
       String subject,
       Long kolId,
-      String kol) {}
+      String kol,
+      boolean afterSales) {}
 
   /** Payment row of the income detail: a paid withdrawal or a prepay payment. */
   public record PaymentLine(
@@ -426,7 +427,8 @@ public class CommissionIncomeService {
               adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
-              kol.name()));
+              kol.name(),
+              Boolean.TRUE.equals(row.getAfterSales())));
     }
     return lines;
   }
@@ -612,12 +614,11 @@ public class CommissionIncomeService {
 
   /**
    * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
-   * accrual is computed from — not the raw source basis. Null when the source has no basis.
+   * accrual is computed from — not the raw source basis; 0.00 for unreleased lines of an order in
+   * after-sales (task 113). Null when the source has no basis.
    */
   private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value =
-        CommissionSettlementRules.effectiveBasis(
-            row.getBasisCny(), row.getBasisIncludesRefund(), row.getSuccessfulRefundCny());
+    BigDecimal value = CommissionSettlementRules.commissionable(row);
     return value == null ? null : value.toPlainString();
   }
 }

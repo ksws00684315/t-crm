@@ -36,6 +36,7 @@ const demoOrders: CreatorOrder[] = [
     orderStatus: "COMPLETED",
     settlementStatus: "WITHDRAWABLE",
     payAmount: "1280.00",
+    afterSales: false,
     refundAmount: "0.00",
     items: [
       {
@@ -56,6 +57,7 @@ const demoOrders: CreatorOrder[] = [
     orderStatus: "RECEIVED",
     settlementStatus: "FROZEN",
     payAmount: "860.00",
+    afterSales: false,
     refundAmount: "0.00",
     items: [
       {
@@ -76,6 +78,7 @@ const demoOrders: CreatorOrder[] = [
     orderStatus: "COMPLETED",
     settlementStatus: "WITHDRAWING",
     payAmount: "540.00",
+    afterSales: false,
     refundAmount: "0.00",
     items: [
       {
@@ -96,6 +99,7 @@ const demoOrders: CreatorOrder[] = [
     orderStatus: "CLOSED",
     settlementStatus: "NO_COMMISSION",
     payAmount: "320.00",
+    afterSales: false,
     refundAmount: "320.00",
     items: [
       {
@@ -116,6 +120,7 @@ const demoOrders: CreatorOrder[] = [
     orderStatus: "COMPLETED",
     settlementStatus: "WITHDRAWN",
     payAmount: "960.00",
+    afterSales: false,
     refundAmount: "0.00",
     items: [
       {
@@ -250,6 +255,8 @@ export interface CreatorOrder {
   payAmount: string;
   refundAmount: string;
   items: CreatorOrderLine[];
+  /** The order is in after-sales (task 113): unreleased commission counts 0, released is frozen. */
+  afterSales: boolean;
 }
 
 export interface CreatorOrderPage {
