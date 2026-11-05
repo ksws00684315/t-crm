@@ -10,7 +10,6 @@ import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
 import { routes } from "@/router/routes";
 import { useLocaleStore } from "@/stores/locale";
-import { useMenuSearchStore } from "@/stores/menu-search";
 import { SIDEBAR_STORAGE_KEY } from "@/utils/sidebar";
 import Layout from "../index.vue";
 
@@ -70,7 +69,7 @@ describe("layout header (task 32 §2.4)", () => {
       expect(wrapper.find(`[data-test="${removed}"]`).exists()).toBe(false);
     }
     // What the owner kept: menu search, bell, locale, company switch, user menu, tab bar.
-    expect(wrapper.find('[data-test="menu-search"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="menu-search"]').exists()).toBe(false);
     expect(wrapper.findComponent({ name: "NotificationBell" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "LocaleSwitch" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "TabBar" }).exists()).toBe(true);
@@ -229,7 +228,7 @@ describe("layout tenant label", () => {
       "var(--tcrm-sidebar-collapsed)"
     );
     expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe("1");
-    expect(wrapper.text()).toContain("搜索菜单");
+    expect(wrapper.text()).not.toContain("搜索菜单");
   });
 
   it("does not throw when the sidebar preference cannot be saved", async () => {
@@ -296,30 +295,6 @@ describe("layout tenant label", () => {
     expect(wrapper.text()).toContain("达人管理");
     expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBeNull();
     expect(wrapper.find("[data-test=fullscreen]").exists()).toBe(false);
-  });
-
-  it("opens menu search from the header button", async () => {
-    storeState.user = {
-      id: "1",
-      username: "alice",
-      nickname: "Alice",
-      email: null,
-      role: "SUPER_ADMIN",
-      postTemplate: null,
-      permissions: [],
-      dataScope: "ALL",
-      tenantId: "1",
-      tenantName: "北美公司",
-      status: 1,
-      lastLoginTime: null,
-      createTime: "2026-10-05T00:00:00Z"
-    } satisfies UserVO;
-    const router = createRouter({ history: createMemoryHistory(), routes });
-    const wrapper = mount(Layout, {
-      global: { plugins: [ElementPlus, i18n, router], stubs: { RouterView: true } }
-    });
-    await wrapper.get("[data-test=menu-search]").trigger("click");
-    expect(useMenuSearchStore().visible).toBe(true);
   });
 });
 

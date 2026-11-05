@@ -144,6 +144,7 @@ export default {
   kolId: "Creator ID",
   bdName: "BD name",
   assignedBd: "Assigned BD",
+  requestedAmount: "Requested amount",
   amount: "Amount",
   status: "Status",
   createdAt: "Application time",

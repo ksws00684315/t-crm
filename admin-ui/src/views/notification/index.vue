@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Avatar, Bell, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -25,6 +25,7 @@ defineOptions({ name: "NotificationPage" });
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const user = useUserStore();
 const access = computed(() => accessOf(user.user));
 
@@ -108,7 +109,11 @@ function onPage(next: number) {
   void load();
 }
 
-onMounted(load);
+watch(
+  () => route.query.view,
+  view => (view === "all" ? showAll() : showUnread()),
+  { immediate: true }
+);
 </script>
 
 <template>

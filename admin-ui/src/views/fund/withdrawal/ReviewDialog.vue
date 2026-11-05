@@ -69,7 +69,7 @@ async function submit(next: "APPROVE" | "REJECT") {
   <el-dialog
     :model-value="modelValue"
     :title="t(`finance.${stage}`)"
-    width="min(940px, calc(100vw - 32px))"
+    width="min(1080px, calc(100vw - 32px))"
     align-center
     class="withdrawal-review-dialog"
     :close-on-click-modal="false"
@@ -89,7 +89,7 @@ async function submit(next: "APPROVE" | "REJECT") {
         <el-descriptions-item :label="t('finance.assignedBd')">{{
           withdrawal.bdName || "—"
         }}</el-descriptions-item>
-        <el-descriptions-item :label="t('finance.amount')">{{
+        <el-descriptions-item :label="t('finance.requestedAmount')">{{
           formatAmountWithCurrency(withdrawal.amount, withdrawal.currency)
         }}</el-descriptions-item>
         <el-descriptions-item :label="t('finance.createdAt')">{{
@@ -150,7 +150,7 @@ async function submit(next: "APPROVE" | "REJECT") {
 }
 .review-steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   list-style: none;
   margin: 0;
   padding: 0;
@@ -188,7 +188,7 @@ async function submit(next: "APPROVE" | "REJECT") {
   line-height: 1.3;
 }
 .application-info :deep(.el-descriptions__cell) {
-  padding: 8px 12px;
+  padding: var(--tcrm-space-3) var(--tcrm-space-4);
 }
 .review-content :deep(.el-form-item) {
   margin-bottom: 0;

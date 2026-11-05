@@ -148,7 +148,7 @@ function changeLine(diff: { key: string; from: string; to: string }): string {
 
 function visibleChanges(record: PromotionRecordVO) {
   return promotionFieldDiffs(record.before, record.after).filter(
-    diff => diff.key !== "inviteCode" && diff.key !== "platformAddress"
+    diff => diff.key === "defaultRate"
   );
 }
 
@@ -362,7 +362,7 @@ function onRecordsSize(size: number): void {
           <DataTable
             plain
             table-id="kol-commission-records"
-            :rows="records"
+            :rows="records.filter(record => visibleChanges(record).length > 0)"
             :columns="recordColumns"
             :failed="recordsFailed"
             :total="recordsTotal"

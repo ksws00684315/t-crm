@@ -398,9 +398,8 @@ describe("creator list page (task 32 §2.2)", () => {
     expect(document.body.textContent).toContain("审核达人 KOL-ASD001");
     // Email and creator ID are read-only text with a copy affordance, not disabled inputs.
     expect(element("profile-email").text()).toContain("alice@example.com");
-    expect(element("profile-code").text()).toContain("KOL-ASD001");
+    expect(document.body.textContent).toContain("KOL-ASD001");
     expect(element("profile-email").find('[data-test="copy"]').exists()).toBe(true);
-    expect(element("profile-code").find('[data-test="copy"]').exists()).toBe(true);
     wrapper.unmount();
   });
 

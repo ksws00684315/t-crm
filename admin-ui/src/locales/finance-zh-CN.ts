@@ -134,6 +134,7 @@ export default {
   kolId: "达人ID",
   bdName: "商务名",
   assignedBd: "所属商务",
+  requestedAmount: "申请金额",
   amount: "金额",
   status: "状态",
   createdAt: "申请时间",

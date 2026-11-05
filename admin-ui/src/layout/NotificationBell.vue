@@ -166,7 +166,7 @@ async function openItem(item: NotificationVO) {
           type="primary"
           text
           data-test="notification-view-all"
-          @click="router.push('/notifications')"
+          @click="router.push({ path: '/notifications', query: { view: 'all' } })"
         >
           {{ t("notification.viewAll") }}
         </el-button>

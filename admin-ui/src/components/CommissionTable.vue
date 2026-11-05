@@ -6,7 +6,12 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
 import { formatRate } from "@/utils/rate";
 import { formatInstant, formatPrice } from "@/utils/format";
-defineProps<{ rows: CommissionLine[]; tableId: string; settlement?: boolean }>();
+const props = defineProps<{
+  rows: CommissionLine[];
+  tableId: string;
+  settlement?: boolean;
+  compactLedger?: boolean;
+}>();
 const { t } = useI18n();
 const columns = computed<DataColumn[]>(() =>
   [
@@ -21,20 +26,22 @@ const columns = computed<DataColumn[]>(() =>
     "adjustment",
     "releaseBasis",
     "businessAt"
-  ].map(key => ({
-    key,
-    prop: key,
-    label: t(`finance.${key}`),
-    minWidth:
-      key === "releaseBasis"
-        ? { "zh-CN": 210, "en-US": 250 }
-        : ["businessAt", "product"].includes(key)
-          ? 210
-          : 160,
-    amount: ["base", "commission", "adjustment"].includes(key),
-    align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
-    tooltip: true
-  }))
+  ]
+    .filter(key => !props.compactLedger || !["itemId", "rateVersion", "ruleVersion"].includes(key))
+    .map(key => ({
+      key,
+      prop: key,
+      label: t(`finance.${key}`),
+      minWidth:
+        key === "releaseBasis"
+          ? { "zh-CN": 210, "en-US": 250 }
+          : ["businessAt", "product"].includes(key)
+            ? 210
+            : 160,
+      amount: ["base", "commission", "adjustment"].includes(key),
+      align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
+      tooltip: true
+    }))
 );
 </script>
 <template>

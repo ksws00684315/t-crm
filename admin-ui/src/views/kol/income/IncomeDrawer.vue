@@ -104,7 +104,7 @@ const paymentColumns = computed<DataColumn[]>(() =>
         <p>{{ t("finance.paidNote") }}</p>
         <el-tabs v-model="tab">
           <el-tab-pane :label="t('finance.commissionLines')" name="commission"
-            ><CommissionTable :rows="detail.lines" table-id="finance-income-ledger"
+            ><CommissionTable :rows="detail.lines" table-id="finance-income-ledger" compact-ledger
           /></el-tab-pane>
           <el-tab-pane :label="t('finance.payments')" name="payments">
             <p>{{ t("finance.prepayReadOnly") }}</p>

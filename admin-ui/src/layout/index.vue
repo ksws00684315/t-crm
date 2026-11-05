@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDown, Check, Expand, Fold, Search } from "@element-plus/icons-vue";
+import { ArrowDown, Check, Expand, Fold } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -8,21 +8,13 @@ import { translate } from "@/locales";
 import { routes } from "@/router/routes";
 import { useCompanySync } from "@/composables/useCompanySync";
 import { useLocaleStore } from "@/stores/locale";
-import { useMenuSearchStore } from "@/stores/menu-search";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
-import { flattenMenu, rememberRecentMenu } from "@/utils/menu-search";
 import { accessOf, accountLabel, buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
 import { affixFor } from "@/utils/tabs";
-import {
-  isMacPlatform,
-  loadSidebarCollapsed,
-  saveSidebarCollapsed,
-  subscribeNarrow
-} from "@/utils/sidebar";
-import MenuSearch from "./MenuSearch.vue";
+import { loadSidebarCollapsed, saveSidebarCollapsed, subscribeNarrow } from "@/utils/sidebar";
 import NotificationBell from "./NotificationBell.vue";
 import ReauthDialog from "./ReauthDialog.vue";
 import SideMenu from "./SideMenu.vue";
@@ -35,7 +27,6 @@ const route = useRoute();
 const router = useRouter();
 const user = useUserStore();
 const localeStore = useLocaleStore();
-const menuSearch = useMenuSearchStore();
 const reauth = useReauthStore();
 const tabs = useTabsStore();
 const company = useCompanySync();
@@ -43,7 +34,6 @@ const company = useCompanySync();
 const collapsed = ref(loadSidebarCollapsed());
 const narrow = ref(false);
 const drawerOpen = ref(false);
-const mac = isMacPlatform();
 
 const access = computed(() => accessOf(user.user));
 const menu = computed(() => {
@@ -126,10 +116,6 @@ watch(
       affix: route.path === affix.path,
       componentName
     });
-    const userId = user.user?.id;
-    if (userId && flattenMenu(menu.value).some(entry => entry.path === route.path)) {
-      rememberRecentMenu(userId, route.path);
-    }
   },
   { immediate: true }
 );
@@ -190,13 +176,6 @@ onBeforeUnmount(() => {
           </el-breadcrumb>
         </div>
         <div class="layout__actions">
-          <el-button data-test="menu-search" @click="menuSearch.open()">
-            <el-icon><Search /></el-icon>
-            <span class="layout__label">{{ t("layout.searchMenu") }}</span>
-            <kbd class="layout__kbd">{{
-              mac ? t("layout.shortcutMac") : t("layout.shortcutOther")
-            }}</kbd>
-          </el-button>
           <!-- Keyed by company: a switch rebuilds the bell and it reloads the unread count at once. -->
           <NotificationBell v-if="!access.isPlatformAdmin" :key="company.currentId.value ?? ''" />
           <LocaleSwitch />
@@ -287,7 +266,6 @@ onBeforeUnmount(() => {
         </el-watermark>
       </el-main>
     </el-container>
-    <MenuSearch />
     <ReauthDialog />
   </el-container>
 </template>
@@ -327,17 +305,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--tcrm-space-2);
-}
-.layout__kbd {
-  margin-left: var(--tcrm-space-2);
-  padding: 0 6px;
-  border: 1px solid var(--tcrm-color-border);
-  border-radius: var(--tcrm-radius-tag);
-  font-family: var(--tcrm-font-sans);
-  font-size: var(--tcrm-font-size-body);
-  line-height: 22px;
-  color: var(--tcrm-color-text-secondary);
-  background: var(--tcrm-color-muted);
 }
 .layout__header-start :deep(.el-breadcrumb) {
   min-width: 0;
@@ -424,8 +391,7 @@ onBeforeUnmount(() => {
   max-height: 100%;
 }
 @media (max-width: 991px) {
-  .layout__label,
-  .layout__kbd {
+  .layout__label {
     display: none;
   }
 }

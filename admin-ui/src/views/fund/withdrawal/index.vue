@@ -53,7 +53,7 @@ const columns = computed<DataColumn[]>(() =>
   ["applicationNo", "kolIdentity", "amount", "status", "createdAt", "actions"].map(key => ({
     key,
     prop: key,
-    label: t(`finance.${key}`),
+    label: t(key === "amount" ? "finance.requestedAmount" : `finance.${key}`),
     minWidth:
       key === "actions"
         ? locale.value === "en-US"
@@ -77,7 +77,7 @@ const chips = computed(() =>
     .filter(([, value]) => value)
     .map(([key, value]) => ({
       key,
-      label: t(`finance.${key}`),
+      label: t(key === "amount" ? "finance.requestedAmount" : `finance.${key}`),
       text: key === "status" ? t(`finance.${value}`) : value
     }))
 );
