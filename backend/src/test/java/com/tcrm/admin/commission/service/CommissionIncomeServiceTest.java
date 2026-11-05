@@ -49,6 +49,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** Unit tests of the creator income list and detail (requirement 11.02). */
 class CommissionIncomeServiceTest {
@@ -413,7 +415,7 @@ class CommissionIncomeServiceTest {
   }
 
   @Test
-  void shouldBuildLinesWithDebitDirectionAndMissingParts() {
+  void shouldBuildLinesWithCreditDirectionAndMissingParts() {
     when(states.listByKol(KOL)).thenReturn(List.of(stateRow()));
     when(orderSettlement.listOrdersByIds(anyCollection()))
         .thenReturn(List.of(new OrderRefDTO(5001L, "WD-1", 30L, PAY, "PAID", null)));
@@ -441,9 +443,9 @@ class CommissionIncomeServiceTest {
         TenantScope.callCompany(
             TENANT, () -> service.detail(superAdmin(), KOL, filter(null, null)));
     CommissionLine line = detail.lines().getFirst();
-    // released 5 − accrued 10 = -5 → clawed-back difference shows as DEBIT.
-    assertThat(line.direction()).isEqualTo("DEBIT");
-    assertThat(line.adjustment()).isEqualTo("-5.00");
+    // accrued 10, released 5: the unreleased 5 is frozen, not a refund adjustment (task 114).
+    assertThat(line.direction()).isEqualTo("CREDIT");
+    assertThat(line.adjustment()).isEqualTo("0.00");
     assertThat(line.commission()).isEqualTo("10.00");
     assertThat(line.product()).isEqualTo("item");
     assertThat(line.sku()).isEqualTo("sku");
@@ -453,6 +455,31 @@ class CommissionIncomeServiceTest {
     assertThat(line.base()).isEqualTo("100.00");
     assertThat(detail.income().kolId()).isEqualTo(KOL);
     assertThat(detail.income().name()).isEqualTo("Kol A");
+  }
+
+  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @CsvSource({
+    "15.00, 0.00, 0.00, CREDIT",
+    "15.00, 15.00, 0.00, CREDIT",
+    "12.00, 15.00, -3.00, DEBIT",
+    "0.00, 15.00, -15.00, DEBIT"
+  })
+  void shouldCountOnlyAReductionAfterReleaseAsAdjustment(
+      String accrued, String released, String adjustment, String direction) {
+    // Task 114: a frozen line (accrued, not yet released) is not a refund adjustment; the same
+    // inputs give the same result in CommissionSettlementDetailServiceTest.
+    CommissionItemStateDO row = stateRow();
+    row.setAccruedCommissionCny(new BigDecimal(accrued));
+    row.setReleasedCommissionCny(new BigDecimal(released));
+    when(states.listByKol(KOL)).thenReturn(List.of(row));
+    when(revisions.listLatestByItemStateIds(anyCollection())).thenReturn(List.of());
+
+    IncomeDetail detail =
+        TenantScope.callCompany(
+            TENANT, () -> service.detail(superAdmin(), KOL, filter(null, null)));
+    CommissionLine line = detail.lines().getFirst();
+    assertThat(line.adjustment()).isEqualTo(adjustment);
+    assertThat(line.direction()).isEqualTo(direction);
   }
 
   @Test

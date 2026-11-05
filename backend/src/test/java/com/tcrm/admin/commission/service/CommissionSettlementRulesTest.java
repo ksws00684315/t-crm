@@ -2,9 +2,12 @@ package com.tcrm.admin.commission.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** Unit tests of the pure settlement rules (design §8.3 / ADR-032 §2 and §5). */
 class CommissionSettlementRulesTest {
@@ -376,6 +379,33 @@ class CommissionSettlementRulesTest {
                 basis, false, new BigDecimal("30.00"), false, null))
         .isEqualByComparingTo("70.00");
     assertThat(CommissionSettlementRules.commissionable(null, false, null, true, null)).isNull();
+  }
+
+  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @CsvSource({
+    "15.00, 0.00, 0.00, CREDIT",
+    "15.00, 15.00, 0.00, CREDIT",
+    "12.00, 15.00, -3.00, DEBIT",
+    "0.00, 15.00, -15.00, DEBIT",
+    "15.00, , 0.00, CREDIT"
+  })
+  void shouldCountOnlyAReductionAfterReleaseAsRefundAdjustment(
+      String accrued, String released, String adjustment, String direction) {
+    BigDecimal value =
+        CommissionSettlementRules.refundAdjustment(
+            new BigDecimal(accrued), released == null ? null : new BigDecimal(released));
+    assertThat(value.toPlainString()).isEqualTo(adjustment);
+    assertThat(CommissionSettlementRules.adjustmentDirection(value)).isEqualTo(direction);
+  }
+
+  @Test
+  void shouldRenderCommissionableTextOrNull() {
+    CommissionItemStateDO row = new CommissionItemStateDO();
+    row.setBasisCny(new BigDecimal("100.00"));
+    row.setSuccessfulRefundCny(new BigDecimal("30.00"));
+    assertThat(CommissionSettlementRules.commissionableText(row)).isEqualTo("70.00");
+    row.setBasisCny(null);
+    assertThat(CommissionSettlementRules.commissionableText(row)).isNull();
   }
 
   /** Pay 100, rate 10%, confirmed settlement; refund, after-sales flag and released vary. */
