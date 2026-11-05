@@ -283,9 +283,6 @@ onMounted(() => {
       show-icon
       :title="t('orders.loadFailed')"
     />
-    <p v-if="orders.length && !error" class="orders-note" data-test="orders-amount-note">
-      {{ t("orders.amountNote") }}
-    </p>
     <DataTable
       table-id="kol-orders"
       class="orders-table"
@@ -344,7 +341,6 @@ onMounted(() => {
           <strong>{{ order.orderNo }}</strong>
           <span>{{ productLabel(order) }}</span>
           <span>{{ t("orders.orderAmount") }}: {{ money(order.payAmount) }}</span>
-          <small class="amount-note">{{ t("orders.amountNote") }}</small>
           <span v-if="order.settlementStatus">{{
             t(`orders.settlement.${order.settlementStatus}`)
           }}</span>
@@ -399,20 +395,6 @@ h1 {
   padding: var(--tcrm-space-6);
   text-align: center;
   color: var(--tcrm-color-text-secondary);
-}
-.amount-note,
-.orders-note {
-  color: var(--tcrm-color-text-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
-}
-.amount-note {
-  display: block;
-  margin-top: var(--tcrm-space-1);
-  white-space: normal;
-}
-.orders-note {
-  margin: 0;
 }
 .product-cell {
   display: block;
@@ -515,8 +497,7 @@ h1 {
     height: auto;
     min-height: 0;
   }
-  .orders-table,
-  .orders-note {
+  .orders-table {
     display: none;
   }
   .order-cards {

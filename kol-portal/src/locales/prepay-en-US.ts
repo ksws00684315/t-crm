@@ -1,6 +1,6 @@
 export default {
   number: "Prepay number",
-  paidAmount: "Paid amount",
+  paidAmount: "Payment Amount",
   entryType: "Entry type",
   entryAmount: "Entry amount",
   occurredAt: "Entry time",
@@ -9,8 +9,8 @@ export default {
   payTime: "Payment time",
   payMethod: "Payment method (free text)",
   balance: "Commission wallet balance",
-  recovered: "Recovered",
-  remaining: "Remaining deduction",
+  recovered: "Deducted",
+  remaining: "Pending Deduction",
   posted: "Deduction posted",
   detail: "Details",
   voucher: "Payment voucher",

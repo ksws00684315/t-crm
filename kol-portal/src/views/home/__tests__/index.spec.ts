@@ -241,7 +241,7 @@ describe("workspace section 2: commission details", () => {
     expect(zh("home.withdrawingCaption")).toBe("已提交提现申请待打款的金额");
     expect(zh("home.withdrawnCaption")).toBe("已完成打款");
     expect(zh("home.detailsFootnote")).toBe(
-      "以上四项合计等于预估总佣金。历史订单按下单时的佣金比例计算。"
+      "以上四项合计等于累计佣金。历史订单按下单时的佣金比例计算。"
     );
     expect(wrapper!.text()).toContain(i18n.global.t("home.detailsFootnote"));
   });
@@ -287,7 +287,7 @@ describe("workspace section 3: sales trend", () => {
     expect(text("trend-zone")).toBe("Beijing time");
   });
 
-  it("draws GMV bars and commission line and totals the period in the legend", async () => {
+  it("draws sales bars and commission line and totals the period in the legend", async () => {
     vi.mocked(getCreatorAnalytics).mockResolvedValue(
       overview([
         { date: "2026-10-30", salesCny: "1000.10", commissionCny: "120.01", orderCount: 3 },
@@ -304,6 +304,11 @@ describe("workspace section 3: sales trend", () => {
     expect(applied.series[0].data.at(-1)).toBe(0.2);
     expect(applied.series[0].data.at(-3)).toBe(1000.1);
     expect(applied.series[1].yAxisIndex).toBe(1);
+    // Task 112: the bar series and its note say 销售额 (order paid amount, freight included).
+    expect(applied.series[0].name).toBe("Sales");
+    expect(i18n.global.t("home.gmvNote", {}, { locale: "zh-CN" })).toBe(
+      "销售额为订单支付金额合计，含运费，未扣除退款。"
+    );
   });
 
   it("shows the empty state when the period has no order", async () => {

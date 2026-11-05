@@ -159,7 +159,7 @@ describe("Kol item page", () => {
     });
     expect(wrapper.text()).toContain("链接编码");
     expect(wrapper.text()).toContain("商品");
-    expect(wrapper.text()).toContain("支付金额");
+    expect(wrapper.text()).toContain("商品销售额");
     expect(wrapper.text()).toContain("清理状态");
     expect(wrapper.text()).toContain("KPL-ABCDEF123456");
     expect(
@@ -179,7 +179,7 @@ describe("Kol item page", () => {
     i18n.global.locale.value = "en-US";
     const wrapper = await mountPage();
     expect(wrapper.text()).toContain("Link Code");
-    expect(wrapper.text()).toContain("Pay Amount");
+    expect(wrapper.text()).toContain("Product Sales");
     expect(wrapper.text()).toContain("Cleanup failed");
     expect(wrapper.text()).toContain("Weidian");
   });
@@ -266,8 +266,9 @@ describe("Kol item page", () => {
     expect(drawer.text()).toContain("商品主图");
     expect(drawer.text()).toContain("Alice（KOL-TAA001）");
     expect(drawer.text()).toContain("访问次数");
-    expect(drawer.text()).toContain("累计支付金额");
-    expect(drawer.text()).not.toContain("累计退款");
+    expect(drawer.text()).toContain("商品销售额");
+    // Spec 13 §3.14: the owner removed the refund line from this drawer; only the label changed.
+    expect(drawer.text()).not.toContain("退款金额");
     expect(drawer.text()).toContain("closed");
     expect(drawer.text()).toContain("rejected");
     await findTest(wrapper, "open-source").trigger("click");

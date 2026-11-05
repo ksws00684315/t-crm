@@ -28,7 +28,9 @@ import {
   refundTypeText
 } from "@/utils/order";
 import { formatRate } from "@/utils/rate";
+import OrderAmounts from "../OrderAmounts.vue";
 import OrderProductCell from "../OrderProductCell.vue";
+import { useDescriptionColumns } from "@/composables/useDescriptionColumns";
 
 defineOptions({ name: "OrderChainPage" });
 
@@ -122,10 +124,9 @@ const refundTotalAmount = computed(
   () => chain.value?.funds?.refundTotal ?? completedRefundTotal.value
 );
 
-/** Pay amount: the funds block first, then the order detail header value. */
-const payAmountText = computed(() =>
-  formatAmountWithCurrency(chain.value?.funds?.payAmount ?? detail.value?.payAmount ?? null)
-);
+/** Funds section columns, the same responsive rule as the order detail drawer. */
+const fundsRegion = ref<HTMLElement | null>(null);
+const fundsColumns = useDescriptionColumns(fundsRegion);
 
 /** Non-null flow rows for the table; the empty cases come from {@link #flowsView}. */
 const flows = computed(() =>
@@ -373,7 +374,7 @@ const summaryColumns = computed<DataColumn[]>(() => [
   { key: "kol", align: "left", label: t("order.chain.summaryKol"), minWidth: 145 },
   { key: "unitPrice", label: t("order.detail.unitPrice"), minWidth: 130, amount: true },
   { key: "quantity", label: t("order.line.quantity"), minWidth: 90 },
-  { key: "payAmount", label: t("order.payAmount"), minWidth: 110, amount: true },
+  { key: "productTotal", label: t("order.amounts.productTotal"), minWidth: 110, amount: true },
   {
     key: "rate",
     label: t("order.chain.summaryRate"),
@@ -487,26 +488,9 @@ onMounted(load);
     <template v-if="chain">
       <section class="chain-page__card" data-test="chain-funds">
         <h3 class="chain-page__title">{{ t("order.chain.fundsSection") }}</h3>
-        <div class="chain-fund-cards">
-          <article class="chain-fund-card">
-            <span>{{ t("order.payAmount") }}</span>
-            <strong>{{ payAmountText }}</strong>
-          </article>
-          <article class="chain-fund-card">
-            <span>{{ t("order.refundTotal") }}</span>
-            <strong>{{
-              refundTotalAmount
-                ? formatAmountWithCurrency(refundTotalAmount, "CNY")
-                : t("common.developing")
-            }}</strong>
-          </article>
-          <article
-            class="chain-fund-card"
-            :class="{ 'chain-fund-card--pending': chain.funds?.kolCommission == null }"
-          >
-            <span>{{ t("order.chain.kolCommission") }}</span>
-            <strong>{{ fundsText(chain.funds?.kolCommission) }}</strong>
-          </article>
+        <div ref="fundsRegion">
+          <OrderAmounts v-if="detail" :detail="detail" :columns="fundsColumns" />
+          <div v-else class="chain-product__secondary">-</div>
         </div>
         <div
           v-if="chain.funds?.accountStatus"
@@ -633,8 +617,10 @@ onMounted(load);
               : formatAmountWithCurrency(lineItem(row as ChainLineVO)?.unitPrice)
           }}</template>
           <template #cell-quantity="{ row }">{{ (row as ChainLineVO).quantity ?? "-" }}</template>
-          <template #cell-payAmount="{ row }">{{
-            formatAmountWithCurrency((row as ChainLineVO).payAmount)
+          <template #cell-productTotal="{ row }">{{
+            lineItem(row as ChainLineVO)?.totalAmount == null
+              ? t("order.missingHistoricalPrice")
+              : formatAmountWithCurrency(lineItem(row as ChainLineVO)?.totalAmount)
           }}</template>
           <template #cell-rate="{ row }"
             ><span v-if="!canSeeCommission">-</span
@@ -746,7 +732,12 @@ onMounted(load);
                   {{ t("order.line.quantity") }}: {{ line.quantity ?? "-" }}
                 </div>
                 <div class="chain-block__text">
-                  {{ t("order.line.payAmount") }}: {{ formatAmountWithCurrency(line.payAmount) }}
+                  {{ t("order.amounts.productTotal") }}:
+                  {{
+                    lineItem(line)?.totalAmount == null
+                      ? t("order.missingHistoricalPrice")
+                      : formatAmountWithCurrency(lineItem(line)?.totalAmount)
+                  }}
                 </div>
               </div>
 
@@ -1115,33 +1106,6 @@ onMounted(load);
   gap: var(--tcrm-space-2);
   margin-top: var(--tcrm-space-3);
 }
-.chain-fund-cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tcrm-space-3);
-}
-.chain-fund-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-2);
-  min-width: 0;
-  padding: var(--tcrm-space-3);
-  border: 1px solid var(--tcrm-color-border);
-  border-radius: var(--tcrm-radius-card);
-  background: var(--tcrm-color-card);
-}
-.chain-fund-card > span {
-  color: var(--tcrm-color-text-secondary);
-}
-.chain-fund-card > strong {
-  overflow-wrap: anywhere;
-  font-size: var(--tcrm-font-size-section);
-}
-.chain-fund-card--pending > strong {
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-body);
-  font-weight: 400;
-}
 .chain-no-permission {
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-body);
@@ -1193,9 +1157,6 @@ onMounted(load);
   grid-column: 1 / -1;
 }
 @media (max-width: 900px) {
-  .chain-fund-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .chain-commission-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -1,6 +1,6 @@
 export default {
   number: "预付单号",
-  paidAmount: "实付金额",
+  paidAmount: "付款金额",
   entryType: "流水类型",
   entryAmount: "流水金额",
   occurredAt: "入账时间",
@@ -9,7 +9,7 @@ export default {
   payTime: "支付时间",
   payMethod: "支付方式（自由填写）",
   balance: "佣金钱包余额",
-  recovered: "已冲抵",
+  recovered: "已抵扣",
   remaining: "待抵扣",
   posted: "抵扣记账",
   detail: "详情",

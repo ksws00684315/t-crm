@@ -2,10 +2,8 @@ package com.tcrm.admin.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.order.api.CommissionOrderStateApi;
-import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.model.OrderDO;
-import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
@@ -26,25 +24,20 @@ import org.springframework.stereotype.Service;
 
 /**
  * Read-only creator workbench overview (task 64). Identity and company scope are taken from the KOL
- * session. Sales are summed over the creator's own order lines, matching the /kol-api/orders
- * amounts; commission figures belong to the commission module and stay at zero until task 62.
+ * session. Sales are the order pay amounts (freight included, refunds not deducted; task 112),
+ * matching the /kol-api/orders order amount; commission figures come from the commission port.
  */
 @Service
 public class KolAnalyticsService {
   private static final int MAX_SPAN_DAYS = 366;
 
   private final OrderMapper orders;
-  private final OrderItemMapper orderItems;
   private final CurrentKolContext current;
   private final CommissionOrderStateApi commissionStates;
 
   public KolAnalyticsService(
-      OrderMapper orders,
-      OrderItemMapper orderItems,
-      CurrentKolContext current,
-      CommissionOrderStateApi commissionStates) {
+      OrderMapper orders, CurrentKolContext current, CommissionOrderStateApi commissionStates) {
     this.orders = orders;
-    this.orderItems = orderItems;
     this.current = current;
     this.commissionStates = commissionStates;
   }
@@ -62,7 +55,7 @@ public class KolAnalyticsService {
     List<OrderDO> range =
         orders.selectList(
             new LambdaQueryWrapper<OrderDO>()
-                .select(OrderDO::getId, OrderDO::getPayTime)
+                .select(OrderDO::getId, OrderDO::getPayTime, OrderDO::getPayAmount)
                 .eq(OrderDO::getKolId, kol.id())
                 .eq(OrderDO::getAttributionStatus, "ATTRIBUTED")
                 .ge(OrderDO::getPayTime, from.toInstant())
@@ -71,20 +64,13 @@ public class KolAnalyticsService {
     Map<String, BigDecimal> byDay = new TreeMap<>();
     Map<String, Long> ordersByDay = new HashMap<>();
     ZoneOffset bucket = from.getOffset();
-    if (!range.isEmpty()) {
-      List<Long> orderIds = range.stream().map(OrderDO::getId).toList();
-      Map<Long, BigDecimal> perOrder = new HashMap<>();
-      for (OrderItemDO line : ownLines(orderIds, kol)) {
-        BigDecimal amount = line.getPayAmount() == null ? BigDecimal.ZERO : line.getPayAmount();
-        perOrder.merge(line.getOrderId(), amount, BigDecimal::add);
-      }
-      for (OrderDO order : range) {
-        BigDecimal amount = money(perOrder.getOrDefault(order.getId(), BigDecimal.ZERO));
-        sales = sales.add(amount);
-        String day = order.getPayTime().atZone(bucket).toLocalDate().toString();
-        byDay.merge(day, amount, BigDecimal::add);
-        ordersByDay.merge(day, 1L, Long::sum);
-      }
+    for (OrderDO order : range) {
+      BigDecimal amount =
+          money(order.getPayAmount() == null ? BigDecimal.ZERO : order.getPayAmount());
+      sales = sales.add(amount);
+      String day = order.getPayTime().atZone(bucket).toLocalDate().toString();
+      byDay.merge(day, amount, BigDecimal::add);
+      ordersByDay.merge(day, 1L, Long::sum);
     }
     // Commission accrual of the creator's lines, grouped by the order's pay date (task 62 via the
     // commission port). The withdrawal occupation (task 63) splits the lines into withdrawing and
@@ -138,12 +124,12 @@ public class KolAnalyticsService {
 
   /**
    * Cumulative sales of the signed-in creator, aggregated in SQL so the 366-day cap of {@link
-   * #overview} does not apply. Same basis as the overview: own lines, attributed paid orders, pay
-   * amount before refunds.
+   * #overview} does not apply. Same basis as the overview: attributed paid orders, order pay amount
+   * (freight included) before refunds.
    */
   public KolSalesTotalDTO salesTotal() {
     KolAccountDTO kol = current.kol();
-    BigDecimal total = orderItems.sumAttributedPayAmount(kol.id());
+    BigDecimal total = orders.sumAttributedPayAmount(kol.id());
     return new KolSalesTotalDTO(money(total == null ? BigDecimal.ZERO : total), Instant.now());
   }
 
@@ -160,14 +146,6 @@ public class KolAnalyticsService {
       }
     }
     return frozen;
-  }
-
-  private List<OrderItemDO> ownLines(List<Long> orderIds, KolAccountDTO kol) {
-    return orderItems.selectList(
-        new LambdaQueryWrapper<OrderItemDO>()
-            .select(OrderItemDO::getOrderId, OrderItemDO::getPayAmount)
-            .in(OrderItemDO::getOrderId, orderIds)
-            .eq(OrderItemDO::getKolId, kol.id()));
   }
 
   private static OffsetDateTime parse(String text) {

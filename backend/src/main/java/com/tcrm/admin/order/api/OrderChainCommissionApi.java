@@ -56,12 +56,15 @@ public interface OrderChainCommissionApi {
    * @param netCommissionCny Σ accumulated net commission of the order's live snapshots (unverified
    *     rows contribute 0; same basis as the settlement details)
    * @param allVerified every live snapshot is verified (true when the order has none)
+   * @param commissionableCny Σ line commissionable amounts (task 112, 计佣金额); null unless every
+   *     requested line has a verified snapshot
    */
   record OrderCommissionChainDTO(
       BigDecimal netCommissionCny,
       boolean allVerified,
       List<LineCommissionDTO> lines,
-      List<FlowDTO> flows) {}
+      List<FlowDTO> flows,
+      BigDecimal commissionableCny) {}
 
   /**
    * One line's commission block (B07/B09).
@@ -80,6 +83,9 @@ public interface OrderChainCommissionApi {
    *     withdrawn allocations never count
    * @param withdrawals every allocation of the line, whatever the application state, so the UI can
    *     tell paid, in-flight and released occupations apart by status
+   * @param commissionableCny commissionable amount of the line (task 112, 计佣金额): the effective
+   *     basis of the snapshot, successful refunds already deducted — the amount the net commission
+   *     is accrued from; null while the line is unverified or has no snapshot
    */
   record LineCommissionDTO(
       long orderItemId,
@@ -88,7 +94,8 @@ public interface OrderChainCommissionApi {
       BigDecimal netCommissionCny,
       String releaseBasis,
       BigDecimal occupiedCny,
-      List<WithdrawalRefDTO> withdrawals) {}
+      List<WithdrawalRefDTO> withdrawals,
+      BigDecimal commissionableCny) {}
 
   /** One allocation of the line, with the payment fact when the application is paid (B09). */
   record WithdrawalRefDTO(

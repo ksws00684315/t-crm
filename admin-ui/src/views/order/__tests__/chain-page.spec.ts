@@ -190,9 +190,13 @@ const orderDetail: OrderDetailVO = {
   lastSyncTime: "2026-10-20T11:00:00Z",
   createTime: "2026-10-20T10:00:05Z",
   itemAmount: "180.00",
-  totalAmount: "185.00",
   payAmount: "180.00",
   freight: "5.00",
+  orderAmount: "185.00",
+  discount: "5.00",
+  refundAmount: "20.00",
+  netReceived: "160.00",
+  commission: null,
   items: [
     {
       id: "301",
@@ -205,6 +209,7 @@ const orderDetail: OrderDetailVO = {
       kolCode: "KOL-ZS01",
       quantity: 2,
       unitPrice: "60.00",
+      totalAmount: "120.00",
       payAmount: "120.00",
       refundAmount: "20.00",
       status: "REFUNDED"
@@ -220,11 +225,18 @@ const orderDetail: OrderDetailVO = {
       kolCode: null,
       quantity: 1,
       unitPrice: "60.00",
+      totalAmount: "60.00",
       payAmount: "60.00",
       refundAmount: null,
       status: null
     }
   ]
+};
+
+/** The detail as commission:view viewers receive it: the order-level commission block filled. */
+const financedDetail: OrderDetailVO = {
+  ...orderDetail,
+  commission: { commissionableAmount: "160.00", rates: ["0.1000"], estimatedCommission: "16.00" }
 };
 
 function signIn(role: Role, permissions: string[], dataScope: "ALL" | "OWN" = "ALL") {
@@ -351,10 +363,11 @@ describe("order chain page (task 40)", () => {
     expect(second.querySelector('[data-test="chain-kol-item"]')?.textContent).toContain("-");
     expect(second.querySelector('[data-test="chain-refunds"]')?.textContent).toContain("无退款");
     expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("180.00");
-    // Financial blocks absent (null fixture): a super admin falls back to 待核实, never to 0 or
-    // 开发中 — the refund total still sums from the line refunds.
+    // Task 112: the order-level amounts come from the detail for every viewer; a commission
+    // block missing for a viewer who may see it reads 待核实, never a fake 0 or 开发中.
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("20.00");
+    expect(funds).toContain("¥20.00");
+    expect(funds).toContain("¥160.00");
     expect(funds).toContain("待核实");
     expect(funds).not.toContain("开发中");
     expect(wrapper.find('[data-test="chain-flows-incomplete"]').exists()).toBe(true);
@@ -392,6 +405,7 @@ describe("order chain page (task 40)", () => {
   it("renders commission funds, line blocks and finance flows (task 72)", async () => {
     signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
     const { wrapper } = await mountPage();
 
     const funds = wrapper.find('[data-test="chain-funds"]').text();
@@ -417,7 +431,7 @@ describe("order chain page (task 40)", () => {
     const secondText = blocks[1].text();
     expect(secondText).toContain("待核实");
     expect(secondText).toContain("¥0.00");
-    expect(secondText).toContain("无提现占用");
+    expect(secondText).toContain("无提现申请");
 
     // Finance flows: increase for the release credit, decrease for clawback and allocations,
     // per-withdrawal numbers with payment times, "-" when no withdrawal is linked.
@@ -476,7 +490,7 @@ describe("order chain page (task 40)", () => {
     signIn("STAFF", ["order:view"]);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
-    expect(funds).toContain("当前账号无佣金查看权限");
+    expect(funds).toContain("无权限查看佣金");
     // The order wiring itself stays visible; only the financial blocks disappear.
     expect(wrapper.findAll('[data-test="chain-line"]')).toHaveLength(2);
     expect(wrapper.find('[data-test="chain-commission"]').exists()).toBe(false);
@@ -503,11 +517,11 @@ describe("order chain page (task 40)", () => {
       "状态",
       "所属达人",
       "单价",
-      "数量",
-      "支付金额",
+      "件数",
+      "商品总价",
       "佣金比例",
-      "达人佣金",
-      "提现占用",
+      "预估佣金",
+      "已申请提现",
       "操作"
     ]);
     wrapper.unmount();
@@ -683,6 +697,7 @@ describe("order chain page (task 40)", () => {
     // profit card (task 81, L-024) and without the scope note.
     signIn("STAFF", ["order:view", "commission:view"], "OWN");
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
     const { wrapper } = await mountPage();
     const funds = wrapper.find('[data-test="chain-funds"]').text();
     expect(funds).toContain("¥16.00");
@@ -692,10 +707,9 @@ describe("order chain page (task 40)", () => {
     wrapper.unmount();
   });
 
-  it("deduplicates one refund across lines in the fallback total and formats every card", async () => {
-    // Without commission:view the funds block is null, so the refund total falls back to the
-    // client sum: the same refund attached to both lines must count once (B07 dedup rule), and
-    // all four cards share the amount-plus-currency rendering, not raw strings.
+  it("deduplicates one refund across lines in the refund node fallback total", async () => {
+    // Without commission:view the chain funds are null, so the refund node falls back to the
+    // client sum: the same refund attached to both lines must count once (B07 dedup rule).
     signIn("STAFF", ["order:view"]);
     const duplicated: OrderChainVO = {
       ...chain,
@@ -718,9 +732,62 @@ describe("order chain page (task 40)", () => {
     };
     vi.mocked(orderApi.getOrderChain).mockResolvedValue(duplicated);
     const { wrapper } = await mountPage();
-    const funds = wrapper.find('[data-test="chain-funds"]').text();
+    expect(wrapper.get('[data-test="chain-stage-refund"]').text()).toContain("¥20.00");
+    expect(wrapper.find('[data-test="chain-funds"]').text()).toContain("¥180.00");
+    wrapper.unmount();
+  });
+
+  it("lists the order-level amounts in the amount-terms order with commission (task 112)", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
+    const { wrapper } = await mountPage();
+    const labels = wrapper
+      .get('[data-test="chain-funds"]')
+      .findAll(".el-descriptions__label")
+      .map(item => item.text());
+    expect(labels).toEqual([
+      "商品总价",
+      "商品数量",
+      "运费",
+      "订单金额",
+      "优惠",
+      "支付金额",
+      "退款金额",
+      "订单实收",
+      "计佣金额",
+      "佣金比例",
+      "预估佣金"
+    ]);
+    const funds = wrapper.get('[data-test="chain-funds"]').text();
+    expect(funds).toContain("¥185.00");
+    expect(funds).toContain("¥5.00");
+    expect(funds).toContain("¥160.00");
+    expect(funds).toContain("10%");
+    expect(funds).toContain("¥16.00");
+    wrapper.unmount();
+  });
+
+  it("shows the product total per line and blanks it when the unit price is missing (task 112)", async () => {
+    signIn("SUPER_ADMIN", ["order:view"]);
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...orderDetail,
+      itemAmount: null,
+      orderAmount: null,
+      discount: null,
+      items: orderDetail.items.map(item =>
+        item.id === "301" ? { ...item, unitPrice: null, totalAmount: null } : item
+      )
+    });
+    const { wrapper } = await mountPage();
+    const totals = wrapper
+      .get('[data-test="chain-product-summary"]')
+      .findAll("tbody tr")
+      .map(row => row.findAll("td")[5]?.text());
+    expect(totals).toEqual(["缺失历史售价", "¥60.00"]);
+    const funds = wrapper.get('[data-test="chain-funds"]').text();
+    expect(funds).toContain("缺失历史售价");
     expect(funds).toContain("¥180.00");
-    expect(funds).toContain("¥20.00");
     wrapper.unmount();
   });
 

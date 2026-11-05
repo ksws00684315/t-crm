@@ -5,9 +5,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Creator workbench overview (task 64). Sales figures are computed from the creator's own order
- * lines; commission amounts stay at zero until task 62 provides them through the commission {@code
- * api} package.
+ * Creator workbench overview (task 64). Sales figures are order pay amounts (freight included,
+ * refunds not deducted; task 112); commission amounts come from the commission port.
  */
 public record KolAnalyticsOverviewDTO(
     Instant asOf,

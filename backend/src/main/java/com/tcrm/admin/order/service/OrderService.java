@@ -314,6 +314,14 @@ public class OrderService {
                 .reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
     var orderKol =
         order.getKolId() == null ? null : kolById(List.of(order.getKolId())).get(order.getKolId());
+    // Task 112 order-level amounts (amount terms §2), computed here so the UI does no arithmetic:
+    // 订单金额 = 商品总价 + 运费, 优惠 = 订单金额 − 支付金额, 订单实收 = 支付金额 − 退款金额.
+    BigDecimal payAmount = order.getPayAmount();
+    BigDecimal orderAmount =
+        itemAmount == null
+            ? null
+            : itemAmount.add(order.getFreight() == null ? BigDecimal.ZERO : order.getFreight());
+    BigDecimal refundAmount = successfulRefundTotal(refunds);
     return new OrderDetailDTO(
         order.getId(),
         order.getWeidianOrderId(),
@@ -334,9 +342,13 @@ public class OrderService {
         order.getLastSyncTime(),
         order.getCreateTime(),
         itemAmount,
-        itemAmount,
-        order.getPayAmount(),
+        payAmount,
         order.getFreight(),
+        orderAmount,
+        orderAmount == null || payAmount == null ? null : orderAmount.subtract(payAmount),
+        refundAmount,
+        payAmount == null ? null : payAmount.subtract(refundAmount),
+        detailCommission(current.user(), order, lines),
         lines.stream()
             .map(
                 line -> {
@@ -361,6 +373,32 @@ public class OrderService {
                       order.getOrderStatus());
                 })
             .toList());
+  }
+
+  /**
+   * Order-level commission of the detail (task 112): same gate as the chain funds — {@code
+   * commission:view} plus OWN coverage — and the same commission port, so both pages show the same
+   * numbers. Null when the caller may not see commission.
+   */
+  private OrderDetailDTO.CommissionDTO detailCommission(
+      AccountDTO user, OrderDO order, List<OrderItemDO> lines) {
+    if (!user.effectivePermissions().contains("commission:view") || !ownCoverage(user, lines)) {
+      return null;
+    }
+    var commission =
+        commissionChain.chainOfOrder(
+            order.getId(), lines.stream().map(OrderItemDO::getId).toList());
+    List<BigDecimal> rates = new ArrayList<>();
+    for (var line : commission.lines()) {
+      var rate = line.rateSnapshot();
+      if (rate != null && rates.stream().noneMatch(r -> r.compareTo(rate) == 0)) {
+        rates.add(rate);
+      }
+    }
+    return new OrderDetailDTO.CommissionDTO(
+        commission.allVerified() ? commission.commissionableCny() : null,
+        List.copyOf(rates),
+        commission.allVerified() ? commission.netCommissionCny() : null);
   }
 
   /**

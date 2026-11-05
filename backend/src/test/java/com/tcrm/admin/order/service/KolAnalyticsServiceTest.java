@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
@@ -37,12 +36,11 @@ class KolAnalyticsServiceTest {
   }
 
   private final OrderMapper orders = mock(OrderMapper.class);
-  private final OrderItemMapper items = mock(OrderItemMapper.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final com.tcrm.admin.order.api.CommissionOrderStateApi commissionStates =
       mock(com.tcrm.admin.order.api.CommissionOrderStateApi.class);
   private final KolAnalyticsService service =
-      new KolAnalyticsService(orders, items, current, commissionStates);
+      new KolAnalyticsService(orders, current, commissionStates);
 
   @BeforeEach
   void setUp() {
@@ -52,14 +50,15 @@ class KolAnalyticsServiceTest {
   }
 
   @Test
-  void shouldBucketSalesByTheRequestedOffset_andSumOwnLinesOnly() {
+  void shouldBucketOrderPayAmountsIncludingFreightByTheRequestedOffset() {
     // 2026-09-30T17:00Z is 2026-10-01 01:00+08; 2026-10-01T16:00Z is 2026-10-02 00:00+08.
-    // The mapper answers only the creator's own lines; the kol_id constraint is asserted below.
+    // Task 112: sales are the order pay amounts (goods 90 + freight 10 = 100.50 / 49.50 here),
+    // never the creator's line sums; the attribution and pay-time conditions are unchanged.
     when(orders.selectList(any()))
         .thenReturn(
-            List.of(order(21L, "2026-09-30T17:00:00Z"), order(22L, "2026-10-01T16:00:00Z")));
-    when(items.selectList(any()))
-        .thenReturn(List.of(line(21L, 700L, "100.50"), line(22L, 700L, "49.50")));
+            List.of(
+                order(21L, "2026-09-30T17:00:00Z", "100.50"),
+                order(22L, "2026-10-01T16:00:00Z", "49.50")));
 
     var overview = service.overview("2026-10-01T00:00:00+08:00", "2026-10-03T00:00:00+08:00");
 
@@ -83,9 +82,18 @@ class KolAnalyticsServiceTest {
         .contains("kol_id")
         .contains("attribution_status")
         .contains("pay_time");
-    var lines = ArgumentCaptor.forClass(Wrapper.class);
-    verify(items).selectList(lines.capture());
-    assertThat(lines.getValue().getSqlSegment()).contains("kol_id");
+  }
+
+  @Test
+  void shouldIncludeFreightInSales_forOrder81000000002Shape() {
+    // Goods 90 + freight 10, paid 100: the workbench counts 100, not the 90 of the goods line.
+    when(orders.selectList(any()))
+        .thenReturn(List.of(order(21L, "2026-09-30T17:00:00Z", "100.00")));
+
+    var overview = service.overview("2026-10-01T00:00:00+08:00", "2026-10-02T00:00:00+08:00");
+
+    assertThat(overview.salesCny()).isEqualByComparingTo("100.00");
+    assertThat(overview.daily().getFirst().salesCny()).isEqualByComparingTo("100.00");
   }
 
   @Test
@@ -121,9 +129,9 @@ class KolAnalyticsServiceTest {
     // line outside the range whose 5.00 accrual (2.00 released) only feeds the frozen total.
     when(orders.selectList(any()))
         .thenReturn(
-            List.of(order(21L, "2026-09-30T17:00:00Z"), order(22L, "2026-10-01T16:00:00Z")));
-    when(items.selectList(any()))
-        .thenReturn(List.of(line(21L, 700L, "100.50"), line(22L, 700L, "49.50")));
+            List.of(
+                order(21L, "2026-09-30T17:00:00Z", "100.50"),
+                order(22L, "2026-10-01T16:00:00Z", "49.50")));
     when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
         .thenReturn(
             List.of(
@@ -181,8 +189,8 @@ class KolAnalyticsServiceTest {
   void shouldSkipZeroCommissionOrders_whenBuildingTheDailyAxis() {
     // The order is in range but its line has no accrual yet (unverified): the commission day map
     // skips it, so the daily row keeps "0.00" without adding a day of its own.
-    when(orders.selectList(any())).thenReturn(List.of(order(21L, "2026-09-30T17:00:00Z")));
-    when(items.selectList(any())).thenReturn(List.of(line(21L, 700L, "100.50")));
+    when(orders.selectList(any()))
+        .thenReturn(List.of(order(21L, "2026-09-30T17:00:00Z", "100.50")));
     when(commissionStates.listByKolAndOrderIds(anyLong(), any())).thenReturn(List.of());
     when(commissionStates.listByKol(anyLong())).thenReturn(List.of());
 
@@ -198,21 +206,20 @@ class KolAnalyticsServiceTest {
 
   @Test
   void shouldTakeTheCumulativeSalesFromTheSqlAggregateOfTheSignedInCreator() {
-    when(items.sumAttributedPayAmount(700L)).thenReturn(new BigDecimal("12345678.9"));
+    when(orders.sumAttributedPayAmount(700L)).thenReturn(new BigDecimal("12345678.9"));
 
     var total = service.salesTotal();
 
     assertThat(total.salesCny()).isEqualTo(new BigDecimal("12345678.90"));
     assertThat(total.asOf()).isNotNull();
-    verify(items).sumAttributedPayAmount(700L);
+    verify(orders).sumAttributedPayAmount(700L);
     // The aggregate never reads rows into memory.
     verify(orders, org.mockito.Mockito.never()).selectList(any());
-    verify(items, org.mockito.Mockito.never()).selectList(any());
   }
 
   @Test
   void shouldReturnZeroCumulativeSales_whenThereIsNoOrder() {
-    when(items.sumAttributedPayAmount(700L)).thenReturn(null);
+    when(orders.sumAttributedPayAmount(700L)).thenReturn(null);
 
     assertThat(service.salesTotal().salesCny()).isEqualTo(new BigDecimal("0.00"));
   }
@@ -234,23 +241,14 @@ class KolAnalyticsServiceTest {
         true);
   }
 
-  private static OrderDO order(long id, String payTime) {
+  private static OrderDO order(long id, String payTime, String payAmount) {
     OrderDO value = new OrderDO();
     value.setId(id);
     value.setKolId(700L);
     value.setAttributionStatus("ATTRIBUTED");
     value.setOrderStatus("PAID");
     value.setPayTime(Instant.parse(payTime));
-    return value;
-  }
-
-  private static OrderItemDO line(long orderId, long kolId, String pay) {
-    OrderItemDO value = new OrderItemDO();
-    value.setId(orderId * 10);
-    value.setOrderId(orderId);
-    value.setKolId(kolId);
-    value.setItemName("Widget");
-    value.setPayAmount(new BigDecimal(pay));
+    value.setPayAmount(new BigDecimal(payAmount));
     return value;
   }
 }

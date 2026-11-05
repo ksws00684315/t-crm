@@ -11,7 +11,7 @@ export interface TrendLabels {
 }
 
 /**
- * GMV as bars on the left axis, commission as a line on the right axis. The option carries no
+ * Sales as bars on the left axis, commission as a line on the right axis. The option carries no
  * colours or font sizes: `ChartPanel` themes it from tokens.css. Plot values are display-only
  * numbers; every total shown as text is summed in cents (`buildTrend`).
  */

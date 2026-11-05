@@ -141,7 +141,7 @@ describe("settlement details page", () => {
     await flushPromises();
 
     const text = wrapper.text();
-    expect(text).toContain("微店可提现金额");
+    expect(text).toContain("结算金额");
     expect(text).not.toContain("店铺获利");
     expect(text).not.toContain("净增减");
     wrapper.unmount();
@@ -188,7 +188,7 @@ describe("settlement details page", () => {
     const rows = wrapper.findAll(".el-table__body tbody tr");
     expect(rows).toHaveLength(3);
     const headers = wrapper.findAll(".el-table__header th").map(th => th.text());
-    const column = headers.findIndex(header => header.includes("微店可提现金额"));
+    const column = headers.findIndex(header => header.includes("结算金额"));
     expect(column).toBeGreaterThan(-1);
     expect(rows[0].findAll("td")[column].text()).toBe("-");
     expect(rows[0].text()).toContain("冻结中");

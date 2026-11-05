@@ -206,7 +206,7 @@ describe("refund query page (task 40)", () => {
     expect(drawer?.textContent).toContain("Blue / L");
     expect(
       [...(drawer?.querySelectorAll("thead th") ?? [])].map(item => item.textContent?.trim())
-    ).toEqual(["商品", "达人", "数量", "退款金额"]);
+    ).toEqual(["商品", "达人", "件数", "退款金额"]);
     expect(drawer?.textContent).toContain("¥20.00");
     wrapper.unmount();
   });
@@ -233,9 +233,13 @@ describe("refund query page (task 40)", () => {
       lastSyncTime: null,
       createTime: null,
       itemAmount: "115.00",
-      totalAmount: "125.00",
       payAmount: "120.00",
       freight: "5.00",
+      orderAmount: "120.00",
+      discount: "0.00",
+      refundAmount: "0.00",
+      netReceived: "120.00",
+      commission: null,
       items: []
     });
     const wrapper = await mountPage();

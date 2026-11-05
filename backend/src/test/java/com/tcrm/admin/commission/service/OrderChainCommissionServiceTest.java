@@ -198,6 +198,54 @@ class OrderChainCommissionServiceTest {
   }
 
   @Test
+  void shouldReportTheEffectiveBasisAsCommissionable_andSumItOnlyWhenAllVerified() {
+    // Task 112: 计佣金额 is the effective basis (source 100 − confirmed refund 30 = 70), the amount
+    // the accrual multiplies by the rate; a source basis that already excludes refunds is kept.
+    var refunded = state(50L, 20L, true, "7.00");
+    refunded.setBasisCny(dec("100.00"));
+    refunded.setBasisIncludesRefund(false);
+    refunded.setSuccessfulRefundCny(dec("30.00"));
+    var net = state(51L, 21L, true, "5.00");
+    net.setBasisCny(dec("50.00"));
+    net.setBasisIncludesRefund(true);
+    net.setSuccessfulRefundCny(dec("10.00"));
+    when(states.listByOrderIds(any())).thenReturn(List.of(refunded, net));
+
+    var chain = service.chainOfOrder(10L, List.of(20L, 21L));
+
+    assertThat(chain.lines().get(0).commissionableCny()).isEqualByComparingTo("70.00");
+    assertThat(chain.lines().get(1).commissionableCny()).isEqualByComparingTo("50.00");
+    assertThat(chain.commissionableCny()).isEqualByComparingTo("120.00");
+
+    // One unverified line blanks the order total; that line has no commissionable amount.
+    var withBasis = unverified(52L, 22L);
+    withBasis.setBasisCny(dec("40.00"));
+    when(states.listByOrderIds(any())).thenReturn(List.of(refunded, withBasis));
+    var partial = service.chainOfOrder(10L, List.of(20L, 22L));
+    assertThat(partial.lines().get(1).commissionableCny()).isNull();
+    assertThat(partial.commissionableCny()).isNull();
+  }
+
+  @Test
+  void shouldBlankTheOrderCommissionable_whenAVerifiedLineHasNoBasis() {
+    // All lines verified, but one has no source basis so its effective basis is null: the order
+    // total must stay null rather than count that line as 0.
+    var withBasis = state(53L, 23L, true, "7.00");
+    withBasis.setBasisCny(dec("100.00"));
+    withBasis.setBasisIncludesRefund(true);
+    var noBasis = state(54L, 24L, true, "0.00");
+    noBasis.setBasisCny(null);
+    when(states.listByOrderIds(any())).thenReturn(List.of(withBasis, noBasis));
+
+    var chain = service.chainOfOrder(10L, List.of(23L, 24L));
+
+    assertThat(chain.allVerified()).isTrue();
+    assertThat(chain.lines().get(0).commissionableCny()).isEqualByComparingTo("100.00");
+    assertThat(chain.lines().get(1).commissionableCny()).isNull();
+    assertThat(chain.commissionableCny()).isNull();
+  }
+
+  @Test
   void shouldFallBackToEmptyBlocks_whenOrderHasNoItemsOrSnapshots() {
     var empty = service.chainOfOrder(10L, List.of());
     assertThat(empty.netCommissionCny()).isEqualByComparingTo("0.00");

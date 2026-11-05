@@ -43,8 +43,10 @@ describe("financial drawers and payment registration", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
+    expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain("提现中");
+    // Task 112: the period payment split and the lifetime total no longer share one name.
     expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain(
-      "申请占用"
+      "期间已提现"
     );
     expect(document.querySelector('[data-test="income-detail"]')?.textContent).toContain("600.00");
     expect(api.getIncome).toHaveBeenCalledWith("102301", {});
