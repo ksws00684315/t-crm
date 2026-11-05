@@ -67,15 +67,11 @@ async function load() {
 }
 
 function showUnread() {
-  unreadOnly.value = true;
-  page.value = 1;
-  void load();
+  void router.replace({ query: { ...route.query, view: "unread" } });
 }
 
 function showAll() {
-  unreadOnly.value = false;
-  page.value = 1;
-  void load();
+  void router.replace({ query: { ...route.query, view: "all" } });
 }
 
 async function markAll() {
@@ -111,7 +107,11 @@ function onPage(next: number) {
 
 watch(
   () => route.query.view,
-  view => (view === "all" ? showAll() : showUnread()),
+  view => {
+    unreadOnly.value = view !== "all";
+    page.value = 1;
+    void load();
+  },
   { immediate: true }
 );
 </script>
