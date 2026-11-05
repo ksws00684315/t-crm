@@ -57,6 +57,8 @@ public interface CommissionOrderStateApi {
    * @param commissionAmount accrued net commission; null when unverified
    * @param releasedAmount already released into the wallet; null when unverified. Frozen =
    *     commissionAmount − releasedAmount.
+   * @param afterSales the order is in after-sales (task 113): unreleased commission counts 0 and
+   *     released commission is frozen until the refund concludes
    */
   record ItemCommissionStateDTO(
       long orderId,
@@ -64,5 +66,6 @@ public interface CommissionOrderStateApi {
       String settlementStatus,
       BigDecimal rateSnapshot,
       BigDecimal commissionAmount,
-      BigDecimal releasedAmount) {}
+      BigDecimal releasedAmount,
+      boolean afterSales) {}
 }

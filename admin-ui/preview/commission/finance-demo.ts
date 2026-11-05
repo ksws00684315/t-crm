@@ -154,7 +154,8 @@ export const seedLines: CommissionLine[] = [
     businessAt: "2026-10-12T08:00:00Z",
     direction: "CREDIT",
     subject: "KOL",
-    kol: "t1023_Alex Morgan"
+    kol: "t1023_Alex Morgan",
+    afterSales: false
   },
   {
     id: "102352",
@@ -173,7 +174,8 @@ export const seedLines: CommissionLine[] = [
     businessAt: "2026-10-18T08:00:00Z",
     direction: "CREDIT",
     subject: "KOL",
-    kol: "t1023_Alex Morgan"
+    kol: "t1023_Alex Morgan",
+    afterSales: false
   },
   {
     id: "102353",
@@ -192,7 +194,8 @@ export const seedLines: CommissionLine[] = [
     businessAt: "2026-10-19T08:00:00Z",
     direction: "DEBIT",
     subject: "KOL",
-    kol: "t1023_Alex Morgan"
+    kol: "t1023_Alex Morgan",
+    afterSales: false
   },
   {
     id: "102354",
@@ -211,7 +214,8 @@ export const seedLines: CommissionLine[] = [
     businessAt: "2026-10-20T08:00:00Z",
     direction: "CREDIT",
     subject: "KOL",
-    kol: "t1023_Alex Morgan"
+    kol: "t1023_Alex Morgan",
+    afterSales: false
   }
 ];
 seedLines.push(

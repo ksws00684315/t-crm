@@ -309,22 +309,24 @@ class BusinessChainIT {
     world.release();
     ChainWorld.money(world.overview().at("/income/available"), "6.50");
     // Raw status 2 is not a completed refund, so it stays UNKNOWN and blocks line A (rule 1).
+    // One order belongs to one creator, so line B is in after-sales too (task 113, 定稿 §2.1).
     world.stubRefund(world.refund(1), "1", 4000, "2");
     world.awaitRefundStatus(world.refund(1), "UNKNOWN");
     JsonNode kolOrders = world.kolOrders(world.kolToken());
     assertThat(kolLineStatus(kolOrders, "t79-a")).isEqualTo("FROZEN");
-    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("WITHDRAWABLE");
-    // 可提现 (L-033): the wallet still holds 6.50, but line A's 4.33 sits in the open refund, so
-    // the displayed available drops to what the rows still fund — line B's 2.17 — and equals the
-    // cap an application can actually allocate. The blocked released money stays visible as
-    // frozen, keeping 预估 6.50 = 冻结 4.33 + 可提现 2.17 + 占用 0.00.
-    ChainWorld.money(world.conditions().at("/available"), "2.17");
-    ChainWorld.money(world.conditions().at("/frozen"), "4.33");
-    ChainWorld.money(world.overview().at("/income/available"), "2.17");
-    ChainWorld.money(world.overview().at("/income/frozen"), "4.33");
-    // Line A's released 4.33 cannot be occupied by a new application: only line B is funded.
+    assertThat(kolLineStatus(kolOrders, "t79-b")).isEqualTo("FROZEN");
+    // 可提现 (L-033): the wallet still holds 6.50 (nothing is clawed back), but every released
+    // row sits in the open refund, so nothing is withdrawable. The blocked released money stays
+    // visible as frozen, keeping 累计 6.50 = 冻结 6.50 + 可提现 0.00 + 提现中 0.00.
+    ChainWorld.money(world.conditions().at("/available"), "0.00");
+    ChainWorld.money(world.conditions().at("/frozen"), "6.50");
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    ChainWorld.money(world.overview().at("/income/frozen"), "6.50");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    // No released money of the order can be occupied by a new application.
     long payoutAccountId = world.createPayout();
-    assertThat(world.applyWithdrawalOutcome(payoutAccountId, "6.50"))
+    assertThat(world.applyWithdrawalOutcome(payoutAccountId, "2.17"))
         .isEqualTo("422 WITHDRAWAL_INSUFFICIENT_AVAILABLE");
   }
 
@@ -340,18 +342,143 @@ class BusinessChainIT {
     // A failed recompute would answer false and hold the shop's checkpoint back.
     world.stubRefund(world.refund(1), "1", 4000, "2");
     world.awaitRefundStatus(world.refund(1), "UNKNOWN");
-    assertThat(world.pull()).isTrue();
-    assertThat(world.revisionCount()).isEqualTo(revisions + 1);
-    world.closeRefund(world.refund(1));
+    // The whole order goes into after-sales and back (task 113): both lines revise each time.
     assertThat(world.pull()).isTrue();
     assertThat(world.revisionCount()).isEqualTo(revisions + 2);
+    world.closeRefund(world.refund(1));
+    assertThat(world.pull()).isTrue();
+    assertThat(world.revisionCount()).isEqualTo(revisions + 4);
     // Repeat recompute and release: nothing new, and the one release stands.
     assertThat(world.pull()).isTrue();
     world.release();
-    assertThat(world.revisionCount()).isEqualTo(revisions + 2);
+    assertThat(world.revisionCount()).isEqualTo(revisions + 4);
     ChainWorld.money(world.overview().at("/income/available"), "6.50");
     ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
     assertThat(kolLineStatus(world.kolOrders(world.kolToken()), "t79-a")).isEqualTo("WITHDRAWABLE");
+  }
+
+  @Test
+  void shouldZeroUnreleasedCommissionWhileRefundIsOpenAndRestoreWhenRejected() throws Exception {
+    // Task 113 timeline 1: pay → refund opens (nothing released) → refund rejected.
+    world.open("t113-open");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    assertFiveLayers(world.overview().path("income"), "6.50");
+    ChainWorld.money(world.overview().at("/income/frozen"), "6.50");
+
+    // Refund on line B only; raw status 2 stays UNKNOWN. The whole order counts 0.
+    world.stubRefund(world.refund(2), "2", 2000, "2");
+    world.awaitRefundStatus(world.refund(2), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    for (Map<String, Object> state : world.itemStates()) {
+      assertThat(state.get("verified")).isEqualTo(true);
+      assertThat(state.get("release_basis")).isEqualTo("AFTER_SALES");
+      assertThat(ChainWorld.money(state.get("accrued_commission_cny")))
+          .isEqualByComparingTo("0.00");
+    }
+    world.release();
+    assertThat(world.ledger()).isEmpty();
+    assertFiveLayers(world.overview().path("income"), "0.00");
+    JsonNode kolOrder = world.kolOrders(world.kolToken()).path("items").get(0);
+    assertThat(kolOrder.path("afterSales").asBoolean()).isTrue();
+    JsonNode chain = world.chain(world.bdToken());
+    ChainWorld.money(chain.at("/funds/kolCommission"), "0.00");
+
+    // Rejected (CLOSED once RefundDictionary maps it, M0): the accrual returns and releases.
+    world.closeRefund(world.refund(2));
+    assertThat(world.pull()).isTrue();
+    List<Map<String, Object>> states = world.itemStates();
+    assertThat(ChainWorld.money(states.get(0).get("accrued_commission_cny")))
+        .isEqualByComparingTo("4.33");
+    assertThat(ChainWorld.money(states.get(1).get("accrued_commission_cny")))
+        .isEqualByComparingTo("2.17");
+    assertThat(
+            world.kolOrders(world.kolToken()).path("items").get(0).path("afterSales").asBoolean())
+        .isFalse();
+    world.release();
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    ChainWorld.money(world.overview().at("/income/available"), "6.50");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+  }
+
+  @Test
+  void shouldPauseWithoutClawbackWhileRefundIsOpenAndResumeWhenRejected() throws Exception {
+    // Task 113 timeline 2: pay → release → pending application → refund opens → rejected. The
+    // application holds only line A (FIFO); the refund opens on line B: one order, one creator,
+    // so the application still pauses, and the wallet keeps its 6.50.
+    world.open("t113-pause");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "2.00");
+    world.approveWithdrawal(withdrawalId);
+    assertFiveLayers(world.overview().path("income"), "6.50");
+
+    world.stubRefund(world.refund(2), "2", 2000, "2");
+    world.awaitRefundStatus(world.refund(2), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    JsonNode paused = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(paused.path("paused").asBoolean()).isTrue();
+    assertThat(historyCount(paused, "PAUSED")).isEqualTo(1);
+    assertThat(world.payWithdrawalOutcome(withdrawalId, "2.00")).isEqualTo("409 WITHDRAWAL_PAUSED");
+    // No ledger entry: released money stays, frozen; 累计 6.50 = 冻结 4.50 + 可提现 0 + 提现中 2.00.
+    ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    assertThat(world.walletBalance()).isEqualByComparingTo("6.50");
+    ChainWorld.money(world.overview().at("/income/frozen"), "4.50");
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+
+    world.closeRefund(world.refund(2));
+    assertThat(world.pull()).isTrue();
+    JsonNode resumed = world.withdrawal(world.financeToken(), withdrawalId);
+    assertThat(resumed.path("paused").asBoolean()).isFalse();
+    assertThat(historyCount(resumed, "RESUMED")).isEqualTo(1);
+    ChainWorld.money(world.overview().at("/income/available"), "4.50");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+    world.pay(withdrawalId, "2.00");
+    assertThat(world.withdrawal(world.financeToken(), withdrawalId).path("status").asString())
+        .isEqualTo("PAID");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+  }
+
+  @Test
+  void shouldDeductOnlyWhenThePartialRefundSucceedsAfterWithdrawal() throws Exception {
+    // Task 113 timeline 3: pay → release → withdrawn → refund opens → partial refund succeeds.
+    world.open("t113-negative");
+    world.syncPaidOrder();
+    world.stubIncome();
+    assertThat(world.pull()).isTrue();
+    world.release();
+    long payoutAccountId = world.createPayout();
+    long withdrawalId = world.applyWithdrawal(payoutAccountId, "6.50");
+    world.approveWithdrawal(withdrawalId);
+    world.pay(withdrawalId, "6.50");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+
+    // Open refund of 10.00 on line A: nothing is clawed back while it is open.
+    world.stubRefund(world.refund(1), "1", 1000, "2");
+    world.awaitRefundStatus(world.refund(1), "UNKNOWN");
+    assertThat(world.pull()).isTrue();
+    ChainWorld.money(world.overview().at("/income/available"), "0.00");
+    assertFiveLayers(world.overview().path("income"), "6.50");
+    assertThat(world.ledger()).hasSize(3);
+
+    // It succeeds: line A accrues (43.33 − 10.00) × 10% = 3.33, so −1.00 is clawed back and the
+    // wallet goes to −1.00 (累计 5.50 = 冻结 0 + 可提现 −1.00 + 已提现 6.50).
+    world.stubRefund(world.refund(1), "1", 1000, "10");
+    world.awaitRefundStatus(world.refund(1), "SUCCESS");
+    assertThat(world.pull()).isTrue();
+    ChainWorld.assertLedger(
+        world.ledger(),
+        "COMMISSION_CREDIT=4.33",
+        "COMMISSION_CREDIT=2.17",
+        "COMMISSION_WITHDRAWAL=-6.50",
+        "COMMISSION_ADJUSTMENT=-1.00");
+    ChainWorld.money(world.overview().at("/income/available"), "-1.00");
+    assertFiveLayers(world.overview().path("income"), "5.50");
   }
 
   @Test
@@ -569,6 +696,17 @@ class BusinessChainIT {
     assertThat(conditions.path("unverifiedCount").asInt()).isEqualTo(2);
     assertThat(conditions.path("canApply").asBoolean()).isFalse();
     assertThat(ChainWorld.count(world.kolOrders(world.kolToken()).path("total"))).isEqualTo(2);
+  }
+
+  /** 累计佣金 = 冻结中 + 可提现 + 提现中 + 已提现 (design §4.8.2), and 累计 itself. */
+  private static void assertFiveLayers(JsonNode income, String estimated) {
+    ChainWorld.money(income.path("estimated"), estimated);
+    BigDecimal sum =
+        new BigDecimal(income.path("frozen").asString())
+            .add(new BigDecimal(income.path("available").asString()))
+            .add(new BigDecimal(income.path("occupied").asString()))
+            .add(new BigDecimal(income.path("commissionPaid").asString()));
+    assertThat(sum).isEqualByComparingTo(estimated);
   }
 
   /** PAUSED/RESUMED entries of one withdrawal detail history. */

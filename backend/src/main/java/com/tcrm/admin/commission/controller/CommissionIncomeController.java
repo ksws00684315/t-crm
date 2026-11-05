@@ -223,7 +223,8 @@ public class CommissionIncomeController {
       String direction,
       String subject,
       String kolId,
-      String kol) {
+      String kol,
+      boolean afterSales) {
     static CommissionLineVO from(CommissionLine line) {
       return new CommissionLineVO(
           String.valueOf(line.id()),
@@ -243,7 +244,8 @@ public class CommissionIncomeController {
           line.direction(),
           line.subject(),
           line.kolId() == null ? null : String.valueOf(line.kolId()),
-          line.kol());
+          line.kol(),
+          line.afterSales());
     }
   }
 

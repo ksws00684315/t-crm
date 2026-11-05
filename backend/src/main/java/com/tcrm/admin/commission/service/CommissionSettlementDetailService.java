@@ -100,7 +100,8 @@ public class CommissionSettlementDetailService {
       String direction,
       String subject,
       Long kolId,
-      String kol) {}
+      String kol,
+      boolean afterSales) {}
 
   @Transactional(readOnly = true)
   public PageResult<SettlementRow> page(AccountDTO user, DetailFilter filter) {
@@ -266,7 +267,8 @@ public class CommissionSettlementDetailService {
               adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
-              kol == null ? null : kol.name()));
+              kol == null ? null : kol.name(),
+              Boolean.TRUE.equals(row.getAfterSales())));
     }
     List<String> kolNames = new ArrayList<>();
     for (Long kolId : rowKolIds) {
@@ -309,12 +311,11 @@ public class CommissionSettlementDetailService {
 
   /**
    * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
-   * accrual is computed from — not the raw source basis. Null when the source has no basis.
+   * accrual is computed from — not the raw source basis; 0.00 for unreleased lines of an order in
+   * after-sales (task 113). Null when the source has no basis.
    */
   private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value =
-        CommissionSettlementRules.effectiveBasis(
-            row.getBasisCny(), row.getBasisIncludesRefund(), row.getSuccessfulRefundCny());
+    BigDecimal value = CommissionSettlementRules.commissionable(row);
     return value == null ? null : value.toPlainString();
   }
 }

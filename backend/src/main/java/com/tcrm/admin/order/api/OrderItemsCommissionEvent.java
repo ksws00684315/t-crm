@@ -29,7 +29,8 @@ public record OrderItemsCommissionEvent(
    *     order
    * @param settlementTime Weidian settlement time; null when unknown
    * @param completedTime trade completion time; null when unknown
-   * @param afterSales true when the line has an unconcluded refund (PROCESSING/UNKNOWN)
+   * @param afterSales true when any refund of the order is unconcluded (PROCESSING/UNKNOWN); one
+   *     order belongs to one creator, so every line of the order carries it (task 113)
    * @param basisCheckReason why the basis is missing (task 76: NO_SETTLEMENT / INCOME_MISMATCH /
    *     MULTIPLE_KOLS / ALLOCATION_FAILED); null when a basis was computed
    */

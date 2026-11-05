@@ -327,6 +327,67 @@ class OrderImportIT {
   }
 
   @Test
+  void shouldAccrueNetOfImportedPartialRefund() throws Exception {
+    // Task 113 refund import path: pay 100, rate 10%, a completed partial refund of 30 is imported
+    // → the accrual is (100 − 30) × 10% = 7.00.
+    clearCommission();
+    try {
+      jdbc.update(
+          "INSERT INTO crm_kol_promotion_record(id,tenant_id,kol_id,change_type,before_json,"
+              + "after_json,version_no,effective_time,create_time) VALUES(113001,1,100,'CONFIG',"
+              + "'{}'::jsonb,'{\"defaultRate\":\"0.1000\",\"configVersion\":1}'::jsonb,1,?,now())",
+          Timestamp.from(PAID.minusSeconds(3600)));
+      jdbc.update(
+          "INSERT INTO crm_order(id,tenant_id,shop_id,weidian_order_id,kol_id,order_status,"
+              + "raw_status,order_time,pay_time,total_amount,pay_amount,freight,discount,source,"
+              + "attribution_status,last_sync_time,create_time,update_time) VALUES(60,1,10,"
+              + "'8113002',100,'PAID','pay',?,?,100,100,0,0,1,'ATTRIBUTED',now(),now(),now())",
+          Timestamp.from(PAID),
+          Timestamp.from(PAID));
+      jdbc.update(
+          "INSERT INTO crm_order_item(id,tenant_id,order_id,sub_order_id,weidian_item_id,sku_id,"
+              + "item_name,sku_name,quantity,pay_amount,refund_amount,kol_id,attribution_type,"
+              + "create_time,update_time) VALUES(61,1,60,'sub-113','9001','','Line','',1,100,0,"
+              + "100,1,now(),now())");
+
+      String task =
+          submit(
+              "/admin-api/order/refund-imports",
+              refundWorkbook(
+                  List.of(
+                      List.of(
+                          "100",
+                          "RF-113",
+                          "8113002",
+                          "sub-113",
+                          "30.00",
+                          "2026-10-16 15:00:00",
+                          "2026-10-16 16:00:00"))),
+              "t113.xlsx");
+      assertThat(awaitTask(task).path("status").asText()).isEqualTo("SUCCESS");
+
+      Map<String, Object> state =
+          jdbc.queryForMap(
+              "SELECT verified, after_sales, successful_refund_cny, accrued_commission_cny"
+                  + " FROM crm_commission_item_state WHERE order_item_id = 61");
+      assertThat(state.get("verified")).isEqualTo(true);
+      assertThat(state.get("after_sales")).isEqualTo(false);
+      assertThat((java.math.BigDecimal) state.get("successful_refund_cny"))
+          .isEqualByComparingTo("30.00");
+      assertThat((java.math.BigDecimal) state.get("accrued_commission_cny"))
+          .isEqualByComparingTo("7.00");
+    } finally {
+      clearCommission();
+    }
+  }
+
+  private void clearCommission() {
+    jdbc.update("DELETE FROM crm_commission_item_revision");
+    jdbc.update("DELETE FROM crm_commission_item_state");
+    jdbc.update("DELETE FROM crm_kol_promotion_record");
+  }
+
+  @Test
   void shouldReplaceImportLines_whenApiSyncTakesOverSameOrder() throws Exception {
     List<List<String>> rows =
         List.of(

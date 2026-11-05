@@ -49,7 +49,8 @@ const columns = computed<DataColumn[]>(() => [
   { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
   { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
   { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
-  { key: "commission", label: t("orders.commissionAmount"), minWidth: 120, amount: true },
+  // Room for the after-sales tag next to the amount (task 113).
+  { key: "commission", label: t("orders.commissionAmount"), minWidth: 190, amount: true },
   {
     key: "settlementStatus",
     label: t("orders.settlementStatus"),
@@ -313,9 +314,14 @@ onMounted(() => {
       <template #cell-rate="{ row }"
         ><span data-test="order-rates">{{ rate(row) }}</span></template
       >
-      <template #cell-commission="{ row }">{{
-        commission(row) == null ? "—" : money(commission(row)!)
-      }}</template>
+      <template #cell-commission="{ row }"
+        >{{ commission(row) == null ? "—" : money(commission(row)!)
+        }}<el-tooltip v-if="row.afterSales" :content="t('orders.afterSalesHint')"
+          ><el-tag type="warning" class="after-sales-tag" data-test="order-after-sales">{{
+            t("orders.afterSales")
+          }}</el-tag></el-tooltip
+        ></template
+      >
       <template #cell-settlementStatus="{ row }"
         ><el-tag v-if="row.settlementStatus" :type="statusType(row.settlementStatus)">{{
           t(`orders.settlement.${row.settlementStatus}`)
@@ -352,6 +358,12 @@ onMounted(() => {
             >{{ t("orders.commissionAmount") }}:
             {{ commission(order) == null ? "—" : money(commission(order)!) }}</span
           >
+          <span
+            v-if="order.afterSales"
+            class="after-sales-note"
+            data-test="order-card-after-sales"
+            >{{ t("orders.afterSalesHint") }}</span
+          >
           <div
             v-for="(item, itemIndex) in order.items"
             :key="item.itemId ?? itemIndex"
@@ -375,6 +387,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.after-sales-tag {
+  margin-left: var(--tcrm-space-1);
+}
+.after-sales-note {
+  color: var(--el-color-warning);
+}
 /* A height the rows cannot change, or DataTable's ceiling shrinks with its own table. On a very short
    window the floor keeps the first row readable and hands scrolling to the page. */
 .orders-page {

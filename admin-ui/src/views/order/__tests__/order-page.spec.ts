@@ -318,7 +318,8 @@ describe("order list page (task 40)", () => {
       commission: {
         commissionableAmount: null,
         rates: ["0.1000", "0.1500"],
-        estimatedCommission: null
+        estimatedCommission: null,
+        afterSales: false
       }
     });
     const wrapper = await mountPage();

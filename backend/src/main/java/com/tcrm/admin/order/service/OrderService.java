@@ -398,7 +398,8 @@ public class OrderService {
     return new OrderDetailDTO.CommissionDTO(
         commission.allVerified() ? commission.commissionableCny() : null,
         List.copyOf(rates),
-        commission.allVerified() ? commission.netCommissionCny() : null);
+        commission.allVerified() ? commission.netCommissionCny() : null,
+        commission.afterSales());
   }
 
   /**

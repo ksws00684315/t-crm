@@ -61,7 +61,8 @@ class KolOrderControllerTest {
                     new java.math.BigDecimal("5.00"),
                     "WITHDRAWABLE",
                     new java.math.BigDecimal("0.1000"),
-                    new java.math.BigDecimal("2.50"))));
+                    new java.math.BigDecimal("2.50"))),
+            false);
     when(orders.page(any())).thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
 
     mvc.perform(
@@ -177,7 +178,8 @@ class KolOrderControllerTest {
                     new java.math.BigDecimal("5.00"),
                     "WITHDRAWABLE",
                     new java.math.BigDecimal("0.1000"),
-                    new java.math.BigDecimal("2.50"))));
+                    new java.math.BigDecimal("2.50"))),
+            false);
     when(orders.page(any())).thenReturn(new PageResult<>(List.of(order), 1, 1, 20));
 
     mvc.perform(

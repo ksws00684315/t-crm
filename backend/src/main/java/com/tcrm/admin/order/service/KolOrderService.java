@@ -150,7 +150,9 @@ public class KolOrderService {
                       money(payAmount),
                       money(refundAmount),
                       order.getPayTime() == null ? null : mostActiveStatus(ownStates),
-                      itemRows);
+                      itemRows,
+                      ownStates.stream()
+                          .anyMatch(CommissionOrderStateApi.ItemCommissionStateDTO::afterSales));
                 })
             .toList(),
         total,

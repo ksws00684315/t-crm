@@ -78,6 +78,8 @@ export default {
   view: "查看",
   refresh: "刷新",
   unverified: "待核实",
+  afterSalesShort: "售后处理中",
+  afterSalesHint: "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减",
   unverifiedNotice: "尚有 {count} 条待核实记录未计入金额，不能按零佣金理解。",
   balanceNote:
     "可提现＝累计佣金－冻结中－提现中－已提现－已抵扣。允许负余额；待抵扣预付不重复扣减。",

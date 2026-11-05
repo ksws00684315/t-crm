@@ -141,14 +141,16 @@ class KolAnalyticsServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.0300"),
                     new BigDecimal("3.00"),
-                    new BigDecimal("3.00")),
+                    new BigDecimal("3.00"),
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     22L,
                     701L,
                     "FROZEN",
                     new BigDecimal("0.0400"),
                     new BigDecimal("2.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     // Frozen over ALL live rows: (3.00 - 3.00) + (2.00 - 0.00) + (5.00 - 2.00) = 5.00.
     when(commissionStates.listByKol(anyLong()))
         .thenReturn(
@@ -159,21 +161,24 @@ class KolAnalyticsServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.0300"),
                     new BigDecimal("3.00"),
-                    new BigDecimal("3.00")),
+                    new BigDecimal("3.00"),
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     22L,
                     701L,
                     "FROZEN",
                     new BigDecimal("0.0400"),
                     new BigDecimal("2.00"),
-                    BigDecimal.ZERO),
+                    BigDecimal.ZERO,
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     99L,
                     800L,
                     "WITHDRAWABLE",
                     new BigDecimal("0.0500"),
                     new BigDecimal("5.00"),
-                    new BigDecimal("2.00"))));
+                    new BigDecimal("2.00"),
+                    false)));
 
     var overview = service.overview("2026-10-01T00:00:00+08:00", "2026-10-03T00:00:00+08:00");
 
