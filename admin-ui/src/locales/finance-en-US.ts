@@ -4,7 +4,7 @@ export default {
   withdrawalAmount: "Withdrawal amount",
   operationsNote: "Operations notes",
   orderProduct: "Product",
-  orderOccupied: "Withdrawing",
+  orderOccupied: "Applied for Withdrawal",
   moneyUnit: "Currency: {currency}",
   ordersPerPage: "{count} orders, {size} per page",
   orderSnapshotNote:
@@ -58,14 +58,14 @@ export default {
   currentNote:
     "Total commission, frozen and withdrawable are current totals. Paid amount is the CNY book value for the selected period.",
   paidNote:
-    "Paid amount = withdrawn + paid prepayments. Non-deductible paid prepayments are included for display and are not deducted from commission.",
+    "Paid amount = withdrawn in period + paid prepayments. Non-deductible paid prepayments are included for display and are not deducted from commission.",
   salesNote:
     "Orders are deduplicated by order payment time. Units count valid sales. Payment type limits payments and matching creators only.",
   estimated: "Total Commission",
   frozen: "Frozen",
   available: "Withdrawable",
   paid: "Paid amount",
-  commissionPaid: "Withdrawn",
+  commissionPaid: "Withdrawn in Period",
   prepayPaid: "Prepayments",
   occupied: "Withdrawing",
   pendingDeduction: "Pending Deduction",

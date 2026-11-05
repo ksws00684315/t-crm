@@ -521,7 +521,7 @@ describe("order chain page (task 40)", () => {
       "商品总价",
       "佣金比例",
       "预估佣金",
-      "提现中",
+      "已申请提现",
       "操作"
     ]);
     wrapper.unmount();

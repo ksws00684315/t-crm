@@ -82,7 +82,7 @@ export default {
   payment: "Payment result",
   balance: "Commission wallet balance",
   posted: "Deduction posted",
-  recovered: "Recovered",
+  recovered: "Deducted",
   remaining: "Pending Deduction",
   timeline: "Activity",
   yes: "Yes",

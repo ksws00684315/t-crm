@@ -75,7 +75,7 @@ export default {
   payment: "付款结果",
   balance: "佣金钱包余额",
   posted: "抵扣记账",
-  recovered: "已冲抵",
+  recovered: "已抵扣",
   remaining: "待抵扣",
   timeline: "操作轨迹",
   yes: "是",

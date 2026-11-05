@@ -9,7 +9,7 @@ export default {
   payTime: "支付时间",
   payMethod: "支付方式（自由填写）",
   balance: "佣金钱包余额",
-  recovered: "已冲抵",
+  recovered: "已抵扣",
   remaining: "待抵扣",
   posted: "抵扣记账",
   detail: "详情",

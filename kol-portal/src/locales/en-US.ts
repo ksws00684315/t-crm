@@ -226,7 +226,7 @@ const enUS = {
       INVALID: "Pending verification",
       NO_COMMISSION: "No commission",
       WITHDRAWING: "Withdrawing",
-      WITHDRAWABLE: "Available"
+      WITHDRAWABLE: "Withdrawable"
     },
     payTime: "Payment time",
     payAmount: "Paid",
@@ -288,9 +288,9 @@ const enUS = {
     withdrawConfirm: "Withdraw this request while it is under review?",
     withdrawSuccess: "The request has been withdrawn.",
     minimum: "Minimum withdrawal: {amount}",
-    availableBalance: "Available balance: {amount}",
-    occupiedBalance: "Withdrawal requests in progress: {amount}",
-    frozenBalance: "Frozen commission: {amount}",
+    availableBalance: "Withdrawable: {amount}",
+    occupiedBalance: "Withdrawing: {amount}",
+    frozenBalance: "Frozen: {amount}",
     estimatedBalance: "Total Commission: {amount}",
     withdrawalFrozen: "Withdrawals are temporarily disabled for this account.",
     unverifiedBlocked: "{count} commission item(s) still need verification.",
