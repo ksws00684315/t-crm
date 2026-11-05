@@ -1049,7 +1049,7 @@ public class WithdrawalService {
           for (OrderAmountDTO amount : orderItems.listOrderAmounts(orderIds)) {
             amountsByOrder.put(amount.orderId(), amount);
           }
-          Map<Long, List<String>> ratesByOrder = orderRates(orderIds);
+          Map<Long, List<String>> ratesByOrder = orderRates(orderIds, row.kolId());
           List<OrderView> items = new ArrayList<>();
           for (WithdrawalMapper.OrderSnapshotRow snapshot : snapshots) {
             List<ProductView> products =
@@ -1091,26 +1091,32 @@ public class WithdrawalService {
    * commission lines, ascending; the portal formats and joins them, so mixed-rate orders show every
    * snapshot instead of failing to parse one joined string.
    */
-  private Map<Long, List<String>> orderRates(List<Long> orderIds) {
-    List<CommissionItemStateDO> states = itemStates.listByOrderIds(orderIds);
+  private Map<Long, List<String>> orderRates(List<Long> orderIds, long kolId) {
+    if (orderIds.isEmpty()) {
+      return Map.of();
+    }
+    List<CommissionItemStateDO> states =
+        itemStates.listByOrderIds(orderIds).stream()
+            .filter(state -> Objects.equals(state.getKolId(), kolId))
+            .toList();
     if (states.isEmpty()) {
       return Map.of();
     }
     Map<Long, BigDecimal> rateByState =
         CommissionRateSnapshots.rateByStateId(
             itemRevisions, states.stream().map(CommissionItemStateDO::getId).toList());
-    Map<Long, TreeSet<String>> ratesByOrder = new HashMap<>();
+    Map<Long, TreeSet<BigDecimal>> ratesByOrder = new HashMap<>();
     for (CommissionItemStateDO state : states) {
       BigDecimal rate = rateByState.get(state.getId());
       if (rate != null) {
         ratesByOrder
             .computeIfAbsent(state.getOrderId(), k -> new TreeSet<>())
-            .add(rate.toPlainString());
+            .add(rate);
       }
     }
     Map<Long, List<String>> result = new HashMap<>();
     for (var entry : ratesByOrder.entrySet()) {
-      result.put(entry.getKey(), List.copyOf(entry.getValue()));
+      result.put(entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
     }
     return result;
   }

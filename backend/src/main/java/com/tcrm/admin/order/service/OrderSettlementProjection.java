@@ -10,6 +10,7 @@ import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -148,9 +149,9 @@ public class OrderSettlementProjection implements OrderSettlementApi {
             .stream()
             .map(row -> new Line(row.getKolId(), row.getQuantity() == null ? 0 : row.getQuantity()))
             .toList();
-    var byOrderLine = new java.util.HashMap<Long, List<Long>>();
-    var salesByKol = new java.util.HashMap<Long, BigDecimal>();
-    var linesById = new java.util.HashMap<Long, List<Line>>();
+    var byOrderLine = new HashMap<Long, List<Long>>();
+    var salesByKol = new HashMap<Long, BigDecimal>();
+    var linesById = new HashMap<Long, List<Line>>();
     // Order-level attribution: crm_order.kol_id is the order's single KOL (conflict orders have
     // null and are excluded by the wrapper); map every paid order to that KOL.
     for (OrderDO order : paidOrders) {
@@ -174,7 +175,7 @@ public class OrderSettlementProjection implements OrderSettlementApi {
               quantity,
               salesByKol
                   .getOrDefault(entry.getKey(), BigDecimal.ZERO)
-                  .setScale(2, java.math.RoundingMode.HALF_UP)));
+                  .setScale(2, RoundingMode.HALF_UP)));
     }
     return rows;
   }

@@ -710,6 +710,18 @@ class WithdrawalServiceTest {
   }
 
   @Test
+  void shouldReturnAnEmptyOrderPageWithoutQueryingRates() {
+    when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW"));
+    when(withdrawals.countOrderSnapshots(ID)).thenReturn(1L);
+    when(withdrawals.pageOrderSnapshots(ID, 20, 20L)).thenReturn(List.of());
+
+    var page = service.orders(reviewer("commission:view"), ID, 2, 20);
+
+    assertThat(page.items()).isEmpty();
+    verify(itemStates, never()).listByOrderIds(any());
+  }
+
+  @Test
   void shouldListEveryDistinctRateSnapshot_whenAnOrderHasMixedRates() {
     // Task 115 review: lines of one order may carry different rate snapshots; the portal formats
     // each one, so the port hands over the distinct values instead of a pre-joined string.
@@ -734,10 +746,15 @@ class WithdrawalServiceTest {
     second.setId(3022L);
     second.setOrderId(1009L);
     second.setKolId(KOL);
-    when(itemStates.listByOrderIds(List.of(1009L))).thenReturn(List.of(first, second));
+    var previousOwner = new CommissionItemStateDO();
+    previousOwner.setId(3023L);
+    previousOwner.setOrderId(1009L);
+    previousOwner.setKolId(KOL + 1);
+    when(itemStates.listByOrderIds(List.of(1009L)))
+        .thenReturn(List.of(first, second, previousOwner));
     var firstRate = new CommissionItemRevisionDO();
     firstRate.setItemStateId(3021L);
-    firstRate.setRate(new BigDecimal("0.1200"));
+    firstRate.setRate(new BigDecimal("1.0000"));
     var secondRate = new CommissionItemRevisionDO();
     secondRate.setItemStateId(3022L);
     secondRate.setRate(new BigDecimal("0.1500"));
@@ -747,7 +764,7 @@ class WithdrawalServiceTest {
     var page = service.orders(reviewer("commission:view"), ID, 1, 20);
 
     // Ascending and deduplicated; the same rate on two lines collapses into one entry.
-    assertThat(page.items().getFirst().rates()).containsExactly("0.1200", "0.1500");
+    assertThat(page.items().getFirst().rates()).containsExactly("0.1500", "1.0000");
   }
 
   @Test

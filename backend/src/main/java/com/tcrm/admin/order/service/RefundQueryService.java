@@ -21,6 +21,7 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -243,7 +244,7 @@ public class RefundQueryService {
    * (one order has one creator, {@code crm_order.kol_id}); unpaid or unattributed orders have none.
    */
   private Map<Long, CommissionView> commissionViews(
-      java.util.Collection<OrderDO> pageOrders, AccountDTO user) {
+      Collection<OrderDO> pageOrders, AccountDTO user) {
     Map<Long, CommissionView> result = new HashMap<>();
     if (pageOrders.isEmpty()) {
       return result;

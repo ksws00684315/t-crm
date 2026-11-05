@@ -160,15 +160,6 @@ public class OrderCommissionSync {
     orders.update(null, update);
   }
 
-  /**
-   * Whether the order is in after-sales: any refund row of the order is unconcluded (PROCESSING /
-   * UNKNOWN, §8.4), whether or not it maps to a single line. One order belongs to one creator, so
-   * the whole order is judged at once (task 113, 定稿 §2.1, owner 2026-11-05): every line blocks
-   * release and new withdrawal occupation, and unreleased commission counts 0 until the refund
-   * concludes. A successful refund is already netted from the basis, so it no longer blocks (task
-   * 81 PR review, 2026-10-30); CLOSED never blocks. Until M0 maps the real Weidian raw values,
-   * every raw status other than 10 is UNKNOWN (design §8.1a).
-   */
   /** A refund whose conclusion is unknown (or still running) keeps the order in after-sales. */
   static final List<String> UNCONCLUDED_REFUND_STATUSES = List.of("PROCESSING", "UNKNOWN");
 
@@ -181,6 +172,15 @@ public class OrderCommissionSync {
                     && UNCONCLUDED_REFUND_STATUSES.contains(refund.getRefundStatus()));
   }
 
+  /**
+   * Whether the order is in after-sales: any refund row of the order is unconcluded (PROCESSING /
+   * UNKNOWN, §8.4), whether or not it maps to a single line. One order belongs to one creator, so
+   * the whole order is judged at once (task 113, 定稿 §2.1, owner 2026-11-05): every line blocks
+   * release and new withdrawal occupation, and unreleased commission counts 0 until the refund
+   * concludes. A successful refund is already netted from the basis, so it no longer blocks (task
+   * 81 PR review, 2026-10-30); CLOSED never blocks. Until M0 maps the real Weidian raw values,
+   * every raw status other than 10 is UNKNOWN (design §8.1a).
+   */
   private boolean hasUnconcludedRefund(long orderId) {
     // The status column must be selected: the shared rule reads it from the fetched rows.
     return hasUnconcludedRefund(
