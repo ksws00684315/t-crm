@@ -979,6 +979,37 @@ class OrderServiceTest {
     assertThat(commission.commissionableAmount()).isEqualByComparingTo("100.00");
     assertThat(commission.rates()).containsExactly(new BigDecimal("0.1000"));
     assertThat(commission.estimatedCommission()).isEqualByComparingTo("10.00");
+    assertThat(commission.afterSales()).isFalse();
+  }
+
+  @Test
+  void shouldFlagDetailCommissionAfterSales_whenAnyLineIsOnAfterSales() {
+    // Task 113: an order in after-sales shows its unreleased commission as 0.00 plus a hint.
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                BigDecimal.ZERO,
+                true,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L,
+                        new BigDecimal("0.1000"),
+                        false,
+                        new BigDecimal("0.00"),
+                        "AFTER_SALES",
+                        BigDecimal.ZERO,
+                        List.of(),
+                        new BigDecimal("0.00"))),
+                List.of(),
+                new BigDecimal("0.00")));
+
+    var commission = service.detail(10L).commission();
+
+    assertThat(commission.afterSales()).isTrue();
+    assertThat(commission.commissionableAmount()).isEqualByComparingTo("0.00");
+    assertThat(commission.estimatedCommission()).isEqualByComparingTo("0.00");
   }
 
   @Test

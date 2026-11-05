@@ -223,14 +223,19 @@ public class OrderChainCommissionService implements OrderChainCommissionApi {
 
   /**
    * Commissionable amount of a verified snapshot (task 112): the same effective basis the accrual
-   * multiplies by the rate, so 预估佣金 = 计佣金额 × 佣金比例 holds on screen. Unverified → null.
+   * multiplies by the rate, so 预估佣金 = 计佣金额 × 佣金比例 holds on screen; 0.00 for unreleased lines of an
+   * order in after-sales (task 113). Unverified → null.
    */
   private static BigDecimal commissionable(CommissionItemStateDO state) {
     if (state == null || !Boolean.TRUE.equals(state.getVerified())) {
       return null;
     }
-    return CommissionSettlementRules.effectiveBasis(
-        state.getBasisCny(), state.getBasisIncludesRefund(), state.getSuccessfulRefundCny());
+    return CommissionSettlementRules.commissionable(
+        state.getBasisCny(),
+        state.getBasisIncludesRefund(),
+        state.getSuccessfulRefundCny(),
+        Boolean.TRUE.equals(state.getAfterSales()),
+        state.getReleasedCommissionCny());
   }
 
   /**

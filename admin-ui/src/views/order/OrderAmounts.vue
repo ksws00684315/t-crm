@@ -90,7 +90,13 @@ const rateText = computed(() => {
       <el-descriptions-item :label="t('order.amounts.estimatedCommission')"
         ><span data-test="order-amounts-estimated">{{
           money(detail.commission.estimatedCommission, t("finance.unverified"))
-        }}</span></el-descriptions-item
+        }}</span
+        ><span
+          v-if="detail.commission.afterSales"
+          class="order-amounts__after-sales"
+          data-test="order-amounts-after-sales"
+          >{{ t("finance.afterSalesHint") }}</span
+        ></el-descriptions-item
       >
     </template>
     <template v-else>
@@ -123,5 +129,10 @@ const rateText = computed(() => {
 }
 .order-amounts__hidden {
   color: var(--el-text-color-secondary);
+}
+/* Task 113: why the commission counts 0 / stays frozen while a refund is open. */
+.order-amounts__after-sales {
+  display: block;
+  color: var(--el-color-warning);
 }
 </style>

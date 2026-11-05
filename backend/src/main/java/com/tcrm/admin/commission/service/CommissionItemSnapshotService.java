@@ -143,6 +143,15 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
     // applications were locked at the start of this transaction, so applying the flip here cannot
     // deadlock with the payment registration.
     boolean wasBlocked = row.getId() != null && pauses.isItemBlocked(row.getId());
+    Long previousKol = row.getKolId();
+    BigDecimal previousReleased =
+        row.getReleasedCommissionCny() == null ? ZERO : row.getReleasedCommissionCny();
+    // Ownership change: claw the released amount back from the previous KOL's wallet (design
+    // §8.3 / ADR-032 §10); the new owner accrues from zero and releases later.
+    boolean ownershipChanged =
+        previousKol != null
+            && !Objects.equals(previousKol, item.kolId())
+            && previousReleased.signum() > 0;
     CommissionSettlementRules.Result result =
         CommissionSettlementRules.evaluate(
             new CommissionSettlementRules.Inputs(
@@ -156,19 +165,13 @@ public class CommissionItemSnapshotService implements CommissionItemApi {
                 item.settlementTime(),
                 item.completedTime(),
                 item.afterSales(),
-                rule.freezeDays()));
+                rule.freezeDays(),
+                // After-sales caps the accrual at what the owner already received, so nothing is
+                // clawed back while the refund is open (task 113); a new owner holds nothing yet.
+                ownershipChanged ? ZERO : previousReleased));
 
-    Long previousKol = row.getKolId();
-    BigDecimal previousReleased =
-        row.getReleasedCommissionCny() == null ? ZERO : row.getReleasedCommissionCny();
     BigDecimal released = previousReleased;
     BigDecimal walletDelta = ZERO;
-    // Ownership change: claw the released amount back from the previous KOL's wallet (design
-    // §8.3 / ADR-032 §10); the new owner accrues from zero and releases later.
-    boolean ownershipChanged =
-        previousKol != null
-            && !Objects.equals(previousKol, item.kolId())
-            && previousReleased.signum() > 0;
     if (ownershipChanged) {
       BigDecimal clawback = previousReleased.negate();
       wallet.postCommissionAdjustment(

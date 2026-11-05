@@ -301,6 +301,100 @@ class CommissionSettlementRulesTest {
     assertThat(result.releaseAt()).isNull();
   }
 
+  @Test
+  void shouldAccrueZeroForUnreleasedLineInAfterSales() {
+    // Task 113 (定稿 §2.1): pay 100, rate 10%, nothing released, refund open → accrual 0.
+    var result = CommissionSettlementRules.evaluate(afterSalesInputs(null, true, null));
+    assertThat(result.verified()).isTrue();
+    assertThat(result.accruedCny()).isEqualByComparingTo("0.00");
+    assertThat(result.effectiveBasisCny()).isEqualByComparingTo("0.00");
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertThat(result.releaseAt()).isNull();
+  }
+
+  @Test
+  void shouldKeepReleasedAccrualFrozenInAfterSales() {
+    // Released 10.00 before the refund opened: the accrual stays 10.00 (never below released), so
+    // the snapshot service writes no clawback.
+    var result =
+        CommissionSettlementRules.evaluate(afterSalesInputs(null, true, new BigDecimal("10.00")));
+    assertThat(result.accruedCny()).isEqualByComparingTo("10.00");
+    assertThat(result.effectiveBasisCny()).isEqualByComparingTo("100.00");
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+  }
+
+  @Test
+  void shouldRestoreAccrualWhenRefundIsRejected() {
+    // Rejected or closed: no longer after-sales, the regular rule applies again.
+    var result = CommissionSettlementRules.evaluate(afterSalesInputs(null, false, null));
+    assertThat(result.accruedCny()).isEqualByComparingTo("10.00");
+    assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_CONFIRMED);
+  }
+
+  @Test
+  void shouldAccrueNetOfPartialRefundOnceItSucceeds() {
+    var result =
+        CommissionSettlementRules.evaluate(
+            afterSalesInputs(new BigDecimal("30.00"), false, new BigDecimal("10.00")));
+    assertThat(result.accruedCny()).isEqualByComparingTo("7.00");
+  }
+
+  @Test
+  void shouldAccrueZeroOnceFullRefundSucceeds() {
+    var result =
+        CommissionSettlementRules.evaluate(
+            afterSalesInputs(new BigDecimal("100.00"), false, new BigDecimal("10.00")));
+    assertThat(result.accruedCny()).isEqualByComparingTo("0.00");
+  }
+
+  @Test
+  void shouldCapAfterSalesAccrualAtNetOfAnEarlierSuccessfulRefund() {
+    // A refund of 30 already succeeded and another is open: the open one keeps the line frozen,
+    // the successful one is deducted (7.00 < released 10.00 → the service claws back 3.00).
+    var result =
+        CommissionSettlementRules.evaluate(
+            afterSalesInputs(new BigDecimal("30.00"), true, new BigDecimal("10.00")));
+    assertThat(result.accruedCny()).isEqualByComparingTo("7.00");
+  }
+
+  @Test
+  void shouldShowCommissionableZeroOnlyForUnreleasedAfterSalesLines() {
+    BigDecimal basis = new BigDecimal("100.00");
+    assertThat(CommissionSettlementRules.commissionable(basis, false, null, true, null))
+        .isEqualByComparingTo("0.00");
+    assertThat(
+            CommissionSettlementRules.commissionable(
+                basis, false, null, true, new BigDecimal("0.00")))
+        .isEqualByComparingTo("0.00");
+    assertThat(
+            CommissionSettlementRules.commissionable(
+                basis, false, null, true, new BigDecimal("10.00")))
+        .isEqualByComparingTo("100.00");
+    assertThat(
+            CommissionSettlementRules.commissionable(
+                basis, false, new BigDecimal("30.00"), false, null))
+        .isEqualByComparingTo("70.00");
+    assertThat(CommissionSettlementRules.commissionable(null, false, null, true, null)).isNull();
+  }
+
+  /** Pay 100, rate 10%, confirmed settlement; refund, after-sales flag and released vary. */
+  private static CommissionSettlementRules.Inputs afterSalesInputs(
+      BigDecimal successfulRefund, boolean afterSales, BigDecimal released) {
+    return new CommissionSettlementRules.Inputs(
+        new BigDecimal("100.00"),
+        false,
+        successfulRefund,
+        10L,
+        1,
+        new BigDecimal("0.1000"),
+        "CONFIRMED",
+        SETTLED,
+        null,
+        afterSales,
+        7,
+        released);
+  }
+
   private static CommissionSettlementRules.Inputs inputs(
       BigDecimal basis,
       Boolean includesRefund,
@@ -324,6 +418,7 @@ class CommissionSettlementRulesTest {
         settlementTime,
         completedTime,
         afterSales,
-        freezeDays);
+        freezeDays,
+        null);
   }
 }

@@ -82,6 +82,33 @@ class OrderCommissionSyncTest {
 
   @Test
   @SuppressWarnings("unchecked")
+  void shouldMarkEveryLineAfterSalesWhenOneLineHasAnOpenRefund() {
+    // Task 113 (定稿 §2.1): one order belongs to one creator, so an open refund on line 9001 puts
+    // the whole order in after-sales, line 9002 included; the order stays verified.
+    when(refunds.selectList(any(LambdaQueryWrapper.class)))
+        .thenReturn(List.of(refund(9001L, "UNKNOWN")));
+    when(flows.listByRemoteOrderId(anyLong(), anyString())).thenReturn(List.of());
+    OrderDO order = order(null);
+    TestTransactions.template()
+        .executeWithoutResult(
+            status ->
+                sync.sync(
+                    order,
+                    List.of(
+                        item(9001L, 101L, 1, null, "60.00"), item(9002L, 101L, 1, null, "40.00"))));
+    ArgumentCaptor<OrderItemsCommissionEvent> captor =
+        ArgumentCaptor.forClass(OrderItemsCommissionEvent.class);
+    verify(events).publishEvent(captor.capture());
+    assertThat(captor.getValue().items())
+        .extracting(OrderItemsCommissionEvent.ItemFacts::afterSales)
+        .containsExactly(true, true);
+    assertThat(captor.getValue().items())
+        .extracting(OrderItemsCommissionEvent.ItemFacts::basisCheckReason)
+        .containsOnly("NO_SETTLEMENT");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
   void shouldCarrySettlementRefundGapIntoSuccessfulRefundOnce() {
     // Goods income 6.00 matches pay 6.00; the flows show a refund 0.60 that no CRM record has.
     // The gap is netted into the line's successful refund, the basis stays the pay amount.

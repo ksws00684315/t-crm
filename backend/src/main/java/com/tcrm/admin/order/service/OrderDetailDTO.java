@@ -59,9 +59,15 @@ public record OrderDetailDTO(
    *     accrued
    * @param estimatedCommission 预估佣金: the chain funds {@code kolCommission}; null while any line is
    *     unverified
+   * @param afterSales the order is in after-sales (any line released on {@code AFTER_SALES}, task
+   *     113): unreleased commission counts 0 and released commission is frozen until the refund
+   *     concludes; the UI shows the after-sales hint
    */
   record CommissionDTO(
-      BigDecimal commissionableAmount, List<BigDecimal> rates, BigDecimal estimatedCommission) {}
+      BigDecimal commissionableAmount,
+      List<BigDecimal> rates,
+      BigDecimal estimatedCommission,
+      boolean afterSales) {}
 
   /** One product line of the detail view (row 09.04). */
   record OrderDetailItemDTO(

@@ -55,6 +55,31 @@ class KolOrderServiceTest {
   }
 
   @Test
+  void shouldMarkTheOrderAfterSalesWhenAnyOwnLineIs() {
+    // Task 113: the portal shows the after-sales hint from the order-level flag.
+    OrderDO order = order(21L, "123456789012", "ATTRIBUTED", "PAID");
+    order.setPayAmount(new BigDecimal("30.00"));
+    when(orders.selectPage(any(), any())).thenReturn(page(order));
+    when(commissionStates.listByOrderItemIds(anyLong(), any()))
+        .thenReturn(
+            List.of(
+                new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+                    21L,
+                    21L,
+                    com.tcrm.admin.order.api.CommissionOrderStateApi.STATUS_FROZEN,
+                    new BigDecimal("0.1000"),
+                    new BigDecimal("0.00"),
+                    new BigDecimal("0.00"),
+                    true)));
+
+    var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
+
+    assertThat(result.items().getFirst().afterSales()).isTrue();
+    assertThat(result.items().getFirst().items().getFirst().commissionAmount())
+        .isEqualByComparingTo("0.00");
+  }
+
+  @Test
   void shouldReturnMaskedOrderWithOrderPayAmountIncludingFreight() {
     // Task 112: the order amount is the order pay amount (goods 25 + freight 5 = 30), not the
     // sum of the creator's lines.
@@ -85,7 +110,8 @@ class KolOrderServiceTest {
                         new BigDecimal("5.00"),
                         com.tcrm.admin.order.api.CommissionOrderStateApi.STATUS_INVALID,
                         null,
-                        null))));
+                        null)),
+                false));
     var query = ArgumentCaptor.forClass(Wrapper.class);
     verify(orders).selectPage(any(), query.capture());
     assertThat(query.getValue().getSqlSegment())

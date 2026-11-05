@@ -236,7 +236,12 @@ const orderDetail: OrderDetailVO = {
 /** The detail as commission:view viewers receive it: the order-level commission block filled. */
 const financedDetail: OrderDetailVO = {
   ...orderDetail,
-  commission: { commissionableAmount: "160.00", rates: ["0.1000"], estimatedCommission: "16.00" }
+  commission: {
+    commissionableAmount: "160.00",
+    rates: ["0.1000"],
+    estimatedCommission: "16.00",
+    afterSales: false
+  }
 };
 
 function signIn(role: Role, permissions: string[], dataScope: "ALL" | "OWN" = "ALL") {
@@ -765,6 +770,37 @@ describe("order chain page (task 40)", () => {
     expect(funds).toContain("¥160.00");
     expect(funds).toContain("10%");
     expect(funds).toContain("¥16.00");
+    wrapper.unmount();
+  });
+
+  it("explains a zero estimated commission while the order is in after-sales (task 113)", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue({
+      ...financedDetail,
+      commission: {
+        commissionableAmount: "0.00",
+        rates: ["0.1000"],
+        estimatedCommission: "0.00",
+        afterSales: true
+      }
+    });
+    const { wrapper } = await mountPage();
+    const funds = wrapper.get('[data-test="chain-funds"]');
+    expect(funds.get('[data-test="order-amounts-estimated"]').text()).toBe("¥0.00");
+    expect(funds.get('[data-test="order-amounts-after-sales"]').text()).toBe(
+      "售后处理中，暂不计佣；已释放部分冻结，退款成功后按退款金额扣减"
+    );
+    expect(funds.get('[data-test="order-amounts"]').text()).not.toContain("待核实");
+    wrapper.unmount();
+  });
+
+  it("drops the after-sales hint once the refund concludes (task 113)", async () => {
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    vi.mocked(orderApi.getOrderChain).mockResolvedValue(financedChain);
+    vi.mocked(orderApi.getOrder).mockResolvedValue(financedDetail);
+    const { wrapper } = await mountPage();
+    expect(wrapper.find('[data-test="order-amounts-after-sales"]').exists()).toBe(false);
     wrapper.unmount();
   });
 

@@ -250,6 +250,8 @@ export interface CreatorOrder {
   payAmount: string;
   refundAmount: string;
   items: CreatorOrderLine[];
+  /** The order is in after-sales (task 113): unreleased commission counts 0, released is frozen. */
+  afterSales?: boolean;
 }
 
 export interface CreatorOrderPage {

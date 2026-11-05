@@ -309,12 +309,17 @@ public class CommissionSettlementDetailService {
 
   /**
    * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
-   * accrual is computed from — not the raw source basis. Null when the source has no basis.
+   * accrual is computed from — not the raw source basis; 0.00 for unreleased lines of an order in
+   * after-sales (task 113). Null when the source has no basis.
    */
   private static String commissionableText(CommissionItemStateDO row) {
     BigDecimal value =
-        CommissionSettlementRules.effectiveBasis(
-            row.getBasisCny(), row.getBasisIncludesRefund(), row.getSuccessfulRefundCny());
+        CommissionSettlementRules.commissionable(
+            row.getBasisCny(),
+            row.getBasisIncludesRefund(),
+            row.getSuccessfulRefundCny(),
+            Boolean.TRUE.equals(row.getAfterSales()),
+            row.getReleasedCommissionCny());
     return value == null ? null : value.toPlainString();
   }
 }

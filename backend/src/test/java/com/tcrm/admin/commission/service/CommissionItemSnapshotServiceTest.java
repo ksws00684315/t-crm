@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tcrm.admin.commission.api.CommissionItemApi.ItemSourceDTO;
@@ -190,6 +191,64 @@ class CommissionItemSnapshotServiceTest {
     verify(states).updateById(row.capture());
     assertThat(row.getValue().getReleasedCommissionCny()).isEqualByComparingTo("5.00");
     assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("5.00");
+  }
+
+  @Test
+  void shouldZeroUnreleasedAccrualInAfterSales_andRestoreWhenRefundIsRejected() {
+    // Task 113: pay 100, rate 10%, nothing released.
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    CommissionItemStateDO row = firstRevision(new BigDecimal("100.00"));
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+
+    syncAfterSales(true);
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("0.00");
+    assertThat(row.getReleaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    assertThat(row.getVerified()).isTrue();
+
+    syncAfterSales(false);
+    assertThat(row.getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getReleaseBasis()).isNotEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    verifyNoInteractions(wallet);
+  }
+
+  @Test
+  void shouldKeepReleasedAccrualWithoutAnyLedgerEntryInAfterSales() {
+    // Released 10.00, then a refund opens: the released money stays, frozen, no clawback.
+    CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");
+    existing.setSourceVersion("old");
+    when(states.lockByOrderItemId(9001L)).thenReturn(existing);
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    syncAfterSales(true);
+    ArgumentCaptor<CommissionItemStateDO> row =
+        ArgumentCaptor.forClass(CommissionItemStateDO.class);
+    verify(states).updateById(row.capture());
+    assertThat(row.getValue().getAccruedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getValue().getReleasedCommissionCny()).isEqualByComparingTo("10.00");
+    assertThat(row.getValue().getReleaseBasis())
+        .isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
+    verifyNoInteractions(wallet);
+  }
+
+  @Test
+  void shouldDeductReleasedCommissionOnlyWhenThePartialRefundSucceeds() {
+    // Released 10.00 → refund open (no entry) → refund 30 succeeds → 7.00, clawback −3.00.
+    CommissionItemStateDO existing = verifiedRow(9001L, KOL_A, "100.00", "10.00");
+    existing.setSourceVersion("old");
+    when(states.lockByOrderItemId(9001L)).thenReturn(existing);
+    whenRateAtPayTime(KOL_A, "0.1000", 3);
+    syncAfterSales(true);
+    verifyNoInteractions(wallet);
+    syncRefund(new BigDecimal("30.00"));
+    verify(wallet)
+        .postCommissionAdjustment(
+            eq(TENANT),
+            eq(KOL_A),
+            eq(existing.getId()),
+            any(String.class),
+            eq(new BigDecimal("-3.00")),
+            eq(NOW));
+    assertThat(existing.getAccruedCommissionCny()).isEqualByComparingTo("7.00");
+    assertThat(existing.getReleasedCommissionCny()).isEqualByComparingTo("7.00");
   }
 
   @Test
