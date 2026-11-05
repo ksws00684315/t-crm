@@ -18,6 +18,7 @@ const order: CreatorOrder = {
   orderStatus: "PAID",
   settlementStatus: "WITHDRAWABLE",
   payAmount: "128.00",
+  afterSales: false,
   refundAmount: "8.00",
   items: [
     {

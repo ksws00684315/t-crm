@@ -307,7 +307,8 @@ class CommissionSettlementRulesTest {
     var result = CommissionSettlementRules.evaluate(afterSalesInputs(null, true, null));
     assertThat(result.verified()).isTrue();
     assertThat(result.accruedCny()).isEqualByComparingTo("0.00");
-    assertThat(result.effectiveBasisCny()).isEqualByComparingTo("0.00");
+    // The result keeps the real effective basis; only the display reads 0.00 (commissionable).
+    assertThat(result.effectiveBasisCny()).isEqualByComparingTo("100.00");
     assertThat(result.releaseBasis()).isEqualTo(CommissionSettlementRules.RELEASE_AFTER_SALES);
     assertThat(result.releaseAt()).isNull();
   }

@@ -395,13 +395,11 @@ public class OrderService {
         rates.add(rate);
       }
     }
-    boolean afterSales =
-        commission.lines().stream().anyMatch(line -> "AFTER_SALES".equals(line.releaseBasis()));
     return new OrderDetailDTO.CommissionDTO(
         commission.allVerified() ? commission.commissionableCny() : null,
         List.copyOf(rates),
         commission.allVerified() ? commission.netCommissionCny() : null,
-        afterSales);
+        commission.afterSales());
   }
 
   /**

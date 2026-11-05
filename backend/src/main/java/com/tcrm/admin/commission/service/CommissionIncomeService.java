@@ -152,7 +152,8 @@ public class CommissionIncomeService {
       String direction,
       String subject,
       Long kolId,
-      String kol) {}
+      String kol,
+      boolean afterSales) {}
 
   /** Payment row of the income detail: a paid withdrawal or a prepay payment. */
   public record PaymentLine(
@@ -426,7 +427,8 @@ public class CommissionIncomeService {
               adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
-              kol.name()));
+              kol.name(),
+              Boolean.TRUE.equals(row.getAfterSales())));
     }
     return lines;
   }
@@ -616,13 +618,7 @@ public class CommissionIncomeService {
    * after-sales (task 113). Null when the source has no basis.
    */
   private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value =
-        CommissionSettlementRules.commissionable(
-            row.getBasisCny(),
-            row.getBasisIncludesRefund(),
-            row.getSuccessfulRefundCny(),
-            Boolean.TRUE.equals(row.getAfterSales()),
-            row.getReleasedCommissionCny());
+    BigDecimal value = CommissionSettlementRules.commissionable(row);
     return value == null ? null : value.toPlainString();
   }
 }

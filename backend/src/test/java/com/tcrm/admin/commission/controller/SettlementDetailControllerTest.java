@@ -65,7 +65,8 @@ class SettlementDetailControllerTest {
                                 "CREDIT",
                                 "KOL",
                                 77L,
-                                "Kol A")))),
+                                "Kol A",
+                                false)))),
                 1,
                 1,
                 20));
@@ -106,7 +107,8 @@ class SettlementDetailControllerTest {
         .andExpect(jsonPath("$.data.items[0].lines[0].businessAt").value("2026-10-10T08:00:00Z"))
         .andExpect(jsonPath("$.data.items[0].lines[0].direction").value("CREDIT"))
         .andExpect(jsonPath("$.data.items[0].lines[0].subject").value("KOL"))
-        .andExpect(jsonPath("$.data.items[0].lines[0].kol").value("Kol A"));
+        .andExpect(jsonPath("$.data.items[0].lines[0].kol").value("Kol A"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].afterSales").value(false));
   }
 
   @Test

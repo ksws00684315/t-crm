@@ -279,7 +279,8 @@ class KolOrderServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.1000"),
                     new BigDecimal("2.50"),
-                    new BigDecimal("2.50"))));
+                    new BigDecimal("2.50"),
+                    false)));
 
     var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 20));
 
@@ -304,7 +305,8 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     when(items.selectList(any()))
         .thenReturn(List.of(item(21L, 700L, "25.00", "5.00"), item(22L, 700L, "10.00", "0.00")));
 
@@ -327,7 +329,8 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     // The enriched page stage resolves the same line through the item-id port.
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(
@@ -338,7 +341,8 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
 
     var result = service.page(new KolOrderFilterDTO(null, null, null, null, null, "FROZEN", 1, 20));
 
@@ -363,14 +367,16 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO),
+                    BigDecimal.ZERO,
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     31L,
                     31L,
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(
             List.of(
@@ -380,7 +386,8 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
 
     var result =
@@ -408,14 +415,16 @@ class KolOrderServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.1000"),
                     new BigDecimal("3.00"),
-                    new BigDecimal("3.00")),
+                    new BigDecimal("3.00"),
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     31L,
                     31L,
                     "WITHDRAWABLE",
                     new BigDecimal("0.1000"),
                     new BigDecimal("3.00"),
-                    new BigDecimal("3.00"))));
+                    new BigDecimal("3.00"),
+                    false)));
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(
             List.of(
@@ -425,7 +434,8 @@ class KolOrderServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.1000"),
                     new BigDecimal("3.00"),
-                    new BigDecimal("3.00"))));
+                    new BigDecimal("3.00"),
+                    false)));
     when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
 
     var result =
@@ -451,7 +461,8 @@ class KolOrderServiceTest {
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
 
     // Asking for WITHDRAWABLE when the only line is FROZEN: an empty page, no item queries.
     var result =
@@ -477,14 +488,16 @@ class KolOrderServiceTest {
                     "WITHDRAWABLE",
                     new BigDecimal("0.1000"),
                     new BigDecimal("2.00"),
-                    new BigDecimal("2.00")),
+                    new BigDecimal("2.00"),
+                    false),
                 new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
                     21L,
                     22L,
                     "FROZEN",
                     new BigDecimal("0.1000"),
                     new BigDecimal("1.00"),
-                    BigDecimal.ZERO)));
+                    BigDecimal.ZERO,
+                    false)));
     when(items.selectList(any()))
         .thenReturn(List.of(item(21L, 700L, "25.00", "5.00"), item(22L, 700L, "10.00", "0.00")));
 
@@ -504,7 +517,7 @@ class KolOrderServiceTest {
   private static com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO state(
       long orderId, long itemId, String status) {
     return new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
-        orderId, itemId, status, new BigDecimal("0.1000"), BigDecimal.ONE, BigDecimal.ZERO);
+        orderId, itemId, status, new BigDecimal("0.1000"), BigDecimal.ONE, BigDecimal.ZERO, false);
   }
 
   private static OrderItemDO summaryLine(long id, String pay, String refund) {

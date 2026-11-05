@@ -734,7 +734,8 @@ class OrderServiceTest {
                         List.of(),
                         null)),
                 List.of(),
-                null));
+                null,
+                false));
     error(
         () -> service.supplementRate(10L, 20L, new BigDecimal("0.1"), "test"),
         ErrorCode.ORDER_COMMISSION_RATE_EXISTS);
@@ -764,7 +765,7 @@ class OrderServiceTest {
     when(commissionChain.chainOfOrder(10L, List.of(20L)))
         .thenReturn(
             new OrderChainCommissionApi.OrderCommissionChainDTO(
-                BigDecimal.ZERO, false, List.of(), List.of(), null));
+                BigDecimal.ZERO, false, List.of(), List.of(), null, false));
     return order;
   }
 
@@ -972,7 +973,8 @@ class OrderServiceTest {
                         List.of(),
                         new BigDecimal("100.00"))),
                 List.of(),
-                new BigDecimal("100.00")));
+                new BigDecimal("100.00"),
+                false));
 
     var commission = service.detail(10L).commission();
 
@@ -1003,7 +1005,8 @@ class OrderServiceTest {
                         List.of(),
                         new BigDecimal("0.00"))),
                 List.of(),
-                new BigDecimal("0.00")));
+                new BigDecimal("0.00"),
+                true));
 
     var commission = service.detail(10L).commission();
 
@@ -1013,13 +1016,37 @@ class OrderServiceTest {
   }
 
   @Test
+  void shouldFlagDetailCommissionAfterSales_evenWhenALineIsUnverified() {
+    // Review of PR #206: the flag comes from the snapshots, not from releaseBasis, so an
+    // unverified line (release basis UNVERIFIED) of an order in after-sales still gets the hint.
+    amountOrder("100.00");
+    when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
+    when(commissionChain.chainOfOrder(eq(10L), any()))
+        .thenReturn(
+            new OrderChainCommissionApi.OrderCommissionChainDTO(
+                BigDecimal.ZERO,
+                false,
+                List.of(
+                    new OrderChainCommissionApi.LineCommissionDTO(
+                        20L, null, false, null, "UNVERIFIED", BigDecimal.ZERO, List.of(), null)),
+                List.of(),
+                null,
+                true));
+
+    var commission = service.detail(10L).commission();
+
+    assertThat(commission.afterSales()).isTrue();
+    assertThat(commission.estimatedCommission()).isNull();
+  }
+
+  @Test
   void shouldShowDetailCommissionAsUnverified_whenAnyLineIsUnverified() {
     amountOrder("100.00");
     when(account.effectivePermissions()).thenReturn(List.of("order:view", "commission:view"));
     when(commissionChain.chainOfOrder(eq(10L), any()))
         .thenReturn(
             new OrderChainCommissionApi.OrderCommissionChainDTO(
-                BigDecimal.ZERO, false, List.of(), List.of(), null));
+                BigDecimal.ZERO, false, List.of(), List.of(), null, false));
 
     var commission = service.detail(10L).commission();
 
@@ -1167,7 +1194,8 @@ class OrderServiceTest {
                         PAID.plusSeconds(1),
                         PAID.plusSeconds(3600),
                         "W20261016000001")),
-                null));
+                null,
+                false));
 
     var chain = service.chain(10L);
 
@@ -1232,7 +1260,7 @@ class OrderServiceTest {
     when(commissionChain.chainOfOrder(eq(10L), any()))
         .thenReturn(
             new OrderChainCommissionApi.OrderCommissionChainDTO(
-                new BigDecimal("0.00"), true, List.of(), List.of(), new BigDecimal("0.00")));
+                new BigDecimal("0.00"), true, List.of(), List.of(), new BigDecimal("0.00"), false));
 
     var chain = service.chain(10L);
 

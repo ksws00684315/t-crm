@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -96,6 +97,16 @@ public final class CommissionSettlementRules {
     return effective;
   }
 
+  /** {@link #commissionable} of a stored snapshot: the one entry for every 计佣金额 display. */
+  public static BigDecimal commissionable(CommissionItemStateDO row) {
+    return commissionable(
+        row.getBasisCny(),
+        row.getBasisIncludesRefund(),
+        row.getSuccessfulRefundCny(),
+        Boolean.TRUE.equals(row.getAfterSales()),
+        row.getReleasedCommissionCny());
+  }
+
   /** Accrued commission = round_half_up(effective amount × rate, 2); unverified lines accrue 0. */
   public static BigDecimal accrue(BigDecimal effectiveBasisCny, BigDecimal rate) {
     if (effectiveBasisCny == null || rate == null) {
@@ -122,18 +133,9 @@ public final class CommissionSettlementRules {
       // min(accrual, released) — unreleased commission counts 0, released commission stays frozen
       // and is never clawed back here, so no ledger entry arises; a successful refund deducts
       // later.
+      // The result keeps the real effective basis; the displayed 0.00 lives in commissionable.
       BigDecimal released = in.releasedCny() == null ? ZERO : in.releasedCny();
-      return new Result(
-          true,
-          commissionable(
-              in.basisCny(),
-              in.basisIncludesRefund(),
-              in.successfulRefundCny(),
-              true,
-              in.releasedCny()),
-          accrued.min(released),
-          RELEASE_AFTER_SALES,
-          null);
+      return new Result(true, effective, accrued.min(released), RELEASE_AFTER_SALES, null);
     }
     // Owner 2026-11-03 (L-052): freeze days win over settlement confirmation when completedTime
     // is present; CONFIRMED only applies when there is no completedTime.

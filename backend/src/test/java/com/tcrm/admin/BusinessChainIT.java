@@ -426,6 +426,7 @@ class BusinessChainIT {
     assertThat(world.payWithdrawalOutcome(withdrawalId, "2.00")).isEqualTo("409 WITHDRAWAL_PAUSED");
     // No ledger entry: released money stays, frozen; 累计 6.50 = 冻结 4.50 + 可提现 0 + 提现中 2.00.
     ChainWorld.assertLedger(world.ledger(), "COMMISSION_CREDIT=4.33", "COMMISSION_CREDIT=2.17");
+    assertThat(world.walletBalance()).isEqualByComparingTo("6.50");
     ChainWorld.money(world.overview().at("/income/frozen"), "4.50");
     ChainWorld.money(world.overview().at("/income/available"), "0.00");
     assertFiveLayers(world.overview().path("income"), "6.50");

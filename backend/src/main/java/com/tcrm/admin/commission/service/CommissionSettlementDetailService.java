@@ -100,7 +100,8 @@ public class CommissionSettlementDetailService {
       String direction,
       String subject,
       Long kolId,
-      String kol) {}
+      String kol,
+      boolean afterSales) {}
 
   @Transactional(readOnly = true)
   public PageResult<SettlementRow> page(AccountDTO user, DetailFilter filter) {
@@ -266,7 +267,8 @@ public class CommissionSettlementDetailService {
               adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
-              kol == null ? null : kol.name()));
+              kol == null ? null : kol.name(),
+              Boolean.TRUE.equals(row.getAfterSales())));
     }
     List<String> kolNames = new ArrayList<>();
     for (Long kolId : rowKolIds) {
@@ -313,13 +315,7 @@ public class CommissionSettlementDetailService {
    * after-sales (task 113). Null when the source has no basis.
    */
   private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value =
-        CommissionSettlementRules.commissionable(
-            row.getBasisCny(),
-            row.getBasisIncludesRefund(),
-            row.getSuccessfulRefundCny(),
-            Boolean.TRUE.equals(row.getAfterSales()),
-            row.getReleasedCommissionCny());
+    BigDecimal value = CommissionSettlementRules.commissionable(row);
     return value == null ? null : value.toPlainString();
   }
 }

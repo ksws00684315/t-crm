@@ -356,7 +356,21 @@ describe("finance admin pages", () => {
       global,
       props: {
         rows: [
-          { ...demoLines[0], releaseBasis: "AFTER_SALES", commission: "0.00", base: "0.00" },
+          {
+            ...demoLines[0],
+            releaseBasis: "AFTER_SALES",
+            commission: "0.00",
+            base: "0.00",
+            afterSales: true
+          },
+          // An unverified line of an order in after-sales still carries the hint (PR #206).
+          {
+            ...demoLines[0],
+            id: `${demoLines[0].id}-u`,
+            releaseBasis: "UNVERIFIED",
+            commission: null,
+            afterSales: true
+          },
           { ...demoLines[0], id: `${demoLines[0].id}-b`, releaseBasis: "CONFIRMED" }
         ],
         tableId: "after-sales-line"
@@ -364,7 +378,7 @@ describe("finance admin pages", () => {
     });
     await flushPromises();
     const tags = wrapper.findAll('[data-test="commission-after-sales"]');
-    expect(tags).toHaveLength(1);
+    expect(tags).toHaveLength(2);
     expect(tags[0].text()).toBe("售后处理中");
     wrapper.unmount();
   });

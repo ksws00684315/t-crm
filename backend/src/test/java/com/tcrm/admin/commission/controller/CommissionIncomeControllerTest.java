@@ -156,7 +156,8 @@ class CommissionIncomeControllerTest {
                         "DEBIT",
                         "KOL",
                         77L,
-                        "Kol A"),
+                        "Kol A",
+                        false),
                     new CommissionLine(
                         7002L,
                         "WD124",
@@ -175,7 +176,8 @@ class CommissionIncomeControllerTest {
                         "CREDIT",
                         "COMPANY",
                         null,
-                        null)),
+                        null,
+                        true)),
                 List.of(
                     new PaymentLine(
                         8001L,
@@ -194,6 +196,9 @@ class CommissionIncomeControllerTest {
     mvc.perform(get(BASE + "/77").header(AdminMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.income.id").value("77"))
+        .andExpect(jsonPath("$.data.lines[0].afterSales").value(false))
+        // Task 113: an unverified line of an order in after-sales still carries the flag.
+        .andExpect(jsonPath("$.data.lines[1].afterSales").value(true))
         .andExpect(jsonPath("$.data.lines[0].id").value("7001"))
         .andExpect(jsonPath("$.data.lines[0].orderNo").value("WD123"))
         .andExpect(jsonPath("$.data.lines[0].itemId").value("9001"))

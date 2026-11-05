@@ -36,7 +36,8 @@ const columns = computed<DataColumn[]>(() =>
             : 160,
     amount: ["base", "commission", "adjustment"].includes(key),
     align: ["orderNo", "product", "itemId"].includes(key) ? "left" : "center",
-    tooltip: true
+    // The commission cell carries its own after-sales tooltip; no second overflow tooltip.
+    tooltip: key !== "commission"
   }))
 );
 </script>
@@ -61,10 +62,7 @@ const columns = computed<DataColumn[]>(() =>
     }}</template>
     <template #cell-commission="{ row }"
       >{{ row.commission === null ? t("finance.unverified") : formatPrice(row.commission, "CNY")
-      }}<el-tooltip
-        v-if="row.releaseBasis === 'AFTER_SALES'"
-        :content="t('finance.afterSalesHint')"
-        placement="top"
+      }}<el-tooltip v-if="row.afterSales" :content="t('finance.afterSalesHint')" placement="top"
         ><el-tag
           type="warning"
           size="small"

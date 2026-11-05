@@ -58,13 +58,15 @@ public interface OrderChainCommissionApi {
    * @param allVerified every live snapshot is verified (true when the order has none)
    * @param commissionableCny Σ line commissionable amounts (task 112, 计佣金额); null unless every
    *     requested line has a verified snapshot
+   * @param afterSales any live snapshot of the order is in after-sales (task 113), verified or not
    */
   record OrderCommissionChainDTO(
       BigDecimal netCommissionCny,
       boolean allVerified,
       List<LineCommissionDTO> lines,
       List<FlowDTO> flows,
-      BigDecimal commissionableCny) {}
+      BigDecimal commissionableCny,
+      boolean afterSales) {}
 
   /**
    * One line's commission block (B07/B09).

@@ -67,23 +67,5 @@ public interface CommissionOrderStateApi {
       BigDecimal rateSnapshot,
       BigDecimal commissionAmount,
       BigDecimal releasedAmount,
-      boolean afterSales) {
-    /** A line outside after-sales. */
-    public ItemCommissionStateDTO(
-        long orderId,
-        long orderItemId,
-        String settlementStatus,
-        BigDecimal rateSnapshot,
-        BigDecimal commissionAmount,
-        BigDecimal releasedAmount) {
-      this(
-          orderId,
-          orderItemId,
-          settlementStatus,
-          rateSnapshot,
-          commissionAmount,
-          releasedAmount,
-          false);
-    }
-  }
+      boolean afterSales) {}
 }
