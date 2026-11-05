@@ -20,13 +20,6 @@ export function saveSidebarCollapsed(collapsed: boolean): void {
   }
 }
 
-export function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const platform = navigator.platform || "";
-  const agent = navigator.userAgent || "";
-  return /Mac|iPhone|iPad/i.test(platform) || /Mac OS/i.test(agent);
-}
-
 /** Subscribes to the narrow-viewport query. Calls `onChange` once with the current match. */
 export function subscribeNarrow(onChange: (matches: boolean) => void): () => void {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {

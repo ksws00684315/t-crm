@@ -13,6 +13,7 @@ import com.tcrm.admin.commission.mapper.WithdrawalMapper.PaidWindowRow;
 import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
 import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.kol.api.KolApi;
+import com.tcrm.admin.kol.api.KolRateDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderSettlementApi;
 import com.tcrm.admin.order.api.OrderSettlementApi.ItemRefDTO;
@@ -102,7 +103,11 @@ public class CommissionIncomeService {
       BigDecimal prepayPaid,
       Instant lastPaidAt) {}
 
-  /** One income row of the list. */
+  /**
+   * One income row of the list. {@code salesAmount} is the pay-amount sum of the KOL's orders paid
+   * in the window (销售额); {@code rate} the KOL's current default rate text, null when unset (task
+   * 115).
+   */
   public record IncomeRow(
       Long kolId,
       String kolCode,
@@ -112,6 +117,8 @@ public class CommissionIncomeService {
       String bd,
       long orderCount,
       long quantity,
+      BigDecimal salesAmount,
+      String rate,
       KolMoney money,
       long unverified) {}
 
@@ -236,6 +243,8 @@ public class CommissionIncomeService {
         aggregates.bdNames.get(kol.bdUserId()),
         aggregates.orderCounts.getOrDefault(kol.id(), 0L),
         aggregates.quantities.getOrDefault(kol.id(), 0L),
+        aggregates.sales.getOrDefault(kol.id(), zero()),
+        aggregates.rates.get(kol.id()),
         aggregates.money.get(kol.id()),
         aggregates.unverified.getOrDefault(kol.id(), 0L));
   }
@@ -261,6 +270,8 @@ public class CommissionIncomeService {
       Map<Long, KolMoney> money,
       Map<Long, Long> orderCounts,
       Map<Long, Long> quantities,
+      Map<Long, BigDecimal> sales,
+      Map<Long, String> rates,
       Map<Long, Long> unverified,
       Map<Long, String> bdNames) {}
 
@@ -289,9 +300,17 @@ public class CommissionIncomeService {
 
     Map<Long, Long> orderCounts = new HashMap<>();
     Map<Long, Long> quantities = new HashMap<>();
+    Map<Long, BigDecimal> sales = new HashMap<>();
     for (var row : orderSettlement.aggregateKolOrders(kolIds, filter.start(), filter.end())) {
       orderCounts.put(row.kolId(), row.orderCount());
       quantities.put(row.kolId(), row.quantity());
+      sales.put(row.kolId(), row.salesAmount());
+    }
+    Map<Long, String> rates = new HashMap<>();
+    for (KolRateDTO rate : kols.listRatesByIds(kolIds)) {
+      if (rate.rateText() != null) {
+        rates.put(rate.kolId(), rate.rateText());
+      }
     }
     Set<Long> bdIds = new HashSet<>();
     for (KolRefDTO kol : kols.listByIds(kolIds)) {
@@ -325,7 +344,7 @@ public class CommissionIncomeService {
               prepayWindow,
               period.lastPaid().get(id)));
     }
-    return new Aggregates(money, orderCounts, quantities, unverified, bdNames);
+    return new Aggregates(money, orderCounts, quantities, sales, rates, unverified, bdNames);
   }
 
   private Summary summary(List<Long> kolIds, IncomeFilter filter) {

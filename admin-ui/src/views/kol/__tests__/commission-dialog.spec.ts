@@ -162,7 +162,66 @@ describe("commission dialog, 10-20 supplement", () => {
     wrapper.findComponent({ name: "ElPagination" }).vm.$emit("size-change", 50);
     await flushPromises();
     expect(promotionApi.listPromotionRecords).toHaveBeenCalledTimes(1);
-    expect(promotionApi.listPromotionRecords).toHaveBeenCalledWith("1", { page: 1, size: 50 });
+    expect(promotionApi.listPromotionRecords).toHaveBeenCalledWith("1", {
+      page: 1,
+      size: 50,
+      rateOnly: true
+    });
+    wrapper.unmount();
+  });
+
+  it("asks the server for rate changes only and keeps its total (task 115, B5)", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1500",
+      platforms: [],
+      inviteCode: "OLD",
+      jumpTemplateId: "7",
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [
+        {
+          changeType: "CONFIG",
+          versionNo: 2,
+          effectiveTime: "2026-11-01T00:00:00Z",
+          before: { defaultRate: "0.1000", sheetUrl: "https://docs.google.com/a" },
+          after: { defaultRate: "0.1500", sheetUrl: "https://docs.google.com/b" },
+          remark: null,
+          operatorName: "Admin",
+          createTime: "2026-11-01T00:00:00Z"
+        }
+      ],
+      total: "23",
+      page: 1,
+      size: 10
+    });
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    expect(promotionApi.listPromotionRecords).toHaveBeenCalledWith("1", {
+      page: 1,
+      size: 10,
+      rateOnly: true
+    });
+    wrapper.findComponent({ name: "ElTabs" }).vm.$emit("update:modelValue", "records");
+    await flushPromises();
+    const table = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(item => item.props("tableId") === "kol-commission-records");
+    // Paging follows the server total; the page shows every returned row unfiltered.
+    expect(table?.props("total")).toBe(23);
+    expect(table?.props("rows")).toHaveLength(1);
+    const changes = table!.text();
+    expect(changes).toContain("10");
+    expect(changes).toContain("15");
+    expect(changes).not.toContain("docs.google.com");
     wrapper.unmount();
   });
 });

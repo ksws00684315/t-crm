@@ -50,34 +50,36 @@ const reviewOpen = ref(false);
 const paymentOpen = ref(false);
 
 const columns = computed<DataColumn[]>(() =>
-  ["applicationNo", "kolIdentity", "amount", "status", "createdAt", "actions"].map(key => ({
-    key,
-    prop: key,
-    label: t(key === "amount" ? "finance.requestedAmount" : `finance.${key}`),
-    minWidth:
-      key === "actions"
-        ? locale.value === "en-US"
-          ? 250
-          : 170
-        : key === "applicationNo"
-          ? 175
-          : key === "kolIdentity"
+  ["applicationNo", "kolIdentity", "requestedAmount", "status", "createdAt", "actions"].map(
+    key => ({
+      key,
+      prop: key,
+      label: t(`finance.${key}`),
+      minWidth:
+        key === "actions"
+          ? locale.value === "en-US"
+            ? 250
+            : 170
+          : key === "applicationNo"
             ? 175
-            : key === "createdAt"
-              ? { "zh-CN": 175, "en-US": 200 }
-              : key === "status"
-                ? { "zh-CN": 145, "en-US": 180 }
-                : 145,
-    amount: key === "amount",
-    align: key === "applicationNo" || key === "kolIdentity" ? ("left" as const) : undefined
-  }))
+            : key === "kolIdentity"
+              ? 175
+              : key === "createdAt"
+                ? { "zh-CN": 175, "en-US": 200 }
+                : key === "status"
+                  ? { "zh-CN": 145, "en-US": 180 }
+                  : 145,
+      amount: key === "requestedAmount",
+      align: key === "applicationNo" || key === "kolIdentity" ? ("left" as const) : undefined
+    })
+  )
 );
 const chips = computed(() =>
   Object.entries(filters)
     .filter(([, value]) => value)
     .map(([key, value]) => ({
       key,
-      label: t(key === "amount" ? "finance.requestedAmount" : `finance.${key}`),
+      label: t(`finance.${key}`),
       text: key === "status" ? t(`finance.${value}`) : value
     }))
 );
@@ -256,7 +258,7 @@ onMounted(load);
           <div class="creator-name">{{ row.kolName }}</div>
           <small class="creator-id">{{ row.kolCode }}</small>
         </template>
-        <template #cell-amount="{ row }">{{
+        <template #cell-requestedAmount="{ row }">{{
           formatAmountWithCurrency(row.amount, row.currency)
         }}</template>
         <template #cell-status="{ row }">

@@ -38,7 +38,10 @@ const processing: RefundVO = {
   refundStatus: "PROCESSING",
   amount: "20.00",
   applyTime: "2026-10-20T12:00:00Z",
-  finishTime: null
+  finishTime: null,
+  commissionStatus: "FROZEN",
+  commissionAfterSales: false,
+  commissionHidden: false
 };
 
 const succeeded: RefundVO = {
@@ -47,7 +50,31 @@ const succeeded: RefundVO = {
   refundNo: "R20261021002",
   refundType: "REFUND_ONLY",
   refundStatus: "SUCCESS",
-  finishTime: "2026-10-20T13:00:00Z"
+  finishTime: "2026-10-20T13:00:00Z",
+  commissionStatus: "WITHDRAWN"
+};
+
+const afterSales: RefundVO = {
+  ...processing,
+  id: "503",
+  refundNo: "R20261021003",
+  commissionStatus: "WITHDRAWABLE",
+  commissionAfterSales: true
+};
+
+const hidden: RefundVO = {
+  ...processing,
+  id: "504",
+  refundNo: "R20261021004",
+  commissionStatus: null,
+  commissionHidden: true
+};
+
+const unknownStatus: RefundVO = {
+  ...processing,
+  id: "505",
+  refundNo: "R20261021005",
+  commissionStatus: null
 };
 
 const refundDetail: RefundDetailVO = {
@@ -250,6 +277,88 @@ describe("refund query page (task 40)", () => {
     await flushPromises();
     expect(vi.mocked(orderApi.getOrder)).toHaveBeenCalledWith("101");
     expect(document.body.querySelector('[data-test="order-detail"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("renders the order commission status with the original-table names (task 115, B12)", async () => {
+    vi.mocked(orderApi.listRefunds).mockResolvedValue({
+      items: [
+        { ...processing, commissionStatus: "FROZEN" },
+        { ...processing, id: "511", commissionStatus: "WITHDRAWABLE" },
+        { ...processing, id: "512", commissionStatus: "WITHDRAWN" },
+        { ...processing, id: "513", commissionStatus: "NO_COMMISSION" },
+        { ...processing, id: "514", commissionStatus: "WITHDRAWING" },
+        { ...processing, id: "515", commissionStatus: "INVALID" }
+      ],
+      total: "6",
+      page: 1,
+      size: 20
+    });
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const wrapper = await mountPage();
+    const cells = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-test="refund-commission-status"]')
+    ].filter(item => item.closest("tr") !== null);
+    expect(cells.map(cell => cell.textContent?.trim())).toEqual([
+      "冻结中",
+      "可提现",
+      "已提现",
+      "不可用",
+      "提现中",
+      "待核实"
+    ]);
+    wrapper.unmount();
+  });
+
+  it("adds the after-sales tag next to the commission status (task 113)", async () => {
+    vi.mocked(orderApi.listRefunds).mockResolvedValue({
+      items: [afterSales],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const wrapper = await mountPage();
+    const cell = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-test="refund-commission-status"]')
+    ].find(item => item.closest("tr") !== null);
+    expect(cell?.textContent).toContain("可提现");
+    expect(cell?.querySelector('[data-test="refund-after-sales-tag"]')?.textContent).toBe(
+      "售后处理中"
+    );
+    wrapper.unmount();
+  });
+
+  it("shows the no-permission sentence when the backend hides the commission", async () => {
+    vi.mocked(orderApi.listRefunds).mockResolvedValue({
+      items: [hidden],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    signIn("STAFF", ["order:view"]);
+    const wrapper = await mountPage();
+    const cell = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-test="refund-commission-status"]')
+    ].find(item => item.closest("tr") !== null);
+    expect(cell?.textContent).toContain("无权限查看佣金");
+    expect(cell?.querySelector('[data-test="refund-after-sales-tag"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("shows a dash when the order has no commission status yet", async () => {
+    vi.mocked(orderApi.listRefunds).mockResolvedValue({
+      items: [unknownStatus],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    signIn("SUPER_ADMIN", ["order:view", "commission:view"]);
+    const wrapper = await mountPage();
+    const cell = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-test="refund-commission-status"]')
+    ].find(item => item.closest("tr") !== null);
+    expect(cell?.textContent?.trim()).toBe("-");
     wrapper.unmount();
   });
 

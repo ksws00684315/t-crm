@@ -18,6 +18,8 @@ import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalFreezeMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
+import com.tcrm.admin.commission.model.CommissionItemRevisionDO;
+import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.commission.model.FinanceTaskQuery;
 import com.tcrm.admin.commission.model.FinanceTaskRow;
 import com.tcrm.admin.commission.model.PayoutAccountDO;
@@ -84,6 +86,10 @@ class WithdrawalServiceTest {
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final SystemConfigApi configs = mock(SystemConfigApi.class);
   private final CommissionRuleConfigService ruleConfig = mock(CommissionRuleConfigService.class);
+  private final com.tcrm.admin.commission.mapper.CommissionItemStateMapper itemStates =
+      mock(com.tcrm.admin.commission.mapper.CommissionItemStateMapper.class);
+  private final com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper itemRevisions =
+      mock(com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper.class);
   private WithdrawalService service;
 
   @BeforeEach
@@ -106,6 +112,8 @@ class WithdrawalServiceTest {
                 audit,
                 ruleConfig,
                 configs,
+                itemStates,
+                itemRevisions,
                 Clock.fixed(NOW, ZoneOffset.UTC)));
     when(configs.getInt("commission.minimum-withdrawal-cny")).thenReturn(200);
     when(ruleConfig.current())
@@ -660,6 +668,69 @@ class WithdrawalServiceTest {
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+  }
+
+  // ------------------------------------------------------------------ order snapshot view
+
+  @Test
+  void shouldEnrichOrderSnapshotsWithOrderAmountAndRate_forTheDetailView() {
+    // Task 115 (1105 sheet B9): the withdrawal detail's order rows carry 订单金额 (goods total +
+    // freight) and the commission rate snapshot of the order's lines.
+    when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW"));
+    when(withdrawals.countOrderSnapshots(ID)).thenReturn(1L);
+    when(withdrawals.pageOrderSnapshots(ID, 20, 0L))
+        .thenReturn(
+            List.of(
+                new WithdrawalMapper.OrderSnapshotRow(
+                    901L, 1007L, "W99000107", new BigDecimal("350.00"), new BigDecimal("50.00"))));
+    when(withdrawals.allocationsOfOrder(ID, "W99000107")).thenReturn(List.of());
+    when(orderItems.listOrderAmounts(List.of(1007L)))
+        .thenReturn(
+            List.of(
+                new OrderItemInfoApi.OrderAmountDTO(
+                    1007L, new BigDecimal("500.00"), new BigDecimal("30.00"))));
+    var state = new CommissionItemStateDO();
+    state.setId(3011L);
+    state.setOrderId(1007L);
+    state.setKolId(KOL);
+    when(itemStates.listByOrderIds(List.of(1007L))).thenReturn(List.of(state));
+    var revision = new CommissionItemRevisionDO();
+    revision.setItemStateId(3011L);
+    revision.setRate(new BigDecimal("0.1000"));
+    when(itemRevisions.listLatestByItemStateIds(List.of(3011L))).thenReturn(List.of(revision));
+
+    var page = service.orders(reviewer("commission:view"), ID, 1, 20);
+
+    assertThat(page.total()).isEqualTo(1);
+    var view = page.items().getFirst();
+    assertThat(view.orderAmount()).isEqualTo("530.00");
+    assertThat(view.commissionRate()).isEqualTo("0.1000");
+    assertThat(view.occupied()).isEqualTo("350.00");
+    assertThat(view.remainingSnapshot()).isEqualTo("50.00");
+  }
+
+  @Test
+  void shouldBlankOrderAmount_whenALineMissesItsHistoricalPrice() {
+    // 商品总价 blanks the whole 订单金额 when any line lacks its price (amount terms §2).
+    when(withdrawals.findRow(ID)).thenReturn(row("PENDING_REVIEW"));
+    when(withdrawals.countOrderSnapshots(ID)).thenReturn(1L);
+    when(withdrawals.pageOrderSnapshots(ID, 20, 0L))
+        .thenReturn(
+            List.of(
+                new WithdrawalMapper.OrderSnapshotRow(
+                    902L, 1008L, "W99000108", new BigDecimal("120.00"), null)));
+    when(withdrawals.allocationsOfOrder(ID, "W99000108")).thenReturn(List.of());
+    when(orderItems.listOrderAmounts(List.of(1008L)))
+        .thenReturn(
+            List.of(new OrderItemInfoApi.OrderAmountDTO(1008L, null, new BigDecimal("30.00"))));
+    when(itemStates.listByOrderIds(List.of(1008L))).thenReturn(List.of());
+
+    var page = service.orders(reviewer("commission:view"), ID, 1, 20);
+
+    var view = page.items().getFirst();
+    assertThat(view.orderAmount()).isNull();
+    assertThat(view.commissionRate()).isNull();
+    assertThat(view.remainingSnapshot()).isNull();
   }
 
   // ------------------------------------------------------------------ masking & scope

@@ -192,12 +192,16 @@ export interface CreatorSalesTotal {
   asOf: string;
 }
 
-/** Sales summary under the same filters as the order list (task 92). */
+/** Order summary under the same filters as the order list (task 92; §2.4 of task 115). */
 export interface CreatorOrderSummary {
-  salesCny: string;
-  settledCny: string;
-  pendingCny: string;
-  refundedCny: string;
+  /** 订单销售额: the orders' pay-amount sum, freight and refunds included. */
+  orderSalesCny: string;
+  /** 预估退款金额: refunding orders count their full pay amount, concluded ones their refunds. */
+  estimatedRefundCny: string;
+  /** 计佣金额: order sales − estimated refund; equals the per-order commission bases. */
+  commissionBaseCny: string;
+  /** 预估总佣金: the rows' estimated commissions summed. */
+  estimatedCommissionCny: string;
 }
 
 export interface FundSummary {
@@ -612,10 +616,9 @@ export type CreatorOrderFilter = Omit<CreatorOrderQuery, "page" | "size">;
 export function getCreatorOrderSummary(params: CreatorOrderFilter): Promise<CreatorOrderSummary> {
   if (isDemoMode) {
     const zero = (): bigint => 0n;
-    let sales = zero();
-    let settled = zero();
-    let pending = zero();
-    let refunded = zero();
+    let orderSales = zero();
+    let estimatedRefund = zero();
+    let estimatedCommission = zero();
     for (const order of demoOrders.filter(
       order =>
         (!params.orderNo || order.orderNo.toLowerCase().includes(params.orderNo.toLowerCase())) &&
@@ -625,21 +628,21 @@ export function getCreatorOrderSummary(params: CreatorOrderFilter): Promise<Crea
           )) &&
         (!params.settlementStatus || order.settlementStatus === params.settlementStatus)
     )) {
+      // Task 115 §2.4 (amount terms §5a): a refunding order holds its whole pay amount; a
+      // concluded one counts what was refunded. The base is the difference; the estimated
+      // commission sums the rows' commission amounts.
+      const pay = moneyCents(order.payAmount);
+      orderSales += pay;
+      estimatedRefund += order.afterSales ? pay : moneyCents(order.refundAmount);
       for (const item of order.items) {
-        const pay = moneyCents(item.payAmount);
-        const refund = moneyCents(item.refundAmount);
-        sales += pay;
-        refunded += refund;
-        if (["WITHDRAWABLE", "WITHDRAWING", "WITHDRAWN"].includes(item.settlementStatus ?? ""))
-          settled += pay - refund;
-        else if (item.settlementStatus === "FROZEN") pending += pay - refund;
+        estimatedCommission += moneyCents(item.commissionAmount ?? "0");
       }
     }
     return Promise.resolve({
-      salesCny: centsMoney(sales),
-      settledCny: centsMoney(settled),
-      pendingCny: centsMoney(pending),
-      refundedCny: centsMoney(refunded)
+      orderSalesCny: centsMoney(orderSales),
+      estimatedRefundCny: centsMoney(estimatedRefund),
+      commissionBaseCny: centsMoney(orderSales - estimatedRefund),
+      estimatedCommissionCny: centsMoney(estimatedCommission)
     });
   }
   return http.request<CreatorOrderSummary>({ method: "GET", url: "/orders/summary", params });

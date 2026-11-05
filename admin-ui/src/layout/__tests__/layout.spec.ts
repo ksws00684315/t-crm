@@ -68,7 +68,8 @@ describe("layout header (task 32 §2.4)", () => {
     for (const removed of ["refresh-page", "fullscreen", "lock", "theme"]) {
       expect(wrapper.find(`[data-test="${removed}"]`).exists()).toBe(false);
     }
-    // What the owner kept: menu search, bell, locale, company switch, user menu, tab bar.
+    // Menu search is removed system-wide (1105 sheet B4); the owner kept the bell, locale,
+    // company switch, user menu and tab bar.
     expect(wrapper.find('[data-test="menu-search"]').exists()).toBe(false);
     expect(wrapper.findComponent({ name: "NotificationBell" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "LocaleSwitch" }).exists()).toBe(true);

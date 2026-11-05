@@ -122,3 +122,79 @@ describe("WithdrawalDrawer notes", () => {
     empty.unmount();
   });
 });
+
+describe("WithdrawalDrawer order columns (task 115, B9/B10)", () => {
+  function orderFixture(overrides: Partial<WithdrawalOrder> = {}): WithdrawalOrder {
+    return {
+      id: "1001",
+      orderNo: "t1023_WD001",
+      products: [{ id: "1", image: "", product: "商品甲", sku: "SKU-A" }],
+      orderAmount: "530.00",
+      commissionRate: "0.1500",
+      occupied: "350.00",
+      remainingSnapshot: "180.00",
+      ...overrides
+    };
+  }
+
+  async function mountWithOrders(rows: WithdrawalOrder[]) {
+    vi.mocked(api.getWithdrawal).mockResolvedValue(detail());
+    vi.mocked(api.getWithdrawalOrders).mockResolvedValue({
+      items: rows,
+      total: String(rows.length),
+      page: 1,
+      size: 10
+    } satisfies Page<WithdrawalOrder>);
+    const wrapper = mount(WithdrawalDrawer, {
+      props: { modelValue: true, id: "102371" },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await flushPromises();
+    return wrapper;
+  }
+
+  it("shows the creator on one line as 名称（编号） and the amount as 申请金额", async () => {
+    const wrapper = await mountWithOrders([]);
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain("达人一（t1023_K001）");
+    expect(contentCellAfter(i18n.global.t("finance.requestedAmount"))).toBe("¥200.00");
+    wrapper.unmount();
+  });
+
+  it("renders the B9 order columns with amount, rate, 待确认 occupation and remaining", async () => {
+    const wrapper = await mountWithOrders([orderFixture()]);
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain(i18n.global.t("finance.orderAmount"));
+    expect(text).toContain(i18n.global.t("finance.rate"));
+    expect(text).toContain(i18n.global.t("finance.actualCommission"));
+    expect(text).toContain(i18n.global.t("finance.orderOccupied"));
+    expect(text).toContain(i18n.global.t("finance.remainingSnapshot"));
+    // 订单金额 and 佣金比例 render the fetched values; 实际佣金 stays 待确认 (M0 pending).
+    expect(text).toContain("¥530.00");
+    expect(text).toContain("15%");
+    expect(text).toContain(i18n.global.t("finance.pendingConfirm"));
+    expect(text).toContain("¥350.00");
+    expect(text).toContain("¥180.00");
+    wrapper.unmount();
+  });
+
+  it("blanks 订单金额 when a line misses its historical price and shows the rate dash", async () => {
+    const wrapper = await mountWithOrders([
+      orderFixture({ orderAmount: null, commissionRate: null })
+    ]);
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain(i18n.global.t("finance.missingHistoricalPrice"));
+    expect(text).toContain("—");
+    wrapper.unmount();
+  });
+
+  it("keeps the product column and the snapshot note about remaining amount", async () => {
+    const wrapper = await mountWithOrders([orderFixture()]);
+    const text = document.querySelector('[data-test="withdrawal-detail"]')?.textContent;
+    expect(text).toContain(i18n.global.t("finance.orderProduct"));
+    expect(text).toContain("商品甲");
+    expect(text).toContain(i18n.global.t("finance.orderSnapshotNote"));
+    wrapper.unmount();
+  });
+});

@@ -45,7 +45,11 @@ export interface PromotionRecordVO {
   createTime: string;
 }
 
-export function listPromotionRecords(id: string, query: { page: number; size: number }) {
+/** `rateOnly` keeps only records that changed the default commission rate (task 115). */
+export function listPromotionRecords(
+  id: string,
+  query: { page: number; size: number; rateOnly?: boolean }
+) {
   return http.request<PageResult<PromotionRecordVO>>({
     method: "get",
     url: `/kol/kols/${id}/promotion-records`,

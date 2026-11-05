@@ -10,6 +10,7 @@ import ListSearch from "@/components/ListSearch.vue";
 import RowActions from "@/components/RowActions.vue";
 import CopyText from "@/components/CopyText.vue";
 import { formatInstant, formatPrice } from "@/utils/format";
+import { formatRate } from "@/utils/rate";
 import { financeApiReady, previewContext, periodBounds } from "@/utils/finance";
 import { notifyError } from "@/utils/notify";
 import IncomeDrawer from "./IncomeDrawer.vue";
@@ -79,6 +80,8 @@ const columns = computed<DataColumn[]>(() =>
   [
     "creator",
     "bd",
+    "salesAmount",
+    "rate",
     "sales",
     "estimated",
     "frozen",
@@ -99,10 +102,12 @@ const columns = computed<DataColumn[]>(() =>
             ? 200
             : key === "actions"
               ? 100
-              : locale.value === "en-US"
-                ? 190
-                : 140,
-    amount: ["estimated", "frozen", "available", "paid"].includes(key),
+              : key === "rate"
+                ? 110
+                : locale.value === "en-US"
+                  ? 190
+                  : 140,
+    amount: ["salesAmount", "estimated", "frozen", "available", "paid"].includes(key),
     align: key === "creator" ? ("left" as const) : undefined,
     tooltip: ["bd"].includes(key)
   }))
@@ -215,6 +220,10 @@ onMounted(load);
             <strong>{{ row.name }}</strong
             ><CopyText :value="row.code" /></div
         ></template>
+        <template #cell-salesAmount="{ row }">{{ formatPrice(row.salesAmount, "CNY") }}</template>
+        <template #cell-rate="{ row }">{{
+          row.rate == null ? "—" : formatRate(row.rate)
+        }}</template>
         <template #cell-sales="{ row }">{{ row.orderCount }} / {{ row.quantity }}</template>
         <template
           v-for="key in ['estimated', 'frozen', 'available']"

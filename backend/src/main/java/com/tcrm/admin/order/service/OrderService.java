@@ -577,6 +577,14 @@ public class OrderService {
             .map(KolRefDTO::id)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
+    return coversOwnLines(ownKolIds, lines);
+  }
+
+  /**
+   * OWN coverage of one order's lines against the caller's creators; shared with the refund list's
+   * commission status (task 115) so both pages hide commission on the same basis.
+   */
+  static boolean coversOwnLines(Set<Long> ownKolIds, List<OrderItemDO> lines) {
     boolean anyOwn = false;
     for (var line : lines) {
       Long kolId = line.getKolId();

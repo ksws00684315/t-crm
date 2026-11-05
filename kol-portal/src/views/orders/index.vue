@@ -125,10 +125,24 @@ function currentFilter() {
   };
 }
 const summaryCards = computed(() => [
-  { key: "total", label: "orders.summaryTotal", amount: summary.value?.salesCny },
-  { key: "settled", label: "orders.summarySettled", amount: summary.value?.settledCny },
-  { key: "pending", label: "orders.summaryPending", amount: summary.value?.pendingCny },
-  { key: "refunded", label: "orders.summaryRefunded", amount: summary.value?.refundedCny }
+  // Task 115 §2.4 (amount terms §5a): order sales, estimated refund, commission base and
+  // estimated commission, in this order.
+  { key: "orderSales", label: "orders.summaryOrderSales", amount: summary.value?.orderSalesCny },
+  {
+    key: "estimatedRefund",
+    label: "orders.summaryEstimatedRefund",
+    amount: summary.value?.estimatedRefundCny
+  },
+  {
+    key: "commissionBase",
+    label: "orders.summaryCommissionBase",
+    amount: summary.value?.commissionBaseCny
+  },
+  {
+    key: "estimatedCommission",
+    label: "orders.summaryEstimatedCommission",
+    amount: summary.value?.estimatedCommissionCny
+  }
 ]);
 async function loadSummary() {
   const current = ++summaryRequest;

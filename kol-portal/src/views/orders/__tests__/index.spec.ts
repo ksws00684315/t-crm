@@ -53,10 +53,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(getCreatorOrders).mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
   vi.mocked(getCreatorOrderSummary).mockResolvedValue({
-    salesCny: "1000.00",
-    settledCny: "500.00",
-    pendingCny: "300.00",
-    refundedCny: "120.00"
+    orderSalesCny: "1000.00",
+    estimatedRefundCny: "120.00",
+    commissionBaseCny: "880.00",
+    estimatedCommissionCny: "300.00"
   });
 });
 
@@ -244,28 +244,33 @@ describe("sales summary cards (task 92 section 4.4)", () => {
   const amount = (wrapper: Awaited<ReturnType<typeof mountPage>>, key: string) =>
     wrapper.get(`[data-test="summary-${key}-amount"]`).text();
 
-  it("shows the four sales figures in the owner's order, with the refund note beneath", async () => {
+  it("shows the four summary cards in the owner's order, with the base note beneath", async () => {
     const wrapper = await mountPage();
     const cards = wrapper.findAll(".summary-card");
     expect(cards.map(card => card.text())).toEqual([
-      `${enUS.orders.summaryTotal}¥1,000.00`,
-      `${enUS.orders.summarySettled}¥500.00`,
-      `${enUS.orders.summaryPending}¥300.00`,
-      `${enUS.orders.summaryRefunded}¥120.00`
+      `${enUS.orders.summaryOrderSales}¥1,000.00`,
+      `${enUS.orders.summaryEstimatedRefund}¥120.00`,
+      `${enUS.orders.summaryCommissionBase}¥880.00`,
+      `${enUS.orders.summaryEstimatedCommission}¥300.00`
     ]);
     expect(wrapper.get('[data-test="summary-note"]').text()).toBe(
-      "Total sales are before refunds. Settled and unsettled sales are after refunds."
+      "Commission base = order sales − estimated refund. Estimated refund: a refunding order " +
+        "counts its full pay amount, a concluded one counts what was refunded. Estimated " +
+        "commission sums the rows' estimated commissions."
     );
     wrapper.unmount();
   });
 
   it("keeps the owner's Chinese wording", () => {
     const zh = (key: string) => i18n.global.t(key, {}, { locale: "zh-CN" });
-    expect(zh("orders.summaryTotal")).toBe("总销售额");
-    expect(zh("orders.summarySettled")).toBe("已结算销售额");
-    expect(zh("orders.summaryPending")).toBe("待结算销售额");
-    expect(zh("orders.summaryRefunded")).toBe("已退款销售额");
-    expect(zh("orders.summaryNote")).toBe("总销售额未扣除退款，已结算和待结算销售额已扣除退款。");
+    expect(zh("orders.summaryOrderSales")).toBe("订单销售额");
+    expect(zh("orders.summaryEstimatedRefund")).toBe("预估退款金额");
+    expect(zh("orders.summaryCommissionBase")).toBe("计佣金额");
+    expect(zh("orders.summaryEstimatedCommission")).toBe("预估总佣金");
+    expect(zh("orders.summaryNote")).toBe(
+      "计佣金额 = 订单销售额 − 预估退款金额。预估退款金额：退款中订单按整单支付金额计，" +
+        "退款完成订单按已退金额计；预估总佣金为各行预估佣金合计。"
+    );
   });
 
   it("asks for the summary with the same filters as the list", async () => {
@@ -326,25 +331,25 @@ describe("sales summary cards (task 92 section 4.4)", () => {
     vi.mocked(getCreatorOrderSummary).mockRejectedValueOnce(new Error("down"));
     const wrapper = await mountPage();
     expect(wrapper.get('[data-test="summary-failed"]').text()).toContain(enUS.orders.summaryFailed);
-    expect(wrapper.find('[data-test="summary-total-amount"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="summary-orderSales-amount"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("¥0.00");
     await wrapper.get('[data-test="summary-retry"]').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="summary-failed"]').exists()).toBe(false);
-    expect(amount(wrapper, "total")).toBe("¥1,000.00");
+    expect(amount(wrapper, "orderSales")).toBe("¥1,000.00");
     wrapper.unmount();
   });
 
   it("shows long amounts in full", async () => {
     vi.mocked(getCreatorOrderSummary).mockResolvedValue({
-      salesCny: "12345678.90",
-      settledCny: "9876543.21",
-      pendingCny: "0.00",
-      refundedCny: "0.00"
+      orderSalesCny: "12345678.90",
+      estimatedRefundCny: "0.00",
+      commissionBaseCny: "9876543.21",
+      estimatedCommissionCny: "0.00"
     });
     const wrapper = await mountPage();
-    expect(amount(wrapper, "total")).toBe("¥12,345,678.90");
-    expect(amount(wrapper, "pending")).toBe("¥0.00");
+    expect(amount(wrapper, "orderSales")).toBe("¥12,345,678.90");
+    expect(amount(wrapper, "commissionBase")).toBe("¥9,876,543.21");
     wrapper.unmount();
   });
 });

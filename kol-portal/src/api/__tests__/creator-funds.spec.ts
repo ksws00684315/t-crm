@@ -194,10 +194,10 @@ describe("workspace and order summary requests (task 92)", () => {
 
   it("requests the order summary with the list filters and no paging", async () => {
     vi.mocked(http.request).mockResolvedValue({
-      salesCny: "1.00",
-      settledCny: "0.00",
-      pendingCny: "0.00",
-      refundedCny: "0.00"
+      orderSalesCny: "1.00",
+      estimatedRefundCny: "0.00",
+      commissionBaseCny: "1.00",
+      estimatedCommissionCny: "0.00"
     });
     const filter = {
       payFrom: "2026-10-01T00:00:00.000Z",

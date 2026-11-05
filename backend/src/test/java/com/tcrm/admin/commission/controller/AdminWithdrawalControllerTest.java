@@ -154,6 +154,8 @@ class AdminWithdrawalControllerTest {
                         901L,
                         "WD1001",
                         List.of(new ProductView(101L, "img", "Hat", "Red")),
+                        "530.00",
+                        "0.1000",
                         "350.00",
                         "0.00")),
                 1L,
@@ -165,6 +167,9 @@ class AdminWithdrawalControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].id").value("901"))
         .andExpect(jsonPath("$.data.items[0].orderNo").value("WD1001"))
+        // Task 115 (1105 sheet B9): the order amount and the commission rate snapshot columns.
+        .andExpect(jsonPath("$.data.items[0].orderAmount").value("530.00"))
+        .andExpect(jsonPath("$.data.items[0].commissionRate").value("0.1000"))
         .andExpect(jsonPath("$.data.items[0].occupied").value("350.00"))
         .andExpect(jsonPath("$.data.items[0].remainingSnapshot").value("0.00"))
         .andExpect(jsonPath("$.data.items[0].products[0].id").value("101"))

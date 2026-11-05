@@ -10,6 +10,7 @@ import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
+import { useUserStore } from "@/stores/user";
 import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
@@ -64,6 +65,20 @@ function shopText(refund: RefundVO): string {
 const zhWidth = computed(() => useLocaleStore().locale === "zh-CN");
 const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 
+/**
+ * The commission status column follows the order chain's rule (task 115, B12): it needs
+ * commission:view, and an OWN scope additionally sees nothing on orders it cannot cover. The
+ * backend decides per row; the frontend renders the reason instead of the status.
+ */
+const userStore = useUserStore();
+const canSeeCommission = computed(() => userStore.can("commission:view"));
+
+function commissionStatusText(row: RefundVO): string {
+  if (row.commissionHidden) return t("order.chain.commissionHidden");
+  if (!row.commissionStatus) return "-";
+  return t(`order.refund.commission.${row.commissionStatus}`);
+}
+
 const columns = computed<DataColumn[]>(() => [
   { key: "refundNo", align: "left" as const, label: t("order.refund.no"), width: 150 },
   { key: "orderNo", align: "left" as const, label: t("order.refund.orderNo"), width: 150 },
@@ -74,6 +89,12 @@ const columns = computed<DataColumn[]>(() => [
   { key: "kol", align: "left" as const, label: t("order.kol"), minWidth: 170 },
   { key: "refundType", label: t("order.refund.typeColumn"), width: px(100, 130) },
   { key: "refundStatus", label: t("order.refund.statusColumn"), width: px(90, 110) },
+  {
+    key: "commissionStatus",
+    label: t("order.refund.commissionStatus"),
+    // The after-sales tag sits beside the status; both fit without truncation (2026-11-06 audit).
+    width: canSeeCommission.value ? px(170, 210) : px(140, 210)
+  },
   { key: "amount", label: t("order.refund.amount"), width: 100, amount: true },
   { key: "applyTime", label: t("order.refund.applyTime"), width: px(170, 190) },
   { key: "finishTime", label: t("order.refund.finishTime"), width: px(170, 190) },
@@ -348,6 +369,17 @@ onMounted(() => {
           {{ refundStatusText(asRefund(row).refundStatus) }}
         </el-tag>
       </template>
+      <template #cell-commissionStatus="{ row }">
+        <div class="commission-status" data-test="refund-commission-status">
+          <span>{{ commissionStatusText(asRefund(row)) }}</span>
+          <el-tag
+            v-if="asRefund(row).commissionAfterSales && !asRefund(row).commissionHidden"
+            type="warning"
+            data-test="refund-after-sales-tag"
+            >{{ t("finance.afterSalesShort") }}</el-tag
+          >
+        </div>
+      </template>
       <template #cell-amount="{ row }">{{
         formatAmountWithCurrency(asRefund(row).amount)
       }}</template>
@@ -362,3 +394,11 @@ onMounted(() => {
     <OrderDetailDrawer v-model="orderVisible" :order-id="orderDetailId" />
   </div>
 </template>
+<style scoped>
+.commission-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tcrm-space-1);
+}
+</style>

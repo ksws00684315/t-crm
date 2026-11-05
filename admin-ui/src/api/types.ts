@@ -543,6 +543,12 @@ export interface RefundVO {
   amount: string;
   applyTime: string | null;
   finishTime: string | null;
+  /** Order-level commission status (task 115, B12); null when the order is unpaid or unattributed. */
+  commissionStatus: string | null;
+  /** The order is in after-sales (task 113): shown as a tag next to the status. */
+  commissionAfterSales: boolean;
+  /** The caller lacks commission:view, or an OWN scope cannot see the order's creator. */
+  commissionHidden: boolean;
 }
 
 /** One refunded product row, linked to its order line (task 40 §3.3). */

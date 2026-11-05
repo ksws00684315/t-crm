@@ -91,20 +91,27 @@ describe("finance admin pages", () => {
     ).toEqual([
       "达人",
       "商务",
-      "订单数／件数",
+      "销售额",
+      "佣金比例",
+      "订单数/销量",
       "累计佣金",
       "冻结中",
       "可提现",
-      "已付金额",
+      "总支出",
       "最近打款时间",
       "操作"
     ]);
     expect(wrapper.get('[data-test="income-page"]').text()).toContain("t1023_K001");
     expect(wrapper.get('[data-test="income-page"]').text()).toContain("¥1,320.00");
+    // Task 115 (1105 sheet B7): the sales amount and the creator's current rate columns.
+    expect(wrapper.get('[data-test="income-page"]').text()).toContain("¥1,288.50");
+    expect(wrapper.get('[data-test="income-page"]').text()).toContain("15%");
+    // A creator without a rate shows the em dash instead of a fabricated figure.
+    expect(wrapper.get('[data-test="income-page"]').text()).toContain("—");
     expect(wrapper.findAll('[data-test="income-ledger"]')).toHaveLength(3);
     i18n.global.locale.value = "en-US";
     await flushPromises();
-    expect(wrapper.getComponent(DataTable).props("columns")[6].label).toBe("Paid amount");
+    expect(wrapper.getComponent(DataTable).props("columns")[8].label).toBe("Total paid");
     wrapper.unmount();
   });
   it("queries from the first page, resets filters and handles failures without stale income", async () => {
@@ -132,7 +139,7 @@ describe("finance admin pages", () => {
         .getComponent(DataTable)
         .props("columns")
         .map((column: { label: string }) => column.label)
-    ).toEqual(["申请编号", "达人名称及ID", "金额", "状态", "申请时间", "操作"]);
+    ).toEqual(["申请编号", "达人名称及ID", "申请金额", "状态", "申请时间", "操作"]);
     expect(wrapper.find('[data-test="withdrawal-kol-id"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="withdrawal-bd-name"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="withdrawal-progress-action"]')).toHaveLength(4);

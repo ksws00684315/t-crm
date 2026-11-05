@@ -60,7 +60,7 @@ class KolPromotionControllerTest {
 
   @Test
   void shouldReturnPromotionRecords() throws Exception {
-    when(promotions.pageRecords(10L, 1, 20))
+    when(promotions.pageRecords(10L, 1, 20, false))
         .thenReturn(
             new PageResult<>(
                 List.of(
@@ -81,6 +81,20 @@ class KolPromotionControllerTest {
                 .header(AdminMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.items[0].changeType").value("STATUS"));
+  }
+
+  @Test
+  void shouldPassRateOnlyFilter_toPromotionRecords() throws Exception {
+    when(promotions.pageRecords(10L, 2, 10, true))
+        .thenReturn(new PageResult<>(List.of(), 13, 2, 10));
+    mvc.perform(
+            get("/admin-api/kol/kols/10/promotion-records")
+                .param("page", "2")
+                .param("size", "10")
+                .param("rateOnly", "true")
+                .header(AdminMvcSupport.TOKEN_HEADER, token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("13"));
   }
 
   @Test
@@ -122,7 +136,7 @@ class KolPromotionControllerTest {
                 null,
                 3L,
                 null));
-    when(promotions.pageRecords(10L, 1, 20))
+    when(promotions.pageRecords(10L, 1, 20, false))
         .thenReturn(
             new PageResult<>(
                 List.of(

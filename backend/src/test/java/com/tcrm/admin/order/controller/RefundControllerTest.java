@@ -59,7 +59,10 @@ class RefundControllerTest {
                         "SUCCESS",
                         new BigDecimal("5.00"),
                         Instant.EPOCH,
-                        Instant.EPOCH.plusSeconds(1))),
+                        Instant.EPOCH.plusSeconds(1),
+                        "NO_COMMISSION",
+                        false,
+                        false)),
                 1,
                 1,
                 20));
@@ -74,7 +77,10 @@ class RefundControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.total").value("1"))
         .andExpect(jsonPath("$.data.items[0].refundNo").value("R1"))
-        .andExpect(jsonPath("$.data.items[0].amount").value("5.00"));
+        .andExpect(jsonPath("$.data.items[0].amount").value("5.00"))
+        .andExpect(jsonPath("$.data.items[0].commissionStatus").value("NO_COMMISSION"))
+        .andExpect(jsonPath("$.data.items[0].commissionAfterSales").value(false))
+        .andExpect(jsonPath("$.data.items[0].commissionHidden").value(false));
     var filter = ArgumentCaptor.forClass(RefundFilterDTO.class);
     verify(refunds).page(filter.capture());
     assertThat(filter.getValue().refundNo()).isEqualTo("R1");

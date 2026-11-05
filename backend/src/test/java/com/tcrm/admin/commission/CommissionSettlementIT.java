@@ -223,7 +223,14 @@ class CommissionSettlementIT {
         .andExpect(jsonPath("$.data.summary.commissionPaid").value("0.00"))
         .andExpect(jsonPath("$.data.summary.prepayPaid").value("0.00"))
         .andExpect(jsonPath("$.data.summary.unverified").isNumber())
-        .andExpect(jsonPath("$.data.summary.unverified").value(0));
+        .andExpect(jsonPath("$.data.summary.unverified").value(0))
+        // Task 115 (1105 sheet B7): the order's pay amount is KOL A's sales, current rate 10%.
+        .andExpect(
+            jsonPath("$.data.items[?(@.id == '" + kolA + "')].salesAmount")
+                .value(org.hamcrest.Matchers.contains("200.00")))
+        .andExpect(
+            jsonPath("$.data.items[?(@.id == '" + kolA + "')].rate")
+                .value(org.hamcrest.Matchers.contains("0.1000")));
     mvc.perform(
             get("/admin-api/commission/settlement-details")
                 .param("orderNo", ORDER_NO)

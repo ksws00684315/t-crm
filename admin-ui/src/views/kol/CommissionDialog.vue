@@ -146,6 +146,7 @@ function changeLine(diff: { key: string; from: string; to: string }): string {
   });
 }
 
+/** The server keeps only rate-change records (1105 sheet B5); show just the rate line of each. */
 function visibleChanges(record: PromotionRecordVO) {
   return promotionFieldDiffs(record.before, record.after).filter(
     diff => diff.key === "defaultRate"
@@ -185,7 +186,7 @@ async function loadAll() {
     const [config, templateList, recordPage] = await Promise.all([
       getPromotionConfig(id),
       listLinkTemplates().catch(() => [] as LinkTemplateVO[]),
-      listPromotionRecords(id, { page: 1, size: recordsSize.value })
+      listPromotionRecords(id, { page: 1, size: recordsSize.value, rateOnly: true })
     ]);
     templates.value = templateList;
     form.percent = rateToPercent(config.defaultRate);
@@ -212,7 +213,11 @@ async function loadRecords(page: number) {
   const id = props.kol?.id;
   if (!id) return;
   try {
-    const result = await listPromotionRecords(id, { page, size: recordsSize.value });
+    const result = await listPromotionRecords(id, {
+      page,
+      size: recordsSize.value,
+      rateOnly: true
+    });
     records.value = result.items;
     recordsTotal.value = Number(result.total);
     recordsPage.value = page;
@@ -362,7 +367,7 @@ function onRecordsSize(size: number): void {
           <DataTable
             plain
             table-id="kol-commission-records"
-            :rows="records.filter(record => visibleChanges(record).length > 0)"
+            :rows="records"
             :columns="recordColumns"
             :failed="recordsFailed"
             :total="recordsTotal"

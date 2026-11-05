@@ -109,10 +109,12 @@ class OrderSettlementProjectionTest {
     first.setId(501L);
     first.setKolId(77L);
     first.setPayTime(Instant.parse("2026-10-10T08:00:00Z"));
+    first.setPayAmount(new java.math.BigDecimal("100.50"));
     OrderDO second = new OrderDO();
     second.setId(502L);
     second.setKolId(77L);
     second.setPayTime(Instant.parse("2026-10-11T08:00:00Z"));
+    second.setPayAmount(new java.math.BigDecimal("20.00"));
     when(orders.selectList(any())).thenReturn(List.of(first, second));
     OrderItemDO lineOne = new OrderItemDO();
     lineOne.setOrderId(501L);
@@ -131,6 +133,8 @@ class OrderSettlementProjectionTest {
     assertThat(rows.getFirst().kolId()).isEqualTo(77L);
     assertThat(rows.getFirst().orderCount()).isEqualTo(2);
     assertThat(rows.getFirst().quantity()).isEqualTo(5);
+    // Hand calc (task 115, 销售额): pay amounts 100.50 + 20.00 = 120.50, freight included.
+    assertThat(rows.getFirst().salesAmount()).isEqualByComparingTo("120.50");
   }
 
   @Test
@@ -146,6 +150,8 @@ class OrderSettlementProjectionTest {
 
     assertThat(rows).hasSize(1);
     assertThat(rows.getFirst().quantity()).isZero();
+    // No pay amount recorded: the sales amount is zero, never null.
+    assertThat(rows.getFirst().salesAmount()).isEqualByComparingTo("0");
     assertThat(projection.aggregateKolOrders(List.of(), null, null)).isEmpty();
   }
 

@@ -64,6 +64,8 @@ class CommissionIncomeControllerTest {
         .andExpect(jsonPath("$.data.items[0].orderCount").value(2))
         .andExpect(jsonPath("$.data.items[0].quantity").isNumber())
         .andExpect(jsonPath("$.data.items[0].quantity").value(3))
+        .andExpect(jsonPath("$.data.items[0].salesAmount").value("1288.50"))
+        .andExpect(jsonPath("$.data.items[0].rate").value("0.1500"))
         .andExpect(jsonPath("$.data.items[0].estimated").value("500.00"))
         .andExpect(jsonPath("$.data.items[0].frozen").value("200.00"))
         .andExpect(jsonPath("$.data.items[0].available").value("100.00"))
@@ -260,6 +262,8 @@ class CommissionIncomeControllerTest {
         "BD One",
         2,
         3,
+        new BigDecimal("1288.5"),
+        "0.1500",
         new KolMoney(
             new BigDecimal("500.00"),
             new BigDecimal("200.00"),

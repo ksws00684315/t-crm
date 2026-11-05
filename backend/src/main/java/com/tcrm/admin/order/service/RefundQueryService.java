@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
+import com.tcrm.admin.order.api.CommissionOrderStateApi;
+import com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.RefundMapper;
@@ -13,10 +15,12 @@ import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
+import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +40,7 @@ public class RefundQueryService {
   private final KolApi kols;
   private final ProductAccessApi products;
   private final CurrentUserContext current;
+  private final CommissionOrderStateApi commissionStates;
 
   public RefundQueryService(
       RefundMapper refunds,
@@ -44,7 +49,8 @@ public class RefundQueryService {
       ShopAccessApi shops,
       KolApi kols,
       ProductAccessApi products,
-      CurrentUserContext current) {
+      CurrentUserContext current,
+      CommissionOrderStateApi commissionStates) {
     this.refunds = refunds;
     this.orders = orders;
     this.items = items;
@@ -52,6 +58,7 @@ public class RefundQueryService {
     this.kols = kols;
     this.products = products;
     this.current = current;
+    this.commissionStates = commissionStates;
   }
 
   /** Paginated refunds; an unknown channel filter selects nothing (Weidian is the only channel). */
@@ -88,7 +95,7 @@ public class RefundQueryService {
     if (result.getRecords().isEmpty()) {
       return new PageResult<>(List.of(), result.getTotal(), filter.page(), filter.size());
     }
-    var rows = decorate(result.getRecords());
+    var rows = decorate(result.getRecords(), user);
     return new PageResult<>(rows, result.getTotal(), filter.page(), filter.size());
   }
 
@@ -153,7 +160,7 @@ public class RefundQueryService {
         lineDto == null ? List.of() : List.of(lineDto));
   }
 
-  private List<RefundDTO> decorate(List<RefundDO> records) {
+  private List<RefundDTO> decorate(List<RefundDO> records, AccountDTO user) {
     Map<Long, OrderDO> orderById =
         orders.selectByIds(records.stream().map(RefundDO::getOrderId).distinct().toList()).stream()
             .collect(Collectors.toMap(OrderDO::getId, Function.identity()));
@@ -181,6 +188,7 @@ public class RefundQueryService {
     Map<Long, KolRefDTO> kolById =
         kols.listByIds(kolIds).stream()
             .collect(Collectors.toMap(KolRefDTO::id, Function.identity()));
+    Map<Long, CommissionView> commissionByOrder = commissionViews(orderById.values(), user);
     return records.stream()
         .map(
             refund -> {
@@ -196,6 +204,8 @@ public class RefundQueryService {
                   order == null || order.getShopId() == null
                       ? null
                       : shopById.get(order.getShopId());
+              var commission =
+                  commissionByOrder.getOrDefault(refund.getOrderId(), CommissionView.NONE);
               return new RefundDTO(
                   refund.getId(),
                   refund.getWeidianRefundNo(),
@@ -212,9 +222,77 @@ public class RefundQueryService {
                   refund.getRefundStatus(),
                   refund.getAmount(),
                   refund.getRefundTime(),
-                  refund.getFinishTime());
+                  refund.getFinishTime(),
+                  commission.status(),
+                  commission.afterSales(),
+                  commission.hidden());
             })
         .toList();
+  }
+
+  /** Commission status of one refund row's order (task 115, 1105 sheet B12). */
+  private record CommissionView(String status, boolean afterSales, boolean hidden) {
+    static final CommissionView NONE = new CommissionView(null, false, false);
+    static final CommissionView HIDDEN = new CommissionView(null, false, true);
+  }
+
+  /**
+   * Order-level commission status per order, gated like the order chain: {@code commission:view}
+   * plus OWN coverage of the order's lines. The status is the creator portal's most active line
+   * (one order has one creator, {@code crm_order.kol_id}); unpaid or unattributed orders have none.
+   */
+  private Map<Long, CommissionView> commissionViews(
+      java.util.Collection<OrderDO> pageOrders, AccountDTO user) {
+    Map<Long, CommissionView> result = new HashMap<>();
+    if (pageOrders.isEmpty()) {
+      return result;
+    }
+    if (!user.effectivePermissions().contains("commission:view")) {
+      pageOrders.forEach(order -> result.put(order.getId(), CommissionView.HIDDEN));
+      return result;
+    }
+    Map<Long, List<OrderItemDO>> linesByOrder =
+        items
+            .selectList(
+                new LambdaQueryWrapper<OrderItemDO>()
+                    .select(OrderItemDO::getId, OrderItemDO::getOrderId, OrderItemDO::getKolId)
+                    .in(OrderItemDO::getOrderId, pageOrders.stream().map(OrderDO::getId).toList()))
+            .stream()
+            .collect(Collectors.groupingBy(OrderItemDO::getOrderId));
+    Set<Long> ownKolIds =
+        user.ownScope()
+            ? kols.listByBdUserId(user.id()).stream()
+                .map(KolRefDTO::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet())
+            : Set.of();
+    Map<Long, List<Long>> visibleByKol = new HashMap<>();
+    for (OrderDO order : pageOrders) {
+      if (user.ownScope()
+          && !OrderService.coversOwnLines(
+              ownKolIds, linesByOrder.getOrDefault(order.getId(), List.of()))) {
+        result.put(order.getId(), CommissionView.HIDDEN);
+      } else if (order.getKolId() != null && order.getPayTime() != null) {
+        visibleByKol
+            .computeIfAbsent(order.getKolId(), k -> new java.util.ArrayList<>())
+            .add(order.getId());
+      }
+    }
+    for (var entry : visibleByKol.entrySet()) {
+      Map<Long, List<ItemCommissionStateDTO>> byOrder =
+          commissionStates.listByKolAndOrderIds(entry.getKey(), entry.getValue()).stream()
+              .collect(Collectors.groupingBy(ItemCommissionStateDTO::orderId));
+      for (Long orderId : entry.getValue()) {
+        var states = byOrder.getOrDefault(orderId, List.of());
+        result.put(
+            orderId,
+            new CommissionView(
+                KolOrderService.mostActiveStatus(states),
+                states.stream().anyMatch(ItemCommissionStateDTO::afterSales),
+                false));
+      }
+    }
+    return result;
   }
 
   private List<Long> orderIds(LambdaQueryWrapper<OrderDO> wrapper) {

@@ -221,6 +221,15 @@ export function createFinanceDemo() {
     if (!row || !owned(role, row)) financeError(404, "COMMON_NOT_FOUND");
     return row;
   }
+  // Task 115 (1105 sheet B9): demo per-order 订单金额 (goods total + freight) and rate snapshot.
+  const demoOrderAmounts = new Map<string, string>();
+  const demoOrderRates = new Map<string, string>();
+  for (let orderIndex = 1; orderIndex <= 11; orderIndex += 1) {
+    const orderNo = `t1023_WD${String(orderIndex).padStart(3, "0")}`;
+    demoOrderAmounts.set(orderNo, `${(160 + orderIndex * 80).toFixed(2)}`);
+    demoOrderRates.set(orderNo, orderIndex % 3 === 0 ? "0.1200" : "0.1500");
+  }
+
   function withdrawalOrders(
     role: FinanceRole,
     scenario: Scenario,
@@ -244,6 +253,9 @@ export function createFinanceDemo() {
         id: orderNo,
         orderNo,
         products: items.map(({ id, image, product, sku }) => ({ id, image, product, sku })),
+        // Task 115 (1105 sheet B9): the demo shows a priced order amount and one rate snapshot.
+        orderAmount: demoOrderAmounts.get(orderNo) ?? null,
+        commissionRate: demoOrderRates.get(orderNo) ?? null,
         occupied: sumMoney(items.map(item => item.occupied)),
         remainingSnapshot: snapshots.size === 1 ? [...snapshots][0] : null
       };

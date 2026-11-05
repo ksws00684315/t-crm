@@ -16,8 +16,10 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
@@ -33,7 +35,7 @@ import org.mockito.ArgumentCaptor;
 class KolOrderServiceTest {
   @BeforeAll
   static void metadata() {
-    for (var type : List.of(OrderDO.class, OrderItemDO.class)) {
+    for (var type : List.of(OrderDO.class, OrderItemDO.class, RefundDO.class)) {
       TableInfoHelper.initTableInfo(
           new MapperBuilderAssistant(new MybatisConfiguration(), ""), type);
     }
@@ -41,11 +43,12 @@ class KolOrderServiceTest {
 
   private final OrderMapper orders = mock(OrderMapper.class);
   private final OrderItemMapper items = mock(OrderItemMapper.class);
+  private final RefundMapper refunds = mock(RefundMapper.class);
   private final CurrentKolContext current = mock(CurrentKolContext.class);
   private final com.tcrm.admin.order.api.CommissionOrderStateApi commissionStates =
       mock(com.tcrm.admin.order.api.CommissionOrderStateApi.class);
   private final KolOrderService service =
-      new KolOrderService(orders, items, current, commissionStates);
+      new KolOrderService(orders, items, refunds, current, commissionStates);
 
   @BeforeEach
   void setUp() {
@@ -520,43 +523,82 @@ class KolOrderServiceTest {
         orderId, itemId, status, new BigDecimal("0.1000"), BigDecimal.ONE, BigDecimal.ZERO, false);
   }
 
-  private static OrderItemDO summaryLine(long id, String pay, String refund) {
-    OrderItemDO value = item(id, 700L, pay, refund);
-    value.setOrderId(21L);
+  private static OrderDO paidOrder(long id, String pay) {
+    OrderDO value = order(id, "123456789012", "ATTRIBUTED", "PAID");
+    value.setPayAmount(new BigDecimal(pay));
     return value;
   }
 
+  private static RefundDO refund(long orderId, String amount, String status) {
+    RefundDO value = new RefundDO();
+    value.setOrderId(orderId);
+    value.setAmount(new BigDecimal(amount));
+    value.setRefundStatus(status);
+    return value;
+  }
+
+  /** One own line per order; the line id mirrors the order id so states can key off it. */
+  private static OrderItemDO line(long orderId) {
+    OrderItemDO value = new OrderItemDO();
+    value.setId(orderId);
+    value.setOrderId(orderId);
+    value.setKolId(700L);
+    return value;
+  }
+
+  private static com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO commission(
+      long orderId, BigDecimal amount) {
+    return new com.tcrm.admin.order.api.CommissionOrderStateApi.ItemCommissionStateDTO(
+        orderId, orderId, "WITHDRAWABLE", new BigDecimal("0.1000"), amount, BigDecimal.ZERO, false);
+  }
+
   @Test
-  void shouldSummariseSalesSettledPendingAndRefundedByLineStatus() {
-    when(orders.selectList(any()))
-        .thenReturn(List.of(order(21L, "123456789012", "ATTRIBUTED", "PAID")));
-    when(items.selectList(any()))
+  void shouldSummariseOrderSalesRefundsBaseAndCommission_overFourRefundStates() {
+    // Task 115 §2.4 (amount terms §5a): 计佣金额 = 订单销售额 − 预估退款金额, and it equals the
+    // sum of the per-order commission bases (amount terms §2.1) across the four refund states.
+    OrderDO noRefund = paidOrder(21L, "100.00");
+    OrderDO refunding = paidOrder(31L, "50.00");
+    OrderDO partial = paidOrder(41L, "100.00");
+    OrderDO full = paidOrder(51L, "100.00");
+    when(orders.selectList(any())).thenReturn(List.of(noRefund, refunding, partial, full));
+    when(refunds.selectList(any()))
         .thenReturn(
             List.of(
-                // Settled in three flavours: pay 100 refund 20 -> 80, 50 -> 50, 30 refund 30 -> 0.
-                summaryLine(1L, "100.00", "20.00"),
-                summaryLine(2L, "50.00", "0.00"),
-                summaryLine(3L, "30.00", "30.00"),
-                // Pending (frozen) 40 refund 10 -> 30.
-                summaryLine(4L, "40.00", "10.00"),
-                // Unverified (no snapshot) and no-commission lines count in sales only.
-                summaryLine(5L, "7.00", "0.00"),
-                summaryLine(6L, "8.00", "8.00")));
+                // 退款中：the whole order pay amount is held back, even with a finished refund.
+                refund(31L, "20.00", "PROCESSING"),
+                // 部分退款完成：the refunded 30 counts, the closed 5 does not.
+                refund(41L, "30.00", "SUCCESS"),
+                refund(41L, "5.00", "CLOSED"),
+                // 全额退款完成：the refunded 100 counts.
+                refund(51L, "100.00", "SUCCESS")));
+    when(items.selectList(any())).thenReturn(List.of(line(21L), line(31L), line(41L), line(51L)));
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(
             List.of(
-                state(21L, 1L, "WITHDRAWABLE"),
-                state(21L, 2L, "WITHDRAWING"),
-                state(21L, 3L, "WITHDRAWN"),
-                state(21L, 4L, "FROZEN"),
-                state(21L, 6L, "NO_COMMISSION")));
+                commission(21L, new BigDecimal("10.00")),
+                // A refunding order's released commission stays frozen and still counts as
+                // estimated commission, while its commission base is zero.
+                commission(31L, new BigDecimal("2.00")),
+                commission(41L, new BigDecimal("7.00")),
+                commission(51L, BigDecimal.ZERO)));
 
     var summary = service.summary(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 1));
 
-    assertThat(summary.salesCny()).isEqualTo(new BigDecimal("235.00"));
-    assertThat(summary.settledCny()).isEqualTo(new BigDecimal("130.00"));
-    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("30.00"));
-    assertThat(summary.refundedCny()).isEqualTo(new BigDecimal("68.00"));
+    // 订单销售额 = 100 + 50 + 100 + 100; 预估退款金额 = 0 + 50(整单) + 30(已退) + 100(全额).
+    assertThat(summary.orderSalesCny()).isEqualByComparingTo("350.00");
+    assertThat(summary.estimatedRefundCny()).isEqualByComparingTo("180.00");
+    assertThat(summary.commissionBaseCny()).isEqualByComparingTo("170.00");
+    assertThat(summary.commissionBaseCny())
+        .isEqualByComparingTo(summary.orderSalesCny().subtract(summary.estimatedRefundCny()));
+    // Per-order commission bases: 100 + 0 + 70 + 0 = 170.
+    assertThat(summary.commissionBaseCny())
+        .isEqualByComparingTo(
+            new BigDecimal("100.00")
+                .add(BigDecimal.ZERO)
+                .add(new BigDecimal("70.00"))
+                .add(BigDecimal.ZERO));
+    // 预估总佣金 sums the rows' estimated commissions.
+    assertThat(summary.estimatedCommissionCny()).isEqualByComparingTo("19.00");
     // Verify the order query is the list's base query restricted to paid orders.
     var query = ArgumentCaptor.forClass(Wrapper.class);
     verify(orders).selectList(query.capture());
@@ -575,11 +617,12 @@ class KolOrderServiceTest {
 
     var summary = service.summary(new KolOrderFilterDTO(null, null, null, null, null, null, 1, 1));
 
-    assertThat(summary.salesCny()).isEqualTo(new BigDecimal("0.00"));
-    assertThat(summary.settledCny()).isEqualTo(new BigDecimal("0.00"));
-    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("0.00"));
-    assertThat(summary.refundedCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.orderSalesCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.estimatedRefundCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.commissionBaseCny()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.estimatedCommissionCny()).isEqualTo(new BigDecimal("0.00"));
     verifyNoInteractions(items);
+    verifyNoInteractions(refunds);
   }
 
   @Test
@@ -611,19 +654,24 @@ class KolOrderServiceTest {
 
   @Test
   void shouldSummariseOnlyOrdersWhoseStatusMatchesTheSettlementFilter() {
-    OrderDO frozen = order(21L, "123456789012", "ATTRIBUTED", "PAID");
-    OrderDO released = order(31L, "999900001111", "ATTRIBUTED", "PAID");
+    OrderDO frozen = paidOrder(21L, "10.00");
+    OrderDO released = paidOrder(31L, "20.00");
     when(orders.selectList(any())).thenReturn(List.of(frozen, released));
     when(commissionStates.listByKolAndOrderIds(anyLong(), any()))
         .thenReturn(List.of(state(21L, 21L, "FROZEN"), state(31L, 31L, "WITHDRAWABLE")));
-    when(items.selectList(any())).thenReturn(List.of(item(21L, 700L, "10.00", "0.00")));
+    when(refunds.selectList(any())).thenReturn(List.of());
+    when(items.selectList(any())).thenReturn(List.of(line(21L)));
     when(commissionStates.listByOrderItemIds(anyLong(), any()))
         .thenReturn(List.of(state(21L, 21L, "FROZEN")));
 
     var summary =
         service.summary(new KolOrderFilterDTO(null, null, null, null, null, "FROZEN", 1, 1));
 
-    assertThat(summary.pendingCny()).isEqualTo(new BigDecimal("10.00"));
+    // Only the FROZEN order counts: sales 10, no refunds, base 10, estimated commission 1.
+    assertThat(summary.orderSalesCny()).isEqualByComparingTo("10.00");
+    assertThat(summary.estimatedRefundCny()).isEqualByComparingTo("0.00");
+    assertThat(summary.commissionBaseCny()).isEqualByComparingTo("10.00");
+    assertThat(summary.estimatedCommissionCny()).isEqualByComparingTo("1.00");
     // Only the FROZEN order's id reaches the line query.
     var lines = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).selectList(lines.capture());

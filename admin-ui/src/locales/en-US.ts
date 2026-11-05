@@ -487,10 +487,7 @@ const enUS: MessageSchema = {
     resignation: "Resignation",
     user: "{nickname} ({role})",
     collapse: "Collapse sidebar",
-    expand: "Expand sidebar",
-    searchMenu: "Search menu",
-    shortcutMac: "⌘ K",
-    shortcutOther: "Ctrl K"
+    expand: "Expand sidebar"
   },
   company: {
     switchTitle: "Switch Company",
@@ -508,12 +505,6 @@ const enUS: MessageSchema = {
     submit: "Sign in again",
     switch: "Switch account",
     failed: "Could not sign in again. Try once more."
-  },
-  menuSearch: {
-    title: "Search menu",
-    placeholder: "Menu name",
-    recent: "Recent",
-    empty: "No matching menus"
   },
   copy: {
     done: "Copied {text}",
@@ -1282,7 +1273,7 @@ const enUS: MessageSchema = {
     missingHistoricalPrice: "No price",
     amounts: {
       productTotal: "Product Total",
-      itemCount: "Items",
+      itemCount: "Sales Qty",
       orderAmount: "Order Amount",
       discount: "Discount",
       refundAmount: "Refund Amount",
@@ -1406,6 +1397,15 @@ const enUS: MessageSchema = {
       orderNo: "Order No.",
       typeColumn: "Refund type",
       statusColumn: "Refund status",
+      commissionStatus: "Commission status",
+      commission: {
+        FROZEN: "Frozen",
+        WITHDRAWABLE: "Withdrawable",
+        WITHDRAWN: "Withdrawn",
+        NO_COMMISSION: "Unavailable",
+        WITHDRAWING: "Withdrawing",
+        INVALID: "Unverified"
+      },
       amount: "Refund Amount",
       applyTime: "Applied at",
       finishTime: "Succeeded at",
@@ -1472,11 +1472,11 @@ const enUS: MessageSchema = {
       rateSnapshot: "Rate snapshot",
       rateSupplemented: "Supplemented",
       releaseBasis: "Release basis",
-      occupiedTotal: "Applied for Withdrawal",
+      occupiedTotal: "Withdrawal Occupied",
       applicationNo: "Application no.",
-      withdrawalAmount: "Applied for Withdrawal",
+      withdrawalAmount: "Withdrawal Occupied",
       paidAt: "Paid at",
-      withdrawalOccupation: "Applied for Withdrawal",
+      withdrawalOccupation: "Withdrawal Occupied",
       noWithdrawal: "No withdrawal application",
       noFlows: "No finance flows",
       incompleteFlows:

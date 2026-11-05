@@ -80,6 +80,10 @@ class WithdrawalServiceScopeTest {
   private final ExternalAuditApi audit = mock(ExternalAuditApi.class);
   private final SystemConfigApi configs = mock(SystemConfigApi.class);
   private final CommissionRuleConfigService ruleConfig = mock(CommissionRuleConfigService.class);
+  private final com.tcrm.admin.commission.mapper.CommissionItemStateMapper itemStates =
+      mock(com.tcrm.admin.commission.mapper.CommissionItemStateMapper.class);
+  private final com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper itemRevisions =
+      mock(com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper.class);
   private WithdrawalService service;
 
   @BeforeEach
@@ -101,6 +105,8 @@ class WithdrawalServiceScopeTest {
             audit,
             ruleConfig,
             configs,
+            itemStates,
+            itemRevisions,
             Clock.fixed(NOW, ZoneOffset.UTC));
     when(configs.getInt(any())).thenReturn(200);
     when(ruleConfig.current())

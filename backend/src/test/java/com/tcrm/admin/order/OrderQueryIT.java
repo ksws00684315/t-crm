@@ -465,7 +465,30 @@ class OrderQueryIT {
     jdbc.update("UPDATE crm_order SET bd_user_id=? WHERE id=?", bd, orderId);
     mvc.perform(get("/admin-api/order/refunds").header("X-Admin-Token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.total").value("1"));
+        .andExpect(jsonPath("$.data.total").value("1"))
+        // Task 115 (B12): order:view alone never reveals the commission status.
+        .andExpect(jsonPath("$.data.items[0].commissionHidden").value(true))
+        .andExpect(jsonPath("$.data.items[0].commissionStatus").doesNotExist());
+
+    // Task 115 (B12): the order-level commission status, read through the commission port.
+    jdbc.update(
+        "UPDATE crm_commission_item_state SET verified=true, accrued_commission_cny=0,"
+            + " released_commission_cny=0, after_sales=false, release_basis='CONFIRMED'"
+            + " WHERE order_item_id=?",
+        itemId);
+    mvc.perform(get("/admin-api/order/refunds").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].commissionHidden").value(false))
+        .andExpect(jsonPath("$.data.items[0].commissionStatus").value("NO_COMMISSION"))
+        .andExpect(jsonPath("$.data.items[0].commissionAfterSales").value(false));
+    jdbc.update(
+        "UPDATE crm_commission_item_state SET accrued_commission_cny=5, after_sales=true"
+            + " WHERE order_item_id=?",
+        itemId);
+    mvc.perform(get("/admin-api/order/refunds").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].commissionStatus").value("FROZEN"))
+        .andExpect(jsonPath("$.data.items[0].commissionAfterSales").value(true));
   }
 
   @Test

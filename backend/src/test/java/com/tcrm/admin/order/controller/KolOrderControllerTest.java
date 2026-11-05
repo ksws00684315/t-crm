@@ -117,10 +117,10 @@ class KolOrderControllerTest {
     when(orders.summary(any()))
         .thenReturn(
             new KolOrderSummaryDTO(
-                new java.math.BigDecimal("235.00"),
-                new java.math.BigDecimal("130.00"),
-                new java.math.BigDecimal("30.00"),
-                new java.math.BigDecimal("68.00")));
+                new java.math.BigDecimal("350.00"),
+                new java.math.BigDecimal("180.00"),
+                new java.math.BigDecimal("170.00"),
+                new java.math.BigDecimal("19.00")));
 
     mvc.perform(
             get("/kol-api/orders/summary")
@@ -131,10 +131,10 @@ class KolOrderControllerTest {
                 .param("settlementStatus", "FROZEN")
                 .header(KolMvcSupport.TOKEN_HEADER, token()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("235.00"))
-        .andExpect(jsonPath("$.data.settledCny").value("130.00"))
-        .andExpect(jsonPath("$.data.pendingCny").value("30.00"))
-        .andExpect(jsonPath("$.data.refundedCny").value("68.00"));
+        .andExpect(jsonPath("$.data.orderSalesCny").value("350.00"))
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("180.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("170.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("19.00"));
 
     verify(orders)
         .summary(
