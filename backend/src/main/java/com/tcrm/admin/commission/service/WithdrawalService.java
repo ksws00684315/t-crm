@@ -1116,7 +1116,8 @@ public class WithdrawalService {
     }
     Map<Long, List<String>> result = new HashMap<>();
     for (var entry : ratesByOrder.entrySet()) {
-      result.put(entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
+      result.put(
+          entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
     }
     return result;
   }
