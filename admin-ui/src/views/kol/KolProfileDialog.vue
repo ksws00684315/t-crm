@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import CopyText from "@/components/CopyText.vue";
-import NameCode from "@/components/NameCode.vue";
 import { ElMessage } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
@@ -160,16 +159,10 @@ async function submit() {
   <el-dialog
     :model-value="modelValue"
     :title="title"
-    width="560px"
+    width="min(680px, calc(100vw - 32px))"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <NameCode v-if="kol" :name="kol?.name" :code="kol?.kolCode" />
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="130px" @submit.prevent>
-      <el-form-item :label="t('kol.code')">
-        <div class="readonly-value" data-test="profile-code">
-          <CopyText :value="kol?.kolCode" />
-        </div>
-      </el-form-item>
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
       <el-form-item :label="t('common.email')">
         <div class="readonly-value" data-test="profile-email">
           <CopyText :value="kol?.email" />

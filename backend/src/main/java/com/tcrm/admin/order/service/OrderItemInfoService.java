@@ -6,10 +6,13 @@ import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,5 +60,42 @@ public class OrderItemInfoService implements OrderItemInfoApi {
                     row.getProductId(),
                     row.getKolId()))
         .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<OrderAmountDTO> listOrderAmounts(Collection<Long> orderIds) {
+    if (orderIds == null || orderIds.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, BigDecimal> freightById = new HashMap<>();
+    for (OrderDO order : orders.selectBatchIds(orderIds)) {
+      freightById.put(
+          order.getId(), order.getFreight() == null ? BigDecimal.ZERO : order.getFreight());
+    }
+    if (freightById.isEmpty()) {
+      return List.of();
+    }
+    // 商品总价 shares the order detail's exact formula (task 107 basis; extracted in the task 115
+    // review so both call sites can never drift).
+    Map<Long, List<OrderItemDO>> linesByOrder =
+        items
+            .selectList(
+                new LambdaQueryWrapper<OrderItemDO>()
+                    .select(
+                        OrderItemDO::getId,
+                        OrderItemDO::getOrderId,
+                        OrderItemDO::getHistoricalUnitPrice,
+                        OrderItemDO::getQuantity)
+                    .in(OrderItemDO::getOrderId, freightById.keySet()))
+            .stream()
+            .collect(Collectors.groupingBy(OrderItemDO::getOrderId));
+    List<OrderAmountDTO> result = new ArrayList<>();
+    for (var entry : freightById.entrySet()) {
+      List<OrderItemDO> lines = linesByOrder.getOrDefault(entry.getKey(), List.of());
+      result.add(
+          new OrderAmountDTO(entry.getKey(), OrderService.goodsTotalOf(lines), entry.getValue()));
+    }
+    return result;
   }
 }

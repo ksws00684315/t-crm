@@ -120,6 +120,7 @@ class KolOrderIT {
     for (String table :
         List.of(
             "crm_commission_item_state",
+            "crm_refund",
             "crm_order_item",
             "crm_order",
             "crm_kol_auth_token",
@@ -304,49 +305,60 @@ class KolOrderIT {
   }
 
   @Test
-  void shouldSummariseOrdersByLineStatusWithTheListFilters() throws Exception {
-    // Order 1007: three own lines. Settled 100-20, frozen 40-10, unverified 60 (no state row).
+  void shouldSummariseOrdersByRefundStatesWithTheListFilters() throws Exception {
+    // Task 115 §2.4 (amount terms §5a): the four summary cards over the same orders the list
+    // shows, refund states included.
+    // Order 1007 (pay 150.00) is refunding: its whole pay amount counts as estimated refund.
     order(1007, 1L, "W99000107", kolA, "COMPLETED", PAY_B);
     item(2011, 1007, 1L, kolA, "Settled Widget", "100.00");
     item(2012, 1007, 1L, kolA, "Frozen Widget", "40.00");
     item(2013, 1007, 1L, kolA, "Unverified Widget", "60.00");
-    jdbc.update("UPDATE crm_order_item SET refund_amount = 20.00 WHERE id = 2011");
-    jdbc.update("UPDATE crm_order_item SET refund_amount = 10.00 WHERE id = 2012");
     commissionState(3011, 1007, 2011, kolA, "10.00", "10.00");
     commissionState(3012, 1007, 2012, kolA, "4.00", "0.00");
-    // Order 1001 (kolA lines 100 + 50) has no commission state: unverified.
+    refund(7001, 1007, "R9900010701", "20.00", "PROCESSING", null);
+    // Order 1001 (pay 150.00) finished a partial refund: only the refunded 30 counts.
+    refund(7002, 1001, "R9900010101", "30.00", "SUCCESS", Instant.parse("2026-10-17T00:00:00Z"));
     String token = kolLogin("a@example.test");
 
     mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("350.00"))
-        .andExpect(jsonPath("$.data.settledCny").value("80.00"))
-        .andExpect(jsonPath("$.data.pendingCny").value("30.00"))
-        .andExpect(jsonPath("$.data.refundedCny").value("30.00"));
+        // 订单销售额 = 150 + 150; 预估退款金额 = 150(退款中整单) + 30(已退); 计佣金额 = 300 − 180.
+        .andExpect(jsonPath("$.data.orderSalesCny").value("300.00"))
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("180.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("120.00"))
+        // 预估总佣金 sums the rows' commission amounts (10 + 4; the unverified line has none).
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
     // The summary follows the list filters: product name, order number and status.
     mvc.perform(
             get("/kol-api/orders/summary").param("productName", "frozen").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        // The order matches, and its three own lines all count (same scope as the list rows).
-        .andExpect(jsonPath("$.data.salesCny").value("200.00"));
+        // Refunding order: the whole pay amount is held back and the commission base is zero.
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("150.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("0.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
     mvc.perform(get("/kol-api/orders/summary").param("orderNo", "0101").header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("150.00"))
-        .andExpect(jsonPath("$.data.settledCny").value("0.00"));
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("30.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("120.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("0.00"));
     mvc.perform(
             get("/kol-api/orders/summary")
                 .param("settlementStatus", "WITHDRAWABLE")
                 .header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("200.00"))
-        .andExpect(jsonPath("$.data.settledCny").value("80.00"));
+        // Only order 1007 has a WITHDRAWABLE line.
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("0.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("14.00"));
     mvc.perform(
             get("/kol-api/orders/summary")
                 .param("payFrom", "2026-10-16T00:00:00Z")
                 .param("payTo", "2026-10-17T00:00:00Z")
                 .header(KOL_TOKEN, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("200.00"));
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"));
     mvc.perform(
             get("/kol-api/orders/summary")
                 .param("settlementStatus", "MYSTERY")
@@ -356,19 +368,19 @@ class KolOrderIT {
 
   @Test
   void shouldKeepTheOrderSummaryOwnAndInCompany() throws Exception {
-    // kolB owns order 1002 only; its 70.00 line on kolA's order 1001 does not count.
+    // kolB owns order 1002 only (pay 150.00); the 70.00 line on kolA's order 1001 does not count.
     String tokenB = kolLogin("b@example.test");
     mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, tokenB))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("30.00"))
-        .andExpect(jsonPath("$.data.settledCny").value("0.00"))
-        .andExpect(jsonPath("$.data.pendingCny").value("0.00"))
-        .andExpect(jsonPath("$.data.refundedCny").value("0.00"));
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedRefundCny").value("0.00"))
+        .andExpect(jsonPath("$.data.commissionBaseCny").value("150.00"))
+        .andExpect(jsonPath("$.data.estimatedCommissionCny").value("0.00"));
     // Unpaid order 1003 and the other company's order 1004 never count for kolA.
     String tokenA = kolLogin("a@example.test");
     mvc.perform(get("/kol-api/orders/summary").header(KOL_TOKEN, tokenA))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.salesCny").value("150.00"));
+        .andExpect(jsonPath("$.data.orderSalesCny").value("150.00"));
     mvc.perform(get("/kol-api/orders/summary")).andExpect(status().isUnauthorized());
   }
 
@@ -438,6 +450,22 @@ class KolOrderIT {
         "0",
         name,
         new BigDecimal(payAmount));
+  }
+
+  /** One refund row of an order; PROCESSING means an unconcluded refund (amount terms §2.1). */
+  private void refund(
+      long id, long orderId, String refundNo, String amount, String status, Instant finishTime) {
+    jdbc.update(
+        "INSERT INTO crm_refund(id,tenant_id,order_id,weidian_refund_no,amount,raw_status,"
+            + "refund_type,refund_status,refund_time,finish_time,create_time,update_time)"
+            + " VALUES(?,1,?,?,?,'10','REFUND_ONLY',?,?,?,now(),now())",
+        id,
+        orderId,
+        refundNo,
+        new BigDecimal(amount),
+        status,
+        Timestamp.from(PAY_A),
+        finishTime == null ? null : Timestamp.from(finishTime));
   }
 
   private String kolLogin(String email) throws Exception {

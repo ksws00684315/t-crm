@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.order.api.CommissionOrderStateApi;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
+import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
+import com.tcrm.admin.order.model.RefundDO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.KolAccountDTO;
 import com.tcrm.admin.shared.BusinessException;
@@ -28,26 +30,24 @@ public class KolOrderService {
   private static final int MAX_SIZE = 50;
   private static final int MAX_KEYWORD = 128;
   private static final int SUMMARY_CHUNK = 1000;
-  private static final List<String> SETTLED_STATUSES =
-      List.of(
-          CommissionOrderStateApi.STATUS_WITHDRAWABLE,
-          CommissionOrderStateApi.STATUS_WITHDRAWING,
-          CommissionOrderStateApi.STATUS_WITHDRAWN);
   private static final List<String> STATUSES =
       List.of("UNPAID", "PAID", "SHIPPED", "RECEIVED", "COMPLETED", "CLOSED", "UNKNOWN");
 
   private final OrderMapper orders;
   private final OrderItemMapper orderItems;
+  private final RefundMapper refunds;
   private final CurrentKolContext current;
   private final CommissionOrderStateApi commissionStates;
 
   public KolOrderService(
       OrderMapper orders,
       OrderItemMapper orderItems,
+      RefundMapper refunds,
       CurrentKolContext current,
       CommissionOrderStateApi commissionStates) {
     this.orders = orders;
     this.orderItems = orderItems;
+    this.refunds = refunds;
     this.current = current;
     this.commissionStates = commissionStates;
   }
@@ -161,10 +161,13 @@ public class KolOrderService {
   }
 
   /**
-   * Sales summary over the same orders the list shows for these filters (paging ignored). Only paid
-   * orders count. Settled and pending amounts are net of refunds and classified by the line status
-   * of the commission port, the same source as the list rows; unverified and no-commission lines
-   * belong to neither, so the three figures may add up to less than the total.
+   * Sales summary over the same orders the list shows for these filters (paging ignored),
+   * amount-terms §5a (task 115). 订单销售额 sums the orders' pay amounts (freight and refunds included).
+   * 预估退款金额 adds the full pay amount of every order with an unconcluded refund (any refund row
+   * PROCESSING/UNKNOWN, the same rule the commission sync uses for after-sales) and the successful
+   * refund amount of the concluded ones. 计佣金额 is their difference, so it equals the sum of the
+   * per-order commission bases (§2.1). 预估总佣金 sums the rows' estimated commissions, i.e. the line
+   * commission amounts the list rows show.
    */
   public KolOrderSummaryDTO summary(KolOrderFilterDTO filter) {
     if (invalidConditions(filter)) {
@@ -173,7 +176,9 @@ public class KolOrderService {
     KolAccountDTO kol = current.kol();
     List<OrderDO> candidates =
         orders.selectList(
-            baseQuery(filter, kol.id()).select(OrderDO::getId).isNotNull(OrderDO::getPayTime));
+            baseQuery(filter, kol.id())
+                .select(OrderDO::getId, OrderDO::getPayAmount)
+                .isNotNull(OrderDO::getPayTime));
     List<Long> orderIds;
     if (notBlank(filter.settlementStatus())) {
       orderIds =
@@ -182,47 +187,73 @@ public class KolOrderService {
     } else {
       orderIds = candidates.stream().map(OrderDO::getId).toList();
     }
-    BigDecimal sales = BigDecimal.ZERO;
-    BigDecimal settled = BigDecimal.ZERO;
-    BigDecimal pending = BigDecimal.ZERO;
-    BigDecimal refunded = BigDecimal.ZERO;
+    if (orderIds.isEmpty()) {
+      return new KolOrderSummaryDTO(money(null), money(null), money(null), money(null));
+    }
+    Map<Long, BigDecimal> payByOrder = new HashMap<>();
+    for (OrderDO order : candidates) {
+      if (order.getPayAmount() != null) {
+        // Candidate ids are unique, so one put per order is exact (task 115 review).
+        payByOrder.put(order.getId(), order.getPayAmount());
+      }
+    }
+    Map<Long, List<RefundDO>> refundsByOrder = new HashMap<>();
+    // Refund rows follow the same chunking as the line queries below (task 115 review).
+    for (int from = 0; from < orderIds.size(); from += SUMMARY_CHUNK) {
+      List<Long> chunk = orderIds.subList(from, Math.min(from + SUMMARY_CHUNK, orderIds.size()));
+      for (RefundDO refund :
+          refunds.selectList(
+              new LambdaQueryWrapper<RefundDO>()
+                  .select(RefundDO::getOrderId, RefundDO::getAmount, RefundDO::getRefundStatus)
+                  .in(RefundDO::getOrderId, chunk))) {
+        refundsByOrder.computeIfAbsent(refund.getOrderId(), k -> new ArrayList<>()).add(refund);
+      }
+    }
+    BigDecimal orderSales = BigDecimal.ZERO;
+    BigDecimal estimatedRefund = BigDecimal.ZERO;
+    for (Long orderId : orderIds) {
+      BigDecimal pay = payByOrder.getOrDefault(orderId, BigDecimal.ZERO);
+      orderSales = orderSales.add(pay);
+      List<RefundDO> refundRows = refundsByOrder.getOrDefault(orderId, List.of());
+      // Same unconcluded-refund rule the commission sync uses for after-sales (task 115 review).
+      boolean unconcluded = OrderCommissionSync.hasUnconcludedRefund(refundRows);
+      estimatedRefund =
+          estimatedRefund.add(
+              unconcluded
+                  ? pay
+                  : refundRows.stream()
+                      .filter(refund -> "SUCCESS".equals(refund.getRefundStatus()))
+                      .map(
+                          refund ->
+                              refund.getAmount() == null ? BigDecimal.ZERO : refund.getAmount())
+                      .reduce(BigDecimal.ZERO, BigDecimal::add));
+    }
+    BigDecimal estimatedCommission = BigDecimal.ZERO;
     for (int from = 0; from < orderIds.size(); from += SUMMARY_CHUNK) {
       List<Long> chunk = orderIds.subList(from, Math.min(from + SUMMARY_CHUNK, orderIds.size()));
       List<OrderItemDO> lines =
           orderItems.selectList(
               new LambdaQueryWrapper<OrderItemDO>()
-                  .select(
-                      OrderItemDO::getId,
-                      OrderItemDO::getOrderId,
-                      OrderItemDO::getPayAmount,
-                      OrderItemDO::getRefundAmount)
+                  .select(OrderItemDO::getId)
                   .in(OrderItemDO::getOrderId, chunk)
                   .eq(OrderItemDO::getKolId, kol.id()));
-      Map<Long, CommissionOrderStateApi.ItemCommissionStateDTO> statesByItem =
-          commissionStates
-              .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
-              .stream()
-              .collect(
-                  Collectors.toMap(
-                      CommissionOrderStateApi.ItemCommissionStateDTO::orderItemId, s -> s));
-      for (OrderItemDO line : lines) {
-        BigDecimal pay = line.getPayAmount() == null ? BigDecimal.ZERO : line.getPayAmount();
-        BigDecimal refund =
-            line.getRefundAmount() == null ? BigDecimal.ZERO : line.getRefundAmount();
-        BigDecimal net = pay.subtract(refund);
-        sales = sales.add(pay);
-        refunded = refunded.add(refund);
-        CommissionOrderStateApi.ItemCommissionStateDTO state = statesByItem.get(line.getId());
-        String status =
-            state == null ? CommissionOrderStateApi.STATUS_INVALID : state.settlementStatus();
-        if (SETTLED_STATUSES.contains(status)) {
-          settled = settled.add(net);
-        } else if (CommissionOrderStateApi.STATUS_FROZEN.equals(status)) {
-          pending = pending.add(net);
-        }
+      if (lines.isEmpty()) {
+        continue;
       }
+      estimatedCommission =
+          estimatedCommission.add(
+              commissionStates
+                  .listByOrderItemIds(kol.id(), lines.stream().map(OrderItemDO::getId).toList())
+                  .stream()
+                  .map(CommissionOrderStateApi.ItemCommissionStateDTO::commissionAmount)
+                  .filter(Objects::nonNull)
+                  .reduce(BigDecimal.ZERO, BigDecimal::add));
     }
-    return new KolOrderSummaryDTO(money(sales), money(settled), money(pending), money(refunded));
+    return new KolOrderSummaryDTO(
+        money(orderSales),
+        money(estimatedRefund),
+        money(orderSales.subtract(estimatedRefund)),
+        money(estimatedCommission));
   }
 
   /** Conditions shared by the list and the summary; paging is validated by the list only. */
@@ -249,9 +280,11 @@ public class KolOrderService {
     return state == null ? CommissionOrderStateApi.STATUS_INVALID : state.settlementStatus();
   }
 
-  /** Order-level status: the most active own line (appendix B ladder). */
-  private static String mostActiveStatus(
-      List<CommissionOrderStateApi.ItemCommissionStateDTO> states) {
+  /**
+   * Order-level status: the most active own line (appendix B ladder). Also used by the admin refund
+   * list's commission status (task 115).
+   */
+  static String mostActiveStatus(List<CommissionOrderStateApi.ItemCommissionStateDTO> states) {
     List<String> ladder =
         List.of(
             CommissionOrderStateApi.STATUS_WITHDRAWING,

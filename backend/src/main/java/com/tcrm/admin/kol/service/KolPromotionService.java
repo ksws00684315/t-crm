@@ -156,14 +156,24 @@ public class KolPromotionService {
         });
   }
 
-  public PageResult<PromotionRecordDTO> pageRecords(Long id, int page, int size) {
+  /**
+   * Paged promotion records, newest first. {@code rateOnly} keeps only CONFIG records whose default
+   * commission rate changed (task 115, 1105 sheet B5), so total and paging count those records.
+   */
+  public PageResult<PromotionRecordDTO> pageRecords(Long id, int page, int size, boolean rateOnly) {
     requireOwned(id, current.user());
-    var result =
-        records.selectPage(
-            new Page<>(page, size),
-            new LambdaQueryWrapper<KolPromotionRecordDO>()
-                .eq(KolPromotionRecordDO::getKolId, id)
-                .orderByDesc(KolPromotionRecordDO::getCreateTime, KolPromotionRecordDO::getId));
+    var query =
+        new LambdaQueryWrapper<KolPromotionRecordDO>()
+            .eq(KolPromotionRecordDO::getKolId, id)
+            .orderByDesc(KolPromotionRecordDO::getCreateTime, KolPromotionRecordDO::getId);
+    if (rateOnly) {
+      query
+          .eq(KolPromotionRecordDO::getChangeType, PromotionChangeType.CONFIG.name())
+          // Constant SQL fragment on JSONB columns: no parameters, nothing concatenated, so the
+          // 数据库规范 04 §65 no-concatenation rule is met (task 115 review).
+          .apply("before_json->'defaultRate' IS DISTINCT FROM after_json->'defaultRate'");
+    }
+    var result = records.selectPage(new Page<>(page, size), query);
     Set<Long> operators =
         result.getRecords().stream()
             .map(KolPromotionRecordDO::getCreateBy)

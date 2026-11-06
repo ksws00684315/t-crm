@@ -11,6 +11,7 @@ import com.tcrm.admin.kol.mapper.KolPlatformMapper;
 import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.KolPlatformDO;
+import com.tcrm.admin.kol.model.KolPromotionRecordDO;
 import com.tcrm.admin.kol.model.RelationStatus;
 import com.tcrm.admin.kol.model.ReviewStatus;
 import com.tcrm.admin.kol.service.KolPromotionService.PlatformInput;
@@ -43,6 +44,14 @@ class KolPromotionServiceTest {
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private KolPromotionService service;
 
+  @org.junit.jupiter.api.BeforeAll
+  static void metadata() {
+    com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+        new org.apache.ibatis.builder.MapperBuilderAssistant(
+            new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""),
+        KolPromotionRecordDO.class);
+  }
+
   @BeforeEach
   void setUp() {
     service =
@@ -59,6 +68,45 @@ class KolPromotionServiceTest {
             events);
     when(current.user()).thenReturn(admin());
     when(sanitizer.sanitize(any())).thenReturn("{}");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void pageRecords_rateOnlyFiltersInQuery_soTotalCountsRateChangesOnly() {
+    when(kols.selectById(1L)).thenReturn(baseKol());
+    var captor =
+        org.mockito.ArgumentCaptor.forClass(
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+    var page =
+        new com.baomidou.mybatisplus.extension.plugins.pagination.Page<KolPromotionRecordDO>(1, 10);
+    page.setTotal(3);
+    page.setRecords(List.of());
+    when(records.selectPage(any(), captor.capture())).thenReturn(page);
+
+    var result = service.pageRecords(1L, 1, 10, true);
+
+    assertThat(result.total()).isEqualTo(3);
+    String sql = captor.getValue().getSqlSegment();
+    assertThat(sql)
+        .contains("change_type")
+        .contains("before_json->'defaultRate' IS DISTINCT FROM after_json->'defaultRate'");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void pageRecords_withoutRateOnly_keepsAllRecordTypes() {
+    when(kols.selectById(1L)).thenReturn(baseKol());
+    var captor =
+        org.mockito.ArgumentCaptor.forClass(
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+    var page =
+        new com.baomidou.mybatisplus.extension.plugins.pagination.Page<KolPromotionRecordDO>(1, 10);
+    page.setRecords(List.of());
+    when(records.selectPage(any(), captor.capture())).thenReturn(page);
+
+    service.pageRecords(1L, 1, 10, false);
+
+    assertThat(captor.getValue().getSqlSegment()).doesNotContain("defaultRate");
   }
 
   @Test

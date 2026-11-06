@@ -1,10 +1,13 @@
 package com.tcrm.admin.commission.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.tcrm.admin.commission.mapper.CommissionItemRevisionMapper;
+import com.tcrm.admin.commission.mapper.CommissionItemStateMapper;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalFreezeMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
+import com.tcrm.admin.commission.model.CommissionItemStateDO;
 import com.tcrm.admin.commission.model.FileBizType;
 import com.tcrm.admin.commission.model.FinanceTaskQuery;
 import com.tcrm.admin.commission.model.FinanceTaskRow;
@@ -19,6 +22,7 @@ import com.tcrm.admin.commission.service.WithdrawalFundingSource.FundingRow;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderItemInfoApi;
+import com.tcrm.admin.order.api.OrderItemInfoApi.OrderAmountDTO;
 import com.tcrm.admin.order.api.OrderItemInfoApi.OrderItemInfoDTO;
 import com.tcrm.admin.product.api.ProductAccessApi;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -53,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,6 +109,8 @@ public class WithdrawalService {
   private final ExternalAuditApi audit;
   private final CommissionRuleConfigService ruleConfig;
   private final SystemConfigApi configs;
+  private final CommissionItemStateMapper itemStates;
+  private final CommissionItemRevisionMapper itemRevisions;
   private final Clock clock;
 
   @Autowired
@@ -122,7 +129,9 @@ public class WithdrawalService {
       SecretCipher cipher,
       ExternalAuditApi audit,
       CommissionRuleConfigService ruleConfig,
-      SystemConfigApi configs) {
+      SystemConfigApi configs,
+      CommissionItemStateMapper itemStates,
+      CommissionItemRevisionMapper itemRevisions) {
     this(
         withdrawals,
         freezes,
@@ -139,6 +148,8 @@ public class WithdrawalService {
         audit,
         ruleConfig,
         configs,
+        itemStates,
+        itemRevisions,
         Clock.systemUTC());
   }
 
@@ -158,6 +169,8 @@ public class WithdrawalService {
       ExternalAuditApi audit,
       CommissionRuleConfigService ruleConfig,
       SystemConfigApi configs,
+      CommissionItemStateMapper itemStates,
+      CommissionItemRevisionMapper itemRevisions,
       Clock clock) {
     this.withdrawals = withdrawals;
     this.freezes = freezes;
@@ -174,6 +187,8 @@ public class WithdrawalService {
     this.audit = audit;
     this.ruleConfig = ruleConfig;
     this.configs = configs;
+    this.itemStates = itemStates;
+    this.itemRevisions = itemRevisions;
     this.clock = clock;
   }
 
@@ -1010,7 +1025,10 @@ public class WithdrawalService {
   /**
    * Order-level allocation snapshots (13.04, contract §6.2): one row per order from the persisted
    * order snapshot table; the products[] come from the row-level allocations of that order. The
-   * order remaining snapshot is the persisted history value, null when unknown.
+   * order remaining snapshot is the persisted history value, null when unknown. Task 115 (1105
+   * sheet B9) adds 订单金额 (商品总价 + 运费, null when a line misses its historical price) and the
+   * commission rate snapshots of the order's own lines; 实际佣金 stays 待确认 on the portal until M0
+   * confirms the settlement flows, so it is not computed here.
    */
   @Transactional(readOnly = true)
   public PageResult<OrderView> orders(AccountDTO user, long id, int page, int size) {
@@ -1023,9 +1041,17 @@ public class WithdrawalService {
           WithdrawalRow row = requireRow(id);
           requireKolScope(user, requireKol(row.kolId()));
           Long total = withdrawals.countOrderSnapshots(id);
+          List<WithdrawalMapper.OrderSnapshotRow> snapshots =
+              withdrawals.pageOrderSnapshots(id, size, (long) (page - 1) * size);
+          List<Long> orderIds =
+              snapshots.stream().map(WithdrawalMapper.OrderSnapshotRow::orderId).toList();
+          Map<Long, OrderAmountDTO> amountsByOrder = new HashMap<>();
+          for (OrderAmountDTO amount : orderItems.listOrderAmounts(orderIds)) {
+            amountsByOrder.put(amount.orderId(), amount);
+          }
+          Map<Long, List<String>> ratesByOrder = orderRates(orderIds, row.kolId());
           List<OrderView> items = new ArrayList<>();
-          for (WithdrawalMapper.OrderSnapshotRow snapshot :
-              withdrawals.pageOrderSnapshots(id, size, (long) (page - 1) * size)) {
+          for (WithdrawalMapper.OrderSnapshotRow snapshot : snapshots) {
             List<ProductView> products =
                 withdrawals.allocationsOfOrder(id, snapshot.orderNo()).stream()
                     .map(
@@ -1036,11 +1062,21 @@ public class WithdrawalService {
                                 item.itemName(),
                                 item.skuName()))
                     .toList();
+            OrderAmountDTO amount = amountsByOrder.get(snapshot.orderId());
+            String orderAmount =
+                amount == null || amount.itemAmount() == null
+                    ? null
+                    : money(
+                        amount
+                            .itemAmount()
+                            .add(amount.freight() == null ? BigDecimal.ZERO : amount.freight()));
             items.add(
                 new OrderView(
                     snapshot.id(),
                     snapshot.orderNo(),
                     products,
+                    orderAmount,
+                    ratesByOrder.getOrDefault(snapshot.orderId(), List.of()),
                     money(snapshot.occupiedCny()),
                     snapshot.remainingSnapshotCny() == null
                         ? null
@@ -1050,11 +1086,46 @@ public class WithdrawalService {
         });
   }
 
+  /**
+   * Rate snapshots per order (task 115, B9 佣金比例): the distinct latest revision rates of the order's
+   * commission lines, ascending; the portal formats and joins them, so mixed-rate orders show every
+   * snapshot instead of failing to parse one joined string.
+   */
+  private Map<Long, List<String>> orderRates(List<Long> orderIds, long kolId) {
+    if (orderIds.isEmpty()) {
+      return Map.of();
+    }
+    List<CommissionItemStateDO> states =
+        itemStates.listByOrderIds(orderIds).stream()
+            .filter(state -> Objects.equals(state.getKolId(), kolId))
+            .toList();
+    if (states.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, BigDecimal> rateByState =
+        CommissionRateSnapshots.rateByStateId(
+            itemRevisions, states.stream().map(CommissionItemStateDO::getId).toList());
+    Map<Long, TreeSet<BigDecimal>> ratesByOrder = new HashMap<>();
+    for (CommissionItemStateDO state : states) {
+      BigDecimal rate = rateByState.get(state.getId());
+      if (rate != null) {
+        ratesByOrder.computeIfAbsent(state.getOrderId(), k -> new TreeSet<>()).add(rate);
+      }
+    }
+    Map<Long, List<String>> result = new HashMap<>();
+    for (var entry : ratesByOrder.entrySet()) {
+      result.put(entry.getKey(), entry.getValue().stream().map(BigDecimal::toPlainString).toList());
+    }
+    return result;
+  }
+
   /** One order row of the allocation pagination (contract §6.2 / #112). */
   public record OrderView(
       long id,
       String orderNo,
       List<ProductView> products,
+      String orderAmount,
+      List<String> rates,
       String occupied,
       String remainingSnapshot) {}
 

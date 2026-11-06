@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Avatar, Bell, CircleCheck, Clock, Switch, Wallet, Warning } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -25,6 +25,7 @@ defineOptions({ name: "NotificationPage" });
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
 const user = useUserStore();
 const access = computed(() => accessOf(user.user));
 
@@ -66,15 +67,21 @@ async function load() {
 }
 
 function showUnread() {
-  unreadOnly.value = true;
-  page.value = 1;
-  void load();
+  // Re-clicking the active view re-runs the query (router.replace with the same query would not
+  // trigger the route watch; task 115 review restored that refresh).
+  if (route.query.view !== "unread") {
+    void router.replace({ query: { ...route.query, view: "unread" } });
+  } else {
+    void load();
+  }
 }
 
 function showAll() {
-  unreadOnly.value = false;
-  page.value = 1;
-  void load();
+  if (route.query.view !== "all") {
+    void router.replace({ query: { ...route.query, view: "all" } });
+  } else {
+    void load();
+  }
 }
 
 async function markAll() {
@@ -108,7 +115,15 @@ function onPage(next: number) {
   void load();
 }
 
-onMounted(load);
+watch(
+  () => route.query.view,
+  view => {
+    unreadOnly.value = view !== "all";
+    page.value = 1;
+    void load();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>

@@ -422,8 +422,13 @@ const withdrawalColumns = computed<DataColumn[]>(() => [
 const flowColumns = computed<DataColumn[]>(() => [
   { key: "flowNo", align: "left" as const, label: t("order.chain.flowNo"), width: 130 },
   { key: "shopName", align: "left" as const, label: t("order.chain.shopName"), width: 130 },
-  { key: "type", label: t("order.chain.financeType"), width: 110 },
-  { key: "direction", label: t("order.chain.direction"), width: 80 },
+  // "Creator commission" (en) needs the wider box; zh fits 110 (2026-11-06 audit).
+  {
+    key: "type",
+    label: t("order.chain.financeType"),
+    width: locale.value.startsWith("en") ? 170 : 110
+  },
+  { key: "direction", label: t("order.chain.direction"), width: 100 },
   { key: "amount", label: t("order.chain.financeAmount"), width: 110, amount: true },
   { key: "businessAt", label: t("order.chain.businessTime"), width: 170 },
   { key: "transferredAt", label: t("order.chain.transferTime"), width: 170 },

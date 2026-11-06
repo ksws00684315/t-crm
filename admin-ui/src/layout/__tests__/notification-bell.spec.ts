@@ -5,6 +5,7 @@ import { nextTick } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "@/locales";
+import NotificationPage from "@/views/notification/index.vue";
 import NotificationBell from "../NotificationBell.vue";
 
 const api = vi.hoisted(() => ({
@@ -99,6 +100,26 @@ describe("notification bell", () => {
     mounted.length = 0;
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("opens the full inbox with read notifications included", async () => {
+    api.listNotifications.mockResolvedValue({
+      items: [{ ...payout, readTime: "2026-10-17T12:30:00Z" }],
+      total: 1
+    });
+    const { wrapper, router } = await mountBell();
+    await wrapper.get("[data-test=notification-bell]").trigger("click");
+    await flushPromises();
+    document.querySelector<HTMLElement>("[data-test=notification-view-all]")!.click();
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/notifications");
+    const inbox = mount(NotificationPage, {
+      global: { plugins: [ElementPlus, i18n, router] }
+    });
+    mounted.push(inbox);
+    await flushPromises();
+    expect(api.listNotifications).toHaveBeenLastCalledWith(1, 20, false);
+    expect(inbox.findAll("[data-test=notification-item]")).toHaveLength(1);
   });
 
   it("shows 99+ when the unread count is over 99", async () => {

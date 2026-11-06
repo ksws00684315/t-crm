@@ -331,7 +331,7 @@ describe("order list page (task 40)", () => {
     );
     expect(labels).toEqual([
       "商品总价",
-      "商品数量",
+      "销量",
       "运费",
       "订单金额",
       "优惠",

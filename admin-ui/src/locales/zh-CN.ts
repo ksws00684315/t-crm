@@ -466,10 +466,7 @@ const zhCN = {
     resignation: "离职申请",
     user: "{nickname}（{role}）",
     collapse: "折叠侧边栏",
-    expand: "展开侧边栏",
-    searchMenu: "搜索菜单",
-    shortcutMac: "⌘ K",
-    shortcutOther: "Ctrl K"
+    expand: "展开侧边栏"
   },
   company: {
     switchTitle: "切换公司",
@@ -487,12 +484,6 @@ const zhCN = {
     submit: "重新登录",
     switch: "切换账号",
     failed: "重新登录失败，请重试"
-  },
-  menuSearch: {
-    title: "搜索菜单",
-    placeholder: "输入菜单名称",
-    recent: "最近访问",
-    empty: "没有匹配的菜单"
   },
   copy: {
     done: "已复制 {text}",
@@ -1248,7 +1239,7 @@ const zhCN = {
     missingHistoricalPrice: "缺失历史售价",
     amounts: {
       productTotal: "商品总价",
-      itemCount: "商品数量",
+      itemCount: "销量",
       orderAmount: "订单金额",
       discount: "优惠",
       refundAmount: "退款金额",
@@ -1370,6 +1361,15 @@ const zhCN = {
       orderNo: "原订单号",
       typeColumn: "退款类型",
       statusColumn: "退款状态",
+      commissionStatus: "佣金状态",
+      commission: {
+        FROZEN: "冻结中",
+        WITHDRAWABLE: "可提现",
+        WITHDRAWN: "已提现",
+        NO_COMMISSION: "不可用",
+        WITHDRAWING: "提现中",
+        INVALID: "待核实"
+      },
       amount: "退款金额",
       applyTime: "申请时间",
       finishTime: "成功时间",
@@ -1436,11 +1436,11 @@ const zhCN = {
       rateSnapshot: "比例快照",
       rateSupplemented: "补录",
       releaseBasis: "释放依据",
-      occupiedTotal: "已申请提现",
+      occupiedTotal: "提现占用",
       applicationNo: "提现编号",
-      withdrawalAmount: "已申请提现",
+      withdrawalAmount: "提现占用",
       paidAt: "付款时间",
-      withdrawalOccupation: "已申请提现",
+      withdrawalOccupation: "提现占用",
       noWithdrawal: "无提现申请",
       noFlows: "暂无财务流水",
       incompleteFlows: "财务流水数据不完整，暂无法展示，请联系管理员。",

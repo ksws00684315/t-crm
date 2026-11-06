@@ -79,7 +79,9 @@ describe("financial drawers and payment registration", () => {
     expect(text).toContain("关联订单（11笔）");
     expect(text).toContain("t1023_WD001");
     expect(text).toContain("t1023_WD010");
-    expect(text).toContain("剩余快照为本次申请占用后，该笔订单当时剩余的可提现金额。");
+    expect(text).toContain(
+      "剩余金额为申请时该笔订单剩余可提现金额的快照；实际佣金需等结算流水核实后另计（待确认）。"
+    );
     expect(text).toContain("运营备注");
     expect(text).toContain("财务备注");
     expect(text).not.toContain("占用合计");

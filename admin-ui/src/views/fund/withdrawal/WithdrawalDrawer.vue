@@ -5,7 +5,8 @@ import { getWithdrawal, getWithdrawalOrders } from "@/api/commission/finance";
 import type { Withdrawal, WithdrawalOrder } from "@/api/commission/finance-types";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
-import { formatAmountWithCurrency, formatInstant } from "@/utils/format";
+import { formatAmountWithCurrency, formatInstant, formatNameWithCode } from "@/utils/format";
+import { formatRate } from "@/utils/rate";
 import { notifyError } from "@/utils/notify";
 import { subscribeNarrow } from "@/utils/sidebar";
 
@@ -47,10 +48,26 @@ const financeNote = computed(
     "—"
 );
 const columns = computed<DataColumn[]>(() => [
+  // Task 115 (1105 sheet B9): order no, order amount, rate, actual commission, occupation and
+  // remaining amount; the product column stays (the sheet keeps it) and moves last.
   { key: "orderNo", align: "left" as const, label: t("finance.orderNo"), minWidth: 200 },
-  { key: "product", align: "left" as const, label: t("finance.orderProduct"), minWidth: 380 },
+  {
+    key: "orderAmount",
+    label: t("finance.orderAmount"),
+    minWidth: 140,
+    amount: true,
+    tooltip: true
+  },
+  { key: "rates", label: t("finance.rate"), minWidth: 110 },
+  { key: "actualCommission", label: t("finance.actualCommission"), minWidth: 150 },
   { key: "occupied", label: t("finance.orderOccupied"), minWidth: 140, amount: true },
-  { key: "remainingSnapshot", label: t("finance.remainingSnapshot"), minWidth: 160, amount: true }
+  {
+    key: "remainingSnapshot",
+    label: t("finance.remainingSnapshot"),
+    minWidth: 160,
+    amount: true
+  },
+  { key: "product", align: "left" as const, label: t("finance.orderProduct"), minWidth: 380 }
 ]);
 async function loadDetail() {
   const sequence = ++detailSequence;
@@ -139,10 +156,9 @@ watch(
             <el-tag v-if="detail.paused" type="danger">{{ t("finance.paused") }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item :label="t('finance.creator')">
-            <div class="creator-name">{{ detail.kolName }}</div>
-            <small class="identity-id">{{ detail.kolCode }}</small>
+            <div class="creator-name">{{ formatNameWithCode(detail.kolName, detail.kolCode) }}</div>
           </el-descriptions-item>
-          <el-descriptions-item :label="t('finance.withdrawalAmount')"
+          <el-descriptions-item :label="t('finance.requestedAmount')"
             ><strong>{{
               formatAmountWithCurrency(detail.amount, detail.currency)
             }}</strong></el-descriptions-item
@@ -204,6 +220,16 @@ watch(
             plain
           >
             <template #cell-orderNo="{ row }"><CopyText :value="row.orderNo" /></template>
+            <template #cell-orderAmount="{ row }">{{
+              row.orderAmount === null
+                ? t("finance.missingHistoricalPrice")
+                : formatAmountWithCurrency(row.orderAmount)
+            }}</template>
+            <template #cell-rates="{ row }">{{
+              row.rates.length ? row.rates.map(formatRate).join(" / ") : "—"
+            }}</template>
+            <!-- Actual commission waits for the M0 settlement-flow confirmation (amount terms §6 P1). -->
+            <template #cell-actualCommission>{{ t("finance.pendingConfirm") }}</template>
             <template #cell-product="{ row }">
               <div class="products">
                 <div v-for="product in row.products" :key="product.id" class="product-row">
@@ -284,7 +310,6 @@ watch(
   font-weight: 400;
   color: var(--el-text-color-primary);
 }
-.identity-id,
 .product-copy small,
 .snapshot-note {
   color: var(--tcrm-color-text-secondary);

@@ -10,6 +10,7 @@ import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -122,7 +123,7 @@ public class OrderSettlementProjection implements OrderSettlementApi {
     }
     var wrapper =
         new LambdaQueryWrapper<OrderDO>()
-            .select(OrderDO::getId, OrderDO::getKolId)
+            .select(OrderDO::getId, OrderDO::getKolId, OrderDO::getPayAmount)
             .in(OrderDO::getKolId, kolIds)
             .isNotNull(OrderDO::getPayTime)
             .ge(start != null, OrderDO::getPayTime, start)
@@ -148,12 +149,17 @@ public class OrderSettlementProjection implements OrderSettlementApi {
             .stream()
             .map(row -> new Line(row.getKolId(), row.getQuantity() == null ? 0 : row.getQuantity()))
             .toList();
-    var byOrderLine = new java.util.HashMap<Long, List<Long>>();
-    var linesById = new java.util.HashMap<Long, List<Line>>();
+    var byOrderLine = new HashMap<Long, List<Long>>();
+    var salesByKol = new HashMap<Long, BigDecimal>();
+    var linesById = new HashMap<Long, List<Line>>();
     // Order-level attribution: crm_order.kol_id is the order's single KOL (conflict orders have
     // null and are excluded by the wrapper); map every paid order to that KOL.
     for (OrderDO order : paidOrders) {
       byOrderLine.computeIfAbsent(order.getKolId(), k -> new ArrayList<>()).add(order.getId());
+      // 销售额: the order's pay amount, freight and later refunds included (amount-terms §5).
+      if (order.getPayAmount() != null) {
+        salesByKol.merge(order.getKolId(), order.getPayAmount(), BigDecimal::add);
+      }
     }
     for (Line line : lines) {
       linesById.computeIfAbsent(line.kolId(), k -> new ArrayList<>()).add(line);
@@ -162,7 +168,14 @@ public class OrderSettlementProjection implements OrderSettlementApi {
     for (var entry : byOrderLine.entrySet()) {
       int quantity =
           linesById.getOrDefault(entry.getKey(), List.of()).stream().mapToInt(Line::quantity).sum();
-      rows.add(new KolOrderRowDTO(entry.getKey(), entry.getValue().size(), quantity));
+      rows.add(
+          new KolOrderRowDTO(
+              entry.getKey(),
+              entry.getValue().size(),
+              quantity,
+              salesByKol
+                  .getOrDefault(entry.getKey(), BigDecimal.ZERO)
+                  .setScale(2, RoundingMode.HALF_UP)));
     }
     return rows;
   }

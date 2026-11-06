@@ -119,8 +119,9 @@ public class KolController {
   public R<PageResult<PromotionRecordVO>> promotionRecords(
       @PathVariable @Min(1) Long id,
       @RequestParam(defaultValue = "1") @Min(1) int page,
-      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-    return R.ok(promotions.pageRecords(id, page, size).map(PromotionRecordVO::from));
+      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+      @RequestParam(defaultValue = "false") boolean rateOnly) {
+    return R.ok(promotions.pageRecords(id, page, size, rateOnly).map(PromotionRecordVO::from));
   }
 
   @PutMapping("/{id}/auto-cleanup")

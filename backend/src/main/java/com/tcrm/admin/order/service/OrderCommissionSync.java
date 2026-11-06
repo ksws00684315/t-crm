@@ -160,6 +160,18 @@ public class OrderCommissionSync {
     orders.update(null, update);
   }
 
+  /** A refund whose conclusion is unknown (or still running) keeps the order in after-sales. */
+  static final List<String> UNCONCLUDED_REFUND_STATUSES = List.of("PROCESSING", "UNKNOWN");
+
+  /** Shared unconcluded rule (task 115 review): also drives the creator order summary. */
+  static boolean hasUnconcludedRefund(List<RefundDO> refundRows) {
+    return refundRows.stream()
+        .anyMatch(
+            refund ->
+                refund.getRefundStatus() != null
+                    && UNCONCLUDED_REFUND_STATUSES.contains(refund.getRefundStatus()));
+  }
+
   /**
    * Whether the order is in after-sales: any refund row of the order is unconcluded (PROCESSING /
    * UNKNOWN, §8.4), whether or not it maps to a single line. One order belongs to one creator, so
@@ -170,12 +182,12 @@ public class OrderCommissionSync {
    * every raw status other than 10 is UNKNOWN (design §8.1a).
    */
   private boolean hasUnconcludedRefund(long orderId) {
-    return !refunds
-        .selectList(
+    // The status column must be selected: the shared rule reads it from the fetched rows.
+    return hasUnconcludedRefund(
+        refunds.selectList(
             new LambdaQueryWrapper<RefundDO>()
-                .select(RefundDO::getId)
+                .select(RefundDO::getId, RefundDO::getRefundStatus)
                 .eq(RefundDO::getOrderId, orderId)
-                .in(RefundDO::getRefundStatus, "PROCESSING", "UNKNOWN"))
-        .isEmpty();
+                .in(RefundDO::getRefundStatus, UNCONCLUDED_REFUND_STATUSES)));
   }
 }

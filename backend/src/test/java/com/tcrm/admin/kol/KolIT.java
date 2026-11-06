@@ -911,4 +911,64 @@ class KolIT {
     mvc.perform(post("/admin-api/kol/cleanup-items/9/retry").header(TOKEN, admin))
         .andExpect(status().isNotFound());
   }
+
+  @Test
+  void shouldPageOnlyRateChanges_whenPromotionRecordsFilteredByRate() throws Exception {
+    String admin = companyAdmin();
+    String kolId =
+        json.readTree(
+                mvc.perform(
+                        post("/admin-api/kol/kols")
+                            .header(TOKEN, admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                "{\"name\":\"RateOnly\",\"email\":\"rate-only@example.com\","
+                                    + "\"country\":\"US\"}"))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    long kol = Long.parseLong(kolId);
+    jdbc.update("DELETE FROM crm_kol_promotion_record WHERE kol_id = ?", kol);
+    String insert =
+        "INSERT INTO crm_kol_promotion_record (id, tenant_id, kol_id, change_type, before_json,"
+            + " after_json) SELECT ?, tenant_id, id, ?, ?::jsonb, ?::jsonb FROM crm_kol WHERE id = ?";
+    jdbc.update(insert, 9_115_001L, "CONFIG", "{}", "{\"defaultRate\":\"0.1000\"}", kol);
+    jdbc.update(
+        insert,
+        9_115_002L,
+        "CONFIG",
+        "{\"defaultRate\":\"0.1000\",\"inviteCode\":\"A\"}",
+        "{\"defaultRate\":\"0.1000\",\"inviteCode\":\"B\"}",
+        kol);
+    jdbc.update(
+        insert,
+        9_115_003L,
+        "CONFIG",
+        "{\"defaultRate\":\"0.1000\"}",
+        "{\"defaultRate\":\"0.1200\"}",
+        kol);
+    jdbc.update(
+        insert,
+        9_115_004L,
+        "STATUS",
+        "{\"relationStatus\":\"PENDING_PROMOTION\"}",
+        "{\"relationStatus\":\"PROMOTING\"}",
+        kol);
+
+    mvc.perform(
+            get("/admin-api/kol/kols/" + kolId + "/promotion-records")
+                .param("rateOnly", "true")
+                .param("size", "1")
+                .header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("2"))
+        .andExpect(jsonPath("$.data.items.length()").value(1))
+        .andExpect(jsonPath("$.data.items[0].changeType").value("CONFIG"));
+    mvc.perform(get("/admin-api/kol/kols/" + kolId + "/promotion-records").header(TOKEN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value("4"));
+  }
 }

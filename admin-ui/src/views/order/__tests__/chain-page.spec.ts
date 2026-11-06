@@ -488,6 +488,17 @@ describe("order chain page (task 40)", () => {
       "withdrawalNo"
     ]);
     expect(wrapper.get('[data-test="chain-wiring-details"]').text()).toContain("8001");
+    // Task 115 (§2.3): the per-order occupation is 提现占用 everywhere on the chain.
+    const withdrawalTable = wrapper
+      .findAllComponents({ name: "DataTable" })
+      .find(table => String(table.props("tableId")).startsWith("chain-withdrawals-"));
+    expect(
+      withdrawalTable
+        ?.props("columns")
+        .find((column: { key: string }) => column.key === "occupiedCny")?.label
+    ).toBe("提现占用");
+    expect(wrapper.text()).toContain("提现占用");
+    expect(wrapper.text()).not.toContain("已申请提现");
     wrapper.unmount();
   });
 
@@ -526,7 +537,7 @@ describe("order chain page (task 40)", () => {
       "商品总价",
       "佣金比例",
       "预估佣金",
-      "已申请提现",
+      "提现占用",
       "操作"
     ]);
     wrapper.unmount();
@@ -753,7 +764,7 @@ describe("order chain page (task 40)", () => {
       .map(item => item.text());
     expect(labels).toEqual([
       "商品总价",
-      "商品数量",
+      "销量",
       "运费",
       "订单金额",
       "优惠",

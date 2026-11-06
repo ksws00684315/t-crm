@@ -36,6 +36,10 @@ export interface Income extends Metrics {
   email: string;
   bdId: string;
   bd: string;
+  /** Sales: the pay-amount sum of the creator's orders paid in the window (task 115, B7). */
+  salesAmount: string;
+  /** The creator's current default rate text, null when unset (task 115, B7). */
+  rate: string | null;
   orderCount: number;
   quantity: number;
   lastPaidAt: string | null;
@@ -106,6 +110,10 @@ export interface WithdrawalOrder {
   id: string;
   orderNo: string;
   products: Pick<Allocation, "id" | "image" | "product" | "sku">[];
+  /** Order amount = goods total + freight; null when a line misses its price (task 115, B9). */
+  orderAmount: string | null;
+  /** Distinct rate snapshots of the order's commission lines, ascending (task 115, B9). */
+  rates: string[];
   occupied: string;
   remainingSnapshot: string | null;
 }

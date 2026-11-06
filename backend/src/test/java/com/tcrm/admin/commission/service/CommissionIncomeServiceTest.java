@@ -192,7 +192,10 @@ class CommissionIncomeServiceTest {
         .thenReturn(
             List.of(new PrepayPaidRow(KOL, new BigDecimal("300.00"), PAY.plusSeconds(3600))));
     when(orderSettlement.aggregateKolOrders(eq(List.of(KOL)), any(), any()))
-        .thenReturn(List.of(new OrderSettlementApi.KolOrderRowDTO(KOL, 4, 9)));
+        .thenReturn(
+            List.of(new OrderSettlementApi.KolOrderRowDTO(KOL, 4, 9, new BigDecimal("1288.50"))));
+    when(kols.listRatesByIds(List.of(KOL)))
+        .thenReturn(List.of(new com.tcrm.admin.kol.api.KolRateDTO(KOL, "0.1500")));
     when(accountNames.listByIds(anyCollection()))
         .thenReturn(List.of(new AccountNameDTO(9L, "BD One")));
 
@@ -213,6 +216,9 @@ class CommissionIncomeServiceTest {
     assertThat(row.money().lastPaidAt()).isEqualTo(PAY.plusSeconds(3600));
     assertThat(row.orderCount()).isEqualTo(4);
     assertThat(row.quantity()).isEqualTo(9);
+    // Task 115 (1105 sheet B7): sales amount from the order port, current rate from the kol api.
+    assertThat(row.salesAmount()).isEqualByComparingTo("1288.50");
+    assertThat(row.rate()).isEqualTo("0.1500");
     assertThat(row.bd()).isEqualTo("BD One");
     assertThat(row.unverified()).isEqualTo(3);
     // Hand calc: summary paid = commission 20 + windowed prepay 300.

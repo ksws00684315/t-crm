@@ -465,11 +465,15 @@ public class AdminWithdrawalController {
     }
   }
 
-  /** One order row of the allocation pagination (contract §6.2 / #112). */
+  /**
+   * One order row of the allocation pagination (contract §6.2 / #112; task 115 adds B9 columns).
+   */
   record WithdrawalOrderVO(
       String id,
       String orderNo,
       List<ProductVO> products,
+      String orderAmount,
+      List<String> rates,
       String occupied,
       String remainingSnapshot) {
     static WithdrawalOrderVO from(OrderView order) {
@@ -477,6 +481,8 @@ public class AdminWithdrawalController {
           Long.toString(order.id()),
           order.orderNo(),
           order.products().stream().map(ProductVO::from).toList(),
+          order.orderAmount(),
+          List.copyOf(order.rates()),
           order.occupied(),
           order.remainingSnapshot());
     }

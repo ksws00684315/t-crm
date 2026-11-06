@@ -41,7 +41,8 @@ public interface OrderSettlementApi {
 
   /**
    * Pays-time window aggregates per KOL for the income list (11.02): order count (distinct paid
-   * orders with at least one line of the KOL) and quantity (line pieces).
+   * orders with at least one line of the KOL), quantity (line pieces) and sales amount (sum of the
+   * orders' pay amounts, freight and refunds included; amount-terms §5 销售额, task 115).
    */
   List<KolOrderRowDTO> aggregateKolOrders(Collection<Long> kolIds, Instant start, Instant end);
 
@@ -66,6 +67,9 @@ public interface OrderSettlementApi {
       Long kolId,
       Long productId) {}
 
-  /** Order count and pieces of one KOL inside the pay-time window (both bounds optional). */
-  record KolOrderRowDTO(long kolId, long orderCount, long quantity) {}
+  /**
+   * Order count, pieces and sales amount of one KOL inside the pay-time window (both bounds
+   * optional).
+   */
+  record KolOrderRowDTO(long kolId, long orderCount, long quantity, BigDecimal salesAmount) {}
 }
