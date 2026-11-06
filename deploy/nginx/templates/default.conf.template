@@ -42,6 +42,33 @@ server {
     ssl_reject_handshake on;
 }
 
+# ---- <domain> (zone apex): Weidian open-platform ownership file only (task 119) ----
+# The Weidian service-market console verifies domain ownership by GET-ing
+# https://<domain>/weidian_open.json from the APEX (not from admin.<domain>), so the apex needs an
+# answer. The file lives OUTSIDE the release directories (/usr/share/nginx/sites/weidian_open.json,
+# i.e. TCRM_STATIC_DIR on the host) because release.sh switches the "current" symlink and would drop
+# a file placed under it. The apex uses the Cloudflare Origin Certificate (covered by its SAN) and
+# Authenticated Origin Pulls, same as the other proxied sites.
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${TCRM_DOMAIN};
+    include /etc/nginx/snippets/tls.conf;
+    include /etc/nginx/snippets/cloudflare-origin-pull.conf;
+    include /etc/nginx/snippets/security-headers.conf;
+
+    root /usr/share/nginx/sites;
+
+    location = /weidian_open.json {
+        default_type application/json;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
 # ---- t.<domain>: redirect service (only /t/..., /i/... and /healthz are exposed) ----
 server {
     listen 443 ssl;
