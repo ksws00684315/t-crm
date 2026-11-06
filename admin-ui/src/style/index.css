@@ -283,8 +283,9 @@ textarea {
 }
 
 .el-select-dropdown {
+  /* Inner surface of the 12px panel inset by 4px: 12 - 4 = 8 keeps the corners concentric. */
   max-width: min(var(--tcrm-select-panel-max-width), calc(100vw - var(--tcrm-space-5)));
-  border-radius: var(--tcrm-radius-card);
+  border-radius: var(--tcrm-radius-control);
 }
 
 .el-select-dropdown__wrap {
