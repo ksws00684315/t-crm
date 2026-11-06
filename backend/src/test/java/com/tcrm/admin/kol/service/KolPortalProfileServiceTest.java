@@ -119,14 +119,16 @@ class KolPortalProfileServiceTest {
   }
 
   @Test
-  void shouldUpdateNameAndReplaceOnlyThePrimarySocialSlot() {
-    service.update("  Alice Kim  ", " YouTube ", " @alice.kim ", "127.0.0.1");
+  void shouldReplaceOnlyThePrimarySocialSlot_andLeaveTheStoredNicknameAlone() {
+    service.update(" YouTube ", " @alice.kim ", "127.0.0.1");
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Wrapper<KolDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).update(isNull(), captor.capture());
     assertThat(captor.getValue().getSqlSegment()).contains("id =").contains("tenant_id =");
-    assertThat(savedValues(captor)).anyMatch(v -> v.contains("Alice Kim"));
+    // The nickname is read-only after registration (task 122): no name value reaches the update.
+    assertThat(savedValues(captor))
+        .noneMatch(v -> v.contains("Alice Kim") || v.contains("Creator"));
     assertThat(savedValues(captor))
         .anyMatch(
             v ->
@@ -147,12 +149,12 @@ class KolPortalProfileServiceTest {
 
   @Test
   void shouldClearThePrimarySlot_whenPlatformAndHandleAreAbsent() {
-    service.update("Alice", null, null, "127.0.0.1");
+    service.update(null, null, "127.0.0.1");
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Wrapper<KolDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
     verify(kols).update(isNull(), captor.capture());
-    assertThat(savedValues(captor)).anyMatch(v -> v.contains("Alice"));
+    assertThat(savedValues(captor)).noneMatch(v -> v.contains("Alice") || v.contains("Creator"));
     assertThat(savedValues(captor))
         .anyMatch(
             v ->
@@ -173,16 +175,13 @@ class KolPortalProfileServiceTest {
   }
 
   @Test
-  void shouldRejectBlankOrOversizedNames_andHalfSocialPairs() {
+  void shouldRejectHalfSocialPairs_andOversizedPlatformFields() {
     List<Runnable> invalid =
         List.of(
-            () -> service.update(null, null, null, "127.0.0.1"),
-            () -> service.update("   ", null, null, "127.0.0.1"),
-            () -> service.update("名".repeat(65), null, null, "127.0.0.1"),
-            () -> service.update("Alice", "TikTok", null, "127.0.0.1"),
-            () -> service.update("Alice", null, "@alice", "127.0.0.1"),
-            () -> service.update("Alice", "p".repeat(33), "@alice", "127.0.0.1"),
-            () -> service.update("Alice", "TikTok", "h".repeat(129), "127.0.0.1"));
+            () -> service.update("TikTok", null, "127.0.0.1"),
+            () -> service.update(null, "@alice", "127.0.0.1"),
+            () -> service.update("p".repeat(33), "@alice", "127.0.0.1"),
+            () -> service.update("TikTok", "h".repeat(129), "127.0.0.1"));
     for (Runnable run : invalid) {
       assertThatThrownBy(run::run).isInstanceOf(BusinessException.class);
     }
@@ -196,7 +195,7 @@ class KolPortalProfileServiceTest {
     when(kols.selectById(700L)).thenReturn(moved);
 
     assertThatThrownBy(() -> service.get()).isInstanceOf(BusinessException.class);
-    assertThatThrownBy(() -> service.update("Alice", null, null, "127.0.0.1"))
+    assertThatThrownBy(() -> service.update(null, null, "127.0.0.1"))
         .isInstanceOf(BusinessException.class);
   }
 
@@ -204,7 +203,7 @@ class KolPortalProfileServiceTest {
   void shouldAnswerNotFound_whenTheRowVanishesBeforeTheWrite() {
     when(kols.update(isNull(), any())).thenReturn(0);
 
-    assertThatThrownBy(() -> service.update("Alice", null, null, "127.0.0.1"))
+    assertThatThrownBy(() -> service.update(null, null, "127.0.0.1"))
         .isInstanceOf(BusinessException.class);
     verifyNoInteractions(audit);
   }

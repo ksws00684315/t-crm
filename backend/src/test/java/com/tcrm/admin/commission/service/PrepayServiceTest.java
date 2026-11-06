@@ -11,6 +11,9 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.PrepayMapper;
 import com.tcrm.admin.commission.model.FileBizType;
@@ -25,6 +28,7 @@ import com.tcrm.admin.commission.model.PrepayPageQuery;
 import com.tcrm.admin.commission.model.PrepayPaymentRow;
 import com.tcrm.admin.commission.model.PrepayRecipientRow;
 import com.tcrm.admin.commission.model.PrepayWrite;
+import com.tcrm.admin.commission.model.UsdtNetwork;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.security.api.AccountDTO;
@@ -54,6 +58,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,6 +67,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.dao.EmptyResultDataAccessException;
 
@@ -86,6 +93,13 @@ class PrepayServiceTest {
   private int changed = 1;
   private final PrepayMapper prepays = mock(PrepayMapper.class, this::answer);
   private PrepayService service;
+
+  /** Column metadata for wrapper assertions; the mapper itself stays mocked. */
+  @BeforeAll
+  static void metadata() {
+    TableInfoHelper.initTableInfo(
+        new MapperBuilderAssistant(new MybatisConfiguration(), ""), PayoutAccountDO.class);
+  }
 
   @BeforeEach
   void prepare() {
@@ -1000,6 +1014,56 @@ class PrepayServiceTest {
                     new PrepayService.Filter(null, null, null, 1, 20)),
                 StandardCharsets.UTF_8))
         .contains("WAITING_DETAILS");
+  }
+
+  @Test
+  void shouldListOnlyApprovedMaskedAccountsOfTheCreator() {
+    PayoutAccountDO usdt = account();
+    usdt.setId(34L);
+    usdt.setAccountType(PayoutAccountType.USDT);
+    usdt.setCurrency(null);
+    usdt.setUsdtNetwork(UsdtNetwork.TRC20);
+    usdt.setAccountMasked("TQ***cdef");
+    usdt.setHolderName(null);
+    when(accounts.selectList(any())).thenReturn(List.of(account(), usdt));
+
+    List<PrepayService.PayoutOption> options = service.payoutOptions(user("prepay:apply"), KOL);
+
+    assertThat(options)
+        .containsExactly(
+            new PrepayService.PayoutOption(
+                33L, "PAYPAL", "CNY", null, "al***@example.test", "Test recipient"),
+            new PrepayService.PayoutOption(34L, "USDT", null, "TRC20", "TQ***cdef", null));
+  }
+
+  @Test
+  void shouldFilterAccountOptionsToApprovedRowsOfTheCreator() {
+    when(accounts.selectList(any())).thenReturn(List.of());
+    service.payoutOptions(user("prepay:apply"), KOL);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Wrapper<PayoutAccountDO>> captor = ArgumentCaptor.forClass(Wrapper.class);
+    verify(accounts).selectList(captor.capture());
+    assertThat(captor.getValue().getSqlSegment()).contains("kol_id").contains("status");
+    assertThat(
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<Object, Object, ?>)
+                    (Object) captor.getValue())
+                .getParamNameValuePairs()
+                .values())
+        .contains(KOL, PayoutAccountStatus.APPROVED);
+  }
+
+  @Test
+  void shouldLetFinanceAccessAnyCreatorButKeepOwnScopeForBusiness() {
+    when(accounts.selectList(any())).thenReturn(List.of());
+    when(kols.listByIds(List.of(KOL))).thenReturn(List.of(kol(99L)));
+    fails(() -> service.payoutOptions(user("prepay:apply"), KOL), ErrorCode.AUTH_FORBIDDEN);
+    assertThat(service.payoutOptions(reviewer("prepay:finance-review"), KOL)).isEmpty();
+  }
+
+  @Test
+  void shouldRejectAccountOptions_withoutAnyPrepayPermission() {
+    fails(() -> service.payoutOptions(user("commission:view"), KOL), ErrorCode.AUTH_FORBIDDEN);
   }
 
   private static AccountDTO user(String... permissions) {

@@ -67,8 +67,8 @@ export const getMe = () =>
   isDemoMode
     ? Promise.resolve(demoProfile)
     : http.request<KolProfile>({ method: "GET", url: "/me" });
+/** The nickname is set at registration and read-only afterwards (task 122). */
 export const updateMe = (data: {
-  name: string;
   primaryPlatform: string | null;
   primaryHandle: string | null;
 }) => {

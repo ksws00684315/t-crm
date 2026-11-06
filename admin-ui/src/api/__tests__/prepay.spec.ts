@@ -14,7 +14,7 @@ describe("prepay multipart contract", () => {
     const payload = {
       reason: "finance",
       expectedPayDate: "2026-10-23",
-      recipientText: "Bank\nRecipient\nFull account 123456789\nCNY",
+      payoutAccountId: "33",
       deductFromCommission: false
     };
     const attachment = new File(["proof"], "proof.pdf", { type: "application/pdf" });

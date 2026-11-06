@@ -117,7 +117,9 @@ export const seedPayments: Payment[] = [
     paidAt: "2026-10-21T09:00:00Z",
     deduct: true,
     deducted: "300.00",
-    pending: "200.00"
+    pending: "200.00",
+    actualAmount: "500.00",
+    actualCurrency: "CNY"
   },
   {
     id: "102343",
@@ -128,7 +130,9 @@ export const seedPayments: Payment[] = [
     paidAt: "2026-10-22T09:00:00Z",
     deduct: false,
     deducted: "0.00",
-    pending: "0.00"
+    pending: "0.00",
+    actualAmount: "120.00",
+    actualCurrency: "CNY"
   },
   {
     id: "102344",
@@ -139,7 +143,9 @@ export const seedPayments: Payment[] = [
     paidAt: "2026-10-10T09:00:00Z",
     deduct: false,
     deducted: "0.00",
-    pending: "0.00"
+    pending: "0.00",
+    actualAmount: "80.00",
+    actualCurrency: "CNY"
   }
 ];
 export const seedLines: CommissionLine[] = [

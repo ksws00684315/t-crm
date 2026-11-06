@@ -1,5 +1,6 @@
 package com.tcrm.admin.commission.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.PayoutAccountMapper;
 import com.tcrm.admin.commission.mapper.PrepayMapper;
@@ -393,6 +394,41 @@ public class PrepayService {
           requireKolScope(user, kol);
           Long id = prepays.findLatestActiveId(kolId);
           return id == null ? null : detail(user, id);
+        });
+  }
+
+  /**
+   * Effective (APPROVED) payout accounts of one creator, for the applicant's account picker. Only
+   * masked values leave this method; the full account stays behind the audited recipient endpoint.
+   * A caller without finance access reaches their own creators only (task 122).
+   */
+  public List<PayoutOption> payoutOptions(AccountDTO user, long kolId) {
+    requirePrepayAccess(user);
+    long tenantId = requireTenant(user);
+    return TenantScope.callCompany(
+        tenantId,
+        () -> {
+          KolRefDTO kol = requireKol(kolId);
+          if (!hasFinanceAccess(user)) {
+            requireKolScope(user, kol);
+          }
+          return payoutAccounts
+              .selectList(
+                  new LambdaQueryWrapper<PayoutAccountDO>()
+                      .eq(PayoutAccountDO::getKolId, kolId)
+                      .eq(PayoutAccountDO::getStatus, PayoutAccountStatus.APPROVED)
+                      .orderByAsc(PayoutAccountDO::getId))
+              .stream()
+              .map(
+                  account ->
+                      new PayoutOption(
+                          account.getId(),
+                          account.getAccountType() == null ? null : account.getAccountType().name(),
+                          account.getCurrency(),
+                          account.getUsdtNetwork() == null ? null : account.getUsdtNetwork().name(),
+                          account.getAccountMasked(),
+                          account.getHolderName()))
+              .toList();
         });
   }
 
@@ -1164,28 +1200,27 @@ public class PrepayService {
         || user.permissions().contains("prepay:pay");
   }
 
+  private static void requirePrepayAccess(AccountDTO user) {
+    requireAnyPermission(
+        user, "prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay");
+  }
+
   private static void requirePermission(AccountDTO user, String code) {
     if (user.role() != Role.SUPER_ADMIN && !user.permissions().contains(code)) {
       throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
     }
   }
 
-  private static void requireAnyPermission(AccountDTO user, String first, String second) {
-    if (user.role() != Role.SUPER_ADMIN
-        && !user.permissions().contains(first)
-        && !user.permissions().contains(second)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+  private static void requireAnyPermission(AccountDTO user, String... codes) {
+    if (user.role() == Role.SUPER_ADMIN) {
+      return;
     }
-  }
-
-  private static void requireAnyPermission(
-      AccountDTO user, String first, String second, String third) {
-    if (user.role() != Role.SUPER_ADMIN
-        && !user.permissions().contains(first)
-        && !user.permissions().contains(second)
-        && !user.permissions().contains(third)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    for (String code : codes) {
+      if (user.permissions().contains(code)) {
+        return;
+      }
     }
+    throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
   }
 
   private static void requireDetailPermission(AccountDTO user) {

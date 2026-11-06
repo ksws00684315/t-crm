@@ -86,6 +86,35 @@ class PrepayControllerTest {
   }
 
   @Test
+  void shouldReturnMaskedPayoutAccountOptionsForTheCreator() throws Exception {
+    when(service.payoutOptions(any(), eq(22L)))
+        .thenReturn(
+            List.of(
+                new PrepayService.PayoutOption(
+                    33L, "PAYPAL", "CNY", null, "al***@example.test", "Test recipient")));
+    mvc.perform(
+            get(BASE + "/payout-accounts")
+                .param("kolId", "22")
+                .header(AdminMvcSupport.TOKEN_HEADER, token("prepay:apply")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].id").value("33"))
+        .andExpect(jsonPath("$.data[0].type").value("PAYPAL"))
+        .andExpect(jsonPath("$.data[0].maskedAccount").value("al***@example.test"))
+        .andExpect(jsonPath("$.data[0].account").doesNotExist());
+    verify(service).payoutOptions(any(), eq(22L));
+  }
+
+  @Test
+  void shouldDenyPayoutAccountOptions_withoutPrepayPermission() throws Exception {
+    mvc.perform(
+            get(BASE + "/payout-accounts")
+                .param("kolId", "22")
+                .header(AdminMvcSupport.TOKEN_HEADER, token("commission:view")))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(service);
+  }
+
+  @Test
   void shouldSubmitOnlyCreatorAndAmountWithoutFinanceFields() throws Exception {
     mvc.perform(
             multipart(BASE)

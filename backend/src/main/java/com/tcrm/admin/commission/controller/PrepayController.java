@@ -73,6 +73,18 @@ public class PrepayController {
     return R.ok(PrepayDetailVO.from(prepays.activeApplication(current.user(), kolId)));
   }
 
+  /** Masked payout-account options of one creator, for the application-details picker. */
+  @GetMapping("/admin-api/commission/prepays/payout-accounts")
+  @SaCheckPermission(
+      value = {"prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay"},
+      mode = SaMode.OR)
+  public R<List<PrepayPayoutOptionVO>> payoutAccounts(@RequestParam @Positive Long kolId) {
+    return R.ok(
+        prepays.payoutOptions(current.user(), kolId).stream()
+            .map(PrepayPayoutOptionVO::from)
+            .toList());
+  }
+
   /**
    * CSV export. Annotation requires {@code data:export}; service also requires a prepay list
    * permission ({@code prepay:apply}/{@code prepay:review}/{@code prepay:finance-review}/{@code

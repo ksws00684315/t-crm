@@ -200,6 +200,9 @@ async function openItem(item: NotificationVO) {
 
 .notification-bell__item {
   display: grid;
+  /* A button's auto width is fit-content; the row must reach the panel edge (task 122). */
+  width: 100%;
+  box-sizing: border-box;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--tcrm-space-1) var(--tcrm-space-2);
   padding: var(--tcrm-space-2);

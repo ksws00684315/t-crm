@@ -52,6 +52,28 @@ describe("financial drawers and payment registration", () => {
     expect(api.getIncome).toHaveBeenCalledWith("102301", {});
     wrapper.unmount();
   });
+  it("shows prepay payment amounts and drops the bookkeeping and action columns (task 122)", async () => {
+    const wrapper = mount(IncomeDrawer, {
+      props: { modelValue: false, id: "102301", query: {} },
+      global,
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    wrapper.getComponent({ name: "ElTabs" }).vm.$emit("update:modelValue", "payments");
+    await flushPromises();
+    const table = [...document.querySelectorAll("table")].find(element =>
+      element.textContent?.includes("来源编号")
+    );
+    expect(table).toBeTruthy();
+    const headers = [...table!.querySelectorAll("th")].map(header => header.textContent?.trim());
+    expect(headers).toContain("付款金额");
+    expect(headers).not.toContain("人民币记账金额");
+    expect(headers).not.toContain("操作");
+    expect(table!.closest(".el-table")?.textContent).toContain("¥500.00");
+    wrapper.unmount();
+  });
+
   it("reports an income error without keeping stale details", async () => {
     vi.mocked(api.getIncome).mockRejectedValue(new Error("network"));
     const wrapper = mount(IncomeDrawer, {

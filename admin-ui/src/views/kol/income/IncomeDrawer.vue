@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { financePreview } from "@/utils/finance";
-import { downloadWithdrawalVoucher, getIncome } from "@/api/commission/finance";
-import type { IncomeDetail, IncomeQuery, Payment } from "@/api/commission/finance-types";
+import { getIncome } from "@/api/commission/finance";
+import type { IncomeDetail, IncomeQuery } from "@/api/commission/finance-types";
 import FinanceMetrics from "./FinanceMetrics.vue";
 import CommissionTable from "@/components/CommissionTable.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
 import CopyText from "@/components/CopyText.vue";
-import RowActions from "@/components/RowActions.vue";
 import { formatAmountWithCurrency, formatInstant, formatPrice } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
-import { saveBlob } from "@/utils/download";
-import WithdrawalDrawer from "@/views/fund/withdrawal/WithdrawalDrawer.vue";
 const props = defineProps<{ modelValue: boolean; id: string; query: IncomeQuery }>();
 const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
 const { t } = useI18n();
@@ -20,19 +16,6 @@ const detail = ref<IncomeDetail>();
 const loading = ref(false);
 const failed = ref(false);
 const tab = ref("commission");
-const voucher = ref(false);
-const voucherPayment = ref<Payment>();
-const applicationOpen = ref(false);
-const applicationId = ref("");
-async function downloadVoucher() {
-  if (!voucherPayment.value?.voucher) return;
-  try {
-    const file = await downloadWithdrawalVoucher(voucherPayment.value.voucher);
-    saveBlob(file.blob, file.fileName ?? "payment-voucher");
-  } catch (error) {
-    notifyError(error);
-  }
-}
 async function load() {
   loading.value = true;
   failed.value = false;
@@ -59,19 +42,19 @@ const paymentColumns = computed<DataColumn[]>(() =>
   [
     "sourceNo",
     "paymentType",
-    "amountCny",
     "actualAmount",
     "actualCurrency",
     "paidAt",
     "deduct",
     "deducted",
-    "pendingDeduction",
-    "actions"
+    "pendingDeduction"
   ].map(key => ({
     key,
     label: t(`finance.${key}`),
-    minWidth: key === "paidAt" ? 200 : 160,
-    amount: ["amountCny", "deducted", "pendingDeduction"].includes(key)
+    // Payment rows are all short; the identifiers get the room the copy button needs.
+    minWidth: key === "sourceNo" ? 200 : key === "paidAt" ? 180 : key === "paymentType" ? 170 : 140,
+    align: key === "sourceNo" ? ("left" as const) : undefined,
+    amount: ["deducted", "pendingDeduction"].includes(key)
   }))
 );
 </script>
@@ -120,15 +103,10 @@ const paymentColumns = computed<DataColumn[]>(() =>
               <template #cell-paymentType="{ row }">{{
                 t(`finance.${row.type ?? "COMMISSION"}`)
               }}</template>
-              <template #cell-amountCny="{ row }">{{ formatPrice(row.amountCny, "CNY") }}</template>
               <template #cell-actualAmount="{ row }">{{
-                row.type === "COMMISSION"
-                  ? formatAmountWithCurrency(row.actualAmount, row.actualCurrency)
-                  : "—"
+                formatAmountWithCurrency(row.actualAmount, row.actualCurrency)
               }}</template
-              ><template #cell-actualCurrency="{ row }">{{
-                row.type === "COMMISSION" ? row.actualCurrency : "—"
-              }}</template>
+              ><template #cell-actualCurrency="{ row }">{{ row.actualCurrency }}</template>
               <template #cell-paidAt="{ row }">{{ formatInstant(row.paidAt) }}</template>
               <template #cell-deduct="{ row }">{{
                 row.type === "PREPAY" ? t(row.deduct ? "finance.yes" : "finance.no") : "—"
@@ -139,51 +117,11 @@ const paymentColumns = computed<DataColumn[]>(() =>
               <template #cell-pendingDeduction="{ row }">{{
                 row.type === "PREPAY" && row.deduct ? formatPrice(row.pending, "CNY") : "—"
               }}</template>
-              <template #actions="{ row }"
-                ><RowActions
-                  :actions="[
-                    {
-                      key: 'application',
-                      label: t('finance.view'),
-                      hidden: row.type !== 'COMMISSION' || !row.withdrawalId,
-                      onClick: () => {
-                        applicationId = row.withdrawalId;
-                        applicationOpen = true;
-                      }
-                    },
-                    {
-                      key: 'voucher',
-                      label: t('finance.voucherPreview'),
-                      hidden: row.type !== 'COMMISSION',
-                      disabled: !row.voucher,
-                      onClick: () => {
-                        voucherPayment = row;
-                        voucher = true;
-                      }
-                    }
-                  ]"
-              /></template>
             </DataTable>
           </el-tab-pane>
         </el-tabs>
       </template>
     </div>
-    <el-dialog
-      v-model="voucher"
-      :title="t('finance.voucher')"
-      width="min(560px, 92vw)"
-      append-to-body
-      ><el-alert v-if="financePreview" :title="t('finance.voucherDemo')" :closable="false" />
-      <p>{{ voucherPayment?.sourceNo }}</p>
-      <p>
-        {{ formatAmountWithCurrency(voucherPayment?.actualAmount, voucherPayment?.actualCurrency) }}
-      </p>
-      <p>{{ formatAmountWithCurrency(voucherPayment?.amountCny) }}</p>
-      <el-button data-test="income-voucher-download" @click="downloadVoucher">{{
-        t("finance.voucherPreview")
-      }}</el-button></el-dialog
-    >
-    <WithdrawalDrawer v-model="applicationOpen" :id="applicationId" />
   </el-drawer>
 </template>
 <style scoped>

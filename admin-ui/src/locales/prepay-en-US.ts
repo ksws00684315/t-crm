@@ -11,8 +11,9 @@ export default {
   lockedInfo:
     "Application details are locked after submission. Reject incorrect applications so the business owner can reapply.",
   retryRecipient: "Unable to load recipient information. Retry",
-  recipientHint:
-    "Enter payment method, recipient, full account and currency/network required for payment (up to 1,000 characters).",
+  reasonHint: "Enter the application reason or the creator's actual receiving account",
+  chooseAccount: "Select the creator's payout account",
+  accountsFailed: "Payout accounts could not be loaded. Retry.",
   systemPerson: "System",
   historicalPerson: "Historical user",
   paymentInfo: "Payment",
@@ -29,7 +30,7 @@ export default {
   completeDetails: "Complete prepay application",
   saveDetails: "Submit for operations review",
   detailsRequired:
-    "Complete the deduction choice, reason, expected payment date and payout account before submitting for operations review.",
+    "Complete the deduction choice, application note, expected payment date and payout account before submitting for operations review.",
   title: "Creator prepays",
   type: "Creator prepay",
   number: "Application number",
@@ -50,7 +51,7 @@ export default {
   financeReview: "Finance review",
   currency: "Currency",
   statusLabel: "Status",
-  reason: "Application reason",
+  reason: "Application note",
   expectedDate: "Expected payment date",
   account: "Recipient information",
   deduct: "Deduct from future commission",
@@ -61,7 +62,7 @@ export default {
   required: "Complete the required field",
   invalidAmount: "Enter a positive CNY amount with at most two decimal places",
   noAccounts:
-    "No approved, active accounts. Ask the creator to complete a PayPal or USDT account under Payout accounts and wait for approval.",
+    "This creator has no usable payout account yet. Ask them to add one under Payout accounts, then submit again.",
   reloadAccounts: "Reload accounts",
   retrySame:
     "Result unconfirmed. Retry sends the original content and request ID. Close and check the application list before editing.",
