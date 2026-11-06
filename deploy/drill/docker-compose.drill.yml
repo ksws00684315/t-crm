@@ -1,9 +1,9 @@
 # Recovery drill project (RUNBOOK chapter 17 / README "恢复演练").
 # Derived from docker-compose.prod.yml with these deliberate differences:
 #   - project "tcrmdrill", own volumes, own subnet 172.29.0.0/24 -> production volumes are untouched
-#     The subnet must NOT overlap the host VPC (the AWS default VPC is 172.31.0.0/16): with
-#     172.31.0.0/24 the bridge took the VPC gateway address, all container egress failed and the
-#     restore died on an S3 timeout (first drill attempt, 2026-11-06).
+#     The subnet must NOT overlap the host VPC (the AWS default VPC is 172.31.0.0/16): when the first
+#     drill attempt used 172.31.0.0/24, the bridge took the VPC gateway address, all container egress
+#     failed and the restore died on an S3 timeout (2026-11-06).
 #   - NO Nginx; admin/redirect are published on 127.0.0.1 only for the drill
 #   - postgres starts with archive_mode=off: the drill must never push WAL into the production repo
 #   - small memory limits and restart: "no" (throw-away project)
@@ -40,7 +40,7 @@ services:
       TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
       TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}
       TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
-      TCRM_TRUSTED_PROXIES: 172.31.0.0/24
+      TCRM_TRUSTED_PROXIES: 172.29.0.0/24
       TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     ports:
@@ -74,7 +74,7 @@ services:
       TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
       TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
       TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
-      TCRM_TRUSTED_PROXIES: 172.31.0.0/24
+      TCRM_TRUSTED_PROXIES: 172.29.0.0/24
       TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
     ports:
@@ -166,7 +166,7 @@ networks:
   default:
     ipam:
       config:
-        - subnet: 172.31.0.0/24
+        - subnet: 172.29.0.0/24
 
 volumes:
   pgdata:

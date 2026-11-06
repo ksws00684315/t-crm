@@ -485,7 +485,7 @@ deploy/scripts/ops-check.sh                      # 手动跑一次；期望输�
 
 步骤与核对 SQL 见 README「恢复演练」（在**另一台**主机或独立 Compose 项目上做：准备相同 `.env`、空数据卷 → `deploy/backup/restore-pitr.sh latest` → 再试指定时间点 → 逻辑备份恢复 → 四条核对 SQL + Flyway 校验 + 重建链接索引 → 记录）。整机重建路径见 README「恢复」的「整机丢失时」一段。
 
-独立 Compose 项目版的演练模板见 [`deploy/drill/docker-compose.drill.yml`](drill/README.md)：独立卷、独立子网、`archive_mode=off`（确保不往生产仓库写 WAL）。子网**不得与主机 VPC 重叠**（AWS 默认 VPC 为 `172.31.0.0/16`），否则 Docker 桥接会占用 VPC 网关、容器全部断网。
+独立 Compose 项目版的演练模板与步骤见 [`deploy/drill/`](drill/README.md)：独立卷、独立子网、`archive_mode=off`（确保不往生产仓库写 WAL）。子网**不得与主机 VPC 重叠**（AWS 默认 VPC 为 `172.31.0.0/16`），否则 Docker 桥接会占用 VPC 网关、容器全部断网。
 
 演练记录表（演练时逐行填写。**第 1～9 行与第 17 行是「待真机确认」项**：本手册只做过静态核对，未在真机执行，必须在演练主机上验证；第 10～16 行是恢复演练本身的记录项）：
 
