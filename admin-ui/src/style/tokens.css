@@ -15,12 +15,26 @@
   --tcrm-color-muted: #f0f2f5;
   --tcrm-color-border: #e2e5ea;
   --tcrm-color-input-border: #d5dbe5;
+  --tcrm-color-input-border-hover: #c0c4cc;
+  --tcrm-color-text-disabled: #a8abb2;
+  --tcrm-color-disabled-bg: #f5f7fa;
+  --tcrm-color-disabled-border: #e4e7ed;
   --tcrm-color-table-header: #fafafa;
   --tcrm-color-table-border: #e9edf2;
   --tcrm-color-table-text: #1f1f1f;
   --tcrm-color-table-secondary: #595959;
   --tcrm-color-table-placeholder: #6b737d;
   --tcrm-color-order-band: color-mix(in srgb, var(--tcrm-color-primary) 8%, var(--tcrm-color-card));
+  --tcrm-color-option-selected-bg: color-mix(
+    in srgb,
+    var(--tcrm-color-primary) 8%,
+    var(--tcrm-color-card)
+  );
+  --tcrm-color-option-selected-hover-bg: color-mix(
+    in srgb,
+    var(--tcrm-color-primary) 14%,
+    var(--tcrm-color-card)
+  );
   --tcrm-color-chain-finance: #8b5cf6;
   --tcrm-order-detail-width: 880px;
   --tcrm-refund-detail-width: 800px;
@@ -51,6 +65,8 @@
   --tcrm-radius-card: 12px;
   --tcrm-radius-control: 8px;
   --tcrm-radius-tag: 6px;
+  --tcrm-select-panel-max-width: 480px;
+  --tcrm-select-panel-max-height: 280px;
   --tcrm-sidebar-width: 224px;
   --tcrm-sidebar-collapsed: 64px;
   --tcrm-header-height: 56px;
@@ -104,10 +120,15 @@
   --el-text-color-regular: var(--tcrm-color-text);
   --el-text-color-secondary: var(--tcrm-color-text-secondary);
   --el-text-color-placeholder: var(--tcrm-color-text-secondary);
+  --el-text-color-disabled: var(--tcrm-color-text-disabled);
+  --el-disabled-text-color: var(--tcrm-color-text-disabled);
+  --el-disabled-bg-color: var(--tcrm-color-disabled-bg);
+  --el-disabled-border-color: var(--tcrm-color-disabled-border);
   --el-border-color: var(--tcrm-color-border);
   --el-border-color-light: var(--tcrm-color-border);
   --el-border-color-lighter: var(--tcrm-color-border);
   --el-border-color-extra-light: var(--tcrm-color-border);
+  --el-border-color-hover: var(--tcrm-color-input-border-hover);
   --el-fill-color: var(--tcrm-color-muted);
   --el-fill-color-light: var(--tcrm-color-muted);
   --el-fill-color-blank: var(--tcrm-color-card);
