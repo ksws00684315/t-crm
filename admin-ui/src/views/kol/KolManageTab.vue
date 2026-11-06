@@ -99,6 +99,11 @@ function kolLabel(kol: KolVO): string {
   return formatNameWithCode(kol.name, kol.kolCode);
 }
 
+/** BD option text; the login account repeats the nickname for some accounts (smoke item 4). */
+function bdLabel(bd: BdUserVO): string {
+  return bd.nickname === bd.username ? bd.nickname : formatNameWithCode(bd.nickname, bd.username);
+}
+
 function effectiveAtOrNull(): { value?: string; error?: string } {
   if (!form.scheduled) return {};
   const picked = form.effectiveLocal;
@@ -192,12 +197,7 @@ onMounted(loadBdUsers);
           :placeholder="t('bdTransfer.bdAllLabel')"
           class="filter-w-lg"
         >
-          <el-option
-            v-for="bd in bdOptions"
-            :key="bd.id"
-            :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
-            :value="bd.id"
-          />
+          <el-option v-for="bd in bdOptions" :key="bd.id" :label="bdLabel(bd)" :value="bd.id" />
         </el-select>
       </el-form-item>
       <el-form-item v-else :label="t('bdTransfer.scopeSpecific')">
@@ -226,12 +226,7 @@ onMounted(loadBdUsers);
           class="filter-w-lg"
           data-test="transfer-target-bd"
         >
-          <el-option
-            v-for="bd in bdOptions"
-            :key="bd.id"
-            :label="t('kol.bdOption', { nickname: bd.nickname, username: bd.username })"
-            :value="bd.id"
-          />
+          <el-option v-for="bd in bdOptions" :key="bd.id" :label="bdLabel(bd)" :value="bd.id" />
           <el-option :label="t('bdTransfer.unassigned')" :value="UNASSIGNED" />
         </el-select>
       </el-form-item>

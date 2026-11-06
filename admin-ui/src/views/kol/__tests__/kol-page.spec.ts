@@ -18,6 +18,7 @@ vi.mock("@/api/kol/bd-transfer");
 vi.mock("@/api/link/link");
 vi.mock("@/api/link/template");
 vi.mock("@/api/system/bd-user");
+vi.mock("@/api/commission/prepay");
 // jsdom has no canvas; the dialog only needs the data URL the library returns.
 vi.mock("qrcode", () => ({
   default: { toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,UVI=") }
@@ -304,6 +305,32 @@ describe("creator list page (task 32 §2.2)", () => {
     bdWrapper.unmount();
   });
 
+  it("puts the prepay entry under the invite button for a BD with prepay:apply (序号 17)", async () => {
+    signIn("STAFF", "OWN", BD);
+    const withoutApply = await mountPage();
+    expect(withoutApply.find('[data-test="kol-prepay-apply"]').exists()).toBe(false);
+    withoutApply.unmount();
+
+    signIn("STAFF", "OWN", [...BD, "prepay:apply"]);
+    const bdWrapper = await mountPage();
+    const actions = bdWrapper.find(".kol-page-actions");
+    const buttons = actions.findAll("button").map(item => item.text());
+    expect(buttons[0]).toContain("邀请达人");
+    // 入口在「邀请达人」下方（同一个纵向容器里的第二个按钮）。
+    expect(buttons[1]).toContain("申请预付");
+    bdWrapper.unmount();
+  });
+
+  it("opens the shared prepay dialog from the creator list", async () => {
+    signIn("STAFF", "OWN", [...BD, "prepay:apply"]);
+    const wrapper = await mountPage();
+    await element("kol-prepay-apply").trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="prepay-apply"]')).not.toBeNull();
+    expect(document.body.textContent).toContain("申请预付");
+    wrapper.unmount();
+  });
+
   it("opens the invite dialog with the registration QR code and the super-administrator hint", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     vi.mocked(kolApi.getRegisterCode).mockResolvedValue({
@@ -339,7 +366,7 @@ describe("creator list page (task 32 §2.2)", () => {
   it("keeps the manage tab for the super administrator only", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const superWrapper = await mountPage();
-    expect(superWrapper.find("#tab-manage").text()).toContain("达人管理");
+    expect(superWrapper.find("#tab-manage").text()).toContain("达人分配");
     superWrapper.unmount();
 
     signIn("STAFF", "OWN", BD);

@@ -200,7 +200,7 @@ const enUS: MessageSchema = {
     settlementConfig: "Settlement Config",
     system: "System",
     users: "Accounts",
-    postTemplates: "Permissions",
+    postTemplates: "Permission templates",
     linkTemplates: "Platform Maintenance",
     importTasks: "Uploads",
     auditLogs: "Audit Log",
@@ -582,6 +582,7 @@ const enUS: MessageSchema = {
   },
   user: {
     editInfo: "Edit information",
+    editPermissions: "Edit permissions",
     create: "Create User",
     editTitle: "Edit User",
     createTitle: "Create User",
@@ -594,8 +595,6 @@ const enUS: MessageSchema = {
     allPermissionsShort: "All",
     permissionsTitle: "Permissions",
     permissionsSaved: "Permissions saved.",
-    permissionsSeparate:
-      "Open permission settings from this edit dialog to change this account's permissions and data scope.",
     currentPost: "Current post: {post}",
     selectAll: "Select all",
     permissionRequired: "Select at least one permission",
@@ -809,7 +808,7 @@ const enUS: MessageSchema = {
     disabledCommissionApproved: "Approve the creator before changing commission",
     editProfileTitle: "Edit profile - {code} ({name})",
     /** Super-admin tab on the creator page: transfer creators between BDs. */
-    manageTab: "Creator Management",
+    manageTab: "Creator assignment",
     listTab: "Creator List",
     transferRecordsHint: "Transfer records are in System → Audit Log"
   },
@@ -1619,7 +1618,7 @@ const enUS: MessageSchema = {
     moduleAll: "Select Module",
     selectedCount: "{selected} / {total} selected",
     selectModule: "Select all {module} permissions",
-    title: "Permissions",
+    title: "Permission templates",
     hint: "Only affects accounts created afterwards; existing accounts are not changed.",
     cardTitle: "{post} post template",
     dataScope: "Default data scope",

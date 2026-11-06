@@ -128,7 +128,7 @@ describe("notification bell", () => {
     expect(wrapper.get("[data-test=notification-badge]").text()).toContain("99+");
   });
 
-  it("renders name-above-code when kolName exists, plain code for history (task 71)", async () => {
+  it("keeps the creator name inline in the sentence, falling back to the code (task 123)", async () => {
     api.listNotifications.mockImplementation(async () => ({
       items: [
         { ...payout, id: "78", params: { ...payout.params, kolName: "Ada" } },
@@ -145,15 +145,13 @@ describe("notification bell", () => {
 
     const items = [...document.querySelectorAll<HTMLElement>("[data-test=notification-item]")];
     expect(items).toHaveLength(2);
-    // New message: two-line identity (name above, code below) inside the sentence.
+    // 序号 29：达人身份必须是句子里的单行「名称（编号）」，不能再塞两行的 NameCode。
     const withName = items[0]?.querySelector("[data-test=notification-text]");
-    expect(withName?.querySelector("[data-test=identity-name]")?.textContent?.trim()).toBe("Ada");
-    expect(withName?.querySelector("[data-test=identity-code]")?.textContent?.trim()).toBe(
-      "KOL0010"
-    );
-    // History without kolName: the code stays inline and no identity block is rendered.
+    expect(withName?.querySelector("[data-test=name-code]")).toBeNull();
+    expect(withName?.textContent).toContain("达人 Ada（KOL0010） 提交了 PAYPAL 收款账户，待审核");
+    // 历史消息没有达人名：仍显示编号，不渲染空的身份块。
     const withoutName = items[1]?.querySelector("[data-test=notification-text]");
-    expect(withoutName?.querySelector("[data-test=identity-name]")).toBeNull();
+    expect(withoutName?.querySelector("[data-test=name-code]")).toBeNull();
     expect(withoutName?.textContent).toContain("达人 KOL0010 提交了 PAYPAL 收款账户，待审核");
   });
 
