@@ -485,6 +485,8 @@ deploy/scripts/ops-check.sh                      # 手动跑一次；期望输�
 
 步骤与核对 SQL 见 README「恢复演练」（在**另一台**主机或独立 Compose 项目上做：准备相同 `.env`、空数据卷 → `deploy/backup/restore-pitr.sh latest` → 再试指定时间点 → 逻辑备份恢复 → 四条核对 SQL + Flyway 校验 + 重建链接索引 → 记录）。整机重建路径见 README「恢复」的「整机丢失时」一段。
 
+独立 Compose 项目版的演练模板与步骤见 [`deploy/drill/`](drill/README.md)：独立卷、独立子网、`archive_mode=off`（确保不往生产仓库写 WAL）。子网**不得与主机 VPC 重叠**（AWS 默认 VPC 为 `172.31.0.0/16`），否则 Docker 桥接会占用 VPC 网关、容器全部断网。
+
 演练记录表（演练时逐行填写。**第 1～9 行与第 17 行是「待真机确认」项**：本手册只做过静态核对，未在真机执行，必须在演练主机上验证；第 10～16 行是恢复演练本身的记录项）：
 
 | # | 项目 | 对照 / 说明 | 结果（实测填写） |
@@ -506,6 +508,34 @@ deploy/scripts/ops-check.sh                      # 手动跑一次；期望输�
 | 15 | Object Lock 实际效果 | 副本桶中尝试删除对象版本被拒绝 / 仅加删除标记 | |
 | 16 | 告警与心跳真实到达 | 飞书与 Healthchecks | |
 | 17 | 真实 `admin.`/`upload.` 证书浏览器上传大表格 | 操作清单 §6 第 3 条 | |
+
+### 首次演练记录（2026-11-06）
+
+环境：生产主机（c7a.xlarge），独立 Compose 项目 `tcrmdrill`，镜像 v0.1.1，备份集 `20261106-040403F`（33.4 MB）；演练结束已 `down -v` 并删除 `/opt/tcrm-drill`。
+
+| # | 项目 | 实测结果 |
+|---|---|---|
+| 1 | 各条安装命令照抄可执行 | 通过。唯一阻塞是自建演练项目的 Docker 子网与主机 VPC 重叠（`172.31.0.0/24`），容器断网导致 S3 超时；改为 `172.29.0.0/24` 后通过。已写入 `deploy/drill/README.md` |
+| 2 | Session Manager 登录 | 通过，全程经 SSM 执行 |
+| 3 | 实例角色凭证链 | 通过，`aws sts get-caller-identity` 返回 `assumed-role/crm-prod-instance/...` |
+| 4 | IMDS hop limit 1 + 容器读不到元数据 | 通过，备份凭证由主机每 15 分钟刷新后挂载，演练容器直接读取该片段 |
+| 5 | 真实 S3 全链路 | 通过，`restore` 从 S3 读取备份集并回放 WAL |
+| 6 | Let's Encrypt 真实签发与续期 | 通过，`/var/log/tcrm-cert.log` 输出 `certificate unchanged, nothing to reload` |
+| 7 | Cloudflare 回源认证生效 | 通过，直连 EIP（带 `admin.` / `t.` Host）返回 400，经 Cloudflare 返回 200 |
+| 8 | L-061：全新数据卷首启 postgres 是否自愈 | 通过，恢复后首次 `up` 直接 healthy |
+| 9 | L-110：`current` 软链切换无需刷新 | 通过，0.1.0、0.1.1 两次发布后前端均为新版本 |
+| 10 | 恢复总耗时 | 通过：latest **63 秒**（pgBackRest restore 46 秒），指定时间点 **13 秒**（增量恢复 0.8 秒），目标 ≤ 2 小时 |
+| 11 | 实际丢失数据窗口 | 机制上限约 5 分钟（`archive_timeout=300`）；演练时业务表为空，实测无丢失 |
+| 12 | 核对项与生产一致 | 通过：`flyway_schema_history` 94、`sys_user` 2、`sys_tenant` 1、`crm_fx_rate` 1 与生产一致；`pg_is_in_recovery()` 为 `f`；两次恢复后 Flyway 均输出 `Successfully validated 94 migrations` 与 `Schema "public" is up to date` |
+| 13 | 逻辑备份可解密恢复 | 通过，`tcrm-20261106T040616Z.dump.gpg` 解密后 `pg_restore` 成功，94 个迁移完整 |
+| 14 | S3 跨区域复制实际效果 | 通过，副本桶 `prod-backup-replica-594711655566`（us-east-2）已出现 `pgbackrest/`、`logical/` 前缀；生命周期规则 `expire-all`（当前 42 天、非当前 1 天） |
+| 15 | Object Lock 实际效果 | 通过，副本桶中删除 `.perm-test-retry` 的对象版本被拒绝（访问被拒绝，0 成功 / 1 失败） |
+| 16 | 告警与心跳真实到达 | ALERT 已实测送达飞书；Healthchecks 心跳未接入（可选） |
+| 17 | 真实 `admin.`/`upload.` 证书浏览器上传大表格 | 未做，待交付前由负责人实际登录管理端上传一次 |
+
+演练期间生产未受影响：五个容器全程健康，备份仓库没有新增对象或 WAL 段（`pgbackrest info` 的 `wal archive max` 与备份集未变），恢复后 `ops-check: all checks passed`。
+
+**链路索引重建未演练**：当时业务表为空（0 达人、0 链接），重建空索引没有校验意义；有真实数据后再做一次时按 README「恢复演练」第 4 步补做。
 
 ## 18. 日常运维入口（只放链接）
 

@@ -1,0 +1,173 @@
+# Recovery drill project (RUNBOOK chapter 17 / README "恢复演练").
+# Derived from docker-compose.prod.yml with these deliberate differences:
+#   - project "tcrmdrill", own volumes, own subnet 172.29.0.0/24 -> production volumes are untouched
+#     The subnet must NOT overlap the host VPC (the AWS default VPC is 172.31.0.0/16): when the first
+#     drill attempt used 172.31.0.0/24, the bridge took the VPC gateway address, all container egress
+#     failed and the restore died on an S3 timeout (2026-11-06).
+#   - NO Nginx; admin/redirect are published on 127.0.0.1 only for the drill
+#   - postgres starts with archive_mode=off: the drill must never push WAL into the production repo
+#   - small memory limits and restart: "no" (throw-away project)
+name: tcrmdrill
+
+x-restart: &restart
+  restart: "no"
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 20m
+      max-file: "2"
+
+services:
+  crm-admin:
+    <<: [*restart, *logging]
+    image: ${TCRM_IMAGE_REGISTRY:?}/crm-admin:${TCRM_VERSION:?}
+    environment:
+      TCRM_ADMIN_PORT: "8080"
+      TCRM_DB_HOST: postgres
+      TCRM_DB_PORT: "5432"
+      TCRM_DB_NAME: ${TCRM_DB_NAME:-tcrm}
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
+      TCRM_REDIS_HOST: redis
+      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
+      TCRM_LINK_BASE_URL: ${TCRM_LINK_BASE_URL}
+      TCRM_UPLOAD_BASE_URL: ${TCRM_UPLOAD_BASE_URL:-}
+      TCRM_KOL_PORTAL_BASE_URL: ${TCRM_KOL_PORTAL_BASE_URL}
+      TCRM_ADMIN_BASE_URL: ${TCRM_ADMIN_BASE_URL}
+      TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
+      TCRM_SECRET_KEY: ${TCRM_SECRET_KEY}
+      TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
+      TCRM_TRUSTED_PROXIES: 172.29.0.0/24
+      TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    ports:
+      - "127.0.0.1:18080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\r\n\r\n' >&3 && grep -q '\"status\":\"UP\"' <&3"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    mem_limit: 1g
+
+  crm-redirect:
+    <<: [*restart, *logging]
+    image: ${TCRM_IMAGE_REGISTRY:?}/crm-redirect:${TCRM_VERSION:?}
+    environment:
+      TCRM_REDIRECT_PORT: "8081"
+      TCRM_REDIS_HOST: redis
+      TCRM_REDIS_PORT: "6379"
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD}
+      TCRM_REDIRECT_FALLBACK_URL: ${TCRM_REDIRECT_FALLBACK_URL}
+      TCRM_IP_HASH_SALT: ${TCRM_IP_HASH_SALT}
+      TCRM_TRUSTED_PROXIES: 172.29.0.0/24
+      TCRM_CLICK_STREAM_MAXLEN: ${TCRM_CLICK_STREAM_MAXLEN:-1000000}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+    ports:
+      - "127.0.0.1:18081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /healthz HTTP/1.0\r\n\r\n' >&3 && head -n 1 <&3 | grep -q ' 200'"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: 256m
+
+  postgres:
+    <<: [*restart, *logging]
+    image: ${TCRM_IMAGE_REGISTRY:?}/crm-postgres:${TCRM_POSTGRES_VERSION:-${TCRM_VERSION:?}}
+    init: true
+    environment:
+      POSTGRES_DB: ${TCRM_DB_NAME:-tcrm}
+      POSTGRES_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      POSTGRES_PASSWORD: ${TCRM_DB_SUPERUSER_PASSWORD}
+      TCRM_DB_USERNAME: ${TCRM_DB_USERNAME}
+      TCRM_DB_PASSWORD: ${TCRM_DB_PASSWORD}
+      TZ: UTC
+      PGBACKREST_PG1_USER: ${TCRM_DB_SUPERUSER_USERNAME}
+      PGBACKREST_PG1_DATABASE: ${TCRM_DB_NAME:-tcrm}
+      PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-s3}
+      PGBACKREST_REPO1_PATH: ${PGBACKREST_REPO1_PATH:-/pgbackrest}
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS}
+      PGBACKREST_REPO1_S3_BUCKET: ${PGBACKREST_REPO1_S3_BUCKET}
+      PGBACKREST_REPO1_S3_REGION: ${PGBACKREST_REPO1_S3_REGION:-us-west-2}
+      PGBACKREST_REPO1_S3_ENDPOINT: ${PGBACKREST_REPO1_S3_ENDPOINT:-s3.${PGBACKREST_REPO1_S3_REGION:-us-west-2}.amazonaws.com}
+    shm_size: 256m
+    # archive_mode=off is the critical drill-specific setting: without it, command-line defaults from
+    # the restored postgresql.conf would archive WAL into the PRODUCTION repository.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - log_min_duration_statement=100
+      - -c
+      - archive_mode=off
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ${TCRM_PGBACKREST_CREDS_DIR:?}:/etc/pgbackrest/conf.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+
+  redis:
+    <<: [*restart, *logging]
+    image: redis:7.4.5
+    command:
+      - sh
+      - -c
+      - >-
+        [ -n "$$TCRM_REDIS_PASSWORD" ] || { echo "TCRM_REDIS_PASSWORD must be set" >&2; exit 1; };
+        exec redis-server --appendonly no --maxmemory 200mb --maxmemory-policy noeviction
+        --requirepass "$$TCRM_REDIS_PASSWORD"
+    environment:
+      TCRM_REDIS_PASSWORD: ${TCRM_REDIS_PASSWORD:-}
+    volumes:
+      - redisdata:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH="$$TCRM_REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 384m
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  pgdata:
+  redisdata:
