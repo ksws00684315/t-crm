@@ -78,7 +78,15 @@ describe("shared frontend visual tokens", () => {
       "tcrm-font-size-section",
       "tcrm-line-height-section",
       "tcrm-font-size-help",
-      "tcrm-line-height-help"
+      "tcrm-line-height-help",
+      "tcrm-color-input-border-hover",
+      "tcrm-color-text-disabled",
+      "tcrm-color-disabled-bg",
+      "tcrm-color-disabled-border",
+      "tcrm-color-option-selected-bg",
+      "tcrm-color-option-selected-hover-bg",
+      "tcrm-select-panel-max-width",
+      "tcrm-select-panel-max-height"
     ];
 
     for (const token of tokens) {

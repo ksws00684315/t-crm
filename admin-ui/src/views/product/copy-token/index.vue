@@ -16,7 +16,7 @@ import NameCode from "@/components/NameCode.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useUserStore } from "@/stores/user";
 import { copyText } from "@/utils/copy";
-import { formatInstant } from "@/utils/format";
+import { formatInstant, formatNameWithCode } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { accessOf } from "@/utils/permission";
 import { useLocaleStore } from "@/stores/locale";
@@ -315,7 +315,7 @@ onMounted(() => {
             <el-option
               v-for="kol in kolOptions"
               :key="kol.id"
-              :label="`${kol.name} (${kol.kolCode})`"
+              :label="formatNameWithCode(kol.name, kol.kolCode)"
               :value="kol.id"
               ><NameCode :name="kol.name" :code="kol.kolCode"
             /></el-option>
