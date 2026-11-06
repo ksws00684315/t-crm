@@ -68,13 +68,14 @@
 操作清单 §3 有完整条目；此处按顺序列出与装机直接相关的动作。
 
 1. 域名开注册商锁和 MFA（操作清单 §3 第 1 条）。
-2. DNS 四条 A 记录都指向 `<EIP>`：`t.`、`kol.`、`admin.` **橙云（Proxied）**；`upload.` **灰云（DNS only）**（README「生产部署」第 1 条）。
+2. DNS 四条 A 记录都指向 `<EIP>`：`t.`、`kol.`、`admin.` **橙云（Proxied）**；`upload.` **灰云（DNS only）**（README「生产部署」第 1 条）。再加一条根域名记录 `@` → `<EIP>`，**橙云**：微店开放平台验证域名所有权时取的是根域名下的 `weidian_open.json`（第 16 章第 6 项），根域名不解析则应用无法发布。
 3. SSL/TLS → Overview：模式 **Full (strict)**。
 4. SSL/TLS → Origin Server → Create Certificate：默认参数（RSA、覆盖 `<域名>` 与 `*.<域名>`）→ 生成后**立即保存** PEM 与私钥（页面只显示一次），第 9 章放到主机。
 5. **开启 Authenticated Origin Pulls**（SSL/TLS → Edge Certificates 或 Origin Pull 页）：不开则 `t.`、`kol.`、`admin.` 三个域名回源失败（Nginx 会校验 Cloudflare 客户端证书，见 README「Nginx 说明」）。
 6. 创建 API 令牌：权限只给本 Zone 的 **Zone → DNS → Edit**（certbot DNS-01 用，第 8、9 章写入主机）。令牌值不进 `.env`、不进日志。
 7. Security → WAF → Rate limiting rules：按仓库 README「Cloudflare 频率限制规则」表的规则表达式与阈值建管理端验证码签发规则（GitHub 网页可看），建好在 README 该表注明日期。
 8. 其他服务（操作清单 §4 + README「邮件服务」）：Resend 添加发件域名（建议 `mail.<域名>`，与第 8 章 `TCRM_MAIL_FROM` 一致）并加 SPF/DKIM/DMARC 记录、建 API Key；UptimeRobot 三条探测；Healthchecks 建一个心跳检查（记下 URL）；飞书建自定义机器人（关键词放行 `ALERT` 与 `RECOVERED`、不开签名校验，记下 webhook URL）；GitHub 建 `read:packages` 令牌。
+9. 微店开放平台注册服务型应用（操作清单 §3）：授权回调链接填 `https://admin.<域名>/admin-api/integration/weidian/oauth/callback`，保存后下载 `weidian_open.json`，放到主机的 `<TCRM_STATIC_DIR>` 根目录（默认 `/var/lib/tcrm/www/weidian_open.json`，**不要**放进 `releases/` 或 `current/`，发布切软链会丢文件），再确认 `https://<域名>/weidian_open.json` 返回该 JSON。根域名下这个文件由 Nginx 的根域名 server 块提供（任务 119），其余路径返回 404。
 
 ## 6. 主机初始化【主机 root】
 
@@ -469,7 +470,7 @@ deploy/scripts/ops-check.sh                      # 手动跑一次；期望输�
 | 3 | `upload.` 用公开证书 | `openssl s_client -connect upload.<域名>:443 -servername upload.<域名> </dev/null \| openssl x509 -noout -issuer` | issuer 为 Let's Encrypt（README「生产部署」第 8 条） |
 | 4 | `url.upload` 已设置 | 管理端（平台管理员）→ 系统配置；或 `grep '^TCRM_UPLOAD_BASE_URL=' /opt/tcrm/deploy/.env` | `https://upload.<域名>` |
 | 5 | CORS 包含管理端源 | `grep '^TCRM_CORS_ALLOWED_ORIGINS=' /opt/tcrm/deploy/.env` | 含 `https://admin.<域名>` |
-| 6 | 微店回调域名已登记 | 微店开放平台控制台（操作清单 §3） | `admin.<域名>` 已登记 |
+| 6 | 微店回调域名已登记 | 微店开放平台控制台（操作清单 §3）；`curl -s https://<域名>/weidian_open.json` | `admin.<域名>` 已登记；根域名 `weidian_open.json` 返回验证 JSON（第 5 章第 9 条） |
 | 7 | 引导密码已删 | 第 14 章第 3 步 | 已删且 crm-admin healthy |
 | 8 | 外部探测就绪 | UptimeRobot / Healthchecks 控制台（操作清单 §4） | `t./healthz`、管理端、达人端三条探测 Up；心跳按期到达 |
 | 9 | 告警链路可达 | 第 15 章实测（演练机上做即可，不必在生产机 stop redis） | 飞书收到 ALERT 与 RECOVERED |
