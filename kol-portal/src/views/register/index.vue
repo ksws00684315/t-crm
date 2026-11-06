@@ -25,7 +25,6 @@ const session = useSessionStore();
 const linkedCode = computed(() => (typeof route.query.code === "string" ? route.query.code : ""));
 const code = ref(linkedCode.value.toUpperCase());
 const bdUserName = ref("");
-const tenantName = ref("");
 const linkState = ref<"checking" | "ready" | "invalid" | "empty">(
   linkedCode.value ? "checking" : "empty"
 );
@@ -54,7 +53,6 @@ async function loadPreview() {
   if (!code.value) {
     linkState.value = "empty";
     bdUserName.value = "";
-    tenantName.value = "";
     return;
   }
   if (!/^[A-HJ-KM-NP-Z2-9]{8}$/.test(code.value)) {
@@ -65,7 +63,6 @@ async function loadPreview() {
   try {
     const preview = await previewRegister(code.value);
     bdUserName.value = preview.bdUserName ?? "";
-    tenantName.value = preview.tenantName ?? "";
     linkState.value = "ready";
   } catch (error) {
     linkState.value = "invalid";
@@ -74,13 +71,9 @@ async function loadPreview() {
   }
 }
 
-/** 02.01: the code belongs to the super administrator when no BD name comes back. */
+/** 02.01: only a BD invitation shows "Invited by"; a super-administrator code shows nothing. */
 const invitedByText = computed(() =>
-  bdUserName.value
-    ? t("register.invitedBy", { name: bdUserName.value })
-    : tenantName.value
-      ? t("register.invitedBy", { name: tenantName.value })
-      : ""
+  bdUserName.value ? t("register.invitedBy", { name: bdUserName.value }) : ""
 );
 
 function register() {

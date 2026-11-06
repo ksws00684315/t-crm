@@ -11,11 +11,14 @@ import { useLocaleStore } from "@/stores/locale";
 import AppLayout from "../index.vue";
 import { NAV_ITEMS } from "../nav";
 
-function mountLayout() {
+function mountLayout(attachToBody = false) {
   const pinia = createPinia();
   setActivePinia(pinia);
   const router = createRouter({ history: createMemoryHistory(), routes });
-  return mount(AppLayout, { global: { plugins: [ElementPlus, i18n, pinia, router] } });
+  return mount(AppLayout, {
+    global: { plugins: [ElementPlus, i18n, pinia, router] },
+    ...(attachToBody ? { attachTo: document.body } : {})
+  });
 }
 
 describe("layout header", () => {
@@ -36,6 +39,33 @@ describe("layout header", () => {
     await nextTick();
     expect(wrapper.find(".shell__brand").text()).toBe("SparkTrack 达人端");
     expect(wrapper.find("button").text()).toContain("退出登录");
+  });
+
+  it("closes the user menu on an outside click or Escape (smoke item 9)", async () => {
+    const wrapper = mountLayout(true);
+    const menu = wrapper.get("details.user-menu").element as HTMLDetailsElement;
+    menu.open = true;
+    await nextTick();
+
+    // A click elsewhere on the page closes the menu.
+    document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await nextTick();
+    expect(menu.open).toBe(false);
+
+    // Escape closes it too.
+    menu.open = true;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await nextTick();
+    expect(menu.open).toBe(false);
+
+    // A click inside the panel leaves it open for the next choice.
+    menu.open = true;
+    wrapper
+      .get(".user-menu__panel")
+      .element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await nextTick();
+    expect(menu.open).toBe(true);
+    wrapper.unmount();
   });
 });
 

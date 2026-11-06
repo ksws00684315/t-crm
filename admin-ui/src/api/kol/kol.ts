@@ -127,11 +127,6 @@ export function getRegisterCode(): Promise<RegisterCodeVO> {
   return http.request<RegisterCodeVO>({ method: "get", url: "/kol/register-code" });
 }
 
-/** Revokes the current registration link and returns a new one. */
-export function rotateRegisterCode(): Promise<RegisterCodeVO> {
-  return http.request<RegisterCodeVO>({ method: "post", url: "/kol/register-code" });
-}
-
 export function uploadKolImport(file: File): Promise<KolImportVO> {
   const form = new FormData();
   form.append("file", file);

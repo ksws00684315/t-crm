@@ -1,5 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import ElementPlus, { ElSelect } from "element-plus";
+import ElementPlus, { ElSelect, ElTabs } from "element-plus";
 import { createPinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMe, updateMe } from "@/api/auth";
@@ -95,17 +95,51 @@ describe("creator profile validation", () => {
     expect(systemItem.find('[data-test="copy"]').exists()).toBe(true);
   });
 
-  it("makes the title the top of the page, with the identity right below it in the first card", async () => {
+  it("keeps the title and identity above the tabs", async () => {
     await page();
-    const firstCard = wrapper.findAll(".section-card")[0];
-    expect(wrapper.get(".account-page").element.firstElementChild).toBe(firstCard.element);
-    const header = firstCard.get(".el-card__header");
+    const header = wrapper.get(".account-header");
+    expect(wrapper.get(".account-page").element.firstElementChild).toBe(header.element);
     expect(header.element.firstElementChild?.tagName).toBe("H1");
-    expect(wrapper.findAll(".section-card h1")).toHaveLength(1);
     expect(header.get("h1").element.nextElementSibling).toBe(
       header.get('[data-test="name-code"]').element
     );
     expect(wrapper.findAll('[data-test="name-code"]')).toHaveLength(1);
+  });
+
+  it("groups the cards into profile, payout and password tabs (smoke item 15)", async () => {
+    await page();
+    const labels = wrapper.findAll(".el-tabs__item").map(tab => tab.text());
+    expect(labels).toEqual([
+      i18n.global.t("account.tabProfile"),
+      i18n.global.t("account.tabPayout"),
+      i18n.global.t("account.tabPassword")
+    ]);
+    /** Element Plus hides inactive panes with `v-show`; the inline display is the visible state. */
+    const paneShown = (index: number): boolean =>
+      (wrapper.findAll(".el-tab-pane")[index]!.element as HTMLElement).style.display !== "none";
+    const panes = wrapper.findAll(".el-tab-pane");
+    expect(panes).toHaveLength(3);
+    // Profile first; the other two stay rendered but hidden, so their forms keep their state.
+    expect(paneShown(0)).toBe(true);
+    expect(panes[0]!.find('[data-test="profile-save"]').exists()).toBe(true);
+    expect(paneShown(1)).toBe(false);
+    expect(paneShown(2)).toBe(false);
+
+    const tabs = wrapper.findComponent(ElTabs);
+    tabs.vm.$emit("update:modelValue", "payout");
+    await flushPromises();
+    expect(paneShown(1)).toBe(true);
+    expect(wrapper.findAll(".el-tab-pane")[1]!.text()).toContain(
+      i18n.global.t("account.payoutInfo")
+    );
+    expect(paneShown(0)).toBe(false);
+
+    tabs.vm.$emit("update:modelValue", "password");
+    await flushPromises();
+    expect(paneShown(2)).toBe(true);
+    expect(wrapper.findAll(".el-tab-pane")[2]!.find('[data-test="password-form"]').exists()).toBe(
+      true
+    );
   });
 
   it("enforces the backend handle length instead of allowing 255 characters", async () => {

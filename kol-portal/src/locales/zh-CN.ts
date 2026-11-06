@@ -90,6 +90,9 @@ const zhCN: MessageSchema = {
       INVALID: "已失效"
     },
     personalInfo: "个人基础信息",
+    tabProfile: "基础信息",
+    tabPayout: "收款信息",
+    tabPassword: "修改密码",
     payoutInfo: "收款信息",
     systemId: "系统ID",
     nickname: "昵称",

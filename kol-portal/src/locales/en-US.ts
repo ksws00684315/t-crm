@@ -90,6 +90,9 @@ const enUS = {
       INVALID: "Inactive"
     },
     personalInfo: "Personal information",
+    tabProfile: "Basic info",
+    tabPayout: "Payout info",
+    tabPassword: "Password",
     payoutInfo: "Payout information",
     systemId: "System ID",
     nickname: "Nickname",
