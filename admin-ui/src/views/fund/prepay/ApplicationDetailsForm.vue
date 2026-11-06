@@ -83,24 +83,30 @@ watch(
   },
   { immediate: true }
 );
+let accountsSequence = 0;
 async function loadAccounts(kolId: string) {
+  const request = ++accountsSequence;
   accountsLoading.value = true;
   accountsFailed.value = false;
   try {
-    accounts.value = await prepayPayoutAccounts(kolId);
+    const rows = await prepayPayoutAccounts(kolId);
+    if (request === accountsSequence) accounts.value = rows;
   } catch (error) {
+    if (request !== accountsSequence) return;
     accounts.value = [];
     accountsFailed.value = true;
     notifyError(error);
   } finally {
-    accountsLoading.value = false;
+    if (request === accountsSequence) accountsLoading.value = false;
   }
 }
 watch(
   () => [props.detail.kolId, props.editable] as const,
   ([kolId, editable]) => {
+    accountsSequence += 1;
     accounts.value = [];
     accountsFailed.value = false;
+    accountsLoading.value = false;
     if (editable && kolId) void loadAccounts(kolId);
   },
   { immediate: true }
@@ -203,7 +209,7 @@ defineExpose({ save });
         <div v-if="editable" class="account-picker">
           <el-select
             v-model="form.payoutAccountId"
-            :placeholder="t('prepay.accountPlaceholder')"
+            :placeholder="t('prepay.chooseAccount')"
             :loading="accountsLoading"
             filterable
             data-test="finance-prepay-account"

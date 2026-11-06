@@ -552,7 +552,13 @@ describe("prepay safe submission", () => {
     expect(wrapper.get('[data-test="prepay-account-empty"]').text()).toContain(
       i18n.global.t("prepay.noAccounts")
     );
-    expect(wrapper.find('[data-test="finance-prepay-details-save"]').exists()).toBe(true);
+    await set(wrapper, "finance-prepay-reason", "finance details");
+    wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
+    wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", false);
+    await flushPromises();
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await flushPromises();
+    expect(api.savePrepayApplicationDetails).not.toHaveBeenCalled();
   });
   it("uses one activity tab and names with handling roles without internal ID fallback", async () => {
     vi.mocked(api.getPrepay).mockResolvedValue({

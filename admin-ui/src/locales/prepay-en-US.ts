@@ -12,7 +12,6 @@ export default {
     "Application details are locked after submission. Reject incorrect applications so the business owner can reapply.",
   retryRecipient: "Unable to load recipient information. Retry",
   reasonHint: "Enter the application reason or the creator's actual receiving account",
-  accountPlaceholder: "Select the creator's payout account",
   chooseAccount: "Select the creator's payout account",
   accountsFailed: "Payout accounts could not be loaded. Retry.",
   systemPerson: "System",

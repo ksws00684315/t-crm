@@ -1201,13 +1201,8 @@ public class PrepayService {
   }
 
   private static void requirePrepayAccess(AccountDTO user) {
-    if (user.role() != Role.SUPER_ADMIN
-        && !user.permissions().contains("prepay:apply")
-        && !user.permissions().contains("prepay:review")
-        && !user.permissions().contains("prepay:finance-review")
-        && !user.permissions().contains("prepay:pay")) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
-    }
+    requireAnyPermission(
+        user, "prepay:apply", "prepay:review", "prepay:finance-review", "prepay:pay");
   }
 
   private static void requirePermission(AccountDTO user, String code) {
@@ -1216,22 +1211,16 @@ public class PrepayService {
     }
   }
 
-  private static void requireAnyPermission(AccountDTO user, String first, String second) {
-    if (user.role() != Role.SUPER_ADMIN
-        && !user.permissions().contains(first)
-        && !user.permissions().contains(second)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+  private static void requireAnyPermission(AccountDTO user, String... codes) {
+    if (user.role() == Role.SUPER_ADMIN) {
+      return;
     }
-  }
-
-  private static void requireAnyPermission(
-      AccountDTO user, String first, String second, String third) {
-    if (user.role() != Role.SUPER_ADMIN
-        && !user.permissions().contains(first)
-        && !user.permissions().contains(second)
-        && !user.permissions().contains(third)) {
-      throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+    for (String code : codes) {
+      if (user.permissions().contains(code)) {
+        return;
+      }
     }
+    throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
   }
 
   private static void requireDetailPermission(AccountDTO user) {

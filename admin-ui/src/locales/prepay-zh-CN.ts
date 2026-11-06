@@ -11,7 +11,6 @@ export default {
   lockedInfo: "申请资料已提交并锁定；填写有误请驳回，由商务重新申请。",
   retryRecipient: "收款信息读取失败，点击重试",
   reasonHint: "填写申请原因或达人实际收款账户",
-  accountPlaceholder: "请选择达人收款账户",
   chooseAccount: "请选择达人收款账户",
   accountsFailed: "收款账户加载失败，点击重新加载。",
   systemPerson: "系统",
