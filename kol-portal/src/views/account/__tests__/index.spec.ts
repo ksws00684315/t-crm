@@ -45,12 +45,42 @@ async function settleErrors() {
 }
 
 describe("creator profile validation", () => {
-  it("preserves the name above the creator code alongside editable profile fields", async () => {
+  it("keeps the nickname above the creator code as read-only text (task 122)", async () => {
     await page();
     const identity = wrapper.get('[data-test="name-code"]');
     expect(identity.get('[data-test="identity-name"]').text()).toBe("Creator");
     expect(identity.get('[data-test="identity-code"]').text()).toBe("t60_creator");
-    expect(wrapper.get('[data-test="profile-name"]').element).toBeInstanceOf(HTMLInputElement);
+    const nickname = wrapper.get('[data-test="profile-name"]');
+    expect(nickname.find("input").exists()).toBe(false);
+    expect(nickname.get('[data-test="value"]').text()).toBe("Creator");
+    expect(nickname.find('[data-test="copy"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain(i18n.global.t("account.nicknameHint"));
+  });
+
+  it("submits only the primary social slot, never the nickname", async () => {
+    vi.mocked(updateMe).mockResolvedValue({
+      kolCode: "t60_creator",
+      name: "Creator",
+      email: "t60_creator@example.test",
+      tenantName: "t60_company",
+      country: null,
+      primaryPlatform: "YouTube",
+      primaryHandle: "@creator"
+    });
+    await page();
+    const platformSelect = wrapper
+      .findAllComponents(ElSelect)
+      .find(select => select.props("modelValue") === "TikTok");
+    if (!platformSelect) throw new Error("Primary platform selector was not rendered");
+    platformSelect.vm.$emit("update:modelValue", "YouTube");
+    await flushPromises();
+    await wrapper.get('[data-test="profile-handle"]').setValue("@creator");
+    await wrapper.get('[data-test="profile-save"]').trigger("click");
+    await flushPromises();
+    expect(updateMe).toHaveBeenCalledWith({
+      primaryPlatform: "YouTube",
+      primaryHandle: "@creator"
+    });
   });
   it("shows email and system ID as plain CopyText (L-101)", async () => {
     await page();
@@ -94,20 +124,6 @@ describe("creator profile validation", () => {
 });
 
 describe("creator profile feedback (task 104)", () => {
-  it("shows one nickname error under the field and no retry for a validation failure", async () => {
-    await page();
-    await wrapper.get('[data-test="profile-name"]').setValue("");
-    await wrapper.get('[data-test="profile-save"]').trigger("click");
-    await settleErrors();
-    const message = i18n.global.t("register.nameRequired");
-    expect(wrapper.text().split(message)).toHaveLength(2);
-    const nickname = wrapper.get('[data-test="profile-name"]').element.closest(".el-form-item");
-    expect(nickname?.textContent).toContain(message);
-    expect(wrapper.find('[data-test="load-retry"]').exists()).toBe(false);
-    expect(wrapper.find(".account-page > .el-alert").exists()).toBe(false);
-    wrapper.unmount();
-  });
-
   it("shows the platform and handle pair error under the handle field", async () => {
     await page();
     await wrapper.get('[data-test="profile-handle"]').setValue("");

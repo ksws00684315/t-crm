@@ -66,16 +66,16 @@ public class KolPortalProfileService {
         rateEffectiveAt);
   }
 
-  /** Only the nickname and the existing primary social-account slot can change here. */
+  /**
+   * Only the existing primary social-account slot can change here: the nickname is entered at
+   * registration and read-only afterwards (task 122), while the back office may still edit it.
+   */
   @Transactional
-  public void update(String name, String primaryPlatform, String primaryHandle, String clientIp) {
+  public void update(String primaryPlatform, String primaryHandle, String clientIp) {
     KolAccountDTO account = current.kol();
     String platform = trimToNull(primaryPlatform);
     String handle = trimToNull(primaryHandle);
-    if (name == null
-        || name.isBlank()
-        || KolRules.length(name.strip()) > KolRules.MAX_NAME
-        || (platform == null) != (handle == null)) {
+    if ((platform == null) != (handle == null)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
     if (platform != null
@@ -96,7 +96,6 @@ public class KolPortalProfileService {
         new LambdaUpdateWrapper<KolDO>()
             .eq(KolDO::getId, account.id())
             .eq(KolDO::getTenantId, account.tenantId())
-            .set(KolDO::getName, name.strip())
             .set(
                 KolDO::getSocialAccounts,
                 SocialAccountsJson.write(socialAccounts),

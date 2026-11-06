@@ -236,19 +236,54 @@ class KolAuthControllerTest {
             put("/kol-api/me")
                 .header(KolMvcSupport.TOKEN_HEADER, token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    "{\"name\":\"Alice Kim\",\"primaryPlatform\":\"Instagram\","
-                        + "\"primaryHandle\":\"@alice.kim\"}"))
+                .content("{\"primaryPlatform\":\"Instagram\",\"primaryHandle\":\"@alice.kim\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.name").value("Alice Kim"))
         .andExpect(jsonPath("$.data.primaryPlatform").value("TikTok"));
-    verify(profiles).update("Alice Kim", "Instagram", "@alice.kim", "127.0.0.1");
+    verify(profiles).update("Instagram", "@alice.kim", "127.0.0.1");
   }
 
   @Test
-  void shouldRejectInvalidProfileBodies_atBinding() throws Exception {
+  void shouldAcceptAnEmptyBody_asClearingThePrimarySocialSlot() throws Exception {
+    when(auth.me()).thenReturn(kol());
+    when(profiles.get()).thenReturn(profile());
+    when(accounts.getById(9007199254740993L))
+        .thenReturn(
+            new KolAccountDTO(
+                9007199254740993L,
+                "KOL0001",
+                "Alice Kim",
+                "alice@example.com",
+                "US",
+                "hash",
+                1,
+                1,
+                0,
+                Instant.EPOCH,
+                2L,
+                "Acme",
+                true,
+                "+15550002222",
+                "+15550001111",
+                null));
     String token = KolMvcSupport.actAs(current, kol());
-    for (String body : List.of("{}", "{\"name\":\"  \"}")) {
+    mvc.perform(
+            put("/kol-api/me")
+                .header(KolMvcSupport.TOKEN_HEADER, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isOk());
+    verify(profiles).update(null, null, "127.0.0.1");
+  }
+
+  @Test
+  void shouldRejectOversizedProfileFields_atBinding() throws Exception {
+    String token = KolMvcSupport.actAs(current, kol());
+    List<String> bodies =
+        List.of(
+            "{\"primaryPlatform\":\"" + "p".repeat(33) + "\"}",
+            "{\"primaryHandle\":\"" + "h".repeat(129) + "\"}");
+    for (String body : bodies) {
       mvc.perform(
               put("/kol-api/me")
                   .header(KolMvcSupport.TOKEN_HEADER, token)

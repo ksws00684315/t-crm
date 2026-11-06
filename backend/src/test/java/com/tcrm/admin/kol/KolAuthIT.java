@@ -574,19 +574,23 @@ class KolAuthIT {
         .andExpect(jsonPath("$.data.loginStatus").value("NORMAL"))
         .andExpect(jsonPath("$.data.commissionRate").doesNotExist());
 
-    // The whitelist ignores read-only fields sent along; the pairing rule guards the social slot.
+    String seededName =
+        jdbc.queryForObject("SELECT name FROM crm_kol WHERE id = ?", String.class, kolId);
+
+    // The whitelist ignores read-only fields sent along; the nickname never changes from here
+    // (task 122), and the pairing rule still guards the social slot.
     mvc.perform(
             json(
                 put("/kol-api/me").header(KOL_TOKEN, token),
                 "{\"name\":\"Renamed Creator\",\"email\":\"hacker@example.com\","
                     + "\"primaryPlatform\":\"YouTube\",\"primaryHandle\":\"@new\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.name").value("Renamed Creator"))
+        .andExpect(jsonPath("$.data.name").value(seededName))
         .andExpect(jsonPath("$.data.primaryPlatform").value("YouTube"))
         .andExpect(jsonPath("$.data.email").value("profile@example.com"));
 
     assertThat(jdbc.queryForObject("SELECT name FROM crm_kol WHERE id = ?", String.class, kolId))
-        .isEqualTo("Renamed Creator");
+        .isEqualTo(seededName);
     assertThat(jdbc.queryForObject("SELECT email FROM crm_kol WHERE id = ?", String.class, kolId))
         .isEqualTo("profile@example.com");
     String socials =

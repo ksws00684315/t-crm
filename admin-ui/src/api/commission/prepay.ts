@@ -96,7 +96,7 @@ export interface PrepayApplicationDetails {
   deductFromCommission: boolean;
   reason: string;
   expectedPayDate: string;
-  recipientText: string;
+  payoutAccountId: string;
 }
 export function savePrepayApplicationDetails(
   id: string,
@@ -113,6 +113,24 @@ export function savePrepayApplicationDetails(
   });
 }
 const root = "/commission/prepays";
+
+/** Masked payout-account option of one creator, for the application-details picker (task 122). */
+export interface PrepayPayoutOption {
+  id: string;
+  type: "PAYPAL" | "USDT";
+  currency?: string | null;
+  network?: string | null;
+  maskedAccount: string;
+  holderName: string | null;
+}
+
+/** Selector data source: the endpoint returns the creator's effective accounts as a plain list. */
+export const prepayPayoutAccounts = (kolId: string) =>
+  http.request<PrepayPayoutOption[]>({
+    url: `${root}/payout-accounts`,
+    method: "get",
+    params: { kolId }
+  });
 export const listPrepays = (params: PrepayQuery) =>
   http.request<PageResult<PrepayRow>>({ url: root, method: "get", params });
 export const getPrepay = (id: string) =>

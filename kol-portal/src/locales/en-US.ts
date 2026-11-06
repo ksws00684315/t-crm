@@ -93,6 +93,7 @@ const enUS = {
     payoutInfo: "Payout information",
     systemId: "System ID",
     nickname: "Nickname",
+    nicknameHint: "It cannot be changed after registration",
     primaryPlatform: "Primary platform",
     primaryHandle: "Primary platform ID",
     profileSaved: "Your profile has been updated.",

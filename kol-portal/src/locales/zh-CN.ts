@@ -93,6 +93,7 @@ const zhCN: MessageSchema = {
     payoutInfo: "收款信息",
     systemId: "系统ID",
     nickname: "昵称",
+    nicknameHint: "注册后不可修改",
     primaryPlatform: "核心平台",
     primaryHandle: "核心平台ID",
     profileSaved: "个人信息已更新。",

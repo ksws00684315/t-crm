@@ -24,7 +24,7 @@ import type { UploadFile } from "element-plus";
 defineOptions({ name: "AccountPage" });
 const { t } = useI18n();
 const session = useSessionStore();
-const profile = reactive({ name: "", primaryPlatform: "", primaryHandle: "" });
+const profile = reactive({ primaryPlatform: "", primaryHandle: "" });
 const payout = reactive({
   type: "PAYPAL" as "PAYPAL" | "USDT",
   account: "",
@@ -55,13 +55,12 @@ const payoutError = computed(() => payoutRequest.failure.value?.displayMessage ?
 const passwordError = computed(() => passwordRequest.failure.value?.displayMessage ?? "");
 const profileLoading = loadRequest.busy;
 const qrError = ref("");
-const profileFieldErrors = reactive({ name: "", handle: "" });
+const profileFieldErrors = reactive({ handle: "" });
 const payoutFieldErrors = reactive({ account: "", holder: "" });
 const passwordFieldErrors = reactive({ oldPassword: "", newPassword: "", confirm: "" });
 watch(
-  () => [profile.name, profile.primaryPlatform, profile.primaryHandle],
+  () => [profile.primaryPlatform, profile.primaryHandle],
   () => {
-    profileFieldErrors.name = "";
     profileFieldErrors.handle = "";
   },
   { flush: "sync" }
@@ -103,7 +102,6 @@ function load() {
   return loadRequest.submit(async () => {
     const [me, paymentAccounts] = await Promise.all([getMe(), listPayoutAccounts()]);
     session.updateProfile(me);
-    profile.name = me.name;
     profile.primaryPlatform = me.primaryPlatform ?? "";
     profile.primaryHandle = me.primaryHandle ?? "";
     accounts.value = paymentAccounts;
@@ -128,15 +126,9 @@ function selectAccount(id: string) {
 function saveProfile() {
   profileSaved.value = false;
   profileRequest.failure.value = null;
-  profileFieldErrors.name = "";
   profileFieldErrors.handle = "";
-  const name = profile.name.trim();
   const primaryPlatform = profile.primaryPlatform.trim();
   const primaryHandle = profile.primaryHandle.trim();
-  if (!name || name.length > 64) {
-    profileFieldErrors.name = "register.nameRequired";
-    return;
-  }
   if (primaryPlatform.length > 32 || primaryHandle.length > 128) {
     profileFieldErrors.handle = "errors.field";
     return;
@@ -147,7 +139,6 @@ function saveProfile() {
   }
   return profileRequest.submit(async () => {
     const updated = await updateMe({
-      name,
       primaryPlatform: primaryPlatform || null,
       primaryHandle: primaryHandle || null
     });
@@ -277,15 +268,12 @@ function savePassword() {
             <el-form-item :label="t('account.systemId')">
               <CopyText :value="systemId" data-test="profile-system-id" />
             </el-form-item>
-            <el-form-item
-              :label="t('account.nickname')"
-              :error="profileFieldErrors.name ? t(profileFieldErrors.name) : undefined"
-              ><el-input
-                v-model="profile.name"
-                maxlength="64"
-                show-word-limit
-                data-test="profile-name"
-            /></el-form-item>
+            <el-form-item :label="t('account.nickname')">
+              <div class="read-value">
+                <CopyText :value="session.kol.name" data-test="profile-name" />
+                <small class="read-hint">{{ t("account.nicknameHint") }}</small>
+              </div>
+            </el-form-item>
             <el-form-item :label="t('account.primaryPlatform')"
               ><el-select
                 v-model="profile.primaryPlatform"
@@ -567,6 +555,15 @@ h1 {
   grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
   gap: var(--tcrm-space-3) var(--tcrm-space-5);
   margin: 0;
+}
+.read-value {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-1);
+  min-height: 32px;
+}
+.read-value small {
+  display: block;
 }
 .read-only-grid dt {
   color: var(--tcrm-color-text-secondary);

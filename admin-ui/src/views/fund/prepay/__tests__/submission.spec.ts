@@ -18,7 +18,8 @@ vi.mock("@/api/commission/prepay", () => ({
   approvePrepay: vi.fn(),
   cancelPrepay: vi.fn(),
   downloadPrepayFile: vi.fn(),
-  savePrepayApplicationDetails: vi.fn()
+  savePrepayApplicationDetails: vi.fn(),
+  prepayPayoutAccounts: vi.fn()
 }));
 const detail: api.PrepayDetail = {
   id: "9",
@@ -69,6 +70,16 @@ beforeEach(() => {
     maskedAccount: "***",
     holderName: null
   });
+  vi.mocked(api.prepayPayoutAccounts).mockResolvedValue([
+    {
+      id: "2",
+      type: "PAYPAL",
+      currency: "CNY",
+      network: null,
+      maskedAccount: "t***",
+      holderName: "Test"
+    }
+  ]);
   vi.spyOn(ElMessageBox, "confirm").mockResolvedValue({ action: "confirm" } as never);
 });
 afterEach(() => {
@@ -103,6 +114,15 @@ async function open(component: typeof ApplyDialog | typeof DetailDrawer) {
 /** The apply dialog picks its creator from the remote select (task 82); the stub emits the value. */
 async function pickKol(wrapper: VueWrapper, kolId = "3") {
   wrapper.getComponent({ name: "ElSelect" }).vm.$emit("update:modelValue", kolId);
+  await flushPromises();
+}
+/** Picks a payout account from the application-details select (task 122). */
+async function pickAccount(wrapper: VueWrapper, id = "2") {
+  const select = wrapper
+    .findAllComponents({ name: "ElSelect" })
+    .find(component => component.attributes("data-test") === "finance-prepay-account");
+  if (!select) throw new Error("Payout account select was not rendered");
+  select.vm.$emit("update:modelValue", id);
   await flushPromises();
 }
 async function set(wrapper: VueWrapper, name: string, value: string) {
@@ -472,7 +492,7 @@ describe("prepay safe submission", () => {
     const wrapper = await open(DetailDrawer);
     await set(wrapper, "finance-prepay-reason", "finance details");
     wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
-    await set(wrapper, "finance-prepay-recipient", "Bank\nTest recipient\n123456");
+    await pickAccount(wrapper, "2");
     wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", false);
     await flushPromises();
     await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
@@ -482,40 +502,58 @@ describe("prepay safe submission", () => {
       {
         reason: "finance details",
         expectedPayDate: "2026-10-23",
-        recipientText: "Bank\nTest recipient\n123456",
+        payoutAccountId: "2",
         deductFromCommission: false
       },
       []
     );
     expect(wrapper.find('[data-test="prepay-approve"]').exists()).toBe(false);
     expect(wrapper.props("modelValue")).toBe(true);
-    expect(wrapper.find('[data-test="finance-prepay-recipient"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="finance-prepay-account"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="prepay-recipient-value"]').text()).toBe(
       "Bank\nTest recipient\n123456"
     );
     expect(wrapper.find('[data-test="finance-prepay-details-save"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-test="prepay-application-details"]')).toHaveLength(1);
   });
-  it.each([0, 1000, 1001])(
-    "validates manual recipient boundary %i before submission",
-    async length => {
-      useUserStore().user!.permissions = ["prepay:apply"];
-      vi.mocked(api.getPrepay).mockResolvedValue({
-        ...detail,
-        status: "WAITING_DETAILS",
-        payoutAccountSnapshot: null
-      });
-      vi.mocked(api.savePrepayApplicationDetails).mockResolvedValue({
-        ...detail,
-        status: "PENDING_OPERATIONS_REVIEW"
-      });
-      const wrapper = await open(DetailDrawer);
-      await set(wrapper, "finance-prepay-recipient", "收".repeat(length));
-      await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
-      await flushPromises();
-      expect(api.savePrepayApplicationDetails).toHaveBeenCalledTimes(length === 1000 ? 1 : 0);
-    }
-  );
+  it("blocks submission without a picked payout account (task 122)", async () => {
+    useUserStore().user!.permissions = ["prepay:apply"];
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      status: "WAITING_DETAILS",
+      payoutAccountSnapshot: null,
+      payoutAccountId: null
+    });
+    const wrapper = await open(DetailDrawer);
+    await set(wrapper, "finance-prepay-reason", "finance details");
+    wrapper.getComponent({ name: "ElDatePicker" }).vm.$emit("update:modelValue", "2026-10-23");
+    wrapper.getComponent({ name: "ElRadioGroup" }).vm.$emit("update:modelValue", false);
+    await flushPromises();
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await flushPromises();
+    expect(api.savePrepayApplicationDetails).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(wrapper.text()).toContain(i18n.global.t("prepay.chooseAccount")));
+    await pickAccount(wrapper, "2");
+    await wrapper.get('[data-test="finance-prepay-details-save"]').trigger("click");
+    await flushPromises();
+    expect(api.savePrepayApplicationDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains that a creator without payout accounts cannot submit yet (task 122)", async () => {
+    useUserStore().user!.permissions = ["prepay:apply"];
+    vi.mocked(api.getPrepay).mockResolvedValue({
+      ...detail,
+      status: "WAITING_DETAILS",
+      payoutAccountSnapshot: null,
+      payoutAccountId: null
+    });
+    vi.mocked(api.prepayPayoutAccounts).mockResolvedValue([]);
+    const wrapper = await open(DetailDrawer);
+    expect(wrapper.get('[data-test="prepay-account-empty"]').text()).toContain(
+      i18n.global.t("prepay.noAccounts")
+    );
+    expect(wrapper.find('[data-test="finance-prepay-details-save"]').exists()).toBe(true);
+  });
   it("uses one activity tab and names with handling roles without internal ID fallback", async () => {
     vi.mocked(api.getPrepay).mockResolvedValue({
       ...detail,

@@ -103,8 +103,8 @@ public class KolAuthController {
   @SaCheckLogin(type = StpKolUtil.TYPE)
   @PutMapping("/kol-api/me")
   public R<KolMeVO> updateMe(@Valid @RequestBody KolMeUpdateRequest r, HttpServletRequest request) {
-    profiles.update(r.name(), r.primaryPlatform(), r.primaryHandle(), clientIps.resolve(request));
-    // Re-read the account so the answer carries the new name, not the session snapshot.
+    profiles.update(r.primaryPlatform(), r.primaryHandle(), clientIps.resolve(request));
+    // Re-read the account so the answer carries the stored name, not the session snapshot.
     return R.ok(KolMeVO.from(accounts.getById(auth.me().id()), profiles.get()));
   }
 

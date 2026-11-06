@@ -97,9 +97,11 @@ const detailsComplete = computed(
     !!detail.value.expectedPayDate &&
     !!detail.value.payoutAccountSnapshot
 );
-function detailsSaved(value: PrepayDetail, text: string) {
-  recipient.value = text;
+function detailsSaved(value: PrepayDetail) {
   detail.value = value;
+  recipient.value = null;
+  // A saved account is shown through the audited recipient endpoint, like a reopened task.
+  if (value.payoutAccountSnapshot) void revealRecipient();
   emit("saved");
 }
 function beforeClose(done: () => void) {
