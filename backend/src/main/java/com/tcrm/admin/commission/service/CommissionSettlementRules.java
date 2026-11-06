@@ -107,6 +107,29 @@ public final class CommissionSettlementRules {
         row.getReleasedCommissionCny());
   }
 
+  /**
+   * {@link #commissionable(CommissionItemStateDO)} as display text; null when the source has none.
+   */
+  public static String commissionableText(CommissionItemStateDO row) {
+    BigDecimal value = commissionable(row);
+    return value == null ? null : value.toPlainString();
+  }
+
+  /**
+   * 退款调整 of a line (task 81, task 114): min(accrued − released, 0). Only a reduction after release
+   * (refund or attribution change) is an adjustment; the frozen remainder (accrued minus released,
+   * not yet released) is not. The one entry for the income detail and the settlement detail.
+   */
+  public static BigDecimal refundAdjustment(BigDecimal accruedCny, BigDecimal releasedCny) {
+    BigDecimal released = releasedCny == null ? BigDecimal.ZERO : releasedCny;
+    return accruedCny.subtract(released).min(ZERO);
+  }
+
+  /** Direction of a {@link #refundAdjustment}: DEBIT when negative, otherwise CREDIT (task 81). */
+  public static String adjustmentDirection(BigDecimal adjustment) {
+    return adjustment.signum() < 0 ? "DEBIT" : "CREDIT";
+  }
+
   /** Accrued commission = round_half_up(effective amount × rate, 2); unverified lines accrue 0. */
   public static BigDecimal accrue(BigDecimal effectiveBasisCny, BigDecimal rate) {
     if (effectiveBasisCny == null || rate == null) {

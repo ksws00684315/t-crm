@@ -423,9 +423,9 @@ public class CommissionIncomeService {
       ItemRefDTO item = itemsById.get(row.getOrderItemId());
       CommissionItemRevisionDO revision = latestRevisions.get(row.getId());
       BigDecimal rate = revision == null ? null : revision.getRate();
-      BigDecimal released =
-          row.getReleasedCommissionCny() == null ? BigDecimal.ZERO : row.getReleasedCommissionCny();
-      BigDecimal adjustment = released.subtract(row.getAccruedCommissionCny());
+      BigDecimal adjustment =
+          CommissionSettlementRules.refundAdjustment(
+              row.getAccruedCommissionCny(), row.getReleasedCommissionCny());
       Instant businessAt = order == null ? null : order.payTime();
       lines.add(
           new CommissionLine(
@@ -435,7 +435,7 @@ public class CommissionIncomeService {
               item == null ? null : textOrNull(item.itemName()),
               item == null ? null : textOrNull(item.skuName()),
               item == null || item.productId() == null ? null : images.get(item.productId()),
-              commissionableText(row),
+              CommissionSettlementRules.commissionableText(row),
               rate == null ? null : rate.toPlainString(),
               row.getConfigVersion(),
               row.getRuleVersionId(),
@@ -443,7 +443,7 @@ public class CommissionIncomeService {
               adjustment.toPlainString(),
               row.getReleaseBasis(),
               businessAt,
-              adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
+              CommissionSettlementRules.adjustmentDirection(adjustment),
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
               kol.name(),
@@ -629,15 +629,5 @@ public class CommissionIncomeService {
       map.put(row.kolId(), nz(row.amountCny()));
     }
     return map;
-  }
-
-  /**
-   * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
-   * accrual is computed from — not the raw source basis; 0.00 for unreleased lines of an order in
-   * after-sales (task 113). Null when the source has no basis.
-   */
-  private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value = CommissionSettlementRules.commissionable(row);
-    return value == null ? null : value.toPlainString();
   }
 }

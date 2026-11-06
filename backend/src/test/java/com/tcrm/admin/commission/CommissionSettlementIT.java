@@ -158,6 +158,21 @@ class CommissionSettlementIT {
     assertThat(itemStateField(itemId, "accrued_commission_cny")).isEqualTo(new BigDecimal("20.00"));
     assertThat(itemStateField(itemId, "release_basis")).isEqualTo("CONFIRMED");
 
+    // Task 114: the accrued 20.00 is frozen, not yet released — not a refund adjustment, on the
+    // income detail and the settlement detail alike.
+    mvc.perform(get("/admin-api/commission/incomes/" + kolA).header("X-Admin-Token", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.lines[0].commission").value("20.00"))
+        .andExpect(jsonPath("$.data.lines[0].adjustment").value("0.00"))
+        .andExpect(jsonPath("$.data.lines[0].direction").value("CREDIT"));
+    mvc.perform(
+            get("/admin-api/commission/settlement-details")
+                .param("orderNo", ORDER_NO)
+                .header("X-Admin-Token", adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.items[0].lines[0].adjustment").value("0.00"))
+        .andExpect(jsonPath("$.data.items[0].lines[0].direction").value("CREDIT"));
+
     // 3. The release job credits the wallet with a COMMISSION_CREDIT ledger row.
     releaseJob.releaseDue();
     assertThat(walletBalance(kolA)).isEqualByComparingTo("20.00");
