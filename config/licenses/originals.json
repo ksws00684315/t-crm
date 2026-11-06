@@ -19,6 +19,10 @@
     "file": "SparseBitSet-1.3.txt",
     "url": "https://raw.githubusercontent.com/brettwooldridge/SparseBitSet/SparseBitSet-1.3/LICENSE"
   },
+  "io.netty:*:4.2.17.Final": {
+    "file": "netty-4.2.17.Final.txt",
+    "url": "https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/LICENSE.txt"
+  },
   "io.netty:*:4.2.19.Final": {
     "file": "netty-4.2.19.Final.txt",
     "url": "https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/LICENSE.txt"
