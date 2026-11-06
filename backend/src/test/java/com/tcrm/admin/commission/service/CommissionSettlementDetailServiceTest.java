@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** Unit tests of the settlement detail list (requirement 13.05). */
 class CommissionSettlementDetailServiceTest {
@@ -236,6 +238,44 @@ class CommissionSettlementDetailServiceTest {
     // Nothing released yet: the frozen amount is not a refund adjustment and reads as a credit.
     assertThat(settlement.lines().getFirst().adjustment()).isEqualTo("0.00");
     assertThat(settlement.lines().getFirst().direction()).isEqualTo("CREDIT");
+  }
+
+  @ParameterizedTest(name = "accrued {0}, released {1} -> adjustment {2}")
+  @CsvSource({
+    "15.00, 0.00, 0.00, CREDIT",
+    "15.00, 15.00, 0.00, CREDIT",
+    "12.00, 15.00, -3.00, DEBIT",
+    "0.00, 15.00, -15.00, DEBIT"
+  })
+  void shouldCountOnlyAReductionAfterReleaseAsAdjustment(
+      String accrued, String released, String adjustment, String direction) {
+    // Task 114: same inputs and results as CommissionIncomeServiceTest.
+    when(orderSettlement.pageOrderIds(any(), any(), any(), anyInt(), anyInt()))
+        .thenReturn(new PageResult<>(List.of(5004L), 1, 1, 20));
+    when(orderSettlement.listOrdersByIds(List.of(5004L)))
+        .thenReturn(
+            List.of(new OrderRefDTO(5004L, "WD-4", 30L, PAY, "PAID", new BigDecimal("150.00"))));
+    when(orderSettlement.listItemsByOrderIds(List.of(5004L)))
+        .thenReturn(
+            List.of(
+                new ItemRefDTO(
+                    9004L,
+                    5004L,
+                    "Goods B",
+                    null,
+                    1,
+                    new BigDecimal("150.00"),
+                    BigDecimal.ZERO,
+                    77L,
+                    51L)));
+    when(states.listByOrderIds(List.of(5004L)))
+        .thenReturn(List.of(stateRow(5004L, 9004L, 77L, accrued, released, true, "CONFIRMED")));
+    PageResult<SettlementRow> page =
+        TenantScope.callCompany(
+            TENANT, () -> service.page(superAdmin(), new DetailFilter(null, null, null, 1, 20)));
+    SettlementRow settlement = page.items().getFirst();
+    assertThat(settlement.lines().getFirst().adjustment()).isEqualTo(adjustment);
+    assertThat(settlement.lines().getFirst().direction()).isEqualTo(direction);
   }
 
   private static AccountDTO superAdmin() {

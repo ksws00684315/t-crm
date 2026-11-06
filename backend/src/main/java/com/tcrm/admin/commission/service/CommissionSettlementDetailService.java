@@ -241,10 +241,8 @@ public class CommissionSettlementDetailService {
       BigDecimal released =
           row.getReleasedCommissionCny() == null ? BigDecimal.ZERO : row.getReleasedCommissionCny();
       frozen = frozen || row.getAccruedCommissionCny().compareTo(released) > 0;
-      // Only a reduction after release is an adjustment (refund or attribution change). The frozen
-      // remainder (accrued minus released) is not an adjustment (task 81).
       BigDecimal adjustment =
-          row.getAccruedCommissionCny().subtract(released).min(BigDecimal.ZERO.setScale(2));
+          CommissionSettlementRules.refundAdjustment(row.getAccruedCommissionCny(), released);
       KolRefDTO kol = row.getKolId() == null ? null : kolsById.get(row.getKolId());
       ItemRefDTO item =
           items.stream().filter(i -> i.id() == row.getOrderItemId()).findFirst().orElse(null);
@@ -256,7 +254,7 @@ public class CommissionSettlementDetailService {
               item == null ? null : textOrNull(item.itemName()),
               item == null ? null : textOrNull(item.skuName()),
               item == null || item.productId() == null ? null : images.get(item.productId()),
-              commissionableText(row),
+              CommissionSettlementRules.commissionableText(row),
               rate == null ? null : rate.toPlainString(),
               row.getConfigVersion(),
               row.getRuleVersionId(),
@@ -264,7 +262,7 @@ public class CommissionSettlementDetailService {
               adjustment.toPlainString(),
               row.getReleaseBasis(),
               order.payTime(),
-              adjustment.signum() < 0 ? "DEBIT" : "CREDIT",
+              CommissionSettlementRules.adjustmentDirection(adjustment),
               row.getKolId() == null ? "COMPANY" : "KOL",
               row.getKolId(),
               kol == null ? null : kol.name(),
@@ -307,15 +305,5 @@ public class CommissionSettlementDetailService {
   /** Blank order-line names (a line with no SKU) stay null so the client can tell them apart. */
   private static String textOrNull(String value) {
     return value == null || value.isBlank() ? null : value;
-  }
-
-  /**
-   * 计佣金额 column (task 112): the effective basis, successful refunds deducted, the same amount the
-   * accrual is computed from — not the raw source basis; 0.00 for unreleased lines of an order in
-   * after-sales (task 113). Null when the source has no basis.
-   */
-  private static String commissionableText(CommissionItemStateDO row) {
-    BigDecimal value = CommissionSettlementRules.commissionable(row);
-    return value == null ? null : value.toPlainString();
   }
 }
