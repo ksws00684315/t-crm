@@ -15,10 +15,10 @@
 2. 把 `SparkTrack-3.0.5.gs` 的内容粘贴到默认脚本文件（可重命名为 `SparkTrack-3.0.5`）。
 3. 依次「文件 → 新建 → HTML」，分别创建 3 个 HTML 文件并粘贴对应内容，名字必须正好是 `submitFrom`、`weidianOriginalForm`、`buyLinkConvertForm`（脚本按名字引用）。
 4. 左侧「项目设置」，在**脚本属性**中新增：
-   - `TALENT_CRM_API_BASE_URL` ＝ 本系统后台地址，例如 `https://admin.<正式域名>/admin-api`。
+   - `TALENT_CRM_API_BASE_URL` ＝ 本系统后台地址 `https://admin.sparktrackcrm.com/admin-api`（可选：脚本默认已指向该地址，只有切换环境时才需要设置）。
 5. 保存后回到表格，刷新页面会出现「链接工具」菜单：🔗 一键替换链接(V2)、转换为微店原始链接、buy 链接互转（选区）。
 
-> **默认接口地址**：`SparkTrack-3.0.5.gs` 顶部的 `PRODUCT_LINK_API_DEFAULT_BASE_URL` 当前指向 `https://admin.river0413.top/admin-api`（预演环境）。**正式环境必须**设置脚本属性 `TALENT_CRM_API_BASE_URL` 为正式域名，或把该常量改为正式地址。
+> **默认接口地址**：`SparkTrack-3.0.5.gs` 顶部的 `PRODUCT_LINK_API_DEFAULT_BASE_URL` 指向正式环境 `https://admin.sparktrackcrm.com/admin-api`，粘贴脚本后即可使用。如需指向其他环境，在脚本属性中设置 `TALENT_CRM_API_BASE_URL` 覆盖（优先级高于该常量）。
 
 ## 使用要点
 
@@ -38,7 +38,7 @@
 
 | 位置 | 原件 | SparkTrack 版 |
 |---|---|---|
-| `PRODUCT_LINK_API_DEFAULT_BASE_URL` | 旧系统的复制接口地址（见原件第 11 行） | `https://admin.river0413.top/admin-api`（附注释：正式环境用脚本属性覆盖） |
+| `PRODUCT_LINK_API_DEFAULT_BASE_URL` | 旧系统的复制接口地址（见原件第 11 行） | `https://admin.sparktrackcrm.com/admin-api`（正式环境；可由脚本属性覆盖） |
 | `var baseUrl` | 旧系统地址（见原件第 10 行） | **删除** |
 
 ### 2. `syncGetRequest` 改调本系统短链解析

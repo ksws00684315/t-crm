@@ -7,7 +7,7 @@ function onOpen() {
     .addToUi();
 }
 
-var PRODUCT_LINK_API_DEFAULT_BASE_URL = "https://admin.river0413.top/admin-api"; // SparkTrack (T-CRM); 原为旧系统地址，正式环境请改为正式域名或设置脚本属性 TALENT_CRM_API_BASE_URL
+var PRODUCT_LINK_API_DEFAULT_BASE_URL = "https://admin.sparktrackcrm.com/admin-api"; // SparkTrack (T-CRM) 正式环境；如需切换到其他环境，用脚本属性 TALENT_CRM_API_BASE_URL 覆盖
 var PRODUCT_LINK_JOB_RECOVERY_KEY = "productLinkJobRecovery";
 var PRODUCT_LINK_SOURCE_CHANNEL_CODE = "WEIDIAN";
 var PRODUCT_LINK_REPLACEMENT_BATCH_SIZE = 50;
