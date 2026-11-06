@@ -8,18 +8,18 @@ Lists of 67 third-party dependencies.
      (The Apache Software License, Version 2.0) Jackson-annotations (com.fasterxml.jackson.core:jackson-annotations:2.21 - https://github.com/FasterXML/jackson)
      (Apache-2.0) Apache Commons Logging (commons-logging:commons-logging:1.3.6 - https://commons.apache.org/proper/commons-logging/)
      (MIT) Lettuce (io.lettuce:lettuce-core:7.5.2.RELEASE - https://github.com/redis/lettuce)
-     (The Apache Software License, Version 2.0) micrometer-commons (io.micrometer:micrometer-commons:1.17.1 - https://github.com/micrometer-metrics/micrometer-commercial)
-     (The Apache Software License, Version 2.0) micrometer-observation (io.micrometer:micrometer-observation:1.17.1 - https://github.com/micrometer-metrics/micrometer-commercial)
-     (Apache License, Version 2.0) Netty/Buffer (io.netty:netty-buffer:4.2.17.Final - https://netty.io/netty-buffer/)
-     (Apache License, Version 2.0) Netty/Codec/Base (io.netty:netty-codec-base:4.2.17.Final - https://netty.io/netty-codec-base/)
-     (Apache License, Version 2.0) Netty/Codec/DNS (io.netty:netty-codec-dns:4.2.17.Final - https://netty.io/netty-codec-dns/)
-     (Apache License, Version 2.0) Netty/Common (io.netty:netty-common:4.2.17.Final - https://netty.io/netty-common/)
-     (Apache License, Version 2.0) Netty/Handler (io.netty:netty-handler:4.2.17.Final - https://netty.io/netty-handler/)
-     (Apache License, Version 2.0) Netty/Resolver (io.netty:netty-resolver:4.2.17.Final - https://netty.io/netty-resolver/)
-     (Apache License, Version 2.0) Netty/Resolver/DNS (io.netty:netty-resolver-dns:4.2.17.Final - https://netty.io/netty-resolver-dns/)
-     (Apache License, Version 2.0) Netty/Transport (io.netty:netty-transport:4.2.17.Final - https://netty.io/netty-transport/)
-     (Apache License, Version 2.0) Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.2.17.Final - https://netty.io/netty-transport-native-unix-common/)
-     (Apache License, Version 2.0) Non-Blocking Reactive Foundation for the JVM (io.projectreactor:reactor-core:3.8.7 - https://github.com/reactor/reactor-core)
+     (The Apache Software License, Version 2.0) micrometer-commons (io.micrometer:micrometer-commons:1.17.2 - https://github.com/micrometer-metrics/micrometer)
+     (The Apache Software License, Version 2.0) micrometer-observation (io.micrometer:micrometer-observation:1.17.2 - https://github.com/micrometer-metrics/micrometer)
+     (Apache License, Version 2.0) Netty/Buffer (io.netty:netty-buffer:4.2.19.Final - https://netty.io/netty-buffer/)
+     (Apache License, Version 2.0) Netty/Codec/Base (io.netty:netty-codec-base:4.2.19.Final - https://netty.io/netty-codec-base/)
+     (Apache License, Version 2.0) Netty/Codec/DNS (io.netty:netty-codec-dns:4.2.19.Final - https://netty.io/netty-codec-dns/)
+     (Apache License, Version 2.0) Netty/Common (io.netty:netty-common:4.2.19.Final - https://netty.io/netty-common/)
+     (Apache License, Version 2.0) Netty/Handler (io.netty:netty-handler:4.2.19.Final - https://netty.io/netty-handler/)
+     (Apache License, Version 2.0) Netty/Resolver (io.netty:netty-resolver:4.2.19.Final - https://netty.io/netty-resolver/)
+     (Apache License, Version 2.0) Netty/Resolver/DNS (io.netty:netty-resolver-dns:4.2.19.Final - https://netty.io/netty-resolver-dns/)
+     (Apache License, Version 2.0) Netty/Transport (io.netty:netty-transport:4.2.19.Final - https://netty.io/netty-transport/)
+     (Apache License, Version 2.0) Netty/Transport/Native/Unix/Common (io.netty:netty-transport-native-unix-common:4.2.19.Final - https://netty.io/netty-transport-native-unix-common/)
+     (Apache License, Version 2.0) Non-Blocking Reactive Foundation for the JVM (io.projectreactor:reactor-core:3.8.8 - https://github.com/reactor/reactor-core)
      (BSD-3-Clause) Jakarta Activation API (jakarta.activation:jakarta.activation-api:2.1.4 - https://github.com/jakartaee/jaf-api)
      (EPL-2.0) Jakarta Annotations API (jakarta.annotation:jakarta.annotation-api:3.0.0 - https://projects.eclipse.org/projects/ee4j.ca)
      (BSD-3-Clause) Jakarta XML Binding API (jakarta.xml.bind:jakarta.xml.bind-api:4.0.5 - https://github.com/jakartaee/jaxb-api/jakarta.xml.bind-api)
@@ -30,42 +30,42 @@ Lists of 67 third-party dependencies.
      (Apache License, Version 2.0) tomcat-embed-websocket (org.apache.tomcat.embed:tomcat-embed-websocket:11.0.26 - https://tomcat.apache.org/)
      (The Apache License, Version 2.0) JSpecify annotations (org.jspecify:jspecify:1.0.1 - https://jspecify.dev/)
      (MIT-0) reactive-streams (org.reactivestreams:reactive-streams:1.0.4 - http://www.reactive-streams.org/)
-     (MIT) JUL to SLF4J bridge (org.slf4j:jul-to-slf4j:2.0.18 - http://www.slf4j.org)
-     (MIT) SLF4J API Module (org.slf4j:slf4j-api:2.0.18 - http://www.slf4j.org)
-     (Apache License, Version 2.0) Spring AOP (org.springframework:spring-aop:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Beans (org.springframework:spring-beans:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Context (org.springframework:spring-context:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Context Support (org.springframework:spring-context-support:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Core (org.springframework:spring-core:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Expression Language (SpEL) (org.springframework:spring-expression:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Messaging (org.springframework:spring-messaging:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Object/XML Marshalling (org.springframework:spring-oxm:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Transaction (org.springframework:spring-tx:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Web (org.springframework:spring-web:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) Spring Web MVC (org.springframework:spring-webmvc:7.0.9 - https://github.com/spring-projects/spring-framework)
-     (Apache License, Version 2.0) spring-boot (org.springframework.boot:spring-boot:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-autoconfigure (org.springframework.boot:spring-boot-autoconfigure:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-data-commons (org.springframework.boot:spring-boot-data-commons:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-data-redis (org.springframework.boot:spring-boot-data-redis:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-http-converter (org.springframework.boot:spring-boot-http-converter:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-jackson (org.springframework.boot:spring-boot-jackson:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-netty (org.springframework.boot:spring-boot-netty:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-persistence (org.springframework.boot:spring-boot-persistence:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-servlet (org.springframework.boot:spring-boot-servlet:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter (org.springframework.boot:spring-boot-starter:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-data-redis (org.springframework.boot:spring-boot-starter-data-redis:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-jackson (org.springframework.boot:spring-boot-starter-jackson:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-logging (org.springframework.boot:spring-boot-starter-logging:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-tomcat (org.springframework.boot:spring-boot-starter-tomcat:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-tomcat-runtime (org.springframework.boot:spring-boot-starter-tomcat-runtime:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-starter-webmvc (org.springframework.boot:spring-boot-starter-webmvc:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-tomcat (org.springframework.boot:spring-boot-tomcat:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-transaction (org.springframework.boot:spring-boot-transaction:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-web-server (org.springframework.boot:spring-boot-web-server:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) spring-boot-webmvc (org.springframework.boot:spring-boot-webmvc:4.1.1 - https://spring.io/projects/spring-boot)
-     (Apache License, Version 2.0) Spring Data Core (org.springframework.data:spring-data-commons:4.1.1 - https://spring.io/projects/spring-data)
-     (Apache License, Version 2.0) Spring Data KeyValue (org.springframework.data:spring-data-keyvalue:4.1.1 - https://www.spring.io/spring-data/spring-data-keyvalue)
-     (Apache License, Version 2.0) Spring Data Redis (org.springframework.data:spring-data-redis:4.1.1 - https://spring.io/projects/spring-data-redis)
+     (MIT) JUL to SLF4J bridge (org.slf4j:jul-to-slf4j:2.0.20 - http://www.slf4j.org)
+     (MIT) SLF4J API Module (org.slf4j:slf4j-api:2.0.20 - http://www.slf4j.org)
+     (Apache License, Version 2.0) Spring AOP (org.springframework:spring-aop:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Beans (org.springframework:spring-beans:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Context (org.springframework:spring-context:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Context Support (org.springframework:spring-context-support:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Core (org.springframework:spring-core:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Expression Language (SpEL) (org.springframework:spring-expression:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Messaging (org.springframework:spring-messaging:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Object/XML Marshalling (org.springframework:spring-oxm:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Transaction (org.springframework:spring-tx:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Web (org.springframework:spring-web:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) Spring Web MVC (org.springframework:spring-webmvc:7.0.10 - https://github.com/spring-projects/spring-framework)
+     (Apache License, Version 2.0) spring-boot (org.springframework.boot:spring-boot:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-autoconfigure (org.springframework.boot:spring-boot-autoconfigure:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-data-commons (org.springframework.boot:spring-boot-data-commons:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-data-redis (org.springframework.boot:spring-boot-data-redis:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-http-converter (org.springframework.boot:spring-boot-http-converter:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-jackson (org.springframework.boot:spring-boot-jackson:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-netty (org.springframework.boot:spring-boot-netty:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-persistence (org.springframework.boot:spring-boot-persistence:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-servlet (org.springframework.boot:spring-boot-servlet:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter (org.springframework.boot:spring-boot-starter:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-data-redis (org.springframework.boot:spring-boot-starter-data-redis:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-jackson (org.springframework.boot:spring-boot-starter-jackson:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-logging (org.springframework.boot:spring-boot-starter-logging:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-tomcat (org.springframework.boot:spring-boot-starter-tomcat:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-tomcat-runtime (org.springframework.boot:spring-boot-starter-tomcat-runtime:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-starter-webmvc (org.springframework.boot:spring-boot-starter-webmvc:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-tomcat (org.springframework.boot:spring-boot-tomcat:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-transaction (org.springframework.boot:spring-boot-transaction:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-web-server (org.springframework.boot:spring-boot-web-server:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) spring-boot-webmvc (org.springframework.boot:spring-boot-webmvc:4.1.2 - https://spring.io/projects/spring-boot)
+     (Apache License, Version 2.0) Spring Data Core (org.springframework.data:spring-data-commons:4.1.2 - https://spring.io/projects/spring-data)
+     (Apache License, Version 2.0) Spring Data KeyValue (org.springframework.data:spring-data-keyvalue:4.1.2 - https://www.spring.io/spring-data/spring-data-keyvalue)
+     (Apache License, Version 2.0) Spring Data Redis (org.springframework.data:spring-data-redis:4.1.2 - https://spring.io/projects/spring-data-redis)
      (Apache License, Version 2.0) SnakeYAML (org.yaml:snakeyaml:2.6 - https://bitbucket.org/snakeyaml/snakeyaml)
      (MIT) redis-authx-core (redis.clients.authentication:redis-authx-core:0.1.1-beta2 - https://github.com/redis/redis-authx-core)
      (The Apache Software License, Version 2.0) Jackson-core (tools.jackson.core:jackson-core:3.1.7 - https://github.com/FasterXML/jackson-core)
@@ -127,8 +127,8 @@ Original source: https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.
 Original documents: Dc950da6ee37b1a32 D413a87740dc75dc4 D652e068d061a4ba0
 
 
-=== org.slf4j:jul-to-slf4j:2.0.18 ===
-Original source: https://repo.maven.apache.org/maven2/org/slf4j/jul-to-slf4j/2.0.18/jul-to-slf4j-2.0.18.jar
+=== org.slf4j:jul-to-slf4j:2.0.20 ===
+Original source: https://repo.maven.apache.org/maven2/org/slf4j/jul-to-slf4j/2.0.20/jul-to-slf4j-2.0.20.jar
 
 Original documents: D1432bbf5e9e80547
 
@@ -163,70 +163,70 @@ Original source: https://repo.maven.apache.org/maven2/ch/qos/logback/logback-cor
 Original documents: Da9acf673dc4ca6a6 D4637d954fb8f8840 De4d8cc2059a8f91c D88fe72fd01f6df70
 
 
-=== io.micrometer:micrometer-commons:1.17.1 ===
-Original source: https://repo.maven.apache.org/maven2/io/micrometer/micrometer-commons/1.17.1/micrometer-commons-1.17.1.jar
+=== io.micrometer:micrometer-commons:1.17.2 ===
+Original source: https://repo.maven.apache.org/maven2/io/micrometer/micrometer-commons/1.17.2/micrometer-commons-1.17.2.jar
 
 Original documents: D1ea510579e38145f D208b1892820fa8b1
 
 
-=== io.micrometer:micrometer-observation:1.17.1 ===
-Original source: https://repo.maven.apache.org/maven2/io/micrometer/micrometer-observation/1.17.1/micrometer-observation-1.17.1.jar
+=== io.micrometer:micrometer-observation:1.17.2 ===
+Original source: https://repo.maven.apache.org/maven2/io/micrometer/micrometer-observation/1.17.2/micrometer-observation-1.17.2.jar
 
 Original documents: D1ea510579e38145f D208b1892820fa8b1
 
 
-=== io.netty:netty-buffer:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.2.17.Final/netty-buffer-4.2.17.Final-sources.jar
+=== io.netty:netty-buffer:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.2.19.Final/netty-buffer-4.2.19.Final-sources.jar
 
-Original documents: De6a47c07e233811a D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D9d172756e3182b96 D786640d2407d47d4 D1150a363aeec7e5f D4ce43416d32567eb Df593f6351f5eb1f0 Dc5a5e5c3c569a5c3 D4ab98a1bd6ace904 D54dec2fa0ac46a45 D2f314e9f8ccb9a0c D85425de29d33066f D50a68cb48cf867bc
-
-
-=== io.netty:netty-codec-base:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-base/4.2.17.Final/netty-codec-base-4.2.17.Final-sources.jar
-
-Original documents: D95586f51f3d9630e D54dec2fa0ac46a45 D602ce7f9b33b6f8c D786640d2407d47d4 D9d172756e3182b96 Dcb03690ba48bfe23 Dc182e0e5b2eff62a D9a07269fd77a29c0 D32a0af353069c401 D8f0a094595444eae De996b3cb42cadaec D1f6822718a87206f D50a68cb48cf867bc
+Original documents: De6a47c07e233811a D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D9d172756e3182b96 D786640d2407d47d4 D1150a363aeec7e5f D4ce43416d32567eb Df593f6351f5eb1f0 Dc5a5e5c3c569a5c3 D4ab98a1bd6ace904 D54dec2fa0ac46a45 D2f314e9f8ccb9a0c D85425de29d33066f D7ec4038b72d8b62c
 
 
-=== io.netty:netty-codec-dns:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-dns/4.2.17.Final/netty-codec-dns-4.2.17.Final-sources.jar
+=== io.netty:netty-codec-base:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-base/4.2.19.Final/netty-codec-base-4.2.19.Final-sources.jar
 
-Original documents: D786640d2407d47d4 D9d172756e3182b96 De6bef7a8d3326153 Df83a13bb272b0ac8 Df963fbf8975131d9 D50a68cb48cf867bc
-
-
-=== io.netty:netty-common:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-common/4.2.17.Final/netty-common-4.2.17.Final-sources.jar
-
-Original documents: D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D54dec2fa0ac46a45 D1150a363aeec7e5f D786640d2407d47d4 D9d172756e3182b96 D909b53f756d334b3 Dc5a5e5c3c569a5c3 De6a47c07e233811a Df593f6351f5eb1f0 D8282375271dd832c D52430bf1f37c3237 Df83a13bb272b0ac8 De6bef7a8d3326153 D4ce1cb952ca8dd11 D91f2c8a729b059f1 Da8e60ef02b0e18af De5c9f4e2d01c0eb9 D0705fd00a5f36464 D0534a5011d919ecf D99f7b51e40c6f715 Dc9775f3c81346291 D7dbd0d439654b340 D50a68cb48cf867bc
+Original documents: D95586f51f3d9630e D54dec2fa0ac46a45 D602ce7f9b33b6f8c D786640d2407d47d4 D9d172756e3182b96 Dcb03690ba48bfe23 Dc182e0e5b2eff62a D9a07269fd77a29c0 D32a0af353069c401 D8f0a094595444eae De996b3cb42cadaec D1f6822718a87206f D7ec4038b72d8b62c
 
 
-=== io.netty:netty-handler:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.2.17.Final/netty-handler-4.2.17.Final-sources.jar
+=== io.netty:netty-codec-dns:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-dns/4.2.19.Final/netty-codec-dns-4.2.19.Final-sources.jar
 
-Original documents: De6bef7a8d3326153 Dc5a5e5c3c569a5c3 D710b293e7c098726 D9d172756e3182b96 D56146aed07d4199e D410f82bb6e876255 D54dec2fa0ac46a45 Df1371f1e1fee2d13 D602ce7f9b33b6f8c D6f8c7c3c52f07882 D372cea3bf2201f24 D249b5f7a5e0fe457 Df593f6351f5eb1f0 D786640d2407d47d4 Df83a13bb272b0ac8 D4ce43416d32567eb D95586f51f3d9630e D909b53f756d334b3 De6a47c07e233811a D1150a363aeec7e5f Dd7f7880cfb2be6c5 D03c985358454bbf9 D3c0f1d81897699db D5e866ebd94e66392 Da5604c5486ee4356 D7ba0c0f2751de9f9 Dd0f13bc5974f9bf6 D50a68cb48cf867bc
-
-
-=== io.netty:netty-resolver:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.2.17.Final/netty-resolver-4.2.17.Final-sources.jar
-
-Original documents: D786640d2407d47d4 D54dec2fa0ac46a45 Df593f6351f5eb1f0 Df83a13bb272b0ac8 D9d172756e3182b96 D74bc71aa476bbf5c D50a68cb48cf867bc
+Original documents: D786640d2407d47d4 D9d172756e3182b96 De6bef7a8d3326153 Df83a13bb272b0ac8 Df963fbf8975131d9 D7ec4038b72d8b62c
 
 
-=== io.netty:netty-resolver-dns:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver-dns/4.2.17.Final/netty-resolver-dns-4.2.17.Final-sources.jar
+=== io.netty:netty-common:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-common/4.2.19.Final/netty-common-4.2.19.Final-sources.jar
 
-Original documents: D909b53f756d334b3 Df593f6351f5eb1f0 De6bef7a8d3326153 D9d172756e3182b96 D786640d2407d47d4 D54dec2fa0ac46a45 D372cea3bf2201f24 D1150a363aeec7e5f D4ce43416d32567eb Dc5a5e5c3c569a5c3 Dd4a7d5035182359c D50a68cb48cf867bc
-
-
-=== io.netty:netty-transport:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.2.17.Final/netty-transport-4.2.17.Final-sources.jar
-
-Original documents: D602ce7f9b33b6f8c D9d172756e3182b96 Dd7f7880cfb2be6c5 D372cea3bf2201f24 Df593f6351f5eb1f0 D6ec924028488b71f D54dec2fa0ac46a45 De6bef7a8d3326153 D786640d2407d47d4 D1150a363aeec7e5f De6a47c07e233811a Df83a13bb272b0ac8 D909b53f756d334b3 Dc5a5e5c3c569a5c3 Dfa54c4b9fd1ab0b1 D5aaa68eb1993acf9 Dc3844b7e58ad33f1 Dd74bc5607309efc9 D505341f9aca33958 D20b02894dda6695d Dc669c3945f8b29e1 D4f46f715ec9527ac D4ce43416d32567eb Ded2473e1f9699e5c De6afc0bcc9d23ca3 Dec5b3ddc7ff4309d D50a68cb48cf867bc
+Original documents: D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D54dec2fa0ac46a45 D1150a363aeec7e5f D786640d2407d47d4 D9d172756e3182b96 D909b53f756d334b3 Dc5a5e5c3c569a5c3 De6a47c07e233811a Df593f6351f5eb1f0 D8282375271dd832c D52430bf1f37c3237 Df83a13bb272b0ac8 De6bef7a8d3326153 D95586f51f3d9630e D4ce1cb952ca8dd11 D91f2c8a729b059f1 Da8e60ef02b0e18af De5c9f4e2d01c0eb9 D0705fd00a5f36464 D0534a5011d919ecf D99f7b51e40c6f715 D9cfa907f93155ea6 Dc9775f3c81346291 D7dbd0d439654b340 D7ec4038b72d8b62c
 
 
-=== io.netty:netty-transport-native-unix-common:4.2.17.Final ===
-Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport-native-unix-common/4.2.17.Final/netty-transport-native-unix-common-4.2.17.Final-sources.jar
+=== io.netty:netty-handler:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.2.19.Final/netty-handler-4.2.19.Final-sources.jar
 
-Original documents: D909b53f756d334b3 D786640d2407d47d4 Df83a13bb272b0ac8 D9d172756e3182b96 D4ce43416d32567eb D54dec2fa0ac46a45 Df593f6351f5eb1f0 D78d87a38a307def3 D50a68cb48cf867bc
+Original documents: De6bef7a8d3326153 Dc5a5e5c3c569a5c3 D710b293e7c098726 D9d172756e3182b96 D56146aed07d4199e D410f82bb6e876255 D54dec2fa0ac46a45 Df1371f1e1fee2d13 D602ce7f9b33b6f8c D6f8c7c3c52f07882 D372cea3bf2201f24 D249b5f7a5e0fe457 Df593f6351f5eb1f0 D786640d2407d47d4 Df83a13bb272b0ac8 D4ce43416d32567eb D95586f51f3d9630e D909b53f756d334b3 De6a47c07e233811a D1150a363aeec7e5f Dd7f7880cfb2be6c5 D03c985358454bbf9 D3c0f1d81897699db D5e866ebd94e66392 Da5604c5486ee4356 D7ba0c0f2751de9f9 Dd0f13bc5974f9bf6 D7ec4038b72d8b62c
+
+
+=== io.netty:netty-resolver:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.2.19.Final/netty-resolver-4.2.19.Final-sources.jar
+
+Original documents: D786640d2407d47d4 D54dec2fa0ac46a45 Df593f6351f5eb1f0 Df83a13bb272b0ac8 D9d172756e3182b96 D74bc71aa476bbf5c D7ec4038b72d8b62c
+
+
+=== io.netty:netty-resolver-dns:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver-dns/4.2.19.Final/netty-resolver-dns-4.2.19.Final-sources.jar
+
+Original documents: D909b53f756d334b3 Df593f6351f5eb1f0 De6bef7a8d3326153 D9d172756e3182b96 D786640d2407d47d4 D54dec2fa0ac46a45 D372cea3bf2201f24 D1150a363aeec7e5f D4ce43416d32567eb Dc5a5e5c3c569a5c3 Dd4a7d5035182359c D7ec4038b72d8b62c
+
+
+=== io.netty:netty-transport:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.2.19.Final/netty-transport-4.2.19.Final-sources.jar
+
+Original documents: D602ce7f9b33b6f8c D9d172756e3182b96 Dd7f7880cfb2be6c5 D372cea3bf2201f24 Df593f6351f5eb1f0 D6ec924028488b71f D54dec2fa0ac46a45 De6bef7a8d3326153 D786640d2407d47d4 D1150a363aeec7e5f De6a47c07e233811a Df83a13bb272b0ac8 D909b53f756d334b3 Dc5a5e5c3c569a5c3 Dfa54c4b9fd1ab0b1 D5aaa68eb1993acf9 Dc3844b7e58ad33f1 Dd74bc5607309efc9 D505341f9aca33958 D20b02894dda6695d Dc669c3945f8b29e1 D4f46f715ec9527ac D4ce43416d32567eb Ded2473e1f9699e5c De6afc0bcc9d23ca3 Dec5b3ddc7ff4309d D7ec4038b72d8b62c
+
+
+=== io.netty:netty-transport-native-unix-common:4.2.19.Final ===
+Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport-native-unix-common/4.2.19.Final/netty-transport-native-unix-common-4.2.19.Final-sources.jar
+
+Original documents: D909b53f756d334b3 D786640d2407d47d4 Df83a13bb272b0ac8 D9d172756e3182b96 D4ce43416d32567eb D54dec2fa0ac46a45 Df593f6351f5eb1f0 D78d87a38a307def3 D7ec4038b72d8b62c
 
 
 === org.reactivestreams:reactive-streams:1.0.4 ===
@@ -235,8 +235,8 @@ Original source: https://repo.maven.apache.org/maven2/org/reactivestreams/reacti
 Original documents: D8ff2d5f7d911acdf
 
 
-=== io.projectreactor:reactor-core:3.8.7 ===
-Original source: https://repo.maven.apache.org/maven2/io/projectreactor/reactor-core/3.8.7/reactor-core-3.8.7.jar
+=== io.projectreactor:reactor-core:3.8.8 ===
+Original source: https://repo.maven.apache.org/maven2/io/projectreactor/reactor-core/3.8.8/reactor-core-3.8.8.jar
 
 Original documents: D1ea510579e38145f
 
@@ -247,10 +247,10 @@ Original source: https://repo.maven.apache.org/maven2/redis/clients/authenticati
 Original documents: De16366ef413d0416
 
 
-=== org.slf4j:slf4j-api:2.0.18 ===
-Original source: https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.18/slf4j-api-2.0.18.jar
+=== org.slf4j:slf4j-api:2.0.20 ===
+Original source: https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.20/slf4j-api-2.0.20.jar
 
-Original documents: D1432bbf5e9e80547
+Original documents: Da15f67650581ad74
 
 
 === org.yaml:snakeyaml:2.6 ===
@@ -259,208 +259,208 @@ Original source: https://repo.maven.apache.org/maven2/org/yaml/snakeyaml/2.6/sna
 Original documents: D5e41d4dfa63d871c Df8b65a79484abcbc
 
 
-=== org.springframework:spring-aop:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-aop/7.0.9/spring-aop-7.0.9.jar
+=== org.springframework:spring-aop:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-aop/7.0.10/spring-aop-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-beans:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-beans/7.0.9/spring-beans-7.0.9.jar
+=== org.springframework:spring-beans:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-beans/7.0.10/spring-beans-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework.boot:spring-boot:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot/4.1.1/spring-boot-4.1.1.jar
+=== org.springframework.boot:spring-boot:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot/4.1.2/spring-boot-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-autoconfigure:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-autoconfigure/4.1.1/spring-boot-autoconfigure-4.1.1.jar
+=== org.springframework.boot:spring-boot-autoconfigure:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-autoconfigure/4.1.2/spring-boot-autoconfigure-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-data-commons:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-data-commons/4.1.1/spring-boot-data-commons-4.1.1.jar
+=== org.springframework.boot:spring-boot-data-commons:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-data-commons/4.1.2/spring-boot-data-commons-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-data-redis:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-data-redis/4.1.1/spring-boot-data-redis-4.1.1.jar
+=== org.springframework.boot:spring-boot-data-redis:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-data-redis/4.1.2/spring-boot-data-redis-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-http-converter:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-http-converter/4.1.1/spring-boot-http-converter-4.1.1.jar
+=== org.springframework.boot:spring-boot-http-converter:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-http-converter/4.1.2/spring-boot-http-converter-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-jackson:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-jackson/4.1.1/spring-boot-jackson-4.1.1.jar
+=== org.springframework.boot:spring-boot-jackson:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-jackson/4.1.2/spring-boot-jackson-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-netty:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-netty/4.1.1/spring-boot-netty-4.1.1.jar
+=== org.springframework.boot:spring-boot-netty:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-netty/4.1.2/spring-boot-netty-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-persistence:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-persistence/4.1.1/spring-boot-persistence-4.1.1.jar
+=== org.springframework.boot:spring-boot-persistence:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-persistence/4.1.2/spring-boot-persistence-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-servlet:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-servlet/4.1.1/spring-boot-servlet-4.1.1.jar
+=== org.springframework.boot:spring-boot-servlet:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-servlet/4.1.2/spring-boot-servlet-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter/4.1.1/spring-boot-starter-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter/4.1.2/spring-boot-starter-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-data-redis:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-data-redis/4.1.1/spring-boot-starter-data-redis-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-data-redis:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-data-redis/4.1.2/spring-boot-starter-data-redis-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-jackson:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-jackson/4.1.1/spring-boot-starter-jackson-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-jackson:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-jackson/4.1.2/spring-boot-starter-jackson-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-logging:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-logging/4.1.1/spring-boot-starter-logging-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-logging:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-logging/4.1.2/spring-boot-starter-logging-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-tomcat:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-tomcat/4.1.1/spring-boot-starter-tomcat-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-tomcat:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-tomcat/4.1.2/spring-boot-starter-tomcat-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-tomcat-runtime:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-tomcat-runtime/4.1.1/spring-boot-starter-tomcat-runtime-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-tomcat-runtime:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-tomcat-runtime/4.1.2/spring-boot-starter-tomcat-runtime-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-starter-webmvc:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-webmvc/4.1.1/spring-boot-starter-webmvc-4.1.1.jar
+=== org.springframework.boot:spring-boot-starter-webmvc:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-webmvc/4.1.2/spring-boot-starter-webmvc-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-tomcat:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-tomcat/4.1.1/spring-boot-tomcat-4.1.1.jar
+=== org.springframework.boot:spring-boot-tomcat:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-tomcat/4.1.2/spring-boot-tomcat-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-transaction:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-transaction/4.1.1/spring-boot-transaction-4.1.1.jar
+=== org.springframework.boot:spring-boot-transaction:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-transaction/4.1.2/spring-boot-transaction-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-web-server:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-web-server/4.1.1/spring-boot-web-server-4.1.1.jar
+=== org.springframework.boot:spring-boot-web-server:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-web-server/4.1.2/spring-boot-web-server-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework.boot:spring-boot-webmvc:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-webmvc/4.1.1/spring-boot-webmvc-4.1.1.jar
+=== org.springframework.boot:spring-boot-webmvc:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-webmvc/4.1.2/spring-boot-webmvc-4.1.2.jar
 
-Original documents: D1ea510579e38145f Df3604ae00d5be24b
+Original documents: D1ea510579e38145f D2c2aa786c909721a
 
 
-=== org.springframework:spring-context:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-context/7.0.9/spring-context-7.0.9.jar
+=== org.springframework:spring-context:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-context/7.0.10/spring-context-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-context-support:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-context-support/7.0.9/spring-context-support-7.0.9.jar
+=== org.springframework:spring-context-support:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-context-support/7.0.10/spring-context-support-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-core:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-core/7.0.9/spring-core-7.0.9.jar
+=== org.springframework:spring-core:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-core/7.0.10/spring-core-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework.data:spring-data-commons:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-commons/4.1.1/spring-data-commons-4.1.1.jar
+=== org.springframework.data:spring-data-commons:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-commons/4.1.2/spring-data-commons-4.1.2.jar
 
-Original documents: D1ea510579e38145f D22231107ec587abb
+Original documents: D1ea510579e38145f Ded4ac2395337b49e
 
 
-=== org.springframework.data:spring-data-keyvalue:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-keyvalue/4.1.1/spring-data-keyvalue-4.1.1.jar
+=== org.springframework.data:spring-data-keyvalue:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-keyvalue/4.1.2/spring-data-keyvalue-4.1.2.jar
 
-Original documents: D1ea510579e38145f D41a7907f32d218f7
+Original documents: D1ea510579e38145f D336ff63e503560f6
 
 
-=== org.springframework.data:spring-data-redis:4.1.1 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-redis/4.1.1/spring-data-redis-4.1.1.jar
+=== org.springframework.data:spring-data-redis:4.1.2 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/data/spring-data-redis/4.1.2/spring-data-redis-4.1.2.jar
 
-Original documents: D1ea510579e38145f D29a264d96d211da8
+Original documents: D1ea510579e38145f D5a75c7e0c5d21154
 
 
-=== org.springframework:spring-expression:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-expression/7.0.9/spring-expression-7.0.9.jar
+=== org.springframework:spring-expression:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-expression/7.0.10/spring-expression-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-messaging:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-messaging/7.0.9/spring-messaging-7.0.9.jar
+=== org.springframework:spring-messaging:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-messaging/7.0.10/spring-messaging-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-oxm:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-oxm/7.0.9/spring-oxm-7.0.9.jar
+=== org.springframework:spring-oxm:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-oxm/7.0.10/spring-oxm-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-tx:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-tx/7.0.9/spring-tx-7.0.9.jar
+=== org.springframework:spring-tx:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-tx/7.0.10/spring-tx-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-web:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-web/7.0.9/spring-web-7.0.9.jar
+=== org.springframework:spring-web:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-web/7.0.10/spring-web-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
-=== org.springframework:spring-webmvc:7.0.9 ===
-Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-webmvc/7.0.9/spring-webmvc-7.0.9.jar
+=== org.springframework:spring-webmvc:7.0.10 ===
+Original source: https://repo.maven.apache.org/maven2/org/springframework/spring-webmvc/7.0.10/spring-webmvc-7.0.10.jar
 
-Original documents: D4fc5a260f8bd6942 Dccaae9019ae20e35
+Original documents: D9d37baaaa8586ae9 Dce440b3faa20a615
 
 
 === org.apache.tomcat.embed:tomcat-embed-core:11.0.26 ===
@@ -2063,10 +2063,10 @@ Original paths: Source copyright/license header: io/netty/buffer/search/package-
 Text blocks: T5c746979236b5e1a Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f T2a4c0b47e6d796b0
 
 
---- D50a68cb48cf867bc ---
-Original paths: Upstream original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/LICENSE.txt
+--- D7ec4038b72d8b62c ---
+Original paths: Upstream original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/LICENSE.txt
 
-Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tf1c8ae6ed5e952cb T5b4989820c321545 Tbce5a817a43595ed T1aadf94a692b52f3 T920235dccd4caa88 Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f T0b6c14f5d3954ce9 T728e2fcbec87638d Tf8ff6aed51d420b1 Td90faf1f81834ce2 T5d24ea76195d4abf T08a6558ac5f10888 T9d2f0ba51bcf73fd T71c7cd18b955a513 T401ae9bcdff97265 Te6367ca16e975598 T9da2b09ceaa3eca4 Te4488a1717088290 T811251a3d8648e4d T296d1f0b0016322f T0112287732847510 T001ed2a871597c3e Tca5dfefa59020514 T1cb2ef3b9880180d Tab895742e672b12e T192a315e60005658 T4a85ab4782d1f237 T74dc0c76066efe23 T0cc480f1d7373bbc Tc0d90911e52da11f Tf14cc109876dd5da T0f82b1d9b9175d70 T9e307b0a24ca0dfd Td45fd3244f145fc2 T9efa66633a259ea6 T03d19106d3fbf861 Tbf7d85d0c33ddc3c Tb0d67a32ee42e790 T00918987c424d380 T0efd51cc3b17e06e T987cdd85a3849aaf Tecbc4846b901114f T0abcc6df73bd5126 T973a3059441b8bad T1ad7fc741f9cee31 T5289710cf1739c0d T1bcb96948db5188e T846f78dd69df6251 T26286e885445e7db Tf821dd84f81ea0bc Ta97f340d21688742 Ta393fad65c6de99e T02366a91d8d02994 Tda80709f80430fe0 Tfa7bc9cd64f2f5e5 Ta450181dfb0ecb45 Tc0bd2a3d416f44c1 T795bcffa37e26535 T8f72e15d14c040d5 T0592a54713cb0f72 Tafb05c4ae38dd219 T215423488ce8327d Tbaefbc1a999d47ea Td144e22be97922f9 Te839aa509bc8ba10 Tb6097358f3ef2721 Tf11c4cf2ea444a4c Tded38c6e9c492099 Tf4bb06dcc4e6dada T0cceda26ca8758b2 T20330317178bf275 Tc39688c24936c740 T8043364ee8da7757 T9a3c00066fe92680 T20330317178bf275 Taee9c18a7145a41f T8043364ee8da7757 T33acc005d24cfd9f T6f50ac3cb9b00f8a T7a72f9a2d7a07d51 T96d30a7f6df5436d T693a5dc45091f6cb T1c06291e2ec7fd84 T4638d14532c44f67 T10c999d40eec8f9f Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T60f9eaa128c42e35 Tee5e9a69de9c7def T95ff8aaf1616861d T325da7095599739c Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 T899a4d3010c24dab Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 Tde8be95729d6ffce Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T0a6a9ae557670b70 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 T16b9c7b3d178d422 T8e679afff129fa28 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T5b7f6d0a5518cc90 T7a72f9a2d7a07d51 T634945b63f78a71d Tcb79a766b4bedb63 T401930e4123ca412 Tda469828770020f8 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T9392a66e5e5c09f3 T5b4989820c321545 Tbce5a817a43595ed T1aadf94a692b52f3 T920235dccd4caa88 Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f T0b6c14f5d3954ce9 T728e2fcbec87638d Tf8ff6aed51d420b1 Td90faf1f81834ce2 T5d24ea76195d4abf T08a6558ac5f10888 T9d2f0ba51bcf73fd T71c7cd18b955a513 T401ae9bcdff97265 Te6367ca16e975598 T9da2b09ceaa3eca4 Te4488a1717088290 T811251a3d8648e4d T296d1f0b0016322f T0112287732847510 T001ed2a871597c3e Tca5dfefa59020514 T1cb2ef3b9880180d Tab895742e672b12e T192a315e60005658 T4a85ab4782d1f237 T74dc0c76066efe23 T0cc480f1d7373bbc Tc0d90911e52da11f Tf14cc109876dd5da T0f82b1d9b9175d70 T9e307b0a24ca0dfd Td45fd3244f145fc2 T9efa66633a259ea6 T03d19106d3fbf861 Tbf7d85d0c33ddc3c Tb0d67a32ee42e790 T00918987c424d380 T0efd51cc3b17e06e T987cdd85a3849aaf Tecbc4846b901114f T0abcc6df73bd5126 T973a3059441b8bad T1ad7fc741f9cee31 T5289710cf1739c0d T1bcb96948db5188e T846f78dd69df6251 T26286e885445e7db Tf821dd84f81ea0bc Ta97f340d21688742 Ta393fad65c6de99e T02366a91d8d02994 Tda80709f80430fe0 Tfa7bc9cd64f2f5e5 Ta450181dfb0ecb45 Tc0bd2a3d416f44c1 T795bcffa37e26535 T8f72e15d14c040d5 T0592a54713cb0f72 Tafb05c4ae38dd219 T215423488ce8327d Tbaefbc1a999d47ea Td144e22be97922f9 Te839aa509bc8ba10 Tb6097358f3ef2721 Tf11c4cf2ea444a4c Tded38c6e9c492099 Tf4bb06dcc4e6dada T6a84bfa8ee187c9a T20330317178bf275 Tc39688c24936c740 T8043364ee8da7757 T5d883f8461a9abdd T20330317178bf275 Taee9c18a7145a41f T8043364ee8da7757 T81fb216aa6f875e7 T6f50ac3cb9b00f8a T7a72f9a2d7a07d51 T96d30a7f6df5436d T693a5dc45091f6cb T1c06291e2ec7fd84 T4638d14532c44f67 Td00d9d5d70c301e4 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T4de010aac22236db Tee5e9a69de9c7def T95ff8aaf1616861d T59d7bb2b01aac756 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tb835d3c857c91227 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T5a864258f36fdc38 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T447e48d7afeaa3ca Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 T81778ff85ab69b56 T8e679afff129fa28 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 Tec67480981e5ad5a T7a72f9a2d7a07d51 T634945b63f78a71d Tcb79a766b4bedb63 T401930e4123ca412 Te124d6d297342163 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47
 
 
 --- D95586f51f3d9630e ---
@@ -2077,6 +2077,9 @@ Source copyright/license header: io/netty/handler/ssl/OpenSslCredential.java
 Source copyright/license header: io/netty/handler/ssl/OpenSslCredentialBuilder.java
 Source copyright/license header: io/netty/handler/ssl/OpenSslCredentialPointer.java
 Source copyright/license header: io/netty/handler/ssl/OpenSslEngineMap.java
+Source copyright/license header: io/netty/util/internal/RuntimeJvmArgs.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/DoNotRemove.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/DoNotRemove.java
 
 Text blocks: T71771d4278c0d251 Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
@@ -2370,6 +2373,44 @@ Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queue
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/unpadded/SpscLinkedUnpaddedQueue.java
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/unpadded/SpscUnboundedUnpaddedArrayQueue.java
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/unpadded/SpscUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/BaseLinkedVarHandleQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/BaseMpscLinkedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/BaseSpscLinkedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/ConcurrentCircularVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/ConcurrentSequencedCircularVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/LinkedQueueVarHandleNode.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpmcVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscBlockingConsumerVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscChunkedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscGrowableVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscLinkedVarHandleQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscUnboundedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/MpscVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpmcVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpscChunkedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpscGrowableVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpscLinkedVarHandleQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpscUnboundedVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/SpscVarHandleArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/VarHandleQueueUtil.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/BaseLinkedVarHandleUnpaddedQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/BaseMpscLinkedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/BaseSpscLinkedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/ConcurrentCircularVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/ConcurrentSequencedCircularVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpmcVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscBlockingConsumerVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscChunkedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscGrowableVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscLinkedVarHandleUnpaddedQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscUnboundedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/MpscVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpmcVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpscChunkedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpscGrowableVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpscLinkedVarHandleUnpaddedQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpscUnboundedVarHandleUnpaddedArrayQueue.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/SpscVarHandleUnpaddedArrayQueue.java
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/util/InternalAPI.java
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/util/PaddedAtomicLong.java
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/util/PortableJvmInfo.java
@@ -2381,6 +2422,13 @@ Source copyright/license header: io/netty/util/internal/shaded/org/jctools/util/
 Source copyright/license header: io/netty/util/internal/shaded/org/jctools/util/UnsafeRefArrayAccess.java
 
 Text blocks: T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
+
+
+--- D9cfa907f93155ea6 ---
+Original paths: Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/package-info.java
+Source copyright/license header: io/netty/util/internal/shaded/org/jctools/queues/varhandle/unpadded/package-info.java
+
+Text blocks: T71771d4278c0d251 Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f Tf409e95375964cfc
 
 
 --- Dc9775f3c81346291 ---
@@ -2597,6 +2645,12 @@ Source copyright/license header: redis/clients/authentication/core/TokenRequestE
 Text blocks: T4445addae6449292 T09817dc4895e8c8d
 
 
+--- Da15f67650581ad74 ---
+Original paths: META-INF/LICENSE.txt
+
+Text blocks: T073670b30f603335 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429
+
+
 --- D5e41d4dfa63d871c ---
 Original paths: Source copyright/license header: org/yaml/snakeyaml/DumperOptions.java
 Source copyright/license header: org/yaml/snakeyaml/LoaderOptions.java
@@ -2730,40 +2784,40 @@ Source copyright/license header: org/yaml/snakeyaml/external/com/google/gdata/ut
 Text blocks: T8260210f008cf07e T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f
 
 
---- D4fc5a260f8bd6942 ---
+--- D9d37baaaa8586ae9 ---
 Original paths: META-INF/license.txt
 
-Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Ta7f999c22817fc4e T749985e63ea3cbbf T82ec4b1eb13f5ac2 Tb2f2a5752aaf67bc Tf0e9201f03678645 T7a72f9a2d7a07d51 Tf40d165f25833406 T8abd57f1f4ea9a3f T2e4f65b73c00a78d Tcb79a766b4bedb63 T3e027acb9f3894a0 T0493469acc37e335 T40574b665d72f090 T46a21688ddd87e76 T54376238a7f18603 Tcc41a6e69e74b2a7 Tc9bf1a0e18643f45 T4964c7720a625201 T7479b1eb18b6737b T4a7622508ebd22e4 Tad7b01849f723d1f T738b04d4bcebb448
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f Ta7f999c22817fc4e T4f15ad667e442978 T4598a51273a08f39 Tb2f2a5752aaf67bc Tf0e9201f03678645 T7a72f9a2d7a07d51 Tf40d165f25833406 T8abd57f1f4ea9a3f T2e4f65b73c00a78d Tcb79a766b4bedb63 T3e027acb9f3894a0 T0493469acc37e335 T40574b665d72f090 T46a21688ddd87e76 T54376238a7f18603 Tcc41a6e69e74b2a7 Tc9bf1a0e18643f45 T4964c7720a625201 T7479b1eb18b6737b T4a7622508ebd22e4 Tad7b01849f723d1f T738b04d4bcebb448
 
 
---- Dccaae9019ae20e35 ---
+--- Dce440b3faa20a615 ---
 Original paths: META-INF/notice.txt
 
-Text blocks: T06b1ea3c255ca120 T8e5c16e609c631af Tb7dca16e19b8e48b
+Text blocks: T16b0e57bb032eae9 T8e5c16e609c631af Tb7dca16e19b8e48b
 
 
---- Df3604ae00d5be24b ---
+--- D2c2aa786c909721a ---
 Original paths: META-INF/NOTICE.txt
 
-Text blocks: Tebeab3a3187c6f8c T8e5c16e609c631af
+Text blocks: T31e7c3ba9db9f714 T8e5c16e609c631af
 
 
---- D22231107ec587abb ---
+--- Ded4ac2395337b49e ---
 Original paths: META-INF/notice.txt
 
-Text blocks: T0d7f351dea9dc0ef T8e5c16e609c631af T3cfb28d3e59ceab9
+Text blocks: Tceda6837a310b1b6 T8e5c16e609c631af T3cfb28d3e59ceab9
 
 
---- D41a7907f32d218f7 ---
+--- D336ff63e503560f6 ---
 Original paths: META-INF/notice.txt
 
-Text blocks: T73e3ad35d20ae5d3 T8e5c16e609c631af Tb7dca16e19b8e48b
+Text blocks: Tb8c50fb567a6e144 T8e5c16e609c631af Tb7dca16e19b8e48b
 
 
---- D29a264d96d211da8 ---
+--- D5a75c7e0c5d21154 ---
 Original paths: META-INF/notice.txt
 
-Text blocks: Ta6cc95c8ef7e6472 T8e5c16e609c631af T3cfb28d3e59ceab9
+Text blocks: Tf051bf61a16dbe9a T8e5c16e609c631af T3cfb28d3e59ceab9
 
 
 --- Dd1e3002166e16c7c ---
@@ -4684,8 +4738,8 @@ package in the Spring Framework library, distributed by VMware, Inc:
  */
 
 
---- Tf1c8ae6ed5e952cb ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/NOTICE.txt
+--- T9392a66e5e5c09f3 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/NOTICE.txt
 
 
 --- T5b4989820c321545 ---
@@ -5083,8 +5137,8 @@ This product is statically linked against boringssl.
     * https://boringssl.googlesource.com/boringssl/
 
 
---- T0cceda26ca8758b2 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.jsr166y.txt
+--- T6a84bfa8ee187c9a ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jsr166y.txt
 The person or persons who have associated work with this document (the
 "Dedicator" or "Certifier") hereby either (a) certifies that, to the best of
 his knowledge, the work of authorship identified is in the public domain of
@@ -5119,8 +5173,8 @@ and in any way, including by methods that have not yet been invented or
 conceived.
 
 
---- T9a3c00066fe92680 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.base64.txt
+--- T5d883f8461a9abdd ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.base64.txt
 The person or persons who have associated work with this document (the
 "Dedicator" or "Certifier") hereby either (a) certifies that, to the best of
 his knowledge, the work of authorship identified is in the public domain of
@@ -5141,8 +5195,8 @@ the relinquishment of all rights to enforce (by lawsuit or otherwise) those
 copyrights in the Work.
 
 
---- T33acc005d24cfd9f ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.webbit.txt
+--- T81fb216aa6f875e7 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.webbit.txt
 (BSD License: https://www.opensource.org/licenses/bsd-license)
 
 
@@ -5188,15 +5242,15 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
 
---- T10c999d40eec8f9f ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.slf4j.txt
+--- Td00d9d5d70c301e4 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.slf4j.txt
 /*
  * Copyright (c) 2004-2007 QOS.ch
  * All rights reserved.
 
 
---- T60f9eaa128c42e35 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/NOTICE.harmony.txt
+--- T4de010aac22236db ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/NOTICE.harmony.txt
 Apache Harmony
 
 
@@ -5204,26 +5258,26 @@ Apache Harmony
 Copyright 2006, 2010 The Apache Software Foundation.
 
 
---- T325da7095599739c ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.harmony.txt
+--- T59d7bb2b01aac756 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.harmony.txt
 
 
---- T899a4d3010c24dab ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.jbzip2.txt
+--- Tb835d3c857c91227 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jbzip2.txt
 Copyright (c) 2010-2011 Matthew J. Francis and Contributors of the jbzip2 Project
 
 
---- Tde8be95729d6ffce ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.libdivsufsort.txt
+--- T5a864258f36fdc38 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.libdivsufsort.txt
 Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
 
 
---- T0a6a9ae557670b70 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.jctools.txt
+--- T447e48d7afeaa3ca ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jctools.txt
 
 
---- T16b9c7b3d178d422 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.jfastlz.txt
+--- T81778ff85ab69b56 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jfastlz.txt
 The MIT License
 
 
@@ -5231,8 +5285,8 @@ The MIT License
 Copyright (c) 2009 William Kinney
 
 
---- T5b7f6d0a5518cc90 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.protobuf.txt
+--- Tec67480981e5ad5a ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.protobuf.txt
 Protocol Buffers - Google's data interchange format
 Copyright 2013 Google Inc.  All rights reserved.
 https://developers.google.com/protocol-buffers/
@@ -5257,8 +5311,8 @@ standalone and requires a support library to be linked with it.  This
 support library is itself covered by the above license.
 
 
---- Tda469828770020f8 ---
-Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/license/LICENSE.commons-lang.txt
+--- Te124d6d297342163 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.commons-lang.txt
 
 
 --- T71771d4278c0d251 ---
@@ -5635,6 +5689,11 @@ Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/licen
  */
 
 
+--- T073670b30f603335 ---
+Copyright (c) 2004-2023 QOS.ch
+All rights reserved.
+
+
 --- T45b50a060e17ef60 ---
 /**
  * Copyright (c) 2008, SnakeYAML
@@ -5649,12 +5708,12 @@ Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.17.Final/licen
 =======================================================================
 
 
---- T749985e63ea3cbbf ---
-SPRING FRAMEWORK 7.0.9 SUBCOMPONENTS:
+--- T4f15ad667e442978 ---
+SPRING FRAMEWORK ${version} SUBCOMPONENTS:
 
 
---- T82ec4b1eb13f5ac2 ---
-Spring Framework 7.0.9 includes a number of subcomponents
+--- T4598a51273a08f39 ---
+Spring Framework ${version} includes a number of subcomponents
 with separate copyright notices and license terms. The product that
 includes this file does not necessarily use all the open source
 subcomponents referred to below. Your use of the source
@@ -5756,9 +5815,9 @@ the date you acquired this Software product. Alternatively, the Source Files
 may accompany the Software.
 
 
---- T06b1ea3c255ca120 ---
-Spring Framework 7.0.9
-Copyright (c) 2002-2026 Pivotal, Inc.
+--- T16b0e57bb032eae9 ---
+Spring Framework 7.0.10
+Copyright (c) 2002-2026 Broadcom Inc.
 
 
 --- T8e5c16e609c631af ---
@@ -5774,13 +5833,13 @@ these subcomponents is subject to the terms and conditions of the
 subcomponent's license, as noted in the license.txt file.
 
 
---- Tebeab3a3187c6f8c ---
-Spring Boot 4.1.1
+--- T31e7c3ba9db9f714 ---
+Spring Boot 4.1.2
 Copyright (c) 2012-2026 VMware, Inc.
 
 
---- T0d7f351dea9dc0ef ---
-Spring Data Commons 4.1.1 (2026.0.1)
+--- Tceda6837a310b1b6 ---
+Spring Data Commons 4.1.2 (2026.0.2)
 Copyright (c) [2010-2026] Pivotal Software, Inc.
 
 
@@ -5791,13 +5850,13 @@ code for the these subcomponents is subject to the terms and
 conditions of the subcomponent's license, as noted in the LICENSE file.
 
 
---- T73e3ad35d20ae5d3 ---
-Spring Data KeyValue 4.1.1 (2026.0.1)
+--- Tb8c50fb567a6e144 ---
+Spring Data KeyValue 4.1.2 (2026.0.2)
 Copyright (c) 2015-2026 Pivotal Software, Inc.
 
 
---- Ta6cc95c8ef7e6472 ---
-Spring Data Redis 4.1.1 (2026.0.1)
+--- Tf051bf61a16dbe9a ---
+Spring Data Redis 4.1.2 (2026.0.2)
 Copyright (c) [2010-2026] Pivotal Software, Inc.
 
 
