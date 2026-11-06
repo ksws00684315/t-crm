@@ -7,8 +7,10 @@ FROM postgres:17.11
 
 ARG PGBACKREST_VERSION=2.60.0-1.pgdg13+1
 
+# ca-certificates is required for pgBackRest's S3 repo: the postgres base image ships without a CA
+# bundle, so TLS verification fails with "unable to get local issuer certificate" (task 116).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}" \
+    && apt-get install -y --no-install-recommends "pgbackrest=${PGBACKREST_VERSION}" ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /etc/pgbackrest /var/spool/pgbackrest /var/log/pgbackrest /var/lib/pgbackrest \
     && chown postgres:postgres /var/spool/pgbackrest /var/log/pgbackrest /var/lib/pgbackrest
