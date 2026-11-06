@@ -178,55 +178,55 @@ Original documents: D1ea510579e38145f D208b1892820fa8b1
 === io.netty:netty-buffer:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.2.19.Final/netty-buffer-4.2.19.Final-sources.jar
 
-Original documents: De6a47c07e233811a D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D9d172756e3182b96 D786640d2407d47d4 D1150a363aeec7e5f D4ce43416d32567eb Df593f6351f5eb1f0 Dc5a5e5c3c569a5c3 D4ab98a1bd6ace904 D54dec2fa0ac46a45 D2f314e9f8ccb9a0c D85425de29d33066f
+Original documents: De6a47c07e233811a D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D9d172756e3182b96 D786640d2407d47d4 D1150a363aeec7e5f D4ce43416d32567eb Df593f6351f5eb1f0 Dc5a5e5c3c569a5c3 D4ab98a1bd6ace904 D54dec2fa0ac46a45 D2f314e9f8ccb9a0c D85425de29d33066f D7ec4038b72d8b62c
 
 
 === io.netty:netty-codec-base:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-base/4.2.19.Final/netty-codec-base-4.2.19.Final-sources.jar
 
-Original documents: D95586f51f3d9630e D54dec2fa0ac46a45 D602ce7f9b33b6f8c D786640d2407d47d4 D9d172756e3182b96 Dcb03690ba48bfe23 Dc182e0e5b2eff62a D9a07269fd77a29c0 D32a0af353069c401 D8f0a094595444eae De996b3cb42cadaec D1f6822718a87206f
+Original documents: D95586f51f3d9630e D54dec2fa0ac46a45 D602ce7f9b33b6f8c D786640d2407d47d4 D9d172756e3182b96 Dcb03690ba48bfe23 Dc182e0e5b2eff62a D9a07269fd77a29c0 D32a0af353069c401 D8f0a094595444eae De996b3cb42cadaec D1f6822718a87206f D7ec4038b72d8b62c
 
 
 === io.netty:netty-codec-dns:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-codec-dns/4.2.19.Final/netty-codec-dns-4.2.19.Final-sources.jar
 
-Original documents: D786640d2407d47d4 D9d172756e3182b96 De6bef7a8d3326153 Df83a13bb272b0ac8 Df963fbf8975131d9
+Original documents: D786640d2407d47d4 D9d172756e3182b96 De6bef7a8d3326153 Df83a13bb272b0ac8 Df963fbf8975131d9 D7ec4038b72d8b62c
 
 
 === io.netty:netty-common:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-common/4.2.19.Final/netty-common-4.2.19.Final-sources.jar
 
-Original documents: D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D54dec2fa0ac46a45 D1150a363aeec7e5f D786640d2407d47d4 D9d172756e3182b96 D909b53f756d334b3 Dc5a5e5c3c569a5c3 De6a47c07e233811a Df593f6351f5eb1f0 D8282375271dd832c D52430bf1f37c3237 Df83a13bb272b0ac8 De6bef7a8d3326153 D95586f51f3d9630e D4ce1cb952ca8dd11 D91f2c8a729b059f1 Da8e60ef02b0e18af De5c9f4e2d01c0eb9 D0705fd00a5f36464 D0534a5011d919ecf D99f7b51e40c6f715 D9cfa907f93155ea6 Dc9775f3c81346291 D7dbd0d439654b340
+Original documents: D602ce7f9b33b6f8c Dd7f7880cfb2be6c5 D54dec2fa0ac46a45 D1150a363aeec7e5f D786640d2407d47d4 D9d172756e3182b96 D909b53f756d334b3 Dc5a5e5c3c569a5c3 De6a47c07e233811a Df593f6351f5eb1f0 D8282375271dd832c D52430bf1f37c3237 Df83a13bb272b0ac8 De6bef7a8d3326153 D95586f51f3d9630e D4ce1cb952ca8dd11 D91f2c8a729b059f1 Da8e60ef02b0e18af De5c9f4e2d01c0eb9 D0705fd00a5f36464 D0534a5011d919ecf D99f7b51e40c6f715 D9cfa907f93155ea6 Dc9775f3c81346291 D7dbd0d439654b340 D7ec4038b72d8b62c
 
 
 === io.netty:netty-handler:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.2.19.Final/netty-handler-4.2.19.Final-sources.jar
 
-Original documents: De6bef7a8d3326153 Dc5a5e5c3c569a5c3 D710b293e7c098726 D9d172756e3182b96 D56146aed07d4199e D410f82bb6e876255 D54dec2fa0ac46a45 Df1371f1e1fee2d13 D602ce7f9b33b6f8c D6f8c7c3c52f07882 D372cea3bf2201f24 D249b5f7a5e0fe457 Df593f6351f5eb1f0 D786640d2407d47d4 Df83a13bb272b0ac8 D4ce43416d32567eb D95586f51f3d9630e D909b53f756d334b3 De6a47c07e233811a D1150a363aeec7e5f Dd7f7880cfb2be6c5 D03c985358454bbf9 D3c0f1d81897699db D5e866ebd94e66392 Da5604c5486ee4356 D7ba0c0f2751de9f9 Dd0f13bc5974f9bf6
+Original documents: De6bef7a8d3326153 Dc5a5e5c3c569a5c3 D710b293e7c098726 D9d172756e3182b96 D56146aed07d4199e D410f82bb6e876255 D54dec2fa0ac46a45 Df1371f1e1fee2d13 D602ce7f9b33b6f8c D6f8c7c3c52f07882 D372cea3bf2201f24 D249b5f7a5e0fe457 Df593f6351f5eb1f0 D786640d2407d47d4 Df83a13bb272b0ac8 D4ce43416d32567eb D95586f51f3d9630e D909b53f756d334b3 De6a47c07e233811a D1150a363aeec7e5f Dd7f7880cfb2be6c5 D03c985358454bbf9 D3c0f1d81897699db D5e866ebd94e66392 Da5604c5486ee4356 D7ba0c0f2751de9f9 Dd0f13bc5974f9bf6 D7ec4038b72d8b62c
 
 
 === io.netty:netty-resolver:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.2.19.Final/netty-resolver-4.2.19.Final-sources.jar
 
-Original documents: D786640d2407d47d4 D54dec2fa0ac46a45 Df593f6351f5eb1f0 Df83a13bb272b0ac8 D9d172756e3182b96 D74bc71aa476bbf5c
+Original documents: D786640d2407d47d4 D54dec2fa0ac46a45 Df593f6351f5eb1f0 Df83a13bb272b0ac8 D9d172756e3182b96 D74bc71aa476bbf5c D7ec4038b72d8b62c
 
 
 === io.netty:netty-resolver-dns:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-resolver-dns/4.2.19.Final/netty-resolver-dns-4.2.19.Final-sources.jar
 
-Original documents: D909b53f756d334b3 Df593f6351f5eb1f0 De6bef7a8d3326153 D9d172756e3182b96 D786640d2407d47d4 D54dec2fa0ac46a45 D372cea3bf2201f24 D1150a363aeec7e5f D4ce43416d32567eb Dc5a5e5c3c569a5c3 Dd4a7d5035182359c
+Original documents: D909b53f756d334b3 Df593f6351f5eb1f0 De6bef7a8d3326153 D9d172756e3182b96 D786640d2407d47d4 D54dec2fa0ac46a45 D372cea3bf2201f24 D1150a363aeec7e5f D4ce43416d32567eb Dc5a5e5c3c569a5c3 Dd4a7d5035182359c D7ec4038b72d8b62c
 
 
 === io.netty:netty-transport:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.2.19.Final/netty-transport-4.2.19.Final-sources.jar
 
-Original documents: D602ce7f9b33b6f8c D9d172756e3182b96 Dd7f7880cfb2be6c5 D372cea3bf2201f24 Df593f6351f5eb1f0 D6ec924028488b71f D54dec2fa0ac46a45 De6bef7a8d3326153 D786640d2407d47d4 D1150a363aeec7e5f De6a47c07e233811a Df83a13bb272b0ac8 D909b53f756d334b3 Dc5a5e5c3c569a5c3 Dfa54c4b9fd1ab0b1 D5aaa68eb1993acf9 Dc3844b7e58ad33f1 Dd74bc5607309efc9 D505341f9aca33958 D20b02894dda6695d Dc669c3945f8b29e1 D4f46f715ec9527ac D4ce43416d32567eb Ded2473e1f9699e5c De6afc0bcc9d23ca3 Dec5b3ddc7ff4309d
+Original documents: D602ce7f9b33b6f8c D9d172756e3182b96 Dd7f7880cfb2be6c5 D372cea3bf2201f24 Df593f6351f5eb1f0 D6ec924028488b71f D54dec2fa0ac46a45 De6bef7a8d3326153 D786640d2407d47d4 D1150a363aeec7e5f De6a47c07e233811a Df83a13bb272b0ac8 D909b53f756d334b3 Dc5a5e5c3c569a5c3 Dfa54c4b9fd1ab0b1 D5aaa68eb1993acf9 Dc3844b7e58ad33f1 Dd74bc5607309efc9 D505341f9aca33958 D20b02894dda6695d Dc669c3945f8b29e1 D4f46f715ec9527ac D4ce43416d32567eb Ded2473e1f9699e5c De6afc0bcc9d23ca3 Dec5b3ddc7ff4309d D7ec4038b72d8b62c
 
 
 === io.netty:netty-transport-native-unix-common:4.2.19.Final ===
 Original source: https://repo.maven.apache.org/maven2/io/netty/netty-transport-native-unix-common/4.2.19.Final/netty-transport-native-unix-common-4.2.19.Final-sources.jar
 
-Original documents: D909b53f756d334b3 D786640d2407d47d4 Df83a13bb272b0ac8 D9d172756e3182b96 D4ce43416d32567eb D54dec2fa0ac46a45 Df593f6351f5eb1f0 D78d87a38a307def3
+Original documents: D909b53f756d334b3 D786640d2407d47d4 Df83a13bb272b0ac8 D9d172756e3182b96 D4ce43416d32567eb D54dec2fa0ac46a45 Df593f6351f5eb1f0 D78d87a38a307def3 D7ec4038b72d8b62c
 
 
 === org.reactivestreams:reactive-streams:1.0.4 ===
@@ -2061,6 +2061,12 @@ Text blocks: Tca557bc01e5255bd Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9
 Original paths: Source copyright/license header: io/netty/buffer/search/package-info.java
 
 Text blocks: T5c746979236b5e1a Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f T2a4c0b47e6d796b0
+
+
+--- D7ec4038b72d8b62c ---
+Original paths: Upstream original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/LICENSE.txt
+
+Text blocks: Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tc42da82809152775 Ta2b416f7deae643e T1880d324105d8601 T5cc9a1deb833e9da T652ab88cd07a1b79 T39a2bab3d1d9fa5f T9392a66e5e5c09f3 T5b4989820c321545 Tbce5a817a43595ed T1aadf94a692b52f3 T920235dccd4caa88 Ta5f1bb2aba218d2f T652ab88cd07a1b79 T39a2bab3d1d9fa5f T0b6c14f5d3954ce9 T728e2fcbec87638d Tf8ff6aed51d420b1 Td90faf1f81834ce2 T5d24ea76195d4abf T08a6558ac5f10888 T9d2f0ba51bcf73fd T71c7cd18b955a513 T401ae9bcdff97265 Te6367ca16e975598 T9da2b09ceaa3eca4 Te4488a1717088290 T811251a3d8648e4d T296d1f0b0016322f T0112287732847510 T001ed2a871597c3e Tca5dfefa59020514 T1cb2ef3b9880180d Tab895742e672b12e T192a315e60005658 T4a85ab4782d1f237 T74dc0c76066efe23 T0cc480f1d7373bbc Tc0d90911e52da11f Tf14cc109876dd5da T0f82b1d9b9175d70 T9e307b0a24ca0dfd Td45fd3244f145fc2 T9efa66633a259ea6 T03d19106d3fbf861 Tbf7d85d0c33ddc3c Tb0d67a32ee42e790 T00918987c424d380 T0efd51cc3b17e06e T987cdd85a3849aaf Tecbc4846b901114f T0abcc6df73bd5126 T973a3059441b8bad T1ad7fc741f9cee31 T5289710cf1739c0d T1bcb96948db5188e T846f78dd69df6251 T26286e885445e7db Tf821dd84f81ea0bc Ta97f340d21688742 Ta393fad65c6de99e T02366a91d8d02994 Tda80709f80430fe0 Tfa7bc9cd64f2f5e5 Ta450181dfb0ecb45 Tc0bd2a3d416f44c1 T795bcffa37e26535 T8f72e15d14c040d5 T0592a54713cb0f72 Tafb05c4ae38dd219 T215423488ce8327d Tbaefbc1a999d47ea Td144e22be97922f9 Te839aa509bc8ba10 Tb6097358f3ef2721 Tf11c4cf2ea444a4c Tded38c6e9c492099 Tf4bb06dcc4e6dada T6a84bfa8ee187c9a T20330317178bf275 Tc39688c24936c740 T8043364ee8da7757 T5d883f8461a9abdd T20330317178bf275 Taee9c18a7145a41f T8043364ee8da7757 T81fb216aa6f875e7 T6f50ac3cb9b00f8a T7a72f9a2d7a07d51 T96d30a7f6df5436d T693a5dc45091f6cb T1c06291e2ec7fd84 T4638d14532c44f67 Td00d9d5d70c301e4 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T4de010aac22236db Tee5e9a69de9c7def T95ff8aaf1616861d T59d7bb2b01aac756 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 Tb835d3c857c91227 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T5a864258f36fdc38 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 T447e48d7afeaa3ca Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47 T81778ff85ab69b56 T8e679afff129fa28 Tfa3ff462f020dcad T70760316a66259dc T1da9072633b5e429 Tec67480981e5ad5a T7a72f9a2d7a07d51 T634945b63f78a71d Tcb79a766b4bedb63 T401930e4123ca412 Te124d6d297342163 Teab6908ad3552f8a T9cacedfb2727274a Te3d22e26a4eda863 Td579b9c368460b11 Tcb1538b21a47caec T15d51d117ddfe3a3 T99feac139e99f8e1 T5fb98b85303f6be6 Td11c341e7a3563ac T18b9e3c7ab949e03 T38d79d7984568527 T54183357b87407ec Tc331257ab46a1584 T3b6f262d039f6e6d Te4926ccf4ca79576 T9f66fb55724957d8 T8bce44c689d23438 T5d59ef92982a2dae Tca1a83109309733d T9fcbd6f1cf70641c T82333b67d7cc73ba Tcda9ebcd04d3f0fb T08ff29e742efa566 T867305ae2843c71d T57ffc34ac5cac251 T75516d9732f1ca28 T26209596e5b7af47
 
 
 --- D95586f51f3d9630e ---
@@ -4730,6 +4736,583 @@ package in the Spring Framework library, distributed by VMware, Inc:
 /**
  * Utility classes for performing efficient substring search within {@link io.netty.buffer.ByteBuf}.
  */
+
+
+--- T9392a66e5e5c09f3 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/NOTICE.txt
+
+
+--- T5b4989820c321545 ---
+The Netty Project
+                            =================
+
+
+--- Tbce5a817a43595ed ---
+Please visit the Netty web site for more information:
+
+
+--- T1aadf94a692b52f3 ---
+* https://netty.io/
+
+
+--- T0b6c14f5d3954ce9 ---
+Also, please refer to each LICENSE.<component>.txt file, which is located in
+the 'license' directory of the distribution file, for the license terms of the
+components that this product depends on.
+
+
+--- T728e2fcbec87638d ---
+-------------------------------------------------------------------------------
+This product contains the extensions to Java Collections Framework which has
+been derived from the works by JSR-166 EG, Doug Lea, and Jason T. Greene:
+
+
+--- Tf8ff6aed51d420b1 ---
+* LICENSE:
+    * license/LICENSE.jsr166y.txt (Public Domain)
+  * HOMEPAGE:
+    * http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/
+    * http://viewvc.jboss.org/cgi-bin/viewvc.cgi/jbosscache/experimental/jsr166/
+
+
+--- Td90faf1f81834ce2 ---
+This product contains a modified version of Robert Harder's Public Domain
+Base64 Encoder and Decoder, which can be obtained at:
+
+
+--- T5d24ea76195d4abf ---
+* LICENSE:
+    * license/LICENSE.base64.txt (Public Domain)
+  * HOMEPAGE:
+    * http://iharder.sourceforge.net/current/java/base64/
+
+
+--- T08a6558ac5f10888 ---
+This product contains a modified portion of 'Webbit', an event based
+WebSocket and HTTP server, which can be obtained at:
+
+
+--- T9d2f0ba51bcf73fd ---
+* LICENSE:
+    * license/LICENSE.webbit.txt (BSD License)
+  * HOMEPAGE:
+    * https://github.com/joewalnes/webbit
+
+
+--- T71c7cd18b955a513 ---
+This product contains a modified portion of 'SLF4J', a simple logging
+facade for Java, which can be obtained at:
+
+
+--- T401ae9bcdff97265 ---
+* LICENSE:
+    * license/LICENSE.slf4j.txt (MIT License)
+  * HOMEPAGE:
+    * https://www.slf4j.org/
+
+
+--- Te6367ca16e975598 ---
+This product contains a modified portion of 'Apache Harmony', an open source
+Java SE, which can be obtained at:
+
+
+--- T9da2b09ceaa3eca4 ---
+* NOTICE:
+    * license/NOTICE.harmony.txt
+  * LICENSE:
+    * license/LICENSE.harmony.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://archive.apache.org/dist/harmony/
+
+
+--- Te4488a1717088290 ---
+This product contains a modified portion of 'jbzip2', a Java bzip2 compression
+and decompression library written by Matthew J. Francis. It can be obtained at:
+
+
+--- T811251a3d8648e4d ---
+* LICENSE:
+    * license/LICENSE.jbzip2.txt (MIT License)
+  * HOMEPAGE:
+    * https://code.google.com/p/jbzip2/
+
+
+--- T296d1f0b0016322f ---
+This product contains a modified portion of 'libdivsufsort', a C API library to construct
+the suffix array and the Burrows-Wheeler transformed string for any input string of
+a constant-size alphabet written by Yuta Mori. It can be obtained at:
+
+
+--- T0112287732847510 ---
+* LICENSE:
+    * license/LICENSE.libdivsufsort.txt (MIT License)
+  * HOMEPAGE:
+    * https://github.com/y-256/libdivsufsort
+
+
+--- T001ed2a871597c3e ---
+This product contains a modified portion of Nitsan Wakart's 'JCTools', Java Concurrency Tools for the JVM,
+ which can be obtained at:
+
+
+--- Tca5dfefa59020514 ---
+* LICENSE:
+    * license/LICENSE.jctools.txt (ASL2 License)
+  * HOMEPAGE:
+    * https://github.com/JCTools/JCTools
+
+
+--- T1cb2ef3b9880180d ---
+This product optionally depends on 'JZlib', a re-implementation of zlib in
+pure Java, which can be obtained at:
+
+
+--- Tab895742e672b12e ---
+* LICENSE:
+    * license/LICENSE.jzlib.txt (BSD style License)
+  * HOMEPAGE:
+    * http://www.jcraft.com/jzlib/
+
+
+--- T192a315e60005658 ---
+This product optionally depends on 'Compress-LZF', a Java library for encoding and
+decoding data in LZF format, written by Tatu Saloranta. It can be obtained at:
+
+
+--- T4a85ab4782d1f237 ---
+* LICENSE:
+    * license/LICENSE.compress-lzf.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/ning/compress
+
+
+--- T74dc0c76066efe23 ---
+This product optionally depends on 'lz4', a LZ4 Java compression
+and decompression library written by Adrien Grand. It can be obtained at:
+
+
+--- T0cc480f1d7373bbc ---
+* LICENSE:
+    * license/LICENSE.lz4.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/jpountz/lz4-java
+
+
+--- Tc0d90911e52da11f ---
+This product optionally depends on 'lzma-java', a LZMA Java compression
+and decompression library, which can be obtained at:
+
+
+--- Tf14cc109876dd5da ---
+* LICENSE:
+    * license/LICENSE.lzma-java.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/jponge/lzma-java
+
+
+--- T0f82b1d9b9175d70 ---
+This product optionally depends on 'zstd-jni', a zstd-jni Java compression
+and decompression library, which can be obtained at:
+
+
+--- T9e307b0a24ca0dfd ---
+* LICENSE:
+    * license/LICENSE.zstd-jni.txt (BSD)
+  * HOMEPAGE:
+    * https://github.com/luben/zstd-jni
+
+
+--- Td45fd3244f145fc2 ---
+This product contains a modified portion of 'jfastlz', a Java port of FastLZ compression
+and decompression library written by William Kinney. It can be obtained at:
+
+
+--- T9efa66633a259ea6 ---
+* LICENSE:
+    * license/LICENSE.jfastlz.txt (MIT License)
+  * HOMEPAGE:
+    * https://code.google.com/p/jfastlz/
+
+
+--- T03d19106d3fbf861 ---
+This product contains a modified portion of and optionally depends on 'Protocol Buffers', Google's data
+interchange format, which can be obtained at:
+
+
+--- Tbf7d85d0c33ddc3c ---
+* LICENSE:
+    * license/LICENSE.protobuf.txt (New BSD License)
+  * HOMEPAGE:
+    * https://github.com/google/protobuf
+
+
+--- Tb0d67a32ee42e790 ---
+This product optionally depends on 'Bouncy Castle Crypto APIs' to generate
+a temporary self-signed X.509 certificate when the JVM does not provide the
+equivalent functionality.  It can be obtained at:
+
+
+--- T00918987c424d380 ---
+* LICENSE:
+    * license/LICENSE.bouncycastle.txt (MIT License)
+  * HOMEPAGE:
+    * https://www.bouncycastle.org/
+
+
+--- T0efd51cc3b17e06e ---
+This product optionally depends on 'Snappy', a compression library produced
+by Google Inc, which can be obtained at:
+
+
+--- T987cdd85a3849aaf ---
+* LICENSE:
+    * license/LICENSE.snappy.txt (New BSD License)
+  * HOMEPAGE:
+    * https://github.com/google/snappy
+
+
+--- Tecbc4846b901114f ---
+This product optionally depends on 'JBoss Marshalling', an alternative Java
+serialization API, which can be obtained at:
+
+
+--- T0abcc6df73bd5126 ---
+* LICENSE:
+    * license/LICENSE.jboss-marshalling.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/jboss-remoting/jboss-marshalling
+
+
+--- T973a3059441b8bad ---
+This product optionally depends on 'Caliper', Google's micro-
+benchmarking framework, which can be obtained at:
+
+
+--- T1ad7fc741f9cee31 ---
+* LICENSE:
+    * license/LICENSE.caliper.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/google/caliper
+
+
+--- T5289710cf1739c0d ---
+This product optionally depends on 'Apache Commons Logging', a logging
+framework, which can be obtained at:
+
+
+--- T1bcb96948db5188e ---
+* LICENSE:
+    * license/LICENSE.commons-logging.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://commons.apache.org/logging/
+
+
+--- T846f78dd69df6251 ---
+This product optionally depends on 'Apache Log4J', a logging framework, which
+can be obtained at:
+
+
+--- T26286e885445e7db ---
+* LICENSE:
+    * license/LICENSE.log4j.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://logging.apache.org/log4j/
+
+
+--- Tf821dd84f81ea0bc ---
+This product optionally depends on 'Aalto XML', an ultra-high performance
+non-blocking XML processor, which can be obtained at:
+
+
+--- Ta97f340d21688742 ---
+* LICENSE:
+    * license/LICENSE.aalto-xml.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://wiki.fasterxml.com/AaltoHome
+
+
+--- Ta393fad65c6de99e ---
+This product contains a modified version of 'HPACK', a Java implementation of
+the HTTP/2 HPACK algorithm written by Twitter. It can be obtained at:
+
+
+--- T02366a91d8d02994 ---
+* LICENSE:
+    * license/LICENSE.hpack.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/twitter/hpack
+
+
+--- Tda80709f80430fe0 ---
+This product contains a modified version of 'HPACK', a Java implementation of
+the HTTP/2 HPACK algorithm written by Cory Benfield. It can be obtained at:
+
+
+--- Tfa7bc9cd64f2f5e5 ---
+* LICENSE:
+    * license/LICENSE.hyper-hpack.txt (MIT License)
+  * HOMEPAGE:
+    * https://github.com/python-hyper/hpack/
+
+
+--- Ta450181dfb0ecb45 ---
+This product contains a modified version of 'HPACK', a Java implementation of
+the HTTP/2 HPACK algorithm written by Tatsuhiro Tsujikawa. It can be obtained at:
+
+
+--- Tc0bd2a3d416f44c1 ---
+* LICENSE:
+    * license/LICENSE.nghttp2-hpack.txt (MIT License)
+  * HOMEPAGE:
+    * https://github.com/nghttp2/nghttp2/
+
+
+--- T795bcffa37e26535 ---
+This product contains a modified portion of 'Apache Commons Lang', a Java library
+provides utilities for the java.lang API, which can be obtained at:
+
+
+--- T8f72e15d14c040d5 ---
+* LICENSE:
+    * license/LICENSE.commons-lang.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://commons.apache.org/proper/commons-lang/
+
+
+--- T0592a54713cb0f72 ---
+This product contains the Maven wrapper scripts from 'Maven Wrapper', that provides an easy way to ensure a user has everything necessary to run the Maven build.
+
+
+--- Tafb05c4ae38dd219 ---
+* LICENSE:
+    * license/LICENSE.mvn-wrapper.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/takari/maven-wrapper
+
+
+--- T215423488ce8327d ---
+This product contains the dnsinfo.h header file, that provides a way to retrieve the system DNS configuration on MacOS.
+This private header is also used by Apple's open source
+ mDNSResponder (https://opensource.apple.com/tarballs/mDNSResponder/).
+
+
+--- Tbaefbc1a999d47ea ---
+* LICENSE:
+    * license/LICENSE.dnsinfo.txt (Apple Public Source License 2.0)
+  * HOMEPAGE:
+    * https://www.opensource.apple.com/source/configd/configd-453.19/dnsinfo/dnsinfo.h
+
+
+--- Td144e22be97922f9 ---
+This product optionally depends on 'Brotli4j', Brotli compression and
+decompression for Java., which can be obtained at:
+
+
+--- Te839aa509bc8ba10 ---
+* LICENSE:
+    * license/LICENSE.brotli4j.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://github.com/hyperxpro/Brotli4j
+
+
+--- Tb6097358f3ef2721 ---
+This product is statically linked against Quiche.
+
+
+--- Tf11c4cf2ea444a4c ---
+* LICENSE:
+    * license/LICENSE.quiche.txt (BSD2)
+  * HOMEPAGE:
+    * https://github.com/cloudflare/quiche
+
+
+--- Tded38c6e9c492099 ---
+This product is statically linked against boringssl.
+
+
+--- Tf4bb06dcc4e6dada ---
+* LICENSE
+    * license/LICENSE.boringssl.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * https://boringssl.googlesource.com/boringssl/
+
+
+--- T6a84bfa8ee187c9a ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jsr166y.txt
+The person or persons who have associated work with this document (the
+"Dedicator" or "Certifier") hereby either (a) certifies that, to the best of
+his knowledge, the work of authorship identified is in the public domain of
+the country from which the work is published, or (b) hereby dedicates whatever
+copyright the dedicators holds in the work of authorship identified below (the
+"Work") to the public domain. A certifier, moreover, dedicates any copyright
+interest he may have in the associated work, and for these purposes, is
+described as a "dedicator" below.
+
+
+--- T20330317178bf275 ---
+A certifier has taken reasonable steps to verify the copyright status of this
+work. Certifier recognizes that his good faith efforts may not shield him from
+liability if in fact the work certified is not in the public domain.
+
+
+--- Tc39688c24936c740 ---
+Dedicator makes this dedication for the benefit of the public at large and to
+the detriment of the Dedicator's heirs and successors. Dedicator intends this
+dedication to be an overt act of relinquishment in perpetuity of all present
+and future rights under copyright law, whether vested or contingent, in the
+Work. Dedicator understands that such relinquishment of all rights includes
+the relinquishment of all rights to enforce (by lawsuit or otherwise) those
+copyrights in the Work.
+
+
+--- T8043364ee8da7757 ---
+Dedicator recognizes that, once placed in the public domain, the Work may be
+freely reproduced, distributed, transmitted, used, modified, built upon, or
+otherwise exploited by anyone for any purpose, commercial or non-commercial,
+and in any way, including by methods that have not yet been invented or
+conceived.
+
+
+--- T5d883f8461a9abdd ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.base64.txt
+The person or persons who have associated work with this document (the
+"Dedicator" or "Certifier") hereby either (a) certifies that, to the best of
+his knowledge, the work of authorship identified is in the public domain of
+the country from which the work is published, or (b) hereby dedicates whatever
+copyright the dedicators holds in the work of authorship identified below (the
+"Work") to the public domain. A certifier, moreover, dedicates any copyright
+interest he may have in the associated work, and for these purposes, is
+described as a "dedicator" below.
+
+
+--- Taee9c18a7145a41f ---
+Dedicator makes this dedication for the benefit of the public at large and to
+the detriment of the Dedicator's heirs and successors. Dedicator intends this
+dedication to be an overt act of relinquishment in perpetuate of all present
+and future rights under copyright law, whether vested or contingent, in the
+Work. Dedicator understands that such relinquishment of all rights includes
+the relinquishment of all rights to enforce (by lawsuit or otherwise) those
+copyrights in the Work.
+
+
+--- T81fb216aa6f875e7 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.webbit.txt
+(BSD License: https://www.opensource.org/licenses/bsd-license)
+
+
+--- T6f50ac3cb9b00f8a ---
+Copyright (c) 2011, Joe Walnes, Aslak Hellesøy and contributors
+All rights reserved.
+
+
+--- T96d30a7f6df5436d ---
+* Redistributions of source code must retain the above
+  copyright notice, this list of conditions and the
+  following disclaimer.
+
+
+--- T693a5dc45091f6cb ---
+* Redistributions in binary form must reproduce the above
+  copyright notice, this list of conditions and the
+  following disclaimer in the documentation and/or other
+  materials provided with the distribution.
+
+
+--- T1c06291e2ec7fd84 ---
+* Neither the name of the Webbit nor the names of
+  its contributors may be used to endorse or promote products
+  derived from this software without specific prior written
+  permission.
+
+
+--- T4638d14532c44f67 ---
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+
+--- Td00d9d5d70c301e4 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.slf4j.txt
+/*
+ * Copyright (c) 2004-2007 QOS.ch
+ * All rights reserved.
+
+
+--- T4de010aac22236db ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/NOTICE.harmony.txt
+Apache Harmony
+
+
+--- Tee5e9a69de9c7def ---
+Copyright 2006, 2010 The Apache Software Foundation.
+
+
+--- T59d7bb2b01aac756 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.harmony.txt
+
+
+--- Tb835d3c857c91227 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jbzip2.txt
+Copyright (c) 2010-2011 Matthew J. Francis and Contributors of the jbzip2 Project
+
+
+--- T5a864258f36fdc38 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.libdivsufsort.txt
+Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
+
+
+--- T447e48d7afeaa3ca ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jctools.txt
+
+
+--- T81778ff85ab69b56 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.jfastlz.txt
+The MIT License
+
+
+--- T8e679afff129fa28 ---
+Copyright (c) 2009 William Kinney
+
+
+--- Tec67480981e5ad5a ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.protobuf.txt
+Protocol Buffers - Google's data interchange format
+Copyright 2013 Google Inc.  All rights reserved.
+https://developers.google.com/protocol-buffers/
+
+
+--- T634945b63f78a71d ---
+* Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+    * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+
+--- T401930e4123ca412 ---
+Code generated by the Protocol Buffer compiler is owned by the owner
+of the input file used when generating it.  This code is not
+standalone and requires a support library to be linked with it.  This
+support library is itself covered by the above license.
+
+
+--- Te124d6d297342163 ---
+Original: https://raw.githubusercontent.com/netty/netty/netty-4.2.19.Final/license/LICENSE.commons-lang.txt
 
 
 --- T71771d4278c0d251 ---
