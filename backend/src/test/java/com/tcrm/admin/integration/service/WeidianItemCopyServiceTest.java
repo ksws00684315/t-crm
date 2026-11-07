@@ -17,6 +17,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
+import com.tcrm.admin.integration.api.WeidianBusinessApi.AttributeGroup;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponseBlock;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemResponse;
@@ -180,6 +181,63 @@ class WeidianItemCopyServiceTest {
     assertThat(add.getValue().skus())
         .singleElement()
         .satisfies(sku -> assertThat(sku.merchantCode()).isNull());
+  }
+
+  @Test
+  void shouldSendSourceAttributes_whenItemHasSkus() throws Exception {
+    // Shape from the vdian.item.get docs: item-level attrList, SKU attr_ids joined by "-".
+    // Without attrList and attrIds Weidian rejects the copy with 200056 "SKU标题不能为空".
+    JsonNode raw =
+        json.readTree(
+            """
+            {"itemid":"7895568922","item_name":"Name","price":"112.00",
+             "attrList":[
+               {"attrTitle":"颜色","attrValues":[{"attrId":764647,"attrValue":"蓝色"}]},
+               {"attrTitle":"型号","attrValues":[{"attrId":"764651","attrValue":"L"}]}],
+             "skus":[{"id":"5884429004","title":"L ; 蓝色","attr_ids":"764651-764647",
+                      "price":"112.00","stock":2}]}
+            """);
+    when(weidian.item(anyLong(), any())).thenReturn(parser.item(raw));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(88L, List.of(), null));
+
+    service.copy(1L, "7895568922", 2L);
+
+    ArgumentCaptor<AddItemRequest> add = ArgumentCaptor.forClass(AddItemRequest.class);
+    verify(weidian).addItem(eq(2L), add.capture());
+    AddItemRequest request = add.getValue();
+    assertThat(request.createTempAttr()).isTrue();
+    assertThat(request.attributes()).extracting(AttributeGroup::title).containsExactly("颜色", "型号");
+    assertThat(request.attributes().get(1).values())
+        .singleElement()
+        .satisfies(
+            value -> {
+              assertThat(value.id()).isEqualTo(764651L);
+              assertThat(value.value()).isEqualTo("L");
+            });
+    assertThat(request.skus())
+        .singleElement()
+        .satisfies(sku -> assertThat(sku.attributeIds()).containsExactly(764651L, 764647L));
+  }
+
+  @Test
+  void shouldSendNoAttributes_whenItemHasNoSkus() throws Exception {
+    JsonNode raw =
+        json.readTree(
+            """
+            {"itemid":"7895568922","item_name":"Name","price":"9.90","skus":[]}
+            """);
+    when(weidian.item(anyLong(), any())).thenReturn(parser.item(raw));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(88L, List.of(), null));
+
+    service.copy(1L, "7895568922", 2L);
+
+    ArgumentCaptor<AddItemRequest> add = ArgumentCaptor.forClass(AddItemRequest.class);
+    verify(weidian).addItem(eq(2L), add.capture());
+    assertThat(add.getValue().attributes()).isNull();
+    assertThat(add.getValue().createTempAttr()).isNull();
+    assertThat(add.getValue().skus()).isNull();
   }
 
   @Test
