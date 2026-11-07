@@ -218,6 +218,17 @@ describe("creator list page (task 32 §2.2)", () => {
     wrapper.unmount();
   });
 
+  it("shows the email as copyable text so a long address can be copied", async () => {
+    signIn("SUPER_ADMIN", "ALL", SUPER);
+    const wrapper = await mountPage();
+    const emailCell = [...document.body.querySelectorAll("tr td")].find(
+      td => td.querySelector('[data-test="value"]')?.textContent === "alice@example.com"
+    );
+    expect(emailCell).toBeDefined();
+    expect(emailCell?.querySelector('[data-test="copy"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
   it("moves review into its status and keeps the commission gate per row", async () => {
     signIn("SUPER_ADMIN", "ALL", SUPER);
     const wrapper = await mountPage("3", [
@@ -343,6 +354,8 @@ describe("creator list page (task 32 §2.2)", () => {
     expect(document.body.textContent).toContain("商务专属邀请码");
     expect(document.body.textContent).toContain("ABCD1234");
     expect(element("register-qr-image").attributes("src")).toBe("data:image/png;base64,UVI=");
+    // The regenerate action is gone (smoke item 7): the dialog only closes.
+    expect(document.body.querySelector('[data-test="rotate-link"]')).toBeNull();
     expect(QRCode.toDataURL).toHaveBeenCalledWith(
       expect.stringContaining("ABCD1234"),
       expect.anything()
@@ -427,6 +440,37 @@ describe("creator list page (task 32 §2.2)", () => {
     expect(element("profile-email").text()).toContain("alice@example.com");
     expect(document.body.textContent).toContain("KOL-ASD001");
     expect(element("profile-email").find('[data-test="copy"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("opens a pending creator's basic info in review mode, then saves once approved", async () => {
+    signIn("SUPER_ADMIN", "ALL", SUPER);
+    const wrapper = await mountPage("1", [{ ...row, reviewStatus: "PENDING" }]);
+    await element("action-edit").trigger("click");
+    await flushPromises();
+    // First opening is the approval step (smoke item 11): the title and the primary button say so.
+    expect(document.body.textContent).toContain("审核达人 KOL-ASD001");
+    expect(element("profile-save").text()).toBe("审核通过");
+
+    // Once the review endpoint succeeds the list reloads with the approved creator.
+    vi.mocked(kolApi.listKols).mockResolvedValue({
+      items: [{ ...row, reviewStatus: "APPROVED" }],
+      total: "1",
+      page: 1,
+      size: 20
+    });
+    await element("profile-save").trigger("click");
+    await flushPromises();
+    expect(kolApi.reviewKol).toHaveBeenCalledWith(
+      row.id,
+      expect.objectContaining({ name: "Alice" })
+    );
+
+    // Reopened after approval, the same entry points at plain editing.
+    await element("action-edit").trigger("click");
+    await flushPromises();
+    expect(document.body.textContent).toContain("资料编辑 - KOL-ASD001（Alice）");
+    expect(element("profile-save").text()).toBe("保存");
     wrapper.unmount();
   });
 

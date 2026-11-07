@@ -7,6 +7,7 @@ import { getCleanupRemaining, updateKolStatus } from "@/api/kol/kol";
 import type { DisplayRelationStatus, KolVO, ReviewStatus } from "@/api/types";
 import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import DataTable, { type DataColumn } from "@/components/DataTable.vue";
+import CopyText from "@/components/CopyText.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useLocaleStore } from "@/stores/locale";
 import { useUserStore } from "@/stores/user";
@@ -151,8 +152,7 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   { key: "kol", align: "left" as const, label: t("copyToken.kol"), minWidth: 170 },
   // 140px is what the literal column name from requirement 04.01 ("Phone/WhatsApp") needs with the
-  // 10px cell padding; the header itself was ellipsized at the old 112px. The email column gives up
-  // those pixels: its values ellipsize with a tooltip either way.
+  // 10px cell padding; the header itself was ellipsized at the old 112px.
   {
     key: "contact",
     align: "left" as const,
@@ -160,12 +160,13 @@ const columns = computed<DataColumn[]>(() => [
     width: px(170, 180),
     tooltip: true
   },
+  // Email is a CopyText cell (2026-11-06 smoke item 10): the copy button needs its own pixels, and
+  // long addresses ellipsize with a tooltip instead of being cut off without a way to copy them.
   {
     key: "email",
     align: "left" as const,
     label: t("kol.email"),
-    width: px(104, 168),
-    tooltip: true
+    width: px(200, 220)
   },
   {
     key: "platform",
@@ -248,7 +249,9 @@ function openFund(row: KolVO) {
 
 function openEdit(row: KolVO) {
   profileKol.value = row;
-  reviewMode.value = false;
+  // A pending creator opens in review mode (2026-11-06 smoke item 11): the first save approves them,
+  // and the primary button shows the localized save label only once the creator is approved.
+  reviewMode.value = abilities.value.canWrite && row.reviewStatus === "PENDING";
   profileVisible.value = true;
 }
 
@@ -462,7 +465,7 @@ onMounted(async () => {
             ></template
           >
           <template #cell-contact="{ row }">{{ contactText(asKol(row)) }}</template>
-          <template #cell-email="{ row }">{{ asKol(row).email }}</template>
+          <template #cell-email="{ row }"><CopyText :value="asKol(row).email" /></template>
           <template #cell-platform="{ row }">{{ platformText(asKol(row)) }}</template>
           <template #cell-rate="{ row }">{{ formatRate(asKol(row).defaultRate) }}</template>
           <template #cell-inviteTime="{ row }">

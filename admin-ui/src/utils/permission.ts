@@ -295,7 +295,7 @@ export interface KolAbilities {
   canAssignBd: boolean;
   /** Filter the list by BD. kol:view outside OWN. */
   canFilterBd: boolean;
-  /** Show and rotate the caller's creator registration link. */
+  /** Show the caller's creator registration link. */
   canRegisterLink: boolean;
   /** Open the "invite creator" dialog: the BD conditions above, or the super administrator. */
   canInviteKol: boolean;

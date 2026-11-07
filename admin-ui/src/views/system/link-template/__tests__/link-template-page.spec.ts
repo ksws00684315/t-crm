@@ -64,6 +64,10 @@ describe("link template page", () => {
     await wrapper.get('[data-test="create"]').trigger("click");
     await nextTick();
     expect(field("template-code").element.disabled).toBe(false);
+    // The address field explains its placeholders (smoke item 6).
+    expect(document.body.querySelector('[data-test="template-url-hint"]')?.textContent).toContain(
+      "{PRODUCT_ID} 会替换为商品 ID"
+    );
     await field("template-code").setValue("agent-one");
     await field("template-url").setValue(row.templateUrl);
     await nextTick();

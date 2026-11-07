@@ -15,7 +15,7 @@
 2. 把 `SparkTrack-3.0.5.gs` 的内容粘贴到默认脚本文件（可重命名为 `SparkTrack-3.0.5`）。
 3. 依次「文件 → 新建 → HTML」，分别创建 3 个 HTML 文件并粘贴对应内容，名字必须正好是 `submitFrom`、`weidianOriginalForm`、`buyLinkConvertForm`（脚本按名字引用）。
 4. 左侧「项目设置」，在**脚本属性**中新增：
-   - `TALENT_CRM_API_BASE_URL` ＝ 本系统后台地址 `https://admin.sparktrackcrm.com/admin-api`（可选：脚本默认已指向该地址，只有切换环境时才需要设置）。
+   - `TALENT_CRM_API_BASE_URL` ＝ 本系统后台地址 `https://admin.sparktrackcrm.com/admin-api`（可选：脚本默认已指向该地址，只有切换环境时才需要设置）。粘贴时注意不要带入换行或空格，脚本会自动去掉所有空白；地址格式不对时会提示「接口地址格式不正确」而不是发出坏请求。
 5. 保存后回到表格，刷新页面会出现「链接工具」菜单：🔗 一键替换链接(V2)、转换为微店原始链接、buy 链接互转（选区）。
 
 > **默认接口地址**：`SparkTrack-3.0.5.gs` 顶部的 `PRODUCT_LINK_API_DEFAULT_BASE_URL` 指向正式环境 `https://admin.sparktrackcrm.com/admin-api`，粘贴脚本后即可使用。如需指向其他环境，在脚本属性中设置 `TALENT_CRM_API_BASE_URL` 覆盖（优先级高于该常量）。

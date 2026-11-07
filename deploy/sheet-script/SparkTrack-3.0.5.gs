@@ -1294,7 +1294,17 @@ function productLinkApiFetch_(path, options, expectArray) {
 
 function productLinkApiBaseUrl_() {
   var configured = PropertiesService.getScriptProperties().getProperty("TALENT_CRM_API_BASE_URL");
-  return String(configured || PRODUCT_LINK_API_DEFAULT_BASE_URL).replace(/\/+$/, "");
+  var raw = String(configured || PRODUCT_LINK_API_DEFAULT_BASE_URL);
+  // Pasting the address into the script properties can turn a line break into a space
+  // ("https://admin.sparktr ackcrm.com/..."), which UrlFetchApp rejects as a bad request.
+  // Drop all whitespace and the trailing slash, and fail with a readable message instead of
+  // sending a malformed host name.
+  var baseUrl = raw.replace(/\s+/g, "").replace(/\/+$/, "");
+  if (!/^https?:\/\/[^\/]+/.test(baseUrl)) {
+    throw new Error(
+      "接口地址格式不正确，请检查脚本属性 TALENT_CRM_API_BASE_URL：" + raw.replace(/\s+/g, " ").trim());
+  }
+  return baseUrl;
 }
 
 function unwrapEasyApiResponse_(response, apiUrl, expectArray) {
