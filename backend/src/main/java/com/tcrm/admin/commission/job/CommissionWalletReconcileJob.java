@@ -67,9 +67,11 @@ public class CommissionWalletReconcileJob {
         continue;
       }
       BigDecimal funding = withdrawals.sumFundingOccupied(kolId);
-      // Funding money must stay inside the balance; a negative balance with pending withdrawals
-      // would mean a prepay deduction raced past an approval and needs manual attention.
-      if (balance.subtract(funding).signum() < 0) {
+      // Funding money must stay inside the balance, but a negative balance on its own is expected:
+      // a clawback or a prepay deduction leaves the creator in debt until later credits recover it
+      // (task 113). Only a live withdrawal on top of the balance needs manual attention, so the
+      // comparison runs only when something is actually occupied (task 123).
+      if (funding.signum() > 0 && funding.compareTo(balance) > 0) {
         LOG.error(
             "withdrawal occupation exceeds wallet balance: tenant {}, kol {}, balance {},"
                 + " funding occupation {}",
