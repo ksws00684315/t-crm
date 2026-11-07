@@ -304,12 +304,22 @@ public class CopyJobWorker implements ApplicationRunner {
     if (name == null || name.isBlank() || price == null) {
       return SourceLookup.lackingInfo();
     }
-    ProductDO registered = ensureProduct(shop.getId(), weidianItemId, name, price);
+    ProductDO registered =
+        ensureProduct(shop.getId(), weidianItemId, name, price, imageOf(hitItem.imageUrl()));
     return SourceLookup.found(registered);
   }
 
+  /** Keeps an image the product rules accept (https, length); otherwise registers none. */
+  private static String imageOf(String url) {
+    return url != null
+            && ProductRules.isHttpsUrl(url)
+            && ProductRules.length(url) <= ProductRules.MAX_IMAGE_URL
+        ? url
+        : null;
+  }
+
   private ProductDO ensureProduct(
-      long shopId, String weidianItemId, String name, BigDecimal price) {
+      long shopId, String weidianItemId, String name, BigDecimal price, String imageUrl) {
     ProductDO existing =
         products.selectOne(
             new LambdaQueryWrapper<ProductDO>()
@@ -331,6 +341,7 @@ public class CopyJobWorker implements ApplicationRunner {
     product.setShopId(shopId);
     product.setWeidianItemId(weidianItemId);
     product.setName(name);
+    product.setImageUrl(imageUrl);
     product.setPrice(price);
     product.setPriceCurrency("CNY");
     product.setStatus(1);

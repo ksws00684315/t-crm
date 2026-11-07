@@ -188,7 +188,8 @@ class CopyJobWorkerTest {
     when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
     when(shops.selectList(any())).thenReturn(List.of(shop(5L)));
     when(products.selectList(any())).thenReturn(List.of());
-    when(copies.probe(5L, "10001")).thenReturn(Optional.of(new ProbedItem("10001", "Name", null)));
+    when(copies.probe(5L, "10001"))
+        .thenReturn(Optional.of(new ProbedItem("10001", "Name", null, null)));
 
     worker.processJob(1L);
 
@@ -304,7 +305,10 @@ class CopyJobWorkerTest {
     when(shops.selectList(any())).thenReturn(List.of(shop(5L)));
     when(products.selectList(any())).thenReturn(List.of());
     when(copies.probe(5L, "10001"))
-        .thenReturn(Optional.of(new ProbedItem("10001", "Src", new BigDecimal("9.9"))));
+        .thenReturn(
+            Optional.of(
+                new ProbedItem(
+                    "10001", "Src", new BigDecimal("9.9"), "https://wd.geilicdn.com/a.jpg")));
     when(products.selectOne(any())).thenReturn(null);
     when(codes.next()).thenReturn("P000001");
     AtomicInteger productId = new AtomicInteger(50);
@@ -323,7 +327,9 @@ class CopyJobWorkerTest {
 
     worker.processJob(1L);
 
-    verify(products).insert(org.mockito.ArgumentMatchers.<ProductDO>any());
+    ArgumentCaptor<ProductDO> registered = ArgumentCaptor.forClass(ProductDO.class);
+    verify(products).insert(registered.capture());
+    assertThat(registered.getValue().getImageUrl()).isEqualTo("https://wd.geilicdn.com/a.jpg");
     ArgumentCaptor<KolItemDO> inserted = ArgumentCaptor.forClass(KolItemDO.class);
     verify(kolItems).insert(inserted.capture());
     assertThat(inserted.getValue().getSource()).isEqualTo("COPY");

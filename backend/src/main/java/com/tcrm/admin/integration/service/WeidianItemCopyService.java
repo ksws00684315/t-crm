@@ -91,7 +91,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       if (item == null || item.itemId() == null) {
         return Optional.empty();
       }
-      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), item.price()));
+      List<ItemImage> images = images(item.raw());
+      String image = images.isEmpty() ? null : httpsUrl(images.getFirst().url());
+      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), item.price(), image));
     } catch (WeidianApiException e) {
       if (isItemNotFound(e)) {
         return Optional.empty();
@@ -281,6 +283,11 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       pos++;
     }
     return out;
+  }
+
+  /** Weidian image addresses come as http://; product images must be https (task 131). */
+  private static String httpsUrl(String url) {
+    return url.startsWith("http://") ? "https://" + url.substring("http://".length()) : url;
   }
 
   private static List<ItemImage> images(JsonNode raw) {

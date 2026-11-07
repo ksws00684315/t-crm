@@ -31,7 +31,10 @@ public interface WeidianItemCopyApi {
    */
   DeleteResult deleteItem(long shopId, String weidianItemId);
 
-  record ProbedItem(String itemId, String name, BigDecimal price) {}
+  /**
+   * @param imageUrl first item image as an https address; null when the item has none
+   */
+  record ProbedItem(String itemId, String name, BigDecimal price, String imageUrl) {}
 
   /**
    * @param newItemId digit-string id returned by {@code vdian.item.add}
