@@ -156,7 +156,7 @@ class ProductLinkServiceTest {
   }
 
   @Test
-  void shouldListTemplates_withRelayFirstAndDedup() {
+  void shouldListTemplates_withoutRelayAndDedup() {
     when(jdbc.query(anyString(), any(RowMapper.class), any(), any()))
         .thenReturn(
             List.of(
@@ -165,9 +165,10 @@ class ProductLinkServiceTest {
                 new ProductLinkService.LinkTemplateView(
                     "2", "b", "B", "https://buy.example/{PRODUCT_ID}", "WEIDIAN", 2)));
     var templates = service.templates("WEIDIAN");
-    assertThat(templates).hasSize(2);
-    assertThat(templates.getFirst().templateCode()).isEqualTo("TCRM_RELAY");
-    assertThat(templates.get(1).templateUrl()).isEqualTo("https://buy.example/{PRODUCT_ID}");
+    // The relay template is disabled (task 126); a company template with the relay URL is still
+    // deduped, so only the real platform remains.
+    assertThat(templates).hasSize(1);
+    assertThat(templates.getFirst().templateCode()).isEqualTo("b");
   }
 
   @Test

@@ -45,17 +45,10 @@ class ProductLinkControllerTest {
   }
 
   @Test
-  void shouldReturnTemplates_withTcrmRelayFirst() throws Exception {
+  void shouldReturnTemplates_fromService() throws Exception {
     when(links.templates("WEIDIAN"))
         .thenReturn(
             List.of(
-                new LinkTemplateView(
-                    "tcrm-relay",
-                    "TCRM_RELAY",
-                    "SparkTrack 中转",
-                    "https://t.example/i/{PRODUCT_ID}",
-                    "WEIDIAN",
-                    0),
                 new LinkTemplateView(
                     "1",
                     "kakobuy",
@@ -66,9 +59,8 @@ class ProductLinkControllerTest {
     mvc.perform(get(BASE + "/templates").param("channelCode", "WEIDIAN"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value(0))
-        .andExpect(jsonPath("$.data[0].templateCode").value("TCRM_RELAY"))
-        .andExpect(jsonPath("$.data[0].templateUrl").value("https://t.example/i/{PRODUCT_ID}"))
-        .andExpect(jsonPath("$.data[1].templateCode").value("kakobuy"));
+        .andExpect(jsonPath("$.data[0].templateCode").value("kakobuy"))
+        .andExpect(jsonPath("$.data[0].templateUrl").value("https://kakobuy.example/{PRODUCT_ID}"));
     verify(rates).checkIp("127.0.0.1");
   }
 

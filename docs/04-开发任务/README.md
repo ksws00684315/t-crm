@@ -143,6 +143,7 @@
 | 121 | 表格脚本默认接口地址改为正式域名：`PRODUCT_LINK_API_DEFAULT_BASE_URL` 由预演地址改为 `https://admin.sparktrackcrm.com/admin-api`，客户粘贴脚本后无需再设置脚本属性；`TALENT_CRM_API_BASE_URL` 覆盖机制保留供切换环境 | 待合并（分支 `task/121-sheet-script-prod-domain`） | [执行报告](121-表格脚本正式域名-执行报告.md) |
 | 124 | 表格脚本接口地址容错：脚本属性里的后台地址被断行成空格（`https://admin.sparktr ackcrm.com/...`），`UrlFetchApp` 报「错误请求」；`productLinkApiBaseUrl_()` 先去掉所有空白再校验，格式不对时提示检查 `TALENT_CRM_API_BASE_URL`，README 补粘贴说明 | 待合并（分支 `task/124-sheet-script-url-sanitize`） | [执行报告](124-表格脚本接口地址容错-执行报告.md) |
 | 125 | 钱包对账负余额误报修复（正式环境 2026-11-07 告警）：预付抵扣/退款扣回让达人余额为负属预期（任务 113、金额口径），但 `CommissionWalletReconcileJob` 用 `balance - funding < 0` 判断，余额为负、无提现时也记 ERROR；改为「有提现占用且占用超过余额」才报，补日志捕获与三个用例 | 待合并（分支 `task/123-wallet-reconcile-negative-balance`） | [执行报告](125-钱包对账负余额误报修复-执行报告.md) |
+| 126 | 停用 SparkTrack 中转模板（负责人 2026-11-07：暂时不需要中转链接）：`ProductLinkService.templates()` 注释内置中转模板，表格脚本「选择平台」只剩公司启用的平台模板；已有 `/i/` 链接、跳转服务与达人端 `transitUrl` 不受影响，恢复时取消注释即可 | 待合并（分支 `task/126-disable-relay-template`） | [执行报告](126-停用中转模板-执行报告.md) |
 
 规则：
 
