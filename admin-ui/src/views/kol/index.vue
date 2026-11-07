@@ -14,9 +14,11 @@ import { useUserStore } from "@/stores/user";
 import { formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import { accessOf, kolAbilities } from "@/utils/permission";
+import { prepayAbilities } from "@/utils/prepay";
 import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
 import { formatRate } from "@/utils/rate";
 import { readPageSize } from "@/utils/table-prefs";
+import ApplyDialog from "@/views/fund/prepay/ApplyDialog.vue";
 import { listKols } from "@/api/kol/kol";
 import CleanupConfigDialog from "./CleanupConfigDialog.vue";
 import CommissionDialog from "./CommissionDialog.vue";
@@ -37,6 +39,8 @@ const { t } = useI18n();
 const me = useUserStore();
 const abilities = computed(() => kolAbilities(me.user));
 const isSuperAdmin = computed(() => accessOf(me.user).isSuperAdmin);
+/** Prepay request entry below the invite button (smoke item 17); same permission as the prepay page. */
+const canApplyPrepay = computed(() => prepayAbilities(me.user).apply);
 /** An own-scoped BD: the list only shows their creators plus exact-search finds. */
 const isBd = computed(() => accessOf(me.user).isOwnScope);
 
@@ -233,6 +237,7 @@ const commissionKol = ref<KolVO | null>(null);
 const cleanupVisible = ref(false);
 const cleanupKol = ref<KolVO | null>(null);
 const inviteVisible = ref(false);
+const prepayApplyVisible = ref(false);
 const fundVisible = ref(false);
 const fundKol = ref<KolVO | null>(null);
 
@@ -413,10 +418,25 @@ onMounted(async () => {
               />
             </el-form-item>
           </template>
-          <template v-if="abilities.canInviteKol" #actions>
-            <el-button type="primary" data-test="invite-kol" @click="inviteVisible = true">
-              + {{ t("kol.registerLink") }}
-            </el-button>
+          <template v-if="abilities.canInviteKol || canApplyPrepay" #actions>
+            <div class="kol-page-actions">
+              <el-button
+                v-if="abilities.canInviteKol"
+                type="primary"
+                data-test="invite-kol"
+                @click="inviteVisible = true"
+              >
+                + {{ t("kol.registerLink") }}
+              </el-button>
+              <!-- Smoke item 17: the prepay entry sits below the invite button. -->
+              <el-button
+                v-if="canApplyPrepay"
+                data-test="kol-prepay-apply"
+                @click="prepayApplyVisible = true"
+              >
+                + {{ t("prepay.applyAction") }}
+              </el-button>
+            </div>
           </template>
         </ListSearch>
 
@@ -520,6 +540,7 @@ onMounted(async () => {
     <KolFundDialog v-model="fundVisible" :kol="fundKol" />
     <CleanupConfigDialog v-model="cleanupVisible" :kol="cleanupKol" @changed="load" />
     <InviteKolDialog v-model="inviteVisible" />
+    <ApplyDialog v-model="prepayApplyVisible" @saved="load" />
   </div>
 </template>
 
@@ -536,6 +557,12 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;
   overflow: visible;
+}
+.kol-page-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tcrm-space-2);
 }
 .kol-tabs :deep(.el-tab-pane) {
   display: flex;

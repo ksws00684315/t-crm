@@ -24,6 +24,7 @@ import {
   SELECTABLE_ROLES
 } from "@/utils/permission";
 import { readPageSize } from "@/utils/table-prefs";
+import PermissionsDialog from "./PermissionsDialog.vue";
 import ResetPasswordDialog from "./ResetPasswordDialog.vue";
 import UserFormDialog from "./UserFormDialog.vue";
 
@@ -82,7 +83,7 @@ const columns = computed<DataColumn[]>(() => [
   { key: "status", label: t("common.status"), width: px(80, 90) },
   { key: "lastLogin", label: t("user.lastLogin"), width: px(170, 190) },
   { key: "createdAt", label: t("common.createdAt"), width: px(180, 190) },
-  { key: "actions", label: t("common.actions"), width: px(328, 430) }
+  { key: "actions", label: t("common.actions"), width: px(392, 560) }
 ]);
 
 const applied = ref({
@@ -112,6 +113,8 @@ const formVisible = ref(false);
 const editingUser = ref<UserVO | null>(null);
 const resetVisible = ref(false);
 const resetUser = ref<UserVO | null>(null);
+const permissionsVisible = ref(false);
+const permissionsUser = ref<UserVO | null>(null);
 /** KOLs per BD row (task 16b): drives the transfer button and the disable confirmation. */
 const kolCounts = ref<Record<string, number>>({});
 const departureVisible = ref(false);
@@ -325,6 +328,12 @@ function openReset(row: UserVO) {
   resetVisible.value = true;
 }
 
+/** Permissions moved out of the edit dialog (smoke item 26): one entry in the row actions. */
+function openPermissions(row: UserVO) {
+  permissionsUser.value = row;
+  permissionsVisible.value = true;
+}
+
 /** Permissions and plan cancellation are reached from their corresponding dialogs. */
 function rowActions(row: UserVO): RowAction[] {
   return [
@@ -332,6 +341,14 @@ function rowActions(row: UserVO): RowAction[] {
       key: "edit",
       label: t("user.editInfo"),
       onClick: () => openEdit(row)
+    },
+    {
+      key: "permissions",
+      label: t("user.editPermissions"),
+      testId: `permissions-${row.id}`,
+      // The super administrator keeps every permission; the dialog only manages post-based staff.
+      hidden: row.role !== "STAFF",
+      onClick: () => openPermissions(row)
     },
     {
       key: "status",
@@ -551,6 +568,7 @@ onMounted(load);
     </DataTable>
 
     <UserFormDialog v-model="formVisible" :user="editingUser" @saved="load" />
+    <PermissionsDialog v-model="permissionsVisible" :user="permissionsUser" @saved="load" />
     <ResetPasswordDialog v-model="resetVisible" :user="resetUser" />
     <DeparturePlanDialog v-model="departureVisible" :user="departureUser" @saved="load" />
   </div>

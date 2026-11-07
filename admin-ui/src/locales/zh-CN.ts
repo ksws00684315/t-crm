@@ -204,7 +204,7 @@ const zhCN = {
     settlementConfig: "结算配置",
     system: "系统管理",
     users: "账号管理",
-    postTemplates: "权限设置",
+    postTemplates: "权限模版",
     linkTemplates: "平台维护",
     importTasks: "上传文件",
     auditLogs: "操作日志",
@@ -561,6 +561,7 @@ const zhCN = {
   },
   user: {
     editInfo: "编辑信息",
+    editPermissions: "编辑权限",
     create: "新增用户",
     editTitle: "编辑用户",
     createTitle: "新增用户",
@@ -573,7 +574,6 @@ const zhCN = {
     allPermissionsShort: "全部",
     permissionsTitle: "权限设置",
     permissionsSaved: "权限已保存",
-    permissionsSeparate: "在编辑信息弹窗中打开权限设置，可调整此账号的权限和数据范围。",
     currentPost: "当前岗位：{post}",
     selectAll: "全选",
     permissionRequired: "请至少勾选一项权限",
@@ -780,7 +780,7 @@ const zhCN = {
     disabledCommissionApproved: "达人审核通过后才能调整佣金",
     editProfileTitle: "资料编辑 - {code}（{name}）",
     /** Super-admin tab on the creator page: transfer creators between BDs. */
-    manageTab: "达人管理",
+    manageTab: "达人分配",
     listTab: "达人列表",
     transferRecordsHint: "转移记录请到 系统管理 → 操作日志 查询"
   },
@@ -1575,7 +1575,7 @@ const zhCN = {
     moduleAll: "模块全选",
     selectedCount: "已选 {selected} / {total} 项",
     selectModule: "全选{module}权限",
-    title: "权限设置",
+    title: "权限模版",
     hint: "只影响之后新建的账号，不会修改已有账号的权限。",
     cardTitle: "{post}岗位模板",
     dataScope: "默认数据范围",

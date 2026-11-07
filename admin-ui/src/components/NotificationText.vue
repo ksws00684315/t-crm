@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { NotificationVO } from "@/api/notification/notification";
-import NameCode from "@/components/NameCode.vue";
 import { notificationKey, notificationValues } from "@/utils/notification";
+import { formatNameWithCode } from "@/utils/format";
 
 /**
- * One notification sentence. When the message carries `kolName` (task 71, B06) the creator renders
- * as the shared two-line identity — name above, code below; messages without it keep the plain
- * inline code, which is also the shape of all history written before the field existed.
+ * One notification sentence. The creator renders inline as "name（code）" (task 126): the two-line
+ * identity used in tables cannot sit inside a sentence — it broke the line into three and left the
+ * code reading as the subject (smoke item 29). Messages without a stored name keep the plain code,
+ * which is also the shape of all history written before the field existed.
  */
 defineOptions({ name: "NotificationText" });
 
 const props = defineProps<{ item: NotificationVO }>();
 
 const values = computed(() => notificationValues(props.item));
-const kolName = computed(() => props.item.params?.kolName ?? null);
+const kolIdentity = computed(() => {
+  const name = props.item.params?.kolName?.trim();
+  const code = props.item.params?.kolCode?.trim();
+  if (!name) return code ?? "";
+  return code && code !== name ? formatNameWithCode(name, code) : name;
+});
 </script>
 
 <template>
@@ -25,15 +31,7 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
     class="notification-text"
     data-test="notification-text"
   >
-    <template #kolCode>
-      <NameCode
-        v-if="kolName"
-        class="notification-text__kol"
-        :name="kolName"
-        :code="item.params?.kolCode"
-      />
-      <template v-else>{{ values.kolCode }}</template>
-    </template>
+    <template #kolCode>{{ kolIdentity }}</template>
     <template #accountType>{{ values.accountType }}</template>
     <template #shopName>{{ values.shopName }}</template>
     <template #reason>{{ values.reason }}</template>
@@ -51,11 +49,5 @@ const kolName = computed(() => props.item.params?.kolName ?? null);
 .notification-text {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.notification-text__kol {
-  display: inline-flex;
-  width: auto;
-  vertical-align: middle;
 }
 </style>

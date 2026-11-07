@@ -23,7 +23,6 @@ import {
   validateUsername
 } from "@/utils/validation";
 import PermissionPicker from "./PermissionPicker.vue";
-import PermissionsDialog from "./PermissionsDialog.vue";
 
 defineOptions({ name: "UserFormDialog" });
 
@@ -49,7 +48,6 @@ const editing = computed(() => props.user !== null);
 const personalLocked = computed(() => isMultiCompany(props.user));
 const formRef = ref<FormInstance>();
 const saving = ref(false);
-const permissionsVisible = ref(false);
 const serverErrors = ref<Record<string, string>>({});
 const catalog = ref<PermissionCatalogVO | null>(null);
 const form = reactive({
@@ -278,21 +276,6 @@ async function submit(): Promise<void> {
       <p v-if="form.role === 'SUPER_ADMIN'" class="all-permissions" data-test="all-permissions">
         {{ t("user.allPermissions") }}
       </p>
-      <div
-        v-else-if="editing && props.user?.role === 'STAFF'"
-        class="edit-permissions"
-        data-test="permissions-in-edit"
-      >
-        <p class="perm-note">{{ t("user.permissionsSeparate") }}</p>
-        <el-button
-          link
-          type="primary"
-          data-test="open-user-permissions"
-          @click="permissionsVisible = true"
-        >
-          {{ t("user.permissionsTitle") }}
-        </el-button>
-      </div>
       <template v-if="showPermissions">
         <div class="perm-scroll" data-test="permission-area">
           <PermissionPicker v-model="form.permissions" :items="catalog?.permissions ?? []" />
@@ -313,7 +296,6 @@ async function submit(): Promise<void> {
       </el-button>
     </template>
   </el-dialog>
-  <PermissionsDialog v-model="permissionsVisible" :user="props.user" @saved="emit('saved')" />
 </template>
 
 <style scoped>
@@ -327,12 +309,5 @@ async function submit(): Promise<void> {
   max-height: 360px;
   overflow: auto;
   margin-bottom: 12px;
-}
-
-.edit-permissions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 </style>

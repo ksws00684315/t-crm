@@ -27,6 +27,22 @@ body {
   outline-offset: var(--tcrm-focus-width);
 }
 
+/* The select trigger draws the focus ring (规范 13 §4.6.1). A filterable select's inner input is
+   keyboard-focused too, and the global rule above painted a second outline inside the trigger —
+   a stray vertical line 18px from its right edge (smoke task 126). */
+.el-select__input:focus-visible {
+  outline: none;
+}
+
+/* Field errors take space in the flow instead of overlapping the next field: the shared help role
+   is 14/22px, taller than Element Plus's 16px error line and the 18px item gap (规范 13 §4.6).
+   Full width keeps the message under the field: the content box wraps, so without it an error
+   after a narrow control (a radio group) would sit beside it (PR #223 R-1). */
+.el-form-item__error {
+  position: static;
+  width: 100%;
+}
+
 .el-overlay-dialog {
   display: flex;
   align-items: center;

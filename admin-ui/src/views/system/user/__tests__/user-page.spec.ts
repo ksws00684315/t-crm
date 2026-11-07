@@ -249,12 +249,37 @@ describe("user management page", () => {
     wrapper.unmount();
   });
 
-  it("keeps the four row actions and removes permission and transfer actions from the list", async () => {
+  it("offers the permissions action in the row actions, not inside the edit dialog (序号 26)", async () => {
     const wrapper = await mountPage([{ ...row, postTemplate: "BD" }]);
     const rowActions = document.body.querySelector(".el-table__body tr .actions-cell");
-    expect(rowActions?.querySelectorAll("button")).toHaveLength(4);
-    expect(document.body.querySelector('[data-test="permissions-9007199254740993"]')).toBeNull();
+    // 编辑信息 / 编辑权限 / 停用 / 标记离职 / 重置密码
+    expect(rowActions?.querySelectorAll("button")).toHaveLength(5);
+    expect(bodyItem("permissions-9007199254740993").textContent).toContain("编辑权限");
     expect(document.body.querySelector('[data-test="transfer-kols-9007199254740993"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("hides the permissions action for the super administrator row", async () => {
+    const wrapper = await mountPage([
+      { ...row, role: "SUPER_ADMIN", postTemplate: null, dataScope: "ALL" }
+    ]);
+    const rowActions = document.body.querySelector(".el-table__body tr .actions-cell");
+    expect(rowActions?.querySelectorAll("button")).toHaveLength(3);
+    expect(document.body.querySelector('[data-test="permissions-9007199254740993"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("opens the permissions dialog from the row action", async () => {
+    vi.mocked(userApi.getPermissionCatalog).mockResolvedValue({ permissions: [], templates: [] });
+    vi.mocked(userApi.getUserPermissions).mockResolvedValue({
+      permissions: ["kol:view"],
+      dataScope: "OWN"
+    });
+    const wrapper = await mountPage();
+    await clickBodyItem("permissions-9007199254740993");
+    await flushPromises();
+    expect(userApi.getUserPermissions).toHaveBeenCalledWith("9007199254740993");
+    expect(document.body.querySelector('[data-test="data-scope"]')).not.toBeNull();
     wrapper.unmount();
   });
 });

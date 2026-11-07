@@ -184,23 +184,15 @@ describe("user form dialog", () => {
     wrapper.unmount();
   });
 
-  it("saves a post change without replacing the existing permissions", async () => {
+  it("moved the permissions entry to the row actions and still saves a post change alone", async () => {
     const wrapper = await open(staff);
     expect(document.body.querySelector('[data-test="permission-area"]')).toBeNull();
     expect(document.body.querySelector('[data-test="data-scope"]')).toBeNull();
-    expect(document.body.textContent).toContain(
-      "在编辑信息弹窗中打开权限设置，可调整此账号的权限和数据范围。"
-    );
+    // 序号 26：编辑信息弹窗里不再有「编辑权限」入口，入口在账号管理操作列。
+    expect(document.body.querySelector('[data-test="permissions-in-edit"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="open-user-permissions"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("在编辑信息弹窗中打开权限设置");
     expect(userApi.getPermissionCatalog).not.toHaveBeenCalled();
-    await new DOMWrapper(
-      document.body.querySelector('[data-test="open-user-permissions"]')!
-    ).trigger("click");
-    await flushPromises();
-    expect(userApi.getUserPermissions).toHaveBeenCalledWith(staff.id);
-    expect(userApi.getPermissionCatalog).toHaveBeenCalledTimes(1);
-    expect(document.body.querySelector('[data-test="current-post"]')?.textContent).toContain(
-      "商务"
-    );
 
     byTest(wrapper, "ElSelect", "post-template").vm.$emit("update:modelValue", "OPERATOR");
     await flushPromises();
