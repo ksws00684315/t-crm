@@ -15,6 +15,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponseBlock;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -156,6 +158,28 @@ class WeidianItemCopyServiceTest {
     assertThat(result.newItemId()).isEqualTo("88");
     assertThat(result.detailWarning()).isNull();
     verify(weidian, never()).saveItemDetail(anyLong(), any());
+  }
+
+  @Test
+  void shouldNotSendMerchantCode_whenCopyingItem() throws Exception {
+    JsonNode raw =
+        json.readTree(
+            """
+            {"itemid":"7895568922","item_name":"Name","price":308.00,"merchant_code":"SRC-001",
+             "skus":[{"merchantCode":"SKU-001","price":308.00,"stock":5}]}
+            """);
+    when(weidian.item(anyLong(), any())).thenReturn(parser.item(raw));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(88L, List.of(), null));
+
+    service.copy(1L, "7895568922", 2L);
+
+    ArgumentCaptor<AddItemRequest> add = ArgumentCaptor.forClass(AddItemRequest.class);
+    verify(weidian).addItem(eq(2L), add.capture());
+    assertThat(add.getValue().merchantCode()).isNull();
+    assertThat(add.getValue().skus())
+        .singleElement()
+        .satisfies(sku -> assertThat(sku.merchantCode()).isNull());
   }
 
   @Test
