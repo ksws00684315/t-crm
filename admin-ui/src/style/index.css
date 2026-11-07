@@ -29,7 +29,7 @@ body {
 
 /* The select trigger draws the focus ring (规范 13 §4.6.1). A filterable select's inner input is
    keyboard-focused too, and the global rule above painted a second outline inside the trigger —
-   a stray vertical line 18px from its right edge (实测任务 123). */
+   a stray vertical line 18px from its right edge (smoke task 126). */
 .el-select__input:focus-visible {
   outline: none;
 }

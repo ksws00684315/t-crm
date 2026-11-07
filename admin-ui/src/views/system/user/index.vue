@@ -35,10 +35,7 @@ defineOptions({ name: "SystemUserPage" });
 
 const { t, locale } = useI18n();
 const me = useUserStore();
-/**
- * Widths are tuned for the 14px Chinese labels; English needs more room and scrolls instead.
- * Actions: five English actions in one tight group need 560px (task 123 added "Edit permissions").
- */
+/** Widths are tuned for the 14px Chinese labels; English needs more room and scrolls instead. */
 const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const exportAllowed = computed(() => canExport(me.user));
 const loading = ref(false);

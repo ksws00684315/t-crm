@@ -5,7 +5,7 @@ import { notificationKey, notificationValues } from "@/utils/notification";
 import { formatNameWithCode } from "@/utils/format";
 
 /**
- * One notification sentence. The creator renders inline as "name（code）" (task 123): the two-line
+ * One notification sentence. The creator renders inline as "name（code）" (task 126): the two-line
  * identity used in tables cannot sit inside a sentence — it broke the line into three and left the
  * code reading as the subject (smoke item 29). Messages without a stored name keep the plain code,
  * which is also the shape of all history written before the field existed.

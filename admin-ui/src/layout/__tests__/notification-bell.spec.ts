@@ -128,7 +128,7 @@ describe("notification bell", () => {
     expect(wrapper.get("[data-test=notification-badge]").text()).toContain("99+");
   });
 
-  it("keeps the creator name inline in the sentence, falling back to the code (task 123)", async () => {
+  it("keeps the creator name inline in the sentence, falling back to the code (task 126)", async () => {
     api.listNotifications.mockImplementation(async () => ({
       items: [
         { ...payout, id: "78", params: { ...payout.params, kolName: "Ada" } },

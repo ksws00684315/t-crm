@@ -11,7 +11,7 @@ function rule(selector: string): string {
   return indexCss.slice(start, indexCss.indexOf("}", start)).replace(/\s+/g, " ");
 }
 
-describe("shared form and select focus rules (task 123)", () => {
+describe("shared form and select focus rules (task 126)", () => {
   it("keeps field errors in the flow so they never overlap the next field (spec 13 §4.6)", () => {
     // The shared help role is 14/22px, taller than Element Plus's 16px error line; keeping the
     // error absolutely positioned made it cover the next input (smoke item 1, create-account dialog).
