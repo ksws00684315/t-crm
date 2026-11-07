@@ -550,3 +550,4 @@ deploy/scripts/ops-check.sh                      # 手动跑一次；期望输�
 | 证书续期排障 | README「公开证书的申请与续期」（日志 `/var/log/tcrm-cert.log`） |
 | S3 不可用时 | README「备份与恢复」→「S3 不可用时」 |
 | 容量与扩容 | README「资源与 Redis 容量」 |
+| 正式环境排障（AI 代理） | skill `$prod-troubleshoot`（`.agents/skills/prod-troubleshoot/SKILL.md`）：经 SSM 只读排查，变更须负责人确认 |
