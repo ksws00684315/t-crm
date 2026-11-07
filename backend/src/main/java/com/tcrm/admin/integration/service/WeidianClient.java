@@ -17,6 +17,11 @@ public class WeidianClient {
     Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4)
   };
 
+  /** Request params are logged on failure so the call can be replayed; keep them bounded. */
+  private static final int PARAM_LOG_LIMIT = 2000;
+
+  private static final int REASON_LIMIT = 200;
+
   private final WeidianTokenCenter tokens;
   private final WeidianRateLimiter limiter;
   private final WeidianHttpGateway gateway;
@@ -51,6 +56,18 @@ public class WeidianClient {
           if (statusCode == 0) {
             return WeidianResponseParser.resultOrThrow(envelope);
           }
+          String reason = WeidianResponseParser.statusReason(envelope);
+          // The numeric code alone says nothing actionable (task 128); Weidian's reason and the
+          // request that produced it make the failure diagnosable and replayable. Params never
+          // carry the access token (it travels in the public form field).
+          LOG.warn(
+              "Weidian API failure method={} version={} shopId={} statusCode={} reason={} params={}",
+              method,
+              version,
+              shopId,
+              statusCode,
+              abbreviate(reason, REASON_LIMIT),
+              abbreviate(paramJson, PARAM_LOG_LIMIT));
           if (statusCode == 10013 || statusCode == 10016) {
             if (passiveRefreshUsed) {
               throw new WeidianApiException(statusCode, "Weidian access token is invalid", false);
@@ -65,7 +82,7 @@ public class WeidianClient {
             throw new WeidianApiException(statusCode, "Weidian authorization is expired", false);
           }
           if (!WeidianResponseParser.isRetryable(statusCode) || retryCount >= BACKOFF.length) {
-            throw new WeidianApiException(statusCode, "Weidian API error " + statusCode, false);
+            throw new WeidianApiException(statusCode, failureMessage(statusCode, reason), false);
           }
           delay.pause(BACKOFF[retryCount]);
           retryCount++;
@@ -89,6 +106,21 @@ public class WeidianClient {
           elapsedMs,
           retryCount);
     }
+  }
+
+  /** Keeps Weidian's own explanation next to the numeric code (task 128). */
+  static String failureMessage(int statusCode, String reason) {
+    String base = "Weidian API error " + statusCode;
+    String safe = abbreviate(reason, REASON_LIMIT);
+    return safe.isEmpty() ? base : base + "：" + safe;
+  }
+
+  private static String abbreviate(String value, int limit) {
+    if (value == null) {
+      return "";
+    }
+    String flat = value.replaceAll("\\s+", " ").strip();
+    return flat.length() > limit ? flat.substring(0, limit) + "…" : flat;
   }
 
   private String stringify(Object params) {
