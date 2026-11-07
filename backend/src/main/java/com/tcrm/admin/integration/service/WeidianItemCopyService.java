@@ -127,10 +127,6 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     Integer stock = item.stock() != null ? item.stock() : intVal(raw, "stock");
     List<ItemImage> images = images(raw);
     List<ItemSku> skus = skus(raw);
-    String merchantCode = text(raw, "merchant_code");
-    if (merchantCode == null) {
-      merchantCode = text(raw, "merchantCode");
-    }
     return new AddItemRequest(
         null,
         null,
@@ -152,7 +148,11 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         null,
         name,
         1,
-        merchantCode,
+        // Weidian rejects vdian.item.add when the merchant product code already exists in the
+        // shop. A copy carries the source product's code, so copying inside the same shop (or
+        // copying the same source twice) is refused. Owner decision 2026-11-07: send no merchant
+        // code at all; copied items keep none (task 127).
+        null,
         null,
         null,
         skus.isEmpty() ? null : skus);
@@ -315,7 +315,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
           new ItemSku(
               null,
               decimal(sku, "costPrice"),
-              text(sku, "merchantCode"),
+              // Same rule as the item-level code: the source SKU's merchant code would already
+              // exist in the shop (task 127).
+              null,
               decimal(sku, "price"),
               decimal(sku, "minPrice"),
               decimal(sku, "maxPrice"),
