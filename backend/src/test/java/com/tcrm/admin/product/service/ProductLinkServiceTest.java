@@ -38,6 +38,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class ProductLinkServiceTest {
   private final CopyTokenApi tokens = mock(CopyTokenApi.class);
@@ -153,6 +155,36 @@ class ProductLinkServiceTest {
     verify(items, org.mockito.Mockito.times(2)).insert(any(CopyJobItemDO.class));
     verify(worker).submit(jobCap.getValue().getId());
     verify(rates).checkConvertToken(1L);
+  }
+
+  @Test
+  void shouldSubmitWorker_onlyAfterCommit_whenTransactionActive() {
+    // Task 131: submitting before commit let the worker read no job row and stop silently.
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ShopDO shop = new ShopDO();
+    shop.setId(5L);
+    shop.setStatus(1);
+    shop.setWeidianShopId("9001");
+    when(shops.selectById(5L)).thenReturn(shop);
+    when(copies.isShopAuthorized(5L)).thenReturn(true);
+    when(items.listByJob(anyLong())).thenReturn(List.of());
+
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      service.convert(
+          new ConvertCommand(
+              "tok", "google_sheet_plugin", List.of(new ConvertItem("WEIDIAN", "111", null))));
+
+      verify(worker, never()).submit(anyLong());
+      for (TransactionSynchronization sync :
+          TransactionSynchronizationManager.getSynchronizations()) {
+        sync.afterCommit();
+      }
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+    verify(worker).submit(anyLong());
   }
 
   @Test

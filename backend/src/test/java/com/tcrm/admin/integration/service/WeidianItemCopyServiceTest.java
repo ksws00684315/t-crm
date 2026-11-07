@@ -24,6 +24,7 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailResponse;
 import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
+import com.tcrm.admin.product.api.WeidianItemCopyApi.ProbedItem;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import java.math.BigDecimal;
@@ -125,6 +126,34 @@ class WeidianItemCopyServiceTest {
 
     Optional<?> hit = service.probe(3L, "7");
     assertThat(hit).isPresent();
+  }
+
+  @Test
+  void shouldProbeFirstImageAsHttps_whenItemHasSeveralImages() throws Exception {
+    // Task 131: the auto-registered product had no image; Weidian returns http:// addresses.
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(
+            new ItemResponse(
+                "7",
+                "Hit",
+                null,
+                new BigDecimal("1.00"),
+                1,
+                "1",
+                json.readTree(
+                    "{\"imgs\":[\"http://wd.geilicdn.com/a.jpg\",\"http://wd.geilicdn.com/b.jpg\"]}")));
+
+    ProbedItem hit = service.probe(3L, "7").orElseThrow();
+
+    assertThat(hit.imageUrl()).isEqualTo("https://wd.geilicdn.com/a.jpg");
+  }
+
+  @Test
+  void shouldProbeNoImage_whenItemHasNoImages() {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("7", "Hit", null, new BigDecimal("1.00"), 1, "1", null));
+
+    assertThat(service.probe(3L, "7").orElseThrow().imageUrl()).isNull();
   }
 
   @Test
