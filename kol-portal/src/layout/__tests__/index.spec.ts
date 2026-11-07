@@ -43,7 +43,7 @@ describe("layout header", () => {
 
   it("closes the user menu on an outside click or Escape (smoke item 9)", async () => {
     const wrapper = mountLayout(true);
-    const menu = wrapper.get("details.user-menu").element as HTMLDetailsElement;
+    const menu = wrapper.get('[data-test="user-menu"]').element as HTMLDetailsElement;
     menu.open = true;
     await nextTick();
 
@@ -61,7 +61,7 @@ describe("layout header", () => {
     // A click inside the panel leaves it open for the next choice.
     menu.open = true;
     wrapper
-      .get(".user-menu__panel")
+      .get('[data-test="user-menu-panel"]')
       .element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await nextTick();
     expect(menu.open).toBe(true);

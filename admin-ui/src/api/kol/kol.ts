@@ -49,7 +49,7 @@ export interface ReviewKolRequest {
   remark: string | null;
 }
 
-/** `GET` / `POST /kol/register-code`. `url` is the full creator-portal link. */
+/** Registration link returned by `GET /kol/register-code`. `url` is the full creator-portal link. */
 export interface RegisterCodeVO {
   code: string;
   url: string;

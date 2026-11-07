@@ -4,7 +4,7 @@ import { http } from "./http";
 /**
  * Registration after task 32 §2.5 / 33 §3.11: no e-mail verification code any more, and the
  * optional country / profile-URL fields are no longer sent. `bdUserName` is null when the code
- * belongs to the super administrator; the page then shows the tenant name.
+ * belongs to the super administrator; the page then shows no invitation line.
  */
 export interface RegisterPreview {
   bdUserName: string | null;

@@ -97,9 +97,13 @@ describe("creator profile validation", () => {
 
   it("keeps the title and identity above the tabs", async () => {
     await page();
-    const header = wrapper.get(".account-header");
-    expect(wrapper.get(".account-page").element.firstElementChild).toBe(header.element);
+    const header = wrapper.get('[data-test="account-header"]');
+    expect(wrapper.get('[data-test="account-page"]').element.firstElementChild).toBe(
+      header.element
+    );
     expect(header.element.firstElementChild?.tagName).toBe("H1");
+    // The page keeps exactly one h1 (spec 13 heading hierarchy).
+    expect(wrapper.findAll("h1")).toHaveLength(1);
     expect(header.get("h1").element.nextElementSibling).toBe(
       header.get('[data-test="name-code"]').element
     );
@@ -108,38 +112,43 @@ describe("creator profile validation", () => {
 
   it("groups the cards into profile, payout and password tabs (smoke item 15)", async () => {
     await page();
-    const labels = wrapper.findAll(".el-tabs__item").map(tab => tab.text());
+    const labels = wrapper.findAll('[role="tab"]').map(tab => tab.text());
     expect(labels).toEqual([
       i18n.global.t("account.tabProfile"),
       i18n.global.t("account.tabPayout"),
       i18n.global.t("account.tabPassword")
     ]);
     /** Element Plus hides inactive panes with `v-show`; the inline display is the visible state. */
-    const paneShown = (index: number): boolean =>
-      (wrapper.findAll(".el-tab-pane")[index]!.element as HTMLElement).style.display !== "none";
-    const panes = wrapper.findAll(".el-tab-pane");
-    expect(panes).toHaveLength(3);
+    const paneShown = (name: string): boolean =>
+      (wrapper.get(`[data-test="account-pane-${name}"]`).element as HTMLElement).style.display !==
+      "none";
+    expect(wrapper.findAll('[data-test^="account-pane-"]')).toHaveLength(3);
     // Profile first; the other two stay rendered but hidden, so their forms keep their state.
-    expect(paneShown(0)).toBe(true);
-    expect(panes[0]!.find('[data-test="profile-save"]').exists()).toBe(true);
-    expect(paneShown(1)).toBe(false);
-    expect(paneShown(2)).toBe(false);
+    expect(paneShown("profile")).toBe(true);
+    expect(
+      wrapper.get('[data-test="account-pane-profile"]').find('[data-test="profile-save"]').exists()
+    ).toBe(true);
+    expect(paneShown("payout")).toBe(false);
+    expect(paneShown("password")).toBe(false);
 
     const tabs = wrapper.findComponent(ElTabs);
     tabs.vm.$emit("update:modelValue", "payout");
     await flushPromises();
-    expect(paneShown(1)).toBe(true);
-    expect(wrapper.findAll(".el-tab-pane")[1]!.text()).toContain(
+    expect(paneShown("payout")).toBe(true);
+    expect(wrapper.get('[data-test="account-pane-payout"]').text()).toContain(
       i18n.global.t("account.payoutInfo")
     );
-    expect(paneShown(0)).toBe(false);
+    expect(paneShown("profile")).toBe(false);
 
     tabs.vm.$emit("update:modelValue", "password");
     await flushPromises();
-    expect(paneShown(2)).toBe(true);
-    expect(wrapper.findAll(".el-tab-pane")[2]!.find('[data-test="password-form"]').exists()).toBe(
-      true
-    );
+    expect(paneShown("password")).toBe(true);
+    expect(
+      wrapper
+        .get('[data-test="account-pane-password"]')
+        .find('[data-test="password-form"]')
+        .exists()
+    ).toBe(true);
   });
 
   it("enforces the backend handle length instead of allowing 255 characters", async () => {

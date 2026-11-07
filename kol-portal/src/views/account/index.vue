@@ -236,19 +236,23 @@ function savePassword() {
 </script>
 
 <template>
-  <section class="account-page">
+  <section class="account-page" data-test="account-page">
     <el-alert v-if="loadError" type="error" :closable="false" :title="loadError" show-icon />
     <el-button v-if="loadError" :loading="profileLoading" data-test="load-retry" @click="load">{{
       t("account.retry")
     }}</el-button>
     <el-skeleton v-if="profileLoading && !session.kol" :rows="4" animated />
     <template v-else-if="session.kol">
-      <header class="account-header">
+      <header class="account-header" data-test="account-header">
         <h1>{{ t("account.title") }}</h1>
         <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
       </header>
-      <el-tabs v-model="activeTab" class="account-tabs">
-        <el-tab-pane :label="t('account.tabProfile')" name="profile">
+      <el-tabs v-model="activeTab" class="account-tabs" data-test="account-tabs">
+        <el-tab-pane
+          :label="t('account.tabProfile')"
+          name="profile"
+          data-test="account-pane-profile"
+        >
           <el-card shadow="never" class="section-card">
             <template #header
               ><h2>{{ t("account.personalInfo") }}</h2></template
@@ -361,7 +365,7 @@ function savePassword() {
             </dl>
           </el-card>
         </el-tab-pane>
-        <el-tab-pane :label="t('account.tabPayout')" name="payout">
+        <el-tab-pane :label="t('account.tabPayout')" name="payout" data-test="account-pane-payout">
           <el-card shadow="never" class="section-card">
             <template #header
               ><h2>{{ t("account.payoutInfo") }}</h2></template
@@ -471,7 +475,11 @@ function savePassword() {
             </el-form>
           </el-card>
         </el-tab-pane>
-        <el-tab-pane :label="t('account.tabPassword')" name="password">
+        <el-tab-pane
+          :label="t('account.tabPassword')"
+          name="password"
+          data-test="account-pane-password"
+        >
           <el-card shadow="never" class="section-card password-card">
             <template #header
               ><h2>{{ t("account.changePassword") }}</h2></template
@@ -566,6 +574,8 @@ h1 {
   height: 44px;
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
+  font-weight: 400;
+  color: var(--tcrm-color-text-secondary);
 }
 .account-tabs :deep(.el-tabs__item.is-active) {
   font-weight: 600;

@@ -107,12 +107,16 @@ onBeforeUnmount(() => {
             >
           </div>
           <LocaleSwitch />
-          <details ref="userMenu" class="user-menu">
+          <details ref="userMenu" class="user-menu" data-test="user-menu">
             <summary>
               <span>{{ t("account.title") }}</span>
               <el-icon><ArrowDown /></el-icon>
             </summary>
-            <nav class="user-menu__panel" :aria-label="t('account.title')">
+            <nav
+              class="user-menu__panel"
+              :aria-label="t('account.title')"
+              data-test="user-menu-panel"
+            >
               <RouterLink to="/account" class="user-menu__link" @click="closeUserMenu">{{
                 t("account.title")
               }}</RouterLink>
