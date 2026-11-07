@@ -141,7 +141,7 @@
 | 118 | 首次恢复演练记录（RUNBOOK 第 17 章，交付客户前）：在生产主机用独立 Compose 项目完成 latest 与指定时间点恢复、逻辑备份解密恢复、四条核对 SQL 与 Flyway 校验、跨区域复制与 Object Lock 实测；把演练模板固化为 `deploy/drill/` | 待合并（分支 `task/118-recovery-drill-record`）；无迁移；只新增演练模板与文档 | [执行报告](118-恢复演练记录-执行报告.md) |
 | 119 | 微店开放平台域名验证文件：平台发布应用时从**根域名**取 `https://<域名>/weidian_open.json`，正式环境因根域名无解析、无 server 块而失败（`UnknownHostException`）；Nginx 新增根域名 server 块只提供该文件，文件放在 `TCRM_STATIC_DIR` 根目录，换版本不丢 | 待合并（分支 `task/119-weidian-domain-verify`）；无迁移；只改 Nginx 模板与部署文档 | [执行报告](119-微店域名验证文件-执行报告.md) |
 | 121 | 表格脚本默认接口地址改为正式域名：`PRODUCT_LINK_API_DEFAULT_BASE_URL` 由预演地址改为 `https://admin.sparktrackcrm.com/admin-api`，客户粘贴脚本后无需再设置脚本属性；`TALENT_CRM_API_BASE_URL` 覆盖机制保留供切换环境 | 待合并（分支 `task/121-sheet-script-prod-domain`） | [执行报告](121-表格脚本正式域名-执行报告.md) |
-| 123 | 钱包对账负余额误报修复（正式环境 2026-11-07 告警）：预付抵扣/退款扣回让达人余额为负属预期（任务 113、金额口径），但 `CommissionWalletReconcileJob` 用 `balance - funding < 0` 判断，余额为负、无提现时也记 ERROR；改为「有提现占用且占用超过余额」才报，补日志捕获与三个用例 | 待合并（分支 `task/123-wallet-reconcile-negative-balance`） | [执行报告](123-钱包对账负余额误报修复-执行报告.md) |
+| 125 | 钱包对账负余额误报修复（正式环境 2026-11-07 告警）：预付抵扣/退款扣回让达人余额为负属预期（任务 113、金额口径），但 `CommissionWalletReconcileJob` 用 `balance - funding < 0` 判断，余额为负、无提现时也记 ERROR；改为「有提现占用且占用超过余额」才报，补日志捕获与三个用例 | 待合并（分支 `task/123-wallet-reconcile-negative-balance`） | [执行报告](125-钱包对账负余额误报修复-执行报告.md) |
 
 规则：
 
