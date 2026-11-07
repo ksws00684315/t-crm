@@ -149,6 +149,48 @@ class WeidianItemCopyServiceTest {
   }
 
   @Test
+  void shouldProbeLowestSkuPrice_whenSkuPricesDiffer() throws Exception {
+    // Task 132: a multi-spec item with differing SKU prices returned no parseable item price, so
+    // the probe reported the source as incomplete.
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(
+            new ItemResponse(
+                "7",
+                "Hit",
+                null,
+                null,
+                1,
+                "onsale",
+                json.readTree(
+                    "{\"price\":\"20.00-35.50\",\"skus\":[{\"price\":\"35.50\"},"
+                        + "{\"price\":\"20.00\"},{\"price\":\"28.00\"}]}")));
+
+    assertThat(service.probe(3L, "7").orElseThrow().price()).isEqualByComparingTo("20.00");
+  }
+
+  @Test
+  void shouldBuildAddWithLowestSkuPrice_whenItemPriceMissing() throws Exception {
+    ItemResponse item =
+        new ItemResponse(
+            "7",
+            "Multi",
+            null,
+            null,
+            3,
+            "onsale",
+            json.readTree(
+                "{\"price\":\"\",\"skus\":[{\"price\":\"35.50\",\"stock\":1},"
+                    + "{\"price\":\"20.00\",\"stock\":2}]}"));
+
+    AddItemRequest add = WeidianItemCopyService.buildAdd(item);
+
+    assertThat(add.price()).isEqualByComparingTo("20.00");
+    assertThat(add.skus())
+        .extracting(sku -> sku.price().toPlainString())
+        .containsExactly("35.50", "20.00");
+  }
+
+  @Test
   void shouldProbeNoImage_whenItemHasNoImages() {
     when(weidian.item(anyLong(), any()))
         .thenReturn(new ItemResponse("7", "Hit", null, new BigDecimal("1.00"), 1, "1", null));

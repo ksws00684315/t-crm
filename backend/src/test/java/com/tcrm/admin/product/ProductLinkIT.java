@@ -115,6 +115,8 @@ class ProductLinkIT {
 
   @BeforeEach
   void prepare() throws Exception {
+    // The test drains the outbox itself; a scheduled drain would delete the row it asserts on.
+    sync.setScheduled(false);
     jdbc.update("DELETE FROM crm_copy_job_item");
     jdbc.update("DELETE FROM crm_copy_job");
     jdbc.update("DELETE FROM crm_link_index_outbox");
