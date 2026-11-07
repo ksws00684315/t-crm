@@ -177,14 +177,18 @@ public class ProductLinkService {
             ? CHANNEL_WEIDIAN
             : channelCode.strip().toUpperCase(Locale.ROOT);
     List<LinkTemplateView> out = new ArrayList<>();
-    out.add(
-        new LinkTemplateView(
-            "tcrm-relay",
-            TCR_TEMPLATE_CODE,
-            "SparkTrack 中转",
-            configs.getValue("url.link") + "/i/{PRODUCT_ID}",
-            channel,
-            0));
+    // The SparkTrack relay template is temporarily disabled: the customer does not need relay
+    // links for now (owner decision 2026-11-07). Restore this block to bring it back. The dedupe
+    // set below still holds the relay URL, so a company template with the same URL is not listed
+    // as if it were a separate platform.
+    // out.add(
+    //     new LinkTemplateView(
+    //         "tcrm-relay",
+    //         TCR_TEMPLATE_CODE,
+    //         "SparkTrack 中转",
+    //         configs.getValue("url.link") + "/i/{PRODUCT_ID}",
+    //         channel,
+    //         0));
     // Merge enabled company templates, dedupe by template_url (system scope: public platform URLs).
     List<LinkTemplateView> platforms =
         TenantScope.callSystem(

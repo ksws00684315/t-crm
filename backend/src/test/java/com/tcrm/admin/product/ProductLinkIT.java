@@ -361,12 +361,10 @@ class ProductLinkIT {
   }
 
   @Test
-  void shouldReturnTemplates_withRelayFirst() throws Exception {
+  void shouldReturnTemplates_withoutTheRelayTemplate() throws Exception {
     mvc.perform(get(BASE + "/templates").param("channelCode", "WEIDIAN"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[0].templateCode").value("TCRM_RELAY"))
-        .andExpect(
-            jsonPath("$.data[0].templateUrl").value("https://t.example.test/i/{PRODUCT_ID}"));
+        .andExpect(jsonPath("$.data").isEmpty());
   }
 
   @Test
