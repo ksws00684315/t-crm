@@ -93,7 +93,7 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       }
       List<ItemImage> images = images(item.raw());
       String image = images.isEmpty() ? null : httpsUrl(images.getFirst().url());
-      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), item.price(), image));
+      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), itemPrice(item), image));
     } catch (WeidianApiException e) {
       if (isItemNotFound(e)) {
         return Optional.empty();
@@ -124,7 +124,7 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     }
     JsonNode raw = item.raw();
     String name = firstNonBlank(item.itemName(), text(raw, "item_name"));
-    BigDecimal price = firstPrice(item.price(), decimal(raw, "price"));
+    BigDecimal price = itemPrice(item);
     if (name == null || price == null) {
       throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, SOURCE_INCOMPLETE, null);
     }
@@ -435,6 +435,29 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       }
     }
     return null;
+  }
+
+  /**
+   * Item-level price, or the lowest SKU price when the item has none: a multi-spec item whose SKUs
+   * differ in price returns no single item price (task 132).
+   */
+  private static BigDecimal itemPrice(ItemResponse item) {
+    BigDecimal price = firstPrice(item.price(), decimal(item.raw(), "price"));
+    if (price != null) {
+      return price;
+    }
+    JsonNode skus = item.raw() == null ? null : item.raw().get("skus");
+    if (skus == null || !skus.isArray()) {
+      return null;
+    }
+    BigDecimal lowest = null;
+    for (JsonNode sku : skus) {
+      BigDecimal skuPrice = decimal(sku, "price");
+      if (skuPrice != null && (lowest == null || skuPrice.compareTo(lowest) < 0)) {
+        lowest = skuPrice;
+      }
+    }
+    return lowest;
   }
 
   private static BigDecimal firstPrice(BigDecimal a, BigDecimal b) {
