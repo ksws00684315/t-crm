@@ -130,6 +130,9 @@ describe("creator fund dialog (task 82)", () => {
     });
     expect(elements("fund-account-masked")).toEqual(["a***@example.com", "TQ9x...8f2k"]);
     expect(elements("fund-status")).toEqual(["正常", "已停用"]);
+    // More than one account: a hint above the selector explains the extra box (smoke item 16).
+    expect(element("fund-picker-hint").text()).toBe("可在下方选择账户，查看完整收款信息。");
+    expect(element("fund-account-select")).toBeTruthy();
     expect(document.body.querySelector('[data-test="fund-empty"]')).toBeNull();
     // The default account carries the 默认 tag; the other row shows a dash.
     const rows = [...document.body.querySelectorAll<HTMLElement>("tr")].filter(row =>
@@ -189,6 +192,9 @@ describe("creator fund dialog (task 82)", () => {
     const wrapper = await openDialog([paypal]);
     const title = document.body.querySelector(".el-drawer__title")?.textContent ?? "";
     expect(title).toBe("资金信息 - Alice（KOL-ASD001）");
+    // A single account needs no selector, so neither the hint nor the box is shown.
+    expect(document.body.querySelector('[data-test="fund-picker-hint"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="fund-account-select"]')).toBeNull();
     wrapper.unmount();
   });
 

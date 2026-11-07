@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import NameCode from "@/components/NameCode.vue";
 import { ArrowDown } from "@element-plus/icons-vue";
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { logout } from "@/api/auth";
@@ -19,6 +19,7 @@ const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 const signingOut = ref(false);
+const userMenu = ref<HTMLDetailsElement | null>(null);
 
 /** Breadcrumb of the current page, the same slot the admin header uses. */
 const brandText = computed(() => `${siteName.value}${t("app.titleSuffix")}`);
@@ -46,6 +47,32 @@ async function signOut() {
     await router.replace("/login");
   }
 }
+
+/** The native popover closes on an outside click, Escape or a navigation (smoke item 9). */
+function closeUserMenu(): void {
+  if (userMenu.value) userMenu.value.open = false;
+}
+
+function onDocumentClick(event: MouseEvent): void {
+  if (!userMenu.value?.open) return;
+  // A click inside the menu, including the summary itself, is the menu's own business.
+  if (event.target instanceof Node && userMenu.value.contains(event.target)) return;
+  userMenu.value.open = false;
+}
+
+function onDocumentKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") closeUserMenu();
+}
+
+onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("keydown", onDocumentKeydown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
+  document.removeEventListener("keydown", onDocumentKeydown);
+});
 </script>
 
 <template>
@@ -80,13 +107,17 @@ async function signOut() {
             >
           </div>
           <LocaleSwitch />
-          <details class="user-menu">
+          <details ref="userMenu" class="user-menu" data-test="user-menu">
             <summary>
               <span>{{ t("account.title") }}</span>
               <el-icon><ArrowDown /></el-icon>
             </summary>
-            <nav class="user-menu__panel" :aria-label="t('account.title')">
-              <RouterLink to="/account" class="user-menu__link">{{
+            <nav
+              class="user-menu__panel"
+              :aria-label="t('account.title')"
+              data-test="user-menu-panel"
+            >
+              <RouterLink to="/account" class="user-menu__link" @click="closeUserMenu">{{
                 t("account.title")
               }}</RouterLink>
               <el-button

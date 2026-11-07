@@ -135,6 +135,7 @@ async function submit() {
           :title="form.templateUrl"
           :placeholder="t('linkTemplate.urlPlaceholder')"
         />
+        <p class="url-hint" data-test="template-url-hint">{{ t("linkTemplate.urlHint") }}</p>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -145,3 +146,12 @@ async function submit() {
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.url-hint {
+  margin: 6px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: 1.5;
+}
+</style>

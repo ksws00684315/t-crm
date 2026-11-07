@@ -169,17 +169,21 @@ function currencyText(row: PayoutAccountRowVO): string {
       </template>
       <template #cell-updated="{ row }">{{ formatInstant(asRow(row).lastSubmittedAt) }}</template>
     </DataTable>
-    <el-select
-      v-if="rows.length > 1"
-      v-model="detailId"
-      :aria-label="t('kol.fundAccount')"
-      data-test="fund-account-select"
-      ><el-option
-        v-for="row in rows"
-        :key="row.id"
-        :value="row.id"
-        :label="`${typeText(row)} · ${row.accountMasked}`"
-    /></el-select>
+    <template v-if="rows.length > 1">
+      <p class="fund-picker-hint" data-test="fund-picker-hint">
+        {{ t("kol.fundPickerHint") }}
+      </p>
+      <el-select
+        v-model="detailId"
+        :aria-label="t('kol.fundAccount')"
+        data-test="fund-account-select"
+        ><el-option
+          v-for="row in rows"
+          :key="row.id"
+          :value="row.id"
+          :label="`${typeText(row)} · ${row.accountMasked}`"
+      /></el-select>
+    </template>
     <PayoutAccountDetailDrawer
       v-if="detailId"
       :key="detailId"
@@ -189,3 +193,11 @@ function currencyText(row: PayoutAccountRowVO): string {
     />
   </el-drawer>
 </template>
+
+<style scoped>
+.fund-picker-hint {
+  margin: 16px 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-help);
+}
+</style>
