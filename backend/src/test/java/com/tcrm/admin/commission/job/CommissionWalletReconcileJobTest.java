@@ -7,6 +7,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.mapper.WithdrawalMapper;
 import com.tcrm.admin.shared.DistributedLocks;
@@ -15,9 +19,11 @@ import com.tcrm.admin.system.api.EnabledTenantApi;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 
 /** Wallet reconciliation (design §4.8): balance vs ledger, occupation inside the balance. */
 class CommissionWalletReconcileJobTest {
@@ -27,9 +33,15 @@ class CommissionWalletReconcileJobTest {
   private final WithdrawalMapper withdrawals = mock(WithdrawalMapper.class);
   private final CommissionWalletReconcileJob job =
       new CommissionWalletReconcileJob(locks, tenants, wallets, withdrawals);
+  private final Logger logger =
+      (Logger) LoggerFactory.getLogger(CommissionWalletReconcileJob.class);
+  private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
   @BeforeEach
   void prepare() throws InterruptedException {
+    logger.setLevel(Level.INFO);
+    appender.start();
+    logger.addAppender(appender);
     // run the locked body directly so the reconciliation logic executes in the test JVM
     when(tenants.enabledTenantIds()).thenReturn(List.of(1L));
     org.mockito.Mockito.doAnswer(
@@ -39,6 +51,11 @@ class CommissionWalletReconcileJobTest {
             })
         .when(locks)
         .run(org.mockito.ArgumentMatchers.anyString(), anyLong(), anyLong(), any(Runnable.class));
+  }
+
+  @AfterEach
+  void detach() {
+    logger.detachAppender(appender);
   }
 
   @Test
@@ -82,6 +99,36 @@ class CommissionWalletReconcileJobTest {
     ArgumentCaptor<Long> kol = ArgumentCaptor.forClass(Long.class);
     verify(withdrawals).sumFundingOccupied(kol.capture());
     assertThat(kol.getValue()).isEqualTo(22L);
+    assertThat(appender.list)
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .anyMatch(line -> line.startsWith("withdrawal occupation exceeds wallet balance"));
+  }
+
+  @Test
+  void shouldStayQuiet_whenTheBalanceIsNegativeWithoutWithdrawals() throws InterruptedException {
+    // A prepay deduction (or a clawback) may leave a creator in debt; later credits recover it, so
+    // an occupation of zero never exceeds the balance and the daily run must not log an error.
+    when(wallets.listWalletKolIds()).thenReturn(List.of(22L));
+    when(wallets.findBalance(22L)).thenReturn(new BigDecimal("-500.00"));
+    when(wallets.sumLedgerCny(22L)).thenReturn(new BigDecimal("-500.00"));
+    when(withdrawals.sumFundingOccupied(22L)).thenReturn(new BigDecimal("0.00"));
+    job.reconcile();
+    assertThat(appender.list).isEmpty();
+  }
+
+  @Test
+  void shouldFlagOccupation_whenTheBalanceIsNegativeAndWithdrawalsExist()
+      throws InterruptedException {
+    // A negative balance together with a live withdrawal stays the case that needs manual
+    // attention (task 63).
+    when(wallets.listWalletKolIds()).thenReturn(List.of(22L));
+    when(wallets.findBalance(22L)).thenReturn(new BigDecimal("-500.00"));
+    when(wallets.sumLedgerCny(22L)).thenReturn(new BigDecimal("-500.00"));
+    when(withdrawals.sumFundingOccupied(22L)).thenReturn(new BigDecimal("100.00"));
+    job.reconcile();
+    assertThat(appender.list)
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .anyMatch(line -> line.startsWith("withdrawal occupation exceeds wallet balance"));
   }
 
   @Test
