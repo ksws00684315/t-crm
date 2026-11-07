@@ -731,9 +731,6 @@ const enUS: MessageSchema = {
     registerLinkUrl: "Registration link",
     registerLinkTitle: "Creator invitation link",
     registerLinkHint: "Creators who sign up through this link join under your name.",
-    registerLinkRotate: "Regenerate",
-    registerLinkConfirm: "The old code and link stop working immediately. Continue?",
-    registerLinkRotated: "New invitation link generated",
     registerQr: "QR code",
     registerSuperHint:
       "Creators registered through this link are not tied to a BD; they show as pending update until an administrator transfers them.",
@@ -789,6 +786,7 @@ const enUS: MessageSchema = {
     actionCommission: "Promotion",
     actionFund: "Funds",
     fundEmpty: "This creator has not added a payout account yet",
+    fundPickerHint: "Select an account below to view its full payout details.",
     fundLoadFailed: "Failed to load payout accounts. Please try again later.",
     fundType: "Type",
     fundAccount: "Account (masked)",
@@ -974,6 +972,8 @@ const enUS: MessageSchema = {
     editTitle: "Edit platform",
     codePlaceholder: "e.g. kakobuy",
     urlPlaceholder: "https://example.com/item/{'{'}PRODUCT_ID{'}'}?code={'{'}INVITE_CODE{'}'}",
+    urlHint:
+      "Placeholder {'{'}PRODUCT_ID{'}'} is replaced with the product ID, {'{'}INVITE_CODE{'}'} with the creator invite code.",
     preview: "Preview",
     sampleProduct: "Sample product ID",
     sampleInvite: "Sample invite code",

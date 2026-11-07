@@ -125,7 +125,7 @@ describe("register page (02.01)", () => {
     expect(registerApi.registerKol).not.toHaveBeenCalled();
   });
 
-  it("shows the inviting BD, or the tenant when the code belongs to the super admin", async () => {
+  it("shows the inviting BD, and nothing for a super-administrator code", async () => {
     vi.mocked(registerApi.previewRegister).mockResolvedValue({
       bdUserName: "Alex",
       tenantName: "Acme"
@@ -133,12 +133,14 @@ describe("register page (02.01)", () => {
     const withBd = await page(`/register?code=${CODE}`);
     expect(withBd.wrapper.text()).toContain("Invited by Alex");
 
+    // The tenant name is no longer a fallback (smoke item 8): a super-admin code shows no line.
     vi.mocked(registerApi.previewRegister).mockResolvedValue({
       bdUserName: null,
       tenantName: "Acme"
     });
     const withoutBd = await page(`/register?code=${CODE}`);
-    expect(withoutBd.wrapper.text()).toContain("Invited by Acme");
+    expect(withoutBd.wrapper.text()).not.toContain("Invited by");
+    expect(withoutBd.wrapper.text()).not.toContain("Acme");
   });
 
   it("shows invalid links with a code and keeps the form closed", async () => {

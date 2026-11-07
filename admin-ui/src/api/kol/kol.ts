@@ -49,7 +49,7 @@ export interface ReviewKolRequest {
   remark: string | null;
 }
 
-/** `GET` / `POST /kol/register-code`. `url` is the full creator-portal link. */
+/** Registration link returned by `GET /kol/register-code`. `url` is the full creator-portal link. */
 export interface RegisterCodeVO {
   code: string;
   url: string;
@@ -125,11 +125,6 @@ export function inviteKol(id: string): Promise<null> {
 /** Current registration link. The backend creates one when the caller has none. */
 export function getRegisterCode(): Promise<RegisterCodeVO> {
   return http.request<RegisterCodeVO>({ method: "get", url: "/kol/register-code" });
-}
-
-/** Revokes the current registration link and returns a new one. */
-export function rotateRegisterCode(): Promise<RegisterCodeVO> {
-  return http.request<RegisterCodeVO>({ method: "post", url: "/kol/register-code" });
 }
 
 export function uploadKolImport(file: File): Promise<KolImportVO> {

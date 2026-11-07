@@ -24,6 +24,8 @@ import type { UploadFile } from "element-plus";
 defineOptions({ name: "AccountPage" });
 const { t } = useI18n();
 const session = useSessionStore();
+/** The page stacks profile, payout and password cards; the owner asked for tabs (smoke item 15). */
+const activeTab = ref("profile");
 const profile = reactive({ primaryPlatform: "", primaryHandle: "" });
 const payout = reactive({
   type: "PAYPAL" as "PAYPAL" | "USDT",
@@ -234,285 +236,312 @@ function savePassword() {
 </script>
 
 <template>
-  <section class="account-page">
+  <section class="account-page" data-test="account-page">
     <el-alert v-if="loadError" type="error" :closable="false" :title="loadError" show-icon />
     <el-button v-if="loadError" :loading="profileLoading" data-test="load-retry" @click="load">{{
       t("account.retry")
     }}</el-button>
     <el-skeleton v-if="profileLoading && !session.kol" :rows="4" animated />
     <template v-else-if="session.kol">
-      <el-card shadow="never" class="section-card">
-        <template #header
-          ><h1>{{ t("account.title") }}</h1>
-          <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
-          <h2>{{ t("account.personalInfo") }}</h2></template
+      <header class="account-header" data-test="account-header">
+        <h1>{{ t("account.title") }}</h1>
+        <NameCode :name="session.kol.name" :code="session.kol.kolCode" />
+      </header>
+      <el-tabs v-model="activeTab" class="account-tabs" data-test="account-tabs">
+        <el-tab-pane
+          :label="t('account.tabProfile')"
+          name="profile"
+          data-test="account-pane-profile"
         >
-        <el-alert
-          v-if="profileSaved"
-          type="success"
-          :closable="false"
-          :title="t('account.profileSaved')"
-        />
-        <el-alert
-          v-if="profileError"
-          type="error"
-          :closable="false"
-          :title="profileError"
-          show-icon
-        />
-        <el-form label-position="top" @submit.prevent="saveProfile">
-          <div class="form-grid">
-            <el-form-item :label="t('account.email')">
-              <CopyText :value="session.kol.email" data-test="profile-email" />
-            </el-form-item>
-            <el-form-item :label="t('account.systemId')">
-              <CopyText :value="systemId" data-test="profile-system-id" />
-            </el-form-item>
-            <el-form-item :label="t('account.nickname')">
-              <div class="read-value">
-                <CopyText :value="session.kol.name" data-test="profile-name" />
-                <small class="read-hint">{{ t("account.nicknameHint") }}</small>
-              </div>
-            </el-form-item>
-            <el-form-item :label="t('account.primaryPlatform')"
-              ><el-select
-                v-model="profile.primaryPlatform"
-                data-test="profile-platform"
-                clearable
-                :placeholder="t('register.platformPlaceholder')"
-                ><el-option
-                  v-for="platform in platforms"
-                  :key="platform"
-                  :label="t(`register.platforms.${platform}`)"
-                  :value="platform" /></el-select
-            ></el-form-item>
-            <el-form-item
-              :label="t('account.primaryHandle')"
-              :error="profileFieldErrors.handle ? t(profileFieldErrors.handle) : undefined"
-              ><el-input v-model="profile.primaryHandle" maxlength="128" data-test="profile-handle"
-            /></el-form-item>
-          </div>
-          <el-button
-            type="primary"
-            :loading="profileBusy"
-            data-test="profile-save"
-            @click="saveProfile"
-            >{{ t("common.save") }}</el-button
-          >
-        </el-form>
-      </el-card>
-
-      <el-card shadow="never" class="section-card">
-        <template #header
-          ><h2>{{ t("account.readOnlyStatus") }}</h2></template
-        >
-        <dl class="read-only-grid">
-          <template v-if="session.kol.tenantName"
-            ><dt>{{ t("account.company") }}</dt>
-            <dd>{{ session.kol.tenantName }}</dd></template
-          >
-          <template v-if="session.kol.country"
-            ><dt>{{ t("account.country") }}</dt>
-            <dd>{{ session.kol.country }}</dd></template
-          >
-          <template v-if="session.kol.phone"
-            ><dt>{{ t("account.phone") }}</dt>
-            <dd>{{ session.kol.phone }}</dd></template
-          >
-          <template v-if="session.kol.whatsapp"
-            ><dt>{{ t("account.whatsapp") }}</dt>
-            <dd>{{ session.kol.whatsapp }}</dd></template
-          >
-          <template v-if="session.kol.reviewStatus"
-            ><dt>{{ t("account.reviewStatus") }}</dt>
-            <dd>{{ t(`account.status.${session.kol.reviewStatus}`) }}</dd></template
-          >
-          <template v-if="session.kol.loginStatus"
-            ><dt>{{ t("account.loginStatus") }}</dt>
-            <dd>{{ t(`account.status.${session.kol.loginStatus}`) }}</dd></template
-          >
-          <template v-if="session.kol.relationStatus"
-            ><dt>{{ t("account.relationStatus") }}</dt>
-            <dd>{{ t(`account.status.${session.kol.relationStatus}`) }}</dd></template
-          >
-          <template
-            ><dt>{{ t("account.commissionRate") }}</dt>
-            <dd>
-              {{
-                session.kol.commissionRate == null
-                  ? t("account.ratePending")
-                  : `${session.kol.commissionRate}%`
-              }}
-            </dd></template
-          >
-          <template v-if="session.kol.rateEffectiveAt"
-            ><dt>{{ t("account.rateEffectiveAt") }}</dt>
-            <dd>{{ formatInstant(session.kol.rateEffectiveAt) }}</dd></template
-          >
-        </dl>
-      </el-card>
-
-      <el-card shadow="never" class="section-card">
-        <template #header
-          ><h2>{{ t("account.payoutInfo") }}</h2></template
-        >
-        <el-alert
-          v-if="payoutSaved"
-          type="success"
-          :closable="false"
-          :title="t('account.payoutSaved')"
-        />
-        <el-alert
-          v-if="payoutError"
-          type="error"
-          :closable="false"
-          :title="payoutError"
-          show-icon
-        />
-        <el-form label-position="top" @submit.prevent="savePayout">
-          <div class="form-grid">
-            <el-form-item :label="t('account.payoutType')"
-              ><el-select :model-value="payout.type" @change="selectType"
-                ><el-option :label="t('payoutAccounts.type.PAYPAL')" value="PAYPAL" /><el-option
-                  :label="t('payoutAccounts.type.USDT')"
-                  value="USDT" /></el-select
-            ></el-form-item>
-            <el-form-item
-              v-if="
-                accounts.some(
-                  item => item.accountType === payout.type && item.status !== 'DISABLED'
-                )
-              "
-              :label="t('account.savedAccount')"
-              ><el-select :model-value="selectedAccountId" @change="selectAccount"
-                ><el-option
-                  v-for="item in accounts.filter(
-                    entry => entry.accountType === payout.type && entry.status !== 'DISABLED'
-                  )"
-                  :key="item.id"
-                  :value="item.id"
-                  :label="item.account" /></el-select
-            ></el-form-item>
-            <el-form-item
-              :label="
-                payout.type === 'PAYPAL' ? t('account.paypalEmail') : t('account.usdtAddress')
-              "
-              :error="payoutFieldErrors.account ? t(payoutFieldErrors.account) : undefined"
-              ><el-input v-model="payout.account" maxlength="128"
-            /></el-form-item>
-            <el-form-item
-              v-if="payout.type === 'PAYPAL'"
-              :label="t('account.receiverName')"
-              :error="payoutFieldErrors.holder ? t(payoutFieldErrors.holder) : undefined"
-              ><el-input v-model="payout.holderName" maxlength="64"
-            /></el-form-item>
-            <el-form-item v-if="payout.type === 'PAYPAL'" :label="t('account.currency')"
-              ><el-select v-model="payout.currency"
-                ><el-option
-                  v-for="currency in paypalCurrencies"
-                  :key="currency"
-                  :label="currency"
-                  :value="currency" /></el-select
-            ></el-form-item>
-            <el-form-item v-if="payout.type === 'USDT'" :label="t('payoutAccounts.form.network')"
-              ><el-select v-model="payout.network"
-                ><el-option
-                  v-for="network in USDT_NETWORKS"
-                  :key="network"
-                  :label="t(`payoutAccounts.network.${network}`)"
-                  :value="network" /></el-select
-            ></el-form-item>
-            <el-form-item
-              v-if="payout.type === 'USDT'"
-              :label="t('account.qrCode')"
-              :error="qrError || undefined"
+          <el-card shadow="never" class="section-card">
+            <template #header
+              ><h2>{{ t("account.personalInfo") }}</h2></template
             >
-              <el-upload
-                :auto-upload="false"
-                :show-file-list="false"
-                accept="image/png,image/jpeg"
-                :disabled="qrUploading"
-                data-test="qr-upload"
-                @change="uploadQr"
+            <el-alert
+              v-if="profileSaved"
+              type="success"
+              :closable="false"
+              :title="t('account.profileSaved')"
+            />
+            <el-alert
+              v-if="profileError"
+              type="error"
+              :closable="false"
+              :title="profileError"
+              show-icon
+            />
+            <el-form label-position="top" @submit.prevent="saveProfile">
+              <div class="form-grid">
+                <el-form-item :label="t('account.email')">
+                  <CopyText :value="session.kol.email" data-test="profile-email" />
+                </el-form-item>
+                <el-form-item :label="t('account.systemId')">
+                  <CopyText :value="systemId" data-test="profile-system-id" />
+                </el-form-item>
+                <el-form-item :label="t('account.nickname')">
+                  <div class="read-value">
+                    <CopyText :value="session.kol.name" data-test="profile-name" />
+                    <small class="read-hint">{{ t("account.nicknameHint") }}</small>
+                  </div>
+                </el-form-item>
+                <el-form-item :label="t('account.primaryPlatform')"
+                  ><el-select
+                    v-model="profile.primaryPlatform"
+                    data-test="profile-platform"
+                    clearable
+                    :placeholder="t('register.platformPlaceholder')"
+                    ><el-option
+                      v-for="platform in platforms"
+                      :key="platform"
+                      :label="t(`register.platforms.${platform}`)"
+                      :value="platform" /></el-select
+                ></el-form-item>
+                <el-form-item
+                  :label="t('account.primaryHandle')"
+                  :error="profileFieldErrors.handle ? t(profileFieldErrors.handle) : undefined"
+                  ><el-input
+                    v-model="profile.primaryHandle"
+                    maxlength="128"
+                    data-test="profile-handle"
+                /></el-form-item>
+              </div>
+              <el-button
+                type="primary"
+                :loading="profileBusy"
+                data-test="profile-save"
+                @click="saveProfile"
+                >{{ t("common.save") }}</el-button
               >
-                <el-button :loading="qrUploading" data-test="qr-upload-button">
-                  <el-icon v-if="!qrUploading"><Plus /></el-icon>
-                  {{ t("payoutAccounts.form.qrAdd") }}
-                </el-button>
-              </el-upload>
-              <small>{{ t("payoutAccounts.form.qrHint") }}</small>
-              <el-tag v-if="payout.qrFileId" type="success">{{ t("account.qrUploaded") }}</el-tag>
-            </el-form-item>
-          </div>
-          <div class="actions">
-            <el-button type="primary" :loading="payoutBusy || qrUploading" @click="savePayout">{{
-              t("common.save")
-            }}</el-button
-            ><RouterLink to="/payout-accounts">{{ t("account.managePayoutAccounts") }}</RouterLink>
-          </div>
-        </el-form>
-      </el-card>
+            </el-form>
+          </el-card>
 
-      <el-card shadow="never" class="section-card password-card">
-        <template #header
-          ><h2>{{ t("account.changePassword") }}</h2></template
+          <el-card shadow="never" class="section-card">
+            <template #header
+              ><h2>{{ t("account.readOnlyStatus") }}</h2></template
+            >
+            <dl class="read-only-grid">
+              <template v-if="session.kol.tenantName"
+                ><dt>{{ t("account.company") }}</dt>
+                <dd>{{ session.kol.tenantName }}</dd></template
+              >
+              <template v-if="session.kol.country"
+                ><dt>{{ t("account.country") }}</dt>
+                <dd>{{ session.kol.country }}</dd></template
+              >
+              <template v-if="session.kol.phone"
+                ><dt>{{ t("account.phone") }}</dt>
+                <dd>{{ session.kol.phone }}</dd></template
+              >
+              <template v-if="session.kol.whatsapp"
+                ><dt>{{ t("account.whatsapp") }}</dt>
+                <dd>{{ session.kol.whatsapp }}</dd></template
+              >
+              <template v-if="session.kol.reviewStatus"
+                ><dt>{{ t("account.reviewStatus") }}</dt>
+                <dd>{{ t(`account.status.${session.kol.reviewStatus}`) }}</dd></template
+              >
+              <template v-if="session.kol.loginStatus"
+                ><dt>{{ t("account.loginStatus") }}</dt>
+                <dd>{{ t(`account.status.${session.kol.loginStatus}`) }}</dd></template
+              >
+              <template v-if="session.kol.relationStatus"
+                ><dt>{{ t("account.relationStatus") }}</dt>
+                <dd>{{ t(`account.status.${session.kol.relationStatus}`) }}</dd></template
+              >
+              <template
+                ><dt>{{ t("account.commissionRate") }}</dt>
+                <dd>
+                  {{
+                    session.kol.commissionRate == null
+                      ? t("account.ratePending")
+                      : `${session.kol.commissionRate}%`
+                  }}
+                </dd></template
+              >
+              <template v-if="session.kol.rateEffectiveAt"
+                ><dt>{{ t("account.rateEffectiveAt") }}</dt>
+                <dd>{{ formatInstant(session.kol.rateEffectiveAt) }}</dd></template
+              >
+            </dl>
+          </el-card>
+        </el-tab-pane>
+        <el-tab-pane :label="t('account.tabPayout')" name="payout" data-test="account-pane-payout">
+          <el-card shadow="never" class="section-card">
+            <template #header
+              ><h2>{{ t("account.payoutInfo") }}</h2></template
+            >
+            <el-alert
+              v-if="payoutSaved"
+              type="success"
+              :closable="false"
+              :title="t('account.payoutSaved')"
+            />
+            <el-alert
+              v-if="payoutError"
+              type="error"
+              :closable="false"
+              :title="payoutError"
+              show-icon
+            />
+            <el-form label-position="top" @submit.prevent="savePayout">
+              <div class="form-grid">
+                <el-form-item :label="t('account.payoutType')"
+                  ><el-select :model-value="payout.type" @change="selectType"
+                    ><el-option :label="t('payoutAccounts.type.PAYPAL')" value="PAYPAL" /><el-option
+                      :label="t('payoutAccounts.type.USDT')"
+                      value="USDT" /></el-select
+                ></el-form-item>
+                <el-form-item
+                  v-if="
+                    accounts.some(
+                      item => item.accountType === payout.type && item.status !== 'DISABLED'
+                    )
+                  "
+                  :label="t('account.savedAccount')"
+                  ><el-select :model-value="selectedAccountId" @change="selectAccount"
+                    ><el-option
+                      v-for="item in accounts.filter(
+                        entry => entry.accountType === payout.type && entry.status !== 'DISABLED'
+                      )"
+                      :key="item.id"
+                      :value="item.id"
+                      :label="item.account" /></el-select
+                ></el-form-item>
+                <el-form-item
+                  :label="
+                    payout.type === 'PAYPAL' ? t('account.paypalEmail') : t('account.usdtAddress')
+                  "
+                  :error="payoutFieldErrors.account ? t(payoutFieldErrors.account) : undefined"
+                  ><el-input v-model="payout.account" maxlength="128"
+                /></el-form-item>
+                <el-form-item
+                  v-if="payout.type === 'PAYPAL'"
+                  :label="t('account.receiverName')"
+                  :error="payoutFieldErrors.holder ? t(payoutFieldErrors.holder) : undefined"
+                  ><el-input v-model="payout.holderName" maxlength="64"
+                /></el-form-item>
+                <el-form-item v-if="payout.type === 'PAYPAL'" :label="t('account.currency')"
+                  ><el-select v-model="payout.currency"
+                    ><el-option
+                      v-for="currency in paypalCurrencies"
+                      :key="currency"
+                      :label="currency"
+                      :value="currency" /></el-select
+                ></el-form-item>
+                <el-form-item
+                  v-if="payout.type === 'USDT'"
+                  :label="t('payoutAccounts.form.network')"
+                  ><el-select v-model="payout.network"
+                    ><el-option
+                      v-for="network in USDT_NETWORKS"
+                      :key="network"
+                      :label="t(`payoutAccounts.network.${network}`)"
+                      :value="network" /></el-select
+                ></el-form-item>
+                <el-form-item
+                  v-if="payout.type === 'USDT'"
+                  :label="t('account.qrCode')"
+                  :error="qrError || undefined"
+                >
+                  <el-upload
+                    :auto-upload="false"
+                    :show-file-list="false"
+                    accept="image/png,image/jpeg"
+                    :disabled="qrUploading"
+                    data-test="qr-upload"
+                    @change="uploadQr"
+                  >
+                    <el-button :loading="qrUploading" data-test="qr-upload-button">
+                      <el-icon v-if="!qrUploading"><Plus /></el-icon>
+                      {{ t("payoutAccounts.form.qrAdd") }}
+                    </el-button>
+                  </el-upload>
+                  <small>{{ t("payoutAccounts.form.qrHint") }}</small>
+                  <el-tag v-if="payout.qrFileId" type="success">{{
+                    t("account.qrUploaded")
+                  }}</el-tag>
+                </el-form-item>
+              </div>
+              <div class="actions">
+                <el-button
+                  type="primary"
+                  :loading="payoutBusy || qrUploading"
+                  @click="savePayout"
+                  >{{ t("common.save") }}</el-button
+                ><RouterLink to="/payout-accounts">{{
+                  t("account.managePayoutAccounts")
+                }}</RouterLink>
+              </div>
+            </el-form>
+          </el-card>
+        </el-tab-pane>
+        <el-tab-pane
+          :label="t('account.tabPassword')"
+          name="password"
+          data-test="account-pane-password"
         >
-        <el-alert
-          v-if="passwordChanged"
-          type="success"
-          :closable="false"
-          :title="t('account.passwordChanged')"
-        />
-        <el-alert
-          v-if="passwordError"
-          type="error"
-          :closable="false"
-          :title="passwordError"
-          show-icon
-        />
-        <p>{{ t("auth.passwordRule") }}</p>
-        <el-form data-test="password-form" label-position="top" @submit.prevent="savePassword">
-          <div class="form-grid">
-            <el-form-item
-              :label="t('account.oldPassword')"
-              :error="
-                passwordFieldErrors.oldPassword ? t(passwordFieldErrors.oldPassword) : undefined
-              "
-              ><el-input
-                v-model="oldPassword"
-                id="old-password"
-                type="password"
-                autocomplete="current-password"
-                show-password
-            /></el-form-item>
-            <el-form-item
-              :label="t('auth.newPassword')"
-              :error="
-                passwordFieldErrors.newPassword ? t(passwordFieldErrors.newPassword) : undefined
-              "
-              ><el-input
-                v-model="newPassword"
-                id="new-password"
-                type="password"
-                autocomplete="new-password"
-                show-password
-            /></el-form-item>
-            <el-form-item
-              :label="t('auth.confirmPassword')"
-              :error="passwordFieldErrors.confirm ? t(passwordFieldErrors.confirm) : undefined"
-              ><el-input
-                v-model="confirm"
-                id="confirm-password"
-                type="password"
-                autocomplete="new-password"
-                show-password
-            /></el-form-item>
-          </div>
-          <el-button type="primary" :loading="passwordBusy" @click="savePassword">{{
-            t("account.changePassword")
-          }}</el-button>
-        </el-form>
-      </el-card>
+          <el-card shadow="never" class="section-card password-card">
+            <template #header
+              ><h2>{{ t("account.changePassword") }}</h2></template
+            >
+            <el-alert
+              v-if="passwordChanged"
+              type="success"
+              :closable="false"
+              :title="t('account.passwordChanged')"
+            />
+            <el-alert
+              v-if="passwordError"
+              type="error"
+              :closable="false"
+              :title="passwordError"
+              show-icon
+            />
+            <p>{{ t("auth.passwordRule") }}</p>
+            <el-form data-test="password-form" label-position="top" @submit.prevent="savePassword">
+              <div class="form-grid">
+                <el-form-item
+                  :label="t('account.oldPassword')"
+                  :error="
+                    passwordFieldErrors.oldPassword ? t(passwordFieldErrors.oldPassword) : undefined
+                  "
+                  ><el-input
+                    v-model="oldPassword"
+                    id="old-password"
+                    type="password"
+                    autocomplete="current-password"
+                    show-password
+                /></el-form-item>
+                <el-form-item
+                  :label="t('auth.newPassword')"
+                  :error="
+                    passwordFieldErrors.newPassword ? t(passwordFieldErrors.newPassword) : undefined
+                  "
+                  ><el-input
+                    v-model="newPassword"
+                    id="new-password"
+                    type="password"
+                    autocomplete="new-password"
+                    show-password
+                /></el-form-item>
+                <el-form-item
+                  :label="t('auth.confirmPassword')"
+                  :error="passwordFieldErrors.confirm ? t(passwordFieldErrors.confirm) : undefined"
+                  ><el-input
+                    v-model="confirm"
+                    id="confirm-password"
+                    type="password"
+                    autocomplete="new-password"
+                    show-password
+                /></el-form-item>
+              </div>
+              <el-button type="primary" :loading="passwordBusy" @click="savePassword">{{
+                t("account.changePassword")
+              }}</el-button>
+            </el-form>
+          </el-card>
+        </el-tab-pane>
+      </el-tabs>
     </template>
   </section>
 </template>
@@ -530,11 +559,34 @@ h1 {
   line-height: var(--tcrm-line-height-title);
   font-weight: 600;
 }
-.section-card :deep(.el-card__header) .name-code {
+.account-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.account-header :deep(.name-code) {
   align-items: flex-start;
-  margin: var(--tcrm-space-2) 0;
   font-weight: 400;
   text-align: left;
+}
+.account-tabs :deep(.el-tabs__item) {
+  height: 44px;
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+  font-weight: 400;
+  color: var(--tcrm-color-text-secondary);
+}
+.account-tabs :deep(.el-tabs__item.is-active) {
+  font-weight: 600;
+}
+.account-tabs :deep(.el-tabs__content) {
+  padding-top: var(--tcrm-space-4);
+}
+.account-tabs :deep(.el-tab-pane) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tcrm-space-4);
 }
 .section-card :deep(.el-card__header) h2 {
   margin: 0;
