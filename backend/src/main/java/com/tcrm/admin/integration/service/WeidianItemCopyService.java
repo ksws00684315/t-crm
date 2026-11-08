@@ -72,7 +72,7 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         sourceIdLong == null
             ? new ItemDetailResponse(List.of(), null)
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
-    // Task 139: every vdian.item.add call counts against the company's daily allowance.
+    // Task 140: every vdian.item.add call counts against the company's daily allowance.
     if (!dailyQuota.tryAcquire()) {
       throw new BusinessException(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED);
     }

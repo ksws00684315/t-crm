@@ -30,7 +30,7 @@ public class CopyJobController {
     this.current = current;
   }
 
-  /** Today's Weidian add-item calls of the current company and the daily limit (task 139). */
+  /** Today's Weidian add-item calls of the current company and the daily limit (task 140). */
   @GetMapping("/daily-quota")
   @SaCheckPermission("product:view")
   public R<DailyQuotaVO> dailyQuota() {

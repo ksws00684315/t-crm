@@ -56,7 +56,7 @@ public enum SystemConfigDefinition {
   /** Items per product-link convert request (task 138); effective without a restart. */
   PRODUCT_LINKS_MAX_CONVERT_ITEMS(
       "product-links.max-convert-items", "business", "integer", null, "500", 1, 5000),
-  /** Weidian vdian.item.add calls per company per Beijing day (task 139). */
+  /** Weidian vdian.item.add calls per company per Beijing day (task 140). */
   COPY_DAILY_LIMIT_PER_COMPANY(
       "copy.daily-limit-per-company", "business", "integer", null, "5000", 1, 1000000),
   LOGIN_PAIR_LIMIT("login.fail.pair-limit", "security", "integer", null, "5", 3, 1000),

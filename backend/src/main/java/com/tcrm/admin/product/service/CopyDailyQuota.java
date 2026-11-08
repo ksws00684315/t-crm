@@ -17,7 +17,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Counts Weidian {@code vdian.item.add} calls per company per Beijing day in Redis (task 139). New
+ * Counts Weidian {@code vdian.item.add} calls per company per Beijing day in Redis (task 140). New
  * copy jobs are refused when their item count would exceed the remaining allowance; the copy itself
  * acquires one unit right before each add call, so concurrent jobs cannot overrun the limit.
  */

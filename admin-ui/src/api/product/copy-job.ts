@@ -62,7 +62,7 @@ export function listCopyJobItems(
   });
 }
 
-/** Task 139: product copies (vdian.item.add calls) the company used today and its daily limit. */
+/** Task 140: product copies (vdian.item.add calls) the company used today and its daily limit. */
 export interface CopyDailyQuotaVO {
   used: number;
   limit: number;

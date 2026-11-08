@@ -39,7 +39,7 @@ const query = reactive({
   status: ""
 });
 
-/** Task 139: today's copy usage; the line stays hidden when it cannot be read. */
+/** Task 140: today's copy usage; the line stays hidden when it cannot be read. */
 const dailyQuota = ref<CopyDailyQuotaVO | null>(null);
 
 const detailVisible = ref(false);

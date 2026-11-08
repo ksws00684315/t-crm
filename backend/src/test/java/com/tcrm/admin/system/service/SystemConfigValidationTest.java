@@ -12,7 +12,7 @@ class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
     // 33 task-34 settings, the two task-76 settlement pull settings, the task-138 convert limit and
-    // the task-139 daily copy limit.
+    // the task-140 daily copy limit.
     assertThat(SystemConfigDefinition.values()).hasSize(37);
     assertThat(SystemConfigDefinition.find("link.short-url.allowed-hosts"))
         .isEqualTo(SystemConfigDefinition.SHORT_URL_ALLOWED_HOSTS);

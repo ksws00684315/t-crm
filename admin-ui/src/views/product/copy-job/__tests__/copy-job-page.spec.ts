@@ -124,7 +124,7 @@ describe("Copy job page", () => {
     wrapper.unmount();
   });
 
-  it("shows today's copy usage against the daily limit (task 139)", async () => {
+  it("shows today's copy usage against the daily limit (task 140)", async () => {
     const wrapper = await open();
     expect(wrapper.get('[data-test="copy-daily-quota"]').text()).toBe(
       "本日已复制商品 4589 条 / 本日最多复制商品 5000 条"

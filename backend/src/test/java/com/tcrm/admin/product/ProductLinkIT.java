@@ -372,7 +372,7 @@ class ProductLinkIT {
 
   @Test
   void shouldCountDailyCopies_inRedis_andRejectConvertBeyondTheLimit() throws Exception {
-    long kolId = createKol("Quota", "quota139@example.com");
+    long kolId = createKol("Quota", "quota140@example.com");
     long tenantId =
         jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE id = ?", Long.class, kolId);
     String key =

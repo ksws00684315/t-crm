@@ -264,7 +264,7 @@ public class ProductLinkService {
             throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
           }
           if (dailyQuota != null) {
-            // Task 139: refuse before any task row when today's add-item allowance is short.
+            // Task 140: refuse before any task row when today's add-item allowance is short.
             dailyQuota.requireRoom(grant.tenantId(), unique.size());
           }
           long targetShopId = resolveTargetShop(grant, command, unique.size());
