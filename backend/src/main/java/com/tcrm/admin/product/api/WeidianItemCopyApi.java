@@ -16,9 +16,10 @@ public interface WeidianItemCopyApi {
   CopyResult copy(long sourceShopId, String sourceItemId, long targetShopId);
 
   /**
-   * Returns item summary when the shop owns {@code weidianItemId}. Empty only when Weidian
-   * explicitly reports the item does not exist / does not belong to the shop. Other Weidian errors
-   * throw {@link com.tcrm.admin.shared.BusinessException}.
+   * Returns item summary when Weidian returns {@code weidianItemId} for the shop's token; see
+   * {@link ProbedItem#sellerConfirmed()} for ownership. Empty only when Weidian explicitly reports
+   * the item does not exist / does not belong to the shop. Other Weidian errors throw {@link
+   * com.tcrm.admin.shared.BusinessException}.
    */
   Optional<ProbedItem> probe(long shopId, String weidianItemId);
 
@@ -33,8 +34,12 @@ public interface WeidianItemCopyApi {
 
   /**
    * @param imageUrl first item image as an https address; null when the item has none
+   * @param sellerConfirmed true when Weidian's {@code seller_id} equals the probed shop's Weidian
+   *     shop id. Weidian answers {@code item.get} for other sellers' items too (task 137), so a hit
+   *     without confirmation does not prove the shop owns the item.
    */
-  record ProbedItem(String itemId, String name, BigDecimal price, String imageUrl) {}
+  record ProbedItem(
+      String itemId, String name, BigDecimal price, String imageUrl, boolean sellerConfirmed) {}
 
   /**
    * @param newItemId digit-string id returned by {@code vdian.item.add}

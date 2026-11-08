@@ -296,6 +296,7 @@ const zhCN = {
     COPY_TOKEN_INVALID: "复制令牌无效或已作废",
     COPY_TOKEN_EXPIRED: "复制令牌已过期",
     COPY_TOKEN_QUOTA_EXCEEDED: "复制令牌额度已用尽",
+    COPY_DAILY_QUOTA_EXCEEDED: "本日复制额度已用完，请明天再试",
     COPY_TARGET_SHOP_MISSING: "未配置默认复制店铺，且令牌未指定目标店铺",
     PRODUCT_LINK_RATE_LIMITED: "请求过于频繁，请稍后再试",
     SHORT_URL_INVALID: "地址必须是 http 或 https，且不超过 2048 个字符",
@@ -447,6 +448,8 @@ const zhCN = {
       product_links_ip_per_minute: "复制接口每 IP 每分钟上限",
       product_links_convert_token_per_minute: "令牌转换每分钟上限",
       product_links_resolve_token_per_minute: "令牌解析每分钟上限",
+      product_links_max_convert_items: "复制任务每次提交商品上限",
+      copy_daily_limit_per_company: "每家公司每日最多复制商品数",
       weidian_qps: "微店接口每秒请求数",
       weidian_settlement_sync_interval_minutes: "结算明细增量拉取间隔（分钟）",
       weidian_settlement_backfill_hour: "结算明细每日回扫整点（北京时间）",
@@ -999,6 +1002,7 @@ const zhCN = {
     defaultsNote: "默认商品数量和有效分钟由系统配置提供"
   },
   copyJob: {
+    dailyQuota: "本日已复制商品 {used} 条 / 本日最多复制商品 {limit} 条",
     jobCode: "任务编号",
     targetChannel: "目标渠道",
     status: "状态",

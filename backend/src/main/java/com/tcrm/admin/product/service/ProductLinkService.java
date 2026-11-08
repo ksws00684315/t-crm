@@ -46,7 +46,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ProductLinkService {
   static final String CHANNEL_WEIDIAN = "WEIDIAN";
   static final String TCR_TEMPLATE_CODE = "TCRM_RELAY";
-  static final int MAX_CONVERT_ITEMS = 500;
+
+  /** Per-request item limit for {@code /convert}, editable in system configuration (task 138). */
+  static final String MAX_CONVERT_ITEMS_KEY = "product-links.max-convert-items";
+
+  static final int DEFAULT_MAX_CONVERT_ITEMS = 500;
   static final int MAX_RESOLVE_ITEMS = 50;
 
   private final CopyTokenApi tokens;
@@ -64,6 +68,7 @@ public class ProductLinkService {
   private final CopyJobFailureRecorder failures;
   private final SecureRandom random;
   private final SystemConfigApi configs;
+  private final CopyDailyQuota dailyQuota;
 
   @Autowired
   public ProductLinkService(
@@ -80,7 +85,8 @@ public class ProductLinkService {
       JdbcTemplate jdbc,
       ProductMapper products,
       CopyJobFailureRecorder failures,
-      SystemConfigApi configs) {
+      SystemConfigApi configs,
+      CopyDailyQuota dailyQuota) {
     this.tokens = tokens;
     this.targetShops = targetShops;
     this.jobs = jobs;
@@ -95,6 +101,7 @@ public class ProductLinkService {
     this.products = products;
     this.failures = failures;
     this.configs = configs;
+    this.dailyQuota = dailyQuota;
     this.random = new SecureRandom();
   }
 
@@ -136,9 +143,10 @@ public class ProductLinkService {
 
           @Override
           public int getInt(String key) {
-            return 0;
+            return MAX_CONVERT_ITEMS_KEY.equals(key) ? DEFAULT_MAX_CONVERT_ITEMS : 0;
           }
         };
+    this.dailyQuota = null;
     this.random = random;
   }
 
@@ -230,8 +238,10 @@ public class ProductLinkService {
     if (command.items() == null || command.items().isEmpty()) {
       throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    if (command.items().size() > MAX_CONVERT_ITEMS) {
-      throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
+    int maxItems = configs.getInt(MAX_CONVERT_ITEMS_KEY);
+    if (command.items().size() > maxItems) {
+      throw new BusinessException(
+          ErrorCode.COMMON_VALIDATION_FAILED, ProductLinkMessages.tooManyItems(maxItems), null);
     }
     CopyTokenGrantDTO grant = authenticate(command.token());
     rates.checkConvertToken(grant.tokenId());
@@ -252,6 +262,10 @@ public class ProductLinkService {
           }
           if (unique.isEmpty()) {
             throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
+          }
+          if (dailyQuota != null) {
+            // Task 140: refuse before any task row when today's add-item allowance is short.
+            dailyQuota.requireRoom(grant.tenantId(), unique.size());
           }
           long targetShopId = resolveTargetShop(grant, command, unique.size());
           Instant now = Instant.now();

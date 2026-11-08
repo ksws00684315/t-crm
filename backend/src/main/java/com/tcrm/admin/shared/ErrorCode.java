@@ -111,6 +111,7 @@ public enum ErrorCode {
   COPY_TOKEN_INVALID(401, "Copy token is invalid or revoked"),
   COPY_TOKEN_EXPIRED(401, "Copy token has expired"),
   COPY_TOKEN_QUOTA_EXCEEDED(429, "Copy token quota has been used up"),
+  COPY_DAILY_QUOTA_EXCEEDED(429, "Daily product copy limit of the company is reached"),
   KOL_DISABLED(403, "Creator account is disabled"),
   KOL_PROMO_SHEET_INVALID(400, "Promo sheet is not a readable .xlsx workbook"),
   KOL_PROMO_SHEET_TOO_LARGE(400, "Promo sheet exceeds 300 MB"),

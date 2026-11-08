@@ -18,11 +18,15 @@ import com.tcrm.admin.link.service.LinkIndexSyncJob;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.ProbedItem;
+import com.tcrm.admin.product.service.CopyDailyQuota;
 import com.tcrm.admin.shared.SecretCipher;
+import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -94,6 +98,7 @@ class ProductLinkIT {
   private final StringRedisTemplate redis;
   private final SecretCipher cipher;
   private final LinkIndexSyncJob sync;
+  private final CopyDailyQuota dailyQuota;
 
   private String admin;
 
@@ -104,13 +109,15 @@ class ProductLinkIT {
       ObjectMapper json,
       StringRedisTemplate redis,
       SecretCipher cipher,
-      LinkIndexSyncJob sync) {
+      LinkIndexSyncJob sync,
+      CopyDailyQuota dailyQuota) {
     this.mvc = mvc;
     this.jdbc = jdbc;
     this.json = json;
     this.redis = redis;
     this.cipher = cipher;
     this.sync = sync;
+    this.dailyQuota = dailyQuota;
   }
 
   @BeforeEach
@@ -136,7 +143,8 @@ class ProductLinkIT {
     when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90001", null));
     when(copies.isShopAuthorized(anyLong())).thenReturn(true);
     when(copies.probe(anyLong(), any()))
-        .thenReturn(Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"), null)));
+        .thenReturn(
+            Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"), null, false)));
   }
 
   @Test
@@ -360,6 +368,49 @@ class ProductLinkIT {
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.errorCode").value("SHOP_COPY_CAPACITY_EXCEEDED"))
         .andExpect(jsonPath("$.msg").value("复制数量超过可用店铺容量"));
+  }
+
+  @Test
+  void shouldCountDailyCopies_inRedis_andRejectConvertBeyondTheLimit() throws Exception {
+    long kolId = createKol("Quota", "quota140@example.com");
+    long tenantId =
+        jdbc.queryForObject("SELECT tenant_id FROM crm_kol WHERE id = ?", Long.class, kolId);
+    String key =
+        "copy:item-add:daily:" + tenantId + ":" + LocalDate.now(ZoneId.of("Asia/Shanghai"));
+    redis.opsForValue().set(key, "4998");
+
+    // The Lua script stops at the default limit of 5000 and keeps the key expiring.
+    assertThat(TenantScope.callCompany(tenantId, dailyQuota::tryAcquire)).isTrue();
+    assertThat(TenantScope.callCompany(tenantId, dailyQuota::tryAcquire)).isTrue();
+    assertThat(TenantScope.callCompany(tenantId, dailyQuota::tryAcquire)).isFalse();
+    assertThat(redis.opsForValue().get(key)).isEqualTo("5000");
+    assertThat(redis.getExpire(key)).isPositive();
+
+    mvc.perform(get("/admin-api/product/copy-jobs/daily-quota").header(ADMIN, admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.used").value(5000))
+        .andExpect(jsonPath("$.data.limit").value(5000));
+
+    long shopId = createShop("1001", "Main");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    String token = createToken(kolId, 5);
+    redis.opsForValue().set(key, "4999");
+    mvc.perform(
+            post(BASE + "/convert")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","callerPlatform":"google_sheet_plugin",
+                     "items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"1"},
+                              {"sourceChannelCode":"WEIDIAN","sourceProductId":"2"}]}
+                    """
+                        .formatted(token)))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(jsonPath("$.errorCode").value("COPY_DAILY_QUOTA_EXCEEDED"))
+        .andExpect(jsonPath("$.msg").value("本日复制额度不足：本日最多复制商品 5000 条，已复制 4999 条，剩余 1 条，本次提交 2 条"));
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_copy_job", Integer.class)).isZero();
   }
 
   @Test

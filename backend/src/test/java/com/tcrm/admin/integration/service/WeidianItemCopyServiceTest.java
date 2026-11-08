@@ -23,6 +23,9 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponseBlock
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailResponse;
 import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
+import com.tcrm.admin.product.api.CopyDailyQuotaApi;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.ProbedItem;
 import com.tcrm.admin.shared.BusinessException;
@@ -41,6 +44,8 @@ import tools.jackson.databind.json.JsonMapper;
 class WeidianItemCopyServiceTest {
   private final WeidianBusinessApi weidian = mock(WeidianBusinessApi.class);
   private final WeidianShopAuthMapper auths = mock(WeidianShopAuthMapper.class);
+  private final ShopAccessApi shops = mock(ShopAccessApi.class);
+  private final CopyDailyQuotaApi dailyQuota = mock(CopyDailyQuotaApi.class);
   private final JsonMapper json = JsonMapper.builder().build();
   private final WeidianBusinessApiParser parser = new WeidianBusinessApiParser();
   private final Logger copyLogger = (Logger) LoggerFactory.getLogger(WeidianItemCopyService.class);
@@ -49,7 +54,8 @@ class WeidianItemCopyServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new WeidianItemCopyService(weidian, auths);
+    service = new WeidianItemCopyService(weidian, auths, shops, dailyQuota);
+    when(dailyQuota.tryAcquire()).thenReturn(true);
     logs.start();
     copyLogger.addAppender(logs);
   }
@@ -126,6 +132,29 @@ class WeidianItemCopyServiceTest {
 
     Optional<?> hit = service.probe(3L, "7");
     assertThat(hit).isPresent();
+  }
+
+  @Test
+  void shouldConfirmSeller_onlyForTheOwningShop() {
+    // Task 137: Weidian item.get answers any shop's token for any item, so with two authorised
+    // shops every source item looked present in both and failed as "多个店铺都有该商品".
+    when(shops.findShop(3L)).thenReturn(new ShopAccessDTO(3L, "A", "1000000001", 1, "S3"));
+    when(shops.findShop(4L)).thenReturn(new ShopAccessDTO(4L, "B", "1000000002", 1, "S4"));
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(
+            new ItemResponse("7", "Hit", "1000000001", new BigDecimal("1.00"), 1, "1", null));
+
+    assertThat(service.probe(3L, "7").orElseThrow().sellerConfirmed()).isTrue();
+    assertThat(service.probe(4L, "7").orElseThrow().sellerConfirmed()).isFalse();
+  }
+
+  @Test
+  void shouldNotConfirmSeller_whenSellerIdMissing() {
+    when(shops.findShop(3L)).thenReturn(new ShopAccessDTO(3L, "A", "1000000001", 1, "S3"));
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("7", "Hit", null, new BigDecimal("1.00"), 1, "1", null));
+
+    assertThat(service.probe(3L, "7").orElseThrow().sellerConfirmed()).isFalse();
   }
 
   @Test
@@ -216,6 +245,34 @@ class WeidianItemCopyServiceTest {
             WeidianItemCopyService.isItemNotFound(
                 new WeidianApiException(999, "rate limited", true)))
         .isFalse();
+  }
+
+  @Test
+  void shouldNotCallAdd_whenDailyQuotaIsUsedUp() {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(dailyQuota.tryAcquire()).thenReturn(false);
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e ->
+                assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED));
+    verify(weidian, never()).addItem(anyLong(), any());
+  }
+
+  @Test
+  void shouldCountOneQuotaUnit_perAddCall() {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(88L, List.of(), null));
+
+    service.copy(1L, "10", 2L);
+
+    verify(dailyQuota).tryAcquire();
   }
 
   @Test

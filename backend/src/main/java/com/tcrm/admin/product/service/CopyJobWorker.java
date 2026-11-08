@@ -281,24 +281,26 @@ public class CopyJobWorker implements ApplicationRunner {
       boolean enabledShop = enabled.stream().anyMatch(s -> s.getId().equals(product.getShopId()));
       return enabledShop ? SourceLookup.found(product) : SourceLookup.missing();
     }
-    // Not registered: probe each enabled shop via Weidian item.get; register the first hit.
+    // Not registered: probe each enabled shop via Weidian item.get; register the single hit.
     // Exclusive IDs are excluded earlier; probe only treats explicit not-found as empty.
-    List<ShopDO> hits = new ArrayList<>();
-    WeidianItemCopyApi.ProbedItem hitItem = null;
+    // Task 137: item.get also answers for other sellers' items, so seller-confirmed hits win;
+    // without any confirmation every hit stays a candidate (behaviour before task 137).
+    List<ProbeHit> hits = new ArrayList<>();
     for (ShopDO shop : enabled) {
-      var probed = copies.probe(shop.getId(), weidianItemId);
-      if (probed.isPresent()) {
-        hits.add(shop);
-        hitItem = probed.get();
-      }
+      copies
+          .probe(shop.getId(), weidianItemId)
+          .ifPresent(item -> hits.add(new ProbeHit(shop, item)));
     }
-    if (hits.isEmpty()) {
+    List<ProbeHit> confirmed = hits.stream().filter(h -> h.item().sellerConfirmed()).toList();
+    List<ProbeHit> candidates = confirmed.isEmpty() ? hits : confirmed;
+    if (candidates.isEmpty()) {
       return SourceLookup.missing();
     }
-    if (hits.size() > 1) {
+    if (candidates.size() > 1) {
       return SourceLookup.conflicted();
     }
-    ShopDO shop = hits.getFirst();
+    ShopDO shop = candidates.getFirst().shop();
+    WeidianItemCopyApi.ProbedItem hitItem = candidates.getFirst().item();
     String name = hitItem == null ? null : hitItem.name();
     BigDecimal price = hitItem == null ? null : hitItem.price();
     if (name == null || name.isBlank() || price == null) {
@@ -428,6 +430,8 @@ public class CopyJobWorker implements ApplicationRunner {
       return weidianItemId;
     }
   }
+
+  private record ProbeHit(ShopDO shop, WeidianItemCopyApi.ProbedItem item) {}
 
   private record SourceLookup(ProductDO product, boolean conflict, boolean incomplete) {
     static SourceLookup missing() {
