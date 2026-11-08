@@ -57,7 +57,7 @@ public class WeidianClient {
             return WeidianResponseParser.resultOrThrow(envelope);
           }
           String reason = WeidianResponseParser.statusReason(envelope);
-          // The numeric code alone says nothing actionable (task 128); Weidian's reason and the
+          // The numeric code alone says nothing actionable (task 134); Weidian's reason and the
           // request that produced it make the failure diagnosable and replayable. Params never
           // carry the access token (it travels in the public form field).
           LOG.warn(
@@ -108,7 +108,7 @@ public class WeidianClient {
     }
   }
 
-  /** Keeps Weidian's own explanation next to the numeric code (task 128). */
+  /** Keeps Weidian's own explanation next to the numeric code (task 134). */
   static String failureMessage(int statusCode, String reason) {
     String base = "Weidian API error " + statusCode;
     String safe = abbreviate(reason, REASON_LIMIT);
