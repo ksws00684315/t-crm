@@ -204,6 +204,7 @@ deploy/scripts/local-infra.sh psql
 - 服务器需要：Docker 与 Compose 插件、`gpg`（发布前备份用 `pg-backup.sh`，口令文件 `TCRM_BACKUP_PASSPHRASE_FILE`，权限必须是 600，见「备份与恢复」）、对 GHCR 的读取权限（`read:packages` 令牌）。`deploy/.env` 必填项发布前由脚本检查。
 - Compose 文件、Nginx 配置和脚本来自服务器上的仓库，镜像里只有应用：**发布前先把仓库切到同一个标签**（`git fetch --tags && git checkout v<版本>`）。
 - 同一个版本号不要重复打标签或重新推送：脚本发现 `releases/<版本>/` 已经解出就不再替换。
+- **`deploy/nginx/` 下的配置变更不随发布生效**：发布脚本按设计不重启也不重载 Nginx（步骤 6），Nginx 只在启动时读取模板与片段，`git checkout` 只改宿主机上的文件。本次发布如果改了 `deploy/nginx/templates/` 或 `deploy/nginx/snippets/`（例如安全响应头），发布完成后必须手动重载：先 `docker compose -f deploy/docker-compose.prod.yml exec -T nginx nginx -t` 校验配置，再执行 `docker compose -f deploy/docker-compose.prod.yml exec -T nginx nginx -s reload`（平滑重载，不中断现有连接），最后用 `curl -I` 核对目标响应头，确认新配置已生效。回滚到带 Nginx 配置变更的版本时同样要重载一次，否则线上仍停留在较新的配置。
 
 **发布一个版本**
 
@@ -224,7 +225,7 @@ deploy/scripts/local-infra.sh psql
    3. 运行 `deploy/backup/pg-backup.sh`，**失败即中止**（首次部署没有数据库，跳过）；
    4. 更新 `crm-admin` 并等待健康。**不健康时前端不切换**，脚本报错退出；
    5. 仅当 `crm-redirect` 镜像摘要变化时更新它；
-   6. 原子切换 `current`（临时链接 + `mv -T`），Nginx 不重启、不重载；
+   6. 原子切换 `current`（临时链接 + `mv -T`），Nginx 不重启、不重载；本次发布改了 `deploy/nginx/` 下的配置时，发布后按「前提与限制」手动重载；
    7. 把 `TCRM_VERSION` 写回 `.env`，在 `deploy/releases.log`（已被 Git 忽略）追加记录，只保留最近 5 个静态版本（正在使用的和上一个版本不会被删）。
 
    任一步失败，脚本停止并打印当前状态和下一步建议，**不自动回滚数据库**。`crm-admin` 被替换后失败时，线上管理端接口不可用，按建议重新执行 `release.sh deploy <上一个版本>` 恢复。发布和回滚都不碰 PostgreSQL、Redis、Nginx 容器。
