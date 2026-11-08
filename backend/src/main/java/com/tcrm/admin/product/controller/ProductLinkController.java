@@ -99,7 +99,8 @@ public class ProductLinkController {
   public record ConvertRequest(
       @NotBlank @Size(max = 128) String token,
       @Size(max = 64) String callerPlatform,
-      @NotEmpty @Size(max = 500) List<ConvertItemRequest> items) {}
+      // Hard ceiling equals the system-config maximum; the effective limit is checked in service.
+      @NotEmpty @Size(max = 5000) List<ConvertItemRequest> items) {}
 
   public record ConvertItemRequest(
       @Size(max = 16) String sourceChannelCode,

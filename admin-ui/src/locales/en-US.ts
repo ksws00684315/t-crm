@@ -467,6 +467,7 @@ const enUS: MessageSchema = {
       product_links_ip_per_minute: "Copy API requests per IP per minute",
       product_links_convert_token_per_minute: "Token conversions per minute",
       product_links_resolve_token_per_minute: "Token resolutions per minute",
+      product_links_max_convert_items: "Products per copy request",
       weidian_qps: "Weidian requests per second",
       weidian_settlement_sync_interval_minutes:
         "Settlement detail incremental pull interval (minutes)",
