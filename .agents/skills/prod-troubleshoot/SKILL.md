@@ -128,6 +128,7 @@ ops-check 告警类型与阈值见 `deploy/README.md`「主机检查脚本」，
 | 症状 | 先看 | 判断与处理 |
 |---|---|---|
 | 表格脚本复制商品失败 | `crm_copy_job`（`job_code`、`status`、`error_message`、计数）→ `crm_copy_job_item`（`source_product_id`、`status`、`error_message`、`target_item_id`）；按任务创建时间查 `crm-admin` 日志中的 `Weidian API error <code>` | 任务级错误多为店铺未授权（查 `crm_weidian_shop_auth`）。200056 是笼统的参数错误码，不能只凭数字码下结论；v0.1.5 起看错误信息和 WARN 日志里的微店原因（案例 134），再查本表历史案例（案例 127 的结论已更正，见案例 130）。新原因要对照微店开放平台文档，在报告里写明来源 |
+| 明细报「多个店铺都有该商品」 | 源商品是否已登记在多个店铺（`crm_product.weidian_item_id`）；日志里每个商品是否对每个启用店铺都有 `vdian.item.get` 且 `statusCode=0` | 已登记在多个店铺：数据问题，交负责人处理。未登记、所有店铺都探测成功：微店 `item.get` 不校验归属，v0.1.10 起按 `seller_id` 确认（案例 137）；修复后仍报，说明 `seller_id` 与店铺微店 ID 不是同一套编号 |
 | 复制任务一直「处理中」 | `crm_copy_job.status`、明细是否都还是 `pending`；日志里有没有这个任务的 `vdian.item.get` | 明细从未被处理是派发问题（案例 131，v0.1.7 已修）；重启 `crm-admin` 会续跑 `processing` 的任务，重启需负责人同意 |
 | 明细报「来源商品信息不完整」 | 源商品是否已登记到 `crm_product`；日志里 `item.get` 之后有没有 `item.add` | 自动登记取不到名称或价格。多规格不同价见案例 132；其他情况看 `item.get` 返回里缺了哪项 |
 | 商品图片不显示 | `crm_product.image_url` 是否有值、是否 https；本机 `curl -sI https://admin.<域名>/ \| grep -i content-security` | `image_url` 为空：案例 131 之前登记的商品没有图片，由负责人手工补。有值但不显示：先看 CSP 的 `img-src`（案例 133），再在浏览器里看图片请求的状态码 |
@@ -158,6 +159,7 @@ ops-check 告警类型与阈值见 `deploy/README.md`「主机检查脚本」，
 | 131 | 复制任务一直「处理中」，明细 `pending` 从未处理；自动登记的商品没有图片 | `convert` 在事务提交前就把任务交给工作线程，线程读不到任务；自动登记源商品时没有保存图片 | 事务提交后再派发；登记时取第一张图（http 转 https），v0.1.7。服务启动时会续跑 `processing` 的任务 |
 | 132 | 续跑后明细失败，「来源商品信息不完整」，日志里只有 `item.get`、没有 `item.add` | 多规格商品各规格价格不同，取不到单个商品价格 | 取不到时用各 SKU 最低价，v0.1.8。已是 `failed` 的任务不会重跑，要在表格里重新提交 |
 | 133 | 管理端、达人端商品图片都不显示，`image_url` 有值 | 两个前端的 CSP 是 `img-src 'self' data:`，拦截所有外部图片 | 改为 `img-src 'self' data: https:`，v0.1.9。Nginx 配置要在发版后手动 `nginx -t` 和 `nginx -s reload` 才生效 |
+| 137 | 接入第二个店铺后，复制任务全部报「多个店铺都有该商品」 | 源商品未登记时逐店探测 `item.get`，而微店不校验商品归属，两店都命中 | 比对 `seller_id` 与店铺微店 ID，确认的店铺优先，无确认时与原逻辑相同。已失败的任务要重新提交 |
 
 新案例处理完后，把一行补进本表（与修复 PR 一起提交）。
 

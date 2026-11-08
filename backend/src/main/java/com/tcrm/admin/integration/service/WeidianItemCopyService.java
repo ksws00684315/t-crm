@@ -18,6 +18,9 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailBlock;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailRequest;
 import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
 import com.tcrm.admin.integration.model.WeidianShopAuthDO;
+import com.tcrm.admin.product.api.CopyDailyQuotaApi;
+import com.tcrm.admin.product.api.ShopAccessApi;
+import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -46,10 +49,18 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
 
   private final WeidianBusinessApi weidian;
   private final WeidianShopAuthMapper auths;
+  private final ShopAccessApi shops;
+  private final CopyDailyQuotaApi dailyQuota;
 
-  public WeidianItemCopyService(WeidianBusinessApi weidian, WeidianShopAuthMapper auths) {
+  public WeidianItemCopyService(
+      WeidianBusinessApi weidian,
+      WeidianShopAuthMapper auths,
+      ShopAccessApi shops,
+      CopyDailyQuotaApi dailyQuota) {
     this.weidian = weidian;
     this.auths = auths;
+    this.shops = shops;
+    this.dailyQuota = dailyQuota;
   }
 
   @Override
@@ -61,6 +72,10 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         sourceIdLong == null
             ? new ItemDetailResponse(List.of(), null)
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
+    // Task 140: every vdian.item.add call counts against the company's daily allowance.
+    if (!dailyQuota.tryAcquire()) {
+      throw new BusinessException(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED);
+    }
     AddItemResponse created = weidian.addItem(targetShopId, add);
     if (created == null || created.itemId() == null) {
       logItemIdMissing(targetShopId, created);
@@ -93,7 +108,13 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       }
       List<ItemImage> images = images(item.raw());
       String image = images.isEmpty() ? null : httpsUrl(images.getFirst().url());
-      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), itemPrice(item), image));
+      return Optional.of(
+          new ProbedItem(
+              item.itemId(),
+              item.itemName(),
+              itemPrice(item),
+              image,
+              sellerConfirmed(shopId, item.sellerId())));
     } catch (WeidianApiException e) {
       if (isItemNotFound(e)) {
         return Optional.empty();
@@ -105,6 +126,15 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     } catch (WeidianTransportException e) {
       throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, "微店接口调用失败", null);
     }
+  }
+
+  /** True only when both ids are known and equal (task 137). */
+  private boolean sellerConfirmed(long shopId, String sellerId) {
+    if (sellerId == null || sellerId.isBlank()) {
+      return false;
+    }
+    ShopAccessDTO shop = shops.findShop(shopId);
+    return shop != null && sellerId.equals(shop.weidianShopId());
   }
 
   @Override

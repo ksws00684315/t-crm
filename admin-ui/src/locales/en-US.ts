@@ -307,6 +307,8 @@ const enUS: MessageSchema = {
     COPY_TOKEN_INVALID: "The copy token is invalid or revoked",
     COPY_TOKEN_EXPIRED: "The copy token has expired",
     COPY_TOKEN_QUOTA_EXCEEDED: "The copy token quota has been used up",
+    COPY_DAILY_QUOTA_EXCEEDED:
+      "Today's product copy limit has been reached. Please try again tomorrow",
     COPY_TARGET_SHOP_MISSING:
       "No default copy shop is set and the token does not name a target shop",
     PRODUCT_LINK_RATE_LIMITED: "Too many requests; please try again later",
@@ -467,6 +469,8 @@ const enUS: MessageSchema = {
       product_links_ip_per_minute: "Copy API requests per IP per minute",
       product_links_convert_token_per_minute: "Token conversions per minute",
       product_links_resolve_token_per_minute: "Token resolutions per minute",
+      product_links_max_convert_items: "Products per copy request",
+      copy_daily_limit_per_company: "Daily product copies per company",
       weidian_qps: "Weidian requests per second",
       weidian_settlement_sync_interval_minutes:
         "Settlement detail incremental pull interval (minutes)",
@@ -1030,6 +1034,7 @@ const enUS: MessageSchema = {
     defaultsNote: "Default quantity and validity are provided by system configuration"
   },
   copyJob: {
+    dailyQuota: "Products copied today: {used} / Daily limit: {limit}",
     jobCode: "Job code",
     targetChannel: "Target channel",
     status: "Status",

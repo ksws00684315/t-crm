@@ -39,8 +39,6 @@ jobs:
           git diff --exit-code -- THIRD-PARTY-NOTICES
       - name: Unit tests, architecture and build gates
         run: mvn -B verify
-      - name: Docker integration tests
-        run: mvn -B verify -Pdocker-it
       - name: Upload coverage and test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -49,5 +47,58 @@ jobs:
           path: |
             backend/target/site/jacoco/
             backend/target/surefire-reports/
-            backend/target/failsafe-reports/
+          if-no-files-found: error
+
+  integration:
+    name: Backend integration (${{ matrix.shard }}/4)
+    # Runs in parallel with "verify". Every *IT class starts its own containers and Spring context,
+    # so the classes are split across shards by sorted position (index modulo the shard count).
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: JDK 21 and Maven cache
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Select integration test classes
+        env:
+          SHARD_INDEX: ${{ strategy.job-index }}
+          SHARD_TOTAL: ${{ strategy.job-total }}
+        run: |
+          classes="$(find src/test/java -name '*IT.java' \
+            | sed -e 's#^src/test/java/##' -e 's#\.java$##' -e 's#/#.#g' \
+            | LC_ALL=C sort \
+            | awk -v n="$SHARD_TOTAL" -v k="$SHARD_INDEX" '(NR - 1) % n == k' \
+            | paste -sd, -)"
+          echo "$classes" | tr ',' '\n'
+          echo "IT_CLASSES=$classes" >> "$GITHUB_ENV"
+      # Unit tests and the format, style and coverage gates run once in "verify"; here surefire runs
+      # nothing (-Dtest=NONE) and JaCoCo is off because one shard alone cannot meet the bundle gate.
+      - name: Docker integration tests
+        run: >-
+          mvn -B verify -Pdocker-it
+          -Dit.test="$IT_CLASSES"
+          -Dtest=NONE -Dsurefire.failIfNoSpecifiedTests=false
+          -Djacoco.skip=true -Dspotless.check.skip=true -Dcheckstyle.skip=true
+      - name: Upload integration test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-integration-${{ matrix.shard }}
+          path: backend/target/failsafe-reports/
           if-no-files-found: error

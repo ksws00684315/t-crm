@@ -11,8 +11,9 @@ import org.junit.jupiter.api.Test;
 class SystemConfigValidationTest {
   @Test
   void shouldRegisterEveryTask34Setting_andKeepInvitationMaximumAt72Hours() {
-    // 33 task-34 settings plus the two task-76 settlement pull settings.
-    assertThat(SystemConfigDefinition.values()).hasSize(35);
+    // 33 task-34 settings, the two task-76 settlement pull settings, the task-138 convert limit and
+    // the task-140 daily copy limit.
+    assertThat(SystemConfigDefinition.values()).hasSize(37);
     assertThat(SystemConfigDefinition.find("link.short-url.allowed-hosts"))
         .isEqualTo(SystemConfigDefinition.SHORT_URL_ALLOWED_HOSTS);
     assertThat(SystemConfigDefinition.find("commission.minimum-withdrawal-cny"))
@@ -29,7 +30,7 @@ class SystemConfigValidationTest {
             java.util.Arrays.stream(SystemConfigDefinition.values())
                 .map(SystemConfigDefinition::key)
                 .collect(Collectors.toSet()))
-        .hasSize(35);
+        .hasSize(37);
   }
 
   @Test
@@ -45,6 +46,20 @@ class SystemConfigValidationTest {
 
   @Test
   void shouldValidateIntegerRangesAndOptionalUploadAddress() {
+    SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "1");
+    SystemConfigService.validate(SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "5000");
+    SystemConfigService.validate(SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "1");
+    SystemConfigService.validate(SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "1000000");
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "0"))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.COPY_DAILY_LIMIT_PER_COMPANY, "1000001"))
+        .isInstanceOf(BusinessException.class);
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1");
     SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1000");
     SystemConfigService.validate(SystemConfigDefinition.ORDER_SYNC_FAILURE_RETENTION_DAYS, "0");
@@ -65,6 +80,11 @@ class SystemConfigValidationTest {
         .isInstanceOf(BusinessException.class);
     assertThatThrownBy(
             () -> SystemConfigService.validate(SystemConfigDefinition.SHOP_MAX_PER_COMPANY, "1001"))
+        .isInstanceOf(BusinessException.class);
+    assertThatThrownBy(
+            () ->
+                SystemConfigService.validate(
+                    SystemConfigDefinition.PRODUCT_LINKS_MAX_CONVERT_ITEMS, "5001"))
         .isInstanceOf(BusinessException.class);
     assertThatThrownBy(
             () -> SystemConfigService.validate(SystemConfigDefinition.KOL_INVITE_TTL_HOURS, "73"))
