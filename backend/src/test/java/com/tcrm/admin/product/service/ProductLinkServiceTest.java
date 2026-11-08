@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -132,6 +133,39 @@ class ProductLinkServiceTest {
     verify(tokens).authenticate("tok");
   }
 
+  @Test
+  void shouldRejectConvert_whenDailyQuotaIsShort_beforeCreatingAJob() {
+    SystemConfigApi configs = mock(SystemConfigApi.class);
+    when(configs.getInt("product-links.max-convert-items")).thenReturn(500);
+    CopyDailyQuota quota = mock(CopyDailyQuota.class);
+    BusinessException shortage =
+        new BusinessException(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED, "本日复制额度不足", null);
+    // Three rows of one product deduplicate to one requested item for company 10.
+    doThrow(shortage).when(quota).requireRoom(10L, 1);
+    when(tokens.authenticate("tok"))
+        .thenReturn(new CopyTokenGrantDTO(1L, 10L, 20L, "WEIDIAN", 5L, 5));
+    ProductLinkService guarded =
+        new ProductLinkService(
+            tokens,
+            null,
+            jobs,
+            items,
+            shops,
+            kolItems,
+            rates,
+            worker,
+            progress,
+            copies,
+            jdbc,
+            products,
+            new CopyJobFailureRecorder(jobs),
+            configs,
+            quota);
+
+    assertThatThrownBy(() -> guarded.convert(convertOf(3))).isSameAs(shortage);
+    verify(jobs, never()).insert(any(CopyJobDO.class));
+  }
+
   private ProductLinkService withConvertLimit(int limit) {
     SystemConfigApi configs = mock(SystemConfigApi.class);
     when(configs.getInt("product-links.max-convert-items")).thenReturn(limit);
@@ -149,7 +183,8 @@ class ProductLinkServiceTest {
         jdbc,
         products,
         new CopyJobFailureRecorder(jobs),
-        configs);
+        configs,
+        null);
   }
 
   private static ConvertCommand convertOf(int count) {

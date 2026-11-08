@@ -74,6 +74,7 @@ async function open(
     page: 1,
     size: 20
   });
+  vi.mocked(copyJobApi.getCopyDailyQuota).mockResolvedValue({ used: 4589, limit: 5000 });
   const wrapper = mount(CopyJobPage, {
     global: { plugins: [ElementPlus, i18n, createPinia()] },
     attachTo: document.body
@@ -120,6 +121,37 @@ describe("Copy job page", () => {
     expect(wrapper.text()).toContain("目标店铺未完成微店授权");
     expect(wrapper.text()).toContain("-");
     expect(wrapper.text()).not.toContain("2026-10-21T01:02:03Z");
+    wrapper.unmount();
+  });
+
+  it("shows today's copy usage against the daily limit (task 140)", async () => {
+    const wrapper = await open();
+    expect(wrapper.get('[data-test="copy-daily-quota"]').text()).toBe(
+      "本日已复制商品 4589 条 / 本日最多复制商品 5000 条"
+    );
+    i18n.global.locale.value = "en-US";
+    await nextTick();
+    expect(wrapper.get('[data-test="copy-daily-quota"]').text()).toBe(
+      "Products copied today: 4589 / Daily limit: 5000"
+    );
+    expect(copyJobApi.getCopyDailyQuota).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("hides the usage line when it cannot be read", async () => {
+    vi.mocked(copyJobApi.getCopyDailyQuota).mockRejectedValueOnce(new Error("down"));
+    vi.mocked(copyJobApi.listCopyJobs).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 20
+    });
+    const wrapper = mount(CopyJobPage, {
+      global: { plugins: [ElementPlus, i18n, createPinia()] },
+      attachTo: document.body
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="copy-daily-quota"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
