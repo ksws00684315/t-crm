@@ -103,5 +103,37 @@ if ! grep -q '发布中止' "$unbound_out"; then
   exit 1
 fi
 echo "release-lock: unbound variable exits non-zero and reports failure (rc=$unbound_rc) OK"
+# L-113: a first deployment (no postgres container, not even a stopped one) must pin the deploy
+# target, not the .env.example placeholder TCRM_VERSION=1.0.0 (which would pull a non-existent
+# crm-postgres tag); an already released host keeps the old behaviour (pin the current version).
+PIN_ENV="$WORKDIR/env-pin"
+printf 'TCRM_VERSION=1.0.0\n' > "$PIN_ENV"
+pin_first="$(
+  set -euo pipefail
+  # shellcheck disable=SC1090
+  source "$RELEASE"
+  ENV_FILE="$PIN_ENV"
+  TARGET_VERSION="2.0.0"
+  container_any_id() { :; }
+  postgres_pin_version
+)"
+if [ "$pin_first" != "2.0.0" ]; then
+  echo "FAIL: first deploy must pin the deploy target, got [$pin_first]" >&2
+  exit 1
+fi
+pin_existing="$(
+  set -euo pipefail
+  # shellcheck disable=SC1090
+  source "$RELEASE"
+  ENV_FILE="$PIN_ENV"
+  TARGET_VERSION="2.0.0"
+  container_any_id() { printf 'abc123'; }
+  postgres_pin_version
+)"
+if [ "$pin_existing" != "1.0.0" ]; then
+  echo "FAIL: released host must keep pinning the current TCRM_VERSION, got [$pin_existing]" >&2
+  exit 1
+fi
+echo "release-lock: first deploy pins the deploy target (L-113) OK"
 echo "release-lock: all tests passed"
 rm -f "$out" "$out2"

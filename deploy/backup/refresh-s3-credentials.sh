@@ -9,6 +9,13 @@
 # Install in root's crontab on the production host:
 #   */15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1
 #
+# Like the other host scripts (L-112), the script loads deploy/.env (path derived from its own
+# location; TCRM_ENV_FILE overrides the file). Values the CALLER already set — the old inline
+# `TCRM_PGBACKREST_CREDS_DIR=... refresh-s3-credentials.sh` form, in cron or by hand — win over
+# the env file, so existing crontabs keep working unchanged. The env file is sourced WITHOUT
+# `set -a`: nothing else from it (secrets in particular) is exported to the aws subprocess. A
+# missing env file is not an error: the caller's environment alone decides, as before.
+#
 # First enablement, before postgres starts: create the directory (OUTSIDE this repository), run this
 # script once, then start the stack (deploy/README.md, "Backup and restore").
 #
@@ -16,11 +23,39 @@
 # credential value ever appears in the output or in an error message. Debug tracing (set -x) is
 # deliberately not used: it would print the credentials.
 #   TCRM_PGBACKREST_CREDS_DIR  target directory (required), e.g. /var/lib/tcrm/pgbackrest-creds;
-#                              must live OUTSIDE this repository; it is created when missing
+#                              must live OUTSIDE this repository; it is created when missing;
+#                              read from deploy/.env unless the caller sets it (caller wins, L-112)
+#   TCRM_ENV_FILE              alternative env file (default: deploy/.env next to the script)
 # Requirements on the host: AWS CLI v2 with access to the instance role (default credential chain).
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# export statements re-applying the caller's values of the given names, after the env file was
+# sourced (same approach as deploy/scripts/ops-check.sh; bash 3.2 compatible: no nameref).
+preserve_caller_env() {
+  local name
+  for name in "$@"; do
+    if [ -n "${!name+x}" ]; then
+      printf 'export %s=%q\n' "$name" "${!name}"
+    fi
+  done
+}
+
+# L-112: load deploy/.env like the other host scripts so cron can call this script directly.
+# Caller-set values win (preserve_caller_env). The env file is sourced WITHOUT `set -a`: only
+# TCRM_PGBACKREST_CREDS_DIR is consumed below, and nothing else from the file (secrets in
+# particular) becomes an environment variable for the aws subprocess. A missing env file is not
+# an error: the caller's environment alone decides (the behaviour before L-112).
+load_env_config() {
+  local env_file="${TCRM_ENV_FILE:-$DEPLOY_DIR/.env}"
+  [ -f "$env_file" ] || return 0
+  local saved
+  saved="$(preserve_caller_env TCRM_PGBACKREST_CREDS_DIR)"
+  # shellcheck source=/dev/null
+  . "$env_file"
+  [ -z "$saved" ] || eval "$saved"
+}
 
 # Name of the fragment inside TCRM_PGBACKREST_CREDS_DIR (must end in .conf: pgBackRest only reads
 # *.conf from config-include-path). deploy/scripts/ops-check.sh watches this same file.
@@ -153,5 +188,6 @@ main() {
 
 # Run only when executed, so the functions above can be sourced by tests.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  load_env_config
   main "$@"
 fi

@@ -6,8 +6,10 @@
 #       e.g. 1.0.1 (a leading "v" is accepted). --postgres updates TCRM_POSTGRES_VERSION and
 #       pulls that crm-postgres tag; omitted = leave the database image alone (L-070/L-073).
 #       A first deployment (no postgres container yet, TCRM_POSTGRES_VERSION not pinned) also
-#       pre-pulls the crm-postgres tag it is about to pin, so a pull failure surfaces in the pull
-#       step instead of inside "compose up" after the release has already started changing things.
+#       pre-pulls the crm-postgres tag it is about to pin — the deploy target itself on a first
+#       release (L-113: the .env TCRM_VERSION is only the placeholder there) — so a pull failure
+#       surfaces in the pull step instead of inside "compose up" after the release has already
+#       started changing things.
 #   release.sh rollback <version>   switch app/front end only — never pulls or changes postgres
 #   release.sh status               current version, running images, "current" link, release history
 #
@@ -612,11 +614,18 @@ prepare_images() { # <version>
   extract_static "$1" || fail "静态文件解出失败"
 }
 
-# The version a host without TCRM_POSTGRES_VERSION gets pinned to (L-073): the current TCRM_VERSION,
-# or the deploy target on a host whose .env has no version yet. pull_images pulls exactly this tag
-# on a first release, so both places agree on the pinned version.
+# The version a host without TCRM_POSTGRES_VERSION gets pinned to (L-073): on an already released
+# host the current TCRM_VERSION; on a first deployment (no postgres container, not even a stopped
+# one) the deploy target itself — L-113: there the .env TCRM_VERSION is only the .env.example
+# placeholder (1.0.0), so pinning it would pull a crm-postgres tag that does not exist and abort
+# the release at the pull step. pull_images pulls exactly this tag on a first release, so both
+# places agree on the pinned version.
 postgres_pin_version() {
   local pin
+  if [ -z "$(container_any_id postgres)" ]; then
+    printf '%s' "$TARGET_VERSION"
+    return 0
+  fi
   pin="$(env_get TCRM_VERSION)"
   [ -n "$pin" ] || pin="$TARGET_VERSION"
   printf '%s' "$pin"
