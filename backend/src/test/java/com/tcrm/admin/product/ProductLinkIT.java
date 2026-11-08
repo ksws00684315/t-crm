@@ -115,6 +115,8 @@ class ProductLinkIT {
 
   @BeforeEach
   void prepare() throws Exception {
+    // The test drains the outbox itself; a scheduled drain would delete the row it asserts on.
+    sync.setScheduled(false);
     jdbc.update("DELETE FROM crm_copy_job_item");
     jdbc.update("DELETE FROM crm_copy_job");
     jdbc.update("DELETE FROM crm_link_index_outbox");
@@ -134,7 +136,7 @@ class ProductLinkIT {
     when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90001", null));
     when(copies.isShopAuthorized(anyLong())).thenReturn(true);
     when(copies.probe(anyLong(), any()))
-        .thenReturn(Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"))));
+        .thenReturn(Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"), null)));
   }
 
   @Test

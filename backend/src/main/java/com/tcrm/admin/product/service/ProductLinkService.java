@@ -35,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * External product-link APIs for the customer spreadsheet script (task 17b / ADR-019). Controllers
@@ -294,8 +296,26 @@ public class ProductLinkService {
             items.insert(row);
           }
           progress.recountAndMaybeFinish(job.getId());
-          worker.submit(job.getId());
+          submitAfterCommit(job.getId());
           return new ConvertResult(jobCode);
+        });
+  }
+
+  /**
+   * The worker reads the job on another connection, so it must start only after this transaction
+   * commits; started earlier it finds no row and the job stays processing (task 131).
+   */
+  private void submitAfterCommit(long jobId) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      worker.submit(jobId);
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            worker.submit(jobId);
+          }
         });
   }
 

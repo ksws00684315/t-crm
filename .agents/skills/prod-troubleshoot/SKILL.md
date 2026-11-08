@@ -37,7 +37,7 @@ description: 正式环境出问题时使用：ops-check / 外部探测告警、�
 .agents/skills/prod-troubleshoot/scripts/prod-run.sh 'deploy/scripts/release.sh status'
 ```
 
-- 实测（2026-11-07，v0.1.4）：`release.sh status` 与第四节总览快照经本脚本执行通过；第四节只读 SQL 的写法尚未在真机验证，第一次使用时先跑 `select now()` 确认。
+- 实测（2026-11-07，v0.1.4）：`release.sh status` 与第四节总览快照经本脚本执行通过；第四节只读 SQL 的写法 2026-11-08 排查任务 132 时在真机验证通过。本机会话的权限检查可能拦下生产 SQL，即使负责人已同意也不要绕过，把要查的 SQL 交给负责人执行。
 - 每次 SSM 调用是一个新 shell，变量不跨调用保留。命令里统一用 `C="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env"` 开头。
 - 第一次调用前先确认本机身份：`aws sts get-caller-identity --profile tcrm-prod`。报 `AccessDenied` 或凭证过期时停下，请负责人处理，不要换别的 profile 或自己建密钥。
 - SSM 会在 AWS 侧留下命令记录，所以**命令文本里不得出现口令、令牌或个人信息**。
@@ -127,7 +127,10 @@ ops-check 告警类型与阈值见 `deploy/README.md`「主机检查脚本」，
 
 | 症状 | 先看 | 判断与处理 |
 |---|---|---|
-| 表格脚本复制商品失败 | `crm_copy_job`（`job_code`、`status`、`error_message`、计数）→ `crm_copy_job_item`（`source_product_id`、`status`、`error_message`、`target_item_id`）；按任务创建时间查 `crm-admin` 日志中的 `Weidian API error <code>` | 任务级错误多为店铺未授权（查 `crm_weidian_shop_auth`）。明细里的微店错误码先查本表历史案例（200056 = 商家编码重复，案例 127）；新错误码要对照微店开放平台文档，在报告里写明来源 |
+| 表格脚本复制商品失败 | `crm_copy_job`（`job_code`、`status`、`error_message`、计数）→ `crm_copy_job_item`（`source_product_id`、`status`、`error_message`、`target_item_id`）；按任务创建时间查 `crm-admin` 日志中的 `Weidian API error <code>` | 任务级错误多为店铺未授权（查 `crm_weidian_shop_auth`）。200056 是笼统的参数错误码，不能只凭数字码下结论；v0.1.5 起看错误信息和 WARN 日志里的微店原因（案例 134），再查本表历史案例（案例 127 的结论已更正，见案例 130）。新原因要对照微店开放平台文档，在报告里写明来源 |
+| 复制任务一直「处理中」 | `crm_copy_job.status`、明细是否都还是 `pending`；日志里有没有这个任务的 `vdian.item.get` | 明细从未被处理是派发问题（案例 131，v0.1.7 已修）；重启 `crm-admin` 会续跑 `processing` 的任务，重启需负责人同意 |
+| 明细报「来源商品信息不完整」 | 源商品是否已登记到 `crm_product`；日志里 `item.get` 之后有没有 `item.add` | 自动登记取不到名称或价格。多规格不同价见案例 132；其他情况看 `item.get` 返回里缺了哪项 |
+| 商品图片不显示 | `crm_product.image_url` 是否有值、是否 https；本机 `curl -sI https://admin.<域名>/ \| grep -i content-security` | `image_url` 为空：案例 131 之前登记的商品没有图片，由负责人手工补。有值但不显示：先看 CSP 的 `img-src`（案例 133），再在浏览器里看图片请求的状态码 |
 | 表格脚本报「错误请求」或连不上 | 客户脚本属性 `TALENT_CRM_API_BASE_URL` 是否被断行出空格；默认地址是否为正式域名 | 见案例 121、124；`deploy/sheet-script/README.md` |
 | 表格脚本「选择平台」没有 SparkTrack 中转 | — | 案例 126：负责人 2026-11-07 决定停用，属预期 |
 | 订单没同步、站内消息「订单同步失败」 | `crm_order_sync_state`（每店一行：`last_success_at`、`last_error`、游标）；`crm_order_sync_failure`（`kind`、`error`、`create_time`） | 同步每 5 分钟一次（UTC）。`last_error` 是英文安全摘要；令牌问题转下一行 |
@@ -149,7 +152,12 @@ ops-check 告警类型与阈值见 `deploy/README.md`「主机检查脚本」，
 | 119 | 微店发布应用时域名验证 `UnknownHostException` | 平台从根域名取 `weidian_open.json`，根域名无解析、无 server 块 | Nginx 增加根域名 server 块 |
 | 121 / 124 | 表格脚本接口地址不对 / 「错误请求」 | 默认地址是预演域名；脚本属性被断行成空格 | 默认改正式域名；先去掉空白再校验 |
 | 125 | 每天 02:30 UTC 佣金对账报 ERROR | 用 `balance - funding < 0` 判断，把合法负余额当异常 | 只在有提现占用且超过余额时报 |
-| 127 | 复制商品失败，`Weidian API error 200056` | 同店复制时带上了源商品的商家编码，店内编码不能重复 | 复制一律不传 `merchantCode`，v0.1.4 |
+| 127 | 复制商品失败，`Weidian API error 200056` | 当时判断为同店复制时商家编码重复。**已更正**：任务 134 透出微店原因后，真实原因是「SKU标题不能为空」，见案例 130 | 复制一律不传 `merchantCode`，v0.1.4；没有解决这次报错 |
+| 134 | 微店报错只有数字码，无法判断原因 | `WeidianClient` 丢弃了 `status_reason` | 异常消息带上原因，WARN 日志记录方法、版本、店铺、请求参数（不含令牌），v0.1.5。原登记为任务 128，与 #223 重号后改号 |
+| 130 | 复制仍报 200056，原因「SKU标题不能为空」 | `vdian.item.add` 没有带源商品的规格（`attrList`、SKU `attrIds`） | 带上源商品规格，v0.1.6 |
+| 131 | 复制任务一直「处理中」，明细 `pending` 从未处理；自动登记的商品没有图片 | `convert` 在事务提交前就把任务交给工作线程，线程读不到任务；自动登记源商品时没有保存图片 | 事务提交后再派发；登记时取第一张图（http 转 https），v0.1.7。服务启动时会续跑 `processing` 的任务 |
+| 132 | 续跑后明细失败，「来源商品信息不完整」，日志里只有 `item.get`、没有 `item.add` | 多规格商品各规格价格不同，取不到单个商品价格 | 取不到时用各 SKU 最低价，v0.1.8。已是 `failed` 的任务不会重跑，要在表格里重新提交 |
+| 133 | 管理端、达人端商品图片都不显示，`image_url` 有值 | 两个前端的 CSP 是 `img-src 'self' data:`，拦截所有外部图片 | 改为 `img-src 'self' data: https:`，v0.1.9。Nginx 配置要在发版后手动 `nginx -t` 和 `nginx -s reload` 才生效 |
 
 新案例处理完后，把一行补进本表（与修复 PR 一起提交）。
 

@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.AddItemResponse;
+import com.tcrm.admin.integration.api.WeidianBusinessApi.AttributeGroup;
+import com.tcrm.admin.integration.api.WeidianBusinessApi.AttributeValue;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.DeleteItemRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailRequest;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponse;
@@ -89,7 +91,9 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       if (item == null || item.itemId() == null) {
         return Optional.empty();
       }
-      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), item.price()));
+      List<ItemImage> images = images(item.raw());
+      String image = images.isEmpty() ? null : httpsUrl(images.getFirst().url());
+      return Optional.of(new ProbedItem(item.itemId(), item.itemName(), itemPrice(item), image));
     } catch (WeidianApiException e) {
       if (isItemNotFound(e)) {
         return Optional.empty();
@@ -120,16 +124,20 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     }
     JsonNode raw = item.raw();
     String name = firstNonBlank(item.itemName(), text(raw, "item_name"));
-    BigDecimal price = firstPrice(item.price(), decimal(raw, "price"));
+    BigDecimal price = itemPrice(item);
     if (name == null || price == null) {
       throw new BusinessException(ErrorCode.WEIDIAN_API_FAILED, SOURCE_INCOMPLETE, null);
     }
     Integer stock = item.stock() != null ? item.stock() : intVal(raw, "stock");
     List<ItemImage> images = images(raw);
     List<ItemSku> skus = skus(raw);
+    // Weidian builds each SKU title from attrList + the SKU's attrIds; without them vdian.item.add
+    // fails with 200056 "SKU标题不能为空" (task 130). The source attribute ids belong to the
+    // source shop, so they are sent as temporary attributes, which the target shop accepts as-is.
+    List<AttributeGroup> attributes = attributes(raw);
     return new AddItemRequest(
-        null,
-        null,
+        attributes.isEmpty() ? null : attributes,
+        attributes.isEmpty() ? null : Boolean.TRUE,
         text(raw, "cate_ids"),
         stock,
         decimal(raw, "crossedPrice"),
@@ -277,6 +285,11 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     return out;
   }
 
+  /** Weidian image addresses come as http://; product images must be https (task 131). */
+  private static String httpsUrl(String url) {
+    return url.startsWith("http://") ? "https://" + url.substring("http://".length()) : url;
+  }
+
   private static List<ItemImage> images(JsonNode raw) {
     if (raw == null) {
       return List.of();
@@ -313,7 +326,7 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
     for (JsonNode sku : node) {
       out.add(
           new ItemSku(
-              null,
+              attrIds(text(sku, "attr_ids")),
               decimal(sku, "costPrice"),
               // Same rule as the item-level code: the source SKU's merchant code would already
               // exist in the shop (task 127).
@@ -324,6 +337,42 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
               intVal(sku, "stock")));
     }
     return out;
+  }
+
+  private static List<AttributeGroup> attributes(JsonNode raw) {
+    JsonNode node = raw == null ? null : raw.get("attrList");
+    if (node == null || !node.isArray()) {
+      return List.of();
+    }
+    List<AttributeGroup> out = new ArrayList<>();
+    for (JsonNode group : node) {
+      List<AttributeValue> values = new ArrayList<>();
+      JsonNode valueNodes = group.get("attrValues");
+      if (valueNodes != null && valueNodes.isArray()) {
+        for (JsonNode value : valueNodes) {
+          values.add(
+              new AttributeValue(
+                  parseLong(text(value, "attrId")), text(value, "attrValue"), text(value, "img")));
+        }
+      }
+      out.add(new AttributeGroup(text(group, "attrTitle"), values));
+    }
+    return out;
+  }
+
+  /** Source SKUs carry their attribute ids as one string, e.g. {@code "764651-764647"}. */
+  private static List<Long> attrIds(String joined) {
+    if (joined == null) {
+      return null;
+    }
+    List<Long> out = new ArrayList<>();
+    for (String part : joined.split("-")) {
+      Long id = parseLong(part.trim());
+      if (id != null) {
+        out.add(id);
+      }
+    }
+    return out.isEmpty() ? null : out;
   }
 
   private static String text(JsonNode node, String field) {
@@ -386,6 +435,29 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
       }
     }
     return null;
+  }
+
+  /**
+   * Item-level price, or the lowest SKU price when the item has none: a multi-spec item whose SKUs
+   * differ in price returns no single item price (task 132).
+   */
+  private static BigDecimal itemPrice(ItemResponse item) {
+    BigDecimal price = firstPrice(item.price(), decimal(item.raw(), "price"));
+    if (price != null) {
+      return price;
+    }
+    JsonNode skus = item.raw() == null ? null : item.raw().get("skus");
+    if (skus == null || !skus.isArray()) {
+      return null;
+    }
+    BigDecimal lowest = null;
+    for (JsonNode sku : skus) {
+      BigDecimal skuPrice = decimal(sku, "price");
+      if (skuPrice != null && (lowest == null || skuPrice.compareTo(lowest) < 0)) {
+        lowest = skuPrice;
+      }
+    }
+    return lowest;
   }
 
   private static BigDecimal firstPrice(BigDecimal a, BigDecimal b) {

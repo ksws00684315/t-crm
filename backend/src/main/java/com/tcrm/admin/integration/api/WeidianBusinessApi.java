@@ -162,7 +162,7 @@ public interface WeidianBusinessApi {
       @JsonProperty("selected") Integer selected) {}
 
   record ItemSku(
-      @JsonProperty("attrIds") List<List<Long>> attributeIds,
+      @JsonProperty("attrIds") List<Long> attributeIds,
       @JsonProperty("costPrice") BigDecimal costPrice,
       @JsonProperty("merchantCode") String merchantCode,
       @JsonProperty("price") BigDecimal price,
