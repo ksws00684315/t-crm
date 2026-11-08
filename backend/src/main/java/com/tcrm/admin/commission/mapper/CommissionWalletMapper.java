@@ -2,6 +2,7 @@ package com.tcrm.admin.commission.mapper;
 
 import com.tcrm.admin.commission.model.LedgerSourceRow;
 import com.tcrm.admin.commission.model.OutstandingDeduction;
+import com.tcrm.admin.commission.model.RecoveryAmountRow;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
@@ -130,4 +131,35 @@ public interface CommissionWalletMapper {
       @Param("deductionLedgerId") long deductionLedgerId,
       @Param("amount") BigDecimal amount,
       @Param("createTime") Instant createTime);
+
+  /**
+   * Net recovery (positive minus already-appended reversals) per prepay deduction ledger, for the
+   * COMMISSION credits of one source row (task 141). Only deductions with a positive net remain.
+   */
+  @Select(
+      """
+      SELECT r.deduction_ledger_id, SUM(r.amount_cny) AS amount_cny
+      FROM crm_commission_recovery r
+      JOIN crm_commission_ledger c ON c.id = r.credit_ledger_id
+      WHERE r.kol_id = #{kolId} AND c.source_type = 'COMMISSION' AND c.source_id = #{sourceId}
+      GROUP BY r.deduction_ledger_id
+      HAVING SUM(r.amount_cny) > 0
+      """)
+  List<RecoveryAmountRow> listCreditRecoveryNets(
+      @Param("kolId") long kolId, @Param("sourceId") long sourceId);
+
+  /**
+   * Recovery rows of the COMMISSION credits of one source row, latest first (LIFO, same time by id
+   * descending), so a clawback reverses the most recent recovery first (task 141).
+   */
+  @Select(
+      """
+      SELECT r.deduction_ledger_id, r.amount_cny
+      FROM crm_commission_recovery r
+      JOIN crm_commission_ledger c ON c.id = r.credit_ledger_id
+      WHERE r.kol_id = #{kolId} AND c.source_type = 'COMMISSION' AND c.source_id = #{sourceId}
+      ORDER BY r.create_time DESC, r.id DESC
+      """)
+  List<RecoveryAmountRow> listCreditRecoveryRows(
+      @Param("kolId") long kolId, @Param("sourceId") long sourceId);
 }
