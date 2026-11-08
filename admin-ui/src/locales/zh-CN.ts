@@ -447,6 +447,7 @@ const zhCN = {
       product_links_ip_per_minute: "复制接口每 IP 每分钟上限",
       product_links_convert_token_per_minute: "令牌转换每分钟上限",
       product_links_resolve_token_per_minute: "令牌解析每分钟上限",
+      product_links_max_convert_items: "复制任务每次提交商品上限",
       weidian_qps: "微店接口每秒请求数",
       weidian_settlement_sync_interval_minutes: "结算明细增量拉取间隔（分钟）",
       weidian_settlement_backfill_hour: "结算明细每日回扫整点（北京时间）",

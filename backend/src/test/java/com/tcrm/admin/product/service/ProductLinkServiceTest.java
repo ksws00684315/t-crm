@@ -29,7 +29,9 @@ import com.tcrm.admin.product.service.ProductLinkService.ConvertItem;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.api.SystemConfigApi;
 import java.security.SecureRandom;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -98,6 +100,63 @@ class ProductLinkServiceTest {
       // nothing to close from outside; tests open via callCompany
       break;
     }
+  }
+
+  @Test
+  void shouldRejectConvert_whenItemsExceedConfiguredLimit() {
+    ProductLinkService limited = withConvertLimit(2);
+
+    assertThatThrownBy(() -> limited.convert(convertOf(3)))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e -> {
+              BusinessException be = (BusinessException) e;
+              assertThat(be.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
+              assertThat(be.getMessage()).isEqualTo("每次最多提交 2 个商品");
+            });
+    verify(tokens, never()).authenticate(anyString());
+  }
+
+  @Test
+  void shouldAcceptConvert_aboveFiveHundred_whenConfiguredHigher() {
+    ProductLinkService limited = withConvertLimit(1000);
+    when(tokens.authenticate("tok")).thenThrow(new BusinessException(ErrorCode.COPY_TOKEN_INVALID));
+
+    // Passing the size check is proven by reaching token authentication.
+    assertThatThrownBy(() -> limited.convert(convertOf(501)))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e ->
+                assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.COPY_TOKEN_INVALID));
+    verify(tokens).authenticate("tok");
+  }
+
+  private ProductLinkService withConvertLimit(int limit) {
+    SystemConfigApi configs = mock(SystemConfigApi.class);
+    when(configs.getInt("product-links.max-convert-items")).thenReturn(limit);
+    return new ProductLinkService(
+        tokens,
+        null,
+        jobs,
+        items,
+        shops,
+        kolItems,
+        rates,
+        worker,
+        progress,
+        copies,
+        jdbc,
+        products,
+        new CopyJobFailureRecorder(jobs),
+        configs);
+  }
+
+  private static ConvertCommand convertOf(int count) {
+    return new ConvertCommand(
+        "tok",
+        "google_sheet_plugin",
+        Collections.nCopies(count, new ConvertItem("WEIDIAN", "123", null)));
   }
 
   @Test

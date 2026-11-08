@@ -46,7 +46,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ProductLinkService {
   static final String CHANNEL_WEIDIAN = "WEIDIAN";
   static final String TCR_TEMPLATE_CODE = "TCRM_RELAY";
-  static final int MAX_CONVERT_ITEMS = 500;
+
+  /** Per-request item limit for {@code /convert}, editable in system configuration (task 138). */
+  static final String MAX_CONVERT_ITEMS_KEY = "product-links.max-convert-items";
+
+  static final int DEFAULT_MAX_CONVERT_ITEMS = 500;
   static final int MAX_RESOLVE_ITEMS = 50;
 
   private final CopyTokenApi tokens;
@@ -136,7 +140,7 @@ public class ProductLinkService {
 
           @Override
           public int getInt(String key) {
-            return 0;
+            return MAX_CONVERT_ITEMS_KEY.equals(key) ? DEFAULT_MAX_CONVERT_ITEMS : 0;
           }
         };
     this.random = random;
@@ -230,8 +234,10 @@ public class ProductLinkService {
     if (command.items() == null || command.items().isEmpty()) {
       throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    if (command.items().size() > MAX_CONVERT_ITEMS) {
-      throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
+    int maxItems = configs.getInt(MAX_CONVERT_ITEMS_KEY);
+    if (command.items().size() > maxItems) {
+      throw new BusinessException(
+          ErrorCode.COMMON_VALIDATION_FAILED, ProductLinkMessages.tooManyItems(maxItems), null);
     }
     CopyTokenGrantDTO grant = authenticate(command.token());
     rates.checkConvertToken(grant.tokenId());

@@ -34,6 +34,10 @@ final class ProductLinkMessages {
 
   private ProductLinkMessages() {}
 
+  static String tooManyItems(int max) {
+    return "每次最多提交 " + max + " 个商品";
+  }
+
   static BusinessException chinese(ErrorCode code) {
     return new BusinessException(code, zh(code), null);
   }
