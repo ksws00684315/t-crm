@@ -31,8 +31,21 @@ final class ProductLinkMessages {
   static final String WEIDIAN_CALL_FAILED = "微店接口调用失败";
   static final String DETAIL_SAVE_WARNING = "商品已复制，详情保存失败，请在微店后台补充详情";
   static final String INTERRUPTED = "应用重启，任务中断";
+  static final String DAILY_QUOTA_USED_UP = "本日复制额度已用完，请明天再试";
 
   private ProductLinkMessages() {}
+
+  static String dailyQuotaShort(int limit, long used, long remaining, int requested) {
+    return "本日复制额度不足：本日最多复制商品 "
+        + limit
+        + " 条，已复制 "
+        + used
+        + " 条，剩余 "
+        + remaining
+        + " 条，本次提交 "
+        + requested
+        + " 条";
+  }
 
   static String tooManyItems(int max) {
     return "每次最多提交 " + max + " 个商品";
@@ -47,6 +60,7 @@ final class ProductLinkMessages {
       case COPY_TOKEN_INVALID -> TOKEN_INVALID;
       case COPY_TOKEN_EXPIRED -> TOKEN_EXPIRED;
       case COPY_TOKEN_QUOTA_EXCEEDED -> TOKEN_QUOTA;
+      case COPY_DAILY_QUOTA_EXCEEDED -> DAILY_QUOTA_USED_UP;
       case KOL_DISABLED -> KOL_DISABLED;
       case COPY_TARGET_SHOP_MISSING -> TARGET_MISSING;
       case SHOP_COPY_CAPACITY_EXCEEDED -> COPY_CAPACITY_EXCEEDED;

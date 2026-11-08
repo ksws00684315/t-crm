@@ -23,6 +23,7 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemDetailResponseBlock
 import com.tcrm.admin.integration.api.WeidianBusinessApi.ItemResponse;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailResponse;
 import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
+import com.tcrm.admin.product.api.CopyDailyQuotaApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi.CopyResult;
@@ -44,6 +45,7 @@ class WeidianItemCopyServiceTest {
   private final WeidianBusinessApi weidian = mock(WeidianBusinessApi.class);
   private final WeidianShopAuthMapper auths = mock(WeidianShopAuthMapper.class);
   private final ShopAccessApi shops = mock(ShopAccessApi.class);
+  private final CopyDailyQuotaApi dailyQuota = mock(CopyDailyQuotaApi.class);
   private final JsonMapper json = JsonMapper.builder().build();
   private final WeidianBusinessApiParser parser = new WeidianBusinessApiParser();
   private final Logger copyLogger = (Logger) LoggerFactory.getLogger(WeidianItemCopyService.class);
@@ -52,7 +54,8 @@ class WeidianItemCopyServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new WeidianItemCopyService(weidian, auths, shops);
+    service = new WeidianItemCopyService(weidian, auths, shops, dailyQuota);
+    when(dailyQuota.tryAcquire()).thenReturn(true);
     logs.start();
     copyLogger.addAppender(logs);
   }
@@ -242,6 +245,34 @@ class WeidianItemCopyServiceTest {
             WeidianItemCopyService.isItemNotFound(
                 new WeidianApiException(999, "rate limited", true)))
         .isFalse();
+  }
+
+  @Test
+  void shouldNotCallAdd_whenDailyQuotaIsUsedUp() {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(dailyQuota.tryAcquire()).thenReturn(false);
+
+    assertThatThrownBy(() -> service.copy(1L, "10", 2L))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            e ->
+                assertThat(((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED));
+    verify(weidian, never()).addItem(anyLong(), any());
+  }
+
+  @Test
+  void shouldCountOneQuotaUnit_perAddCall() {
+    when(weidian.item(anyLong(), any()))
+        .thenReturn(new ItemResponse("10", "Name", null, new BigDecimal("3.5"), 2, "1", null));
+    when(weidian.itemDetail(anyLong(), any())).thenReturn(new ItemDetailResponse(List.of(), null));
+    when(weidian.addItem(eq(2L), any())).thenReturn(new AddItemResponse(88L, List.of(), null));
+
+    service.copy(1L, "10", 2L);
+
+    verify(dailyQuota).tryAcquire();
   }
 
   @Test

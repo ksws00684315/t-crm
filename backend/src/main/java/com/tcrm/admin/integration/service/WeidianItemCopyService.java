@@ -18,6 +18,7 @@ import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailBlock;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.SaveItemDetailRequest;
 import com.tcrm.admin.integration.mapper.WeidianShopAuthMapper;
 import com.tcrm.admin.integration.model.WeidianShopAuthDO;
+import com.tcrm.admin.product.api.CopyDailyQuotaApi;
 import com.tcrm.admin.product.api.ShopAccessApi;
 import com.tcrm.admin.product.api.ShopAccessDTO;
 import com.tcrm.admin.product.api.WeidianItemCopyApi;
@@ -49,12 +50,17 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
   private final WeidianBusinessApi weidian;
   private final WeidianShopAuthMapper auths;
   private final ShopAccessApi shops;
+  private final CopyDailyQuotaApi dailyQuota;
 
   public WeidianItemCopyService(
-      WeidianBusinessApi weidian, WeidianShopAuthMapper auths, ShopAccessApi shops) {
+      WeidianBusinessApi weidian,
+      WeidianShopAuthMapper auths,
+      ShopAccessApi shops,
+      CopyDailyQuotaApi dailyQuota) {
     this.weidian = weidian;
     this.auths = auths;
     this.shops = shops;
+    this.dailyQuota = dailyQuota;
   }
 
   @Override
@@ -66,6 +72,10 @@ public class WeidianItemCopyService implements WeidianItemCopyApi {
         sourceIdLong == null
             ? new ItemDetailResponse(List.of(), null)
             : weidian.itemDetail(sourceShopId, new ItemDetailRequest(sourceIdLong));
+    // Task 139: every vdian.item.add call counts against the company's daily allowance.
+    if (!dailyQuota.tryAcquire()) {
+      throw new BusinessException(ErrorCode.COPY_DAILY_QUOTA_EXCEEDED);
+    }
     AddItemResponse created = weidian.addItem(targetShopId, add);
     if (created == null || created.itemId() == null) {
       logItemIdMissing(targetShopId, created);

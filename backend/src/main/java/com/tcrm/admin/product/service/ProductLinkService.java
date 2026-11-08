@@ -68,6 +68,7 @@ public class ProductLinkService {
   private final CopyJobFailureRecorder failures;
   private final SecureRandom random;
   private final SystemConfigApi configs;
+  private final CopyDailyQuota dailyQuota;
 
   @Autowired
   public ProductLinkService(
@@ -84,7 +85,8 @@ public class ProductLinkService {
       JdbcTemplate jdbc,
       ProductMapper products,
       CopyJobFailureRecorder failures,
-      SystemConfigApi configs) {
+      SystemConfigApi configs,
+      CopyDailyQuota dailyQuota) {
     this.tokens = tokens;
     this.targetShops = targetShops;
     this.jobs = jobs;
@@ -99,6 +101,7 @@ public class ProductLinkService {
     this.products = products;
     this.failures = failures;
     this.configs = configs;
+    this.dailyQuota = dailyQuota;
     this.random = new SecureRandom();
   }
 
@@ -143,6 +146,7 @@ public class ProductLinkService {
             return MAX_CONVERT_ITEMS_KEY.equals(key) ? DEFAULT_MAX_CONVERT_ITEMS : 0;
           }
         };
+    this.dailyQuota = null;
     this.random = random;
   }
 
@@ -258,6 +262,10 @@ public class ProductLinkService {
           }
           if (unique.isEmpty()) {
             throw ProductLinkMessages.chinese(ErrorCode.COMMON_VALIDATION_FAILED);
+          }
+          if (dailyQuota != null) {
+            // Task 139: refuse before any task row when today's add-item allowance is short.
+            dailyQuota.requireRoom(grant.tenantId(), unique.size());
           }
           long targetShopId = resolveTargetShop(grant, command, unique.size());
           Instant now = Instant.now();

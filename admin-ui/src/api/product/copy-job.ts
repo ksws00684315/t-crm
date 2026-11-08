@@ -61,3 +61,13 @@ export function listCopyJobItems(
     params: query
   });
 }
+
+/** Task 139: product copies (vdian.item.add calls) the company used today and its daily limit. */
+export interface CopyDailyQuotaVO {
+  used: number;
+  limit: number;
+}
+
+export function getCopyDailyQuota(): Promise<CopyDailyQuotaVO> {
+  return http.request<CopyDailyQuotaVO>({ method: "get", url: "/product/copy-jobs/daily-quota" });
+}

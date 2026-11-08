@@ -3,8 +3,10 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
+  getCopyDailyQuota,
   listCopyJobItems,
   listCopyJobs,
+  type CopyDailyQuotaVO,
   type CopyJobItemVO,
   type CopyJobVO
 } from "@/api/product/copy-job";
@@ -36,6 +38,9 @@ const query = reactive({
   targetChannel: "",
   status: ""
 });
+
+/** Task 139: today's copy usage; the line stays hidden when it cannot be read. */
+const dailyQuota = ref<CopyDailyQuotaVO | null>(null);
 
 const detailVisible = ref(false);
 const detailLoading = ref(false);
@@ -176,7 +181,16 @@ function listParams() {
   };
 }
 
+async function loadDailyQuota(): Promise<void> {
+  try {
+    dailyQuota.value = await getCopyDailyQuota();
+  } catch {
+    dailyQuota.value = null;
+  }
+}
+
 async function load(): Promise<void> {
+  void loadDailyQuota();
   loading.value = true;
   loadFailed.value = false;
   try {
@@ -287,6 +301,13 @@ onMounted(() => {
 
 <template>
   <div class="list-page" data-test="copy-job-page">
+    <el-alert
+      v-if="dailyQuota"
+      type="info"
+      :closable="false"
+      :title="t('copyJob.dailyQuota', { used: dailyQuota.used, limit: dailyQuota.limit })"
+      data-test="copy-daily-quota"
+    />
     <ListSearch @search="search" @reset="reset">
       <template #primary>
         <el-form-item :label="t('copyJob.jobCode')">
