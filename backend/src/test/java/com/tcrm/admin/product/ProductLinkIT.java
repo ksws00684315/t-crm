@@ -136,7 +136,8 @@ class ProductLinkIT {
     when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90001", null));
     when(copies.isShopAuthorized(anyLong())).thenReturn(true);
     when(copies.probe(anyLong(), any()))
-        .thenReturn(Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"), null)));
+        .thenReturn(
+            Optional.of(new ProbedItem("10001", "Source", new BigDecimal("9.90"), null, false)));
   }
 
   @Test

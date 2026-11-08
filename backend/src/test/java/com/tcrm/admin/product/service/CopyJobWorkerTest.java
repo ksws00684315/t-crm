@@ -163,6 +163,60 @@ class CopyJobWorkerTest {
   }
 
   @Test
+  void shouldRegisterUnderSellerShop_whenEveryShopProbesTheItem() {
+    // Task 137: with two authorised shops Weidian item.get answered both tokens, so every
+    // unregistered source failed as SOURCE_CONFLICT; the seller-confirmed shop must win.
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "10001");
+    stubJob(job, row);
+    when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
+    when(shops.selectList(any())).thenReturn(List.of(shop(5L), shop(6L)));
+    when(products.selectList(any())).thenReturn(List.of());
+    when(copies.probe(5L, "10001"))
+        .thenReturn(Optional.of(new ProbedItem("10001", "Src", BigDecimal.ONE, null, false)));
+    when(copies.probe(6L, "10001"))
+        .thenReturn(Optional.of(new ProbedItem("10001", "Src", BigDecimal.ONE, null, true)));
+    when(products.selectOne(any())).thenReturn(null);
+    when(codes.next()).thenReturn("P000001");
+    when(products.insert(org.mockito.ArgumentMatchers.<ProductDO>any()))
+        .thenAnswer(
+            inv -> {
+              ProductDO p = inv.getArgument(0);
+              p.setId(51L);
+              return 1;
+            });
+    when(products.selectById(51L)).thenAnswer(inv -> product(51L, 6L, "10001"));
+    when(kolItems.findCurrentByKolProduct(10L, 51L)).thenReturn(null);
+    when(tokens.consume(20L, 1)).thenReturn(true);
+    when(copies.copy(6L, "10001", 5L)).thenReturn(new CopyResult("90001", null));
+    when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
+
+    worker.processJob(1L);
+
+    ArgumentCaptor<ProductDO> registered = ArgumentCaptor.forClass(ProductDO.class);
+    verify(products).insert(registered.capture());
+    assertThat(registered.getValue().getShopId()).isEqualTo(6L);
+    verify(copies).copy(6L, "10001", 5L);
+  }
+
+  @Test
+  void shouldFailConflict_whenSeveralShopsProbeWithoutSellerConfirmation() {
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "10001");
+    stubJob(job, row);
+    when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
+    when(shops.selectList(any())).thenReturn(List.of(shop(5L), shop(6L)));
+    when(products.selectList(any())).thenReturn(List.of());
+    when(copies.probe(anyLong(), eq("10001")))
+        .thenReturn(Optional.of(new ProbedItem("10001", "Src", BigDecimal.ONE, null, false)));
+
+    worker.processJob(1L);
+
+    verifyFailedMessage(ProductLinkMessages.SOURCE_CONFLICT);
+    verify(copies, never()).copy(anyLong(), any(), anyLong());
+  }
+
+  @Test
   void shouldFail_whenSourceMissing() {
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "10001");
@@ -189,7 +243,7 @@ class CopyJobWorkerTest {
     when(shops.selectList(any())).thenReturn(List.of(shop(5L)));
     when(products.selectList(any())).thenReturn(List.of());
     when(copies.probe(5L, "10001"))
-        .thenReturn(Optional.of(new ProbedItem("10001", "Name", null, null)));
+        .thenReturn(Optional.of(new ProbedItem("10001", "Name", null, null, false)));
 
     worker.processJob(1L);
 
@@ -308,7 +362,11 @@ class CopyJobWorkerTest {
         .thenReturn(
             Optional.of(
                 new ProbedItem(
-                    "10001", "Src", new BigDecimal("9.9"), "https://wd.geilicdn.com/a.jpg")));
+                    "10001",
+                    "Src",
+                    new BigDecimal("9.9"),
+                    "https://wd.geilicdn.com/a.jpg",
+                    false)));
     when(products.selectOne(any())).thenReturn(null);
     when(codes.next()).thenReturn("P000001");
     AtomicInteger productId = new AtomicInteger(50);
