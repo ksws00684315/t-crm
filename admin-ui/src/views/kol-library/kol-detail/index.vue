@@ -276,6 +276,16 @@ async function load(): Promise<void> {
   }
 }
 
+/**
+ * Loads the profile and then its contents. The contents need the profile (they are skipped while
+ * it is missing), so the two are never started side by side: on a fresh mount the profile is not
+ * there yet and the table would stay empty for good.
+ */
+async function loadAll(): Promise<void> {
+  await load();
+  await loadContents();
+}
+
 async function loadContents(): Promise<void> {
   if (!id.value || !detail.value) return;
   contentsLoading.value = true;
@@ -314,7 +324,7 @@ function openFollowUp(): void {
 }
 
 async function onContentSaved(): Promise<void> {
-  await Promise.all([load(), loadContents()]);
+  await loadAll();
   activeTab.value = "contents";
 }
 
@@ -340,7 +350,7 @@ async function removeContent(row: LibraryContentVO): Promise<void> {
     await deleteLibraryContent(id.value, row.id);
     ElMessage.success(t("library.contentDeleted"));
     tabs.refresh("/kol-library/kols");
-    await Promise.all([load(), loadContents()]);
+    await loadAll();
   } catch (error) {
     notifyError(error);
   }
@@ -384,21 +394,18 @@ function backToList(): void {
 
 watch(id, () => {
   activeTab.value = "profile";
-  void load();
-  void loadContents();
+  void loadAll();
 });
 
 // A tab restored from the tab list is cached by KeepAlive, so leaving and coming back does not run
 // onMounted again: (re)load whenever the creator is shown, which also covers the return from an
 // edit. Reading the id on every activation is cheap; the requests are the ones onMounted made.
 onActivated(() => {
-  void load();
-  void loadContents();
+  void loadAll();
 });
 
 onMounted(() => {
-  void load();
-  void loadContents();
+  void loadAll();
 });
 </script>
 
