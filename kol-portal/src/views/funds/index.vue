@@ -301,11 +301,18 @@ function recordType(value: FundRecord["type"]) {
 function recordAmount(row: FundRecord) {
   return money(row.amount, row.currency);
 }
-function statusLabel(value: string) {
-  return t(`funds.status.${value}`, value);
+/**
+ * L-123 (task 135): the API contract (§6.3) limits publicStatus to the five withdrawal statuses
+ * plus PAID for prepays, but a missing or unknown value must never render as a raw language key
+ * (`funds.status.undefined`) or as the raw enum; both fall back to a neutral label.
+ */
+function statusLabel(value: string | null | undefined) {
+  if (!value) return t("funds.statusUnknown");
+  const label = t(`funds.status.${value}`);
+  return label === `funds.status.${value}` ? t("funds.statusUnknown") : label;
 }
 /** Waiting statuses use the warning colour, paid the success colour, rejected the danger colour. */
-function statusType(value: string): "warning" | "success" | "danger" | "info" {
+function statusType(value: string | null | undefined): "warning" | "success" | "danger" | "info" {
   if (value === "PENDING_REVIEW" || value === "PENDING_PAYMENT") return "warning";
   if (value === "PAID") return "success";
   if (value === "REJECTED") return "danger";

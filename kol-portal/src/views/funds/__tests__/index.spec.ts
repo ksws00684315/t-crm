@@ -424,6 +424,54 @@ describe("commission progress (task 92 section 4.1)", () => {
   });
 });
 
+describe("L-123 (task 135): status label fallback", () => {
+  /** Cast keeps the malformed payloads the backend must never send but the page must survive. */
+  const broken = (value: unknown) => record({ publicStatus: value as string });
+
+  it("renders every known status with its copy and never a language key", async () => {
+    vi.mocked(api.getFundRecords).mockResolvedValue({
+      items: [
+        ...(["PENDING_REVIEW", "PENDING_PAYMENT", "PAID", "REJECTED", "WITHDRAWN"] as const).map(
+          (status, index) =>
+            record({ id: String(index), applicationNo: `WD${index}`, publicStatus: status })
+        )
+      ],
+      total: 5,
+      page: 1,
+      size: 20
+    });
+    await page({ realTable: true });
+    const labels = wrapper
+      .findAll('.records-table tbody [data-test="fund-record-status"]')
+      .map(tag => tag.text());
+    expect(labels).toEqual([
+      enUS.funds.status.PENDING_REVIEW,
+      enUS.funds.status.PENDING_PAYMENT,
+      enUS.funds.status.PAID,
+      enUS.funds.status.REJECTED,
+      enUS.funds.status.WITHDRAWN
+    ]);
+    expect(wrapper.text()).not.toContain("funds.status.");
+  });
+
+  it.each([undefined, null, "", "SOMETHING_NEW"])(
+    "shows the neutral label for the unknown status %j instead of the raw value",
+    async value => {
+      vi.mocked(api.getFundRecords).mockResolvedValue({
+        items: [broken(value)],
+        total: 1,
+        page: 1,
+        size: 20
+      });
+      await page({ realTable: true });
+      const tag = wrapper.get('[data-test="fund-record-status"]');
+      expect(tag.text()).toBe(enUS.funds.statusUnknown);
+      expect(tag.text()).not.toContain("funds.status.");
+      expect(tag.text()).not.toContain("undefined");
+    }
+  );
+});
+
 describe("withdrawal actions and the ?apply=1 link (task 92 sections 4.2, 4.3)", () => {
   it("opens the application dialog once for ?apply=1 and removes the parameter", async () => {
     nav.route.query = { apply: "1", other: "keep" };

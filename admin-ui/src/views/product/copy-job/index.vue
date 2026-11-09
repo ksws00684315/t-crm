@@ -324,7 +324,7 @@ onMounted(() => {
             v-model="query.targetChannel"
             clearable
             data-test="target-channel"
-            class="copy-job__filter"
+            class="filter-w-sm"
             :placeholder="t('common.all')"
           >
             <el-option
@@ -340,7 +340,7 @@ onMounted(() => {
             v-model="query.status"
             clearable
             data-test="job-status"
-            class="copy-job__filter"
+            class="filter-w-sm"
             :placeholder="t('common.all')"
           >
             <el-option

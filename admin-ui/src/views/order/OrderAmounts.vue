@@ -53,7 +53,9 @@ const rateText = computed(() => {
 </script>
 
 <template>
-  <el-descriptions :column="columns" border data-test="order-amounts">
+  <!-- label-width keeps the widest English label ("Commissionable Amount", L-115) on whole
+       words at 1280; the first word alone needs ~114px plus cell padding. -->
+  <el-descriptions :column="columns" border :label-width="150" data-test="order-amounts">
     <el-descriptions-item :label="t('order.amounts.productTotal')">{{
       money(detail.itemAmount, t("order.missingHistoricalPrice"))
     }}</el-descriptions-item>

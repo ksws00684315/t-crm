@@ -213,7 +213,7 @@ onMounted(load);
             v-model="filters.status"
             clearable
             data-test="prepay-filter-status"
-            style="width: 180px"
+            class="filter-w-md"
             ><el-option
               v-for="status in PREPAY_STATUSES"
               :key="status"

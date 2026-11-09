@@ -310,7 +310,7 @@ onMounted(() => {
             :loading="kolSearching"
             :placeholder="t('copyToken.kolPlaceholder')"
             data-test="filter-kol"
-            class="token-filter"
+            class="filter-w-md"
           >
             <el-option
               v-for="kol in kolOptions"
@@ -326,7 +326,7 @@ onMounted(() => {
             v-model="query.targetChannel"
             clearable
             data-test="filter-channel"
-            class="token-filter"
+            class="filter-w-sm"
           >
             <el-option :label="t('copyToken.channelWeidian')" value="WEIDIAN" />
           </el-select>
@@ -334,12 +334,7 @@ onMounted(() => {
       </template>
       <template #more>
         <el-form-item :label="t('common.status')">
-          <el-select
-            v-model="query.status"
-            clearable
-            data-test="filter-status"
-            class="token-filter"
-          >
+          <el-select v-model="query.status" clearable data-test="filter-status" class="filter-w-sm">
             <el-option
               v-for="status in STATUSES"
               :key="status"

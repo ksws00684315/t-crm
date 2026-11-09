@@ -73,6 +73,13 @@ body {
   word-break: break-word;
 }
 
+/* L-115 (task 135): labels wrap between words only — "Commissionable Amount" must not break
+   mid-word. Long labels get room from el-descriptions label-width instead. */
+.el-overlay .el-descriptions__label {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 @media (max-width: 767px) {
   .el-overlay .el-drawer.rtl,
   .el-overlay .el-drawer.ltr {

@@ -404,7 +404,7 @@ onMounted(() => {
             :loading="filterSearching"
             :placeholder="t('mapping.kolPlaceholder')"
             data-test="kol-keyword"
-            style="width: 220px"
+            class="filter-w-md"
             @update:model-value="onKolFilter"
           >
             <el-option
@@ -422,7 +422,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="shop-filter"
-            style="width: 180px"
+            class="filter-w-md"
           >
             <el-option
               v-for="shop in shops"
