@@ -156,12 +156,36 @@
 | --- | --- | --- |
 | 【阻塞】与 main 的文档冲突（`系统详细设计说明书.md`、`docs/04-开发任务/README.md`） | 合并 `origin/main`：README 采用 main 版本（本任务不改该文件）；设计说明书 §3.4 采用 main 的精简「公司」行，并保留本任务的「版本判定」「权限码按版本」「管理端按版本」三行 | 合并提交 |
 | 【阻塞】迁移版本号低于主干已发版的 `V202611091500` | 改名 `V202611091700` / `V202611091701`，见 §8 说明 | `backend/src/main/resources/db/migration/` |
-| 【建议】并发判重 409 可能缺负责人详情 | `create` / `update` 的插入改为**在 savepoint 内执行**：唯一冲突只回滚到 savepoint，同一事务随后读到赢家行并返回完整 `{id, followUpOwner, displayName}`；读不到时回退到预检结果，`update` 不再用正在编辑的自身行充数 | `LibraryKolService.insertRow/existingNow` |
+| 【建议】并发判重 409 可能缺负责人详情 | `create` 与 `update` 的写入都走 `behindSavepoint`：唯一冲突只回滚到 savepoint，同一事务随后读到赢家行并返回完整 `{id, followUpOwner, displayName}`；读不到时回退到预检结果，`update` 不会用正在编辑的自身行充数 | `LibraryKolService.behindSavepoint` |
 | 【建议】关键词对达人ID 的 `LIKE` 区分大小写 | 改为 `lower(kol_username) LIKE lower(pattern)`，与昵称一致 | `LibraryKolService.page` |
 | 【建议】账号列表的批量权限未按版本过滤 | 批量 `storedCodes` 按当前公司版本过滤，与单个账号路径一致（脏数据不会显示无效码） | `UserPermissionService.storedCodes` |
 | 【建议】`editionOf` 请求内缓存只用一个键 | 改为按公司缓存（请求属性里一张 Map），同一请求查多个公司不会串；`switchTo` 仍整表清空 | `CurrentUserContext.editionOf` |
 
 返工新增测试：`KolLibraryIT` 的并发判重详情、关键词大小写、账号列表按版本过滤三条集成测试；`CurrentUserContextTest` 的「一次请求查两个公司」单测。检查结果：`mvn -B verify` 通过（含新增用例，覆盖率门槛达标）；`-Pdocker-it` 的 `KolLibraryIT`(17)、`EditionIT`(8)、`SystemIT`(24)、`PermissionIT`(7)、`TenantIsolationIT`(7)、`MultiCompanyAccountIT`(9) 共 72 项全通过；管理端 114 文件 892 用例、类型检查与格式检查通过。
+
+## 8.2 四轮复核返工（PR #254 第三、四轮审查意见）
+
+| 审查项 | 处理 |
+| --- | --- |
+| 【阻塞】`update` 撞 ID 时返回 500 而非 409（只有 `create` 走了 savepoint；catch 里同事务读库，撞上 `25P02 current transaction is aborted`） | `update` 的写入同样放进 savepoint；注释改为与实现一致；补集成测试 `shouldNameTheWinner_whenTwoEditsRaceOntoTheSameCreatorId`（两个请求同时把不同达人改成同一 ID，输家 409 且详情不是自身行）。**已实测**：把 `update` 临时改回不走 savepoint，该用例拿到 `500 COMMON_INTERNAL_ERROR`；恢复后通过 |
+| 【阻塞】手写 JDBC savepoint 不可接受，应复用 Spring | 改为 `TransactionAspectSupport.currentTransactionStatus().createSavepoint() / rollbackToSavepoint() / releaseSavepoint()`（`TransactionStatus` 本身是 `SavepointManager`），`create`、`update` 共用一个 9 行的 `behindSavepoint`；删除 `DataSource` 注入、`Held` record 与三个 `SQLException` 包装 |
+| 【建议】`existingNow` 只是 `existing` 的别名 | 删除，直接调 `existing` |
+| 【建议】`update` 末尾多余的中间变量 | 还原为直接 `return` |
+
+**同类自查（举一反三，优先用项目现成能力）**——逐项核对本次产出：
+
+| 自查项 | 结论 |
+| --- | --- |
+| 手写的 `tenant_id` 赋值 | **已修**：`LibraryKolService.create`、`LibraryContentService.create` 原来自行 `setTenantId(...)`，而 MyBatis-Plus 租户插件在 INSERT 时自动填充（`KolWriter` 等既有模块都不手工赋值，ADR-014）。已删除两处，`LibraryContentService` 的归属校验改为显式 `creators.require(kolId)` 调用 |
+| savepoint / 事务 | 用 Spring `TransactionStatus`（见上）；项目既有 `TransactionTemplate`（`KolWriter`、`OrderSync`）模式已在别处复用 |
+| 分页参数上限 | 复用 `PageResult.MAX_PAGE`，与既有列表接口一致 |
+| 审计字段 | 复用 `BaseEntity` + `@AuditLog` + `AuditFieldHandler` 自动填充，未手写 |
+| 英文/中文枚举名 | 枚举只定义编码，界面文字全部走语言包（与既有模块一致） |
+| `escapeLike`、`LibraryJson`、金额两位小数 | 项目没有共享实现，各模块各自持有同款私有实现（`KolService.escapeLike`、`ProductRules.escapeLike`、`KolPromotionService.writeJson` 等），本模块沿用同一写法；LIKE 转义已验证 PostgreSQL 默认转义符 `\` 生效 |
+| `JsonbStringTypeHandler` | 项目既有 6 份逐字节相同的副本（commission / notification / kol / system / task / kollibrary），沿用既有模式，不在本任务内合并 |
+| 前端金额与时间格式化 | 复用 `utils/format.ts` 的 `formatAmountWithCurrency` / `formatInstant`，未自写 |
+
+检查结果：`mvn -B clean verify` 通过（覆盖率门槛全部达标）；`-Pdocker-it` 的 `KolLibraryIT`(18)、`EditionIT`(8)、`SystemIT`(24)、`PermissionIT`(7)、`TenantIsolationIT`(7)、`MultiCompanyAccountIT`(9) 共 73 项全通过。
 
 ## 9. 清理与复查
 

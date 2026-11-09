@@ -23,9 +23,6 @@ import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Savepoint;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -33,12 +30,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import javax.sql.DataSource;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 /**
  * Creator profiles of the library (requirements 1.2.1, 1.2.2, 1.2.6). The company comes from the
@@ -58,18 +53,11 @@ public class LibraryKolService {
   private final LibraryKolContentMapper contents;
   private final CurrentUserContext current;
 
-  /** Hands out the connection the savepoint around the insert is opened on. */
-  private final DataSource dataSource;
-
   public LibraryKolService(
-      LibraryKolMapper kols,
-      LibraryKolContentMapper contents,
-      CurrentUserContext current,
-      DataSource dataSource) {
+      LibraryKolMapper kols, LibraryKolContentMapper contents, CurrentUserContext current) {
     this.kols = kols;
     this.contents = contents;
     this.current = current;
-    this.dataSource = dataSource;
   }
 
   /** Paged list, most recently changed first. */
@@ -133,7 +121,7 @@ public class LibraryKolService {
   @Transactional(rollbackFor = Exception.class)
   public LibraryKolDTO.Detail create(LibraryKolCommand command) {
     LibraryKolDO row = new LibraryKolDO();
-    row.setTenantId(current.user().tenantId());
+    // The company column is filled by the tenant interceptor on insert (ADR-014), as elsewhere.
     applyProfile(row, command, true);
     // The pre-check answers the common duplicate with the existing creator. The insert then runs
     // on its own: after a unique violation PostgreSQL aborts the whole transaction, so the existing
@@ -141,11 +129,11 @@ public class LibraryKolService {
     requireUnique(row, null);
     LibraryKolDO existing = existing(row).orElse(null);
     try {
-      insertRow(row);
+      behindSavepoint(() -> kols.insert(row));
     } catch (DuplicateKeyException e) {
       // uk_crm_library_kol_username: a simultaneous request entered the same creator first. The
       // winner is the row that is there now; the pre-check answer is the fallback.
-      LibraryKolDO winner = existingNow(row).orElse(null);
+      LibraryKolDO winner = existing(row).orElse(null);
       throw winner != null
           ? duplicate(winner)
           : (existing == null
@@ -173,12 +161,12 @@ public class LibraryKolService {
         .set(LibraryKolDO::getUpdateBy, current.id())
         .set(LibraryKolDO::getUpdateTime, Instant.now());
     try {
-      kols.update(null, update);
+      behindSavepoint(() -> kols.update(null, update));
     } catch (DuplicateKeyException e) {
-      // A simultaneous edit took this ID first. The row is read in its own transaction (this one
-      // is aborted), and never answered with the row being edited: that is not the conflict.
+      // A simultaneous edit took this ID first. Rolled back to the savepoint, the transaction can
+      // still read the winner; the row being edited is never named as the conflict.
       LibraryKolDO winner =
-          existingNow(row).filter(found -> !Objects.equals(found.getId(), id)).orElse(null);
+          existing(row).filter(found -> !Objects.equals(found.getId(), id)).orElse(null);
       throw winner != null
           ? duplicate(winner)
           : (previous.filter(found -> !Objects.equals(found.getId(), id)).isPresent()
@@ -186,8 +174,7 @@ public class LibraryKolService {
               : new BusinessException(ErrorCode.KOL_LIBRARY_DUPLICATE));
     }
     LibraryKolDO saved = require(id);
-    LibraryKolDTO.Detail detail = toDetail(saved, totalsOf(List.of(id)).get(id));
-    return detail;
+    return toDetail(saved, totalsOf(List.of(id)).get(id));
   }
 
   /** Follow-up dialog: only the five follow-up fields change. */
@@ -384,57 +371,20 @@ public class LibraryKolService {
   }
 
   /**
-   * Inserts the creator behind a savepoint. A unique violation rolls back to the savepoint only, so
-   * the transaction stays usable and the winner of the race can be read before answering.
+   * Runs a write behind a savepoint. A unique violation rolls back to the savepoint only, so the
+   * transaction stays usable: the row that won the race can then be read and named in the answer.
+   * Without the savepoint the failed statement leaves PostgreSQL in the aborted state, and that
+   * read would fail too (the caller would answer 500 instead of 409).
    */
-  private void insertRow(LibraryKolDO row) {
-    Object savepoint =
-        TransactionSynchronizationManager.hasResource(dataSource) ? obtainSavepoint() : null;
+  private void behindSavepoint(Runnable write) {
+    Object savepoint = TransactionAspectSupport.currentTransactionStatus().createSavepoint();
     try {
-      kols.insert(row);
-      releaseSavepoint(savepoint);
+      write.run();
+      TransactionAspectSupport.currentTransactionStatus().releaseSavepoint(savepoint);
     } catch (RuntimeException e) {
-      rollbackToSavepoint(savepoint);
+      TransactionAspectSupport.currentTransactionStatus().rollbackToSavepoint(savepoint);
       throw e;
     }
-  }
-
-  private Object obtainSavepoint() {
-    Connection connection = DataSourceUtils.getConnection(dataSource);
-    try {
-      Savepoint savepoint = connection.setSavepoint("crm_library_kol_insert");
-      return new Held(connection, savepoint);
-    } catch (SQLException e) {
-      throw new IllegalStateException("Cannot open a savepoint for the creator insert", e);
-    }
-  }
-
-  private void releaseSavepoint(Object held) {
-    if (held instanceof Held(Connection connection, Savepoint savepoint)) {
-      try {
-        connection.releaseSavepoint(savepoint);
-      } catch (SQLException e) {
-        throw new IllegalStateException("Cannot release the creator insert savepoint", e);
-      }
-    }
-  }
-
-  private void rollbackToSavepoint(Object held) {
-    if (held instanceof Held(Connection connection, Savepoint savepoint)) {
-      try {
-        connection.rollback(savepoint);
-      } catch (SQLException e) {
-        throw new IllegalStateException("Cannot undo the failed creator insert", e);
-      }
-    }
-  }
-
-  /** The connection and savepoint opened for one insert. */
-  private record Held(Connection connection, Savepoint savepoint) {}
-
-  /** The row that took the platform + ID while this request was inserting, if it is there now. */
-  private Optional<LibraryKolDO> existingNow(LibraryKolDO row) {
-    return existing(row);
   }
 
   private static BusinessException duplicate(LibraryKolDO existing) {

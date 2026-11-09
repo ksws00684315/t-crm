@@ -60,9 +60,10 @@ public class LibraryContentService {
 
   @Transactional(rollbackFor = Exception.class)
   public LibraryContentDTO create(Long kolId, LibraryContentCommand command) {
-    LibraryKolDO kol = creators.require(kolId);
+    // Ownership check: another company's creator is "not found" before anything is written.
+    creators.require(kolId);
     LibraryKolContentDO row = new LibraryKolContentDO();
-    row.setTenantId(kol.getTenantId());
+    // The company column is filled by the tenant interceptor on insert (ADR-014), as elsewhere.
     row.setKolId(kolId);
     apply(row, command);
     contents.insert(row);

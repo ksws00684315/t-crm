@@ -325,6 +325,58 @@ class KolLibraryIT {
   }
 
   @Test
+  void shouldNameTheWinner_whenTwoEditsRaceOntoTheSameCreatorId() throws Exception {
+    // Two creators edited at the same moment onto the same ID: one wins, the other answers 409
+    // with the winner — never with the row it was editing, and never 500.
+    String token = library.token();
+    String first = createOk(token, "raceeditone", "Amy BD");
+    String second = createOk(token, "raceedittwo", "Amy BD");
+    String body = json.writeValueAsString(profile("raceeditfinal", "Amy BD"));
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    List<String> bodies = new CopyOnWriteArrayList<>();
+    try {
+      var one = pool.submit(() -> performEdit(token, first, body, bodies));
+      var two = pool.submit(() -> performEdit(token, second, body, bodies));
+      one.get();
+      two.get();
+    } finally {
+      pool.shutdownNow();
+    }
+    String loser =
+        bodies.stream()
+            .filter(answer -> answer.contains("KOL_LIBRARY_DUPLICATE"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no duplicate answer among " + bodies));
+    JsonNode answer = json.readTree(loser);
+    assertThat(answer.at("/code").asInt()).isEqualTo(409);
+    JsonNode detail = answer.at("/data");
+    assertThat(detail.at("/id").asText()).isNotEmpty();
+    assertThat(detail.at("/followUpOwner").asText()).isEqualTo("Amy BD");
+    assertThat(detail.at("/displayName").asText()).isEqualTo("Nina raceeditfinal");
+    // Exactly one creator holds the ID afterwards.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_library_kol WHERE kol_username = 'raceeditfinal'"
+                    + " AND is_deleted = FALSE",
+                Integer.class))
+        .isEqualTo(1);
+  }
+
+  private Void performEdit(String token, String id, String body, List<String> answers)
+      throws Exception {
+    answers.add(
+        mvc.perform(
+                put(LIB + "/" + id)
+                    .header(TOKEN, token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+    return null;
+  }
+
+  @Test
   void shouldMatchTheKeywordInAnyCase_forTheCreatorId() throws Exception {
     // Stored IDs are lower case; a partly upper-case keyword still finds them.
     String token = library.token();
