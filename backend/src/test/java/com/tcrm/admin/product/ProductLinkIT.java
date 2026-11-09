@@ -1,6 +1,7 @@
 package com.tcrm.admin.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -411,6 +413,31 @@ class ProductLinkIT {
         .andExpect(jsonPath("$.errorCode").value("COPY_DAILY_QUOTA_EXCEEDED"))
         .andExpect(jsonPath("$.msg").value("本日复制额度不足：本日最多复制商品 5000 条，已复制 4999 条，剩余 1 条，本次提交 2 条"));
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_copy_job", Integer.class)).isZero();
+  }
+
+  @Test
+  void shouldAllowCopyJobTotal_upToTheConfiguredMaximum() {
+    insertJob(141001, 1, 141001, 141001, "big141", "processing", 1500, 0, 0, null, Instant.now());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT total_count FROM crm_copy_job WHERE id = 141001", Integer.class))
+        .isEqualTo(1500);
+
+    assertThatThrownBy(
+            () ->
+                insertJob(
+                    141002,
+                    1,
+                    141001,
+                    141001,
+                    "big142",
+                    "processing",
+                    5001,
+                    0,
+                    0,
+                    null,
+                    Instant.now()))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
