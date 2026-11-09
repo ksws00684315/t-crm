@@ -441,6 +441,60 @@ class ProductLinkIT {
   }
 
   @Test
+  void shouldConvertMoreThanTheOldTableLimit_endToEnd() throws Exception {
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    mvc.perform(
+            put("/admin-api/platform/system-configs/product-links.max-convert-items")
+                .header(ADMIN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":\"5000\"}"))
+        .andExpect(status().isOk());
+    try {
+      long kolId = createKol("BigBatch", "bigbatch141@example.com");
+      long shopId = createShop("1001", "Main");
+      mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+          .andExpect(status().isOk());
+      authorizeShop(shopId);
+      String token = createTokenForShop(kolId, 2000, shopId);
+      StringBuilder items = new StringBuilder();
+      for (int i = 1; i <= 1713; i++) {
+        if (i > 1) {
+          items.append(',');
+        }
+        items
+            .append("{\"sourceChannelCode\":\"WEIDIAN\",\"sourceProductId\":\"")
+            .append(i)
+            .append("\"}");
+      }
+
+      mvc.perform(
+              post(BASE + "/convert")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"token\":\"%s\",\"callerPlatform\":\"google_sheet_plugin\",\"items\":[%s]}"
+                          .formatted(token, items)))
+          .andExpect(status().isOk());
+
+      assertThat(jdbc.queryForObject("SELECT total_count FROM crm_copy_job", Integer.class))
+          .isEqualTo(1713);
+
+      // The worker runs asynchronously; let it drain so it cannot touch the next test's data.
+      TestWait.until(
+          Duration.ofSeconds(60),
+          () -> {
+            var statusList = jdbc.queryForList("SELECT status FROM crm_copy_job", String.class);
+            return !statusList.isEmpty() && statusList.stream().noneMatch("processing"::equals);
+          },
+          "copy job should finish before the test ends");
+    } finally {
+      mvc.perform(
+              delete("/admin-api/platform/system-configs/product-links.max-convert-items")
+                  .header(ADMIN, platform))
+          .andExpect(status().isOk());
+    }
+  }
+
+  @Test
   void shouldReturnTemplates_withoutTheRelayTemplate() throws Exception {
     mvc.perform(get(BASE + "/templates").param("channelCode", "WEIDIAN"))
         .andExpect(status().isOk())
