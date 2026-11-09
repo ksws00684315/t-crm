@@ -73,7 +73,12 @@ export function useCompanySync() {
       // Close every tab of the previous company, then land on the new company's own home: the
       // workbench for a distribution company, the creator list for a creator library (ADR-038 §3.3).
       // The saved tab list is rewritten for the new edition so a reload keeps that home pinned.
-      const nextAffix = affixFor(accessOf(user.user).isPlatformAdmin, company === "KOL_LIBRARY");
+      // The version of the company now in force, not of the said company: the switch answer carries
+      // the new account, the watch only carries its company id.
+      const nextAffix = affixFor(
+        accessOf(user.user).isPlatformAdmin,
+        accessOf(user.user).edition === "KOL_LIBRARY"
+      );
       // Only the new company's home tab: close everything, then go to the new company's home and
       // pin it, so the previous company's tabs never come back. (`router.replace` is the router of
       // the running app; the pinned tab is fixed even when the navigation itself is refused.)

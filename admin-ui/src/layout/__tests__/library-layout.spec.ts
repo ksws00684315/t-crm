@@ -108,6 +108,7 @@ async function mountAs(signedIn: UserVO, path = "/kol-library/kols") {
     const signed = useUserStore();
     return { isLoggedIn: signed.isLoggedIn, ...signed.access };
   });
+  await router.push(path);
   // After a company switch the guard recomputes its view on every navigation, as in the app.
   watch(
     () => useUserStore().user,
@@ -115,7 +116,6 @@ async function mountAs(signedIn: UserVO, path = "/kol-library/kols") {
       if (router.currentRoute.value.name) void router.replace(router.currentRoute.value.fullPath);
     }
   );
-  await router.push(path);
   const wrapper = mount(Layout, {
     global: { plugins: [ElementPlus, i18n, router] }
   });
