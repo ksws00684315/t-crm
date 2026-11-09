@@ -81,12 +81,8 @@ const form = reactive({
 
 const rules: FormRules = {
   percent: [{ required: true, ...rule(validatePercent) }],
-  sheetUrl: [
-    {
-      required: true,
-      ...rule(value => (value.trim() ? validateSheetUrl(value) : t("validation.sheetUrlRequired")))
-    }
-  ]
+  // Promo sheet URL is optional (issue #256): creators are reviewed first, the sheet comes later.
+  sheetUrl: [{ ...rule(validateSheetUrl) }]
 };
 
 const title = computed(() =>

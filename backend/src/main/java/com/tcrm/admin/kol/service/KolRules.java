@@ -28,6 +28,12 @@ public final class KolRules {
   /** Promotion sheet URL prefix, same as the database CHECK (task 11 §4.3). */
   public static final String SHEET_URL_PATTERN = "https://docs\\.google\\.com/spreadsheets/.*";
 
+  /**
+   * Optional promotion sheet URL (issue #256): blank means the sheet is created later. The admin UI
+   * sends an empty string, so the pattern has to accept it; the service stores blank as null.
+   */
+  public static final String SHEET_URL_OPTIONAL_PATTERN = "^$|" + SHEET_URL_PATTERN;
+
   public static final int MAX_NAME = 64;
   public static final int MAX_EMAIL = 128;
   public static final int MAX_PLATFORM = 32;

@@ -213,6 +213,7 @@ public class KolPromotionService {
     if (invite != null && !invite.matches(KolRules.INVITE_CODE_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
+    // 推广表格地址非必填：达人先审核、后制表，地址稍后才产生（issue #256）。
     String sheet = blankToNull(command.sheetUrl());
     if (sheet != null && !sheet.matches(KolRules.SHEET_URL_PATTERN)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
@@ -225,7 +226,6 @@ public class KolPromotionService {
     AccountDTO user = current.user();
     String remark = blankToNull(command.remark());
     if (rate == null
-        || sheet == null
         || platformInputs.isEmpty()
         || platformInputs.stream().anyMatch(p -> p.address() == null)) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);

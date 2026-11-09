@@ -40,9 +40,21 @@ class KolPromotionSupportTest {
     assertTrue(missing.contains("defaultRate"));
     assertFalse(missing.contains("inviteCode"));
     assertTrue(missing.contains("platforms"));
-    assertTrue(missing.contains("sheetUrl"));
+    // 推广表格地址非必填（issue #256）。
+    assertFalse(missing.contains("sheetUrl"));
     assertFalse(missing.contains("remark"));
     assertFalse(missing.contains("review"));
+  }
+
+  @Test
+  void configComplete_withoutSheetUrl() {
+    KolDO kol = new KolDO();
+    kol.setReviewStatus(ReviewStatus.APPROVED.name());
+    kol.setDefaultRate(new BigDecimal("0.1550"));
+    kol.setSheetUrl(null);
+    assertTrue(
+        KolPromotionSupport.configComplete(
+            kol, List.of(new PlatformRef(7L, "https://example.com/x"))));
   }
 
   @Test

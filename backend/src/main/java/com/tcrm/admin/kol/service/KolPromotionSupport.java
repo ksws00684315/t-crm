@@ -44,9 +44,7 @@ final class KolPromotionSupport {
     if (platforms == null || platforms.isEmpty()) {
       missing.add("platforms");
     }
-    if (kol.getSheetUrl() == null || kol.getSheetUrl().isBlank()) {
-      missing.add("sheetUrl");
-    }
+    // 推广表格地址非必填（issue #256）：达人先审核、后制表，地址稍后才产生。
     return List.copyOf(missing);
   }
 

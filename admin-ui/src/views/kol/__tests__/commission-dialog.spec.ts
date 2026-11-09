@@ -127,7 +127,45 @@ describe("commission dialog, 10-20 supplement", () => {
     });
     await wrapper.setProps({ modelValue: true });
     await flushPromises();
-    expect(wrapper.findAll(".el-form-item.is-required").length).toBeGreaterThanOrEqual(2);
+    // 推广表格地址非必填（issue #256）：只有佣金比例为必填项。
+    expect(wrapper.findAll(".el-form-item.is-required").length).toBeGreaterThanOrEqual(1);
+    wrapper.unmount();
+  });
+
+  it("saves without a sheet URL", async () => {
+    vi.mocked(templateApi.listLinkTemplates).mockResolvedValue(templates);
+    vi.mocked(promotionApi.getPromotionConfig).mockResolvedValue({
+      defaultRate: "0.1500",
+      platforms: [
+        { templateId: "7", templateName: "Platform 7", address: "https://old.example/7" }
+      ],
+      inviteCode: "OLD",
+      jumpTemplateId: "7",
+      sheetUrl: null,
+      remark: null
+    });
+    vi.mocked(promotionApi.listPromotionRecords).mockResolvedValue({
+      items: [],
+      total: "0",
+      page: 1,
+      size: 10
+    });
+    vi.mocked(promotionApi.savePromotionConfig).mockResolvedValue(null);
+    vi.spyOn(ElMessage, "success").mockImplementation(() => ({}) as never);
+
+    const wrapper = mount(CommissionDialog, {
+      props: { modelValue: false, kol },
+      global: { plugins: [ElementPlus, i18n] },
+      attachTo: document.body
+    });
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    await wrapper.find('[data-test="commission-save"]').trigger("click");
+    await flushPromises();
+    expect(promotionApi.savePromotionConfig).toHaveBeenCalledWith(
+      "1",
+      expect.objectContaining({ sheetUrl: "" })
+    );
     wrapper.unmount();
   });
 

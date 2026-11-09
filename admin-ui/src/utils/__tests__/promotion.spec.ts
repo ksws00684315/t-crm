@@ -92,11 +92,10 @@ describe("missing and incomplete promotion fields", () => {
     expect(missingPromotionFields({ detail: "unreadable" })).toEqual([]);
   });
 
-  it("requires rate, platform selection, sheet and review but not invite code or address", () => {
+  it("requires rate, platform selection and review but not sheet, invite code or address", () => {
     expect(incompletePromotionFields({ review: false })).toEqual([
       "defaultRate",
       "platforms",
-      "sheetUrl",
       "review"
     ]);
     expect(
@@ -111,7 +110,7 @@ describe("missing and incomplete promotion fields", () => {
       incompletePromotionFields({
         defaultRate: "0.1",
         platforms: [{ templateId: "7" }],
-        sheetUrl: "sheet",
+        sheetUrl: null,
         review: true
       })
     ).toEqual([]);
