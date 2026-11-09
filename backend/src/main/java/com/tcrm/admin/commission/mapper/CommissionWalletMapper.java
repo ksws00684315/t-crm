@@ -134,7 +134,12 @@ public interface CommissionWalletMapper {
 
   /**
    * Net recovery (positive minus already-appended reversals) per prepay deduction ledger, for the
-   * COMMISSION credits of one source row (task 141). Only deductions with a positive net remain.
+   * COMMISSION entries of one source row (task 141). Only deductions with a positive net remain.
+   * The JOIN must keep matching {@code COMMISSION_ADJUSTMENT} credit rows: reversal rows point at
+   * the clawback ledger (also {@code source_type = 'COMMISSION'} with the same {@code source_id}),
+   * and their negative amounts are what turns the gross recovery into the net. Filtering by {@code
+   * entry_type = 'COMMISSION_CREDIT'} here would drop previous reversals and make a second clawback
+   * reverse the same amounts twice.
    */
   @Select(
       """
@@ -149,8 +154,11 @@ public interface CommissionWalletMapper {
       @Param("kolId") long kolId, @Param("sourceId") long sourceId);
 
   /**
-   * Recovery rows of the COMMISSION credits of one source row, latest first (LIFO, same time by id
-   * descending), so a clawback reverses the most recent recovery first (task 141).
+   * Recovery rows of the COMMISSION entries of one source row, latest first (LIFO, same time by id
+   * descending), so a clawback reverses the most recent recovery first (task 141). As in {@link
+   * #listCreditRecoveryNets}, the JOIN deliberately includes rows whose credit ledger is a {@code
+   * COMMISSION_ADJUSTMENT} (negative reversals); they are skipped while walking so their amounts
+   * are never reversed again.
    */
   @Select(
       """

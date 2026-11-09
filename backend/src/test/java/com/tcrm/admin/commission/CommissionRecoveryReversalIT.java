@@ -211,6 +211,37 @@ class CommissionRecoveryReversalIT {
     }
   }
 
+  /**
+   * Two consecutive partial clawbacks of one source row across two prepays: the first clawback of
+   * 30 reverses the LIFO tail (B), the second of 40 continues through B's remaining net (10) and
+   * then A (30), keeping the LIFO order across separate clawback transactions.
+   */
+  @Test
+  void shouldKeepLifoOrderAcrossTwoConsecutivePartialClawbacks() {
+    try (TenantScope.Scope ignored = TenantScope.openCompany(TENANT_ID)) {
+      kolId = createKol(TENANT_ID);
+      long prepayA = IdWorker.getId();
+      long prepayB = IdWorker.getId();
+      long sourceId = IdWorker.getId();
+      deduct(prepayA, "60");
+      deduct(prepayB, "40");
+      credit("credit_100", sourceId, "100");
+
+      clawback("claw_30", sourceId, "30");
+      assertThat(recoveredOf(prepayA)).isEqualByComparingTo("60");
+      assertThat(recoveredOf(prepayB)).isEqualByComparingTo("10");
+
+      clawback("claw_40", sourceId, "40");
+      assertThat(balance()).isEqualByComparingTo("-70");
+      assertThat(recoveredOf(prepayA)).isEqualByComparingTo("30");
+      assertThat(recoveredOf(prepayB)).isEqualByComparingTo("0");
+      assertThat(pendingDeduction()).isEqualByComparingTo("70");
+      // Each clawback has its own adjustment ledger: claw_30 reversed B once, claw_40 reversed B
+      // and A once — three negative rows in total.
+      assertThat(reversalCount()).isEqualTo(3);
+    }
+  }
+
   /** Clawing A's row back reverses A's recovery only; B stays untouched. */
   @Test
   void shouldReverseOnlyTheClawedKolRecovery_whenAttributionMovesOut() {
