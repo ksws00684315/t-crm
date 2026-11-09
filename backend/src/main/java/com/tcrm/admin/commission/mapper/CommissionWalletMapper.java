@@ -2,6 +2,7 @@ package com.tcrm.admin.commission.mapper;
 
 import com.tcrm.admin.commission.model.LedgerSourceRow;
 import com.tcrm.admin.commission.model.OutstandingDeduction;
+import com.tcrm.admin.commission.model.RecoveryAmountRow;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
@@ -130,4 +131,43 @@ public interface CommissionWalletMapper {
       @Param("deductionLedgerId") long deductionLedgerId,
       @Param("amount") BigDecimal amount,
       @Param("createTime") Instant createTime);
+
+  /**
+   * Net recovery (positive minus already-appended reversals) per prepay deduction ledger, for the
+   * COMMISSION entries of one source row (task 141). Only deductions with a positive net remain.
+   * The JOIN must keep matching {@code COMMISSION_ADJUSTMENT} credit rows: reversal rows point at
+   * the clawback ledger (also {@code source_type = 'COMMISSION'} with the same {@code source_id}),
+   * and their negative amounts are what turns the gross recovery into the net. Filtering by {@code
+   * entry_type = 'COMMISSION_CREDIT'} here would drop previous reversals and make a second clawback
+   * reverse the same amounts twice.
+   */
+  @Select(
+      """
+      SELECT r.deduction_ledger_id, SUM(r.amount_cny) AS amount_cny
+      FROM crm_commission_recovery r
+      JOIN crm_commission_ledger c ON c.id = r.credit_ledger_id
+      WHERE r.kol_id = #{kolId} AND c.source_type = 'COMMISSION' AND c.source_id = #{sourceId}
+      GROUP BY r.deduction_ledger_id
+      HAVING SUM(r.amount_cny) > 0
+      """)
+  List<RecoveryAmountRow> listCreditRecoveryNets(
+      @Param("kolId") long kolId, @Param("sourceId") long sourceId);
+
+  /**
+   * Recovery rows of the COMMISSION entries of one source row, latest first (LIFO, same time by id
+   * descending), so a clawback reverses the most recent recovery first (task 141). As in {@link
+   * #listCreditRecoveryNets}, the JOIN deliberately includes rows whose credit ledger is a {@code
+   * COMMISSION_ADJUSTMENT} (negative reversals); they are skipped while walking so their amounts
+   * are never reversed again.
+   */
+  @Select(
+      """
+      SELECT r.deduction_ledger_id, r.amount_cny
+      FROM crm_commission_recovery r
+      JOIN crm_commission_ledger c ON c.id = r.credit_ledger_id
+      WHERE r.kol_id = #{kolId} AND c.source_type = 'COMMISSION' AND c.source_id = #{sourceId}
+      ORDER BY r.create_time DESC, r.id DESC
+      """)
+  List<RecoveryAmountRow> listCreditRecoveryRows(
+      @Param("kolId") long kolId, @Param("sourceId") long sourceId);
 }
