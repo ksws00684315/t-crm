@@ -5,13 +5,21 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
+import { mayOpenTab } from "@/router/guard";
 import { routes } from "@/router/routes";
 import { useCompanySync } from "@/composables/useCompanySync";
 import { useLocaleStore } from "@/stores/locale";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
-import { accessOf, accountLabel, buildMenu, canAccessRoute, roleLabel } from "@/utils/permission";
+import {
+  accessOf,
+  accountLabel,
+  buildMenu,
+  canAccessRoute,
+  editionOf,
+  roleLabel
+} from "@/utils/permission";
 import { watermarkInk, watermarkText } from "@/utils/watermark";
 import { affixFor } from "@/utils/tabs";
 import { loadSidebarCollapsed, saveSidebarCollapsed, subscribeNarrow } from "@/utils/sidebar";
@@ -36,6 +44,9 @@ const narrow = ref(false);
 const drawerOpen = ref(false);
 
 const access = computed(() => accessOf(user.user));
+/** The creator-library company has its own home page (the creator list) and no bell. */
+const libraryEdition = computed(() => editionOf(user.user) === "KOL_LIBRARY");
+const affix = computed(() => affixFor(access.value.isPlatformAdmin, libraryEdition.value));
 const menu = computed(() => {
   void localeStore.locale;
   return buildMenu(routes, access.value);
@@ -93,7 +104,7 @@ async function onCommand(command: string) {
 }
 
 tabs.restore(
-  affixFor(access.value.isPlatformAdmin),
+  affix.value,
   path => canAccessRoute(router.resolve(path).meta, access.value),
   user.user?.id ?? null
 );
@@ -107,13 +118,17 @@ watch(
       new Date()
     );
     const componentName = route.meta.componentName;
-    const titleKey = route.meta.title;
-    if (!componentName || !titleKey || route.meta.noTab) return;
-    const affix = affixFor(access.value.isPlatformAdmin);
+    const title = route.meta.tabTitle ?? route.meta.title;
+    // A switch pins the new home itself once the new company is in place, and a page that no
+    // longer matches the session (still loading from the previous company) takes no tab.
+    if (!componentName || !title || route.meta.noTab || company.resetting.value) return;
+    if (!mayOpenTab(route.path, { isLoggedIn: user.isLoggedIn, ...access.value })) return;
     tabs.open({
       path: route.path,
-      titleKey,
-      affix: route.path === affix.path,
+      titleKey: String(title),
+      // A title the page built at run time is already the shown text, not a language key.
+      literalTitle: route.meta.dynamicTitle === true,
+      affix: route.path === affix.value.path,
       componentName
     });
   },
@@ -176,8 +191,12 @@ onBeforeUnmount(() => {
           </el-breadcrumb>
         </div>
         <div class="layout__actions">
-          <!-- Keyed by company: a switch rebuilds the bell and it reloads the unread count at once. -->
-          <NotificationBell v-if="!access.isPlatformAdmin" :key="company.currentId.value ?? ''" />
+          <!-- Keyed by company: a switch rebuilds the bell and it reloads the unread count at once.
+               A creator-library company has no notifications menu at all (ADR-038 §3.2). -->
+          <NotificationBell
+            v-if="!access.isPlatformAdmin && !libraryEdition"
+            :key="company.currentId.value ?? ''"
+          />
           <LocaleSwitch />
           <el-dropdown
             v-if="company.switchable.value"
@@ -256,9 +275,15 @@ onBeforeUnmount(() => {
           :font="{ color: watermarkColor, fontSize: 14 }"
           data-test="watermark"
         >
+          <!-- A company switch unmounts the previous company's pages and shows nothing until the
+               new company is in place, so no old page loads or opens tabs under the new session. -->
           <RouterView v-slot="{ Component }">
             <Transition name="tcrm-page" mode="out-in">
-              <KeepAlive :key="company.cacheKey.value" :include="tabs.include">
+              <KeepAlive
+                v-if="!company.resetting.value"
+                :key="company.cacheKey.value"
+                :include="tabs.include"
+              >
                 <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
               </KeepAlive>
             </Transition>

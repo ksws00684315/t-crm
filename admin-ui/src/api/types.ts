@@ -58,13 +58,25 @@ export type PermissionCode =
   | "dashboard:shop"
   | "dashboard:team"
   | "dashboard:kol"
-  | "data:export";
+  | "data:export"
+  /** Creator-library edition only (ADR-038): view the creator library. */
+  | "kol-library:view"
+  /** Creator-library edition only (ADR-038): add and edit creators and their content. */
+  | "kol-library:edit";
+
+/**
+ * Product edition of a company (ADR-038): `DISTRIBUTION` is the full distribution product,
+ * `KOL_LIBRARY` the TikTok creator library. A company's edition decides its menu and routes.
+ */
+export type CompanyEdition = "DISTRIBUTION" | "KOL_LIBRARY";
 
 /** One company the signed-in account belongs to (`companies` of `/auth/me`, ADR-022). */
 export interface CompanyVO {
   tenantId: string;
   tenantName: string;
   role: CompanyRole;
+  /** Edition of that company (ADR-038); optional at runtime for older backend responses. */
+  edition?: CompanyEdition | null;
 }
 
 /** How a departure plan ends the account (task 41). */
@@ -115,6 +127,11 @@ export interface UserVO {
   tenantId: string | null;
   /** Null for the platform administrator; optional at runtime for older backend responses. */
   tenantName: string | null;
+  /**
+   * Edition of the current company (ADR-038). Distribution when absent (older responses, the
+   * platform administrator), so a build that does not know the field never hides a company menu.
+   */
+  edition?: CompanyEdition | null;
   /** 1 = enabled, 0 = disabled. */
   status: 0 | 1;
   lastLoginTime: string | null;

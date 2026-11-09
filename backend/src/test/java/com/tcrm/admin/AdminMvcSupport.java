@@ -14,6 +14,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.PostTemplate;
@@ -62,7 +63,11 @@ public final class AdminMvcSupport {
     SaManager.setSaTokenDao(new SaTokenDaoDefaultImpl());
     SaManager.setSaTokenContext(new SaTokenContextForSpringInJakartaServlet());
     var security =
-        new SecurityConfiguration(current, new CurrentKolContext(mock(KolAccountStore.class)));
+        new SecurityConfiguration(
+            current,
+            new CurrentKolContext(mock(KolAccountStore.class)),
+            // Standalone slices always run in a distribution company unless a test says otherwise.
+            edition -> Edition.DISTRIBUTION);
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
     var builder = JsonMapper.builder();

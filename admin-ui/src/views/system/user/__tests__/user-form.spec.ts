@@ -1,11 +1,14 @@
 import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ElementPlus, { ElMessage } from "element-plus";
+import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as userApi from "@/api/system/user";
 import type { PermissionCatalogVO } from "@/api/system/user";
 import type { UserVO } from "@/api/types";
 import { i18n } from "@/locales";
+import { useUserStore } from "@/stores/user";
+import type { Role } from "@/api/types";
 import UserFormDialog from "../UserFormDialog.vue";
 
 vi.mock("@/api/system/user");
@@ -90,7 +93,30 @@ describe("user form dialog", () => {
     document.body.innerHTML = "";
   });
 
+  /** Edition of the company the signed-in super administrator works in (ADR-038). */
+  function signIn(edition: "DISTRIBUTION" | "KOL_LIBRARY" = "DISTRIBUTION") {
+    setActivePinia(createPinia());
+    const store = useUserStore();
+    store.user = {
+      id: "1",
+      username: "admin",
+      nickname: "Admin",
+      email: null,
+      role: "SUPER_ADMIN" as Role,
+      postTemplate: null,
+      permissions: [],
+      dataScope: "ALL",
+      status: 1,
+      lastLoginTime: null,
+      createTime: "2026-10-05T00:00:00Z",
+      tenantId: "1",
+      tenantName: "默认公司",
+      edition
+    };
+  }
+
   async function open(user: UserVO | null) {
+    signIn();
     const wrapper = mount(UserFormDialog, {
       props: { modelValue: false, user },
       global: { plugins: [ElementPlus, i18n] },

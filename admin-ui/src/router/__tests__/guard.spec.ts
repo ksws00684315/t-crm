@@ -95,6 +95,14 @@ describe("resolveAccess", () => {
     expect(resolveAccess(target("/home"), session(platformAdmin))).toBe("/platform/tenants");
   });
 
+  it("lets the 403 page through, so the refusal does not redirect to itself", () => {
+    // Sending 403 to 403 is an endless redirect and a white screen for a library company that
+    // opens a distribution route.
+    const forbidden = routes[0].children?.find(item => item.name === "Forbidden");
+    expect(resolveAccess(target("/403", forbidden?.meta), session(viewer))).toBe(true);
+    expect(resolveAccess(target("/403", forbidden?.meta), session(superAdmin))).toBe(true);
+  });
+
   it("rejects a route the account cannot open with the 403 page", () => {
     expect(resolveAccess(target("/system/users", { superAdmin: true }), session(viewer))).toBe(
       "/403"
@@ -214,6 +222,8 @@ describe("installGuard with the real route table", () => {
       ["notifications", null, false, false, false],
       ["account/resignation", null, false, false, false],
       ["account/password", null, false, false, false],
+      // The creator-library group (ADR-038): its routes declare the KOL_LIBRARY edition instead.
+      ["kol-library", null, false, false, false],
       ["403", null, false, false, false],
       // Merged and removed pages survive as plain redirects (task 32 §2.1).
       ["product/products", null, false, false, false],

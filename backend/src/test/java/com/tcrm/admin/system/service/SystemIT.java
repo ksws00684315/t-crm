@@ -182,6 +182,8 @@ class SystemIT {
             "crm_commission_withdrawal:NO",
             "crm_commission_withdrawal_allocation:NO",
             "crm_commission_withdrawal_order:NO",
+            "crm_library_kol:NO",
+            "crm_library_kol_content:NO",
             "crm_commission_withdrawal_freeze:NO",
             "crm_commission_withdrawal_history:NO",
             "crm_commission_withdrawal_outbox:NO",

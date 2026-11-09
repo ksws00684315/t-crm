@@ -1,6 +1,7 @@
 package com.tcrm.admin.system.model;
 
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.shared.BaseEntity;
 
 /** A company. This table has no tenant_id; it is the company registry itself. */
@@ -10,6 +11,9 @@ public class SysTenantDO extends BaseEntity {
   private String name;
   private Integer status;
   private String remark;
+
+  /** Product edition (ADR-038); chosen when the company is created and never changed. */
+  private Edition edition;
 
   public String getTenantCode() {
     return tenantCode;
@@ -41,5 +45,13 @@ public class SysTenantDO extends BaseEntity {
 
   public void setRemark(String value) {
     this.remark = value;
+  }
+
+  public Edition getEdition() {
+    return edition;
+  }
+
+  public void setEdition(Edition value) {
+    this.edition = value;
   }
 }

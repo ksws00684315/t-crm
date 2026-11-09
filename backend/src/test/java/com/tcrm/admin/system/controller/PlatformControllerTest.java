@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tcrm.admin.AdminMvcSupport;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.service.PlatformService;
 import com.tcrm.admin.system.service.TenantAdminDTO;
@@ -36,7 +37,8 @@ class PlatformControllerTest {
   @Test
   void shouldListTenants_whenPlatformAdminCalls() throws Exception {
     when(platform.list())
-        .thenReturn(List.of(new TenantDTO(1L, "default", "Default", 1, null, null)));
+        .thenReturn(
+            List.of(new TenantDTO(1L, "default", "Default", 1, null, Edition.DISTRIBUTION, null)));
     mvc.perform(get("/admin-api/platform/tenants").header(AdminMvcSupport.TOKEN_HEADER, admin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data[0].tenantCode").value("default"));
@@ -44,15 +46,17 @@ class PlatformControllerTest {
 
   @Test
   void shouldCreateTenant_whenRequestValid() throws Exception {
-    when(platform.create(eq("acme"), eq("Acme"), eq(null)))
-        .thenReturn(new TenantDTO(2L, "acme", "Acme", 1, null, null));
+    when(platform.create(eq("acme"), eq("Acme"), eq(null), eq(Edition.KOL_LIBRARY)))
+        .thenReturn(new TenantDTO(2L, "acme", "Acme", 1, null, Edition.KOL_LIBRARY, null));
     mvc.perform(
             post("/admin-api/platform/tenants")
                 .header(AdminMvcSupport.TOKEN_HEADER, admin())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tenantCode\":\"acme\",\"name\":\"Acme\"}"))
+                .content(
+                    "{\"tenantCode\":\"acme\",\"name\":\"Acme\"," + "\"edition\":\"KOL_LIBRARY\"}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.id").value("2"));
+        .andExpect(jsonPath("$.data.id").value("2"))
+        .andExpect(jsonPath("$.data.edition").value("KOL_LIBRARY"));
   }
 
   @Test
@@ -61,7 +65,7 @@ class PlatformControllerTest {
             post("/admin-api/platform/tenants")
                 .header(AdminMvcSupport.TOKEN_HEADER, admin())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tenantCode\":\"\",\"name\":\"\"}"))
+                .content("{\"tenantCode\":\"\",\"name\":\"\"," + "\"edition\":\"DISTRIBUTION\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"));
     verifyNoInteractions(platform);

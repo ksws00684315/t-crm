@@ -23,6 +23,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.security.config.SecurityConfiguration;
 import com.tcrm.admin.security.service.AuthService;
@@ -92,7 +93,8 @@ class AuthControllerTest {
         new SecurityConfiguration(
             current,
             new com.tcrm.admin.security.api.CurrentKolContext(
-                mock(com.tcrm.admin.security.api.KolAccountStore.class)));
+                mock(com.tcrm.admin.security.api.KolAccountStore.class)),
+            tenantId -> com.tcrm.admin.security.api.Edition.DISTRIBUTION);
     security.adminStpLogic();
     SaManager.setStpInterface(security.roles());
     token = StpUtil.createLoginSession(1L);
@@ -178,7 +180,7 @@ class AuthControllerTest {
                 "unit-token",
                 28800,
                 actor,
-                List.of(new CompanyDTO(2L, "Company B", Role.STAFF))));
+                List.of(new CompanyDTO(2L, "Company B", Role.STAFF, Edition.DISTRIBUTION))));
     mvc.perform(
             post("/admin-api/auth/login")
                 .with(
@@ -206,8 +208,8 @@ class AuthControllerTest {
     when(auth.companies(any()))
         .thenReturn(
             List.of(
-                new CompanyDTO(1L, "Company A", Role.SUPER_ADMIN),
-                new CompanyDTO(2L, "Company B", Role.STAFF)));
+                new CompanyDTO(1L, "Company A", Role.SUPER_ADMIN, Edition.DISTRIBUTION),
+                new CompanyDTO(2L, "Company B", Role.STAFF, Edition.DISTRIBUTION)));
     mvc.perform(get("/admin-api/auth/me").header("X-Admin-Token", token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.role").value("STAFF"))
@@ -237,7 +239,8 @@ class AuthControllerTest {
             true);
     when(auth.switchCompany(2L)).thenReturn(switched);
     when(auth.companies(switched))
-        .thenReturn(List.of(new CompanyDTO(2L, "Company B", Role.SUPER_ADMIN)));
+        .thenReturn(
+            List.of(new CompanyDTO(2L, "Company B", Role.SUPER_ADMIN, Edition.DISTRIBUTION)));
     mvc.perform(
             post("/admin-api/auth/company")
                 .header("X-Admin-Token", token)

@@ -6,7 +6,9 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -26,11 +28,17 @@ public class CurrentUserContext {
 
   private static final String CACHE = CurrentUserContext.class.getName() + ".current";
   private static final String VERIFIED = CurrentUserContext.class.getName() + ".verified";
+
+  /** Edition per company, in the request: a request may ask about more than one company. */
+  private static final String EDITIONS = CurrentUserContext.class.getName() + ".editions";
+
   private static final int SCOPE = RequestAttributes.SCOPE_REQUEST;
   private final AccountStore users;
+  private final CompanyStore companies;
 
-  public CurrentUserContext(AccountStore users) {
+  public CurrentUserContext(AccountStore users, CompanyStore companies) {
     this.users = users;
+    this.companies = companies;
   }
 
   /**
@@ -89,7 +97,77 @@ public class CurrentUserContext {
    */
   public List<String> permissionNames(Object loginId) {
     AccountDTO user = forLoginId(loginId);
-    return usable(user) ? user.effectivePermissions() : List.of();
+    return usable(user) ? effectivePermissions(user) : List.of();
+  }
+
+  /**
+   * Codes an account may use in its company (ADR-038 §2.4): a super administrator gets every code
+   * of the company's edition, a staff account the granted codes limited to that edition. Codes of
+   * another edition never take effect, even if a stored row still holds one.
+   */
+  public List<String> effectivePermissions(AccountDTO user) {
+    if (user == null) {
+      return List.of();
+    }
+    List<String> codes = Permission.codesOf(editionOf(user.tenantId()));
+    if (user.role() == Role.SUPER_ADMIN) {
+      return codes;
+    }
+    if (user.role() != Role.STAFF || user.permissions().isEmpty()) {
+      return List.of();
+    }
+    return codes.stream().filter(user.permissions()::contains).toList();
+  }
+
+  /**
+   * Edition of the current company (ADR-038): the token's company, or — for a platform
+   * administrator, who has no company — {@link Edition#DISTRIBUTION}. Read once per request.
+   */
+  public Edition edition() {
+    AccountDTO user = user();
+    return editionOf(user.tenantId());
+  }
+
+  /** Edition of a company; {@code null} (platform administrator) reads as distribution. */
+  public Edition editionOf(Long tenantId) {
+    if (tenantId == null) {
+      return Edition.DISTRIBUTION;
+    }
+    RequestAttributes request = RequestContextHolder.getRequestAttributes();
+    Map<Long, Edition> cached = editions(request);
+    Edition edition = cached == null ? null : cached.get(tenantId);
+    if (edition != null) {
+      return edition;
+    }
+    edition = companies.editionOf(tenantId);
+    if (cached != null) {
+      cached.put(tenantId, edition);
+    }
+    return edition;
+  }
+
+  /**
+   * Per-request cache of company editions, keyed by company: a single request may ask about more
+   * than one company (for instance two memberships), and one company's answer must never stand in
+   * for another's. Null outside a request (jobs, startup).
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<Long, Edition> editions(RequestAttributes request) {
+    if (request == null) {
+      return null;
+    }
+    Object cached = request.getAttribute(EDITIONS, SCOPE);
+    if (cached instanceof Map<?, ?> map) {
+      return (Map<Long, Edition>) map;
+    }
+    Map<Long, Edition> fresh = new HashMap<>();
+    request.setAttribute(EDITIONS, fresh, SCOPE);
+    return fresh;
+  }
+
+  /** Every code of a company's edition (ADR-038): the grants a super administrator holds. */
+  public List<String> editionCodes(Long tenantId) {
+    return Permission.codesOf(editionOf(tenantId));
   }
 
   /**
@@ -114,6 +192,7 @@ public class CurrentUserContext {
     RequestAttributes request = RequestContextHolder.getRequestAttributes();
     if (request != null) {
       request.removeAttribute(CACHE, SCOPE);
+      request.removeAttribute(EDITIONS, SCOPE);
     }
   }
 
@@ -139,12 +218,23 @@ public class CurrentUserContext {
         && user.role() != null;
   }
 
+  /**
+   * The account behind a Sa-Token login id. Role and permission checks ({@code @SaCheckRole},
+   * {@code @SaCheckPermission}) go through Sa-Token's own {@code StpInterface} calls, which convert
+   * the stored login id to its own type: both sides are compared in their canonical form so the
+   * currently logged-in account is recognised, and its role is the one in the token's company.
+   * Without that, the lookup would fall back to the account's <em>last</em> company (an account
+   * belongs to no company, ADR-022) and a person in two companies could be judged by the role of
+   * the wrong one — for instance a library company staff member passing
+   * {@code @SaCheckRole("SUPER_ADMIN")} when its last company made it a super administrator.
+   */
   private AccountDTO forLoginId(Object loginId) {
     Long id = toId(loginId);
     if (id == null) {
       return null;
     }
-    if (id.equals(loginId())) {
+    Long loggedIn = loginId();
+    if (loggedIn != null && loggedIn.equals(id)) {
       Loaded loaded = current(id);
       return loaded == null ? null : loaded.account();
     }

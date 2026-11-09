@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
@@ -66,11 +67,16 @@ public class PlatformService {
         .toList();
   }
 
-  public TenantDTO create(String tenantCode, String name, String remark) {
+  /**
+   * Creates a company with the edition it keeps for good (ADR-038 §1): there is no update path for
+   * the edition, because switching would leave records the other edition cannot show.
+   */
+  public TenantDTO create(String tenantCode, String name, String remark, Edition edition) {
     SysTenantDO row = new SysTenantDO();
     row.setTenantCode(tenantCode);
     row.setName(name.strip());
     row.setRemark(blankToNull(remark));
+    row.setEdition(edition);
     row.setStatus(1);
     row.setDeleted(false);
     try {
@@ -181,30 +187,37 @@ public class PlatformService {
 
   /**
    * Adds an existing company account to this company. A staff member starts from the template's
-   * codes and data scope (ADR-018). 409 USER_ALREADY_MEMBER when a live membership exists; 404 for
-   * an unknown company or account; 400 for a platform administrator account.
+   * codes and data scope (ADR-018), or — in a creator-library company — without a template and with
+   * the ALL data scope (ADR-038). 409 USER_ALREADY_MEMBER when a live membership exists; 404 for an
+   * unknown company or account; 400 for a platform administrator account.
    */
   @Transactional(rollbackFor = Exception.class)
   public PlatformUserDTO addMember(
       Long tenantId, Long userId, Role role, PostTemplate template, DataScope scope) {
-    require(tenantId);
+    SysTenantDO company = require(tenantId);
     return TenantScope.callSystem(
         "add an existing account to a company",
         () -> {
-          MemberRole resolved = MemberRole.resolve(role, template, scope);
-          if (resolved.role() == Role.STAFF) {
-            PostTemplateService.PostTemplateView defaults =
-                postTemplates.getDefault(template, tenantId);
-            resolved =
-                new MemberRole(
-                    Role.STAFF,
-                    scope == null ? defaults.dataScope() : scope,
-                    template,
-                    defaults.permissions());
-          }
           SysUserDO user = requireUser(userId);
           if (user.getRole() != AccountType.MEMBER) {
             throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+          }
+          MemberRole resolved;
+          if (role == Role.STAFF && company.getEdition() == Edition.KOL_LIBRARY) {
+            // The account is granted its codes here, in the company's account screens.
+            resolved = new MemberRole(Role.STAFF, DataScope.ALL, null, List.of());
+          } else {
+            resolved = MemberRole.resolve(role, template, scope);
+            if (resolved.role() == Role.STAFF) {
+              PostTemplateService.PostTemplateView defaults =
+                  postTemplates.getDefault(template, tenantId);
+              resolved =
+                  new MemberRole(
+                      Role.STAFF,
+                      scope == null ? defaults.dataScope() : scope,
+                      template,
+                      defaults.permissions());
+            }
           }
           if (members.getMember(userId, tenantId) != null) {
             throw new BusinessException(ErrorCode.USER_ALREADY_MEMBER);

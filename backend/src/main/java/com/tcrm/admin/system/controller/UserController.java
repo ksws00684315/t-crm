@@ -1,6 +1,8 @@
 package com.tcrm.admin.system.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.tcrm.admin.security.api.Edition;
+import com.tcrm.admin.security.api.EditionScope;
 import com.tcrm.admin.shared.AuditLog;
 import com.tcrm.admin.shared.PageResult;
 import com.tcrm.admin.shared.R;
@@ -26,9 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
  * Super administrators manage accounts; validation 400, missing 404, duplicate 409, business rules
  * 422. Permission replacement is audited on {@code PermissionChangeApplier}, which receives the
  * previous and next code sets.
+ *
+ * <p>Open to both editions (ADR-038 §2.2): the account management screens are the same in the
+ * creator-library edition, limited to its two permission codes by {@code UserPermissionService}.
  */
 @RestController
 @RequestMapping("/admin-api/system/users")
+@EditionScope({Edition.DISTRIBUTION, Edition.KOL_LIBRARY})
 @SaCheckRole("SUPER_ADMIN")
 public class UserController {
   private final UserService users;

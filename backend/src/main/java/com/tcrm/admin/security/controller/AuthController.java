@@ -4,6 +4,8 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
 import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Edition;
+import com.tcrm.admin.security.api.EditionScope;
 import com.tcrm.admin.security.service.AuthService;
 import com.tcrm.admin.security.service.CaptchaService;
 import com.tcrm.admin.shared.AuditLog;
@@ -24,9 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Login and captcha issuing are public; other operations accept every administrator role. Errors
  * AUTH_* and validation 400. These paths are exempt from the {@code X-Company-Id} check.
+ *
+ * <p>Open to both editions (ADR-038 §2.2): signing in, reading and switching the company, signing
+ * out and changing the password are the same for every company.
  */
 @RestController
 @RequestMapping("/admin-api/auth")
+@EditionScope({Edition.DISTRIBUTION, Edition.KOL_LIBRARY})
 public class AuthController {
   private final AuthService auth;
   private final CurrentUserContext current;
@@ -65,7 +71,11 @@ public class AuthController {
             result.tokenName(),
             result.token(),
             result.expiresIn(),
-            UserVO.from(result.user(), result.companies())));
+            UserVO.from(
+                result.user(),
+                result.companies(),
+                auth.edition(result.user()),
+                auth.permissions(result.user()))));
   }
 
   @SaCheckRole(
@@ -101,7 +111,7 @@ public class AuthController {
   }
 
   private UserVO me(AccountDTO user) {
-    return UserVO.from(user, auth.companies(user));
+    return UserVO.from(user, auth.companies(user), auth.edition(user), auth.permissions(user));
   }
 
   @SaCheckRole(

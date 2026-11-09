@@ -1,7 +1,10 @@
 import type { RouteRecordRaw } from "vue-router";
+import { useUserStore } from "@/stores/user";
+import { homePathFor } from "@/utils/tabs";
 
 /**
- * Static routes. Access is `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
+ * Static routes. Access is `meta.editions` (default: the distribution product, ADR-038),
+ * `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
  * The menu is derived from the same data; nothing is fetched from the backend.
  * Company home has no permission code: every company account may open it.
  *
@@ -9,6 +12,16 @@ import type { RouteRecordRaw } from "vue-router";
  * groups mirroring the original system. Pages still under construction render the shared
  * coming-soon component; they stay in the menu.
  */
+/** The home path of the signed-in company; workbench unless it uses the creator-library edition. */
+function companyHome(): string {
+  try {
+    // Read outside a running app (route tests) has no store: the workbench is the default home.
+    return homePathFor(useUserStore().user?.edition === "KOL_LIBRARY");
+  } catch {
+    return homePathFor(false);
+  }
+}
+
 export const routes: RouteRecordRaw[] = [
   {
     path: "/login",
@@ -19,7 +32,10 @@ export const routes: RouteRecordRaw[] = [
   {
     path: "/",
     component: () => import("@/layout/index.vue"),
-    redirect: "/home",
+    // "/" leads to the company's home: the workbench, or the creator list for a creator-library
+    // company (ADR-038 §3.3). The decision is a function so a company switch is honoured; it is
+    // kept off the static "/home" redirect, which would leave a library company on the workbench.
+    redirect: () => companyHome(),
     children: [
       {
         path: "home",
@@ -28,6 +44,8 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.home",
           icon: "HomeFilled",
+          // Every company account may open its home; the screen sends a library company on.
+          editions: ["DISTRIBUTION", "KOL_LIBRARY"],
           componentName: "HomePage"
         }
       },
@@ -319,6 +337,8 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.users",
               superAdmin: true,
+              // Account management is also the library's only other menu (ADR-038 §3.2).
+              editions: ["DISTRIBUTION", "KOL_LIBRARY"],
               componentName: "SystemUserPage"
             }
           },
@@ -349,6 +369,8 @@ export const routes: RouteRecordRaw[] = [
               title: "route.auditLogs",
               superAdmin: true,
               platformAdmin: true,
+              // The audit log stays in the distribution product; a library company has none.
+              editions: ["DISTRIBUTION"],
               componentName: "SystemOperLogPage"
             }
           }
@@ -383,6 +405,67 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: "route.password", hideInMenu: true, componentName: "AccountPasswordPage" }
       },
       {
+        // TikTok creator library (ADR-038, requirement 1.2.5): list, detail, and the full-page form.
+        path: "kol-library",
+        name: "KolLibraryGroup",
+        redirect: "/kol-library/kols",
+        meta: {
+          title: "route.kolLibrary",
+          icon: "Avatar",
+          menuGroup: true,
+          editions: ["KOL_LIBRARY"]
+        },
+        children: [
+          {
+            path: "kols",
+            name: "LibraryKolList",
+            component: () => import("@/views/kol-library/kol-list/index.vue"),
+            meta: {
+              title: "route.libraryKols",
+              permission: "kol-library:view",
+              editions: ["KOL_LIBRARY"],
+              componentName: "LibraryKolListPage"
+            }
+          },
+          {
+            path: "kols/new",
+            name: "LibraryKolCreate",
+            component: () => import("@/views/kol-library/kol-form/index.vue"),
+            meta: {
+              title: "route.libraryKolNew",
+              permission: "kol-library:edit",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              componentName: "LibraryKolFormPage"
+            }
+          },
+          {
+            path: "kols/:id",
+            name: "LibraryKolDetail",
+            component: () => import("@/views/kol-library/kol-detail/index.vue"),
+            meta: {
+              title: "route.libraryKolDetail",
+              permission: "kol-library:view",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              componentName: "LibraryKolDetailPage"
+            }
+          },
+          {
+            path: "kols/:id/edit",
+            name: "LibraryKolEdit",
+            component: () => import("@/views/kol-library/kol-form/index.vue"),
+            meta: {
+              title: "route.libraryKolEdit",
+              permission: "kol-library:edit",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              componentName: "LibraryKolFormPage"
+            }
+          }
+        ]
+      },
+      {
         path: "403",
         name: "Forbidden",
         component: () => import("@/views/error/403.vue"),
@@ -390,7 +473,10 @@ export const routes: RouteRecordRaw[] = [
           title: "route.forbidden",
           hideInMenu: true,
           componentName: "ForbiddenPage",
-          noTab: true
+          noTab: true,
+          // Open to every signed-in company account: the guard must not block the page it sends
+          // people to, or the redirect loops (a library company opening a distribution route).
+          editions: ["DISTRIBUTION", "KOL_LIBRARY"]
         }
       },
       // Merged and removed pages keep working as redirects, so bookmarks, notification links

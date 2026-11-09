@@ -48,7 +48,11 @@ async function submit() {
   loading.value = true;
   try {
     await user.login(form.username, form.password, captchaRef.value?.answer());
-    await router.replace(safeRedirect(route.query.redirect));
+    // A creator-library company's home is its creator list (ADR-038 §3.3); every other company
+    // starts at "/" and the workbench route decides.
+    const redirect = safeRedirect(route.query.redirect);
+    const libraryHome = user.user?.edition === "KOL_LIBRARY" ? "/kol-library/kols" : "/";
+    await router.replace(redirect === "/" ? libraryHome : redirect);
   } catch (error) {
     // The backend consumed the captcha whatever the outcome, so a new one is always needed.
     void captchaRef.value?.refresh();

@@ -14,6 +14,7 @@ import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolBdTransferMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.TenantScope;
@@ -548,7 +549,14 @@ class BdTransferIT {
   void shouldRejectStaffWithEveryPermission_whenAccessingTransferEndpoints() throws Exception {
     long staff =
         CompanySessions.createStaff(
-            mvc, json, admin, PASSWORD, "all-staff", "OPERATOR", "ALL", Permission.codes());
+            mvc,
+            json,
+            admin,
+            PASSWORD,
+            "all-staff",
+            "OPERATOR",
+            "ALL",
+            Permission.codesOf(Edition.DISTRIBUTION));
     String token = CompanySessions.login(mvc, json, "all-staff", PASSWORD);
     assertThat(staff).isPositive();
     mvc.perform(

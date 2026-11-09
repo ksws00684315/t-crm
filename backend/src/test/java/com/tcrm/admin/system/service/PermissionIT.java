@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.PostTemplate;
 import java.time.Duration;
@@ -110,7 +111,7 @@ class PermissionIT {
   @Test
   void shouldRejectSuperAdminEndpoints_whenStaffHoldsEveryCode() throws Exception {
     String admin = companyAdmin();
-    String token = staff(admin, "OPERATOR", "ALL", Permission.codes());
+    String token = staff(admin, "OPERATOR", "ALL", Permission.codesOf(Edition.DISTRIBUTION));
     for (var request : superAdminOnly()) {
       mvc.perform(request.header(TOKEN, token))
           .andExpect(status().isForbidden())
@@ -177,7 +178,10 @@ class PermissionIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.permissions[0].code").value("kol:view"))
         .andExpect(jsonPath("$.data.permissions[0].group").value("KOL"))
-        .andExpect(jsonPath("$.data.permissions.length()").value(Permission.values().length))
+        // The catalog lists the codes of the company's edition (ADR-038 §2.4), not every code.
+        .andExpect(
+            jsonPath("$.data.permissions.length()")
+                .value(Permission.codesOf(Edition.DISTRIBUTION).size()))
         .andExpect(jsonPath("$.data.templates[0].code").value("OPERATOR"))
         .andExpect(jsonPath("$.data.templates[0].dataScope").value("ALL"))
         .andExpect(jsonPath("$.data.templates[1].code").value("BD"))

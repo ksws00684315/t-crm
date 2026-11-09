@@ -37,16 +37,23 @@ public class PostTemplateService {
         .toList();
   }
 
+  /**
+   * Template defaults of {@code tenantId}, limited to that company's edition (ADR-038): stored
+   * codes of another edition are dropped instead of failing the caller.
+   */
   public PostTemplateView getDefault(PostTemplate template, long tenantId) {
     SysPostTemplateDO row = find(template, tenantId);
     if (row == null) {
       return defaultView(template);
     }
-    return new PostTemplateView(
-        template,
-        row.getDataScope(),
-        permissions.canonical(readCodes(row.getPermissions())),
-        false);
+    return new PostTemplateView(template, row.getDataScope(), editionCodes(row, tenantId), false);
+  }
+
+  /** Stored codes that belong to the company's edition, in permission order. */
+  private List<String> editionCodes(SysPostTemplateDO row, long tenantId) {
+    List<String> edition = current.editionCodes(tenantId);
+    List<String> stored = readCodes(row.getPermissions());
+    return edition.stream().filter(stored::contains).toList();
   }
 
   @Transactional(rollbackFor = Exception.class)
@@ -91,11 +98,7 @@ public class PostTemplateService {
     SysPostTemplateDO row = find(template, tenantId);
     return row == null
         ? defaultView(template)
-        : new PostTemplateView(
-            template,
-            row.getDataScope(),
-            permissions.canonical(readCodes(row.getPermissions())),
-            false);
+        : new PostTemplateView(template, row.getDataScope(), editionCodes(row, tenantId), false);
   }
 
   private SysPostTemplateDO find(PostTemplate template, long tenantId) {

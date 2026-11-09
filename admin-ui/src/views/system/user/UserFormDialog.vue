@@ -13,7 +13,14 @@ import type { CompanyRole, DataScope, PostTemplate, UserVO } from "@/api/types";
 import { isMultiCompany } from "@/utils/company";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
-import { POST_TEMPLATES, postLabel, roleLabel, SELECTABLE_ROLES } from "@/utils/permission";
+import { useUserStore } from "@/stores/user";
+import {
+  editionOf,
+  POST_TEMPLATES,
+  postLabel,
+  roleLabel,
+  SELECTABLE_ROLES
+} from "@/utils/permission";
 import {
   rule,
   serverFieldErrors,
@@ -44,6 +51,12 @@ const dataScopes = computed<{ value: DataScope; label: string }[]>(() => [
 ]);
 
 const editing = computed(() => props.user !== null);
+/**
+ * A creator-library company creates its accounts without a post template and data scope (both are
+ * distribution concepts; library accounts do not separate data, requirement P1-13), and its picker
+ * offers the two library codes only (ADR-038 §2.4).
+ */
+const libraryEdition = computed(() => editionOf(useUserStore().user) === "KOL_LIBRARY");
 /** Name and email belong to the person; another company also uses them (ADR-022). */
 const personalLocked = computed(() => isMultiCompany(props.user));
 const formRef = ref<FormInstance>();
@@ -70,8 +83,9 @@ const rules = computed<FormRules>(() => ({
   postTemplate: [
     {
       validator: (_rule, value: string, callback: (error?: Error) => void) => {
-        if (form.role === "STAFF" && !value) callback(new Error(t("user.templateRequired")));
-        else callback();
+        if (form.role === "STAFF" && !value && !libraryEdition.value) {
+          callback(new Error(t("user.templateRequired")));
+        } else callback();
       },
       trigger: "change"
     }
@@ -79,7 +93,11 @@ const rules = computed<FormRules>(() => ({
 }));
 
 const showPermissions = computed(
-  () => !editing.value && form.role === "STAFF" && form.postTemplate !== "" && catalog.value != null
+  () =>
+    !editing.value &&
+    form.role === "STAFF" &&
+    catalog.value != null &&
+    (libraryEdition.value || form.postTemplate !== "")
 );
 
 watch(
@@ -165,6 +183,18 @@ async function submit(): Promise<void> {
         nickname: form.nickname,
         email,
         role: "SUPER_ADMIN"
+      });
+    } else if (libraryEdition.value) {
+      // No template (the backend does not require one here) and the ALL scope the backend records
+      // for every library account; the library codes are taken as chosen (ADR-038 §2.4).
+      await createUser({
+        username: form.username,
+        password: form.password,
+        nickname: form.nickname,
+        email,
+        role: "STAFF",
+        dataScope: "ALL",
+        permissions: [...form.permissions]
       });
     } else {
       await createUser({
@@ -259,7 +289,7 @@ async function submit(): Promise<void> {
         </el-select>
       </el-form-item>
       <el-form-item
-        v-if="form.role === 'STAFF'"
+        v-if="form.role === 'STAFF' && !libraryEdition"
         :label="t('user.postTemplate')"
         prop="postTemplate"
         :error="serverErrors.postTemplate"
@@ -278,9 +308,18 @@ async function submit(): Promise<void> {
       </p>
       <template v-if="showPermissions">
         <div class="perm-scroll" data-test="permission-area">
-          <PermissionPicker v-model="form.permissions" :items="catalog?.permissions ?? []" />
+          <PermissionPicker
+            v-model="form.permissions"
+            :items="catalog?.permissions ?? []"
+            :edition="editionOf(useUserStore().user)"
+          />
         </div>
-        <el-form-item :label="t('user.dataScope')" prop="dataScope" :error="serverErrors.dataScope">
+        <el-form-item
+          v-if="!libraryEdition"
+          :label="t('user.dataScope')"
+          prop="dataScope"
+          :error="serverErrors.dataScope"
+        >
           <el-radio-group v-model="form.dataScope" data-test="data-scope">
             <el-radio v-for="scope in dataScopes" :key="scope.value" :value="scope.value">
               {{ scope.label }}

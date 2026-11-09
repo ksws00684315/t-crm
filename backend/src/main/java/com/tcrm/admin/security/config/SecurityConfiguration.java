@@ -6,6 +6,7 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpLogic;
 import cn.dev33.satoken.stp.StpUtil;
+import com.tcrm.admin.security.api.CompanyStore;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.StpKolUtil;
@@ -28,10 +29,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class SecurityConfiguration implements WebMvcConfigurer {
   private final CurrentUserContext current;
   private final CurrentKolContext currentKol;
+  private final CompanyStore companies;
 
-  public SecurityConfiguration(CurrentUserContext current, CurrentKolContext currentKol) {
+  public SecurityConfiguration(
+      CurrentUserContext current, CurrentKolContext currentKol, CompanyStore companies) {
     this.current = current;
     this.currentKol = currentKol;
+    this.companies = companies;
   }
 
   @Bean
@@ -131,6 +135,14 @@ public class SecurityConfiguration implements WebMvcConfigurer {
         .addInterceptor(new CompanyHeaderInterceptor(current))
         .addPathPatterns(CompanyHeaderInterceptor.PATTERNS)
         .excludePathPatterns(CompanyHeaderInterceptor.EXCLUDED);
+    // The company edition is checked after the status and displayed-company checks (so it sees a
+    // valid login in the right company) and before the role and permission annotations (ADR-038
+    // §2.2): a creator-library company calling a distribution controller answers 403
+    // AUTH_EDITION_FORBIDDEN whatever its roles are. Undeclared controllers are distribution only.
+    registry
+        .addInterceptor(new EditionInterceptor(current, companies))
+        .addPathPatterns(EditionInterceptor.PATTERNS)
+        .excludePathPatterns(EditionInterceptor.EXCLUDED);
     registry
         .addInterceptor(
             new SaInterceptor(

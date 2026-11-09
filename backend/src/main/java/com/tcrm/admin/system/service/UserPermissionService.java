@@ -3,6 +3,7 @@ package com.tcrm.admin.system.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
@@ -23,6 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Stored staff permissions, per company (ADR-022): codes held in one company do not affect another.
  * Unknown codes are rejected before any row is written.
+ *
+ * <p>Codes are limited to the company's edition (ADR-038 §2.4): assignment, the catalog and the
+ * post templates only offer the codes of the current edition, and a code of another edition is
+ * rejected with {@link ErrorCode#USER_PERMISSION_EDITION_MISMATCH} rather than stored. Stored rows
+ * of another edition never take effect either, see {@code CurrentUserContext}.
  */
 @Service
 public class UserPermissionService {
@@ -42,8 +48,12 @@ public class UserPermissionService {
     this.current = current;
   }
 
-  /** Known codes in {@link Permission} order. Duplicates collapse. Null or unknown codes fail. */
-  public List<String> canonical(List<String> codes) {
+  /**
+   * Codes of {@code edition}, in {@link Permission} order. Duplicates collapse. Null or unknown
+   * codes fail with {@code USER_PERMISSION_INVALID}; a known code of another edition fails with
+   * {@code USER_PERMISSION_EDITION_MISMATCH}.
+   */
+  public List<String> canonical(List<String> codes, Edition edition) {
     if (codes == null) {
       throw new BusinessException(ErrorCode.USER_PERMISSION_INVALID);
     }
@@ -53,18 +63,40 @@ public class UserPermissionService {
       if (permission == null) {
         throw new BusinessException(ErrorCode.USER_PERMISSION_INVALID);
       }
+      if (permission.edition() != edition) {
+        throw new BusinessException(ErrorCode.USER_PERMISSION_EDITION_MISMATCH);
+      }
       selected.add(permission);
     }
     return Permission.ordered(selected);
   }
 
-  public List<String> storedCodes(Long userId, long tenantId) {
-    return Permission.codes().stream().filter(storedSet(userId, tenantId)::contains).toList();
+  /** Codes of the current company's edition. */
+  public List<String> canonical(List<String> codes) {
+    return canonical(codes, current.edition());
   }
 
+  /** Stored codes that belong to the current edition, in {@link Permission} order. */
+  public List<String> storedCodes(Long userId, long tenantId) {
+    List<String> codes = current.editionCodes(tenantId);
+    return codes.stream().filter(storedSet(userId, tenantId)::contains).toList();
+  }
+
+  /**
+   * Custody of the same codes for a page of accounts. Limited to the company's edition like the
+   * single-account lookup: a code of the other edition can only come from old data, and the list
+   * must not show codes the account cannot use.
+   */
   public Map<Long, List<String>> storedCodes(Collection<Long> userIds, long tenantId) {
     if (userIds == null || userIds.isEmpty()) {
       return Map.of();
+    }
+    EnumSet<Permission> usable = EnumSet.noneOf(Permission.class);
+    for (String code : current.editionCodes(tenantId)) {
+      Permission permission = Permission.fromCode(code);
+      if (permission != null) {
+        usable.add(permission);
+      }
     }
     Map<Long, EnumSet<Permission>> grouped = new HashMap<>();
     for (SysUserPermissionDO row :
@@ -74,7 +106,7 @@ public class UserPermissionService {
                 .eq(SysUserPermissionDO::getTenantId, tenantId)
                 .in(SysUserPermissionDO::getUserId, userIds))) {
       Permission permission = Permission.fromCode(row.getPermissionCode());
-      if (permission == null) {
+      if (permission == null || !usable.contains(permission)) {
         continue;
       }
       grouped
@@ -131,18 +163,26 @@ public class UserPermissionService {
             id, tenantId, storedCodes(id, tenantId), next, member.getDataScope(), dataScope));
   }
 
+  /**
+   * Codes and post templates assignable in the current company's edition (ADR-038 §2.4). The
+   * creator-library edition has no post templates: they are a distribution concept too.
+   */
   public PermissionCatalog catalog() {
+    Edition edition = current.edition();
     List<PermissionCatalog.Item> items =
         java.util.Arrays.stream(Permission.values())
+            .filter(permission -> permission.edition() == edition)
             .map(permission -> new PermissionCatalog.Item(permission.code(), permission.group()))
             .toList();
     List<PermissionCatalog.Template> templates =
-        java.util.Arrays.stream(PostTemplate.values())
-            .map(
-                template ->
-                    new PermissionCatalog.Template(
-                        template.name(), template.permissionCodes(), template.dataScope()))
-            .toList();
+        edition != Edition.DISTRIBUTION
+            ? List.of()
+            : java.util.Arrays.stream(PostTemplate.values())
+                .map(
+                    template ->
+                        new PermissionCatalog.Template(
+                            template.name(), template.permissionCodes(), template.dataScope()))
+                .toList();
     return new PermissionCatalog(items, templates);
   }
 

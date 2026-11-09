@@ -10,6 +10,11 @@ import java.util.Set;
 /**
  * Fixed permission codes (ADR-018). Names shown in the admin UI come from the language packs; this
  * enum is the only registry.
+ *
+ * <p>Every code belongs to one company edition ({@link #codesOf(Edition)}, ADR-038 §2.4): the
+ * {@code KOL_LIBRARY} codes are the creator library only, every other code is the distribution
+ * product. Super administrators, assignment and the permission catalog are all limited to the codes
+ * of the current company's edition.
  */
 public enum Permission {
   KOL_VIEW("kol:view", Group.KOL),
@@ -33,16 +38,19 @@ public enum Permission {
   DASHBOARD_SHOP("dashboard:shop", Group.DASHBOARD),
   DASHBOARD_TEAM("dashboard:team", Group.DASHBOARD),
   DASHBOARD_KOL("dashboard:kol", Group.DASHBOARD),
-  DATA_EXPORT("data:export", Group.OTHER);
+  DATA_EXPORT("data:export", Group.OTHER),
+  KOL_LIBRARY_VIEW("kol-library:view", Group.KOL_LIBRARY),
+  KOL_LIBRARY_EDIT("kol-library:edit", Group.KOL_LIBRARY);
 
-  /** Group names are the API values: KOL, PRODUCT, ORDER, FUNDS, DASHBOARD, OTHER. */
+  /** Group names are the API values: KOL, PRODUCT, ORDER, FUNDS, DASHBOARD, OTHER, KOL_LIBRARY. */
   public enum Group {
     KOL,
     PRODUCT,
     ORDER,
     FUNDS,
     DASHBOARD,
-    OTHER
+    OTHER,
+    KOL_LIBRARY
   }
 
   private static final Map<String, Permission> BY_CODE = new LinkedHashMap<>();
@@ -72,6 +80,16 @@ public enum Permission {
   /** Every code, in enum order. */
   public static List<String> codes() {
     return Arrays.stream(values()).map(Permission::code).toList();
+  }
+
+  /** Codes of one edition, in enum order (ADR-038 §2.4). */
+  public static List<String> codesOf(Edition edition) {
+    return Arrays.stream(values()).filter(p -> p.edition() == edition).map(p -> p.code).toList();
+  }
+
+  /** The edition this code belongs to. */
+  public Edition edition() {
+    return group == Group.KOL_LIBRARY ? Edition.KOL_LIBRARY : Edition.DISTRIBUTION;
   }
 
   /** The permission for this code, or null when the code is not registered. */
