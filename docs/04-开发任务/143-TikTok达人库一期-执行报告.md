@@ -187,6 +187,12 @@
 
 检查结果：`mvn -B clean verify` 通过（覆盖率门槛全部达标）；`-Pdocker-it` 的 `KolLibraryIT`(18)、`EditionIT`(8)、`SystemIT`(24)、`PermissionIT`(7)、`TenantIsolationIT`(7)、`MultiCompanyAccountIT`(9) 共 73 项全通过。
 
+## 8.3 合并 main（任务 135）后的一处修正
+
+main 的 #247（任务 135，L-122）新增了规范用例 `views/__tests__/filter-width.spec.ts`：ListSearch 里的筛选下拉不得写死像素宽度，必须用共享类 `.filter-w-sm / -md / -lg`。达人列表原先用 `style="width: 140/160/150px"`，合并后该用例扫描到并让 Admin UI 的 CI 失败。
+
+处理：四个筛选下拉与跟进负责人输入框改用 `.filter-w-sm`（规范定义「短下拉」140px）；跟进负责人原为 150px，改为同一档，与其他筛选控件一致。
+
 ## 9. 清理与复查
 
 浏览器验收创建的数据在第 3、4 轮结束时由子代理清理，主代理另行复查。清理对象：公司 `t143-b`（及其成员关系、角色）、账号 `t143_owner` / `t143_bd01` / 其他 `t143_` 账号、权限行、达人 `t143_beauty` / `t143_other` 及内容记录、相关操作日志。

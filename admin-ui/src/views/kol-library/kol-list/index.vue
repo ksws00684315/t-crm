@@ -311,7 +311,7 @@ onMounted(load);
             clearable
             :placeholder="t('common.all')"
             data-test="library-platform"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="option in LIBRARY_PLATFORMS"
@@ -327,7 +327,7 @@ onMounted(load);
             clearable
             :placeholder="t('common.all')"
             data-test="library-country"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="option in LIBRARY_COUNTRIES"
@@ -343,7 +343,7 @@ onMounted(load);
             clearable
             :placeholder="t('common.all')"
             data-test="library-category"
-            style="width: 160px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="option in LIBRARY_CATEGORIES"
@@ -359,7 +359,7 @@ onMounted(load);
             clearable
             :placeholder="t('common.all')"
             data-test="library-outreach-status"
-            style="width: 150px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="option in LIBRARY_OUTREACH_STATUSES"
@@ -375,7 +375,7 @@ onMounted(load);
             clearable
             maxlength="64"
             data-test="library-follow-up-owner"
-            style="width: 150px"
+            class="filter-w-sm"
           />
         </el-form-item>
       </template>
