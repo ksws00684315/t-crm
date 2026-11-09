@@ -477,6 +477,15 @@ class ProductLinkIT {
 
       assertThat(jdbc.queryForObject("SELECT total_count FROM crm_copy_job", Integer.class))
           .isEqualTo(1713);
+
+      // The worker runs asynchronously; let it drain so it cannot touch the next test's data.
+      TestWait.until(
+          Duration.ofSeconds(60),
+          () -> {
+            var statusList = jdbc.queryForList("SELECT status FROM crm_copy_job", String.class);
+            return !statusList.isEmpty() && statusList.stream().noneMatch("processing"::equals);
+          },
+          "copy job should finish before the test ends");
     } finally {
       mvc.perform(
               delete("/admin-api/platform/system-configs/product-links.max-convert-items")
