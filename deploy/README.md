@@ -178,7 +178,7 @@ deploy/scripts/local-infra.sh psql
    微店接入还要求设置 `TCRM_SECRET_KEY` 和 `TCRM_ADMIN_BASE_URL`。使用 `openssl rand -base64 32` 生成主密钥，作为 32 字节 Base64 值保存于受控的部署密钥库，并单独备份；不要写入仓库。丢失主密钥意味着已保存的凭证全部要重新录入。`TCRM_ADMIN_BASE_URL` 必须是无末尾斜杠的 HTTPS 后台地址（例如 `https://admin.example.com`）；将该域名登记为微店开放平台的回调域名。缺失或格式错误时后台启动失败。
    `TCRM_IP_HASH_SALT` 由跳转服务与后端共用，分别用于点击 IP 哈希和订单买家 ID 哈希；生产模板已向两个容器传递同一个变量。按 `.env.example` 生成并保存于受控部署环境，至少 32 字符，不设置默认值；本地启动后端也需显式注入，缺失时启动失败。
    商品源表（ADR-021）不需要新的环境变量，但要求后端能直连 `oauth2.googleapis.com` 与 `sheets.googleapis.com`（服务器部署在海外）。客户需在自己的 Google Cloud 项目中创建服务账号、启用 Google Sheets API、下载 JSON 密钥；超管在管理端「商品 → 商品源表」上传密钥（私钥加密保存，依赖 `TCRM_SECRET_KEY`），再把每张源表分享给页面上显示的服务账号邮箱（查看者）。
-3. 镜像仓库与版本（ADR-037 决定 7）：镜像由 GitHub Actions 构建并推送到 GHCR，服务器不安装 Node.js、Maven，也不构建任何镜像。在 `deploy/.env` 设置 `TCRM_IMAGE_REGISTRY`（例如 `ghcr.io/ksws00684315`，小写、无末尾斜杠）。镜像为私有时，服务器用只有 `read:packages` 权限的令牌登录一次：`echo <令牌> | docker login ghcr.io -u <GitHub 用户名> --password-stdin`（令牌不写进仓库和 `.env`，凭证由 Docker 保存在登录用户的 `~/.docker/config.json`）。`TCRM_VERSION` 由发布脚本维护；**首次发布前确认它与本次要发布的版本一致**（`.env.example` 占位值是 `1.0.0`）：首次发布会把 `crm-postgres` 固定到该值并预拉取该镜像，保留占位值而首发其他版本时会去拉不存在的数据库镜像、发布在拉取步中止。
+3. 镜像仓库与版本（ADR-037 决定 7）：镜像由 GitHub Actions 构建并推送到 GHCR，服务器不安装 Node.js、Maven，也不构建任何镜像。在 `deploy/.env` 设置 `TCRM_IMAGE_REGISTRY`（例如 `ghcr.io/ksws00684315`，小写、无末尾斜杠）。镜像为私有时，服务器用只有 `read:packages` 权限的令牌登录一次：`echo <令牌> | docker login ghcr.io -u <GitHub 用户名> --password-stdin`（令牌不写进仓库和 `.env`，凭证由 Docker 保存在登录用户的 `~/.docker/config.json`）。`TCRM_VERSION` 由发布脚本维护。**首次发布**（主机上还没有 postgres 容器）时，发布脚本把数据库镜像固定为本次要发布的版本并预拉取（L-113），`.env` 里保留 `.env.example` 占位值不影响发布；已发布过的主机不受影响，数据库镜像仍由 `.env` 的 `TCRM_POSTGRES_VERSION` 固定（只有显式 `deploy --postgres <版本>` 才改动）。
 4. 创建数据卷（只做一次）：`docker volume create tcrm_pgdata && docker volume create tcrm_redisdata`。生产 Compose 把这两个卷声明为 `external`，所以 `docker compose down -v` 不会删除数据；没有先创建卷时发布会报找不到卷。先生成公开证书（下文），并把源站证书放进 `TCRM_CERT_DIR`（没有证书文件时发布脚本拒绝启动 Nginx），再把仓库切到要发布的版本标签并发布：`git fetch --tags && git checkout v1.0.0 && deploy/scripts/release.sh deploy 1.0.0`。首次发布没有 postgres 容器，脚本跳过备份，并启动 postgres、redis、crm-admin、crm-redirect 和 Nginx。随后立即按「备份与恢复」创建 pgBackRest 仓库（`stanza-create`）并做第一次全量备份。之后每次发布见「发布与回滚」。
 5. 备份（ADR-037）：按下文「备份与恢复」配置 pgBackRest 与每日加密逻辑备份，上线前做一次完整恢复演练。
 6. 邮件服务（达人邀请与找回密码，任务 12a）：见下节「邮件服务（Resend）」。
@@ -285,8 +285,10 @@ deploy/scripts/local-infra.sh psql
 
    **首次启用顺序**（顺序错了归档会失败）：
    1. 建目录：`install -d -m 755 /var/lib/tcrm/pgbackrest-creds`（仓库外）。**目录必须是 755，不能收成 700**：目录属主是 root，而容器里的 pgBackRest 以 uid 999（postgres）读取凭证文件，700 会挡掉它对目录的进入权限，归档和备份全部失败；机密性由文件本身保证（600、属主 uid 999，只有 postgres 读得到）。父目录保持默认权限即可（bind 挂载的路径由 Docker 守护进程解析，容器不穿越宿主机父目录）；
-   2. 跑一次刷新脚本：`TCRM_PGBACKREST_CREDS_DIR=/var/lib/tcrm/pgbackrest-creds deploy/backup/refresh-s3-credentials.sh`。该脚本只读环境变量、**不加载 `deploy/.env`**（与其他主机脚本不同），目录变量必须像这样行内传入（cron 里同理）；失败非零退出，原因在 stderr；脚本会把目录权限校正回 755；
+   2. 跑一次刷新脚本：`deploy/backup/refresh-s3-credentials.sh`。脚本从 `deploy/.env` 读取 `TCRM_PGBACKREST_CREDS_DIR`（与其他主机脚本一致，L-112）；也可以像旧写法那样行内传入 `TCRM_PGBACKREST_CREDS_DIR=/var/lib/tcrm/pgbackrest-creds deploy/backup/refresh-s3-credentials.sh`——**行内传入的变量优先，旧写法仍然有效**。失败非零退出，原因在 stderr；脚本会把目录权限校正回 755；
    3. 再启动 postgres（凭证目录空着启动也能起来，但首次归档会失败）。
+
+   **正式环境 crontab 调整**（任务 136，L-112）：刷新脚本已改为加载 `deploy/.env`，cron 里的行内变量不再是必需的。合并发版后负责人可以二选一：把 crontab 里 `*/15 * * * * TCRM_PGBACKREST_CREDS_DIR=... refresh-s3-credentials.sh` 改回直接调用 `*/15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh ...`（改法即删掉命令前的行内变量，其余不变）；也可以保持现状不动——行内传入的变量仍然优先，两种写法行为一致。回退方法：把行内变量加回 crontab 即可，脚本任何情况下都以调用方传入的值为准。`ops-check.sh` 等其他主机脚本不受影响。
 2. 备份写入身份的权限按 `backup/iam-policy.example.json` 收紧：只能访问备份桶的 `pgbackrest/`、`logical/` 前缀；显式拒绝修改生命周期、Object Lock、复制、版本控制和桶策略，以及删除对象版本（启用版本控制后，删除只产生删除标记，已锁定的版本删不掉）。把示例中的桶名和前缀换成实际值。
 3. 启动 postgres 后创建仓库并做第一次全量备份（只做一次）：
 
@@ -300,7 +302,7 @@ deploy/scripts/local-infra.sh psql
    ```
 
 4. 逻辑备份需要主机装有 `gpg` 和 AWS CLI。口令文件放在仓库之外，权限 600：`install -m 600 /dev/null /etc/tcrm/backup.pass`，再写入随机口令（`openssl rand -base64 32 > /etc/tcrm/backup.pass`），路径写进 `TCRM_BACKUP_PASSPHRASE_FILE`。脚本发现权限不是 600 会拒绝运行。
-5. 定时任务：全部定时任务（凭证刷新、pgBackRest 备份、逻辑备份、证书续期、`ops-check`）统一安装在 root crontab，完整代码块见 [`RUNBOOK.md`](RUNBOOK.md)「定时任务与首次 ops-check」（含逐行注释、`PATH` 设置和凭证刷新的行内变量；凭证刷新脚本不读 `deploy/.env`）。
+5. 定时任务：全部定时任务（凭证刷新、pgBackRest 备份、逻辑备份、证书续期、`ops-check`）统一安装在 root crontab，完整代码块见 [`RUNBOOK.md`](RUNBOOK.md)「定时任务与首次 ops-check」（含逐行注释和 `PATH` 设置；凭证刷新脚本从 `deploy/.env` 读目录变量，行内传入的变量优先、旧写法仍然有效）。
 
    凭证刷新失败时非零退出并保留旧文件（实例角色凭证有效期约 6 小时，15 分钟一次的刷新足够余量）；刷新是否按时执行由 `ops-check.sh` 检查（见「监控告警」）。备份脚本失败时也非零退出；备份是否按时产出同样由 `ops-check.sh` 检查。
 

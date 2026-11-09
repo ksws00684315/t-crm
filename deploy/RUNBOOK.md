@@ -243,7 +243,7 @@ nano /opt/tcrm/deploy/.env
 | 变量 | 生产取值 | 说明 / 生成方式 |
 |---|---|---|
 | `TCRM_IMAGE_REGISTRY` | 留默认 `ghcr.io/ksws00684315` | 小写、无末尾斜杠（`release.sh` 检查） |
-| `TCRM_VERSION` | **`<版本>`（与首次发布的标签一致，如 `1.0.0`）** | 首次发布会把 `crm-postgres` 固定到该值并预拉取；保留 `.env.example` 占位 `1.0.0` 而首发其他版本会拉取不存在的数据库镜像、发布中止（README「生产部署」第 3 条） |
+| `TCRM_VERSION` | 保持 `.env.example` 占位值即可（首次发布由 `release.sh` 写回） | 首次发布时 `release.sh` 把数据库镜像固定为本次发布的目标版本并预拉取（任务 136，L-113），占位值不再影响发布（README「生产部署」第 3 条） |
 | `TCRM_POSTGRES_VERSION` | 留空 | 首次发布后由 `release.sh` 写入固定值，此后日常发布不再改动数据库镜像 |
 | `TCRM_DOMAIN` | `<域名>` | |
 | `TCRM_CERT_DIR` | `/var/lib/tcrm/certs` | 挂载进 Nginx（只读） |
@@ -322,10 +322,10 @@ openssl x509 -noout -issuer -subject -ext subjectAltName -in /var/lib/tcrm/certs
 
 ## 10. 首次刷新备份凭证【主机 root】
 
-必须在**启动 postgres 之前**执行（README「备份与恢复」首次启用顺序）。注意：该脚本只读环境变量、**不读 `deploy/.env`**，所以要行内传入目录变量（crontab 同理，见第 15 章）：
+必须在**启动 postgres 之前**执行（README「备份与恢复」首次启用顺序）。脚本与 `ops-check.sh` 等其他主机脚本一致地加载 `deploy/.env`（任务 136，L-112），直接调用即可；行内传入的变量优先，旧的行内传参写法（crontab 同理，见第 15 章）仍然有效：
 
 ```bash
-TCRM_PGBACKREST_CREDS_DIR=/var/lib/tcrm/pgbackrest-creds /opt/tcrm/deploy/backup/refresh-s3-credentials.sh
+/opt/tcrm/deploy/backup/refresh-s3-credentials.sh
 stat -c '%u %a' /var/lib/tcrm/pgbackrest-creds/s3-credentials.conf   # 期望 999 600
 ```
 
@@ -347,7 +347,7 @@ stat -c '%u %a' /var/lib/tcrm/pgbackrest-creds/s3-credentials.conf   # 期望 99
 | 8 | 无密钥环境变量 | `env \| grep -E '^AWS_(ACCESS_KEY_ID\|SECRET_ACCESS_KEY)'` | 无输出 |
 | 9 | `.env` 权限 600 | `stat -c '%a' /opt/tcrm/deploy/.env` | `600` |
 | 10 | `release.sh` 必填项全有值 | 见下方循环命令 | 无 `缺:` 输出 |
-| 11 | `TCRM_VERSION` 与首发版本一致 | `grep '^TCRM_VERSION=' /opt/tcrm/deploy/.env` | 等于本次发布的 `<版本>` |
+| 11 | `TCRM_VERSION` 占位值 | `grep '^TCRM_VERSION=' /opt/tcrm/deploy/.env` | 任意值都可以（L-113 后首次发布直接用目标版本固定数据库镜像） |
 | 12 | 外部数据卷存在 | `docker volume ls --format '{{.Name}}' \| grep -c '^tcrm_'` | `2` |
 | 13 | 证书文件齐全 | `ls /var/lib/tcrm/certs` | 四个文件都在 |
 | 14 | 私钥权限 600 | `stat -c '%a' /var/lib/tcrm/certs/origin.key /var/lib/tcrm/certs/public.key` | 都是 `600` |
@@ -426,7 +426,7 @@ cd /opt/tcrm && docker compose -f deploy/docker-compose.prod.yml --env-file depl
 
 ## 15. 定时任务与首次 `ops-check`【主机 root】
 
-`crontab -e` 粘贴以下整块（时间为主机时钟，已设为 UTC；`PATH` 行必须保留，AWS CLI 装在 `/usr/local/bin`；刷新脚本不读 `.env`，变量行内传入）：
+`crontab -e` 粘贴以下整块（时间为主机时钟，已设为 UTC；`PATH` 行必须保留，AWS CLI 装在 `/usr/local/bin`；刷新脚本从 `deploy/.env` 读目录变量（任务 136），行内传入也可：
 
 ```cron
 # tcrm 生产定时任务（root，时间 UTC）
@@ -434,7 +434,7 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 每 15 分钟：取实例角色临时凭证写入 pgBackRest 凭证目录（postgres 容器读不到实例元数据，L-107）
-*/15 * * * * TCRM_PGBACKREST_CREDS_DIR=/var/lib/tcrm/pgbackrest-creds /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1
+*/15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1
 # 每 5 分钟：主机检查（磁盘/内存/容器/证书/备份/凭证/日志），告警走飞书 Webhook，结束发心跳
 */5 * * * * /opt/tcrm/deploy/scripts/ops-check.sh >> /var/log/tcrm-ops-check.log 2>&1
 # 每天 02:00 UTC：pgBackRest 备份（周日全量、其余日差异），结束前 check 归档链路
@@ -444,6 +444,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 每天 04:17 UTC：admin./upload. 公开证书续期检查（距到期不足 30 天才真正续期）
 17 4 * * * /opt/tcrm/deploy/scripts/renew-public-cert.sh >> /var/log/tcrm-cert.log 2>&1
 ```
+
+**正式环境 crontab 调整**（任务 136，L-112）：正式环境现行 crontab 仍带行内变量 `TCRM_PGBACKREST_CREDS_DIR=...`，**不受本次改动影响**（行内变量优先）。合并发版后负责人可选：① 改回直接调用——把该行改为 `*/15 * * * * /opt/tcrm/deploy/backup/refresh-s3-credentials.sh >> /var/log/tcrm-pgbackrest-creds.log 2>&1`（其余不变）；② 保持现状。回退方法：把行内变量重新加回命令前即可，任何情况下调用方传入的值都优先于 `.env`。
 
 首次验证：
 
