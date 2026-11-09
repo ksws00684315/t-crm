@@ -497,6 +497,92 @@ class KolLibraryIT {
   }
 
   @Test
+  void shouldJudgeTheRoleInTheCompanyOfTheToken_whenTheAccountBelongsToTwoCompanies()
+      throws Exception {
+    // One person, staff in the library company with both library codes (may edit, may not delete)
+    // and staff of a distribution company. The role must come from the company the token works in,
+    // never from the account's last company (ADR-022, requirement P1-15).
+    String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
+    String multi = "two-" + suffix;
+    String id = createOk(library.token(), "tgt" + suffix, "Amy BD");
+    CompanySessions.OpenedCompany distribution =
+        CompanySessions.openCompany(
+            mvc, json, PASSWORD, "dist" + suffix, "dist-admin-" + suffix, "DISTRIBUTION");
+    long userId =
+        CompanySessions.createStaff(
+            mvc, json, distribution.token(), PASSWORD, multi, "OPERATOR", "ALL", null);
+    mvc.perform(
+            post("/admin-api/platform/tenants/" + library.tenantId() + "/members")
+                .header(TOKEN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("userId", userId, "role", "STAFF"))))
+        .andExpect(status().isOk());
+    mvc.perform(
+            put("/admin-api/system/users/" + userId + "/permissions")
+                .header(TOKEN, library.token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "permissions",
+                            List.of("kol-library:view", "kol-library:edit"),
+                            "dataScope",
+                            "ALL"))))
+        .andExpect(status().isOk());
+
+    String token = CompanySessions.login(mvc, json, multi, PASSWORD);
+    // Logged in at home in the distribution company (its last company), then switched to the
+    // library.
+    mvc.perform(get("/admin-api/kol-library/kols").header(TOKEN, token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_EDITION_FORBIDDEN"));
+    mvc.perform(
+            post("/admin-api/auth/company")
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tenantId\":\"" + library.tenantId() + "\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.role").value("STAFF"));
+    mvc.perform(get(LIB).header(TOKEN, token)).andExpect(status().isOk());
+    // The role is the one in this company: 403, not a deletion borrowed from another company.
+    mvc.perform(delete(LIB + "/" + id).header(TOKEN, token))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.errorCode").value("AUTH_FORBIDDEN"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT is_deleted FROM crm_library_kol WHERE id = ?",
+                Boolean.class,
+                Long.parseLong(id)))
+        .isFalse();
+  }
+
+  @Test
+  void shouldStoreTheProfileUrlExactly_asTyped() throws Exception {
+    String token = library.token();
+    String url = "https://www.tiktok.com/@t143_beauty_probe";
+    var body = profile("urlprobe", "Amy BD");
+    body.put("profileUrl", url);
+    String created =
+        create(token, body)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String id = json.readTree(created).at("/data/id").asText();
+    assertThat(json.readTree(created).at("/data/profileUrl").asText()).isEqualTo(url);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT profile_url FROM crm_library_kol WHERE id = ?",
+                String.class,
+                Long.parseLong(id)))
+        .isEqualTo(url);
+    // A link that is not http(s) is refused rather than stored.
+    var invalid = profile("badlink", "Amy BD");
+    invalid.put("profileUrl", "http ://www.tiktok.com/@bad");
+    create(token, invalid).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void shouldAllowTheSameCreatorAgain_afterItWasDeleted() throws Exception {
     String token = library.token();
     String id = createOk(token, "again", "Amy BD");

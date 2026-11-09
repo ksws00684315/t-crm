@@ -12,6 +12,16 @@ import { homePathFor } from "@/utils/tabs";
  * groups mirroring the original system. Pages still under construction render the shared
  * coming-soon component; they stay in the menu.
  */
+/** The home path of the signed-in company; workbench unless it uses the creator-library edition. */
+function companyHome(): string {
+  try {
+    // Read outside a running app (route tests) has no store: the workbench is the default home.
+    return homePathFor(useUserStore().user?.edition === "KOL_LIBRARY");
+  } catch {
+    return homePathFor(false);
+  }
+}
+
 export const routes: RouteRecordRaw[] = [
   {
     path: "/login",
@@ -22,7 +32,10 @@ export const routes: RouteRecordRaw[] = [
   {
     path: "/",
     component: () => import("@/layout/index.vue"),
-    redirect: "/home",
+    // "/" leads to the company's home: the workbench, or the creator list for a creator-library
+    // company (ADR-038 §3.3). The decision is a function so a company switch is honoured; it is
+    // kept off the static "/home" redirect, which would leave a library company on the workbench.
+    redirect: () => companyHome(),
     children: [
       {
         path: "home",
@@ -31,6 +44,8 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: "route.home",
           icon: "HomeFilled",
+          // Every company account may open its home; the screen sends a library company on.
+          editions: ["DISTRIBUTION", "KOL_LIBRARY"],
           componentName: "HomePage"
         }
       },
@@ -486,15 +501,6 @@ export const routes: RouteRecordRaw[] = [
         redirect: "/system/oper-logs"
       }
     ]
-  },
-  {
-    // The home of a creator-library company is its creator list (ADR-038 §3.3, requirement 1.2.5):
-    // "/home" and anything unknown lead there instead of the workbench. Every other company keeps
-    // the workbench and the ordinary 404. Read at navigation time so a company switch is honoured.
-    path: "/home",
-    name: "LibraryHome",
-    redirect: () => homePathFor(useUserStore().user?.edition === "KOL_LIBRARY"),
-    meta: { public: true }
   },
   {
     path: "/:pathMatch(.*)*",

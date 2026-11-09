@@ -522,6 +522,20 @@ onMounted(() => {
               </span>
             </div>
           </div>
+          <!-- The actions live above the table: a plain table has no toolbar of its own. -->
+          <div class="contents-toolbar">
+            <span class="data-table__total">{{
+              t("table.total", { total: contents.length })
+            }}</span>
+            <el-button
+              v-if="abilities.canEdit"
+              type="primary"
+              data-test="content-create"
+              @click="openContentDialog(null)"
+            >
+              {{ t("library.content.create") }}
+            </el-button>
+          </div>
           <DataTable
             table-id="library-contents"
             plain
@@ -534,21 +548,6 @@ onMounted(() => {
             @refresh="loadContents"
             @retry="loadContents"
           >
-            <template #toolbar>
-              <div class="contents-toolbar">
-                <span class="data-table__total">{{
-                  t("table.total", { total: contents.length })
-                }}</span>
-                <el-button
-                  v-if="abilities.canEdit"
-                  type="primary"
-                  data-test="content-create"
-                  @click="openContentDialog(null)"
-                >
-                  {{ t("library.content.create") }}
-                </el-button>
-              </div>
-            </template>
             <template #cell-contentForm="{ row }">
               {{ option("contentForm", asContent(row).contentForm) }}
             </template>

@@ -195,12 +195,23 @@ public class CurrentUserContext {
         && user.role() != null;
   }
 
+  /**
+   * The account behind a Sa-Token login id. Role and permission checks ({@code @SaCheckRole},
+   * {@code @SaCheckPermission}) go through Sa-Token's own {@code StpInterface} calls, which convert
+   * the stored login id to its own type: both sides are compared in their canonical form so the
+   * currently logged-in account is recognised, and its role is the one in the token's company.
+   * Without that, the lookup would fall back to the account's <em>last</em> company (an account
+   * belongs to no company, ADR-022) and a person in two companies could be judged by the role of
+   * the wrong one — for instance a library company staff member passing
+   * {@code @SaCheckRole("SUPER_ADMIN")} when its last company made it a super administrator.
+   */
   private AccountDTO forLoginId(Object loginId) {
     Long id = toId(loginId);
     if (id == null) {
       return null;
     }
-    if (id.equals(loginId())) {
+    Long loggedIn = loginId();
+    if (loggedIn != null && loggedIn.equals(id)) {
       Loaded loaded = current(id);
       return loaded == null ? null : loaded.account();
     }

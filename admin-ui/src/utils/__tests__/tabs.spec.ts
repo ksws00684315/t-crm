@@ -9,6 +9,7 @@ import {
   closeRight,
   closeTab,
   homeAffix,
+  homePathFor,
   loadStoredTabs,
   openTab,
   restoreTabs,
@@ -104,6 +105,20 @@ describe("tabs", () => {
   it("pins 公司管理 for a platform administrator and 工作台 otherwise", () => {
     expect(affixFor(true).path).toBe("/platform/tenants");
     expect(affixFor(false).path).toBe("/home");
+  });
+
+  it("pins the creator list as the home of a creator-library company", () => {
+    // ADR-038 §3.3 and requirement 1.2.5: the library has no workbench, the list is its home.
+    expect(affixFor(false, true)).toMatchObject({
+      path: "/kol-library/kols",
+      titleKey: "route.libraryKols",
+      affix: true,
+      componentName: "LibraryKolListPage"
+    });
+    expect(homePathFor(true)).toBe("/kol-library/kols");
+    expect(homePathFor(false)).toBe("/home");
+    // A platform administrator keeps the company management tab whatever the edition.
+    expect(affixFor(true, true).path).toBe("/platform/tenants");
   });
 
   it("discards tabs saved for another user", () => {

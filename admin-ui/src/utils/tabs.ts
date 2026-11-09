@@ -65,6 +65,16 @@ export function homeTabPath(library = false): string {
   return affixFor(false, library).path;
 }
 
+/**
+ * The home a session pins is the only affix tab it may hold: a list restored after a company switch
+ * still names the other edition's home. Its affix flag is dropped and its entry removed first.
+ */
+function withoutForeignAffix(tabs: TabRecord[], affix: string): TabRecord[] {
+  return tabs
+    .filter(tab => !tab.affix || tab.path === affix)
+    .map(tab => (tab.path === affix ? tab : { ...tab, affix: false }));
+}
+
 function snapshot(active: string, tabs: TabRecord[], userId: string | null = null): TabSnapshot {
   return { v: 1, active, tabs, userId };
 }
@@ -82,9 +92,10 @@ function evict(tabs: TabRecord[], active: string): TabRecord[] {
 /** One tab per path. Query strings are not part of the identity. The opened tab becomes active. */
 export function openTab(current: TabSnapshot, tab: TabRecord): TabSnapshot {
   const existing = current.tabs.find(item => item.path === tab.path);
+  const base = tab.affix ? withoutForeignAffix(current.tabs, tab.path) : current.tabs;
   const tabs = existing
-    ? current.tabs.map(item => (item.path === tab.path ? { ...item, ...tab } : item))
-    : evict([...current.tabs, tab], tab.path);
+    ? base.map(item => (item.path === tab.path ? { ...item, ...tab } : item))
+    : evict([...base, tab], tab.path);
   return snapshot(tab.path, tabs, current.userId);
 }
 
@@ -172,8 +183,11 @@ export function restoreTabs(
   // Another account's tabs must not reopen after disable → login as someone else.
   if ((body.userId ?? null) !== userId) return fallback;
   const extras: TabRecord[] = [];
+  const seen = new Set([affix.path]);
   for (const item of body.tabs) {
-    if (!isRecord(item) || item.path === affix.path || item.affix) continue;
+    // The saved list may pin another home (the other edition's): only this session's affix stays.
+    if (!isRecord(item) || seen.has(item.path) || item.affix) continue;
+    seen.add(item.path);
     if (!canAccess(item.path)) continue;
     extras.push({ ...item, affix: false });
   }

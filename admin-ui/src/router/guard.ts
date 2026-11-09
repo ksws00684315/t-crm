@@ -7,6 +7,8 @@ import { applyDocumentTitle } from "@/router/title";
 export const LOGIN_PATH = "/login";
 export const FORBIDDEN_PATH = "/403";
 export const HOME_PATH = "/";
+/** The creator list, home page of a creator-library company (ADR-038 §3.3). */
+export const LIBRARY_HOME_PATH = "/kol-library/kols";
 
 export interface AuthState extends AccessProfile {
   isLoggedIn: boolean;
@@ -38,6 +40,12 @@ export function resolveAccess(
       return "/platform/tenants";
     }
     return FORBIDDEN_PATH;
+  }
+  // The home of a creator-library company is its creator list (ADR-038 §3.3, requirement 1.2.5):
+  // "/home" moves there; every other company keeps the workbench. "/" is left to its own redirect.
+  // The target is a full path: a location without a path resolves back to "/home" and loops.
+  if (!auth.isPlatformAdmin && to.path === "/home" && auth.edition === "KOL_LIBRARY") {
+    return LIBRARY_HOME_PATH;
   }
   return true;
 }

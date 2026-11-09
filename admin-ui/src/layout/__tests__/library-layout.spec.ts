@@ -9,8 +9,10 @@ import * as notificationApi from "@/api/notification/notification";
 import type { LibraryKolDetailVO } from "@/api/kol-library/kol";
 import type { CompanyEdition, UserVO } from "@/api/types";
 import { i18n } from "@/locales";
+import { installGuard } from "@/router/guard";
 import { routes } from "@/router/routes";
 import { useTabsStore } from "@/stores/tabs";
+import { accessOf } from "@/utils/permission";
 import { useUserStore } from "@/stores/user";
 import { saveSession } from "@/utils/session";
 import Layout from "../index.vue";
@@ -80,11 +82,31 @@ function user(edition: CompanyEdition): UserVO {
   };
 }
 
-async function mountAs(signedIn: UserVO, path = "/kol-library/kols") {
+/**
+ * Creates the store before any navigation: the home redirect is decided by the guard, which reads
+ * the edition from the store.
+ */
+function signIn(signedIn: UserVO): void {
   saveSession({ token: "tok", expiresAt: Date.now() + 60_000, user: signedIn });
   setActivePinia(createPinia());
+  useUserStore();
+}
+
+async function mountAs(signedIn: UserVO, path = "/kol-library/kols") {
+  signIn(signedIn);
+  void useTabsStore();
   vi.mocked(authApi.fetchCurrentUser).mockResolvedValue(signedIn);
   const router = createRouter({ history: createMemoryHistory(), routes });
+  // Same home redirect as the app shell: "/" goes to the company's own home.
+  router.addRoute({
+    path: "/",
+    redirect: () => (useUserStore().user?.edition === "KOL_LIBRARY" ? "/kol-library/kols" : "/home")
+  });
+  // The in-app guard reads the store lazily, so it always sees the signed-in account.
+  installGuard(router, () => {
+    const signed = useUserStore();
+    return { isLoggedIn: signed.isLoggedIn, ...signed.access };
+  });
   await router.push(path);
   const wrapper = mount(Layout, {
     global: { plugins: [ElementPlus, i18n, router] }
@@ -166,6 +188,86 @@ describe("creator library layout", () => {
     await router.push("/kol-library/kols/22");
     await flushPromises();
     expect(wrapper.find('[data-test="detail-name"]').text()).toBe("Creator 22");
+    wrapper.unmount();
+  });
+
+  it("sends / to the creator list of a library company", async () => {
+    // The store must exist before the first navigation: the "/" redirect reads the edition from it.
+    signIn(user("KOL_LIBRARY"));
+    const library = await mountAs(user("KOL_LIBRARY"), "/");
+    await vi.waitFor(() =>
+      expect(library.router.currentRoute.value.path).toBe("/kol-library/kols")
+    );
+    library.wrapper.unmount();
+    // A distribution company keeps the workbench.
+    signIn(user("DISTRIBUTION"));
+    const distribution = await mountAs(user("DISTRIBUTION"), "/");
+    expect(distribution.router.currentRoute.value.path).toBe("/home");
+    distribution.wrapper.unmount();
+  });
+
+  it("decides the /home of a library company in the guard", async () => {
+    // The guard sees "/home" with the edition of the account and sends a library company to the
+    // creator list; a distribution company is let through (ADR-038 §3.3, requirement 1.2.5).
+    const { resolveAccess } = await import("@/router/guard");
+    const meta = createRouter({ history: createMemoryHistory(), routes }).resolve("/home").meta;
+    const at = (path: string) => ({ path, fullPath: path, meta });
+    const libraryAuth = { isLoggedIn: true, ...accessOf(user("KOL_LIBRARY")) };
+    expect(resolveAccess(at("/home"), libraryAuth)).toBe("/kol-library/kols");
+    const distributionAuth = { isLoggedIn: true, ...accessOf(user("DISTRIBUTION")) };
+    expect(resolveAccess(at("/home"), distributionAuth)).toBe(true);
+  });
+
+  it("hides account management from a library sub-account", async () => {
+    const staff: UserVO = {
+      ...user("KOL_LIBRARY"),
+      id: "8",
+      username: "bd01",
+      nickname: "BD",
+      role: "STAFF",
+      dataScope: "ALL",
+      permissions: ["kol-library:view", "kol-library:edit"]
+    };
+    const { wrapper } = await mountAs(staff);
+    expect(wrapper.text()).toContain("达人列表");
+    expect(wrapper.text()).not.toContain("账号管理");
+    wrapper.unmount();
+  });
+
+  it("closes the previous company's tabs and pins the new home on a company switch", async () => {
+    const bothCompanies: UserVO = {
+      ...user("KOL_LIBRARY"),
+      companies: [
+        { tenantId: "9", tenantName: "B 公司", role: "SUPER_ADMIN", edition: "KOL_LIBRARY" },
+        { tenantId: "3", tenantName: "A 公司", role: "SUPER_ADMIN", edition: "DISTRIBUTION" }
+      ]
+    };
+    const { wrapper, tabs } = await mountAs(bothCompanies);
+    expect(tabs.tabs[0]).toMatchObject({ path: "/kol-library/kols", affix: true });
+    tabs.open({
+      path: "/kol-library/kols/11",
+      titleKey: "Beauty by Amy",
+      literalTitle: true,
+      affix: false,
+      componentName: "LibraryKolDetailPage"
+    });
+    expect(tabs.tabs.some(tab => tab.path === "/kol-library/kols/11")).toBe(true);
+    // The switch answer puts the same person into the distribution company.
+    vi.mocked(authApi.switchCompany).mockResolvedValue({
+      ...bothCompanies,
+      tenantId: "3",
+      tenantName: "A 公司",
+      edition: "DISTRIBUTION",
+      permissions: []
+    });
+    const dropdown = wrapper
+      .findAllComponents({ name: "ElDropdown" })
+      .find(item => item.attributes("data-test") === "company-switch");
+    dropdown!.vm.$emit("command", "3");
+    await vi.waitFor(() => expect(authApi.switchCompany).toHaveBeenCalledWith("3"));
+    // Every tab of the previous company is closed and only the new edition's home stays pinned.
+    await vi.waitFor(() => expect(tabs.tabs.map(tab => tab.path)).toEqual(["/home"]));
+    expect(tabs.tabs[0]).toMatchObject({ affix: true, titleKey: "route.home" });
     wrapper.unmount();
   });
 

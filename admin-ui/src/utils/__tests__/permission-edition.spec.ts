@@ -124,10 +124,9 @@ describe("edition-aware access", () => {
   });
 
   it("hides the account screens from a library sub-account", () => {
-    // Every company account may open home; the library has no workbench tab of its own, so only
-    // the creator list and its group appear.
+    // Every company account may open the home route (a library company's screen sends it on).
     const menu = menuPaths(libraryStaff);
-    expect(menu).toEqual(["/kol-library", "/kol-library/kols"]);
+    expect(menu).toEqual(["/home", "/kol-library", "/kol-library/kols"]);
     expect(canAccessRoute(metaOf("system"), accessOf(libraryStaff))).toBe(false);
   });
 

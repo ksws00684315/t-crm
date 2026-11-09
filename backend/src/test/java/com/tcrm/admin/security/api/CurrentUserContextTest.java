@@ -224,6 +224,61 @@ class CurrentUserContextTest {
   }
 
   @Test
+  void shouldJudgeTheRoleInTheTokenCompany_whenLoginIdHasAnotherType() {
+    // Sa-Token's StpInterface receives the login id converted to its own type ("7" or another
+    // Long instance, never the very object getLoginIdAsLong returned). The logged-in account must
+    // still be recognised, so its role comes from the token's company (ADR-022) rather than from
+    // the account's last company.
+    var accounts = mock(AccountStore.class);
+    when(accounts.getById(7L, 2L))
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "multi",
+                "test-hash",
+                "Multi",
+                null,
+                Role.STAFF,
+                DataScope.ALL,
+                1,
+                null,
+                null,
+                0,
+                2L,
+                "Library",
+                true));
+    // The account's last company makes it a super administrator; the token works in company 2.
+    when(accounts.getById(7L))
+        .thenReturn(
+            new AccountDTO(
+                7L,
+                "multi",
+                "test-hash",
+                "Multi",
+                null,
+                Role.SUPER_ADMIN,
+                DataScope.ALL,
+                1,
+                null,
+                null,
+                0,
+                1L,
+                "Distribution",
+                true));
+    try (var stp = mockStatic(StpUtil.class)) {
+      stp.when(StpUtil::isLogin).thenReturn(true);
+      stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
+      bindSession(stp, 0, 2L);
+      var current = new CurrentUserContext(accounts, distribution());
+      // A Long, a String of the same id and a different Long instance all name the same account.
+      assertThat(current.roleNames(Long.valueOf(7L))).containsExactly("STAFF");
+      assertThat(current.roleNames("7")).containsExactly("STAFF");
+      assertThat(current.roleNames(Long.valueOf("7"))).containsExactly("STAFF");
+      verify(accounts, never()).getById(7L);
+    }
+  }
+
+  @Test
   void shouldEndOnlyThisToken_whenCompanyIsDisabled() {
     var accounts = mock(AccountStore.class);
     when(accounts.getById(7L, 2L))
