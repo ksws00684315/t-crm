@@ -11,15 +11,20 @@ import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CurrentKolContext;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.KolAccountStore;
 import com.tcrm.admin.security.api.Role;
 import org.junit.jupiter.api.Test;
 
 class SecurityConfigurationTest {
   private final AccountStore accounts = mock(AccountStore.class);
-  private final CurrentUserContext current = new CurrentUserContext(accounts);
+  private final CurrentUserContext current =
+      new CurrentUserContext(accounts, tenantId -> Edition.DISTRIBUTION);
   private final cn.dev33.satoken.stp.StpInterface roles =
-      new SecurityConfiguration(current, new CurrentKolContext(mock(KolAccountStore.class)))
+      new SecurityConfiguration(
+              current,
+              new CurrentKolContext(mock(KolAccountStore.class)),
+              tenantId -> Edition.DISTRIBUTION)
           .roles();
 
   private static AccountDTO account(long id, Role role, int status) {

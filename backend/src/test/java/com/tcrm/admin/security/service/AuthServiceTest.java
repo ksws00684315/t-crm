@@ -21,6 +21,7 @@ import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -81,7 +82,7 @@ class AuthServiceTest {
   }
 
   private static CompanyDTO company(long id, Role role) {
-    return new CompanyDTO(id, "Company " + id, role);
+    return new CompanyDTO(id, "Company " + id, role, Edition.DISTRIBUTION);
   }
 
   @Test

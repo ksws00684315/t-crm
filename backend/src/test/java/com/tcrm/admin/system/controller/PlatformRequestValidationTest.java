@@ -3,6 +3,7 @@ package com.tcrm.admin.system.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -63,11 +64,20 @@ class PlatformRequestValidationTest {
 
   @Test
   void shouldValidateTenantAndAdministratorRequests() {
-    assertThat(validator.validate(new CreateTenantRequest("acme", "Acme", null))).isEmpty();
-    assertThat(validator.validate(new CreateTenantRequest("A", "Acme", null))).isNotEmpty();
-    assertThat(validator.validate(new CreateTenantRequest("a", "Acme", null))).isNotEmpty();
-    assertThat(validator.validate(new CreateTenantRequest("acme", " ", "x".repeat(501))))
+    assertThat(
+            validator.validate(new CreateTenantRequest("acme", "Acme", null, Edition.DISTRIBUTION)))
+        .isEmpty();
+    assertThat(validator.validate(new CreateTenantRequest("A", "Acme", null, Edition.DISTRIBUTION)))
         .isNotEmpty();
+    assertThat(validator.validate(new CreateTenantRequest("a", "Acme", null, Edition.DISTRIBUTION)))
+        .isNotEmpty();
+    assertThat(
+            validator.validate(
+                new CreateTenantRequest("acme", " ", "x".repeat(501), Edition.DISTRIBUTION)))
+        .isNotEmpty();
+    // The edition is required when a company is created and absent from the edit form.
+    assertThat(validator.validate(new CreateTenantRequest("acme", "Acme", null, null)))
+        .anyMatch(violation -> violation.getPropertyPath().toString().equals("edition"));
     assertThat(validator.validate(new EditTenantRequest("Acme", null))).isEmpty();
     assertThat(validator.validate(new EditTenantRequest("", null))).isNotEmpty();
     assertThat(

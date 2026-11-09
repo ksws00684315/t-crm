@@ -6,6 +6,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
@@ -89,7 +90,15 @@ public class AccountStoreService implements AccountStore {
                     m ->
                         Integer.valueOf(1).equals(m.getStatus())
                             && Integer.valueOf(1).equals(m.getTenantStatus()))
-                .map(m -> new CompanyDTO(m.getTenantId(), m.getTenantName(), m.getRole()))
+                .map(
+                    m ->
+                        new CompanyDTO(
+                            m.getTenantId(),
+                            m.getTenantName(),
+                            m.getRole(),
+                            m.getTenantEdition() == null
+                                ? Edition.DISTRIBUTION
+                                : m.getTenantEdition()))
                 .toList());
   }
 

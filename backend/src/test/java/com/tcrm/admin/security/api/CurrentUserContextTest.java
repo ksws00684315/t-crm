@@ -25,6 +25,11 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 class CurrentUserContextTest {
+  /** Every test here runs in a distribution company unless it says otherwise. */
+  private static CompanyStore distribution() {
+    return tenantId -> Edition.DISTRIBUTION;
+  }
+
   @Test
   void shouldExposeAccountIdentity_whenAccountIsEnabled() {
     var accounts = mock(AccountStore.class);
@@ -48,7 +53,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThat(current.user()).isEqualTo(user);
       assertThat(current.id()).isEqualTo(7L);
       assertThat(current.role()).isEqualTo(Role.STAFF);
@@ -81,7 +86,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("this-token");
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       for (int i = 0; i < 2; i++) {
         assertThatThrownBy(current::user)
             .isInstanceOf(BusinessException.class)
@@ -126,7 +131,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::isLogin).thenReturn(true);
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       current.user();
       current.id();
       current.role();
@@ -144,7 +149,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       for (int i = 0; i < 2; i++) {
         RequestContextHolder.setRequestAttributes(
             new ServletRequestAttributes(new MockHttpServletRequest()));
@@ -161,7 +166,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       current.user();
       current.user();
       verify(accounts, times(2)).getById(7L);
@@ -178,7 +183,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("this-token");
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThatThrownBy(current::user).isInstanceOf(BusinessException.class);
       assertThatThrownBy(current::user).isInstanceOf(BusinessException.class);
       verify(accounts, times(1)).getById(7L);
@@ -210,7 +215,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("old-token");
       bindCredentialVersion(stp, 2);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThatThrownBy(current::user)
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_UNAUTHORIZED.message());
@@ -243,7 +248,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::isLogin).thenReturn(true);
       stp.when(StpUtil::getTokenValue).thenReturn("this-token");
       bindSession(stp, 0, 2L);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThatThrownBy(current::user)
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_ACCOUNT_DISABLED.message());
@@ -264,7 +269,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::isLogin).thenReturn(true);
       bindSession(stp, 0, 2L);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThat(current.user().tenantId()).isEqualTo(2L);
       assertThat(current.roleNames(7L)).containsExactly("STAFF");
       assertThat(current.permissionNames(7L)).containsExactly("kol:view");
@@ -280,7 +285,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       var session = bindSession(stp, 0, null);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThat(current.user().tenantId()).isEqualTo(9L);
       verify(session).set(CurrentUserContext.CURRENT_TENANT, 9L);
     }
@@ -296,7 +301,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       var session = bindSession(stp, 0, 1L);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThat(current.user().role()).isEqualTo(Role.SUPER_ADMIN);
       current.switchTo(2L);
       verify(session).set(CurrentUserContext.CURRENT_TENANT, 2L);
@@ -311,7 +316,7 @@ class CurrentUserContextTest {
     var accounts = mock(AccountStore.class);
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::isLogin).thenReturn(false);
-      assertThat(new CurrentUserContext(accounts).currentTenantId()).isNull();
+      assertThat(new CurrentUserContext(accounts, distribution()).currentTenantId()).isNull();
       verifyNoInteractions(accounts);
     }
   }
@@ -344,7 +349,7 @@ class CurrentUserContextTest {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       stp.when(StpUtil::getTokenValue).thenReturn("legacy-token");
       stp.when(StpUtil::getTokenSession).thenReturn(mock(SaSession.class));
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       assertThatThrownBy(current::user)
           .isInstanceOf(BusinessException.class)
           .hasMessage(ErrorCode.AUTH_UNAUTHORIZED.message());
@@ -361,7 +366,7 @@ class CurrentUserContextTest {
     try (var stp = mockStatic(StpUtil.class)) {
       stp.when(StpUtil::getLoginIdAsLong).thenReturn(7L);
       bindCredentialVersion(stp, 0);
-      var current = new CurrentUserContext(accounts);
+      var current = new CurrentUserContext(accounts, distribution());
       current.user();
       current.id();
       current.role();

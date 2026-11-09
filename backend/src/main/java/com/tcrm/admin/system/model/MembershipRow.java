@@ -1,12 +1,14 @@
 package com.tcrm.admin.system.model;
 
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 
-/** One membership of an account with its company name and status. */
+/** One membership of an account with its company name, status and edition. */
 public class MembershipRow {
   private Long tenantId;
   private String tenantName;
   private Integer tenantStatus;
+  private Edition tenantEdition;
   private Role role;
   private Integer status;
 
@@ -24,6 +26,14 @@ public class MembershipRow {
 
   public void setTenantName(String value) {
     this.tenantName = value;
+  }
+
+  public Edition getTenantEdition() {
+    return tenantEdition;
+  }
+
+  public void setTenantEdition(Edition value) {
+    this.tenantEdition = value;
   }
 
   public Integer getTenantStatus() {

@@ -3,12 +3,15 @@ package com.tcrm.admin;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaCheckRole;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.StpKolUtil;
+import com.tcrm.admin.security.config.EditionInterceptor;
 import com.tcrm.admin.shared.DirectPublishFixture;
 import com.tcrm.admin.shared.PublicEndpoint;
 import com.tcrm.admin.shared.TransactionalEvents;
@@ -23,6 +26,9 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -148,6 +154,57 @@ class ArchitectureTest {
     String prefix = "com.tcrm.admin.";
     String name = type.getPackageName();
     return name.startsWith(prefix) ? name.substring(prefix.length()).split("\\.")[0] : "";
+  }
+
+  /**
+   * Controllers open to the creator-library edition (ADR-038 §2.2, task 143 §2.3.2). Every entry
+   * here is a deliberate decision; anything else belongs to the distribution product only.
+   */
+  private static final Set<String> KOL_LIBRARY_CONTROLLERS =
+      Set.of(
+          "com.tcrm.admin.security.controller.AuthController",
+          "com.tcrm.admin.system.controller.UserController",
+          "com.tcrm.admin.system.controller.PermissionController",
+          "com.tcrm.admin.kollibrary.controller.KolLibraryController",
+          "com.tcrm.admin.kollibrary.controller.KolLibraryContentController");
+
+  /**
+   * Each {@code /admin-api/**} controller belongs to a known set of editions (undeclared means
+   * distribution only), and the ones open to the creator-library edition are exactly the reviewed
+   * list above: opening another controller has to change this test, so it cannot happen by
+   * forgetting an annotation (ADR-038 §2.3, task 143 §2.3.6).
+   */
+  @Test
+  void shouldKeepKolLibraryControllers_onTheReviewedList() {
+    Set<String> open = new TreeSet<>();
+    for (JavaClass type : classes) {
+      if (!type.isAnnotatedWith(RestController.class)) {
+        continue;
+      }
+      List<Edition> editions = EditionInterceptor.allowedEditions(type.reflect());
+      assertThat(editions).as("%s must declare at least one edition", type.getName()).isNotEmpty();
+      if (editions.contains(Edition.KOL_LIBRARY)) {
+        open.add(type.getName());
+      }
+    }
+    assertThat(open)
+        .as(
+            "a controller newly open to KOL_LIBRARY must be reviewed and listed here (ADR-038"
+                + " §2.3)")
+        .containsExactlyInAnyOrderElementsOf(KOL_LIBRARY_CONTROLLERS);
+  }
+
+  /** The edition check runs on company endpoints only; platform and external calls are excluded. */
+  @Test
+  void shouldSkipEditionCheck_onlyForPathsOutsideACompanySession() {
+    for (String path : EditionInterceptor.EXCLUDED) {
+      assertThat(EditionInterceptor.requiresCompanyEdition(path.replace("/**", "/x")))
+          .as("%s is not a company endpoint", path)
+          .isFalse();
+    }
+    assertThat(EditionInterceptor.requiresCompanyEdition("/admin-api/kol-library/kols")).isTrue();
+    assertThat(EditionInterceptor.requiresCompanyEdition("/admin-api/auth/resignation")).isTrue();
+    assertThat(EditionInterceptor.requiresCompanyEdition("/kol-api/auth/login")).isFalse();
   }
 
   @Test

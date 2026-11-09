@@ -5,6 +5,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.CurrentUserContext;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -136,6 +137,14 @@ public class AuthService {
     users.recordSwitch(user.id(), tenantId, Instant.now());
     switchAudit.switched(new CompanySwitchAudit.Switched(user.tenantId()));
     return current.user();
+  }
+
+  /**
+   * Edition of the current company (ADR-038). The account is read again so a request that just
+   * switched the token's company reports the new edition without a second login.
+   */
+  public Edition edition(AccountDTO user) {
+    return current.editionOf(user.tenantId());
   }
 
   public void logout() {

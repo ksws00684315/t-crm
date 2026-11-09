@@ -26,11 +26,14 @@ public class CurrentUserContext {
 
   private static final String CACHE = CurrentUserContext.class.getName() + ".current";
   private static final String VERIFIED = CurrentUserContext.class.getName() + ".verified";
+  private static final String EDITION = CurrentUserContext.class.getName() + ".edition";
   private static final int SCOPE = RequestAttributes.SCOPE_REQUEST;
   private final AccountStore users;
+  private final CompanyStore companies;
 
-  public CurrentUserContext(AccountStore users) {
+  public CurrentUserContext(AccountStore users, CompanyStore companies) {
     this.users = users;
+    this.companies = companies;
   }
 
   /**
@@ -89,7 +92,59 @@ public class CurrentUserContext {
    */
   public List<String> permissionNames(Object loginId) {
     AccountDTO user = forLoginId(loginId);
-    return usable(user) ? user.effectivePermissions() : List.of();
+    return usable(user) ? effectivePermissions(user) : List.of();
+  }
+
+  /**
+   * Codes an account may use in its company (ADR-038 §2.4): a super administrator gets every code
+   * of the company's edition, a staff account the granted codes limited to that edition. Codes of
+   * another edition never take effect, even if a stored row still holds one.
+   */
+  public List<String> effectivePermissions(AccountDTO user) {
+    if (user == null) {
+      return List.of();
+    }
+    List<String> codes = Permission.codesOf(editionOf(user.tenantId()));
+    if (user.role() == Role.SUPER_ADMIN) {
+      return codes;
+    }
+    if (user.role() != Role.STAFF || user.permissions().isEmpty()) {
+      return List.of();
+    }
+    return codes.stream().filter(user.permissions()::contains).toList();
+  }
+
+  /**
+   * Edition of the current company (ADR-038): the token's company, or — for a platform
+   * administrator, who has no company — {@link Edition#DISTRIBUTION}. Read once per request.
+   */
+  public Edition edition() {
+    AccountDTO user = user();
+    return editionOf(user.tenantId());
+  }
+
+  /** Edition of a company; {@code null} (platform administrator) reads as distribution. */
+  public Edition editionOf(Long tenantId) {
+    if (tenantId == null) {
+      return Edition.DISTRIBUTION;
+    }
+    RequestAttributes request = RequestContextHolder.getRequestAttributes();
+    if (request != null) {
+      Object cached = request.getAttribute(EDITION, SCOPE);
+      if (cached instanceof Edition cachedEdition) {
+        return cachedEdition;
+      }
+    }
+    Edition edition = companies.editionOf(tenantId);
+    if (request != null) {
+      request.setAttribute(EDITION, edition, SCOPE);
+    }
+    return edition;
+  }
+
+  /** Every code of a company's edition (ADR-038): the grants a super administrator holds. */
+  public List<String> editionCodes(Long tenantId) {
+    return Permission.codesOf(editionOf(tenantId));
   }
 
   /**
@@ -114,6 +169,7 @@ public class CurrentUserContext {
     RequestAttributes request = RequestContextHolder.getRequestAttributes();
     if (request != null) {
       request.removeAttribute(CACHE, SCOPE);
+      request.removeAttribute(EDITION, SCOPE);
     }
   }
 

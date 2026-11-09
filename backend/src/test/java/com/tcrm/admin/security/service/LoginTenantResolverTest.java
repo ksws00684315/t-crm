@@ -17,6 +17,7 @@ import com.tcrm.admin.security.api.AccountDTO;
 import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.Role;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 class LoginTenantResolverTest {
   private final AccountStore accounts = mock(AccountStore.class);
-  private final CurrentUserContext current = new CurrentUserContext(accounts);
+  private final CurrentUserContext current =
+      new CurrentUserContext(accounts, tenantId -> Edition.DISTRIBUTION);
   private final LoginTenantResolver resolver = new LoginTenantResolver(current);
 
   @AfterEach

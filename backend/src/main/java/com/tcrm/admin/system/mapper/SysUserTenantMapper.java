@@ -138,7 +138,8 @@ public interface SysUserTenantMapper extends BaseMapper<SysUserTenantDO> {
    */
   @Select(
       """
-      SELECT m.tenant_id, t.name AS tenant_name, t.status AS tenant_status, m.role, m.status
+      SELECT m.tenant_id, t.name AS tenant_name, t.status AS tenant_status,
+             t.edition AS tenant_edition, m.role, m.status
       FROM sys_user_tenant m
       JOIN sys_tenant t ON t.id = m.tenant_id AND t.is_deleted = FALSE
       WHERE m.user_id = #{userId} AND m.is_deleted = FALSE

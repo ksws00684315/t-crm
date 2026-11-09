@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.DataScope;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
@@ -162,7 +163,8 @@ class AccountStoreServiceTest {
                 row(4L, "D", 1, Role.STAFF, 1)));
     assertThat(store.companies(7L))
         .containsExactly(
-            new CompanyDTO(1L, "A", Role.SUPER_ADMIN), new CompanyDTO(4L, "D", Role.STAFF));
+            new CompanyDTO(1L, "A", Role.SUPER_ADMIN, Edition.DISTRIBUTION),
+            new CompanyDTO(4L, "D", Role.STAFF, Edition.DISTRIBUTION));
   }
 
   private static MembershipRow row(

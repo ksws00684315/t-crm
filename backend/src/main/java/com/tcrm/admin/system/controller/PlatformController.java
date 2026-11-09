@@ -34,7 +34,7 @@ public class PlatformController {
   @PostMapping
   @AuditLog(module = "Platform", action = "Create tenant")
   public R<TenantVO> create(@Valid @RequestBody CreateTenantRequest r) {
-    return R.ok(TenantVO.from(platform.create(r.tenantCode(), r.name(), r.remark())));
+    return R.ok(TenantVO.from(platform.create(r.tenantCode(), r.name(), r.remark(), r.edition())));
   }
 
   @PutMapping("/{id}")

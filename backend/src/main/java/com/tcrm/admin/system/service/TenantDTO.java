@@ -1,10 +1,17 @@
 package com.tcrm.admin.system.service;
 
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.system.model.SysTenantDO;
 import java.time.Instant;
 
 public record TenantDTO(
-    Long id, String tenantCode, String name, Integer status, String remark, Instant createTime) {
+    Long id,
+    String tenantCode,
+    String name,
+    Integer status,
+    String remark,
+    Edition edition,
+    Instant createTime) {
   public static TenantDTO from(SysTenantDO row) {
     return new TenantDTO(
         row.getId(),
@@ -12,6 +19,7 @@ public record TenantDTO(
         row.getName(),
         row.getStatus(),
         row.getRemark(),
+        row.getEdition(),
         row.getCreateTime());
   }
 }

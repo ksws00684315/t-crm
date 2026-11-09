@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
-import com.tcrm.admin.security.api.Permission;
+import com.tcrm.admin.security.api.Edition;
 import com.tcrm.admin.security.api.PostTemplate;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.BusinessException;
@@ -85,13 +85,14 @@ public class UserService {
     List<Long> ids = result.getRecords().stream().map(MemberRow::getUserId).toList();
     Map<Long, List<String>> stored = permissions.storedCodes(ids, tenantId);
     Map<Long, Integer> counts = companyCounts(ids);
+    List<String> editionCodes = current.editionCodes(tenantId);
     return new PageResult<>(
         result.getRecords().stream()
             .map(
                 member ->
                     UserDTO.from(
                         member,
-                        visible(member, stored),
+                        visible(member, stored, editionCodes),
                         counts.getOrDefault(member.getUserId(), 1)))
             .toList(),
         result.getTotal(),
@@ -139,7 +140,10 @@ public class UserService {
       permissions.grant(user.getId(), tenantId, resolved.codes());
     }
     MemberRow created = members.getMember(user.getId(), tenantId);
-    return UserDTO.from(created, visible(created, Map.of(user.getId(), resolved.codes())), 1);
+    return UserDTO.from(
+        created,
+        visible(created, Map.of(user.getId(), resolved.codes()), current.editionCodes(tenantId)),
+        1);
   }
 
   /**
@@ -149,7 +153,8 @@ public class UserService {
    */
   @Transactional(rollbackFor = Exception.class)
   public void update(Long id, EditUserCommand r) {
-    MemberRole resolved = resolve(r.role(), r.postTemplate(), r.dataScope(), null, false);
+    MemberRole resolved =
+        resolve(r.role(), r.postTemplate(), r.dataScope(), null, false, tenantId());
     long tenantId = tenantId();
     MemberRow target = require(id, tenantId);
     if (id.equals(current.id()) && resolved.role() != Role.SUPER_ADMIN) {
@@ -331,26 +336,13 @@ public class UserService {
     return current.user().tenantId();
   }
 
-  /** {@link MemberRole#resolve}; a new staff member may start from an explicit code list. */
-  private MemberRole resolve(
-      Role role, PostTemplate template, DataScope scope, List<String> requested, boolean creating) {
-    MemberRole resolved = MemberRole.resolve(role, template, scope);
-    if (creating && resolved.role() == Role.STAFF) {
-      PostTemplateService.PostTemplateView defaults =
-          postTemplates.getDefault(template, current.user().tenantId());
-      resolved =
-          new MemberRole(
-              Role.STAFF,
-              scope == null ? defaults.dataScope() : scope,
-              template,
-              defaults.permissions());
-    }
-    if (resolved.role() == Role.STAFF && creating && requested != null) {
-      return resolved.withCodes(permissions.canonical(requested));
-    }
-    return resolved;
-  }
-
+  /**
+   * {@link MemberRole#resolve}, limited to the company's edition (ADR-038): a staff account of a
+   * creator-library company has no post template (the concept belongs to the distribution product)
+   * and the ALL data scope recorded anyway, because accounts do not separate data there; its codes
+   * may be given explicitly and are then checked against that edition. A new distribution account
+   * keeps starting from its template's codes and default data scope.
+   */
   private MemberRole resolve(
       Role role,
       PostTemplate template,
@@ -358,6 +350,15 @@ public class UserService {
       List<String> requested,
       boolean creating,
       long tenantId) {
+    if (role == Role.STAFF && current.editionOf(tenantId) == Edition.KOL_LIBRARY) {
+      List<String> codes;
+      if (requested == null) {
+        codes = creating ? List.of() : null;
+      } else {
+        codes = permissions.canonical(requested, Edition.KOL_LIBRARY);
+      }
+      return new MemberRole(Role.STAFF, DataScope.ALL, null, codes);
+    }
     MemberRole resolved = MemberRole.resolve(role, template, scope);
     if (creating && resolved.role() == Role.STAFF) {
       PostTemplateService.PostTemplateView defaults = postTemplates.getDefault(template, tenantId);
@@ -369,19 +370,21 @@ public class UserService {
               defaults.permissions());
     }
     if (resolved.role() == Role.STAFF && creating && requested != null) {
-      return resolved.withCodes(permissions.canonical(requested));
+      return resolved.withCodes(permissions.canonical(requested, Edition.DISTRIBUTION));
     }
     return resolved;
   }
 
-  private static List<String> visible(MemberRow member, Map<Long, List<String>> stored) {
+  private static List<String> visible(
+      MemberRow member, Map<Long, List<String>> stored, List<String> editionCodes) {
     // An unknown stored role reads back as null (LenientEnumTypeHandler): treat it as no access
     // instead of failing the account list (#106).
     if (member.getRole() == null) {
       return List.of();
     }
     return switch (member.getRole()) {
-      case SUPER_ADMIN -> Permission.codes();
+      // A super administrator holds the codes of the company's edition only (ADR-038 §2.4).
+      case SUPER_ADMIN -> editionCodes;
       case STAFF -> stored.getOrDefault(member.getUserId(), List.of());
       default -> List.of();
     };
