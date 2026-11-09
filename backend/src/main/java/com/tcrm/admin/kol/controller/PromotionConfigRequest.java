@@ -16,7 +16,7 @@ public record PromotionConfigRequest(
     @NotEmpty List<@Valid PlatformAddressRequest> platforms,
     @Size(max = KolRules.MAX_INVITE_CODE) @Pattern(regexp = KolRules.INVITE_CODE_PATTERN)
         String inviteCode,
-    @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_PATTERN)
+    @Size(max = KolRules.MAX_SHEET_URL) @Pattern(regexp = KolRules.SHEET_URL_OPTIONAL_PATTERN)
         String sheetUrl,
     @Min(1) Long jumpTemplateId,
     @Size(max = KolRules.MAX_REMARK) String remark) {
