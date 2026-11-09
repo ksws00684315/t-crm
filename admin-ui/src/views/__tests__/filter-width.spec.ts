@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 /**
  * L-122 (task 135): filter dropdowns inside ListSearch must use the shared width classes
  * (`.filter-w-sm` / `.filter-w-md` / `.filter-w-lg`, review R-21) instead of inline pixel widths,
- * so the same kind of control keeps one width within and across pages.
+ * so the same kind of control keeps one width within and across pages. The pattern accepts the
+ * spelling variants reviewers flagged: single or double quotes, a `:style` binding with a literal
+ * width, and no space after the colon. `min-width` and friends must not match.
  */
 const viewsDir = resolve(__dirname, "..");
 
@@ -19,9 +21,21 @@ function vueFiles(dir: string): string[] {
   return out;
 }
 
-const INLINE_WIDTH = /style="width:\s*\d+px"/;
+const INLINE_WIDTH = /(?<![\w-])width:\s*\d+px/;
 
 describe("L-122: ListSearch filter selects use shared width classes", () => {
+  it.each([
+    ['style="width: 180px"', true],
+    ["style='width:180px'", true],
+    [":style=\"true ? 'width: 180px' : ''\"", true],
+    ['style="width:100px"', true],
+    ['style="width: 100%"', false],
+    ['style="min-width: 180px"', false],
+    ['style="max-width:180px"', false]
+  ])("detects inline pixel width in %j", (snippet, shouldMatch) => {
+    expect(INLINE_WIDTH.test(snippet)).toBe(shouldMatch);
+  });
+
   it("keeps inline pixel widths out of every select rendered inside a ListSearch page", () => {
     const offenders: string[] = [];
     for (const file of vueFiles(viewsDir)) {

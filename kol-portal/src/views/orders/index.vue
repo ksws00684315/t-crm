@@ -69,7 +69,8 @@ const columns = computed<DataColumn[]>(() => {
     {
       key: "settlementStatus",
       label: t("orders.settlementStatus"),
-      // 150: the longest tag "Pending verification" overflows 140 by ~8px at 1280 (task 135).
+      // 160: the longest tag "Pending verification" still overflowed 140 by ~8px and 150 by
+      // ~3px at 1280 English (task 135, browser-audit rework).
       minWidth: zh ? 130 : 160
     }
   ];

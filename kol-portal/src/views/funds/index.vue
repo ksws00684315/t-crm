@@ -304,12 +304,19 @@ function recordAmount(row: FundRecord) {
 /**
  * L-123 (task 135): the API contract (§6.3) limits publicStatus to the five withdrawal statuses
  * plus PAID for prepays, but a missing or unknown value must never render as a raw language key
- * (`funds.status.undefined`) or as the raw enum; both fall back to a neutral label.
+ * (`funds.status.undefined`) or as the raw enum; both fall back to a neutral label. A new enum
+ * value must ship its locale entries in the same PR, otherwise it reads as "Unknown" here (the
+ * dev-only warning below makes that visible while debugging).
  */
 function statusLabel(value: string | null | undefined) {
   if (!value) return t("funds.statusUnknown");
-  const label = t(`funds.status.${value}`);
-  return label === `funds.status.${value}` ? t("funds.statusUnknown") : label;
+  const key = `funds.status.${value}`;
+  const label = t(key);
+  if (label === key) {
+    if (import.meta.env.DEV) console.warn(`[funds] publicStatus without locale entry: ${value}`);
+    return t("funds.statusUnknown");
+  }
+  return label;
 }
 /** Waiting statuses use the warning colour, paid the success colour, rejected the danger colour. */
 function statusType(value: string | null | undefined): "warning" | "success" | "danger" | "info" {
