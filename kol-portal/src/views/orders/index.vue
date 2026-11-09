@@ -43,20 +43,38 @@ const statusOptions: SettlementStatus[] = [
   "WITHDRAWING",
   "WITHDRAWABLE"
 ];
-const columns = computed<DataColumn[]>(() => [
-  { key: "orderNo", align: "left" as const, label: t("orders.orderNo"), minWidth: 150 },
-  { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 150 },
-  { key: "payAmount", label: t("orders.orderAmount"), minWidth: 120, amount: true },
-  { key: "payTime", label: t("orders.payTime"), minWidth: locale.value === "zh-CN" ? 180 : 200 },
-  { key: "rate", label: t("orders.commissionRate"), minWidth: 110 },
-  // Room for the after-sales tag next to the amount (task 113).
-  { key: "commission", label: t("orders.commissionAmount"), minWidth: 190, amount: true },
-  {
-    key: "settlementStatus",
-    label: t("orders.settlementStatus"),
-    minWidth: locale.value === "zh-CN" ? 130 : 165
-  }
-]);
+/** Column floors per language (规范 11 §2). English narrows L-119 columns so that at 1280 the
+ * order status column is visible without horizontal scrolling; the English after-sales tag drops
+ * under the amount (see .after-sales-tag) instead of holding the 190px commission floor. */
+const columns = computed<DataColumn[]>(() => {
+  const zh = locale.value === "zh-CN";
+  return [
+    {
+      key: "orderNo",
+      align: "left" as const,
+      label: t("orders.orderNo"),
+      minWidth: zh ? 150 : 130
+    },
+    { key: "product", align: "left" as const, label: t("orders.productSku"), minWidth: 150 },
+    { key: "payAmount", label: t("orders.orderAmount"), minWidth: zh ? 120 : 110, amount: true },
+    { key: "payTime", label: t("orders.payTime"), minWidth: 180 },
+    { key: "rate", label: t("orders.commissionRate"), minWidth: zh ? 110 : 125 },
+    // Room for the after-sales tag next to the amount (task 113, zh only since task 135).
+    {
+      key: "commission",
+      label: t("orders.commissionAmount"),
+      minWidth: zh ? 190 : 130,
+      amount: true
+    },
+    {
+      key: "settlementStatus",
+      label: t("orders.settlementStatus"),
+      // 160: the longest tag "Pending verification" still overflowed 140 by ~8px and 150 by
+      // ~3px at 1280 English (task 135, browser-audit rework).
+      minWidth: zh ? 130 : 160
+    }
+  ];
+});
 function money(value: string) {
   return formatMoney(value, "CNY");
 }
@@ -331,9 +349,13 @@ onMounted(() => {
       <template #cell-commission="{ row }"
         >{{ commission(row) == null ? "—" : money(commission(row)!)
         }}<el-tooltip v-if="row.afterSales" :content="t('orders.afterSalesHint')"
-          ><el-tag type="warning" class="after-sales-tag" data-test="order-after-sales">{{
-            t("orders.afterSales")
-          }}</el-tag></el-tooltip
+          ><el-tag
+            type="warning"
+            class="after-sales-tag"
+            :class="{ 'after-sales-tag--under': locale !== 'zh-CN' }"
+            data-test="order-after-sales"
+            >{{ t("orders.afterSales") }}</el-tag
+          ></el-tooltip
         ></template
       >
       <template #cell-settlementStatus="{ row }"
@@ -403,6 +425,14 @@ onMounted(() => {
 <style scoped>
 .after-sales-tag {
   margin-left: var(--tcrm-space-1);
+}
+/* L-119 (task 135): in English the tag wraps under the amount instead of widening the
+   commission column, so the order status column fits a 1280 viewport without scrolling. */
+.after-sales-tag--under {
+  display: block;
+  width: fit-content;
+  margin-top: var(--tcrm-space-1);
+  margin-left: 0;
 }
 .after-sales-note {
   color: var(--el-color-warning);

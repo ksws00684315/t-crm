@@ -228,7 +228,12 @@ onMounted(load);
             <el-input v-model="filters.kolId" clearable data-test="withdrawal-kol-id" />
           </el-form-item>
           <el-form-item :label="t('finance.status')">
-            <el-select v-model="filters.status" clearable data-test="withdrawal-status">
+            <el-select
+              v-model="filters.status"
+              clearable
+              class="filter-w-md"
+              data-test="withdrawal-status"
+            >
               <el-option
                 v-for="status in WITHDRAWAL_STATUSES"
                 :key="status"

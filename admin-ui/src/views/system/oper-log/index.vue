@@ -223,7 +223,7 @@ onMounted(() => {
             filterable
             :placeholder="t('common.all')"
             data-test="filter-module"
-            style="width: 140px"
+            class="filter-w-md"
           >
             <el-option
               v-for="module in MODULES"

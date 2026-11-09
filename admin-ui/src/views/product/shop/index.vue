@@ -569,7 +569,12 @@ onMounted(() => {
           <el-input v-model="query.shopName" clearable data-test="search-shop-name" />
         </el-form-item>
         <el-form-item :label="t('shop.channel')">
-          <el-select v-model="query.channel" clearable data-test="search-channel">
+          <el-select
+            v-model="query.channel"
+            clearable
+            data-test="search-channel"
+            class="filter-w-sm"
+          >
             <el-option
               :label="t('shop.channelWeidian')"
               value="WEIDIAN"

@@ -237,11 +237,8 @@ const enUS = {
       WITHDRAWABLE: "Withdrawable"
     },
     payTime: "Payment time",
-    payAmount: "Paid",
-    refundAmount: "Refund",
     item: "Item",
     sku: "SKU",
-    quantity: "Quantity",
     empty: "No orders yet. Share your exclusive link and orders will appear here.",
     loadFailed: "Orders could not be loaded. Please try again.",
     statuses: {
@@ -256,6 +253,7 @@ const enUS = {
   },
   funds: {
     title: "Funds",
+    statusUnknown: "Unknown",
     progressTitle: "Commission progress",
     stepFrozen: "Frozen",
     stepFrozenCaption: "Orders not settled yet",

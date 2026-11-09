@@ -284,6 +284,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="filter-refund-channel"
+            class="filter-w-sm"
           >
             <el-option
               v-for="channel in CHANNELS"
@@ -301,6 +302,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="filter-refund-status"
+            class="filter-w-sm"
           >
             <el-option
               v-for="status in REFUND_STATUSES"
@@ -316,6 +318,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="filter-refund-type"
+            class="filter-w-sm"
           >
             <el-option
               v-for="type in REFUND_TYPES"

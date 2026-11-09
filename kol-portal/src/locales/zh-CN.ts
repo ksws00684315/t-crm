@@ -233,11 +233,8 @@ const zhCN: MessageSchema = {
       WITHDRAWABLE: "可提现"
     },
     payTime: "支付时间",
-    payAmount: "实付",
-    refundAmount: "退款",
     item: "商品",
     sku: "规格",
-    quantity: "数量",
     empty: "还没有订单。把你的专属链接分享出去后，订单会显示在这里。",
     loadFailed: "订单加载失败，请重试。",
     statuses: {
@@ -252,6 +249,7 @@ const zhCN: MessageSchema = {
   },
   funds: {
     title: "资金明细",
+    statusUnknown: "未知",
     progressTitle: "佣金进度",
     stepFrozen: "冻结中",
     stepFrozenCaption: "订单未结算，暂不可提现",

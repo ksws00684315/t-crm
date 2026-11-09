@@ -147,7 +147,11 @@ onMounted(load);
             ><el-input v-model="filters.keyword" data-test="income-keyword" clearable
           /></el-form-item>
           <el-form-item :label="t('finance.paymentType')"
-            ><el-select v-model="filters.paymentType" data-test="payment-type" clearable
+            ><el-select
+              v-model="filters.paymentType"
+              data-test="payment-type"
+              clearable
+              class="filter-w-md"
               ><el-option :label="t('finance.all')" value="" /><el-option
                 v-for="type in ['COMMISSION', 'PREPAY']"
                 :key="type"

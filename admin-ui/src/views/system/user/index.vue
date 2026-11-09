@@ -427,7 +427,7 @@ onMounted(load);
             v-model="query.role"
             clearable
             :placeholder="t('common.all')"
-            style="width: 140px"
+            class="filter-w-md"
           >
             <el-option
               v-for="role in SELECTABLE_ROLES"
@@ -442,7 +442,7 @@ onMounted(load);
             v-model="query.status"
             clearable
             :placeholder="t('common.all')"
-            style="width: 120px"
+            class="filter-w-sm"
           >
             <el-option :label="t('common.enabled')" :value="1" />
             <el-option :label="t('common.disabled')" :value="0" />
