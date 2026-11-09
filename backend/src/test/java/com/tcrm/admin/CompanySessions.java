@@ -51,9 +51,21 @@ public final class CompanySessions {
     return login(mvc, json, username, password);
   }
 
-  /** Creates a company and its first super administrator. */
+  /** Creates a distribution company and its first super administrator. */
   public static OpenedCompany openCompany(
       MockMvc mvc, ObjectMapper json, String password, String tenantCode, String username)
+      throws Exception {
+    return openCompany(mvc, json, password, tenantCode, username, "DISTRIBUTION");
+  }
+
+  /** Creates a company of the given edition and its first super administrator. */
+  public static OpenedCompany openCompany(
+      MockMvc mvc,
+      ObjectMapper json,
+      String password,
+      String tenantCode,
+      String username,
+      String edition)
       throws Exception {
     String platform = login(mvc, json, "bootstrap", password);
     String body =
@@ -63,7 +75,10 @@ public final class CompanySessions {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         json.writeValueAsString(
-                            Map.of("tenantCode", tenantCode, "name", username))))
+                            Map.of(
+                                "tenantCode", tenantCode,
+                                "name", username,
+                                "edition", edition))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

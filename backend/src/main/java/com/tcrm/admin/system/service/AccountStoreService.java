@@ -7,6 +7,7 @@ import com.tcrm.admin.security.api.AccountStore;
 import com.tcrm.admin.security.api.CompanyDTO;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.Edition;
+import com.tcrm.admin.security.api.Permission;
 import com.tcrm.admin.security.api.Role;
 import com.tcrm.admin.shared.TenantScope;
 import com.tcrm.admin.system.mapper.SysTenantMapper;
@@ -100,6 +101,39 @@ public class AccountStoreService implements AccountStore {
                                 ? Edition.DISTRIBUTION
                                 : m.getTenantEdition()))
                 .toList());
+  }
+
+  @Override
+  public List<String> effectivePermissions(Long id, Long tenantId) {
+    if (id == null || tenantId == null) {
+      return List.of();
+    }
+    return TenantScope.callSystem(
+        "resolve the account's effective codes in one company",
+        () -> {
+          SysUserDO user = users.selectById(id);
+          if (user == null || user.getRole() == AccountType.PLATFORM_ADMIN) {
+            return List.of();
+          }
+          SysUserTenantDO member = membership(id, tenantId);
+          if (member == null || member.getRole() == null) {
+            return List.of();
+          }
+          SysTenantDO tenant = tenants.selectById(tenantId);
+          Edition edition =
+              tenant == null || tenant.getEdition() == null
+                  ? Edition.DISTRIBUTION
+                  : tenant.getEdition();
+          List<String> codes = Permission.codesOf(edition);
+          return switch (member.getRole()) {
+            case SUPER_ADMIN -> codes;
+            case STAFF -> {
+              Set<String> granted = permissionCodes(id, tenantId);
+              yield codes.stream().filter(granted::contains).toList();
+            }
+            default -> List.of();
+          };
+        });
   }
 
   @Override

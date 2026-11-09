@@ -71,7 +71,11 @@ public class AuthController {
             result.tokenName(),
             result.token(),
             result.expiresIn(),
-            UserVO.from(result.user(), result.companies(), auth.edition(result.user()))));
+            UserVO.from(
+                result.user(),
+                result.companies(),
+                auth.edition(result.user()),
+                auth.permissions(result.user()))));
   }
 
   @SaCheckRole(
@@ -107,7 +111,7 @@ public class AuthController {
   }
 
   private UserVO me(AccountDTO user) {
-    return UserVO.from(user, auth.companies(user), auth.edition(user));
+    return UserVO.from(user, auth.companies(user), auth.edition(user), auth.permissions(user));
   }
 
   @SaCheckRole(

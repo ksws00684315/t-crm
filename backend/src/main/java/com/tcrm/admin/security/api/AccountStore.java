@@ -43,6 +43,14 @@ public interface AccountStore {
    */
   void recordLogin(Long id, Long tenantId, Instant time);
 
+  /**
+   * Codes an account may use as a member of {@code tenantId}, limited to that company's edition
+   * (ADR-038 §2.4): every code of the edition for a super administrator, the granted codes of the
+   * edition for a staff account, none for anyone else. Reads the grants directly, so it is right
+   * whatever company the snapshot was built for; null (platform administrator) yields no codes.
+   */
+  List<String> effectivePermissions(Long id, Long tenantId);
+
   /** Records a company switch: the account's last company and that membership's entry time. */
   void recordSwitch(Long id, long tenantId, Instant time);
 

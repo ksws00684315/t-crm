@@ -45,14 +45,12 @@ public class LibraryContentService {
   /** All records of one creator, newest publication first. */
   public List<LibraryContentDTO> list(Long kolId) {
     creators.require(kolId);
-    return contents
-        .selectList(
+    List<LibraryKolContentDO> rows =
+        contents.selectList(
             new LambdaQueryWrapper<LibraryKolContentDO>()
                 .eq(LibraryKolContentDO::getKolId, kolId)
-                .orderByDesc(LibraryKolContentDO::getPublishDate, LibraryKolContentDO::getId))
-        .stream()
-        .map(LibraryContentService::toDto)
-        .toList();
+                .orderByDesc(LibraryKolContentDO::getPublishDate, LibraryKolContentDO::getId));
+    return rows.stream().map(LibraryContentService::toDto).toList();
   }
 
   /** One record with its calculated values; it must belong to {@code kolId}. */

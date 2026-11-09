@@ -390,11 +390,20 @@ class TenantIsolationIT {
             post("/admin-api/platform/tenants")
                 .header(TOKEN, platform)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tenantCode\":\"A\",\"name\":\"\"}"))
+                .content("{\"tenantCode\":\"A\",\"name\":\"\",\"edition\":\"DISTRIBUTION\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"))
         .andExpect(jsonPath("$.data[?(@.field=='tenantCode')]").exists())
         .andExpect(jsonPath("$.data[?(@.field=='name')]").exists());
+    // The edition decides which product a new company gets; it must be chosen explicitly.
+    mvc.perform(
+            post("/admin-api/platform/tenants")
+                .header(TOKEN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tenantCode\":\"no-edition\",\"name\":\"No edition\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errorCode").value("COMMON_VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.data[?(@.field=='edition')]").exists());
     mvc.perform(
             post("/admin-api/system/users")
                 .header(TOKEN, tokenA)

@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,12 +122,18 @@ public class LibraryKolService {
     LibraryKolDO row = new LibraryKolDO();
     row.setTenantId(current.user().tenantId());
     applyProfile(row, command, true);
+    // The pre-check answers the common duplicate with the existing creator. The insert then runs
+    // on its own: after a unique violation PostgreSQL aborts the whole transaction, so the existing
+    // row has to be read BEFORE the insert, not after a failed one.
     requireUnique(row, null);
+    LibraryKolDO existing = existing(row).orElse(null);
     try {
       kols.insert(row);
     } catch (DuplicateKeyException e) {
       // uk_crm_library_kol_username: a simultaneous request entered the same creator first.
-      throw duplicateOf(row);
+      throw existing == null
+          ? new BusinessException(ErrorCode.KOL_LIBRARY_DUPLICATE)
+          : duplicate(existing);
     }
     // A new creator has no content yet: zero totals and a dash for the ROI.
     return toDetail(require(row.getId()), LibraryMetrics.totals(List.of()));
@@ -140,6 +147,7 @@ public class LibraryKolService {
   public LibraryKolDTO.Detail update(Long id, LibraryKolCommand command) {
     LibraryKolDO row = require(id);
     applyProfile(row, command, false);
+    Optional<LibraryKolDO> previous = existing(row);
     requireUnique(row, id);
     LambdaUpdateWrapper<LibraryKolDO> update =
         new LambdaUpdateWrapper<LibraryKolDO>().eq(LibraryKolDO::getId, id);
@@ -150,7 +158,9 @@ public class LibraryKolService {
     try {
       kols.update(null, update);
     } catch (DuplicateKeyException e) {
-      throw duplicateOf(row);
+      // A simultaneous edit took this ID first; the transaction is aborted, so the answer uses the
+      // result of the check above rather than a new read.
+      throw duplicate(previous.orElse(row));
     }
     LibraryKolDO saved = require(id);
     return toDetail(saved, totalsOf(List.of(id)).get(id));
@@ -328,7 +338,17 @@ public class LibraryKolService {
 
   /** Fails with KOL_LIBRARY_DUPLICATE and the existing creator when platform + ID are taken. */
   private void requireUnique(LibraryKolDO row, Long self) {
-    LibraryKolDO existing =
+    existing(row)
+        .filter(found -> !Objects.equals(found.getId(), self))
+        .ifPresent(
+            found -> {
+              throw duplicate(found);
+            });
+  }
+
+  /** The creator already holding this platform and ID in the company, if any. */
+  private Optional<LibraryKolDO> existing(LibraryKolDO row) {
+    return Optional.ofNullable(
         kols.selectOne(
             new LambdaQueryWrapper<LibraryKolDO>()
                 .select(
@@ -336,10 +356,7 @@ public class LibraryKolService {
                     LibraryKolDO::getFollowUpOwner,
                     LibraryKolDO::getDisplayName)
                 .eq(LibraryKolDO::getPlatform, row.getPlatform())
-                .eq(LibraryKolDO::getKolUsername, row.getKolUsername()));
-    if (existing != null && !Objects.equals(existing.getId(), self)) {
-      throw duplicate(existing);
-    }
+                .eq(LibraryKolDO::getKolUsername, row.getKolUsername())));
   }
 
   private static BusinessException duplicate(LibraryKolDO existing) {
@@ -349,18 +366,6 @@ public class LibraryKolService {
             "id", existing.getId(),
             "followUpOwner", existing.getFollowUpOwner() == null ? "" : existing.getFollowUpOwner(),
             "displayName", existing.getDisplayName() == null ? "" : existing.getDisplayName()));
-  }
-
-  /** Duplicate answer for a raced insert: the same query now finds the row that won. */
-  private BusinessException duplicateOf(LibraryKolDO row) {
-    LibraryKolDO existing =
-        kols.selectOne(
-            new LambdaQueryWrapper<LibraryKolDO>()
-                .eq(LibraryKolDO::getPlatform, row.getPlatform())
-                .eq(LibraryKolDO::getKolUsername, row.getKolUsername()));
-    return existing == null
-        ? new BusinessException(ErrorCode.KOL_LIBRARY_DUPLICATE)
-        : duplicate(existing);
   }
 
   static LibraryKolDTO toDto(LibraryKolDO row) {

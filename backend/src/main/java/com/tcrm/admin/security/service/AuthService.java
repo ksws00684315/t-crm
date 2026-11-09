@@ -147,6 +147,14 @@ public class AuthService {
     return current.editionOf(user.tenantId());
   }
 
+  /**
+   * Codes the account may use in its current company (ADR-038 §2.4), read from the grants of that
+   * company so the profile always agrees with the current edition.
+   */
+  public List<String> permissions(AccountDTO user) {
+    return users.effectivePermissions(user.id(), user.tenantId());
+  }
+
   public void logout() {
     StpUtil.logout();
   }

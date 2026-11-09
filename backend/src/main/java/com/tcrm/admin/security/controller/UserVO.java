@@ -9,6 +9,11 @@ import com.tcrm.admin.security.api.Role;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * The signed-in identity. {@code permissions} are the codes this account may use in the current
+ * company (ADR-038 §2.4): the caller resolves them through the permission service, so a super
+ * administrator of the creator-library company holds its two codes only.
+ */
 public record UserVO(
     Long id,
     String username,
@@ -25,14 +30,13 @@ public record UserVO(
     PostTemplate postTemplate,
     List<String> permissions,
     List<CompanyVO> companies) {
+
   /**
    * Identity in the current company; {@code companies} are the account's usable companies by name
-   * (empty for a platform administrator). {@code edition} is the edition of the current company
-   * (ADR-038), which the admin UI uses for its menu and route guard; {@code permissions} are the
-   * effective codes in that edition, so a super administrator of the creator-library edition holds
-   * the two creator-library codes only.
+   * (empty for a platform administrator) and {@code edition} the current company's edition.
    */
-  public static UserVO from(AccountDTO u, List<CompanyDTO> companies, Edition edition) {
+  public static UserVO from(
+      AccountDTO u, List<CompanyDTO> companies, Edition edition, List<String> permissions) {
     return new UserVO(
         u.id(),
         u.username(),
@@ -47,7 +51,7 @@ public record UserVO(
         u.tenantName(),
         edition,
         u.postTemplate(),
-        u.effectivePermissions(),
+        permissions,
         companies.stream().map(CompanyVO::from).toList());
   }
 }
