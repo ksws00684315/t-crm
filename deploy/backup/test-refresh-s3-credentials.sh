@@ -120,4 +120,45 @@ fi
 grep -q "outside this repository" "$WORK/err.txt" ||
   fail "in-repo error text wrong: $(cat "$WORK/err.txt")"
 
+# --- load_env_config (L-112: deploy/.env loading) ----------------------------
+# main() only runs after load_env_config when the script is EXECUTED; the tests call
+# load_env_config directly. TCRM_ENV_FILE always points into the temp dir, so the real
+# deploy/.env of this checkout can never leak into the results.
+ENV_ONLY="$WORK/env-only"
+mkdir -p "$ENV_ONLY"
+ENV_FILE_A="$WORK/t106.env"
+printf 'TCRM_PGBACKREST_CREDS_DIR=%s\nTCRM_SECRET_KEY=t106-fake-secret\n' "$ENV_ONLY" > "$ENV_FILE_A"
+
+# 1) env file only: TCRM_PGBACKREST_CREDS_DIR is picked up from the env file.
+( TCRM_ENV_FILE="$ENV_FILE_A" load_env_config
+  expect "$ENV_ONLY" "${TCRM_PGBACKREST_CREDS_DIR:-}" "creds dir from env file"
+) || exit 1
+
+# 2) env file AND caller env: the caller's value wins (the pre-L-112 inline crontab form).
+( TCRM_ENV_FILE="$ENV_FILE_A" TCRM_PGBACKREST_CREDS_DIR="$CREDS_DIR" load_env_config
+  expect "$CREDS_DIR" "${TCRM_PGBACKREST_CREDS_DIR:-}" "caller value must win over env file"
+) || exit 1
+
+# 3) no env file at all: caller env only, no error (the behaviour before L-112).
+( TCRM_ENV_FILE="$WORK/does-not-exist.env" load_env_config
+  if [ -n "${TCRM_PGBACKREST_CREDS_DIR:-}" ]; then
+    fail "without an env file only the caller environment decides"
+  fi
+) || exit 1
+
+# 4) TCRM_ENV_FILE pointing at another file: that file is read, not deploy/.env.
+ENV_FILE_B="$WORK/t106-other.env"
+printf 'TCRM_PGBACKREST_CREDS_DIR=%s\n' "$CREDS_DIR" > "$ENV_FILE_B"
+( TCRM_ENV_FILE="$ENV_FILE_B" load_env_config
+  expect "$CREDS_DIR" "${TCRM_PGBACKREST_CREDS_DIR:-}" "TCRM_ENV_FILE override"
+) || exit 1
+
+# 5) nothing else from the env file (the fake TCRM_SECRET_KEY here) may reach the environment
+# of child processes (`aws` and anything else): the env file is sourced without `set -a`.
+( TCRM_ENV_FILE="$ENV_FILE_A" load_env_config
+  if env | grep -q "t106-fake-secret"; then
+    fail "value from the env file leaked into the environment"
+  fi
+) || exit 1
+
 echo "refresh-s3-credentials: all tests passed"

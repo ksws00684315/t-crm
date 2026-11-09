@@ -1,6 +1,7 @@
 package com.tcrm.admin.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -411,6 +413,85 @@ class ProductLinkIT {
         .andExpect(jsonPath("$.errorCode").value("COPY_DAILY_QUOTA_EXCEEDED"))
         .andExpect(jsonPath("$.msg").value("本日复制额度不足：本日最多复制商品 5000 条，已复制 4999 条，剩余 1 条，本次提交 2 条"));
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_copy_job", Integer.class)).isZero();
+  }
+
+  @Test
+  void shouldAllowCopyJobTotal_upToTheConfiguredMaximum() {
+    insertJob(141001, 1, 141001, 141001, "big141", "processing", 1500, 0, 0, null, Instant.now());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT total_count FROM crm_copy_job WHERE id = 141001", Integer.class))
+        .isEqualTo(1500);
+
+    assertThatThrownBy(
+            () ->
+                insertJob(
+                    141002,
+                    1,
+                    141001,
+                    141001,
+                    "big142",
+                    "processing",
+                    5001,
+                    0,
+                    0,
+                    null,
+                    Instant.now()))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void shouldConvertMoreThanTheOldTableLimit_endToEnd() throws Exception {
+    String platform = CompanySessions.login(mvc, json, "bootstrap", PASSWORD);
+    mvc.perform(
+            put("/admin-api/platform/system-configs/product-links.max-convert-items")
+                .header(ADMIN, platform)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\":\"5000\"}"))
+        .andExpect(status().isOk());
+    try {
+      long kolId = createKol("BigBatch", "bigbatch141@example.com");
+      long shopId = createShop("1001", "Main");
+      mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+          .andExpect(status().isOk());
+      authorizeShop(shopId);
+      String token = createTokenForShop(kolId, 2000, shopId);
+      StringBuilder items = new StringBuilder();
+      for (int i = 1; i <= 1713; i++) {
+        if (i > 1) {
+          items.append(',');
+        }
+        items
+            .append("{\"sourceChannelCode\":\"WEIDIAN\",\"sourceProductId\":\"")
+            .append(i)
+            .append("\"}");
+      }
+
+      mvc.perform(
+              post(BASE + "/convert")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"token\":\"%s\",\"callerPlatform\":\"google_sheet_plugin\",\"items\":[%s]}"
+                          .formatted(token, items)))
+          .andExpect(status().isOk());
+
+      assertThat(jdbc.queryForObject("SELECT total_count FROM crm_copy_job", Integer.class))
+          .isEqualTo(1713);
+
+      // The worker runs asynchronously; let it drain so it cannot touch the next test's data.
+      TestWait.until(
+          Duration.ofSeconds(60),
+          () -> {
+            var statusList = jdbc.queryForList("SELECT status FROM crm_copy_job", String.class);
+            return !statusList.isEmpty() && statusList.stream().noneMatch("processing"::equals);
+          },
+          "copy job should finish before the test ends");
+    } finally {
+      mvc.perform(
+              delete("/admin-api/platform/system-configs/product-links.max-convert-items")
+                  .header(ADMIN, platform))
+          .andExpect(status().isOk());
+    }
   }
 
   @Test

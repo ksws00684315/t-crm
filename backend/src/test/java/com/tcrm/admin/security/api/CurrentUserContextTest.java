@@ -16,6 +16,7 @@ import cn.dev33.satoken.stp.StpLogic;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -171,6 +172,29 @@ class CurrentUserContextTest {
       current.user();
       verify(accounts, times(2)).getById(7L);
     }
+  }
+
+  @Test
+  void shouldAnswerEachCompanyFromTheCache_whenOneRequestAsksAboutTwo() {
+    // A request may touch two companies (two memberships, a platform page); one company's answer
+    // must never stand in for another's.
+    var accounts = mock(AccountStore.class);
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    var asked = new ArrayList<Long>();
+    CompanyStore companies =
+        tenantId -> {
+          asked.add(tenantId);
+          return tenantId == 2L ? Edition.KOL_LIBRARY : Edition.DISTRIBUTION;
+        };
+    var current = new CurrentUserContext(accounts, companies);
+    assertThat(current.editionOf(2L)).isEqualTo(Edition.KOL_LIBRARY);
+    assertThat(current.editionOf(3L)).isEqualTo(Edition.DISTRIBUTION);
+    assertThat(current.editionOf(2L)).isEqualTo(Edition.KOL_LIBRARY);
+    assertThat(current.editionOf(3L)).isEqualTo(Edition.DISTRIBUTION);
+    // Read once per company, not once per request.
+    assertThat(asked).containsExactly(2L, 3L);
+    RequestContextHolder.resetRequestAttributes();
   }
 
   @Test

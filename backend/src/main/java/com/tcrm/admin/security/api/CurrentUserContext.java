@@ -6,7 +6,9 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -26,7 +28,10 @@ public class CurrentUserContext {
 
   private static final String CACHE = CurrentUserContext.class.getName() + ".current";
   private static final String VERIFIED = CurrentUserContext.class.getName() + ".verified";
-  private static final String EDITION = CurrentUserContext.class.getName() + ".edition";
+
+  /** Edition per company, in the request: a request may ask about more than one company. */
+  private static final String EDITIONS = CurrentUserContext.class.getName() + ".editions";
+
   private static final int SCOPE = RequestAttributes.SCOPE_REQUEST;
   private final AccountStore users;
   private final CompanyStore companies;
@@ -129,17 +134,35 @@ public class CurrentUserContext {
       return Edition.DISTRIBUTION;
     }
     RequestAttributes request = RequestContextHolder.getRequestAttributes();
-    if (request != null) {
-      Object cached = request.getAttribute(EDITION, SCOPE);
-      if (cached instanceof Edition cachedEdition) {
-        return cachedEdition;
-      }
+    Map<Long, Edition> cached = editions(request);
+    Edition edition = cached == null ? null : cached.get(tenantId);
+    if (edition != null) {
+      return edition;
     }
-    Edition edition = companies.editionOf(tenantId);
-    if (request != null) {
-      request.setAttribute(EDITION, edition, SCOPE);
+    edition = companies.editionOf(tenantId);
+    if (cached != null) {
+      cached.put(tenantId, edition);
     }
     return edition;
+  }
+
+  /**
+   * Per-request cache of company editions, keyed by company: a single request may ask about more
+   * than one company (for instance two memberships), and one company's answer must never stand in
+   * for another's. Null outside a request (jobs, startup).
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<Long, Edition> editions(RequestAttributes request) {
+    if (request == null) {
+      return null;
+    }
+    Object cached = request.getAttribute(EDITIONS, SCOPE);
+    if (cached instanceof Map<?, ?> map) {
+      return (Map<Long, Edition>) map;
+    }
+    Map<Long, Edition> fresh = new HashMap<>();
+    request.setAttribute(EDITIONS, fresh, SCOPE);
+    return fresh;
   }
 
   /** Every code of a company's edition (ADR-038): the grants a super administrator holds. */
@@ -169,7 +192,7 @@ public class CurrentUserContext {
     RequestAttributes request = RequestContextHolder.getRequestAttributes();
     if (request != null) {
       request.removeAttribute(CACHE, SCOPE);
-      request.removeAttribute(EDITION, SCOPE);
+      request.removeAttribute(EDITIONS, SCOPE);
     }
   }
 

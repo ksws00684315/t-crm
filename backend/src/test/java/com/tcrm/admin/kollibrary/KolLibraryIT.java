@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -36,6 +37,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -286,6 +288,78 @@ class KolLibraryIT {
                 "SELECT count(*) FROM crm_library_kol WHERE kol_username = 'raceone'",
                 Integer.class))
         .isEqualTo(1);
+  }
+
+  @Test
+  void shouldNameTheWinner_whenTwoCreatesRace() throws Exception {
+    // The losing request gets the same 409 detail as an ordinary duplicate: the winner's owner.
+    String token = library.token();
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    List<String> bodies = new CopyOnWriteArrayList<>();
+    try {
+      Callable<Void> attempt =
+          () -> {
+            bodies.add(
+                create(token, profile("racetwo", "Amy BD"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString());
+            return null;
+          };
+      var first = pool.submit(attempt);
+      var second = pool.submit(attempt);
+      first.get();
+      second.get();
+    } finally {
+      pool.shutdownNow();
+    }
+    String loser =
+        bodies.stream()
+            .filter(body -> body.contains("KOL_LIBRARY_DUPLICATE"))
+            .findFirst()
+            .orElseThrow();
+    JsonNode detail = json.readTree(loser).at("/data");
+    assertThat(detail.at("/followUpOwner").asText()).isEqualTo("Amy BD");
+    assertThat(detail.at("/displayName").asText()).isEqualTo("Nina racetwo");
+    assertThat(detail.at("/id").asText()).isNotEmpty();
+  }
+
+  @Test
+  void shouldMatchTheKeywordInAnyCase_forTheCreatorId() throws Exception {
+    // Stored IDs are lower case; a partly upper-case keyword still finds them.
+    String token = library.token();
+    createOk(token, "mixedcasekol", "Amy BD");
+    mvc.perform(get(LIB).param("keyword", "MixedCaseKol").header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1));
+    mvc.perform(get(LIB).param("keyword", "CASEKOL").header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(1));
+  }
+
+  @Test
+  void shouldListOnlyTheCodesOfTheEdition_inTheAccountList() throws Exception {
+    // A code of the other edition can only come from old data; the list must not show it.
+    String token = library.token();
+    long staff =
+        CompanySessions.createStaff(
+            mvc, json, token, PASSWORD, "dirtystaff", null, "ALL", List.of("kol-library:view"));
+    jdbc.update(
+        "UPDATE sys_user_permission SET permission_code = 'kol:view' WHERE user_id = ?", staff);
+    String listed =
+        mvc.perform(get("/admin-api/system/users").param("size", "50").header(TOKEN, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    JsonNode row = null;
+    for (JsonNode item : json.readTree(listed).at("/data/items")) {
+      if (item.at("/id").asLong() == staff) {
+        row = item;
+      }
+    }
+    assertThat(row).isNotNull();
+    assertThat(row.at("/permissions").toString()).doesNotContain("kol:view");
   }
 
   @Test

@@ -143,8 +143,25 @@
 
 | 迁移 | 内容 |
 | --- | --- |
-| `V202611091000__sys_tenant_edition.sql` | `sys_tenant.edition`（`VARCHAR(16)`，NOT NULL，默认回填 `DISTRIBUTION` 后删除默认值，CHECK 限定两个版本，带注释）。已有行全部回填 `DISTRIBUTION`，A 公司不受影响 |
-| `V202611091001__create_library_kol_tables.sql` | `crm_library_kol`、`crm_library_kol_content`（均带 `tenant_id` 与逻辑删除）；唯一索引 `uk_crm_library_kol_username (tenant_id, platform, kol_username) WHERE is_deleted = FALSE`；索引 `idx_crm_library_kol_update`、`idx_crm_library_kol_content_kol`。计算字段不入库 |
+| `V202611091700__sys_tenant_edition.sql` | `sys_tenant.edition`（`VARCHAR(16)`，NOT NULL，默认回填 `DISTRIBUTION` 后删除默认值，CHECK 限定两个版本，带注释）。已有行全部回填 `DISTRIBUTION`，A 公司不受影响 |
+| `V202611091701__create_library_kol_tables.sql` | `crm_library_kol`、`crm_library_kol_content`（均带 `tenant_id` 与逻辑删除）；唯一索引 `uk_crm_library_kol_username (tenant_id, platform, kol_username) WHERE is_deleted = FALSE`；索引 `idx_crm_library_kol_update`、`idx_crm_library_kol_content_kol`。计算字段不入库 |
+
+**版本号调整说明（审查二轮阻塞项）**：提示词分配的区间是 `V202611091000`～`099`，但该区间已被热修复 #253 的 `V202611091500` 占用。生产 Flyway 未开 out-of-order、忽略模式为空，若本任务的脚本版本号小于 `1500`，在已执行 1500 的环境上会被判为 ignored 并校验失败（后端起不来），而 CI 用空库、预览开了 out-of-order 都暴露不出来。因此两个脚本改名为 `V202611091700`、`V202611091701`（README 由项目负责人维护，本任务不修改，故不在此处改登记）。改名不影响已建的表：迁移内容未变。
+
+**回滚说明**：迁移删除了 `sys_tenant.edition` 的默认值。回滚到本版本之前的应用（`release.sh rollback` 不动数据库）时，平台新建公司会因该列 NOT NULL 且无默认值而失败；旧应用的其他功能不受影响。需要回滚到更早版本时，可临时 `ALTER TABLE sys_tenant ALTER COLUMN edition SET DEFAULT 'DISTRIBUTION'`，或先回滚应用再执行该语句。
+
+## 8.1 审查返工（PR #254 审查意见）
+
+| 审查项 | 处理 | 位置 |
+| --- | --- | --- |
+| 【阻塞】与 main 的文档冲突（`系统详细设计说明书.md`、`docs/04-开发任务/README.md`） | 合并 `origin/main`：README 采用 main 版本（本任务不改该文件）；设计说明书 §3.4 采用 main 的精简「公司」行，并保留本任务的「版本判定」「权限码按版本」「管理端按版本」三行 | 合并提交 |
+| 【阻塞】迁移版本号低于主干已发版的 `V202611091500` | 改名 `V202611091700` / `V202611091701`，见 §8 说明 | `backend/src/main/resources/db/migration/` |
+| 【建议】并发判重 409 可能缺负责人详情 | `create` / `update` 的插入改为**在 savepoint 内执行**：唯一冲突只回滚到 savepoint，同一事务随后读到赢家行并返回完整 `{id, followUpOwner, displayName}`；读不到时回退到预检结果，`update` 不再用正在编辑的自身行充数 | `LibraryKolService.insertRow/existingNow` |
+| 【建议】关键词对达人ID 的 `LIKE` 区分大小写 | 改为 `lower(kol_username) LIKE lower(pattern)`，与昵称一致 | `LibraryKolService.page` |
+| 【建议】账号列表的批量权限未按版本过滤 | 批量 `storedCodes` 按当前公司版本过滤，与单个账号路径一致（脏数据不会显示无效码） | `UserPermissionService.storedCodes` |
+| 【建议】`editionOf` 请求内缓存只用一个键 | 改为按公司缓存（请求属性里一张 Map），同一请求查多个公司不会串；`switchTo` 仍整表清空 | `CurrentUserContext.editionOf` |
+
+返工新增测试：`KolLibraryIT` 的并发判重详情、关键词大小写、账号列表按版本过滤三条集成测试；`CurrentUserContextTest` 的「一次请求查两个公司」单测。检查结果：`mvn -B verify` 通过（含新增用例，覆盖率门槛达标）；`-Pdocker-it` 的 `KolLibraryIT`(17)、`EditionIT`(8)、`SystemIT`(24)、`PermissionIT`(7)、`TenantIsolationIT`(7)、`MultiCompanyAccountIT`(9) 共 72 项全通过；管理端 114 文件 892 用例、类型检查与格式检查通过。
 
 ## 9. 清理与复查
 

@@ -82,9 +82,21 @@ public class UserPermissionService {
     return codes.stream().filter(storedSet(userId, tenantId)::contains).toList();
   }
 
+  /**
+   * Custody of the same codes for a page of accounts. Limited to the company's edition like the
+   * single-account lookup: a code of the other edition can only come from old data, and the list
+   * must not show codes the account cannot use.
+   */
   public Map<Long, List<String>> storedCodes(Collection<Long> userIds, long tenantId) {
     if (userIds == null || userIds.isEmpty()) {
       return Map.of();
+    }
+    EnumSet<Permission> usable = EnumSet.noneOf(Permission.class);
+    for (String code : current.editionCodes(tenantId)) {
+      Permission permission = Permission.fromCode(code);
+      if (permission != null) {
+        usable.add(permission);
+      }
     }
     Map<Long, EnumSet<Permission>> grouped = new HashMap<>();
     for (SysUserPermissionDO row :
@@ -94,7 +106,7 @@ public class UserPermissionService {
                 .eq(SysUserPermissionDO::getTenantId, tenantId)
                 .in(SysUserPermissionDO::getUserId, userIds))) {
       Permission permission = Permission.fromCode(row.getPermissionCode());
-      if (permission == null) {
+      if (permission == null || !usable.contains(permission)) {
         continue;
       }
       grouped
