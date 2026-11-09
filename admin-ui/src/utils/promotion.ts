@@ -106,7 +106,7 @@ export function incompletePromotionFields(config: PromotionCompletenessInput): s
   if (!config.defaultRate) missing.push("defaultRate");
   if (!config.platforms?.length || config.platforms.some(platform => !platform.templateId))
     missing.push("platforms");
-  if (!config.sheetUrl) missing.push("sheetUrl");
+  // Promo sheet URL is optional (issue #256): creators are reviewed first, the sheet comes later.
   if (config.review === false) missing.push("review");
   return missing;
 }
