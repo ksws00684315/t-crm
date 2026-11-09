@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -388,6 +388,14 @@ watch(id, () => {
   void loadContents();
 });
 
+// A tab restored from the tab list is cached by KeepAlive, so leaving and coming back does not run
+// onMounted again: (re)load whenever the creator is shown, which also covers the return from an
+// edit. Reading the id on every activation is cheap; the requests are the ones onMounted made.
+onActivated(() => {
+  void load();
+  void loadContents();
+});
+
 onMounted(() => {
   void load();
   void loadContents();
@@ -609,11 +617,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Block layout, like the list and form pages: the route host is a scrolling flex container, and a
+   column flex page there is squeezed to its own content height (the header collapsed to 2px). The
+   gaps between sections are margins for the same reason. */
 .detail-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tcrm-space-4);
   min-width: 0;
+}
+.detail-page > * + * {
+  margin-top: var(--tcrm-space-4);
 }
 .header-card {
   display: flex;

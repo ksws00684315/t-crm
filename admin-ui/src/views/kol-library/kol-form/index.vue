@@ -40,6 +40,7 @@ const tabs = useTabsStore();
 const editingId = computed(() => (typeof route.params.id === "string" ? route.params.id : null));
 const editing = computed(() => editingId.value !== null);
 const title = computed(() => (editing.value ? t("library.editTitle") : t("library.createTitle")));
+
 const detailTabPath = computed(() =>
   editingId.value ? `/kol-library/kols/${editingId.value}` : null
 );
@@ -84,6 +85,24 @@ function emptyForm(): LibraryKolRequest {
 }
 
 const form = reactive<LibraryKolRequest>(emptyForm());
+
+/**
+ * The edit tab names the creator being edited: the route's title key alone would show as
+ * "route.libraryKolEdit" in the tab strip.
+ */
+watch(
+  () => form.displayName,
+  name => {
+    const tab = tabs.tabs.find(item => item.path === route.path);
+    if (!editing.value || !tab || !name.trim()) return;
+    tabs.open({
+      ...tab,
+      titleKey: `${t("route.libraryKolEdit")}: ${name.trim()}`,
+      literalTitle: true
+    });
+  },
+  { flush: "post" }
+);
 /** The free tag typed in the input, added with Enter or the Add button. */
 const tagInput = ref("");
 
@@ -228,9 +247,12 @@ async function submit(): Promise<void> {
       ? await updateLibraryKol(editingId.value, toRequest())
       : await createLibraryKol(toRequest());
     ElMessage.success(editing.value ? t("library.saved") : t("library.created"));
-    // The form tab closes and the creator's detail tab opens; an already open list is reloaded.
+    // The form tab closes and the creator's detail tab opens; an already open list is reloaded, and
+    // an already open detail (editing an existing creator) reloads its data instead of showing
+    // what it cached before the change.
     const detailPath = `/kol-library/kols/${saved.id}`;
     tabs.refresh("/kol-library/kols");
+    if (editing.value) tabs.refresh(detailPath);
     tabs.close(route.path);
     tabs.open({
       path: detailPath,

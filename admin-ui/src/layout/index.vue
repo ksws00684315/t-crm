@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import LocaleSwitch from "@/components/LocaleSwitch.vue";
 import { translate } from "@/locales";
+import { mayOpenTab } from "@/router/guard";
 import { routes } from "@/router/routes";
 import { useCompanySync } from "@/composables/useCompanySync";
 import { useLocaleStore } from "@/stores/locale";
@@ -118,7 +119,10 @@ watch(
     );
     const componentName = route.meta.componentName;
     const title = route.meta.tabTitle ?? route.meta.title;
-    if (!componentName || !title || route.meta.noTab) return;
+    // A switch pins the new home itself once the new company is in place, and a page that no
+    // longer matches the session (still loading from the previous company) takes no tab.
+    if (!componentName || !title || route.meta.noTab || company.resetting.value) return;
+    if (!mayOpenTab(route.path, { isLoggedIn: user.isLoggedIn, ...access.value })) return;
     tabs.open({
       path: route.path,
       titleKey: String(title),
@@ -271,9 +275,15 @@ onBeforeUnmount(() => {
           :font="{ color: watermarkColor, fontSize: 14 }"
           data-test="watermark"
         >
+          <!-- A company switch unmounts the previous company's pages and shows nothing until the
+               new company is in place, so no old page loads or opens tabs under the new session. -->
           <RouterView v-slot="{ Component }">
             <Transition name="tcrm-page" mode="out-in">
-              <KeepAlive :key="company.cacheKey.value" :include="tabs.include">
+              <KeepAlive
+                v-if="!company.resetting.value"
+                :key="company.cacheKey.value"
+                :include="tabs.include"
+              >
                 <component :is="Component" v-if="Component" :key="tabs.keyFor(route.path)" />
               </KeepAlive>
             </Transition>

@@ -232,6 +232,26 @@ describe("creator library form", () => {
       "11",
       expect.objectContaining({ displayName: "Beauty by Amy II", platform: "TIKTOK" })
     );
+    // The details tab is opened and the form tab closed.
+    const tabs = useTabsStore();
+    expect(tabs.tabs.find(tab => tab.path === "/kol-library/kols/11/edit")).toBeUndefined();
+    expect(tabs.tabs.find(tab => tab.path === "/kol-library/kols/11")).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("names the edit tab after the creator being edited", async () => {
+    const tabs = useTabsStore();
+    tabs.open({
+      path: "/kol-library/kols/11/edit",
+      titleKey: "route.libraryKolEdit",
+      affix: false,
+      componentName: "LibraryKolFormPage"
+    });
+    const { wrapper } = await mountAt("/kol-library/kols/11/edit");
+    const formTab = tabs.tabs.find(tab => tab.path === "/kol-library/kols/11/edit");
+    // The route's title key alone would show as "route.libraryKolEdit" in the tab strip.
+    expect(formTab?.literalTitle).toBe(true);
+    expect(formTab?.titleKey).toContain("Beauty by Amy");
     wrapper.unmount();
   });
 

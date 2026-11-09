@@ -448,7 +448,6 @@ export const routes: RouteRecordRaw[] = [
               permission: "kol-library:view",
               editions: ["KOL_LIBRARY"],
               hideInMenu: true,
-              dynamicTitle: true,
               componentName: "LibraryKolDetailPage"
             }
           },
@@ -461,7 +460,6 @@ export const routes: RouteRecordRaw[] = [
               permission: "kol-library:edit",
               editions: ["KOL_LIBRARY"],
               hideInMenu: true,
-              dynamicTitle: true,
               componentName: "LibraryKolFormPage"
             }
           }
@@ -475,7 +473,10 @@ export const routes: RouteRecordRaw[] = [
           title: "route.forbidden",
           hideInMenu: true,
           componentName: "ForbiddenPage",
-          noTab: true
+          noTab: true,
+          // Open to every signed-in company account: the guard must not block the page it sends
+          // people to, or the redirect loops (a library company opening a distribution route).
+          editions: ["DISTRIBUTION", "KOL_LIBRARY"]
         }
       },
       // Merged and removed pages keep working as redirects, so bookmarks, notification links
