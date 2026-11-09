@@ -159,7 +159,7 @@ SELECT count(*) FROM crm_library_kol         WHERE kol_username LIKE 't143%'; --
 SELECT count(*) FROM crm_library_kol_content;                          -- 0（本任务数据已删）
 ```
 
-本任务没有新建容器、镜像或网络：后端与管理端用本机进程（18143 / 8843）连共享中间件，集成测试的 Testcontainers 容器由测试自身退出时回收。未停止、未重建负责人的 `tcrm-preview`，未动 `com.tcrm.aliyun-tunnel`，未执行 `down -v`。
+本任务没有新建常驻容器、镜像或网络：后端与管理端用本机进程（18143 / 8843）连共享中间件，交付时已停止这两个进程；集成测试的 Testcontainers 容器由测试自身退出时回收，复查后无残留（`docker ps -a` 无 ryuk / testcontainers 容器）。未停止、未重建负责人的 `tcrm-preview`（其 3 个容器一直在运行），未动 `com.tcrm.aliyun-tunnel`，未执行 `down -v`。
 
 复查结果（第 5 轮结束后实测）：`sys_tenant` / `sys_user` 中 `t143%` 计数为 0，`crm_library_kol` 与 `crm_library_kol_content` 为 0 行。各轮清了公司 1、账号 1～5、成员关系与权限若干、达人 1～4、内容记录 2～3 条、相关操作日志；公司总数回到 3（default / trev-b / t77-b02e732f）。
 
