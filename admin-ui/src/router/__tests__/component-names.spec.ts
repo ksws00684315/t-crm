@@ -42,6 +42,11 @@ describe("cacheable route component names", () => {
         "HomePage",
         "KolItemListPage",
         "KolListPage",
+        // Creator library pages (task 143); the form backs both the create and the edit route.
+        "LibraryKolDetailPage",
+        "LibraryKolFormPage",
+        "LibraryKolFormPage",
+        "LibraryKolListPage",
         "NotificationPage",
         "OrderChainPage",
         "OrderQueryPage",

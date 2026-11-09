@@ -1,7 +1,10 @@
 import type { RouteRecordRaw } from "vue-router";
+import { useUserStore } from "@/stores/user";
+import { homePathFor } from "@/utils/tabs";
 
 /**
- * Static routes. Access is `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
+ * Static routes. Access is `meta.editions` (default: the distribution product, ADR-038),
+ * `meta.permission`, `meta.superAdmin` or `meta.platformAdmin`.
  * The menu is derived from the same data; nothing is fetched from the backend.
  * Company home has no permission code: every company account may open it.
  *
@@ -319,6 +322,8 @@ export const routes: RouteRecordRaw[] = [
             meta: {
               title: "route.users",
               superAdmin: true,
+              // Account management is also the library's only other menu (ADR-038 §3.2).
+              editions: ["DISTRIBUTION", "KOL_LIBRARY"],
               componentName: "SystemUserPage"
             }
           },
@@ -349,6 +354,8 @@ export const routes: RouteRecordRaw[] = [
               title: "route.auditLogs",
               superAdmin: true,
               platformAdmin: true,
+              // The audit log stays in the distribution product; a library company has none.
+              editions: ["DISTRIBUTION"],
               componentName: "SystemOperLogPage"
             }
           }
@@ -381,6 +388,69 @@ export const routes: RouteRecordRaw[] = [
         name: "AccountPassword",
         component: () => import("@/views/account/password.vue"),
         meta: { title: "route.password", hideInMenu: true, componentName: "AccountPasswordPage" }
+      },
+      {
+        // TikTok creator library (ADR-038, requirement 1.2.5): list, detail, and the full-page form.
+        path: "kol-library",
+        name: "KolLibraryGroup",
+        redirect: "/kol-library/kols",
+        meta: {
+          title: "route.kolLibrary",
+          icon: "Avatar",
+          menuGroup: true,
+          editions: ["KOL_LIBRARY"]
+        },
+        children: [
+          {
+            path: "kols",
+            name: "LibraryKolList",
+            component: () => import("@/views/kol-library/kol-list/index.vue"),
+            meta: {
+              title: "route.libraryKols",
+              permission: "kol-library:view",
+              editions: ["KOL_LIBRARY"],
+              componentName: "LibraryKolListPage"
+            }
+          },
+          {
+            path: "kols/new",
+            name: "LibraryKolCreate",
+            component: () => import("@/views/kol-library/kol-form/index.vue"),
+            meta: {
+              title: "route.libraryKolNew",
+              permission: "kol-library:edit",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              componentName: "LibraryKolFormPage"
+            }
+          },
+          {
+            path: "kols/:id",
+            name: "LibraryKolDetail",
+            component: () => import("@/views/kol-library/kol-detail/index.vue"),
+            meta: {
+              title: "route.libraryKolDetail",
+              permission: "kol-library:view",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              dynamicTitle: true,
+              componentName: "LibraryKolDetailPage"
+            }
+          },
+          {
+            path: "kols/:id/edit",
+            name: "LibraryKolEdit",
+            component: () => import("@/views/kol-library/kol-form/index.vue"),
+            meta: {
+              title: "route.libraryKolEdit",
+              permission: "kol-library:edit",
+              editions: ["KOL_LIBRARY"],
+              hideInMenu: true,
+              dynamicTitle: true,
+              componentName: "LibraryKolFormPage"
+            }
+          }
+        ]
       },
       {
         path: "403",
@@ -416,6 +486,15 @@ export const routes: RouteRecordRaw[] = [
         redirect: "/system/oper-logs"
       }
     ]
+  },
+  {
+    // The home of a creator-library company is its creator list (ADR-038 §3.3, requirement 1.2.5):
+    // "/home" and anything unknown lead there instead of the workbench. Every other company keeps
+    // the workbench and the ordinary 404. Read at navigation time so a company switch is honoured.
+    path: "/home",
+    name: "LibraryHome",
+    redirect: () => homePathFor(useUserStore().user?.edition === "KOL_LIBRARY"),
+    meta: { public: true }
   },
   {
     path: "/:pathMatch(.*)*",

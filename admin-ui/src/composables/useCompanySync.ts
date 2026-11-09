@@ -14,7 +14,8 @@ import {
 } from "@/utils/company";
 import { ApiError } from "@/utils/http/error";
 import { notifyError } from "@/utils/notify";
-import { homeAffix } from "@/utils/tabs";
+import { accessOf, canAccessRoute } from "@/utils/permission";
+import { affixFor } from "@/utils/tabs";
 
 /**
  * Company switching in the header (task 21b, ADR-022). The session's current company lives on the
@@ -63,8 +64,17 @@ export function useCompanySync() {
       if (!id || id !== previousId || !company || !previousCompany || company === previousCompany) {
         return;
       }
+      // Close every tab of the previous company, then land on the new company's own home: the
+      // workbench for a distribution company, the creator list for a creator library (ADR-038 §3.3).
+      // The saved tab list is rewritten for the new edition so a reload keeps that home pinned.
       tabs.closeEveryTab();
-      await router.replace(homeAffix().path);
+      const nextAffix = affixFor(accessOf(user.user).isPlatformAdmin, company === "KOL_LIBRARY");
+      tabs.restore(
+        nextAffix,
+        path => canAccessRoute(router.resolve(path).meta, accessOf(user.user)),
+        user.user?.id ?? null
+      );
+      await router.replace(nextAffix.path);
       cacheKey.value = company;
       ElMessage.success(t("company.switched", { name: user.user?.tenantName ?? "" }));
     }

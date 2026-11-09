@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from "vue-router";
-import type { DataScope, PermissionCode, PostTemplate, Role } from "@/api/types";
+import type { CompanyEdition, DataScope, PermissionCode, PostTemplate, Role } from "@/api/types";
 import { i18n, translate } from "@/locales";
 
 /** Account the menu, the guard and the button helpers all read. Role names stay inside this module. */
@@ -12,6 +12,8 @@ export interface AbilitySubject {
   postTemplate?: PostTemplate | null;
   /** 1 enabled, 0 disabled; only the claim check needs it, so callers may omit it. */
   status?: 0 | 1;
+  /** Edition of the company the account currently works in (ADR-038). */
+  edition?: CompanyEdition | null;
 }
 
 /** What a signed-in session may do. Pages use these flags instead of comparing role names. */
@@ -20,7 +22,9 @@ export interface AccessProfile {
   /** Staff whose data scope is OWN. A super administrator is never own-scoped. */
   isOwnScope: boolean;
   isPlatformAdmin: boolean;
-  /** True for every code when the account is a super administrator. */
+  /** Edition of the current company; the distribution product when unknown. */
+  edition: CompanyEdition;
+  /** True for every code of the current edition when the account is a super administrator. */
   can: (code: PermissionCode) => boolean;
 }
 
@@ -28,20 +32,33 @@ export const NO_ACCESS: AccessProfile = {
   isSuperAdmin: false,
   isOwnScope: false,
   isPlatformAdmin: false,
+  edition: "DISTRIBUTION",
   can: () => false
 };
+
+/** Edition a subject belongs to; a missing or unknown value reads as the distribution product. */
+export function editionOf(
+  user: { edition?: CompanyEdition | null } | null | undefined
+): CompanyEdition {
+  return user?.edition === "KOL_LIBRARY" ? "KOL_LIBRARY" : "DISTRIBUTION";
+}
 
 export function accessOf(user: AbilitySubject | null | undefined): AccessProfile {
   if (!user) return NO_ACCESS;
   const isSuperAdmin = user.role === "SUPER_ADMIN";
   const isPlatformAdmin = user.role === "PLATFORM_ADMIN";
   const isOwnScope = user.role === "STAFF" && user.dataScope === "OWN";
+  const edition = editionOf(user);
   const owned = new Set(user.permissions ?? []);
   return {
     isSuperAdmin,
     isOwnScope,
     isPlatformAdmin,
-    can: code => isSuperAdmin || owned.has(code)
+    edition,
+    can: code =>
+      // The backend limits a super administrator to the codes of its edition; the screen does the
+      // same, so a menu entry cannot appear that the company could not use (ADR-038 §2.4).
+      isSuperAdmin ? EDITION_PERMISSION_CODES[edition].includes(code) : owned.has(code)
   };
 }
 
@@ -84,6 +101,39 @@ export const SELECTABLE_ROLES: readonly Exclude<Role, "PLATFORM_ADMIN">[] = [
 
 export const POST_TEMPLATES: readonly PostTemplate[] = ["OPERATOR", "BD", "FINANCE"];
 
+/**
+ * Codes each edition may use (ADR-038 §2.4), mirroring the backend registry. The distribution entry
+ * lists every code of the full product; the creator library only its two codes.
+ */
+export const EDITION_PERMISSION_CODES: Readonly<Record<CompanyEdition, readonly PermissionCode[]>> =
+  {
+    DISTRIBUTION: [
+      "kol:view",
+      "kol:edit",
+      "kol:register-link",
+      "kol:copy-token",
+      "product:view",
+      "product:edit",
+      "product:status",
+      "order:view",
+      "order:manage",
+      "commission:view",
+      "commission:freeze",
+      "payout-account:review",
+      "withdrawal:review",
+      "withdrawal:pay",
+      "prepay:apply",
+      "prepay:review",
+      "prepay:finance-review",
+      "prepay:pay",
+      "dashboard:shop",
+      "dashboard:team",
+      "dashboard:kol",
+      "data:export"
+    ],
+    KOL_LIBRARY: ["kol-library:view", "kol-library:edit"]
+  };
+
 /** Groups from `GET /system/permissions`, in the order the permission picker renders them. */
 export const PERMISSION_GROUP_ORDER = [
   "KOL",
@@ -91,8 +141,16 @@ export const PERMISSION_GROUP_ORDER = [
   "ORDER",
   "FUNDS",
   "DASHBOARD",
-  "OTHER"
+  "OTHER",
+  "KOL_LIBRARY"
 ] as const;
+
+/** Group order of one edition's picker: a creator library shows its own group first. */
+export function permissionGroupOrder(edition: CompanyEdition): readonly string[] {
+  return edition === "KOL_LIBRARY"
+    ? ["KOL_LIBRARY", ...PERMISSION_GROUP_ORDER.filter(group => group !== "KOL_LIBRARY")]
+    : PERMISSION_GROUP_ORDER;
+}
 
 export interface PermissionChoice {
   code: string;
@@ -109,7 +167,8 @@ export const EDIT_PERMISSION_DEPENDENCIES: Readonly<Record<string, string>> = {
   "product:edit": "product:view",
   "product:status": "product:view",
   "order:manage": "order:view",
-  "payout-account:review": "commission:view"
+  "payout-account:review": "commission:view",
+  "kol-library:edit": "kol-library:view"
 };
 
 /** One checkbox flip on a permission set, applying the dependency rules above. */
@@ -138,10 +197,13 @@ export interface PermissionGroupView {
 }
 
 /** Known groups first, then any group the API adds, skipping empty groups. */
-export function groupPermissions(items: readonly PermissionChoice[]): PermissionGroupView[] {
+export function groupPermissions(
+  items: readonly PermissionChoice[],
+  order: readonly string[] = PERMISSION_GROUP_ORDER
+): PermissionGroupView[] {
   const buckets = new Map<string, PermissionChoice[]>();
   const extra: string[] = [];
-  for (const group of PERMISSION_GROUP_ORDER) buckets.set(group, []);
+  for (const group of order) buckets.set(group, []);
   for (const item of items) {
     if (!buckets.has(item.group)) {
       buckets.set(item.group, []);
@@ -149,7 +211,7 @@ export function groupPermissions(items: readonly PermissionChoice[]): Permission
     }
     buckets.get(item.group)?.push(item);
   }
-  return [...PERMISSION_GROUP_ORDER, ...extra]
+  return [...order, ...extra]
     .map(group => ({ group, items: buckets.get(group) ?? [] }))
     .filter(group => group.items.length > 0);
 }
@@ -186,12 +248,38 @@ export function permissionGroupLabel(group: string): string {
 export interface RouteAccessMeta {
   /** Permission code required to open the route. A super administrator passes every code. */
   permission?: PermissionCode | readonly PermissionCode[];
+  /**
+   * Editions the route belongs to (ADR-038). Only the library pages declare `KOL_LIBRARY`; a route
+   * without the flag belongs to the distribution product, so a new page cannot appear in the
+   * library company by being forgotten.
+   */
+  editions?: readonly CompanyEdition[];
   superAdmin?: boolean;
   platformAdmin?: boolean;
   hideForOwn?: boolean;
   hideInMenu?: boolean;
   /** Company business page that stays closed to the platform administrator. */
   companyAccount?: boolean;
+  /**
+   * Tab title built at run time from the record (the creator detail tab shows the nickname). A
+   * route with `dynamicTitle` reports it on the route meta before it is opened in a tab.
+   */
+  dynamicTitle?: boolean;
+}
+
+/** The editions a route belongs to; undeclared means the distribution product only. */
+export function routeEditions(meta: RouteAccessMeta | undefined): readonly CompanyEdition[] {
+  const declared = meta?.editions;
+  return declared && declared.length > 0 ? declared : ["DISTRIBUTION"];
+}
+
+/** True when the route belongs to the edition of the company. */
+export function editionAllowsRoute(
+  meta: RouteAccessMeta | undefined,
+  edition: CompanyEdition
+): boolean {
+  const allowed: readonly CompanyEdition[] = routeEditions(meta);
+  return allowed.some(item => item === edition);
 }
 
 /** The permission codes a route asks for; empty when the route has none. */
@@ -202,19 +290,24 @@ function requiredCodes(meta: RouteAccessMeta | undefined): readonly PermissionCo
 }
 
 /**
- * Whether a signed-in user may open a route. An array `permission` means any one code suffices
+ * Whether a signed-in user may open a route: the route must belong to the company's edition and the
+ * account must hold its permission code or role. An array `permission` means any one code suffices
  * (task 15b §4.2.1). Company home has no permission code: every company account may open it, and
  * the platform administrator may not. OWN hides `hideForOwn` routes.
  */
 export function canAccessRoute(meta: RouteAccessMeta | undefined, access: AccessProfile): boolean {
   if (meta?.platformAdmin && meta?.superAdmin) {
-    return access.isPlatformAdmin || access.isSuperAdmin;
+    // Open to either administrator type, but a company account still needs the edition: the audit
+    // log, for instance, is a distribution page the platform administrator also reads.
+    if (access.isPlatformAdmin) return true;
+    return editionAllowsRoute(meta, access.edition) && access.isSuperAdmin;
   }
   if (meta?.platformAdmin) return access.isPlatformAdmin;
   if (access.isPlatformAdmin) {
     if (meta?.companyAccount) return false;
     return !meta?.permission && !meta?.superAdmin && meta?.hideInMenu === true;
   }
+  if (!editionAllowsRoute(meta, access.edition)) return false;
   if (meta?.superAdmin && !access.isSuperAdmin) return false;
   const codes = requiredCodes(meta);
   if (codes.length > 0 && !codes.some(code => access.can(code))) return false;
@@ -234,43 +327,53 @@ export interface MenuItem {
   badge?: number;
 }
 
-/** Side menu entries the session may open, in route order. Supports one level of grouping. */
+/**
+ * Side menu entries the session may open, in route order. Supports one level of grouping; a group
+ * may sit anywhere in the tree (the creator library is a group of the layout like every other).
+ */
 export function buildMenu(routes: readonly RouteRecordRaw[], access: AccessProfile): MenuItem[] {
+  const joined = (base: string, path: string): string =>
+    path.startsWith("/") ? path : `${base.replace(/\/$/, "")}/${path}`;
+  const group = (route: RouteRecordRaw, path: string): MenuItem | null => {
+    const meta = route.meta;
+    const children: MenuItem[] = [];
+    for (const child of route.children ?? []) {
+      const childPath = joined(path, child.path);
+      const childMeta = child.meta;
+      if (childMeta?.menuGroup) {
+        const nested = group(child, childPath);
+        if (nested) children.push(nested);
+        continue;
+      }
+      if (
+        childMeta?.title &&
+        !childMeta.public &&
+        !childMeta.hideInMenu &&
+        canAccessRoute(childMeta, access)
+      ) {
+        children.push({
+          path: childPath,
+          title: translate(childMeta.title),
+          icon: childMeta.icon as string | undefined
+        });
+      }
+    }
+    if (children.length === 0 || !meta?.title) return null;
+    return {
+      path,
+      title: translate(meta.title),
+      icon: meta.icon as string | undefined,
+      children
+    };
+  };
   const items: MenuItem[] = [];
   const visit = (list: readonly RouteRecordRaw[], base: string) => {
     for (const route of list) {
-      const path = route.path.startsWith("/")
-        ? route.path
-        : `${base.replace(/\/$/, "")}/${route.path}`;
+      const path = joined(base, route.path);
       const meta = route.meta;
-      if (meta?.menuGroup && meta.title) {
-        const children: MenuItem[] = [];
-        for (const child of route.children ?? []) {
-          const childPath = child.path.startsWith("/")
-            ? child.path
-            : `${path.replace(/\/$/, "")}/${child.path}`;
-          const childMeta = child.meta;
-          if (
-            childMeta?.title &&
-            !childMeta.public &&
-            !childMeta.hideInMenu &&
-            canAccessRoute(childMeta, access)
-          ) {
-            children.push({
-              path: childPath,
-              title: translate(childMeta.title),
-              icon: childMeta.icon as string | undefined
-            });
-          }
-        }
-        if (children.length > 0) {
-          items.push({
-            path,
-            title: translate(meta.title),
-            icon: meta.icon as string | undefined,
-            children
-          });
-        }
+      if (meta?.menuGroup) {
+        const entry = group(route, path);
+        if (entry) items.push(entry);
         continue;
       }
       if (meta?.title && !meta.public && !meta.hideInMenu && canAccessRoute(meta, access)) {
@@ -404,4 +507,21 @@ export function orderAbilities(user: AbilitySubject | null | undefined): OrderAb
 /** List export button. */
 export function canExport(user: AbilitySubject | null | undefined): boolean {
   return accessOf(user).can("data:export");
+}
+
+/** Creator-library button visibility (ADR-038, task 143 §3.2.5). The backend enforces the same. */
+export interface LibraryAbilities {
+  /** Add and edit creators, add and edit content, update the follow-up. */
+  canEdit: boolean;
+  /** Delete a creator or a content record: super administrators only (requirement P1-15). */
+  canDelete: boolean;
+}
+
+export function libraryAbilities(user: AbilitySubject | null | undefined): LibraryAbilities {
+  const access = accessOf(user);
+  const inLibrary = access.edition === "KOL_LIBRARY";
+  return {
+    canEdit: inLibrary && access.can("kol-library:edit"),
+    canDelete: inLibrary && access.isSuperAdmin
+  };
 }

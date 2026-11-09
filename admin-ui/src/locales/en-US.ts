@@ -12,6 +12,7 @@ const enUS: MessageSchema = {
   },
   common: {
     language: "Language",
+    required: "This field is required",
     search: "Search",
     reset: "Reset",
     cancel: "Cancel",
@@ -73,7 +74,8 @@ const enUS: MessageSchema = {
     ORDER: "Orders",
     FUNDS: "Funds",
     DASHBOARD: "Dashboards",
-    OTHER: "Other"
+    OTHER: "Other",
+    KOL_LIBRARY: "Creator library"
   },
   permission: {
     "prepay:review": {
@@ -208,7 +210,12 @@ const enUS: MessageSchema = {
     forbidden: "Access denied",
     notFound: "Page not found",
     notifications: "Notifications",
-    resignation: "Resignation"
+    resignation: "Resignation",
+    kolLibrary: "Creator library",
+    libraryKols: "Creators",
+    libraryKolNew: "Add creator",
+    libraryKolDetail: "Creator detail",
+    libraryKolEdit: "Edit profile"
   },
   errors: {
     PREPAY_REQUEST_CONFLICT:
@@ -353,6 +360,10 @@ const enUS: MessageSchema = {
     FILE_IN_USE: "The file is already used by another record.",
     AUTH_COMPANY_NOT_MEMBER: "You are no longer a member of this company, or it has been disabled.",
     AUTH_COMPANY_SWITCHED: "The current company was switched in another tab. The page will reload.",
+    AUTH_EDITION_FORBIDDEN: "The edition of the current company does not include this feature.",
+    USER_PERMISSION_EDITION_MISMATCH:
+      "That permission belongs to another company edition and cannot be used here.",
+    KOL_LIBRARY_DUPLICATE: "This creator is already in the library and cannot be entered twice.",
     USER_MULTI_COMPANY_LOCKED:
       "This account also belongs to other companies. Only the platform administrator can change its name, email or password.",
     USER_ALREADY_MEMBER: "This account is already a member of this company.",
@@ -649,7 +660,14 @@ const enUS: MessageSchema = {
     codePlaceholder:
       "Lowercase letters, digits, hyphens, 2-32 characters. Cannot be changed later.",
     saved: "Company saved.",
-    created: "Company created."
+    created: "Company created.",
+    edition: "Edition",
+    editionRequired: "Choose an edition",
+    editionLocked: "The edition cannot be changed after the company is created.",
+    editionValue: {
+      DISTRIBUTION: "Full distribution",
+      KOL_LIBRARY: "Creator library"
+    }
   },
   tenantAdmin: {
     created: "Super Admin created.",
@@ -691,6 +709,214 @@ const enUS: MessageSchema = {
     confirmEnable: "{username} will be able to sign in to every company it belongs to. Enable?",
     accountDisabled: "Account disabled.",
     accountEnabled: "Account enabled."
+  },
+  library: {
+    separator: ", ",
+    create: "Add creator",
+    createTitle: "Add creator",
+    editTitle: "Edit profile",
+    editProfile: "Edit profile",
+    editTabTitle: "Edit profile: {name}",
+    updateFollowUp: "Update follow-up",
+    view: "View",
+    backToList: "Back to creators",
+    notFound: "This creator does not exist or has been deleted",
+    saved: "Profile saved",
+    created: "Creator added",
+    deleted: "Creator deleted",
+    deleteTitle: "Delete creator",
+    deleteContentTitle: "Delete content record",
+    confirmDelete:
+      'Delete creator "{name}"? Its content records are deleted as well and cannot be restored.',
+    confirmDeleteContent: "Delete the content record published on {date}? It cannot be restored.",
+    followUpSaved: "Follow-up updated",
+    contentDeleted: "Content record deleted",
+    duplicate: "This creator was already entered by {owner}.",
+    addTag: "Add tag",
+    column: {
+      kol: "Creator",
+      platform: "Platform",
+      country: "Country site",
+      categories: "Content categories",
+      outreachStatus: "Outreach status",
+      followUpOwner: "Follow-up owner",
+      updateTime: "Updated"
+    },
+    filter: {
+      keyword: "Keyword",
+      keywordPlaceholder: "Creator ID or nickname"
+    },
+    group: {
+      basic: "Basic data",
+      audience: "Audience",
+      contact: "Contact",
+      quality: "Quality and tier",
+      tags: "Tags and notes",
+      followUp: "Outreach and samples"
+    },
+    field: {
+      kolUsername: "Creator ID (username)",
+      kolUsernamePlaceholder: "Paste {'@'}username; the {'@'} is removed and the value lower-cased",
+      displayName: "Creator name (nickname)",
+      followers: "Followers",
+      platform: "Platform",
+      country: "Country site",
+      profileUrl: "Profile link",
+      profileUrlPlaceholder: "https://www.tiktok.com/{'@'}...",
+      categories: "Content categories",
+      avgViews: "Average views",
+      engagementRate: "Engagement rate (%)",
+      audienceCountry: "Country / region",
+      audienceAgeRange: "Age range",
+      audienceGender: "Gender",
+      contact: "WhatsApp/TEL",
+      contactPlaceholder: "Country code plus number",
+      contentQuality: "Content quality",
+      salesPotential: "Selling potential",
+      cooperationAttitude: "Cooperation attitude",
+      grade: "Creator tier",
+      cooperationStage: "Cooperation stage",
+      tags: "Free tags",
+      tagPlaceholder: "Type and press Enter",
+      remark: "Notes",
+      outreachStatus: "Outreach status",
+      followUpOwner: "Follow-up owner",
+      lastContactDate: "Last contact",
+      sampleStatus: "Sample status",
+      trackingNo: "Tracking number",
+      sampleDate: "Sample date"
+    },
+    validation: {
+      usernameRequired: "Enter the creator ID",
+      nameRequired: "Enter the creator name",
+      categoriesRequired: "Choose at least one content category",
+      ownerRequired: "Enter the follow-up owner",
+      tagsLimit: "At most 10 tags",
+      urlRequired: "Enter the content link",
+      dateRequired: "Choose the publish date"
+    },
+    tab: {
+      profile: "Creator profile",
+      contents: "Sales results"
+    },
+    metric: {
+      contentCount: "Content records",
+      clicks: "Total clicks",
+      orders: "Total orders",
+      gmv: "Total GMV",
+      totalCost: "Total cost",
+      roi: "Total ROI"
+    },
+    content: {
+      publishDate: "Publish date",
+      contentForm: "Format",
+      publishUrl: "Content link",
+      clicks: "Clicks",
+      orders: "Orders",
+      gmv: "GMV",
+      sampleType: "Sample",
+      sampleCost: "Sample cost",
+      slotFee: "Slot fee",
+      commissionRate: "Commission rate (%)",
+      estimatedCommission: "Estimated commission",
+      totalCost: "Total cost",
+      actualRoi: "Actual ROI",
+      nextAction: "Next step",
+      create: "Add content record",
+      createTitle: "Add content record",
+      editTitle: "Edit content record",
+      saved: "Content record saved",
+      created: "Content record added",
+      amountPlaceholder: "Empty counts as 0",
+      ratePlaceholder: "0 to 100; empty counts as 0"
+    },
+    platform: {
+      TIKTOK: "TikTok",
+      INSTAGRAM: "Instagram",
+      YOUTUBE: "YouTube",
+      OTHER: "Other"
+    },
+    country: {
+      US: "United States",
+      GB: "United Kingdom",
+      MX: "Mexico",
+      DE: "Germany",
+      FR: "France",
+      IT: "Italy",
+      ES: "Spain",
+      JP: "Japan",
+      ID: "Indonesia",
+      TH: "Thailand",
+      VN: "Vietnam",
+      MY: "Malaysia",
+      PH: "Philippines",
+      SG: "Singapore",
+      OTHER: "Other"
+    },
+    category: {
+      BEAUTY_PERSONAL_CARE: "Beauty & personal care",
+      HEALTH_SUPPLEMENTS: "Health & supplements",
+      HOME_DAILY: "Home & daily use",
+      ELECTRONICS_3C: "3C & electronics",
+      FASHION_ACCESSORIES: "Fashion & accessories",
+      MATERNAL_BABY: "Mother & baby",
+      FOOD_BEVERAGE: "Food & beverage",
+      PET: "Pets",
+      SPORTS_OUTDOOR: "Sports & outdoors",
+      OTHER: "Other"
+    },
+    level: {
+      HIGH: "High",
+      MEDIUM: "Medium",
+      LOW: "Low"
+    },
+    grade: {
+      S: "S",
+      A: "A",
+      B: "B",
+      C: "C"
+    },
+    cooperationStage: {
+      FIRST_COOPERATION: "First cooperation",
+      REPEAT_INVESTMENT: "Repeat investment",
+      LONG_TERM_PARTNERSHIP: "Long-term partnership",
+      EXCLUSIVE: "Exclusive"
+    },
+    outreachStatus: {
+      NOT_CONTACTED: "Not contacted",
+      EMAIL_SENT: "Email sent",
+      REPLIED: "Replied",
+      WHATSAPP_ADDED: "WhatsApp added",
+      REJECTED: "Rejected",
+      COOPERATING: "Cooperating"
+    },
+    sampleStatus: {
+      NOT_SENT: "Not sent",
+      SHIPPED: "Shipped",
+      RECEIVED: "Received",
+      NOT_NEEDED: "Not needed"
+    },
+    contentForm: {
+      SHORT_VIDEO: "Short video",
+      LIVE: "Live",
+      POST: "Image post"
+    },
+    sampleType: {
+      GIFT: "Gift",
+      PHOTO_SHOOT: "Photo shoot"
+    },
+    audienceAge: {
+      AGE_18_24: "18 to 24",
+      AGE_25_34: "25 to 34",
+      AGE_35_44: "35 to 44",
+      AGE_45_54: "45 to 54",
+      AGE_55_PLUS: "55+"
+    },
+    audienceGender: {
+      MOSTLY_FEMALE: "Mostly female",
+      MOSTLY_MALE: "Mostly male",
+      BALANCED: "Balanced"
+    }
   },
   kol: {
     /** Query area (03.02): creator ID, name, email. */

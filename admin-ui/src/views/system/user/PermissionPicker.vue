@@ -1,20 +1,27 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import type { CompanyEdition } from "@/api/types";
 import type { PermissionChoice } from "@/utils/permission";
 import {
   groupPermissions,
   permissionGroupLabel,
+  permissionGroupOrder,
   permissionText,
   togglePermission
 } from "@/utils/permission";
 
 defineOptions({ name: "PermissionPicker" });
 
-const props = defineProps<{
-  items: PermissionChoice[];
-  modelValue: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    items: PermissionChoice[];
+    modelValue: string[];
+    /** Groups in the order of the current company's edition (a creator library first). */
+    edition?: CompanyEdition;
+  }>(),
+  { edition: "DISTRIBUTION" }
+);
 
 const emit = defineEmits<{
   (event: "update:modelValue", value: string[]): void;
@@ -25,7 +32,7 @@ const { t, locale } = useI18n();
 const groups = computed(() => {
   void locale.value;
   const selected = new Set(props.modelValue);
-  return groupPermissions(props.items).map(group => {
+  return groupPermissions(props.items, permissionGroupOrder(props.edition)).map(group => {
     const codes = group.items.map(item => item.code);
     const picked = codes.filter(code => selected.has(code)).length;
     return {

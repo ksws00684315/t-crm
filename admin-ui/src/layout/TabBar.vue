@@ -64,7 +64,9 @@ function onKeydown(event: KeyboardEvent, index: number): void {
 
 const titles = computed(() => {
   void localeStore.locale;
-  return new Map(tabs.tabs.map(tab => [tab.path, translate(tab.titleKey)]));
+  return new Map(
+    tabs.tabs.map(tab => [tab.path, tab.literalTitle ? tab.titleKey : translate(tab.titleKey)])
+  );
 });
 
 function title(path: string): string {

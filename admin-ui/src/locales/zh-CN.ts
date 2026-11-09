@@ -15,6 +15,7 @@ const zhCN = {
   },
   common: {
     language: "语言",
+    required: "该项为必填",
     search: "查询",
     reset: "重置",
     cancel: "取消",
@@ -77,7 +78,8 @@ const zhCN = {
     ORDER: "订单",
     FUNDS: "资金",
     DASHBOARD: "看板",
-    OTHER: "其他"
+    OTHER: "其他",
+    KOL_LIBRARY: "达人库"
   },
   permission: {
     "prepay:review": {
@@ -212,7 +214,12 @@ const zhCN = {
     forbidden: "无权访问",
     notFound: "页面不存在",
     notifications: "站内消息",
-    resignation: "离职申请"
+    resignation: "离职申请",
+    kolLibrary: "达人库",
+    libraryKols: "达人列表",
+    libraryKolNew: "新增达人",
+    libraryKolDetail: "达人详情",
+    libraryKolEdit: "编辑档案"
   },
   errors: {
     PREPAY_REQUEST_CONFLICT: "该申请编号已用于其他内容，请核对申请列表后重试。",
@@ -337,6 +344,9 @@ const zhCN = {
     FILE_IN_USE: "文件已被其他记录使用",
     AUTH_COMPANY_NOT_MEMBER: "你已不是该公司的成员，或该公司已停用",
     AUTH_COMPANY_SWITCHED: "当前公司已在其他标签页切换，页面将刷新",
+    AUTH_EDITION_FORBIDDEN: "当前公司的版本不包含该功能",
+    USER_PERMISSION_EDITION_MISMATCH: "该权限码属于另一种公司版本，当前公司不可使用",
+    KOL_LIBRARY_DUPLICATE: "该达人已在达人库中，不能重复录入",
     USER_MULTI_COMPANY_LOCKED: "该账号还属于其他公司；姓名、邮箱、密码只能由平台管理员修改",
     USER_ALREADY_MEMBER: "该账号已是这家公司的成员",
     generic: "操作失败，请稍后重试",
@@ -624,7 +634,14 @@ const zhCN = {
     createTitle: "新建公司",
     codePlaceholder: "小写字母、数字、连字符，2～32 位，创建后不可修改",
     saved: "公司已保存",
-    created: "公司已创建"
+    created: "公司已创建",
+    edition: "版本",
+    editionRequired: "请选择版本",
+    editionLocked: "版本在创建后不可修改。",
+    editionValue: {
+      DISTRIBUTION: "分销完整版",
+      KOL_LIBRARY: "达人库版"
+    }
   },
   tenantAdmin: {
     created: "超级管理员已创建",
@@ -665,6 +682,215 @@ const zhCN = {
     confirmEnable: "启用后，{username} 可以登录其所属的所有公司。确定启用吗？",
     accountDisabled: "账号已停用",
     accountEnabled: "账号已启用"
+  },
+  // TikTok 达人库（ADR-038、需求 1.2；任务 143）。下拉取值集中在 library.<family>.<VALUE>。
+  library: {
+    separator: "、",
+    create: "新增达人",
+    createTitle: "新增达人",
+    editTitle: "编辑档案",
+    editProfile: "编辑档案",
+    editTabTitle: "编辑档案：{name}",
+    updateFollowUp: "更新跟进",
+    view: "查看",
+    backToList: "返回达人列表",
+    notFound: "该达人不存在或已被删除",
+    saved: "档案已保存",
+    created: "达人已新增",
+    deleted: "达人已删除",
+    deleteTitle: "删除达人",
+    deleteContentTitle: "删除内容记录",
+    confirmDelete: "确定删除达人「{name}」吗？其内容记录将一并删除，且无法恢复。",
+    confirmDeleteContent: "确定删除 {date} 的这条内容记录吗？删除后无法恢复。",
+    followUpSaved: "跟进已更新",
+    contentDeleted: "内容记录已删除",
+    duplicate: "该达人已由 {owner} 录入。",
+    addTag: "添加标签",
+    column: {
+      kol: "达人",
+      platform: "所属平台",
+      country: "国家站点",
+      categories: "内容类目",
+      outreachStatus: "建联状态",
+      followUpOwner: "跟进负责人",
+      updateTime: "更新时间"
+    },
+    filter: {
+      keyword: "关键词",
+      keywordPlaceholder: "达人ID 或昵称"
+    },
+    group: {
+      basic: "基础数据",
+      audience: "受众画像",
+      contact: "联系方式",
+      quality: "质量及分层",
+      tags: "标签备注",
+      followUp: "建联与寄样"
+    },
+    field: {
+      kolUsername: "达人ID（用户名）",
+      // The at sign is the linked-message marker in vue-i18n, so it is escaped for display.
+      kolUsernamePlaceholder: "可粘贴 {'@'}用户名，保存时自动去 {'@'} 并转小写",
+      displayName: "达人名称（昵称）",
+      followers: "粉丝数",
+      platform: "所属平台",
+      country: "国家站点",
+      profileUrl: "主页链接",
+      profileUrlPlaceholder: "https://www.tiktok.com/{'@'}…",
+      categories: "内容类目",
+      avgViews: "平均播放量",
+      engagementRate: "互动率（%）",
+      audienceCountry: "国家/地区",
+      audienceAgeRange: "年龄段",
+      audienceGender: "性别",
+      contact: "WhatsApp/TEL",
+      contactPlaceholder: "国家区号 + 号码",
+      contentQuality: "内容质量",
+      salesPotential: "带货潜力",
+      cooperationAttitude: "配合度",
+      grade: "达人分级",
+      cooperationStage: "合作阶段",
+      tags: "自由标签",
+      tagPlaceholder: "输入后按回车",
+      remark: "备注",
+      outreachStatus: "建联状态",
+      followUpOwner: "跟进负责人",
+      lastContactDate: "最近沟通时间",
+      sampleStatus: "寄样状态",
+      trackingNo: "快递单号",
+      sampleDate: "寄样日期"
+    },
+    validation: {
+      usernameRequired: "请输入达人ID",
+      nameRequired: "请输入达人名称",
+      categoriesRequired: "请至少选择一个内容类目",
+      ownerRequired: "请填写跟进负责人",
+      tagsLimit: "最多 10 个标签",
+      urlRequired: "请填写发布内容链接",
+      dateRequired: "请选择发布日期"
+    },
+    tab: {
+      profile: "达人档案",
+      contents: "带货数据"
+    },
+    metric: {
+      contentCount: "内容条数",
+      clicks: "累计点击量",
+      orders: "累计出单量",
+      gmv: "累计带货GMV",
+      totalCost: "累计总投入成本",
+      roi: "累计ROI"
+    },
+    content: {
+      publishDate: "发布日期",
+      contentForm: "内容形式",
+      publishUrl: "发布内容链接",
+      clicks: "点击量",
+      orders: "出单量",
+      gmv: "带货GMV",
+      sampleType: "样品情况",
+      sampleCost: "样品成本",
+      slotFee: "坑位费",
+      commissionRate: "佣金比例（%）",
+      estimatedCommission: "预估佣金",
+      totalCost: "总投入成本",
+      actualRoi: "实际ROI",
+      nextAction: "下一步行动计划",
+      create: "新增内容记录",
+      createTitle: "新增内容记录",
+      editTitle: "编辑内容记录",
+      saved: "内容记录已保存",
+      created: "内容记录已新增",
+      amountPlaceholder: "留空按 0 计",
+      ratePlaceholder: "0～100，留空按 0 计"
+    },
+    platform: {
+      TIKTOK: "TikTok",
+      INSTAGRAM: "Instagram",
+      YOUTUBE: "YouTube",
+      OTHER: "其他"
+    },
+    country: {
+      US: "美国",
+      GB: "英国",
+      MX: "墨西哥",
+      DE: "德国",
+      FR: "法国",
+      IT: "意大利",
+      ES: "西班牙",
+      JP: "日本",
+      ID: "印尼",
+      TH: "泰国",
+      VN: "越南",
+      MY: "马来西亚",
+      PH: "菲律宾",
+      SG: "新加坡",
+      OTHER: "其他"
+    },
+    category: {
+      BEAUTY_PERSONAL_CARE: "美妆个护",
+      HEALTH_SUPPLEMENTS: "保健营养",
+      HOME_DAILY: "家居日用",
+      ELECTRONICS_3C: "3C 数码",
+      FASHION_ACCESSORIES: "服饰配饰",
+      MATERNAL_BABY: "母婴",
+      FOOD_BEVERAGE: "食品饮料",
+      PET: "宠物",
+      SPORTS_OUTDOOR: "运动户外",
+      OTHER: "其他"
+    },
+    level: {
+      HIGH: "高",
+      MEDIUM: "中",
+      LOW: "低"
+    },
+    grade: {
+      S: "S",
+      A: "A",
+      B: "B",
+      C: "C"
+    },
+    cooperationStage: {
+      FIRST_COOPERATION: "初次合作",
+      REPEAT_INVESTMENT: "复投中",
+      LONG_TERM_PARTNERSHIP: "长期深度合作",
+      EXCLUSIVE: "独家"
+    },
+    outreachStatus: {
+      NOT_CONTACTED: "未建联",
+      EMAIL_SENT: "已发邮件",
+      REPLIED: "已回复",
+      WHATSAPP_ADDED: "已加 WhatsApp",
+      REJECTED: "拒绝",
+      COOPERATING: "合作中"
+    },
+    sampleStatus: {
+      NOT_SENT: "未寄样",
+      SHIPPED: "已寄出",
+      RECEIVED: "已签收",
+      NOT_NEEDED: "无需寄样"
+    },
+    contentForm: {
+      SHORT_VIDEO: "短视频",
+      LIVE: "直播",
+      POST: "图文"
+    },
+    sampleType: {
+      GIFT: "送样",
+      PHOTO_SHOOT: "寄拍"
+    },
+    audienceAge: {
+      AGE_18_24: "18~24",
+      AGE_25_34: "25~34",
+      AGE_35_44: "35~44",
+      AGE_45_54: "45~54",
+      AGE_55_PLUS: "55+"
+    },
+    audienceGender: {
+      MOSTLY_FEMALE: "女性为主",
+      MOSTLY_MALE: "男性为主",
+      BALANCED: "均衡"
+    }
   },
   kol: {
     /** Query area (03.02): creator ID, name, email. */

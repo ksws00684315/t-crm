@@ -16,6 +16,7 @@ import { formatInstant, formatInstantToMinute } from "@/utils/format";
 import { notifyError } from "@/utils/notify";
 import {
   canExport,
+  editionOf,
   isStaff,
   isSuperAdminAccount,
   permissionText,
@@ -38,6 +39,12 @@ const me = useUserStore();
 /** Widths are tuned for the 14px Chinese labels; English needs more room and scrolls instead. */
 const px = (zh: number, en: number): number => (locale.value === "zh-CN" ? zh : en);
 const exportAllowed = computed(() => canExport(me.user));
+/**
+ * A creator-library company has no post templates and no data scope (both belong to the
+ * distribution product; accounts of the library do not separate data, requirement P1-13), so the
+ * page hides both and keeps only the library codes in the permission picker (ADR-038 §2.4).
+ */
+const libraryEdition = computed(() => editionOf(me.user) === "KOL_LIBRARY");
 const loading = ref(false);
 const loadFailed = ref(false);
 const rows = ref<UserVO[]>([]);
@@ -58,33 +65,42 @@ function asUser(row: object): UserVO {
   return row as UserVO;
 }
 
-const columns = computed<DataColumn[]>(() => [
-  {
-    key: "username",
-    align: "left" as const,
-    label: t("common.username"),
-    prop: "username",
-    minWidth: 130
-  },
-  {
-    key: "nickname",
-    align: "left" as const,
-    label: t("common.nickname"),
-    prop: "nickname",
-    minWidth: 120
-  },
-  { key: "role", label: t("user.role"), width: 120 },
-  { key: "post", label: t("user.post"), width: 90 },
-  // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this
-  // wide placed next to the fixed actions column would sit under it until the user scrolls.
-  { key: "departure", label: t("departure.column"), width: px(210, 250) },
-  { key: "permissions", label: t("user.permissionCount"), minWidth: { "zh-CN": 92, "en-US": 120 } },
-  { key: "dataScope", label: t("user.dataScope"), width: 92 },
-  { key: "status", label: t("common.status"), width: px(80, 90) },
-  { key: "lastLogin", label: t("user.lastLogin"), width: px(170, 190) },
-  { key: "createdAt", label: t("common.createdAt"), width: px(180, 190) },
-  { key: "actions", label: t("common.actions"), width: px(392, 560) }
-]);
+const columns = computed<DataColumn[]>(() => {
+  const list: DataColumn[] = [
+    {
+      key: "username",
+      align: "left" as const,
+      label: t("common.username"),
+      prop: "username",
+      minWidth: 130
+    },
+    {
+      key: "nickname",
+      align: "left" as const,
+      label: t("common.nickname"),
+      prop: "nickname",
+      minWidth: 120
+    },
+    { key: "role", label: t("user.role"), width: 120 },
+    { key: "post", label: t("user.post"), width: 90 },
+    // Right after the account columns: the list scrolls horizontally on 1280/1440, and a column this
+    // wide placed next to the fixed actions column would sit under it until the user scrolls.
+    { key: "departure", label: t("departure.column"), width: px(210, 250) },
+    {
+      key: "permissions",
+      label: t("user.permissionCount"),
+      minWidth: { "zh-CN": 92, "en-US": 120 }
+    },
+    { key: "dataScope", label: t("user.dataScope"), width: 92 },
+    { key: "status", label: t("common.status"), width: px(80, 90) },
+    { key: "lastLogin", label: t("user.lastLogin"), width: px(170, 190) },
+    { key: "createdAt", label: t("common.createdAt"), width: px(180, 190) },
+    { key: "actions", label: t("common.actions"), width: px(392, 560) }
+  ];
+  if (!libraryEdition.value) return list;
+  const hidden = new Set(["post", "departure", "dataScope"]);
+  return list.filter(column => !hidden.has(column.key));
+});
 
 const applied = ref({
   username: "",
@@ -364,7 +380,7 @@ function rowActions(row: UserVO): RowAction[] {
         row.departurePlan?.status === "SCHEDULED" ? t("departure.editPlan") : t("departure.mark"),
       type: "warning",
       testId: `departure-${row.id}`,
-      hidden: !canMarkDeparture(row),
+      hidden: libraryEdition.value || !canMarkDeparture(row),
       onClick: () => openDeparture(row)
     },
     {

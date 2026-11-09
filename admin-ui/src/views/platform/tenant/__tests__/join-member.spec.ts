@@ -19,6 +19,7 @@ const tenant: TenantVO = {
   name: "B 公司",
   status: 1,
   remark: null,
+  edition: "DISTRIBUTION",
   createTime: "2026-10-05T00:00:00Z"
 };
 

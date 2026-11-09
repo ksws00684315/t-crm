@@ -1,3 +1,4 @@
+import type { CompanyEdition } from "../types";
 import { http } from "../http";
 
 /** `TenantVO`; ids are strings and timestamps are ISO 8601 UTC instants. */
@@ -7,6 +8,8 @@ export interface TenantVO {
   name: string;
   status: 0 | 1;
   remark: string | null;
+  /** Product edition chosen when the company was created; it never changes (ADR-038). */
+  edition: CompanyEdition;
   createTime: string;
 }
 
@@ -25,8 +28,11 @@ export interface CreateTenantRequest {
   tenantCode: string;
   name: string;
   remark?: string | null;
+  /** Required: it decides which product the company gets and cannot be changed later. */
+  edition: CompanyEdition;
 }
 
+/** No edition: a company keeps the edition it was created with (ADR-038 §1). */
 export interface UpdateTenantRequest {
   name: string;
   remark?: string | null;

@@ -17,6 +17,7 @@ const tenant: tenantApi.TenantVO = {
   name: "North America",
   status: 1,
   remark: "Primary company",
+  edition: "DISTRIBUTION",
   createTime: "2026-10-05T01:02:03Z"
 };
 
@@ -98,10 +99,12 @@ describe("platform tenant management", () => {
     await wrapper.find("button.el-button--primary").trigger("click");
     await flushPromises();
 
+    // A new company always names its edition; the form starts from the full product (ADR-038 §1).
     expect(tenantApi.createTenant).toHaveBeenCalledWith({
       tenantCode: "north-america",
       name: "North America",
-      remark: null
+      remark: null,
+      edition: "DISTRIBUTION"
     });
     expect(wrapper.findAllComponents({ name: "ElFormItem" })[0].props("error")).toBe(
       "公司编码已存在"

@@ -6,6 +6,11 @@ export const TAB_LIMIT = 12;
 export interface TabRecord {
   path: string;
   titleKey: string;
+  /**
+   * `titleKey` is already the text to show (a title the page built at run time, e.g. the creator's
+   * nickname) rather than a language key. Absent for every static title.
+   */
+  literalTitle?: boolean;
   affix: boolean;
   componentName: string;
 }
@@ -31,9 +36,33 @@ export function tenantAffix(): TabRecord {
   };
 }
 
-/** Platform administrators pin company management; every other role pins home. */
-export function affixFor(platformAdmin: boolean): TabRecord {
-  return platformAdmin ? tenantAffix() : homeAffix();
+/** The creator library's home page: the creator list, pinned instead of the workbench. */
+export function libraryAffix(): TabRecord {
+  return {
+    path: "/kol-library/kols",
+    titleKey: "route.libraryKols",
+    affix: true,
+    componentName: "LibraryKolListPage"
+  };
+}
+
+/**
+ * Platform administrators pin company management, a creator-library company pins the creator list
+ * (requirement 1.2.5: the library is its home page, ADR-038 §3.3), every other company pins home.
+ */
+export function affixFor(platformAdmin: boolean, library = false): TabRecord {
+  if (platformAdmin) return tenantAffix();
+  return library ? libraryAffix() : homeAffix();
+}
+
+/** Where "/" and "/home" lead: the library's home, or the workbench for every other company. */
+export function homePathFor(library: boolean): string {
+  return library ? libraryAffix().path : homeAffix().path;
+}
+
+/** The path of the home tab of a session: the affix tab's path. */
+export function homeTabPath(library = false): string {
+  return affixFor(false, library).path;
 }
 
 function snapshot(active: string, tabs: TabRecord[], userId: string | null = null): TabSnapshot {

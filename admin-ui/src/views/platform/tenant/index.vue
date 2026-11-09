@@ -34,6 +34,8 @@ const px = (zh: number, en: number): number => (zhWidth.value ? zh : en);
 const columns = computed<DataColumn[]>(() => [
   { key: "tenantCode", align: "left" as const, label: t("tenant.code"), minWidth: 150 },
   { key: "name", align: "left" as const, label: t("tenant.name"), prop: "name", minWidth: 160 },
+  // The edition decides the company's product and never changes (ADR-038 §1).
+  { key: "edition", label: t("tenant.edition"), width: px(130, 160) },
   { key: "status", label: t("common.status"), width: 100 },
   {
     key: "remark",
@@ -156,6 +158,11 @@ onMounted(load);
         </div>
       </template>
       <template #cell-tenantCode="{ row }"><CopyText :value="asTenant(row).tenantCode" /></template>
+      <template #cell-edition="{ row }">
+        <el-tag :type="asTenant(row).edition === 'KOL_LIBRARY' ? 'warning' : 'info'">
+          {{ t(`tenant.editionValue.${asTenant(row).edition}`) }}
+        </el-tag>
+      </template>
       <template #cell-status="{ row }">
         <el-tag :type="asTenant(row).status === 1 ? 'success' : 'info'">
           {{ asTenant(row).status === 1 ? t("common.enabled") : t("common.disabled") }}

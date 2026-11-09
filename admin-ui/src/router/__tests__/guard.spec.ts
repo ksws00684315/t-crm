@@ -206,6 +206,8 @@ describe("installGuard with the real route table", () => {
       ["notifications", null, false, false, false],
       ["account/resignation", null, false, false, false],
       ["account/password", null, false, false, false],
+      // The creator-library group (ADR-038): its routes declare the KOL_LIBRARY edition instead.
+      ["kol-library", null, false, false, false],
       ["403", null, false, false, false],
       // Merged and removed pages survive as plain redirects (task 32 §2.1).
       ["product/products", null, false, false, false],
