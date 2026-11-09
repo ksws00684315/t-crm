@@ -165,6 +165,10 @@ SELECT count(*) FROM crm_library_kol_content;                          -- 0（�
 
 存在 1 处**非本任务**的孤儿数据：`sys_oper_log` 里 7 行属于 `tenant_id=2112885098872340481`，该租户在本次任务之前就已不存在，未删除，登记备查。
 
+## 9.1 交付
+
+分支 `task/143-kol-library`，[PR #254](https://github.com/ksws00684315/t-crm/pull/254)（非草稿，未合并、未推 main）。创建后查一次 `gh pr checks 254`：`Backend verify`、`Backend integration (1/4)~(4/4)`、`Admin UI verify` 均为 `pending`（刚入队），结果以 CI 为准。
+
 ## 10. 偏差与遗留事项
 
 ### 本任务范围内
