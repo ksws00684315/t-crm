@@ -264,7 +264,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="filter-type"
-            style="width: 160px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="type in TYPES"
@@ -280,7 +280,7 @@ onMounted(() => {
             clearable
             :placeholder="t('common.all')"
             data-test="filter-status"
-            style="width: 140px"
+            class="filter-w-sm"
           >
             <el-option
               v-for="status in STATUSES"

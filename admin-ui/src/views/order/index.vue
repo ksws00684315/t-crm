@@ -386,6 +386,7 @@ onMounted(() => {
             v-model="query.shopId"
             clearable
             :placeholder="t('common.all')"
+            class="filter-w-md"
             data-test="filter-shop"
           >
             <el-option v-for="s in shops" :key="s.shopId" :label="s.shopName" :value="s.shopId" />

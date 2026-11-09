@@ -4,6 +4,14 @@ import { accessOf, buildMenu, type AbilitySubject } from "@/utils/permission";
 import { installGuard, resolveAccess, type AuthState } from "../guard";
 import { routes } from "../routes";
 
+// L-121 (task 135): the real NProgress leaves two setTimeout callbacks behind every `done()`;
+// once the file finishes Vitest tears jsdom down and those callbacks then fail with
+// "document is not defined" as flaky unhandled errors. The progress bar is irrelevant to the
+// routing rules under test, so stub the whole module instead of leaving live timers behind.
+vi.mock("nprogress", () => ({
+  default: { start: vi.fn(), done: vi.fn() }
+}));
+
 // The first real navigation compiles the login view, which now pulls in vue-i18n and both
 // locale packs. Import it here so that cost stays outside the 5s test timeout.
 import "@/views/login/index.vue";

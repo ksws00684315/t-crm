@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.tcrm.admin.commission.mapper.CommissionWalletMapper;
 import com.tcrm.admin.commission.model.LedgerSourceRow;
 import com.tcrm.admin.commission.model.OutstandingDeduction;
+import com.tcrm.admin.commission.model.RecoveryAmountRow;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
@@ -13,7 +14,10 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
@@ -69,11 +73,14 @@ public class CommissionWalletService {
           BigDecimal existing =
               existingEntry(kolId, "COMMISSION", sourceId, sourceKey, negativeAmount);
           if (existing != null) {
+            // Idempotent replay: the clawback ledger and its recovery reversals already exist.
             return existing;
           }
           BigDecimal next = balance.add(negativeAmount).setScale(2, RoundingMode.UNNECESSARY);
+          Instant time = now();
+          long adjustmentId = IdWorker.getId();
           wallets.insertLedger(
-              IdWorker.getId(),
+              adjustmentId,
               kolId,
               "COMMISSION_ADJUSTMENT",
               negativeAmount,
@@ -83,8 +90,11 @@ public class CommissionWalletService {
               truncate(occurredAt),
               next,
               null,
-              now());
-          wallets.updateBalance(kolId, next, now());
+              time);
+          wallets.updateBalance(kolId, next, time);
+          // Task 141: undo the FIFO recovery this source row's credits did, by appending negative
+          // recovery rows (LIFO) inside the same transaction and wallet lock.
+          reverseRecoveries(kolId, sourceId, adjustmentId, negativeAmount.negate(), time);
           return next;
         });
   }
@@ -285,6 +295,62 @@ public class CommissionWalletService {
       wallets.insertRecovery(
           IdWorker.getId(), command.kolId(), creditId, deduction.ledgerId(), amount, now());
       remainingCredit = remainingCredit.subtract(amount);
+    }
+  }
+
+  /**
+   * Appends negative recovery rows undoing what the COMMISSION credits of one source row offset
+   * (task 141). The reversal amount is capped at the row's net recovery total; deductions are
+   * reversed in LIFO order (latest recovery first, same time by id descending) and become
+   * outstanding again, so later credits recover them through the normal FIFO path. Each clawback
+   * writes at most one reversal per prepay deduction, which the existing unique pair index {@code
+   * (tenant_id, credit_ledger_id, deduction_ledger_id)} also guarantees. Nothing is deleted or
+   * updated: existing recovery rows stay untouched.
+   */
+  private void reverseRecoveries(
+      long kolId, long sourceId, long adjustmentLedgerId, BigDecimal clawback, Instant time) {
+    List<RecoveryAmountRow> nets = wallets.listCreditRecoveryNets(kolId, sourceId);
+    if (nets.isEmpty()) {
+      return;
+    }
+    BigDecimal netTotal =
+        nets.stream()
+            .map(RecoveryAmountRow::amountCny)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.UNNECESSARY);
+    BigDecimal toReverse = clawback.min(netTotal);
+    if (toReverse.signum() == 0) {
+      return;
+    }
+    Map<Long, BigDecimal> remainingNet = new HashMap<>();
+    for (RecoveryAmountRow net : nets) {
+      remainingNet.put(net.deductionLedgerId(), net.amountCny());
+    }
+    Map<Long, BigDecimal> reversals = new LinkedHashMap<>();
+    for (RecoveryAmountRow row : wallets.listCreditRecoveryRows(kolId, sourceId)) {
+      if (toReverse.signum() == 0) {
+        break;
+      }
+      if (row.amountCny().signum() <= 0) {
+        continue;
+      }
+      BigDecimal netRemaining = remainingNet.getOrDefault(row.deductionLedgerId(), BigDecimal.ZERO);
+      if (netRemaining.signum() <= 0) {
+        continue;
+      }
+      BigDecimal take = toReverse.min(row.amountCny()).min(netRemaining);
+      reversals.merge(row.deductionLedgerId(), take, BigDecimal::add);
+      remainingNet.put(row.deductionLedgerId(), netRemaining.subtract(take));
+      toReverse = toReverse.subtract(take);
+    }
+    for (Map.Entry<Long, BigDecimal> reversal : reversals.entrySet()) {
+      wallets.insertRecovery(
+          IdWorker.getId(),
+          kolId,
+          adjustmentLedgerId,
+          reversal.getKey(),
+          reversal.getValue().negate(),
+          time);
     }
   }
 

@@ -2,6 +2,12 @@ import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installGuard } from "@/router/guard";
+
+// L-121 (task 135): same reason as guard.spec.ts — stub NProgress so no navigation leaves
+// setTimeout callbacks that touch the DOM after Vitest has torn jsdom down.
+vi.mock("nprogress", () => ({
+  default: { start: vi.fn(), done: vi.fn() }
+}));
 import { routes } from "@/router/routes";
 import { useReauthStore } from "@/stores/reauth";
 import { useTabsStore } from "@/stores/tabs";

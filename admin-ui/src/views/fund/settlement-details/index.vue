@@ -171,11 +171,16 @@ onMounted(loadShops);
             ><el-input v-model="filters.orderNo" data-test="settlement-order" clearable
           /></el-form-item>
           <el-form-item :label="t('finance.channel')"
-            ><el-select v-model="filters.channel" clearable
+            ><el-select v-model="filters.channel" clearable class="filter-w-sm"
               ><el-option :label="t('finance.weidian')" value="WEIDIAN" /></el-select
           ></el-form-item>
           <el-form-item v-if="canFilterShop" :label="t('finance.shopId')"
-            ><el-select v-model="filters.shopId" clearable filterable data-test="settlement-shop-id"
+            ><el-select
+              v-model="filters.shopId"
+              clearable
+              filterable
+              class="filter-w-md"
+              data-test="settlement-shop-id"
               ><el-option
                 v-for="shop in shops"
                 :key="shop.id"
