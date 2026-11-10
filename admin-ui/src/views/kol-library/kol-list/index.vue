@@ -74,17 +74,17 @@ function followers(value: number | string | null): string {
  * a quantity and stays centered with tabular figures (norm 13 appendix A).
  */
 const columns = computed<DataColumn[]>(() => [
-  { key: "kol", align: "left" as const, label: t("library.column.kol"), minWidth: px(200, 240) },
+  { key: "kol", align: "left" as const, label: t("library.column.kol"), minWidth: px(180, 240) },
   { key: "platform", label: t("library.column.platform"), width: px(100, 110) },
   { key: "followers", label: t("library.column.followers"), amount: true, width: px(110, 120) },
-  { key: "countryCode", label: t("library.column.country"), width: px(100, 130) },
+  { key: "countryCode", label: t("library.column.country"), width: px(100, 150) },
   {
     key: "categories",
     align: "left" as const,
     label: t("library.column.categories"),
-    minWidth: px(200, 260)
+    minWidth: px(150, 260)
   },
-  { key: "outreachStatus", label: t("library.column.outreachStatus"), width: px(120, 150) },
+  { key: "outreachStatus", label: t("library.column.outreachStatus"), width: px(130, 170) },
   {
     key: "followUpOwner",
     align: "left" as const,
