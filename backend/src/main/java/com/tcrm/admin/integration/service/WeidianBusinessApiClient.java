@@ -102,11 +102,12 @@ public class WeidianBusinessApiClient implements WeidianBusinessApi {
    * Converts failures that concern the whole shop into the shared business vocabulary (task 145
    * review): a caller such as order sync must fail the shop instead of skipping every order of the
    * run and notifying once per order. Order- or item-specific Weidian errors keep their type, so
-   * the caller can still skip only the affected record.
+   * the caller can still skip only the affected record. A response that succeeded without a {@code
+   * result} ({@link WeidianApiException#MISSING_RESULT}) is such a per-call failure.
    */
   private static RuntimeException shopWide(WeidianApiException error) {
     int code = error.statusCode();
-    if (code < 0 || UNAVAILABLE_STATUS_CODES.contains(code)) {
+    if (code == WeidianApiException.NO_USABLE_RESPONSE || UNAVAILABLE_STATUS_CODES.contains(code)) {
       return new BusinessException(ErrorCode.WEIDIAN_API_FAILED);
     }
     if (AUTH_STATUS_CODES.contains(code)) {

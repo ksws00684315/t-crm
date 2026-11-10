@@ -16,6 +16,7 @@ import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
+import com.tcrm.admin.integration.service.WeidianApiException;
 import com.tcrm.admin.kol.api.KolOwnershipApi;
 import com.tcrm.admin.order.service.OrderNormalizer;
 import com.tcrm.admin.order.service.OrderSnapshotCorrection;
@@ -438,6 +439,48 @@ class OrderIT {
                     + " WHERE shop_id = 10",
                 Boolean.class,
                 "Order synchronization failed for order 2001: WEIDIAN_API_FAILED"))
+        .isTrue();
+  }
+
+  @Test
+  void shouldSkipOnlyTheOrderWithoutResult_whenOtherOrdersSucceed() {
+    // Task 145 review: a detail without result must stay a per-order failure instead of failing
+    // the shop.
+    var missing = new WeidianBusinessApi.OrderListItem("2001", null, null, null, PAID, null);
+    var good = new WeidianBusinessApi.OrderListItem("2002", null, null, null, PAID, null);
+    when(remote.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                2, 2, List.of(missing, good), false, null, null));
+    when(remote.orderDetail(anyLong(), any()))
+        .thenAnswer(
+            call -> {
+              long id = call.<WeidianBusinessApi.OrderDetailRequest>getArgument(1).orderId();
+              if (id == 2001) {
+                throw new WeidianApiException(
+                    WeidianApiException.MISSING_RESULT,
+                    "Weidian API response is missing result",
+                    false);
+              }
+              return detail(String.valueOf(id), PAID, line("90", "1"));
+            });
+
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isTrue());
+
+    assertThat(jdbc.queryForList("SELECT weidian_order_id FROM crm_order", String.class))
+        .containsExactly("2002");
+    assertThat(jdbc.queryForMap("SELECT order_id, fail_count FROM crm_order_sync_retry"))
+        .containsEntry("order_id", "2001")
+        .containsEntry("fail_count", 1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_failure WHERE shop_id = 10", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT order_cursor IS NOT NULL AND last_error IS NULL FROM crm_order_sync_state"
+                    + " WHERE shop_id = 10",
+                Boolean.class))
         .isTrue();
   }
 

@@ -373,14 +373,26 @@ public class WeidianTokenCenter {
 
   private WeidianTokenPayload parseToken(
       JsonNode envelope, Instant acquiredAt, Instant existingRefreshExpiry) {
-    JsonNode result = WeidianResponseParser.resultOrThrow(envelope);
+    JsonNode result;
+    try {
+      result = WeidianResponseParser.resultOrThrow(envelope);
+    } catch (WeidianApiException error) {
+      if (error.statusCode() != WeidianApiException.MISSING_RESULT) {
+        throw error;
+      }
+      // A token response without a result breaks every call of the shop, not just one call.
+      throw new WeidianApiException(
+          WeidianApiException.NO_USABLE_RESPONSE, "Weidian token response is incomplete", false);
+    }
     String access = text(result, "access_token");
     if (access == null || access.isBlank()) {
-      throw new WeidianApiException(-1, "Weidian token response is incomplete", false);
+      throw new WeidianApiException(
+          WeidianApiException.NO_USABLE_RESPONSE, "Weidian token response is incomplete", false);
     }
     long lifetime = longValue(result, "expire_in", "expires_in");
     if (lifetime <= 0) {
-      throw new WeidianApiException(-1, "Weidian token response is incomplete", false);
+      throw new WeidianApiException(
+          WeidianApiException.NO_USABLE_RESPONSE, "Weidian token response is incomplete", false);
     }
     String refresh = text(result, "refresh_token");
     Instant refreshExpiry = existingRefreshExpiry;
@@ -521,7 +533,8 @@ public class WeidianTokenCenter {
         try {
           return new BigDecimal(value.asText()).longValueExact();
         } catch (ArithmeticException | NumberFormatException e) {
-          throw new WeidianApiException(-1, "Weidian token lifetime is invalid", false);
+          throw new WeidianApiException(
+              WeidianApiException.NO_USABLE_RESPONSE, "Weidian token lifetime is invalid", false);
         }
       }
     }
