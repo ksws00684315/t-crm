@@ -60,7 +60,7 @@ const zhCN = {
       "交易账按订单付款和退款统计。结算账按平台资金入账统计，两者的时间口径与费用项目不同，金额可能不一致。",
     salesAmount: "销售额",
     cohortRefundAmount: "该批订单成功退款",
-    completedRefundAmount: "退款金额（完结时间）",
+    completedRefundAmount: "退款金额",
     riskTitle: "退款风险",
     amountRefundRate: "金额退款率",
     periodRefundedOrderRate: "周期订单退款占比",
@@ -105,7 +105,10 @@ const zhCN = {
       active: "全部店铺 {value}",
       identity: "店铺名称及编号",
       ranking: "店铺经营排行",
-      rankingCount: "共 {count} 家店铺"
+      rankingCount: "共 {count} 家店铺",
+      definitions: {
+        completedRefundAmount: "按退款完结时间累计该店铺在所选期间的成功退款金额。"
+      }
     },
     "best-sellers": {
       selling: "成交 SPU 数",
@@ -144,7 +147,7 @@ const zhCN = {
       relationship: "邀请人/关系",
       paidOrderCount: "订单数",
       linkCount: "成交链接数",
-      commissionRate: "达人佣金比例",
+      commissionRate: "佣金比例",
       estimatedCommission: "预估佣金",
       commissionExpense: "佣金支出",
       cumulativeCommission: "累计佣金",
@@ -175,7 +178,7 @@ const zhCN = {
       selling: "有销售邀请人",
       active: "有效邀请人 {value}",
       identity: "邀请人",
-      creatorCounts: "当前有效达人/累计邀请达人",
+      creatorCounts: "有效达人/累计达人",
       prepayExpense: "预付支出",
       totalEstimatedCommission: "预估总佣金",
       totalExpense: "总支出",

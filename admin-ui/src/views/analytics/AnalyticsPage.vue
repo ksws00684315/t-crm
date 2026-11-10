@@ -56,7 +56,6 @@ const shop = board === "shop-performance";
 const product = board === "best-sellers";
 const creator = board === "kol-ranking";
 const inviter = board === "inviter-performance";
-const hasDefinitions = !shop;
 const draft = ref<Filters>(dates());
 const applied = ref<Filters>({ ...draft.value });
 const page = ref(1);
@@ -85,15 +84,28 @@ const metrics = computed(() => result.value?.summary.metrics);
 const rows = computed(() => result.value?.ranking.items ?? []);
 const columnWidths: Record<string, DataColumn["minWidth"]> = {
   identity: product ? 180 : 184,
-  rank: 68,
+  rank: 90,
   actions: 84,
-  channelStatus: 86,
-  coverage: 122,
-  units: { "zh-CN": 76, "en-US": 106 },
-  paidOrderCount: { "zh-CN": 88, "en-US": 112 },
+  coverage: { "zh-CN": 156, "en-US": 170 },
+  channelStatus: { "zh-CN": 104, "en-US": 136 },
+  units: { "zh-CN": 76, "en-US": 116 },
+  paidOrderCount: { "zh-CN": 112, "en-US": 132 },
   salesAmount: { "zh-CN": 102, "en-US": 112 },
-  completedRefundAmount: { "zh-CN": 114, "en-US": 142 },
-  netSalesAmount: { "zh-CN": 112, "en-US": 128 }
+  completedRefundAmount: { "zh-CN": 112, "en-US": 150 },
+  netSalesAmount: { "zh-CN": 112, "en-US": 128 },
+  averageOrderAmount: { "zh-CN": 126, "en-US": 210 },
+  amountRefundRate: { "zh-CN": 126, "en-US": 180 },
+  kolCount: { "zh-CN": 126, "en-US": 178 },
+  creatorCounts: { "zh-CN": 162, "en-US": 180 },
+  relationship: { "zh-CN": 118, "en-US": 186 },
+  linkCount: { "zh-CN": 132, "en-US": 168 },
+  commissionRate: { "zh-CN": 112, "en-US": 172 },
+  settlementAmount: { "zh-CN": 108, "en-US": 176 },
+  estimatedCommission: { "zh-CN": 108, "en-US": 190 },
+  commissionExpense: { "zh-CN": 108, "en-US": 186 },
+  cumulativeCommission: { "zh-CN": 108, "en-US": 202 },
+  prepayExpense: { "zh-CN": 108, "en-US": 186 },
+  totalEstimatedCommission: { "zh-CN": 126, "en-US": 226 }
 };
 const columns = computed<DataColumn[]>(() =>
   [...columnsByBoard[board], "actions"].map(key => ({
@@ -108,9 +120,15 @@ const columns = computed<DataColumn[]>(() =>
     minWidth: columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 }
   }))
 );
-const headerKeys = hasDefinitions
-  ? columnsByBoard[board]
-  : columnsByBoard[board].filter(key => sortable.has(key));
+const customHeaders = computed(() =>
+  columnsByBoard[board]
+    .filter(key => !shop || sortable.has(key))
+    .map(key => ({
+      key,
+      help:
+        !shop || key === "completedRefundAmount" ? t(`analytics.${board}.definitions.${key}`) : ""
+    }))
+);
 const cellKeys = columnsByBoard[board].filter(
   key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
 );
@@ -390,7 +408,11 @@ onUnmounted(stop);
     />
     <QuerySummary v-if="result" :result="result" :options="options" />
 
-    <div class="analytics-cards" :aria-busy="loading">
+    <div
+      class="analytics-cards"
+      :class="{ 'analytics-cards--combined-note': creator || inviter }"
+      :aria-busy="loading"
+    >
       <MetricCard v-for="card in cards" :key="card.label" v-bind="card" />
     </div>
 
@@ -507,11 +529,11 @@ onUnmounted(stop);
           }}
         </el-tag>
       </template>
-      <template v-for="key in headerKeys" :key="key" #[`header-${key}`]>
+      <template v-for="{ key, help } in customHeaders" :key="key" #[`header-${key}`]>
         <div class="sort-controls" :class="{ 'sort-controls--left': key === 'identity' }">
           <el-tooltip
-            :disabled="!hasDefinitions"
-            :content="hasDefinitions ? t(`analytics.${board}.definitions.${key}`) : ''"
+            :disabled="!help"
+            :content="help"
             :trigger="['hover', 'focus']"
             popper-class="analytics-metric-definition"
             placement="top"
@@ -537,11 +559,7 @@ onUnmounted(stop);
               <span v-if="sortable.has(key)" aria-hidden="true">{{
                 sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
               }}</span>
-              <el-icon
-                v-if="hasDefinitions"
-                class="analytics-column-heading__info"
-                aria-hidden="true"
-              >
+              <el-icon v-if="help" class="analytics-column-heading__info" aria-hidden="true">
                 <InfoFilled />
               </el-icon>
             </component>
@@ -648,6 +666,7 @@ onUnmounted(stop);
 <style scoped>
 .analytics-page {
   --analytics-card-padding: var(--tcrm-space-4);
+  container-type: inline-size;
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -788,6 +807,9 @@ onUnmounted(stop);
   :deep(.el-table__body tr:hover > td.el-table__cell:not(.data-table__highlighted)) {
   background-color: var(--tcrm-color-muted);
 }
+.analytics-ranking :deep(.el-table__header th .cell) {
+  white-space: nowrap;
+}
 .analytics-ranking :deep(.el-table__header th.data-table__highlighted),
 .analytics-ranking :deep(.el-table__body td.data-table__highlighted) {
   background: var(--tcrm-color-option-selected-bg);
@@ -902,9 +924,14 @@ onUnmounted(stop);
 .sort-controls--left {
   justify-content: flex-start;
 }
+.analytics-column-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tcrm-space-1);
+  white-space: nowrap;
+}
 .analytics-column-heading__info {
-  vertical-align: middle;
-  margin-inline-start: var(--tcrm-space-1);
+  flex: none;
   color: var(--tcrm-color-text-secondary);
 }
 :global(.analytics-metric-definition) {
@@ -935,6 +962,21 @@ onUnmounted(stop);
 @media (max-width: 1100px) {
   .analytics-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 1120px) {
+  .analytics-cards--combined-note {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 1420px) {
+  .analytics-cards--combined-note:where(:lang(en)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 600px) {
+  .analytics-cards--combined-note {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 600px) {

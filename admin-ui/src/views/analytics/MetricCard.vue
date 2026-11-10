@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { InfoFilled } from "@element-plus/icons-vue";
-import type { Component } from "vue";
+import { computed, type Component } from "vue";
 
-defineProps<{
+const props = defineProps<{
   label: string;
   value: string;
   detail?: string;
@@ -12,6 +12,8 @@ defineProps<{
   icon?: Component;
   tone?: "neutral" | "blue" | "green" | "amber" | "red";
 }>();
+
+const note = computed(() => [props.detail, props.comparison].filter(Boolean).join(" · "));
 </script>
 
 <template>
@@ -21,7 +23,7 @@ defineProps<{
     </el-icon>
     <div class="metric-card__body">
       <div class="metric-card__label">
-        {{ label }}
+        <span class="metric-card__text" :title="label">{{ label }}</span>
         <el-tooltip v-if="hint" :content="hint" :trigger="['hover', 'focus']">
           <button type="button" class="metric-card__hint" :aria-label="hint">
             <el-icon aria-hidden="true"><InfoFilled /></el-icon>
@@ -31,9 +33,10 @@ defineProps<{
       <div v-if="unavailable" class="metric-card__state">
         <el-tag type="info" effect="light">{{ value }}</el-tag>
       </div>
-      <strong v-else>{{ value }}</strong>
-      <span v-if="detail">{{ detail }}</span>
-      <small v-if="comparison">{{ comparison }}</small>
+      <strong v-else class="metric-card__text" :title="value">{{ value }}</strong>
+      <small v-if="note" class="metric-card__text metric-card__note" :title="note">{{
+        note
+      }}</small>
     </div>
   </article>
 </template>
@@ -81,7 +84,16 @@ defineProps<{
   --metric-accent: var(--tcrm-color-danger);
   --metric-background: var(--tcrm-color-danger-bg);
 }
+.metric-card__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .metric-card__label {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-1);
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
@@ -90,7 +102,7 @@ defineProps<{
 }
 .metric-card__hint {
   display: inline-flex;
-  vertical-align: middle;
+  flex: none;
   padding: 0;
   border: 0;
   background: transparent;
@@ -109,10 +121,8 @@ strong {
   font-size: var(--tcrm-font-size-dashboard-metric);
   line-height: var(--tcrm-line-height-dashboard-metric);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
 }
-span,
-small {
+.metric-card__note {
   color: var(--el-text-color-secondary);
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);

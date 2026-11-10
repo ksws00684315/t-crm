@@ -58,7 +58,7 @@ const enUS: MessageSchema = {
       "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",
     salesAmount: "Sales",
     cohortRefundAmount: "Successful refunds for paid orders",
-    completedRefundAmount: "Refunds by completion date",
+    completedRefundAmount: "Refund amount",
     riskTitle: "Refund risk",
     amountRefundRate: "Amount refund rate",
     periodRefundedOrderRate: "Period refunded order ratio",
@@ -103,7 +103,11 @@ const enUS: MessageSchema = {
       active: "All shops {value}",
       identity: "Shop name / code",
       ranking: "Shop performance ranking",
-      rankingCount: "{count} shop | {count} shops"
+      rankingCount: "{count} shop | {count} shops",
+      definitions: {
+        completedRefundAmount:
+          "Successful refunds for this shop, grouped by refund completion date."
+      }
     },
     "best-sellers": {
       selling: "SPUs with sales",
@@ -149,7 +153,7 @@ const enUS: MessageSchema = {
       relationship: "Inviter / relationship",
       paidOrderCount: "Order count",
       linkCount: "Links with sales",
-      commissionRate: "Creator commission rate",
+      commissionRate: "Commission rate",
       estimatedCommission: "Estimated commission",
       commissionExpense: "Commission paid out",
       cumulativeCommission: "Cumulative commission",
@@ -190,7 +194,7 @@ const enUS: MessageSchema = {
       selling: "Inviters with sales",
       active: "Active inviters {value}",
       identity: "Inviter",
-      creatorCounts: "Active creators / lifetime invites",
+      creatorCounts: "Active / total creators",
       prepayExpense: "Prepayments paid out",
       totalEstimatedCommission: "Total estimated commission",
       totalExpense: "Total paid out",
