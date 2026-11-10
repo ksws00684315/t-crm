@@ -640,9 +640,11 @@ class WeidianIntegrationIT {
       ObjectMapper mapper = new ObjectMapper();
       JsonNode publicValues = mapper.readTree(query("?" + form).get("public"));
       String method = publicValues.path("method").asText();
-      // 真实微店对 vdian.item.list.get 的大 page_size 返回 108（案例 144），假网关同样拒绝。
+      // 真实微店对 vdian.item.list.get 的大 page_size 返回 108（案例 144）。假网关按生产常量
+      // ON_SALE_PAGE_SIZE（WeidianIntegrationService，当前 5）同口径拒绝超出的值；5 是实测可行值，
+      // 真实上限未知，不代表恰好 5。
       JsonNode params = mapper.readTree(query("?" + form).getOrDefault("param", "{}"));
-      if ("vdian.item.list.get".equals(method) && params.path("page_size").asInt(0) > 50) {
+      if ("vdian.item.list.get".equals(method) && params.path("page_size").asInt(0) > 5) {
         body =
             "{\"status\":{\"status_code\":108,"
                 + "\"status_reason\":\"param is error, page_size param illegal!\"}}";

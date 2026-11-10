@@ -182,9 +182,10 @@ public class WeidianIntegrationService implements ShopIntegrationApi {
   }
 
   /**
-   * vdian.item.list.get rejects large page_size with status 108 (case 144); 10 per page is safe.
+   * vdian.item.list.get rejects large page_size with status 108 (case 144). The exact cap is
+   * undocumented; 1 and 5 are values verified working in production, so use 5.
    */
-  private static final int ON_SALE_PAGE_SIZE = 10;
+  private static final int ON_SALE_PAGE_SIZE = 5;
 
   @Override
   public int countOnSaleItems(long shopId) {
