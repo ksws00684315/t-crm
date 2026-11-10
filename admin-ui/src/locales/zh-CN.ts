@@ -48,6 +48,7 @@ const zhCN = {
     settlementHint:
       "按所选期间的微店结算流水统计，店铺应收增加减去应收减少（如退款扣减）。结算流水待接入。",
     pending: "开发中",
+    commissionForbidden: "无权限",
     comparison: "较上期 {value}",
     transactionTitle: "交易与结算对照",
     transactionLedger: "交易账 · 订单商品事实",
@@ -108,30 +109,94 @@ const zhCN = {
     },
     "best-sellers": {
       selling: "成交 SPU 数",
-      identity: "商品",
+      identity: "订单商品",
+      channelCode: "渠道/ID",
+      kolCount: "成交达人数",
+      paidOrderCount: "订单数",
+      netSalesAmount: "净销售额",
+      settlementAmount: "结算金额",
       ranking: "商品排行",
       rankingCount: "共 {count} 个商品",
       net: "商品净销售额",
       keyword: "商品名称／SPU",
-      periodRefundedOrderRate: "订单退款率"
+      definitions: {
+        rank: "按同一筛选条件下的净销售额从高到低计算名次。切换表头排序时，原名次保留。",
+        identity: "展示订单商品名称和已关联源商品的主图。主图缺失时显示占位图标。",
+        channelCode: "展示订单渠道和源链接商品 ID。未关联源商品时，ID 显示横线。",
+        shop: "这笔订单实际成交的店铺。同一商品在不同店铺分别统计。",
+        kolCount: "所选期间内，该商品有支付成交的达人数。同一达人只计一次。",
+        units: "累计所选期间内已支付订单下该商品各 SKU 的购买数量。",
+        paidOrderCount: "所选期间内包含该商品的已支付订单数。同一订单在同一商品行中只计一次。",
+        refundUnits: "按退款完结时间累计成功退款的商品件数。退款件数数据待接入。",
+        salesAmount: "按订单支付时间累计该商品订单行的实付金额，已扣优惠，未分摊运费。",
+        completedRefundAmount:
+          "按退款完结时间累计该商品的成功退款金额，仅纳入能关联到该商品订单行的退款。",
+        netSalesAmount:
+          "所选期间的销售额减去同批已支付订单在 30 个北京时间自然日内完结的成功退款金额。",
+        settlementAmount: "按平台结算流水归属到该商品的结算金额。商品级结算流水待接入。"
+      }
     },
     "kol-ranking": {
       selling: "有销售达人",
       active: "有效达人 {value}",
-      identity: "达人身份及社媒",
+      identity: "达人名/社媒/ID",
+      nameWithPlatform: "{name}（{platform}）",
+      relationship: "邀请人/关系",
+      paidOrderCount: "订单数",
+      linkCount: "成交链接数",
+      commissionRate: "达人佣金比例",
+      estimatedCommission: "预估佣金",
+      commissionExpense: "佣金支出",
+      cumulativeCommission: "累计佣金",
       ranking: "达人排行",
       rankingCount: "共 {count} 位达人",
       netCommission: "达人净佣金",
-      keyword: "达人姓名／编号／社媒"
+      keyword: "达人姓名／编号／社媒",
+      definitions: {
+        identity: "展示达人名称、核心社媒平台、社媒账号和达人编号。未设置核心平台时省略括号。",
+        relationship: "展示当前归属商务和达人列表中的关系状态。",
+        paidOrderCount: "所选期间内归属该达人且已支付的订单数，同一订单只计一次。",
+        units: "累计所选期间内已支付订单下各 SKU 的购买数量。",
+        linkCount: "所选期间内有支付成交的达人专属链接数，按链接 ID 去重。",
+        salesAmount: "按支付时间累计归属该达人的已支付订单实付金额，含运费。",
+        completedRefundAmount: "按退款完结时间累计归属该达人的成功退款金额。",
+        netSalesAmount: "销售额减去同批订单在 30 个北京时间自然日内完结的成功退款金额。",
+        averageOrderAmount: "所选期间的销售额除以已支付订单数。",
+        amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
+        commissionRate: "达人推广配置中当前生效的默认佣金比例。历史订单按支付时适用的比例计佣。",
+        estimatedCommission:
+          "未结算订单按各自计佣金额和适用佣金比例计算的预估佣金合计。看板数据待接入。",
+        commissionExpense: "已完成付款的佣金提现合计。看板数据待接入。",
+        cumulativeCommission:
+          "已核实订单的佣金合计，未结算按预估金额，已结算按实际金额，已提现佣金仍计入原订单。看板数据待接入。"
+      }
     },
     "inviter-performance": {
       selling: "有销售邀请人",
       active: "有效邀请人 {value}",
-      identity: "邀请人名称及编号",
+      identity: "邀请人",
+      creatorCounts: "当前有效达人/累计邀请达人",
+      prepayExpense: "预付支出",
+      totalEstimatedCommission: "预估总佣金",
+      totalExpense: "总支出",
       ranking: "邀请人业绩排行",
       rankingCount: "共 {count} 位邀请人",
       netCommission: "团队达人净佣金",
-      keyword: "邀请人搜索"
+      keyword: "邀请人搜索",
+      definitions: {
+        identity: "展示邀请人姓名和账号。",
+        status: "展示邀请人账号的启停状态。",
+        creatorCounts: "当前归属该邀请人且启用的达人数，以及由该邀请人首次邀请的历史累计达人数。",
+        units: "累计所选期间内归属该邀请人的已支付订单下各 SKU 的购买数量。",
+        salesAmount: "按支付时间累计归属该邀请人的已支付订单实付金额，含运费。",
+        completedRefundAmount: "按退款完结时间累计归属该邀请人的成功退款金额。",
+        netSalesAmount: "销售额减去同批订单在 30 个北京时间自然日内完结的成功退款金额。",
+        amountRefundRate: "所选期间内完结的成功退款金额除以同期销售额。",
+        averageOrderAmount: "所选期间的销售额除以已支付订单数。",
+        prepayExpense: "预付已打款的支出金额。看板数据待接入。",
+        totalEstimatedCommission: "所选期间订单的预估佣金合计。看板数据待接入。",
+        totalExpense: "已支付的佣金支出加预付支出。看板数据待接入。"
+      }
     }
   },
   app: {

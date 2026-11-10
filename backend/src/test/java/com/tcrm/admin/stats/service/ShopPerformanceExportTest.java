@@ -58,7 +58,12 @@ class ShopPerformanceExportTest {
             null,
             "Category",
             List.of("Top"),
-            List.of(point));
+            List.of(point),
+            "source-1",
+            "TikTok",
+            2L,
+            new BigDecimal("0.15"),
+            "PROMOTING");
     var result =
         new AnalyticsRankingService.Result(
             meta,
@@ -82,18 +87,76 @@ class ShopPerformanceExportTest {
           var sheet = book.getSheetAt(0);
           assertThat(sheet.getRow(2).getCell(9).getStringCellValue()).isEqualTo("item");
           var data = sheet.getRow(sheet.getLastRowNum());
-          assertThat(data.getCell(1).getStringCellValue()).isEqualTo("'=item");
-          assertThat(data.getCell(8).getStringCellValue()).isEmpty();
+          var header = sheet.getRow(data.getRowNum() - 1);
+          var labels = new java.util.ArrayList<String>();
+          header.forEach(cell -> labels.add(cell.getStringCellValue()));
+          assertThat(data.getLastCellNum()).isEqualTo(header.getLastCellNum());
           if (board == AnalyticsRankingService.Board.PRODUCT) {
-            var header = sheet.getRow(data.getRowNum() - 1);
-            assertThat(header.getLastCellNum()).isEqualTo((short) 11);
-            assertThat(header.getCell(9).getStringCellValue()).isEqualTo("Rank");
-            assertThat(header.getCell(10).getStringCellValue()).isEqualTo("Shop");
-            assertThat(data.getLastCellNum()).isEqualTo(header.getLastCellNum());
-            assertThat(data.getCell(9).getStringCellValue()).isEqualTo("1");
-            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("Shop");
+            assertThat(data.getCell(1).getStringCellValue()).isEqualTo("'=item");
+            assertThat(labels)
+                .containsExactly(
+                    "Rank",
+                    "Order product",
+                    "Channel / ID",
+                    "Shop",
+                    "Creators with sales",
+                    "Units",
+                    "Order count",
+                    "Refunded units",
+                    "Sales (CNY)",
+                    "Completed refunds (CNY)",
+                    "Net sales (CNY)",
+                    "Settlement amount (CNY)");
+            assertThat(data.getCell(0).getStringCellValue()).isEqualTo("1");
+            assertThat(data.getCell(2).getStringCellValue()).isEqualTo("Weidian / source-1");
+            assertThat(data.getCell(3).getStringCellValue()).isEqualTo("Shop");
+            assertThat(data.getCell(7).getStringCellValue()).isEmpty();
+            assertThat(data.getCell(11).getStringCellValue()).isEmpty();
+          } else if (board == AnalyticsRankingService.Board.CREATOR) {
+            assertThat(labels)
+                .containsExactly(
+                    "Creator / social / ID",
+                    "Inviter / relationship",
+                    "Order count",
+                    "Units",
+                    "Links with sales",
+                    "Sales (CNY)",
+                    "Completed refunds (CNY)",
+                    "Net sales (CNY)",
+                    "Average order amount (CNY)",
+                    "Amount refund rate",
+                    "Creator commission rate",
+                    "Estimated commission (CNY)",
+                    "Commission paid out (CNY)",
+                    "Cumulative commission (CNY)");
+            assertThat(data.getCell(0).getStringCellValue())
+                .isEqualTo("'=item (TikTok) / handle / CODE");
+            assertThat(data.getCell(1).getStringCellValue()).isEqualTo("Shop / Promoting");
+            assertThat(data.getCell(4).getStringCellValue()).isEqualTo("2");
+            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("15%");
+            for (int i = 11; i < 14; i++) {
+              assertThat(data.getCell(i).getStringCellValue()).isEmpty();
+            }
           } else {
-            assertThat(data.getCell(data.getLastCellNum() - 1).getStringCellValue()).isEqualTo("Top");
+            assertThat(labels)
+                .containsExactly(
+                    "Inviter",
+                    "Status",
+                    "Active creators / lifetime invites",
+                    "Units",
+                    "Sales (CNY)",
+                    "Completed refunds (CNY)",
+                    "Net sales (CNY)",
+                    "Amount refund rate",
+                    "Average order amount (CNY)",
+                    "Prepayments paid out (CNY)",
+                    "Total estimated commission (CNY)",
+                    "Total paid out (CNY)");
+            assertThat(data.getCell(0).getStringCellValue()).isEqualTo("'=item / CODE");
+            assertThat(data.getCell(2).getStringCellValue()).isEqualTo("1 / 2");
+            for (int i = 9; i < 12; i++) {
+              assertThat(data.getCell(i).getStringCellValue()).isEmpty();
+            }
           }
         }
       }

@@ -191,7 +191,8 @@ public interface OrderStatsMapper {
         SELECT p.entity_id, SUM(i.quantity) AS units,
                COUNT(DISTINCT (p.shop_id, i.weidian_item_id)) FILTER (WHERE i.weidian_item_id != '') AS spu_count,
                COUNT(DISTINCT (p.shop_id, i.weidian_item_id, i.sku_id))
-                 FILTER (WHERE i.weidian_item_id != '' AND i.sku_id != '') AS sku_count
+                 FILTER (WHERE i.weidian_item_id != '' AND i.sku_id != '') AS sku_count,
+               COUNT(DISTINCT i.kol_item_id) FILTER (WHERE i.kol_id = p.kol_id) AS link_count
         FROM crm_order_item i JOIN ranked_paid p ON p.id = i.order_id
         WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted
         GROUP BY p.entity_id
@@ -224,7 +225,8 @@ public interface OrderStatsMapper {
              COALESCE(sales.sales, 0) AS sales, COALESCE(cohort.amount, 0) AS cohort_refunds,
              COALESCE(completed.amount, 0) AS completed_refunds,
              COALESCE(completed.refunded_orders, 0) AS refunded_orders,
-             sales.last_paid_at, completed.last_refunded_at
+             sales.last_paid_at, completed.last_refunded_at,
+             COALESCE(items.link_count, 0) AS link_count
       FROM shops s
       LEFT JOIN sales USING (entity_id)
       LEFT JOIN items USING (entity_id)

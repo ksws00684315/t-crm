@@ -1,4 +1,5 @@
 import { http } from "@/api/http";
+import type { DisplayRelationStatus } from "@/api/types";
 
 export type Board = "shop-performance" | "best-sellers" | "kol-ranking" | "inviter-performance";
 export type Scalar = number | string;
@@ -65,9 +66,14 @@ export interface RankRow {
   status?: number;
   name?: string;
   code?: string;
+  sourceItemId?: string;
   related?: string;
   enabled?: boolean;
   social?: string[];
+  primaryPlatform?: string;
+  relationStatus?: DisplayRelationStatus;
+  linkCount?: Scalar;
+  commissionRate?: Scalar;
   imageUrl?: string;
   category?: string;
   highlights?: string[];

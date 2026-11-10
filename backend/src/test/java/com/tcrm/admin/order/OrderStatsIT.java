@@ -79,7 +79,7 @@ class OrderStatsIT {
           (3, 4, 1, 't144-deleted', 'A', '3', 'A', '3', 20, 0, 0, 1, now(), now())
         """);
     jdbc.update("UPDATE crm_order_item SET is_deleted = TRUE WHERE id = 3");
-    jdbc.update("UPDATE crm_order_item SET kol_id = 11 WHERE tenant_id = 4");
+    jdbc.update("UPDATE crm_order_item SET kol_id = 11, kol_item_id = 101 WHERE tenant_id = 4");
     jdbc.execute(
         """
         INSERT INTO crm_refund (
@@ -164,6 +164,9 @@ class OrderStatsIT {
           .singleElement()
           .satisfies(row -> assertThat(row.day()).isEqualTo(LocalDate.of(2026, 11, 3)));
       assertThat(mapper.sellingCreators(productScope, FROM, UNTIL)).isEqualTo(1);
+      assertThat(mapper.rankFacts(productScope, RankDimension.KOL, FROM, UNTIL))
+          .singleElement()
+          .satisfies(row -> assertThat(row.linkCount()).isEqualTo(1));
       assertThat(mapper.rankHighlights(productScope, RankDimension.KOL, FROM, UNTIL))
           .singleElement()
           .satisfies(top -> assertThat(top.name()).isEqualTo("A"));

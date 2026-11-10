@@ -84,7 +84,8 @@ public interface OrderStatsApi {
       BigDecimal completedRefunds,
       long refundedOrders,
       Instant lastPaidAt,
-      Instant lastRefundedAt) {}
+      Instant lastRefundedAt,
+      long linkCount) {}
 
   /** A shop/SPU row, or the exact cross-product total when shopId is null. */
   record ProductFactsDTO(

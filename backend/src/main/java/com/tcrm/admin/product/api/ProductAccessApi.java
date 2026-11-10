@@ -29,9 +29,21 @@ public interface ProductAccessApi {
    * @param name product name
    * @param imageUrl main image URL; null when the product has none
    * @param status 1 on sale, 0 off sale
+   * @param sourceItemId original Weidian item ID from the source link
    */
   record ProductRefDTO(
-      Long id, String code, String name, String imageUrl, Integer status, String category) {
+      Long id,
+      String code,
+      String name,
+      String imageUrl,
+      Integer status,
+      String category,
+      String sourceItemId) {
+    public ProductRefDTO(
+        Long id, String code, String name, String imageUrl, Integer status, String category) {
+      this(id, code, name, imageUrl, status, category, null);
+    }
+
     public ProductRefDTO(Long id, String code, String name, String imageUrl, Integer status) {
       this(id, code, name, imageUrl, status, null);
     }

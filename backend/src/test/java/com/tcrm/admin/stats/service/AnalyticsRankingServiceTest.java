@@ -80,7 +80,9 @@ class AnalyticsRankingServiceTest {
                 total, product(1L, "B", 1, 70), product(1L, "A", 2, 30), product(1L, "C", 1, 20)));
     when(catalog.listProducts(List.of(50L)))
         .thenReturn(
-            List.of(new ProductRefDTO(50L, "P1", "Item", "https://example.test/a", 1, "Category")));
+            List.of(
+                new ProductRefDTO(
+                    50L, "P1", "Item", "https://example.test/a", 1, "Category", "source-50")));
     when(orders.productTrend(any(), any(), any(), any()))
         .thenReturn(List.of(product(1L, "A", 2, 60)));
     var result = service.query(Board.PRODUCT, FILTER, "item", 1, 20, "rank", "desc");
@@ -92,6 +94,8 @@ class AnalyticsRankingServiceTest {
     assertThat(result.ranking().items().getLast().metrics().periodRefundedOrderRate())
         .isEqualByComparingTo("0.5");
     assertThat(result.ranking().items().getFirst().category()).isEqualTo("Category");
+    assertThat(result.ranking().items().getFirst().sourceItemId()).isEqualTo("source-50");
+    assertThat(result.ranking().items().getFirst().code()).isEqualTo("B");
     for (String key :
         List.of(
             "rankChange",
@@ -117,7 +121,14 @@ class AnalyticsRankingServiceTest {
     var b = new KolRefDTO(12L, "K2", "Bettina", false, 9L);
     when(account.ownScope()).thenReturn(true);
     when(creators.listByBdUserId(9L)).thenReturn(List.of(a, b));
-    when(creators.analyticsSocialHandles(any())).thenReturn(Map.of(11L, List.of("creator-abc")));
+    when(creators.analyticsProfiles(any(), any()))
+        .thenReturn(
+            Map.of(
+                11L,
+                new KolApi.AnalyticsProfileDTO(List.of("creator-abc"), "TikTok", "PROMOTING")));
+    when(current.effectivePermissions(account)).thenReturn(List.of("commission:view"));
+    when(creators.listRatesByIds(any()))
+        .thenReturn(List.of(new com.tcrm.admin.kol.api.KolRateDTO(11L, "0.1500")));
     when(inviters.listByIds(any())).thenReturn(List.of(new BdUserDTO(9L, "bd", null, true)));
     when(orders.rankFacts(any(), any(), any(), any()))
         .thenReturn(List.of(person(11, 2), person(12, 0)));
@@ -130,6 +141,10 @@ class AnalyticsRankingServiceTest {
         .satisfies(
             row -> {
               assertThat(row.name()).isEqualTo("Alice");
+              assertThat(row.primaryPlatform()).isEqualTo("TikTok");
+              assertThat(row.relationStatus()).isEqualTo("PROMOTING");
+              assertThat(row.linkCount()).isEqualTo(1);
+              assertThat(row.commissionRate()).isEqualByComparingTo("0.15");
               assertThat(row.highlights()).containsExactly("Item");
             });
     org.mockito.Mockito.verify(orders, org.mockito.Mockito.atLeastOnce())
@@ -139,7 +154,7 @@ class AnalyticsRankingServiceTest {
             any(),
             any());
     assertThat(service.options().creators()).hasSize(2);
-    for (String key : List.of("averageOrderAmount", "amountRefundRate")) {
+    for (String key : List.of("averageOrderAmount", "amountRefundRate", "commissionRate")) {
       var all = service.query(Board.CREATOR, FILTER, null, 1, 20, key, "desc");
       assertThat(all.ranking().items()).extracting(Row::id).containsExactly("11", "12");
     }
@@ -189,8 +204,13 @@ class AnalyticsRankingServiceTest {
         .thenReturn(
             List.of(
                 new RankFactsDTO(
-                    11L, 1, 1, 0, 0, 0, ZERO, ZERO, ZERO, 0, FROM.plusSeconds(1), null),
-                new RankFactsDTO(12L, 1, 1, 0, 0, 0, ZERO, ZERO, ZERO, 0, FROM, null)));
+                    11L, 1, 1, 0, 0, 0, ZERO, ZERO, ZERO, 0, FROM.plusSeconds(1), null, 0),
+                new RankFactsDTO(12L, 1, 1, 0, 0, 0, ZERO, ZERO, ZERO, 0, FROM, null, 0)));
+    var restricted = service.query(Board.CREATOR, FILTER, null, 1, 20, "commissionRate", "desc");
+    assertThat(restricted.unavailable())
+        .contains(
+            new StatsOverviewService.UnavailableDTO("commissionRate", "COMMISSION_FORBIDDEN"));
+    org.mockito.Mockito.verify(creators, org.mockito.Mockito.never()).listRatesByIds(any());
     for (String direction : List.of("asc", "desc")) {
       assertThat(
               service
@@ -224,6 +244,6 @@ class AnalyticsRankingServiceTest {
 
   private static RankFactsDTO person(long id, long paid) {
     return new RankFactsDTO(
-        id, paid, paid, 1, 1, 1, BigDecimal.valueOf(paid), ZERO, ZERO, 0, FROM, null);
+        id, paid, paid, 1, 1, 1, BigDecimal.valueOf(paid), ZERO, ZERO, 0, FROM, null, 1);
   }
 }

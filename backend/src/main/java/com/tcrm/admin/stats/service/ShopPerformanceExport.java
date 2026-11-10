@@ -120,80 +120,151 @@ public class ShopPerformanceExport {
                 result.sortBy(),
                 label("direction"),
                 result.sortDirection()));
+    if (board == AnalyticsRankingService.Board.PRODUCT) {
+      return exportProducts(result, metadata);
+    }
+    if (board == AnalyticsRankingService.Board.CREATOR) {
+      return exportCreators(result, metadata);
+    }
     var headers =
-        new java.util.ArrayList<>(
-            List.of(
-                label("entityCode"),
-                label("name"),
-                label("orders"),
-                label("units"),
-                label("sales"),
-                label("refund"),
-                label("net"),
-                label("refundOrders"),
-                label("orderRefundRate")));
-    headers.addAll(
-        switch (board) {
-          case PRODUCT -> List.of(label("rank"), label("shop"));
-          case CREATOR ->
-              List.of(
-                  label("inviter"),
-                  label("status"),
-                  label("social"),
-                  "SPU",
-                  label("average"),
-                  label("amountRefundRate"),
-                  label("highlights"));
-          case INVITER ->
-              List.of(
-                  label("status"),
-                  label("invited"),
-                  label("effective"),
-                  label("creators"),
-                  label("average"),
-                  label("amountRefundRate"),
-                  label("bestCreator"));
-        });
+        List.of(
+            label("inviter"),
+            label("status"),
+            label("creatorCounts"),
+            label("units"),
+            label("sales"),
+            label("refund"),
+            label("net"),
+            label("amountRefundRate"),
+            label("average"),
+            label("prepayExpense"),
+            label("totalEstimatedCommission"),
+            label("totalExpense"));
     var rows =
         result.ranking().items().stream()
             .map(
                 row -> {
                   var m = row.metrics();
-                  var values =
-                      new java.util.ArrayList<>(
-                          List.of(
-                              text(row.code()),
-                              text(row.name()),
-                              text(m.paidOrderCount()),
-                              text(m.units()),
-                              money(m.salesAmount()),
-                              money(m.completedRefundAmount()),
-                              money(m.netSalesAmount()),
-                              text(m.refundedOrderCount()),
-                              money(m.periodRefundedOrderRate())));
-                  values.addAll(
-                      switch (board) {
-                        case PRODUCT -> List.of(text(row.rank()), text(row.related()));
-                        case CREATOR ->
-                            List.of(
-                                text(row.related()),
-                                status(row.enabled()),
-                                row.social() == null ? "" : String.join(" / ", row.social()),
-                                text(row.spuCount()),
-                                money(m.averageOrderAmount()),
-                                money(m.amountRefundRate()),
-                                String.join(" / ", row.highlights()));
-                        case INVITER ->
-                            List.of(
-                                status(row.enabled()),
-                                text(row.invitedCount()),
-                                text(row.effectiveCount()),
-                                text(row.kolCount()),
-                                money(m.averageOrderAmount()),
-                                money(m.amountRefundRate()),
-                                String.join(" / ", row.highlights()));
-                      });
-                  return List.copyOf(values);
+                  return List.of(
+                      join(row.name(), row.code()),
+                      status(row.enabled()),
+                      text(row.effectiveCount()) + " / " + text(row.invitedCount()),
+                      text(m.units()),
+                      money(m.salesAmount()),
+                      money(m.completedRefundAmount()),
+                      money(m.netSalesAmount()),
+                      percent(m.amountRefundRate()),
+                      money(m.averageOrderAmount()),
+                      "",
+                      "",
+                      "");
+                })
+            .toList();
+    return excel.export(metadata, headers, rows);
+  }
+
+  private byte[] exportCreators(
+      AnalyticsRankingService.Result result, List<List<String>> metadata) {
+    var headers =
+        List.of(
+            label("creatorIdentity"),
+            label("creatorRelationship"),
+            label("orderCount"),
+            label("units"),
+            label("linkCount"),
+            label("sales"),
+            label("refund"),
+            label("net"),
+            label("average"),
+            label("amountRefundRate"),
+            label("commissionRate"),
+            label("estimatedCommission"),
+            label("commissionExpense"),
+            label("cumulativeCommission"));
+    var rows =
+        result.ranking().items().stream()
+            .map(
+                row -> {
+                  var m = row.metrics();
+                  String name = text(row.name());
+                  if (!name.isBlank() && row.primaryPlatform() != null) {
+                    name += " (" + row.primaryPlatform() + ")";
+                  }
+                  String identity =
+                      join(
+                          name,
+                          row.social() == null ? null : String.join(" / ", row.social()),
+                          row.code());
+                  String relation =
+                      row.relationStatus() == null
+                          ? null
+                          : label("relation." + row.relationStatus());
+                  return List.of(
+                      identity,
+                      join(row.related(), relation),
+                      text(m.paidOrderCount()),
+                      text(m.units()),
+                      text(row.linkCount()),
+                      money(m.salesAmount()),
+                      money(m.completedRefundAmount()),
+                      money(m.netSalesAmount()),
+                      money(m.averageOrderAmount()),
+                      percent(m.amountRefundRate()),
+                      percent(row.commissionRate()),
+                      "",
+                      "",
+                      "");
+                })
+            .toList();
+    return excel.export(metadata, headers, rows);
+  }
+
+  private static String join(String... parts) {
+    return String.join(
+        " / ",
+        java.util.Arrays.stream(parts).filter(part -> part != null && !part.isBlank()).toList());
+  }
+
+  private static String percent(BigDecimal rate) {
+    return rate == null ? "" : rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
+  }
+
+  private byte[] exportProducts(
+      AnalyticsRankingService.Result result, List<List<String>> metadata) {
+    var headers =
+        List.of(
+            label("rank"),
+            label("productName"),
+            label("channelItemId"),
+            label("shop"),
+            label("sellingCreators"),
+            label("units"),
+            label("orderCount"),
+            label("refundUnits"),
+            label("sales"),
+            label("refund"),
+            label("net"),
+            label("settlementAmount"));
+    var rows =
+        result.ranking().items().stream()
+            .map(
+                row -> {
+                  var m = row.metrics();
+                  return List.of(
+                      text(row.rank()),
+                      text(row.name()),
+                      row.sourceItemId() == null
+                          ? label("weidian")
+                          : label("weidian") + " / " + row.sourceItemId(),
+                      text(row.related()),
+                      text(row.kolCount()),
+                      text(m.units()),
+                      text(m.paidOrderCount()),
+                      "",
+                      money(m.salesAmount()),
+                      money(m.completedRefundAmount()),
+                      money(m.netSalesAmount()),
+                      "");
                 })
             .toList();
     return excel.export(metadata, headers, rows);

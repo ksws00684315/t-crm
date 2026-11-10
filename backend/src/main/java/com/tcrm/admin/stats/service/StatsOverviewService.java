@@ -39,6 +39,10 @@ public class StatsOverviewService {
     return overview(resolve(filter));
   }
 
+  boolean canViewCommission() {
+    return current.effectivePermissions(current.user()).contains("commission:view");
+  }
+
   ResolvedFilter resolve(FilterDTO filter) {
     var account = current.user();
     if (account.tenantId() == null) {

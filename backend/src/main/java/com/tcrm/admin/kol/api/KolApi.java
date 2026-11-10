@@ -1,5 +1,6 @@
 package com.tcrm.admin.kol.api;
 
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -32,8 +33,11 @@ public interface KolApi {
    */
   List<KolRefDTO> listAll();
 
-  /** Public creator handles for the scoped dashboard identities. */
-  Map<Long, List<String>> analyticsSocialHandles(Collection<Long> ids);
+  /** Social accounts and display relation status for the scoped dashboard identities. */
+  Map<Long, AnalyticsProfileDTO> analyticsProfiles(
+      Collection<Long> ids, Map<Long, BdUserDTO> owners);
+
+  record AnalyticsProfileDTO(List<String> handles, String primaryPlatform, String relationStatus) {}
 
   /**
    * Pages the IDs of undeleted KOLs that use the link template, in ascending id order (task 11

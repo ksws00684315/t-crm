@@ -8,7 +8,7 @@ export const boards: Record<string, Board> = {
 };
 
 const trade = ["paidOrderCount", "units", "salesAmount", "completedRefundAmount", "netSalesAmount"];
-const risk = ["averageOrderAmount", "amountRefundRate", "periodRefundedOrderRate", "netCommission"];
+const risk = ["averageOrderAmount", "amountRefundRate", "periodRefundedOrderRate"];
 export const columnsByBoard: Record<Board, string[]> = {
   "shop-performance": [
     "identity",
@@ -26,34 +26,44 @@ export const columnsByBoard: Record<Board, string[]> = {
     "identity",
     "channelCode",
     "shop",
-    "paidOrderCount",
+    "kolCount",
     "units",
+    "paidOrderCount",
     "refundUnits",
-    "netUnits",
     "salesAmount",
     "completedRefundAmount",
     "netSalesAmount",
-    "refundedOrderCount",
-    "periodRefundedOrderRate"
+    "settlementAmount"
   ],
   "kol-ranking": [
     "identity",
     "relationship",
-    ...trade.slice(0, 2),
-    "spuCount",
-    ...trade.slice(2),
-    ...risk,
-    "topProducts"
+    "paidOrderCount",
+    "units",
+    "linkCount",
+    "salesAmount",
+    "completedRefundAmount",
+    "netSalesAmount",
+    "averageOrderAmount",
+    "amountRefundRate",
+    "commissionRate",
+    "estimatedCommission",
+    "commissionExpense",
+    "cumulativeCommission"
   ],
   "inviter-performance": [
     "identity",
     "status",
-    "invitedCount",
-    "effectiveCount",
-    "kolCount",
-    ...trade,
-    ...risk,
-    "bestCreator"
+    "creatorCounts",
+    "units",
+    "salesAmount",
+    "completedRefundAmount",
+    "netSalesAmount",
+    "amountRefundRate",
+    "averageOrderAmount",
+    "prepayExpense",
+    "totalEstimatedCommission",
+    "totalExpense"
   ]
 };
 export const coverageKeys = ["spuCount", "skuCount", "kolCount"];
@@ -62,11 +72,12 @@ export const sortable = new Set([
   "spuCount",
   "kolCount",
   "rank",
-
+  "linkCount",
+  "commissionRate",
   "invitedCount",
   "effectiveCount",
   "refundedOrderCount",
-  ...risk.slice(0, 3)
+  ...risk
 ]);
 export const money = new Set([
   "salesAmount",
@@ -75,10 +86,27 @@ export const money = new Set([
   "netSalesAmount",
   "averageOrderAmount",
   "netCommission",
-  "settlement"
+  "settlement",
+  "settlementAmount",
+  "estimatedCommission",
+  "commissionExpense",
+  "cumulativeCommission",
+  "prepayExpense",
+  "totalEstimatedCommission",
+  "totalExpense"
 ]);
-export const rates = new Set(["amountRefundRate", "periodRefundedOrderRate"]);
-export const pending = new Set(["refundUnits", "netUnits", "netCommission"]);
+export const rates = new Set(["amountRefundRate", "periodRefundedOrderRate", "commissionRate"]);
+export const pending = new Set([
+  "refundUnits",
+  "settlementAmount",
+  "netCommission",
+  "estimatedCommission",
+  "commissionExpense",
+  "cumulativeCommission",
+  "prepayExpense",
+  "totalEstimatedCommission",
+  "totalExpense"
+]);
 
 const DAY = 86_400_000;
 export function dates(days = 7, now = new Date()): Pick<Filters, "startDate" | "endDate"> {

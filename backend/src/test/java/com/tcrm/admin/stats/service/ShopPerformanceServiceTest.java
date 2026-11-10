@@ -140,6 +140,7 @@ class ShopPerformanceServiceTest {
         ZERO,
         0,
         achieved,
-        achieved);
+        achieved,
+        0);
   }
 }

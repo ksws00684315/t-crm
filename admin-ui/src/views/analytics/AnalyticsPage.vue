@@ -7,6 +7,7 @@ import {
   ArrowRight,
   DataBoard,
   Goods,
+  InfoFilled,
   Tickets,
   TrendCharts,
   Wallet,
@@ -30,6 +31,7 @@ import { useUserStore } from "@/stores/user";
 import { saveBlob } from "@/utils/download";
 import { formatAmountWithCurrency } from "@/utils/format";
 import { canExport } from "@/utils/permission";
+import { relationStatusLabelKey, relationTagType } from "@/utils/promotion";
 import {
   boards,
   columnsByBoard,
@@ -53,6 +55,8 @@ const board = boards[String(useRoute().name)]!;
 const shop = board === "shop-performance";
 const product = board === "best-sellers";
 const creator = board === "kol-ranking";
+const inviter = board === "inviter-performance";
+const hasDefinitions = !shop;
 const draft = ref<Filters>(dates());
 const applied = ref<Filters>({ ...draft.value });
 const page = ref(1);
@@ -99,12 +103,14 @@ const columns = computed<DataColumn[]>(() =>
     tooltip: false,
     align: key === "identity" ? "left" : "center",
     interactive: key === "identity",
-    fixed: product && key === "identity" ? "left" : undefined,
+    fixed: (product || creator) && key === "identity" ? "left" : undefined,
     highlighted: sortBy.value === key,
     minWidth: columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 }
   }))
 );
-const sortKeys = columnsByBoard[board].filter(key => sortable.has(key));
+const headerKeys = hasDefinitions
+  ? columnsByBoard[board]
+  : columnsByBoard[board].filter(key => sortable.has(key));
 const cellKeys = columnsByBoard[board].filter(
   key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
 );
@@ -113,18 +119,49 @@ const detailActions = computed(() => [
 ]);
 
 function identity(row: RankRow): string {
+  if (creator && row.name && row.primaryPlatform) {
+    return t("analytics.kol-ranking.nameWithPlatform", {
+      name: row.name,
+      platform: row.primaryPlatform
+    });
+  }
   return (shop ? row.shopName : row.name) || (row.id === "0" ? t("analytics.unassigned") : "—");
 }
 
 function label(key: string): string {
-  if (
-    key === "identity" ||
-    key === "netCommission" ||
-    (product && key === "periodRefundedOrderRate")
-  ) {
+  if (key === "identity" || key === "netCommission") {
     return t(`analytics.${board}.${key}`);
   }
-  if (key === "netSalesAmount" && product) return t("analytics.best-sellers.net");
+  if (
+    product &&
+    ["channelCode", "kolCount", "paidOrderCount", "netSalesAmount", "settlementAmount"].includes(
+      key
+    )
+  ) {
+    return t(`analytics.best-sellers.${key}`);
+  }
+
+  if (
+    creator &&
+    [
+      "relationship",
+      "paidOrderCount",
+      "linkCount",
+      "commissionRate",
+      "estimatedCommission",
+      "commissionExpense",
+      "cumulativeCommission"
+    ].includes(key)
+  ) {
+    return t(`analytics.kol-ranking.${key}`);
+  }
+
+  if (
+    inviter &&
+    ["creatorCounts", "prepayExpense", "totalEstimatedCommission", "totalExpense"].includes(key)
+  ) {
+    return t(`analytics.inviter-performance.${key}`);
+  }
   return t(`analytics.${key}`);
 }
 
@@ -150,6 +187,19 @@ function valueOf(row: RankRow, key: string): Scalar | null {
   return typeof value === "string" || typeof value === "number" ? value : null;
 }
 
+function isCommissionForbidden(key: string): boolean {
+  return (
+    result.value?.unavailable.some(
+      field => field.field === key && field.reason === "COMMISSION_FORBIDDEN"
+    ) ?? false
+  );
+}
+
+function cellDisplay(row: RankRow, key: string): string {
+  if (isCommissionForbidden(key)) return t("analytics.commissionForbidden");
+  return pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key));
+}
+
 function comparison(key: Metric): string {
   return t("analytics.comparison", { value: percent(result.value?.change[key]) });
 }
@@ -169,7 +219,7 @@ const cards = computed(() => {
   const orders = {
     tone: "blue" as const,
     icon: Tickets,
-    label: label("paidOrderCount"),
+    label: t("analytics.paidOrderCount"),
     value: display("", data?.paidOrderCount),
     detail:
       shop || product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) }),
@@ -425,7 +475,7 @@ onUnmounted(stop);
     <DataTable
       class="analytics-ranking"
       scroll-with-page
-      :table-id="`analytics-${board}`"
+      :table-id="`analytics-${board}${shop ? '' : '-v2'}`"
       :columns="columns"
       :rows="rows"
       :row-key="shop ? 'shopId' : 'id'"
@@ -457,25 +507,45 @@ onUnmounted(stop);
           }}
         </el-tag>
       </template>
-      <template v-for="key in sortKeys" :key="key" #[`header-${key}`]>
-        <div class="sort-controls">
-          <button
-            type="button"
-            :aria-label="
-              t('analytics.sortLabel', {
-                label: label(key),
-                direction:
-                  sortBy === key ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
-              })
-            "
-            :class="{ selected: sortBy === key }"
-            @click="sort(key)"
+      <template v-for="key in headerKeys" :key="key" #[`header-${key}`]>
+        <div class="sort-controls" :class="{ 'sort-controls--left': key === 'identity' }">
+          <el-tooltip
+            :disabled="!hasDefinitions"
+            :content="hasDefinitions ? t(`analytics.${board}.definitions.${key}`) : ''"
+            :trigger="['hover', 'focus']"
+            popper-class="analytics-metric-definition"
+            placement="top"
           >
-            {{ label(key) }}
-            <span aria-hidden="true">{{
-              sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
-            }}</span>
-          </button>
+            <component
+              :is="sortable.has(key) ? 'button' : 'span'"
+              :type="sortable.has(key) ? 'button' : undefined"
+              :tabindex="sortable.has(key) ? undefined : 0"
+              :aria-label="
+                sortable.has(key)
+                  ? t('analytics.sortLabel', {
+                      label: label(key),
+                      direction:
+                        sortBy === key ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
+                    })
+                  : undefined
+              "
+              class="analytics-column-heading"
+              :class="{ selected: sortBy === key }"
+              @click="sortable.has(key) && sort(key)"
+            >
+              {{ label(key) }}
+              <span v-if="sortable.has(key)" aria-hidden="true">{{
+                sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
+              }}</span>
+              <el-icon
+                v-if="hasDefinitions"
+                class="analytics-column-heading__info"
+                aria-hidden="true"
+              >
+                <InfoFilled />
+              </el-icon>
+            </component>
+          </el-tooltip>
         </div>
       </template>
       <template #cell-rank="{ row }">
@@ -525,13 +595,14 @@ onUnmounted(stop);
         <div>
           <el-tag size="small" type="info">{{ t("analytics.weidian") }}</el-tag>
         </div>
-        <CopyText :value="row.code" />
+        <CopyText v-if="row.sourceItemId" :value="row.sourceItemId" />
+        <span v-else>—</span>
       </template>
       <template #cell-shop="{ row }">{{ row.related || "—" }}</template>
       <template #cell-relationship="{ row }">
         <div>{{ row.related || t("analytics.unassigned") }}</div>
-        <el-tag v-if="row.enabled != null" size="small" :type="row.enabled ? 'success' : 'info'">
-          {{ t(row.enabled ? "analytics.enabled" : "analytics.disabled") }}
+        <el-tag v-if="row.relationStatus" size="small" :type="relationTagType(row.relationStatus)">
+          {{ t(relationStatusLabelKey(row.relationStatus)) }}
         </el-tag>
       </template>
       <template #cell-status="{ row }">
@@ -557,23 +628,18 @@ onUnmounted(stop);
               'analytics-number--loss':
                 (key === 'completedRefundAmount' && Number(valueOf(row, key)) > 0) ||
                 (key === 'netSalesAmount' && Number(valueOf(row, key)) < 0),
-              'analytics-number--unavailable': pendingColumns.has(key)
+              'analytics-number--unavailable': pendingColumns.has(key) || isCommissionForbidden(key)
             }"
-            >{{
-              pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key))
-            }}</span
-          >
-          <el-tag
-            v-if="product && key === 'periodRefundedOrderRate' && Number(valueOf(row, key)) > 0.2"
-            type="warning"
-            size="small"
-            >{{ t("analytics.highRefund") }}</el-tag
+            >{{ cellDisplay(row, key) }}</span
           >
         </div>
       </template>
 
-      <template #cell-topProducts="{ row }">{{ row.highlights?.join(" · ") || "—" }}</template>
-      <template #cell-bestCreator="{ row }">{{ row.highlights?.[0] || "—" }}</template>
+      <template #cell-creatorCounts="{ row }">
+        {{ display("effectiveCount", valueOf(row, "effectiveCount")) }}
+        <span class="coverage-values__separator" aria-hidden="true">/</span>
+        {{ display("invitedCount", valueOf(row, "invitedCount")) }}
+      </template>
       <template #actions><RowActions :actions="detailActions" /></template>
     </DataTable>
   </div>
@@ -833,7 +899,20 @@ onUnmounted(stop);
 .sort-controls button.selected {
   color: var(--el-color-primary);
 }
-.sort-controls button:focus-visible {
+.sort-controls--left {
+  justify-content: flex-start;
+}
+.analytics-column-heading__info {
+  vertical-align: middle;
+  margin-inline-start: var(--tcrm-space-1);
+  color: var(--tcrm-color-text-secondary);
+}
+:global(.analytics-metric-definition) {
+  max-width: min(360px, calc(100vw - var(--tcrm-space-5)));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.analytics-column-heading:focus-visible {
   outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary);
   outline-offset: var(--tcrm-focus-width);
 }

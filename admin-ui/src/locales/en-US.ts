@@ -46,6 +46,7 @@ const enUS: MessageSchema = {
     settlementHint:
       "Based on Weidian settlement postings in the selected period. Increases in shop receivables are reduced by deductions such as refunds. Settlement data is pending integration.",
     pending: "In development",
+    commissionForbidden: "No access",
     comparison: "vs prior period {value}",
     transactionTitle: "Transaction and settlement comparison",
     transactionLedger: "Transaction ledger · Order activity",
@@ -106,30 +107,120 @@ const enUS: MessageSchema = {
     },
     "best-sellers": {
       selling: "SPUs with sales",
-      identity: "Product",
+      identity: "Order product",
+      channelCode: "Channel / ID",
+      kolCount: "Creators with sales",
+      paidOrderCount: "Order count",
+      netSalesAmount: "Net sales",
+      settlementAmount: "Settlement amount",
       ranking: "Product ranking",
       rankingCount: "{count} product | {count} products",
       net: "Product net sales",
       keyword: "Product name / SPU",
-      periodRefundedOrderRate: "Order refund rate"
+      definitions: {
+        rank: "Rank by net sales under the applied filters. Sorting by another column preserves the business rank.",
+        identity:
+          "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
+        channelCode:
+          "The order channel and the item ID from the original source link. A dash indicates no linked source product.",
+        shop: "The shop where the order was placed. A product is counted separately in each shop.",
+        kolCount: "Distinct creators with a paid sale of this product during the selected period.",
+        units:
+          "Total units purchased across all SKUs of this product in orders paid during the selected period.",
+        paidOrderCount:
+          "Distinct paid orders that include this product during the selected period.",
+        refundUnits:
+          "Units successfully refunded, grouped by refund completion date. Refund quantity data is pending.",
+        salesAmount:
+          "Total paid amount on the product lines, grouped by order payment date, after discounts and excluding shipping.",
+        completedRefundAmount:
+          "Successful refunds linked to this product's order lines, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same paid orders completed within 30 Beijing calendar days.",
+        settlementAmount:
+          "Settlement postings attributable to the product. Product-level settlement data is pending."
+      }
     },
     "kol-ranking": {
       selling: "Creators with sales",
       active: "Active creators {value}",
-      identity: "Creator / social accounts",
+      identity: "Creator / social / ID",
+      nameWithPlatform: "{name} ({platform})",
+      relationship: "Inviter / relationship",
+      paidOrderCount: "Order count",
+      linkCount: "Links with sales",
+      commissionRate: "Creator commission rate",
+      estimatedCommission: "Estimated commission",
+      commissionExpense: "Commission paid out",
+      cumulativeCommission: "Cumulative commission",
       ranking: "Creator ranking",
       rankingCount: "{count} creator | {count} creators",
       netCommission: "Net creator commission",
-      keyword: "Creator name / code / social"
+      keyword: "Creator name / code / social",
+      definitions: {
+        identity:
+          "Creator name, primary social platform, social accounts and creator ID. The platform is omitted when unset.",
+        relationship:
+          "Current assigned inviter and the relationship status shown in the creator directory.",
+        paidOrderCount:
+          "Distinct paid orders attributed to this creator during the selected period.",
+        units: "Total units purchased across SKUs on orders paid during the selected period.",
+        linkCount: "Distinct creator link IDs with a paid sale during the selected period.",
+        salesAmount:
+          "Amount paid on the creator’s orders, including shipping, grouped by payment date.",
+        completedRefundAmount:
+          "Successful refunds attributed to the creator, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same orders completed within 30 Beijing calendar days.",
+        averageOrderAmount:
+          "Sales divided by the number of paid orders during the selected period.",
+        amountRefundRate:
+          "Successful refunds completed during the selected period divided by sales in the same period.",
+        commissionRate:
+          "The creator’s current default commission rate. Historical orders use the rate effective at payment.",
+        estimatedCommission:
+          "Estimated commission on unsettled orders, based on each order’s commissionable amount and applicable rate. Dashboard integration is pending.",
+        commissionExpense:
+          "Commission withdrawals with completed payment. Dashboard integration is pending.",
+        cumulativeCommission:
+          "Commission on verified orders, using estimates for unsettled orders and actual amounts for settled orders. Withdrawn commission remains included once. Dashboard integration is pending."
+      }
     },
     "inviter-performance": {
       selling: "Inviters with sales",
       active: "Active inviters {value}",
-      identity: "Inviter name / code",
+      identity: "Inviter",
+      creatorCounts: "Active creators / lifetime invites",
+      prepayExpense: "Prepayments paid out",
+      totalEstimatedCommission: "Total estimated commission",
+      totalExpense: "Total paid out",
       ranking: "Inviter ranking",
       rankingCount: "{count} inviter | {count} inviters",
       netCommission: "Net team creator commission",
-      keyword: "Inviter name / code"
+      keyword: "Inviter name / code",
+      definitions: {
+        identity: "The inviter’s name and account.",
+        status: "Whether the inviter’s account is enabled.",
+        creatorCounts:
+          "Enabled creators currently assigned to this inviter, followed by creators originally invited by this inviter.",
+        units:
+          "Total units purchased across SKUs on orders attributed to this inviter and paid during the selected period.",
+        salesAmount:
+          "Amount paid on orders attributed to the inviter, including shipping, grouped by payment date.",
+        completedRefundAmount:
+          "Successful refunds attributed to the inviter, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same orders completed within 30 Beijing calendar days.",
+        amountRefundRate:
+          "Successful refunds completed during the selected period divided by sales in the same period.",
+        averageOrderAmount:
+          "Sales divided by the number of paid orders during the selected period.",
+        prepayExpense: "Prepayments with completed payment. Dashboard integration is pending.",
+        totalEstimatedCommission:
+          "Total estimated commission on orders in the selected period. Dashboard integration is pending.",
+        totalExpense:
+          "Commission and prepayments with completed payment. Dashboard integration is pending."
+      }
     }
   },
   app: {

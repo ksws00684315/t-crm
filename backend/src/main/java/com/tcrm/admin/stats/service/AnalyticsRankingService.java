@@ -196,6 +196,7 @@ public class AnalyticsRankingService {
         rows,
         List.of(
             new UnavailableDTO("refundUnits", "REFUND_QUANTITY_PENDING"),
+            new UnavailableDTO("settlementAmount", "WEIDIAN_SETTLEMENT_PENDING"),
             new UnavailableDTO("netUnits", "REFUND_QUANTITY_PENDING")));
   }
 
@@ -227,7 +228,12 @@ public class AnalyticsRankingService {
                   product == null ? null : product.imageUrl(),
                   product == null ? null : product.category(),
                   List.of(),
-                  List.of());
+                  List.of(),
+                  product == null ? null : product.sourceItemId(),
+                  null,
+                  null,
+                  null,
+                  null);
             })
         .sorted(comparator(Board.PRODUCT, new StatsRanking(1, 20, true), NET))
         .toList();
@@ -277,8 +283,20 @@ public class AnalyticsRankingService {
     var bd =
         inviters.listByIds(ownerIds).stream()
             .collect(Collectors.toMap(BdUserDTO::id, Function.identity()));
-    Map<Long, List<String>> socials =
-        board == Board.CREATOR ? creators.analyticsSocialHandles(kols.keySet()) : Map.of();
+    var profiles =
+        board == Board.CREATOR
+            ? creators.analyticsProfiles(kols.keySet(), bd)
+            : Map.<Long, KolApi.AnalyticsProfileDTO>of();
+    var rates = new HashMap<Long, BigDecimal>();
+    boolean commissionVisible = board == Board.CREATOR && overview.canViewCommission();
+    if (commissionVisible) {
+      var allowed = directory.stream().map(k -> k.id()).toList();
+      for (var rate : creators.listRatesByIds(allowed)) {
+        if (rate.rateText() != null) {
+          rates.put(rate.kolId(), new BigDecimal(rate.rateText()));
+        }
+      }
+    }
     var effective = new HashMap<Long, Long>();
     directory.stream()
         .filter(k -> k.enabled() && k.bdUserId() != null)
@@ -286,17 +304,22 @@ public class AnalyticsRankingService {
     var identities = new HashMap<Long, Identity>();
     if (board == Board.CREATOR) {
       kols.forEach(
-          (id, k) ->
-              identities.put(
-                  id,
-                  new Identity(
-                      k.name(),
-                      k.kolCode(),
-                      bd.containsKey(k.bdUserId()) ? display(bd.get(k.bdUserId())) : null,
-                      k.enabled(),
-                      socials.get(id),
-                      null,
-                      null)));
+          (id, k) -> {
+            var profile = profiles.get(id);
+            identities.put(
+                id,
+                new Identity(
+                    k.name(),
+                    k.kolCode(),
+                    bd.containsKey(k.bdUserId()) ? display(bd.get(k.bdUserId())) : null,
+                    k.enabled(),
+                    profile == null ? null : profile.handles(),
+                    null,
+                    null,
+                    profile == null ? null : profile.primaryPlatform(),
+                    rates.get(id),
+                    profile == null ? null : profile.relationStatus()));
+          });
     } else {
       bd.forEach(
           (id, b) ->
@@ -309,7 +332,10 @@ public class AnalyticsRankingService {
                       b.enabled(),
                       null,
                       invited.getOrDefault(id, 0L),
-                      effective.getOrDefault(id, 0L))));
+                      effective.getOrDefault(id, 0L),
+                      null,
+                      null,
+                      null)));
     }
     var matched =
         identities.entrySet().stream()
@@ -393,7 +419,27 @@ public class AnalyticsRankingService {
         new Summary(total.previous(), selling(previous), null, null, null, null),
         total.change(),
         rows,
-        List.of(new UnavailableDTO("netCommission", "WEIDIAN_SETTLEMENT_PENDING")));
+        board == Board.CREATOR
+            ? creatorUnavailable(commissionVisible)
+            : List.of(
+                new UnavailableDTO("netCommission", "WEIDIAN_SETTLEMENT_PENDING"),
+                new UnavailableDTO("prepayExpense", "INVITER_FINANCE_DASHBOARD_PENDING"),
+                new UnavailableDTO("totalEstimatedCommission", "INVITER_FINANCE_DASHBOARD_PENDING"),
+                new UnavailableDTO("totalExpense", "INVITER_FINANCE_DASHBOARD_PENDING")));
+  }
+
+  private static List<UnavailableDTO> creatorUnavailable(boolean authorized) {
+    var fields = new ArrayList<UnavailableDTO>();
+    fields.add(new UnavailableDTO("netCommission", "WEIDIAN_SETTLEMENT_PENDING"));
+    if (!authorized) {
+      fields.add(new UnavailableDTO("commissionRate", "COMMISSION_FORBIDDEN"));
+    }
+    String reason = authorized ? "CREATOR_COMMISSION_DASHBOARD_PENDING" : "COMMISSION_FORBIDDEN";
+    for (String field :
+        List.of("estimatedCommission", "commissionExpense", "cumulativeCommission")) {
+      fields.add(new UnavailableDTO(field, reason));
+    }
+    return List.copyOf(fields);
   }
 
   private Map<Long, Long> invitedCounts() {
@@ -431,7 +477,8 @@ public class AnalyticsRankingService {
                         BigDecimal.ZERO,
                         0,
                         null,
-                        null)));
+                        null,
+                        0)));
     return result;
   }
 
@@ -478,7 +525,12 @@ public class AnalyticsRankingService {
                   null,
                   null,
                   highlights.getOrDefault(f.entityId(), List.of()),
-                  List.of());
+                  List.of(),
+                  null,
+                  identity == null ? null : identity.primaryPlatform(),
+                  f.linkCount(),
+                  identity == null ? null : identity.commissionRate(),
+                  identity == null ? null : identity.relationStatus());
             })
         .toList();
   }
@@ -510,7 +562,7 @@ public class AnalyticsRankingService {
           case "rank", "rankChange", "refundedOrderCount" -> board == Board.PRODUCT;
           case "invitedCount", "effectiveCount" -> board == Board.INVITER;
           case "kolCount" -> board != Board.CREATOR;
-          case "spuCount" -> board == Board.CREATOR;
+          case "spuCount", "linkCount", "commissionRate" -> board == Board.CREATOR;
           case "averageOrderAmount", "amountRefundRate" -> board != Board.PRODUCT;
           case "paidOrderCount",
               "units",
@@ -532,6 +584,8 @@ public class AnalyticsRankingService {
           case "effectiveCount" -> sorting.compare(Row::effectiveCount);
           case "kolCount" -> sorting.compare(Row::kolCount);
           case "spuCount" -> sorting.compare(Row::spuCount);
+          case "linkCount" -> sorting.compare(Row::linkCount);
+          case "commissionRate" -> sorting.compare(Row::commissionRate);
           case "paidOrderCount" -> sorting.compare(r -> r.metrics().paidOrderCount());
           case "units" -> sorting.compare(r -> r.metrics().units());
           case "refundedOrderCount" -> sorting.compare(r -> r.metrics().refundedOrderCount());
@@ -557,7 +611,10 @@ public class AnalyticsRankingService {
       boolean enabled,
       List<String> social,
       Long invited,
-      Long effective) {}
+      Long effective,
+      String primaryPlatform,
+      BigDecimal commissionRate,
+      String relationStatus) {}
 
   private record Data(
       MetaDTO meta,
@@ -598,7 +655,12 @@ public class AnalyticsRankingService {
       String imageUrl,
       String category,
       List<String> highlights,
-      List<TrendPoint> trend) {
+      List<TrendPoint> trend,
+      String sourceItemId,
+      String primaryPlatform,
+      Long linkCount,
+      BigDecimal commissionRate,
+      String relationStatus) {
     Row withRank(int nextRank, Integer change, List<TrendPoint> series) {
       return new Row(
           id,
@@ -621,7 +683,12 @@ public class AnalyticsRankingService {
           imageUrl,
           category,
           highlights,
-          series);
+          series,
+          sourceItemId,
+          primaryPlatform,
+          linkCount,
+          commissionRate,
+          relationStatus);
     }
   }
 

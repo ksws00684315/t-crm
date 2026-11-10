@@ -10,6 +10,8 @@ import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.LinkTemplateDO;
+import com.tcrm.admin.kol.model.RelationStatus;
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
@@ -72,23 +74,41 @@ public class KolLookupService implements KolApi {
   }
 
   @Override
-  public Map<Long, List<String>> analyticsSocialHandles(Collection<Long> ids) {
+  public Map<Long, AnalyticsProfileDTO> analyticsProfiles(
+      Collection<Long> ids, Map<Long, BdUserDTO> owners) {
     if (ids.isEmpty()) {
       return Map.of();
     }
-    var result = new HashMap<Long, List<String>>();
+    var result = new HashMap<Long, AnalyticsProfileDTO>();
     kols.selectList(
             new LambdaQueryWrapper<KolDO>()
-                .select(KolDO::getId, KolDO::getSocialAccounts)
+                .select(
+                    KolDO::getId,
+                    KolDO::getSocialAccounts,
+                    KolDO::getStatus,
+                    KolDO::getRelationStatus,
+                    KolDO::getBdUserId)
                 .in(KolDO::getId, ids))
         .forEach(
-            k ->
-                result.put(
-                    k.getId(),
-                    SocialAccountsJson.read(k.getSocialAccounts()).stream()
-                        .map(SocialAccountDTO::handle)
-                        .filter(Objects::nonNull)
-                        .toList()));
+            k -> {
+              var accounts = SocialAccountsJson.read(k.getSocialAccounts());
+              var handles =
+                  accounts.stream().map(SocialAccountDTO::handle).filter(Objects::nonNull).toList();
+              var primary =
+                  accounts.stream()
+                      .filter(SocialAccountDTO::primary)
+                      .map(SocialAccountDTO::platform)
+                      .filter(Objects::nonNull)
+                      .findFirst()
+                      .orElse(null);
+              var status =
+                  KolPromotionSupport.displayRelationStatus(
+                      k.getStatus(),
+                      Objects.requireNonNullElse(
+                          k.getRelationStatus(), RelationStatus.PENDING_PROMOTION.name()),
+                      k.getBdUserId() == null ? null : owners.get(k.getBdUserId()));
+              result.put(k.getId(), new AnalyticsProfileDTO(handles, primary, status));
+            });
     return result;
   }
 

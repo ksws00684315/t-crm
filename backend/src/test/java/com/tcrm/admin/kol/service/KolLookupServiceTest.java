@@ -9,14 +9,17 @@ import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.tcrm.admin.kol.api.KolApi.AnalyticsProfileDTO;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPromotionRecordMapper;
 import com.tcrm.admin.kol.mapper.LinkTemplateMapper;
 import com.tcrm.admin.kol.model.KolDO;
 import com.tcrm.admin.kol.model.LinkTemplateDO;
+import com.tcrm.admin.system.api.BdUserDTO;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -127,6 +130,32 @@ class KolLookupServiceTest {
     assertThat(all.get(0).linkTemplateEnabled()).isTrue();
     assertThat(all.get(1).linkTemplateUrl()).isNull();
     assertThat(all.get(1).linkTemplateEnabled()).isFalse();
+  }
+
+  @Test
+  void usesPrimarySocialAccountAndDirectoryRelationshipRulesForAnalytics() {
+    KolMapper kols = mock(KolMapper.class);
+    KolDO creator = new KolDO();
+    creator.setId(1L);
+    creator.setStatus(1);
+    creator.setBdUserId(5L);
+    creator.setSocialAccounts(
+        SocialAccountsJson.write(
+            List.of(
+                new SocialAccountDTO("Instagram", "photo", null, null),
+                new SocialAccountDTO("TikTok", "video", null, null, true))));
+    when(kols.selectList(any())).thenReturn(List.of(creator));
+    var lookup = new KolLookupService(kols, mock(LinkTemplateMapper.class), records);
+    var owner = new BdUserDTO(5L, "owner", null, true);
+
+    assertThat(lookup.analyticsProfiles(List.of(1L), Map.of(5L, owner)))
+        .containsEntry(
+            1L, new AnalyticsProfileDTO(List.of("photo", "video"), "TikTok", "PENDING_PROMOTION"));
+    assertThat(lookup.analyticsProfiles(List.of(1L), Map.of()).get(1L).relationStatus())
+        .isEqualTo("PENDING_UPDATE");
+    creator.setStatus(0);
+    assertThat(lookup.analyticsProfiles(List.of(1L), Map.of()).get(1L).relationStatus())
+        .isEqualTo("INVALID");
   }
 
   @Test

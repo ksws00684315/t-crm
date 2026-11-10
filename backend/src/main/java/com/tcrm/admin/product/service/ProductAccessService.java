@@ -50,6 +50,7 @@ public class ProductAccessService implements ProductAccessApi {
         row.getName(),
         row.getImageUrl(),
         row.getStatus(),
-        row.getCategory());
+        row.getCategory(),
+        row.getWeidianItemId());
   }
 }
