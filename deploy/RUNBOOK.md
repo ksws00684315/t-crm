@@ -4,9 +4,9 @@
 >
 > - 本文只写**执行顺序、命令原文和确认方法**；原理与背景见 [`README.md`](README.md) 对应小节和 [ADR-037](../docs/06-架构决策/ADR-037-生产部署拓扑与AWS备份容灾.md)。
 > - 需要负责人在控制台完成的事项见[《生产上线：负责人操作清单》](../docs/04-开发任务/生产上线-负责人操作清单.md)（下称「操作清单」），本文只引用、不复制。
-> - 已定前提（2026-11-04）：Ubuntu 24.04 x86_64 / us-west-2；Session Manager 登录、`sudo -i` 以 root 操作、不开 22 端口；仓库克隆到 `/opt/tcrm`、属主 root、按版本标签检出；定时任务全放 root 的 crontab；主机时区 UTC；证书、静态文件、备份、凭证、状态等数据目录全部在仓库之外、统一放 `/var/lib/tcrm/` 下；`.env.example` 的相对路径默认值保持不变，生产取值见第 8 章。
+> - 已定前提（2026-11-04）：Ubuntu 24.04 x86_64 / us-east-1（正式环境实际区域；任务 145 按 2026-11-10 审查 M-01 回写，原写 us-west-2）；Session Manager 登录、`sudo -i` 以 root 操作、不开 22 端口；仓库克隆到 `/opt/tcrm`、属主 root、按版本标签检出；定时任务全放 root 的 crontab；主机时区 UTC；证书、静态文件、备份、凭证、状态等数据目录全部在仓库之外、统一放 `/var/lib/tcrm/` 下；`.env.example` 的相对路径默认值保持不变，生产取值见第 8 章。
 > - 本文由任务 108 按仓库现状**静态核对**编写，未在真机执行过；「待真机确认」项见第 17 章演练记录表。
-> - 占位符：`<域名>`（如 `example.com`）、`<域名前缀>`（取域名点号前的部分，用于给桶起名）、`<版本>`（如 `1.0.0`，标签为 `v<版本>`）、`<主备份桶名>`、`<EIP>`。GitHub 与 Cloudflare 两个 API 令牌在第 5 章生成，分别在第 7.4、8.1 节按提示输入（不回显、不进 shell 历史）。除标注【AWS 控制台】【Cloudflare】【负责人】【浏览器】外，其余步骤都在主机上以 root 执行。
+> - 占位符：`<域名>`（如 `example.com`）、`<域名前缀>`（取域名点号前的部分，用于给桶起名）、`<版本>`（如 `0.1.14`，标签为 `v<版本>`；版本只以发布标签为准，见规范 08 §8）、`<主备份桶名>`、`<EIP>`。GitHub 与 Cloudflare 两个 API 令牌在第 5 章生成，分别在第 7.4、8.1 节按提示输入（不回显、不进 shell 历史）。除标注【AWS 控制台】【Cloudflare】【负责人】【浏览器】外，其余步骤都在主机上以 root 执行。
 
 ## 0. 目录规划
 
@@ -31,7 +31,7 @@
 
 层次与理由见 README「备份与恢复」的备份层次表；这里只写操作。
 
-1. **主备份桶**（us-west-2，名如 `<域名前缀>-tcrm-backup`）：
+1. **主备份桶**（us-east-1，名如 `<域名前缀>-tcrm-backup`）：
    - Block Public Access：保持全部阻止；
    - Properties → Bucket Versioning：**Enable**（跨区域复制的前提）；
    - Object Lock 不开（只开在副本桶）。
@@ -47,7 +47,7 @@
 ## 3. AWS：IAM 实例角色【AWS 控制台】
 
 1. 建策略 `tcrm-backup-s3`：JSON 内容取仓库中的 `deploy/backup/iam-policy.example.json`（仓库是公开的，此刻主机还没克隆，直接在 GitHub 网页打开复制：<https://github.com/ksws00684315/t-crm> → `deploy/backup/iam-policy.example.json`），把 `EXAMPLE-TCRM-BACKUP-BUCKET` 全部替换为主备份桶名（含 `arn:aws:s3:::` 后的桶名和 `…/pgbackrest/*`、`…/logical/*` 资源）。
-2. 建角色 `tcrm-prod-instance`：Trusted entity 选 EC2；附加两条策略：
+2. 建角色 `crm-prod-instance`（正式环境实际名称）：Trusted entity 选 EC2；附加两条策略：
    - `tcrm-backup-s3`（自定义，S3 备份读写）；
    - AWS 托管策略 **`AmazonSSMManagedInstanceCore`**（Session Manager 登录必需；IAM 示例与操作清单此前未列，操作清单已随本手册补上）。
 3. 不创建任何长期访问密钥（ADR-037 决定 1）。
@@ -56,8 +56,8 @@
 ## 4. AWS：EC2、安全组与弹性 IP【AWS 控制台】
 
 1. **安全组** `tcrm-prod-sg`（VPC 用默认）：入站只开 `80/tcp`、`443/tcp`，来源 `0.0.0.0/0` 和 `::/0`（`upload.` 灰云需要任意来源直连）；**不开 22**（Session Manager 登录，见前提）；出站保持默认全放行（SSM 与镜像拉取需要 443 出站）。防火墙口径见 README「AWS 主机与防火墙」。
-2. **启动实例**：Name `tcrm-prod`；AMI 选 Ubuntu Server **24.04 LTS**（64-bit x86）；机型按操作清单 §1（如 `c7a.xlarge`）；Key pair 选 **Proceed without a key pair**；网络 us-west-2 默认 VPC；安全组选 `tcrm-prod-sg`；存储 gp3 200GB；Advanced details：
-   - IAM instance profile：`tcrm-prod-instance`；
+2. **启动实例**：Name `SparkTrack-Prod`（正式环境实际名称）；AMI 选 Ubuntu Server **24.04 LTS**（64-bit x86）；机型按操作清单 §1（如 `c7a.xlarge`）；Key pair 选 **Proceed without a key pair**；网络 us-east-1 默认 VPC；安全组选 `tcrm-prod-sg`；存储 gp3 200GB；Advanced details：
+   - IAM instance profile：`crm-prod-instance`；
    - Metadata options：Metadata version 选 **V2 only**（IMDSv2 强制），Hop limit **1**（防容器读取实例凭证，ADR-037 决定 1）。漏设时也可启动后在 Actions → Instance settings → Modify instance metadata options 补设。
 3. **Session Manager 登录**：实例状态 running、状态检查通过后，选中实例 → Connect → **Session Manager** 标签 → Connect。连不上时先等 1～2 分钟（SSM 代理注册），仍失败检查角色是否含 `AmazonSSMManagedInstanceCore`。进入后执行 `sudo -i`，此后都在 root shell 操作（提示符为 `#`）。
 4. **弹性 IP**：Elastic IPs → Allocate；关联到本实例；记下 `<EIP>`（下一步 DNS 用）。注意 EIP 空闲也会计费。
@@ -150,7 +150,7 @@ gpg --verify awscliv2.zip.sig awscliv2.zip
 unzip -q awscliv2.zip
 ./aws/install                    # 安装到 /usr/local/aws-cli，命令链接到 /usr/local/bin/aws
 aws --version                    # 期望 aws-cli/2.x
-aws sts get-caller-identity      # 期望 Arn 含 assumed-role/tcrm-prod-instance/…
+aws sts get-caller-identity      # 期望 Arn 含 assumed-role/crm-prod-instance/…
 ```
 
 ### 6.5 命令齐套核对
@@ -173,7 +173,7 @@ docker compose version
 git clone https://github.com/ksws00684315/t-crm.git /opt/tcrm
 cd /opt/tcrm
 git fetch --tags
-git checkout v<版本>            # 例如 v1.0.0；Compose 文件、Nginx 配置、脚本都来自这里的标签
+git checkout v<版本>            # 例如 v0.1.14；Compose 文件、Nginx 配置、脚本都来自这里的标签
 ```
 
 确认：`git -C /opt/tcrm describe --tags` 显示目标标签。发布标签由负责人按 README「发布与回滚」在 main 上打好并等 Release 工作流成功；演练可用临时标签（如 `v0.1.0`），用完在 GitHub 删除。
@@ -254,13 +254,13 @@ nano /opt/tcrm/deploy/.env
 | `TCRM_BACKUP_DIR` | `/var/lib/tcrm/backups` | |
 | `TCRM_BACKUP_S3_BUCKET` | `<主备份桶名>` | 逻辑备份上传目标（第 2 章创建） |
 | `TCRM_BACKUP_S3_PREFIX` | 留默认 `logical` | |
-| `AWS_REGION` | 留默认 `us-west-2` | |
+| `AWS_REGION` | 填 `us-east-1` | 示例默认 `us-west-2` 不是正式环境区域 |
 | `TCRM_BACKUP_PASSPHRASE_FILE` | `/var/lib/tcrm/secrets/backup.pass` | 8.1 创建 |
 | `PGBACKREST_REPO1_TYPE` | 留默认 `s3` | |
 | `PGBACKREST_REPO1_PATH` | 留默认 `/pgbackrest` | S3 内前缀 |
 | `PGBACKREST_REPO1_S3_BUCKET` | `<主备份桶名>` | |
-| `PGBACKREST_REPO1_S3_REGION` | 留默认 `us-west-2` | |
-| `PGBACKREST_REPO1_S3_ENDPOINT` | 保持注释 | 默认 `s3.us-west-2.amazonaws.com` |
+| `PGBACKREST_REPO1_S3_REGION` | 填 `us-east-1` | 同上 |
+| `PGBACKREST_REPO1_S3_ENDPOINT` | 保持注释 | 按区域默认为 `s3.us-east-1.amazonaws.com` |
 | `PGBACKREST_REPO1_CIPHER_PASS` | `openssl rand -base64 32` | 丢失则 pgBackRest 备份全部无法读取，密码管理器另存 |
 | `TCRM_PGBACKREST_CREDS_DIR` | 留默认 `/var/lib/tcrm/pgbackrest-creds` | |
 | `TCRM_DB_NAME` | 留默认 `tcrm` | |
@@ -342,7 +342,7 @@ stat -c '%u %a' /var/lib/tcrm/pgbackrest-creds/s3-credentials.conf   # 期望 99
 | 3 | Docker / Compose | `docker version --format '{{.Server.Version}}'`；`docker compose version` | 正常输出版本号 |
 | 4 | live-restore 已开启 | `docker info --format '{{.LiveRestoreEnabled}}'` | `true` |
 | 5 | AWS CLI 是 v2 | `aws --version` | `aws-cli/2…` |
-| 6 | 实例角色生效 | `aws sts get-caller-identity` | `Arn` 含 `assumed-role/tcrm-prod-instance/…` |
+| 6 | 实例角色生效 | `aws sts get-caller-identity` | `Arn` 含 `assumed-role/crm-prod-instance/…` |
 | 7 | 无长期密钥文件 | `ls /root/.aws/credentials` | No such file or directory |
 | 8 | 无密钥环境变量 | `env \| grep -E '^AWS_(ACCESS_KEY_ID\|SECRET_ACCESS_KEY)'` | 无输出 |
 | 9 | `.env` 权限 600 | `stat -c '%a' /opt/tcrm/deploy/.env` | `600` |
@@ -453,7 +453,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 crontab -l | grep -c '/opt/tcrm/deploy'          # 期望 5
 cd /opt/tcrm
 deploy/backup/pg-backup.sh                       # 手动跑一次逻辑备份，验证 gpg 与 S3 上传（IAM 前缀）
-aws s3 ls --region us-west-2 s3://<主备份桶名>/logical/daily/ | tail -1   # 期望列出刚上传的 .dump.gpg
+aws s3 ls --region us-east-1 s3://<主备份桶名>/logical/daily/ | tail -1   # 期望列出刚上传的 .dump.gpg
 deploy/scripts/ops-check.sh                      # 手动跑一次；期望输出 ops-check: all checks passed
 ```
 
