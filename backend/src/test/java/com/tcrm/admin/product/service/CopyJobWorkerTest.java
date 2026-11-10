@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -43,6 +44,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 
 class CopyJobWorkerTest {
@@ -393,6 +395,62 @@ class CopyJobWorkerTest {
     assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
     assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90001");
     verify(tokens).consume(20L, 1);
+  }
+
+  @Test
+  void shouldLockShopItem_beforeRegisteringProbedProduct() {
+    // Production 2026-11-10: two jobs for the same source item registered it concurrently and
+    // one failed on uk_crm_product_shop_item. The registration must run under the shop-item lock
+    // the import paths use.
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "10001");
+    stubJob(job, row);
+    when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
+    when(shops.selectList(any())).thenReturn(List.of(shop(5L)));
+    when(products.selectList(any())).thenReturn(List.of());
+    when(copies.probe(5L, "10001"))
+        .thenReturn(
+            Optional.of(new ProbedItem("10001", "Src", new BigDecimal("9.9"), null, false)));
+    when(products.selectOne(any())).thenReturn(null);
+    when(codes.next()).thenReturn("P000001");
+    when(products.insert(org.mockito.ArgumentMatchers.<ProductDO>any()))
+        .thenAnswer(
+            inv -> {
+              ProductDO p = inv.getArgument(0);
+              p.setId(50L);
+              return 1;
+            });
+    when(products.selectById(50L)).thenAnswer(inv -> product(50L, 5L, "10001"));
+    when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(null);
+    when(tokens.consume(20L, 1)).thenReturn(true);
+    when(copies.copy(5L, "10001", 5L)).thenReturn(new CopyResult("90001", null));
+    when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
+
+    worker.processJob(1L);
+
+    InOrder order = inOrder(products);
+    order.verify(products).lockShopItem(ProductRules.shopItemLockKey(5L, "10001"));
+    order.verify(products).insert(org.mockito.ArgumentMatchers.<ProductDO>any());
+  }
+
+  @Test
+  void shouldLockShopItem_beforeReusingExistingMapping() {
+    // Registered source item: the lock also serializes the copy itself, so a parallel job cannot
+    // create the same exclusive item twice.
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "10001");
+    stubJob(job, row);
+    when(kolItems.findCurrentByWeidianItem("10001")).thenReturn(null);
+    when(shops.selectList(any())).thenReturn(List.of(shop(5L)));
+    when(products.selectList(any())).thenReturn(List.of(product(50L, 5L, "10001")));
+    KolItemDO existing = new KolItemDO();
+    existing.setWeidianItemId("90001");
+    when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(existing);
+
+    worker.processJob(1L);
+
+    verify(products).lockShopItem(ProductRules.shopItemLockKey(5L, "10001"));
+    verify(copies, never()).copy(anyLong(), any(), anyLong());
   }
 
   @Test
