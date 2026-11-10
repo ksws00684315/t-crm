@@ -45,3 +45,14 @@ deploy/releases.log
 
 # Alert state written by deploy/scripts/ops-check.sh on the production host (task 96)
 deploy/ops-state/
+
+# Credential exports must never be committed (task 145, B-4); keep them outside the repository
+*credentials*.xlsx
+*credentials*.csv
+*credentials*.json
+
+# Local tool state (task 145, S-06)
+.pnpm-store/
+.workbuddy/
+.zcode/
+*.bak-*

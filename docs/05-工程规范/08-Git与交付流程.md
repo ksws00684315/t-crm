@@ -69,7 +69,8 @@
 
 【强制】CI 失败的 PR 不得合并；不得为了通过而关闭检查或降低门槛（调整门槛须修改本规范）。
 【说明】backend 工作流分两类并行运行：「Backend verify」负责依赖清单校验、单元测试、ArchUnit、格式与静态检查和 JaCoCo 覆盖率门槛；「Backend integration」按 4 个分片运行集成测试，`*IT` 类按全限定名排序后按序号取模分配，每片只运行集成测试，不重复跑单元测试，也不判定覆盖率。新增的 `*IT` 类会被自动分配到某个分片，无须手工维护名单。
-【说明】各工作流按改动路径触发（见工作流文件中的 `paths`）：工程只在自身文件变化时运行；只改文档的 PR 不触发任何检查；OSV-Scanner 只在依赖文件变化时运行，另有每周定时扫描。PR 的路径按整个 PR 的差异计算，同一 PR 每推送一次，已触发的检查就重跑一次，所以改动和执行报告应一次推送。
+【说明】各工作流在每个 PR 上都启动，先由「Changed paths」job 判断改动路径（路径列表见各工作流的 `patterns`，判断逻辑在 `.github/actions/path-filter`）：工程文件没有变化时，检查 job 显示为「skipped」，分支保护把它视为通过；只改文档的 PR 不运行任何构建和测试。路径判断本身失败时检查照常运行，不会变成跳过。OSV-Scanner 只在依赖文件变化时扫描，另有每周定时扫描。PR 的路径按整个 PR 的差异计算，同一 PR 每推送一次，已运行的检查就重跑一次，所以改动和执行报告应一次推送。
+【强制】`main` 的分支保护把以下检查设为必需（任务 145，M-11）：`Backend verify`、`Backend integration result`（汇总 4 个分片）、`Redirect verify`、`Admin UI verify`、`KOL Portal verify`、`Compose files and Dockerfiles`、`Vulnerabilities and licenses`。新增或改名检查 job 时同步修改分支保护和本条。负责人按第 1 节例外直接推送的纯过程文档提交以管理员身份绕过，不受影响。
 【强制】工作流中引用的第三方 Action 必须固定到**完整的 40 位提交 SHA**，并在同一行注释标明对应版本号（如 `uses: actions/checkout@<sha> # v5.0.0`）；禁止只写版本标签或分支名。理由：标签可以被强行改指向，2026 年 3 月 trivy-action 的 76 个版本标签即被篡改为窃取 CI 密钥的恶意代码（见 ADR-004）。Dependabot 负责提示更新。
 
 ## 5. 完成标准（Definition of Done）

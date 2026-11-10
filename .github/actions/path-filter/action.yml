@@ -1,0 +1,57 @@
+name: Path filter
+description: >-
+  Reports whether the pull request or push touches any of the given paths. Workflows run on every
+  pull request and skip their jobs through this output instead of "on.paths", so that a required
+  check whose paths are untouched reports "skipped" (which satisfies branch protection) instead of
+  never reporting at all. Uses the GitHub API, so no checkout is needed.
+inputs:
+  patterns:
+    description: >-
+      One bash glob per line, matched against each changed file path ("*" also matches "/", so
+      "backend/*" covers everything under backend/ and "*pom.xml" covers every pom.xml).
+    required: true
+outputs:
+  changed:
+    description: "'true' when a changed file matches, or when the change set cannot be listed in full."
+    value: ${{ steps.filter.outputs.changed }}
+runs:
+  using: composite
+  steps:
+    - id: filter
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PATTERNS: ${{ inputs.patterns }}
+        EVENT: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BEFORE: ${{ github.event.before }}
+        AFTER: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        # Scheduled and manual runs, and pushes without a usable base, always run everything.
+        if [ "$EVENT" = pull_request ]; then
+          files="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename')"
+          limit=3000
+        elif [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+          files="$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[].filename')"
+          limit=300
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        count="$(printf '%s\n' "$files" | grep -c . || true)"
+        # The API truncates at the limit; a truncated list cannot prove a path is untouched.
+        if [ "$count" -ge "$limit" ]; then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        changed=false
+        while IFS= read -r file; do
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            # shellcheck disable=SC2254 # the pattern is meant to be a glob
+            case "$file" in $pattern) changed=true; echo "matched: $file ($pattern)"; break 2 ;; esac
+          done <<< "$PATTERNS"
+        done <<< "$files"
+        echo "changed=$changed" >> "$GITHUB_OUTPUT"
