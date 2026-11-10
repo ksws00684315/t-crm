@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +33,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -310,6 +314,64 @@ class ProductLinkIT {
         jdbc.queryForObject(
             "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, kolId);
     assertThat(used).isEqualTo(1); // only first real copy consumed
+  }
+
+  @Test
+  void shouldProcessConcurrentJobsForTheSameSourceItem_once() throws Exception {
+    // Production 2026-11-10: the spreadsheet submitted the same batch again while the first job
+    // was still running. Both jobs probed the same unregistered item and one failed on
+    // uk_crm_product_shop_item. With the shop-item lock both jobs finish and the item is
+    // registered and copied once.
+    long shopId = createShop("1001", "Main");
+    mvc.perform(put("/admin-api/product/shops/" + shopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopId);
+    long kolId = createKol("ConcurrentKol", "concurrent17b@example.com");
+    String tokenA = createToken(kolId, 10);
+    String tokenB = createToken(kolId, 10);
+
+    CyclicBarrier bothProbed = new CyclicBarrier(2);
+    when(copies.probe(anyLong(), any()))
+        .thenAnswer(
+            inv -> {
+              bothProbed.await(10, TimeUnit.SECONDS);
+              return Optional.of(
+                  new ProbedItem("10001", "Source", new BigDecimal("9.90"), null, false));
+            });
+
+    String jobA = convert(tokenA, "10001");
+    String jobB = convert(tokenB, "10001");
+
+    TestWait.until(
+        Duration.ofSeconds(20),
+        () ->
+            jdbc.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM crm_copy_job
+                    WHERE job_code IN (?, ?) AND status = 'completed'
+                    """,
+                    Integer.class,
+                    jobA,
+                    jobB)
+                == 2,
+        "both concurrent copy jobs should complete");
+
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_product
+                WHERE shop_id = ? AND weidian_item_id = '10001' AND is_deleted = FALSE
+                """,
+                Integer.class,
+                shopId))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NULL",
+                Integer.class,
+                kolId))
+        .isEqualTo(1);
+    verify(copies, times(1)).copy(anyLong(), any(), anyLong());
   }
 
   @Test
@@ -856,6 +918,25 @@ class ProductLinkIT {
             jdbc.queryForObject(
                 "SELECT source_shop_id FROM crm_copy_job_item WHERE id = 38041", Long.class))
         .isEqualTo(shopId);
+  }
+
+  private String convert(String token, String sourceProductId) throws Exception {
+    MvcResult result =
+        mvc.perform(
+                post(BASE + "/convert")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"token":"%s","callerPlatform":"google_sheet_plugin",
+                         "items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"%s","ruleId":"r1"}]}
+                        """
+                            .formatted(token, sourceProductId)))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString())
+        .path("data")
+        .path("jobCode")
+        .asString();
   }
 
   private long createShop(String weidianId, String name) throws Exception {
