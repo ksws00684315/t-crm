@@ -97,12 +97,45 @@ export function dates(days = 7, now = new Date()): Pick<Filters, "startDate" | "
   return { startDate, endDate };
 }
 
-export function datePreset(preset: "today" | "yesterday" | "month", now = new Date()) {
-  const today = dates(1, now).endDate;
-  if (preset === "today") return { startDate: today, endDate: today };
-  if (preset === "month") return { startDate: `${today.slice(0, 7)}-01`, endDate: today };
-  const yesterday = new Date(Date.parse(today) - DAY).toISOString().slice(0, 10);
-  return { startDate: yesterday, endDate: yesterday };
+export const periodModes = ["live", "sevenDays", "thirtyDays", "day", "month", "custom"] as const;
+export type PeriodMode = (typeof periodModes)[number];
+type DateRange = Pick<Filters, "startDate" | "endDate">;
+
+export function shiftDate(day: string, offset: number): string {
+  return new Date(Date.parse(day) + offset * DAY).toISOString().slice(0, 10);
+}
+
+export function monthRange(month: string, today: string): DateRange {
+  const startDate = `${month}-01`;
+  const end = new Date(`${startDate}T00:00:00Z`);
+  end.setUTCMonth(end.getUTCMonth() + 1, 0);
+  return { startDate, endDate: [end.toISOString().slice(0, 10), today].sort()[0]! };
+}
+
+export function periodRange(mode: Exclude<PeriodMode, "custom">, now = new Date()): DateRange {
+  if (mode === "sevenDays") return dates(7, now);
+  if (mode === "thirtyDays") return dates(30, now);
+  const day = dates(1, now);
+  return mode === "month" ? monthRange(day.endDate.slice(0, 7), day.endDate) : day;
+}
+
+export function adjacentPeriod(
+  mode: PeriodMode,
+  range: DateRange,
+  direction: -1 | 1,
+  today: string
+): DateRange | undefined {
+  if (mode === "live") return undefined;
+  if (mode === "month") {
+    const start = new Date(`${range.startDate}T00:00:00Z`);
+    start.setUTCMonth(start.getUTCMonth() + direction, 1);
+    const month = start.toISOString().slice(0, 7);
+    return month <= today.slice(0, 7) ? monthRange(month, today) : undefined;
+  }
+  const days = (Date.parse(range.endDate) - Date.parse(range.startDate)) / DAY + 1;
+  const endDate = shiftDate(range.endDate, days * direction);
+  if (endDate > today) return undefined;
+  return { startDate: shiftDate(endDate, 1 - days), endDate };
 }
 
 export function validDates(filters: Filters): boolean {

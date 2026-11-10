@@ -13,9 +13,18 @@ const zhCN = {
     productCreatorCount: "达人数",
     productRefundHint:
       "商品退款金额统计可关联到商品行的成功退款，订单退款率以所选周期内支付的订单为分母。",
-    preset: { today: "今日", yesterday: "昨日", month: "本月" },
+    period: "时间段",
+    periodMode: {
+      live: "实时",
+      sevenDays: "7天",
+      thirtyDays: "30天",
+      day: "日",
+      month: "月",
+      custom: "自定义"
+    },
+    previousPeriod: "上一时段",
+    nextPeriod: "下一时段",
     refresh: "刷新数据",
-    lastDays: "近 {days} 天",
     startDate: "开始日期",
     endDate: "结束日期",
     shop: "店铺",

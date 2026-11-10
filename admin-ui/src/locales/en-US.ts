@@ -10,9 +10,18 @@ const enUS: MessageSchema = {
     productCreatorCount: "Creators",
     productRefundHint:
       "Product refunds include successful refunds linked to an item. The order refund rate uses orders paid in the selected period.",
-    preset: { today: "Today", yesterday: "Yesterday", month: "This month" },
+    period: "Time period",
+    periodMode: {
+      live: "Live",
+      sevenDays: "7 days",
+      thirtyDays: "30 days",
+      day: "Day",
+      month: "Month",
+      custom: "Custom"
+    },
+    previousPeriod: "Previous period",
+    nextPeriod: "Next period",
     refresh: "Refresh data",
-    lastDays: "Last {days} days",
     startDate: "Start date",
     endDate: "End date",
     shop: "Shop",

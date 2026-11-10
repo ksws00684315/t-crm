@@ -58,6 +58,7 @@ const optionsFailed = ref(false);
 const exporting = ref(false);
 let request = 0;
 let active = false;
+let live = false;
 let timer: ReturnType<typeof setInterval> | undefined;
 
 const query = computed<RankingQuery>(() => ({
@@ -181,6 +182,13 @@ function ratio(part?: Scalar, whole?: Scalar): string {
 }
 
 async function load(): Promise<void> {
+  if (live) {
+    const today = dates(1);
+    if (applied.value.endDate !== today.endDate) {
+      applied.value = { ...applied.value, ...today };
+      page.value = 1;
+    }
+  }
   const id = ++request;
   loading.value = true;
   failed.value = false;
@@ -211,11 +219,12 @@ function refresh(): void {
   void load();
 }
 
-function search(): void {
+function search(useLive = false): void {
   if (!validDates(draft.value)) {
     ElMessage.warning(t("analytics.invalidDates"));
     return;
   }
+  live = useLive;
   const { shopId, kolId, inviterId, channel, keyword, startDate, endDate } = draft.value;
   applied.value = {
     startDate,
@@ -489,6 +498,7 @@ onUnmounted(stop);
 .analytics-page {
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--tcrm-space-4);
 }
 .analytics-cards {
