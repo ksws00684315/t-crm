@@ -5,7 +5,7 @@
 | 文件 | 说明 |
 |---|---|
 | `SparkTrack-3.0.5.gs` | 脚本主文件（Apps Script 脚本） |
-| `submitFrom.html` | 「一键替换链接(V2)」弹窗（与原件一致） |
+| `submitFrom.html` | 「一键替换链接(V2)」弹窗（与原件一致，仅增加网络中断提示与自动重试，见差异清单第 6 节） |
 | `weidianOriginalForm.html` | 「转换为微店原始链接」弹窗（与原件一致） |
 | `buyLinkConvertForm.html` | 「buy 链接互转」弹窗（与原件一致） |
 
@@ -32,7 +32,8 @@
 
 ## 与原件的差异清单
 
-3 个 HTML 文件与原件**逐字节一致**；以下差异全部集中在 `SparkTrack-3.0.5.gs`（可用 `diff` 核对）。
+`weidianOriginalForm.html`、`buyLinkConvertForm.html` 与原件**逐字节一致**；`submitFrom.html` 只改了第 6 节
+列出的网络中断处理，其余内容与原件一致。`.gs` 的差异见第 1～4 节（可用 `diff` 核对）。
 
 ### 1. 接口地址
 
@@ -76,6 +77,30 @@
 ### 5. 验证
 
 - 在本目录对所有文件 grep 旧系统与第三方地址关键字（任务提示词 §3.5 的三个关键字）结果为零；
-- 3 个 HTML 与原件 `cmp` 逐字节一致；
+- `weidianOriginalForm.html`、`buyLinkConvertForm.html` 与原件 `cmp` 逐字节一致；
+  `submitFrom.html` 的差异只有第 6 节列出的网络中断处理（函数 `isReplaceTransportError`、
+  `replaceConnectionMessage`、`replaceCreateConnectionMessage`、`formatRunError` 与
+  `handleReplaceFailure` 的重试分支）；
 - `.gs` 除上述清单外与原件逐行一致（`diff` 核对）；
 - 语法检查：`cp SparkTrack-3.0.5.gs /tmp/check.js && node --check /tmp/check.js`。
+
+### 6. 弹窗网络中断提示与自动重试（`submitFrom.html`）
+
+谷歌脚本运行时会抛 `NetworkError: 连接失败, 原因如下: HTTP 0`：这是浏览器与谷歌脚本服务端之间
+（`google.script.run`）连接断开，不是后台接口返回的错误，后台此时没有收到请求。原实现把它原样
+显示成「错误: NetworkError: …」，客户看不出怎么办。
+
+现在 `submitFrom.html` 的处理：
+
+| 函数 | 作用 |
+|---|---|
+| `isReplaceTransportError` | 识别 `NetworkError` / `Connection failure` / `连接失败` / `HTTP 0`，与后台业务错误区分（后台错误仍原样显示） |
+| `handleReplaceFailure` | 接续类调用（检查、继续替换、按批写入）遇到连接中断时自动重试 3 次，间隔 3s / 6s / 9s；重试用尽后提示「替换进度已保存在服务端，请检查网络后点『继续替换』」 |
+| `replaceCreateConnectionMessage` | 「开始替换」创建任务失败**不自动重试**（避免建出重复任务），提示先确认任务编号、用「继续替换」接续 |
+| `formatRunError` | 选区、模板等读配置失败也给出同样的可读提示 |
+
+自动重试是安全的：服务端按文档属性里的持久化游标和单元格实际内容去重（`.gs` 的
+`applyProductLinkReplacementBatch` 在锁内重读游标，已写入的单元格计为「已应用」），重试不会
+重复替换或重复建任务。
+
+> 客户表格里的 `submitFrom.html` 需要按安装步骤第 3 步重新粘贴一次才会生效。

@@ -610,8 +610,16 @@
 	    const REPLACE_AUTO_POLL_INTERVAL_MS = 30000;
 	    const REPLACE_APPLY_POLL_INTERVAL_MS = 1000;
 	    const REPLACE_AUTO_POLL_MAX_TIMES = 120;
+	    // 浏览器与谷歌脚本服务端之间断开时，按批重试是安全的：服务端按持久化游标去重，
+	    // 已写入的单元格不会重复替换。
+	    const REPLACE_AUTO_RETRY_MAX_TIMES = 3;
+	    const REPLACE_AUTO_RETRY_DELAY_MS = 3000;
 	    let replaceAutoPollTimer = null;
 	    let replaceAutoPollCount = 0;
+	    let replaceAutoRetryTimer = null;
+	    let replaceAutoRetryAttempt = 0;
+	    // create / check / resume / apply：只有接续类调用可以自动重试，创建任务不重试。
+	    let replaceLastCall = '';
 	    let replaceRequestInFlight = false;
 	    let replacePending = false;
 	    let replaceActiveFormData = null;
@@ -654,6 +662,37 @@
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // 谷歌脚本运行环境在「浏览器 ↔ 谷歌脚本服务端」这一跳失败时抛 NetworkError（HTTP 0），
+    // 这不是后台接口返回的错误：后台如果报错，会带统一信封和状态码，走下面的业务错误分支。
+    function isReplaceTransportError(err) {
+      const text = String((err && err.name) || '') + ' ' + String((err && err.message) || err || '');
+      return /NetworkError/i.test(text) || /Connection failure/i.test(text) ||
+        /连接失败/.test(text) || /\bHTTP\s*0\b/i.test(text);
+    }
+
+    function isReplaceBusyError(err) {
+      return /另一个链接转换正在|请稍后继续替换/.test(String((err && err.message) || err || ''));
+    }
+
+    function replaceConnectionMessage() {
+      return '与谷歌脚本服务的连接中断（HTTP 0）：浏览器没收到谷歌脚本服务端的响应，替换进度已保存在服务端。'
+        + '请检查网络或代理后点「继续替换」；重试不会重复处理已完成的单元格。';
+    }
+
+    function replaceCreateConnectionMessage() {
+      return '与谷歌脚本服务的连接中断（HTTP 0）：这次请求可能没到谷歌脚本服务端。'
+        + '请检查网络后重试；如果已经有任务编号，填进「任务编号」并点「继续替换」确认进度；'
+        + '不要反复点「开始替换」，以免重复建任务。';
+    }
+
+    // 选区、模板等读配置的失败也用同一套提示，避免把原始 NetworkError 直接摆给客户。
+    function formatRunError(err) {
+      if (isReplaceTransportError(err)) {
+        return '与谷歌脚本服务的连接中断（HTTP 0），请检查网络或代理后重试';
+      }
+      return escapeHtml(err && err.message ? err.message : String(err || ''));
+    }
+
     function setButtonLoading(btnId, loading, originalHtml) {
       const btn = document.getElementById(btnId);
       if (loading) {
@@ -692,7 +731,7 @@
 	        }
 	        }).withFailureHandler(err => {
 	          endReplaceConfigurationLoad();
-	          showStatus('replaceStatus', '选区读取失败：' + escapeHtml(err.message), 'error');
+	          showStatus('replaceStatus', '选区读取失败：' + formatRunError(err), 'error');
 	        }).getUiState();
 	    }
 
@@ -730,7 +769,7 @@
 	        .withFailureHandler(err => {
 	          renderProductLinkTemplates([]);
 	          endReplaceConfigurationLoad();
-	          showStatus('replaceStatus', '模板加载失败：' + escapeHtml(err.message), 'error');
+	          showStatus('replaceStatus', '模板加载失败：' + formatRunError(err), 'error');
 	        })
 	        .getProductLinkReplaceBootstrap();
 	    }
@@ -875,6 +914,7 @@
 			      clearReplaceAutoPoll();
 			      replaceResultSnapshot = null;
 			      replaceActiveFormData = copyReplaceFormData(buildReplaceFormData());
+			      replaceLastCall = 'create';
 			      beginReplaceRequest('submitReplaceBtn');
 			      showStatus('replaceStatus', '正在创建商品任务，完成后会自动替换链接...', 'info');
 
@@ -1003,10 +1043,13 @@
 		        .withFailureHandler(handleReplaceFailure);
 		      const formData = copyReplaceFormData(replaceActiveFormData);
 		      if (hasReplaceResultSnapshot(formData.productJobCode)) {
+		        replaceLastCall = 'apply';
 		        runner.applyProductLinkReplacementBatch(formData, replaceResultSnapshot, manualResume === true);
 		      } else if (manualResume) {
+		        replaceLastCall = 'resume';
 		        runner.resumeProductLinkReplacement(formData);
 		      } else {
+		        replaceLastCall = 'check';
 		        runner.checkProductLinkReplacementOnce(formData);
 		      }
 		    }
@@ -1014,6 +1057,8 @@
 		    function beginReplaceRequest(buttonId) {
 		      replaceRequestInFlight = true;
 		      replaceLoadingButtonId = buttonId || null;
+		      // 用户点击（带按钮）视为新一轮：清空自动重试次数；自动重试本身不带按钮。
+		      if (buttonId) replaceAutoRetryAttempt = 0;
 		      if (replaceLoadingButtonId) setButtonLoading(replaceLoadingButtonId, true);
 		      updateReplaceControls();
 		    }
@@ -1055,16 +1100,41 @@
 
 		    function handleReplaceFailure(err) {
 		      clearReplaceAutoPoll();
+		      const retryable = isReplaceTransportError(err) || isReplaceBusyError(err);
+		      // 只有接续类调用（check / resume / apply）自动重试：它们按任务编号和持久化游标推进，
+		      // 重试不会重复建任务或重复替换。创建任务失败时重试可能建出重复任务，只提示。
+		      if (retryable && replaceLastCall !== 'create' && replaceAutoRetryAttempt < REPLACE_AUTO_RETRY_MAX_TIMES
+		          && replaceActiveFormData && replaceActiveFormData.productJobCode) {
+		        replaceAutoRetryAttempt += 1;
+		        replacePending = true;
+		        finishReplaceRequest();
+		        updateReplaceControls();
+		        showStatus('replaceStatus', '与谷歌脚本服务连接中断，正在自动重试（' + replaceAutoRetryAttempt
+		          + '/' + REPLACE_AUTO_RETRY_MAX_TIMES + '）…', 'info');
+		        replaceAutoRetryTimer = setTimeout(() => {
+		          replaceAutoRetryTimer = null;
+		          beginReplaceRequest();
+		          requestReplaceContinuation(replaceLastCall === 'resume');
+		        }, REPLACE_AUTO_RETRY_DELAY_MS * replaceAutoRetryAttempt);
+		        return;
+		      }
 		      replacePending = false;
 		      finishReplaceRequest();
 		      updateReplaceControls();
-		      showStatus('replaceStatus', '错误: ' + escapeHtml(err && err.message ? err.message : String(err || '处理失败，请重试')), 'error');
+		      const message = retryable
+		        ? (replaceLastCall === 'create' ? replaceCreateConnectionMessage() : replaceConnectionMessage())
+		        : (err && err.message ? err.message : '处理失败，请重试');
+		      showStatus('replaceStatus', '错误: ' + escapeHtml(message), 'error');
 		    }
 	
 		    function clearReplaceAutoPoll() {
 		      if (replaceAutoPollTimer) {
 		        clearTimeout(replaceAutoPollTimer);
 		        replaceAutoPollTimer = null;
+		      }
+		      if (replaceAutoRetryTimer) {
+		        clearTimeout(replaceAutoRetryTimer);
+		        replaceAutoRetryTimer = null;
 		      }
 		      replaceAutoPollCount = 0;
 		    }
@@ -1099,6 +1169,7 @@
 		    }
 
 		    function handleReplaceResult(res) {
+		      replaceAutoRetryAttempt = 0;
 		      applyReplaceResultFormData(res && res.details && res.details.formData);
 		      if (res && res.jobCode) {
 		        document.getElementById('productJobCode').value = res.jobCode;
