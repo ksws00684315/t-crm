@@ -129,6 +129,8 @@ function reset(): void {
             value-format="YYYY-MM-DD"
             type="daterange"
             single-panel
+            placement="bottom-start"
+            :fallback-placements="['top-start', 'bottom-end', 'top-end']"
             :start-placeholder="t('analytics.startDate')"
             :end-placeholder="t('analytics.endDate')"
             :disabled-date="future"
@@ -261,6 +263,11 @@ function reset(): void {
 }
 .analytics-filter__period :deep(.el-date-editor) {
   max-width: 100%;
+}
+.analytics-filter__period :deep(.el-date-editor--daterange) {
+  flex: 0 1 auto;
+  width: 320px;
+  min-width: 0;
 }
 .analytics-filter__dates {
   color: var(--el-text-color-secondary);
