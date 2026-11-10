@@ -3,7 +3,15 @@ import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } fro
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
-import { DataBoard, Goods, Tickets, TrendCharts, Wallet, Warning } from "@element-plus/icons-vue";
+import {
+  ArrowRight,
+  DataBoard,
+  Goods,
+  Tickets,
+  TrendCharts,
+  Wallet,
+  Warning
+} from "@element-plus/icons-vue";
 import { analyticsOptions, exportAnalytics, queryAnalytics } from "@/api/analytics";
 import type {
   AnalyticsResult,
@@ -71,6 +79,18 @@ const query = computed<RankingQuery>(() => ({
 }));
 const metrics = computed(() => result.value?.summary.metrics);
 const rows = computed(() => result.value?.ranking.items ?? []);
+const columnWidths: Record<string, DataColumn["minWidth"]> = {
+  identity: product ? 180 : 184,
+  rank: 68,
+  actions: 84,
+  channelStatus: 86,
+  coverage: 122,
+  units: { "zh-CN": 76, "en-US": 106 },
+  paidOrderCount: { "zh-CN": 88, "en-US": 112 },
+  salesAmount: { "zh-CN": 102, "en-US": 112 },
+  completedRefundAmount: { "zh-CN": 114, "en-US": 142 },
+  netSalesAmount: { "zh-CN": 112, "en-US": 128 }
+};
 const columns = computed<DataColumn[]>(() =>
   [...columnsByBoard[board], "actions"].map(key => ({
     key,
@@ -80,25 +100,21 @@ const columns = computed<DataColumn[]>(() =>
     align: key === "identity" ? "left" : "center",
     interactive: key === "identity",
     fixed: product && key === "identity" ? "left" : undefined,
-    minWidth:
-      key === "identity"
-        ? product
-          ? 170
-          : 216
-        : key === "rank"
-          ? 76
-          : key === "actions"
-            ? 90
-            : key === "coverage"
-              ? 166
-              : 136
+    highlighted: sortBy.value === key || (key === "coverage" && groupedSort.includes(sortBy.value)),
+    minWidth: columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 }
   }))
 );
 const sortKeys = columnsByBoard[board].filter(key => sortable.has(key) || key === "coverage");
-const cellKeys = columnsByBoard[board].filter(key => sortable.has(key) || pendingColumns.has(key));
+const cellKeys = columnsByBoard[board].filter(
+  key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
+);
 const detailActions = computed(() => [
   { key: "detail", label: t("analytics.detail"), disabled: true, tooltip: t("common.comingSoon") }
 ]);
+
+function identity(row: RankRow): string {
+  return (shop ? row.shopName : row.name) || (row.id === "0" ? t("analytics.unassigned") : "—");
+}
 
 function label(key: string): string {
   if (
@@ -333,25 +349,30 @@ onUnmounted(stop);
         <div class="ledger-comparison__panel ledger-comparison__transaction">
           <h3>{{ t("analytics.transactionLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <span>{{ label("netSalesAmount") }}</span>
             <strong>{{ display("netSalesAmount", metrics?.netSalesAmount) }}</strong>
+            <span>{{ label("netSalesAmount") }}</span>
           </div>
           <div class="ledger-comparison__values">
             <div>
               <span>{{ label("salesAmount") }}</span
               ><strong>{{ display("salesAmount", metrics?.salesAmount) }}</strong>
             </div>
+            <span class="ledger-comparison__operator" aria-hidden="true">−</span>
             <div class="ledger-comparison__refund">
               <span>{{ label("cohortRefundAmount") }}</span
               ><strong>{{ display("cohortRefundAmount", metrics?.cohortRefundAmount) }}</strong>
             </div>
           </div>
         </div>
+        <div class="ledger-comparison__bridge">
+          <el-icon aria-hidden="true"><ArrowRight /></el-icon>
+          <span>{{ t("analytics.ledgerBridge") }}</span>
+        </div>
         <div class="ledger-comparison__panel ledger-comparison__settlement">
           <h3>{{ t("analytics.settlementLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <span>{{ label("settlement") }}</span>
             <strong>{{ t("analytics.pending") }}</strong>
+            <span>{{ label("settlement") }}</span>
           </div>
         </div>
         <div class="ledger-comparison__panel ledger-comparison__note">
@@ -403,6 +424,7 @@ onUnmounted(stop);
     <p v-if="product" class="analytics-note">{{ t("analytics.productRefundHint") }}</p>
     <DataTable
       class="analytics-ranking"
+      scroll-with-page
       :table-id="`analytics-${board}`"
       :columns="columns"
       :rows="rows"
@@ -421,7 +443,20 @@ onUnmounted(stop);
       @update:page="changePage"
       @update:size="changeSize"
     >
-      <template #title>{{ t(`analytics.${board}.ranking`) }}</template>
+      <template #title>
+        <h2 class="analytics-ranking__title">{{ t(`analytics.${board}.ranking`) }}</h2>
+      </template>
+      <template #toolbar>
+        <el-tag v-if="result" effect="light" type="primary">
+          {{
+            t(
+              `analytics.${board}.rankingCount`,
+              { count: display("", result.ranking.total) },
+              Number(result.ranking.total)
+            )
+          }}
+        </el-tag>
+      </template>
       <template v-for="key in sortKeys" :key="key" #[`header-${key}`]>
         <div class="sort-controls">
           <button
@@ -445,6 +480,11 @@ onUnmounted(stop);
           </button>
         </div>
       </template>
+      <template #cell-rank="{ row }">
+        <span class="analytics-rank-badge" :data-rank="valueOf(row, 'rank')">
+          {{ display("rank", valueOf(row, "rank")) }}
+        </span>
+      </template>
       <template #cell-identity="{ row }">
         <div class="analytics-identity">
           <img
@@ -454,14 +494,25 @@ onUnmounted(stop);
             alt=""
             loading="lazy"
           />
-          <strong>{{
-            (shop ? row.shopName : row.name) || (row.id === "0" ? t("analytics.unassigned") : "—")
-          }}</strong>
-          <CopyText
-            v-if="shop ? row.shopCode : !product && row.code"
-            :value="shop ? row.shopCode : row.code"
-          />
-          <small v-if="row.social?.length">{{ row.social.join(" · ") }}</small>
+          <span
+            v-else
+            class="analytics-identity__avatar"
+            :class="{ 'is-product': product }"
+            aria-hidden="true"
+          >
+            <el-icon v-if="product"><Goods /></el-icon>
+            <template v-else>{{
+              Array.from(identity(row))[0]?.toLocaleUpperCase(locale)
+            }}</template>
+          </span>
+          <div class="analytics-identity__text">
+            <strong>{{ identity(row) }}</strong>
+            <CopyText
+              v-if="shop ? row.shopCode : !product && row.code"
+              :value="shop ? row.shopCode : row.code"
+            />
+            <small v-if="row.social?.length">{{ row.social.join(" · ") }}</small>
+          </div>
         </div>
       </template>
       <template #cell-channelStatus="{ row }">
@@ -481,18 +532,22 @@ onUnmounted(stop);
       <template #cell-shop="{ row }">{{ row.related || "—" }}</template>
       <template #cell-relationship="{ row }">
         <div>{{ row.related || t("analytics.unassigned") }}</div>
-        <small v-if="row.enabled != null">{{
-          t(row.enabled ? "analytics.enabled" : "analytics.disabled")
-        }}</small>
+        <el-tag v-if="row.enabled != null" size="small" :type="row.enabled ? 'success' : 'info'">
+          {{ t(row.enabled ? "analytics.enabled" : "analytics.disabled") }}
+        </el-tag>
       </template>
       <template #cell-status="{ row }">
-        {{
-          row.enabled == null ? "—" : t(row.enabled ? "analytics.enabled" : "analytics.disabled")
-        }}
+        <el-tag v-if="row.enabled != null" size="small" :type="row.enabled ? 'success' : 'info'">
+          {{ t(row.enabled ? "analytics.enabled" : "analytics.disabled") }}
+        </el-tag>
+        <span v-else>—</span>
       </template>
       <template #cell-coverage="{ row }">
         <div class="coverage-values">
-          <span v-for="key in groupedSort" :key="key">{{ display(key, valueOf(row, key)) }}</span>
+          <template v-for="(key, index) in groupedSort" :key="key">
+            <span v-if="index" class="coverage-values__separator" aria-hidden="true">/</span>
+            <span>{{ display(key, valueOf(row, key)) }}</span>
+          </template>
         </div>
       </template>
       <template v-for="key in cellKeys" :key="key" #[`cell-${key}`]="{ row }">
@@ -545,6 +600,8 @@ onUnmounted(stop);
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: var(--tcrm-space-4);
 }
 .analytics-cards {
@@ -582,33 +639,50 @@ onUnmounted(stop);
 }
 .ledger-comparison {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) auto minmax(0, 1.35fr) minmax(0, 1fr);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
   overflow: hidden;
 }
 .ledger-comparison__panel {
   min-width: 0;
-  padding: var(--tcrm-space-4);
+  padding: var(--tcrm-space-3) var(--tcrm-space-4);
 }
-.ledger-comparison__panel + .ledger-comparison__panel {
+.ledger-comparison__bridge,
+.ledger-comparison__settlement,
+.ledger-comparison__note {
   border-inline-start: 1px solid var(--tcrm-color-border);
 }
 .ledger-comparison__panel h3 {
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
   font-weight: 600;
-  margin: 0 0 var(--tcrm-space-2);
+  margin: 0 0 var(--tcrm-space-1);
+}
+.ledger-comparison__bridge {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--tcrm-space-1);
+  padding: var(--tcrm-space-2);
+  color: var(--tcrm-color-primary-active);
+  background: color-mix(in srgb, var(--tcrm-color-chain-finance) 8%, var(--tcrm-color-card));
+}
+.ledger-comparison__bridge span {
+  max-width: 10ch;
+  text-align: center;
 }
 .ledger-comparison__transaction {
-  background: color-mix(in srgb, var(--tcrm-color-primary) 6%, var(--tcrm-color-card));
+  background: linear-gradient(110deg, var(--tcrm-color-order-band), var(--tcrm-color-card));
   color: var(--tcrm-color-primary-active);
 }
 .ledger-comparison__settlement {
-  background: color-mix(in srgb, var(--tcrm-color-success) 7%, var(--tcrm-color-card));
+  background: linear-gradient(110deg, var(--tcrm-color-success-bg), var(--tcrm-color-card));
   color: var(--tcrm-color-success);
 }
 .ledger-comparison__note {
+  display: grid;
+  align-content: center;
   background: color-mix(in srgb, var(--tcrm-color-warning-bg) 58%, var(--tcrm-color-card));
   color: var(--tcrm-color-warning);
 }
@@ -619,7 +693,12 @@ onUnmounted(stop);
   line-height: var(--tcrm-line-height-body);
   margin: 0;
 }
-.ledger-comparison__hero,
+.ledger-comparison__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--tcrm-space-2);
+}
 .ledger-comparison__values > div {
   display: grid;
 }
@@ -630,8 +709,13 @@ onUnmounted(stop);
 .ledger-comparison__values {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--tcrm-space-2) var(--tcrm-space-5);
-  margin-top: var(--tcrm-space-2);
+  align-items: end;
+  gap: var(--tcrm-space-1) var(--tcrm-space-3);
+  margin-top: var(--tcrm-space-1);
+}
+.ledger-comparison__operator {
+  align-self: flex-end;
+  padding-block-end: var(--tcrm-space-1);
 }
 .ledger-comparison__values strong {
   font-size: var(--tcrm-font-size-dashboard-comparison);
@@ -656,6 +740,30 @@ onUnmounted(stop);
     var(--tcrm-color-card)
   );
 }
+.analytics-ranking.is-page-scroll {
+  max-height: none;
+}
+.analytics-ranking.is-page-scroll :deep(> .data-table__body) {
+  flex: 0 0 auto;
+}
+.analytics-ranking :deep(.el-table__header th.data-table__highlighted),
+.analytics-ranking :deep(.el-table__body td.data-table__highlighted) {
+  background: var(--tcrm-color-order-band);
+}
+.analytics-ranking :deep(.data-table__toolbar) {
+  justify-content: flex-start;
+}
+.analytics-ranking :deep(.data-table__page-title) {
+  margin-inline-end: auto;
+}
+.analytics-ranking__title {
+  margin: 0;
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
+}
+.analytics-ranking.density-default :deep(.el-table td.el-table__cell) {
+  padding-block: var(--tcrm-space-2);
+}
 .analytics-badges {
   display: flex;
   flex-wrap: wrap;
@@ -663,19 +771,67 @@ onUnmounted(stop);
   gap: var(--tcrm-space-1);
 }
 .analytics-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+  min-width: 0;
+}
+.analytics-identity__text {
   display: grid;
   justify-items: start;
+  min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.analytics-identity small {
-  color: var(--el-text-color-secondary);
+.analytics-identity__text small,
+.analytics-identity__text :deep(.copy-text) {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+}
+.analytics-identity__avatar,
+.product-thumb {
+  flex: 0 0 var(--tcrm-control-height);
+  width: var(--tcrm-control-height);
+  height: var(--tcrm-control-height);
+  border-radius: var(--tcrm-radius-control);
+}
+.analytics-identity__avatar {
+  display: grid;
+  place-items: center;
+  background: var(--tcrm-color-primary);
+  color: var(--tcrm-color-on-primary);
+  font-weight: 600;
+}
+.analytics-identity__avatar.is-product {
+  background: var(--tcrm-color-order-band);
+  color: var(--tcrm-color-primary-active);
 }
 .product-thumb {
-  width: 38px;
-  height: 38px;
   object-fit: cover;
-  border-radius: 8px;
+}
+.analytics-rank-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--tcrm-tag-min-height);
+  min-height: var(--tcrm-tag-min-height);
+  padding-inline: var(--tcrm-space-1);
+  border-radius: 50%;
+  background: var(--tcrm-color-muted);
+  color: var(--tcrm-color-text-secondary);
+  font-weight: 600;
+}
+.analytics-rank-badge[data-rank="1"] {
+  background: var(--tcrm-color-warning-bg);
+  color: var(--tcrm-color-warning);
+}
+.analytics-rank-badge[data-rank="2"] {
+  background: var(--tcrm-color-order-band);
+  color: var(--tcrm-color-primary-active);
+}
+.analytics-rank-badge[data-rank="3"] {
+  background: var(--tcrm-color-danger-bg);
+  color: var(--tcrm-color-danger);
 }
 .analytics-cell {
   display: flex;
@@ -692,6 +848,9 @@ onUnmounted(stop);
   display: flex;
   justify-content: space-evenly;
   gap: var(--tcrm-space-1);
+}
+.coverage-values__separator {
+  color: var(--tcrm-color-text-secondary);
 }
 .sort-controls button {
   background: transparent;
@@ -720,7 +879,11 @@ onUnmounted(stop);
   .ledger-comparison {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ledger-comparison__panel + .ledger-comparison__panel {
+  .ledger-comparison__bridge {
+    display: none;
+  }
+  .ledger-comparison__settlement,
+  .ledger-comparison__note {
     border-inline-start: 0;
     border-top: 1px solid var(--tcrm-color-border);
   }

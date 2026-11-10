@@ -47,6 +47,7 @@ const enUS: MessageSchema = {
     transactionTitle: "Transaction and settlement comparison",
     transactionLedger: "Transaction ledger · Order activity",
     settlementLedger: "Settlement ledger · Shop cash flow",
+    ledgerBridge: "Compare bases",
     ledgerDifference: "Why can the amounts differ?",
     ledgerDifferenceHint:
       "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",
@@ -96,12 +97,14 @@ const enUS: MessageSchema = {
       selling: "Shops with sales",
       active: "All shops {value}",
       identity: "Shop name / code",
-      ranking: "Shop performance ranking"
+      ranking: "Shop performance ranking",
+      rankingCount: "{count} shop | {count} shops"
     },
     "best-sellers": {
       selling: "SPUs with sales",
       identity: "Product",
       ranking: "Product ranking",
+      rankingCount: "{count} product | {count} products",
       net: "Product net sales",
       keyword: "Product name / SPU",
       periodRefundedOrderRate: "Order refund rate"
@@ -111,6 +114,7 @@ const enUS: MessageSchema = {
       active: "Active creators {value}",
       identity: "Creator / social accounts",
       ranking: "Creator ranking",
+      rankingCount: "{count} creator | {count} creators",
       netCommission: "Net creator commission",
       keyword: "Creator name / code / social"
     },
@@ -119,6 +123,7 @@ const enUS: MessageSchema = {
       active: "Active inviters {value}",
       identity: "Inviter name / code",
       ranking: "Inviter ranking",
+      rankingCount: "{count} inviter | {count} inviters",
       netCommission: "Net team creator commission",
       keyword: "Inviter name / code"
     }

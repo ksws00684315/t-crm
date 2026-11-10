@@ -39,6 +39,8 @@ export interface DataColumn {
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
   defaultHidden?: boolean;
   fixed?: "left";
+  /** Emphasizes the active sort column in rankings. */
+  highlighted?: boolean;
 }
 
 const props = withDefaults(
@@ -61,6 +63,8 @@ const props = withDefaults(
     plain?: boolean;
     /** Fill the remaining page space; body scrolls and the pager stays at the card bottom. */
     fillAvailableHeight?: boolean;
+    /** Let a dashboard ranking expand in the page while retaining horizontal table scroll. */
+    scrollWithPage?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
     exportable?: boolean;
     exporting?: boolean;
@@ -98,6 +102,7 @@ const props = withDefaults(
     rowKey: "id",
     plain: false,
     fillAvailableHeight: false,
+    scrollWithPage: false,
     exportable: false,
     exporting: false,
     selectable: false,
@@ -177,7 +182,7 @@ let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
 function measureHeights(): void {
-  if (props.plain) {
+  if (props.plain || (props.scrollWithPage && !fullscreen.value)) {
     fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
     return;
@@ -314,7 +319,14 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => [props.rows, props.plain, props.fillAvailableHeight, props.paged, props.exportable],
+  () => [
+    props.rows,
+    props.plain,
+    props.fillAvailableHeight,
+    props.scrollWithPage,
+    props.paged,
+    props.exportable
+  ],
   scheduleMeasure
 );
 watch(fullscreen, scheduleMeasure);
@@ -484,6 +496,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         'is-fullscreen': fullscreen,
         'is-plain': plain,
         'is-fill': fillAvailableHeight && !plain,
+        'is-page-scroll': scrollWithPage && !fullscreen,
         'is-legacy-order': legacyOrderStyle
       },
       `density-${prefs.density}`
@@ -648,7 +661,14 @@ function canMove(index: number, delta: -1 | 1): boolean {
                 ? column.tooltip
                 : (column.tooltip ?? !column.interactive)
           "
-          :class-name="column.amount ? 'tcrm-amount' : undefined"
+          :class-name="
+            [
+              column.amount ? 'tcrm-amount' : '',
+              column.highlighted ? 'data-table__highlighted' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')
+          "
         >
           <template v-if="$slots[`header-${column.key}`]" #header>
             <slot :name="`header-${column.key}`" />

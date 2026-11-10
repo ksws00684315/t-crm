@@ -49,6 +49,7 @@ const zhCN = {
     transactionTitle: "交易与结算对照",
     transactionLedger: "交易账 · 订单商品事实",
     settlementLedger: "结算账 · 店铺资金流水",
+    ledgerBridge: "口径对照",
     ledgerDifference: "为什么会不同？",
     ledgerDifferenceHint:
       "交易账按订单付款和退款统计。结算账按平台资金入账统计，两者的时间口径与费用项目不同，金额可能不一致。",
@@ -98,12 +99,14 @@ const zhCN = {
       selling: "有成交店铺数",
       active: "全部店铺 {value}",
       identity: "店铺名称及编号",
-      ranking: "店铺经营排行"
+      ranking: "店铺经营排行",
+      rankingCount: "共 {count} 家店铺"
     },
     "best-sellers": {
       selling: "成交 SPU 数",
       identity: "商品",
       ranking: "商品排行",
+      rankingCount: "共 {count} 个商品",
       net: "商品净销售额",
       keyword: "商品名称／SPU",
       periodRefundedOrderRate: "订单退款率"
@@ -113,6 +116,7 @@ const zhCN = {
       active: "有效达人 {value}",
       identity: "达人身份及社媒",
       ranking: "达人排行",
+      rankingCount: "共 {count} 位达人",
       netCommission: "达人净佣金",
       keyword: "达人姓名／编号／社媒"
     },
@@ -121,6 +125,7 @@ const zhCN = {
       active: "有效邀请人 {value}",
       identity: "邀请人名称及编号",
       ranking: "邀请人业绩排行",
+      rankingCount: "共 {count} 位邀请人",
       netCommission: "团队达人净佣金",
       keyword: "邀请人搜索"
     }
