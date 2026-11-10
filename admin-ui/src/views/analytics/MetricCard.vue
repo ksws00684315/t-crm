@@ -42,7 +42,7 @@ defineProps<{
 .metric-card {
   min-width: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: var(--metric-card-alignment, flex-start);
   gap: var(--tcrm-space-3);
   padding: var(--analytics-card-padding, var(--tcrm-space-4));
   background: var(--tcrm-color-card);
@@ -55,12 +55,12 @@ defineProps<{
   gap: var(--tcrm-space-1);
 }
 .metric-card__icon {
-  flex: 0 0 var(--tcrm-control-height-large);
-  height: var(--tcrm-control-height-large);
+  flex: 0 0 var(--metric-icon-box, var(--tcrm-control-height-large));
+  height: var(--metric-icon-box, var(--tcrm-control-height-large));
   border-radius: var(--tcrm-radius-control);
   color: var(--metric-accent, var(--tcrm-color-primary-text));
   background: var(--metric-background, var(--tcrm-color-option-selected-bg));
-  font-size: var(--tcrm-font-size-brand);
+  font-size: var(--metric-icon-size, var(--tcrm-font-size-brand));
 }
 .metric-card--neutral {
   --metric-accent: var(--tcrm-color-text-secondary);

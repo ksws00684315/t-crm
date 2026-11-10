@@ -607,6 +607,9 @@ onUnmounted(stop);
   gap: var(--tcrm-space-4);
 }
 .analytics-cards {
+  --metric-card-alignment: center;
+  --metric-icon-box: calc(var(--tcrm-control-height-large) + var(--tcrm-space-2));
+  --metric-icon-size: var(--tcrm-font-size-title);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--tcrm-space-4);
@@ -857,6 +860,9 @@ onUnmounted(stop);
   }
 }
 @media (max-width: 767px) {
+  .analytics-cards {
+    --metric-icon-box: var(--tcrm-control-height-mobile);
+  }
   .analytics-page {
     --analytics-card-padding: var(--tcrm-space-3);
   }
