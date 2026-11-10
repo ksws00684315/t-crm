@@ -23,16 +23,19 @@ class AuditSanitizerTest {
     AuditSanitizer sanitizer = new AuditSanitizer(JsonMapper.builder().build());
 
     String sanitized =
-        sanitizer.sanitize(new LibraryProfile("beautybyamy", "+1 555 0100", "Amy BD"));
+        sanitizer.sanitize(
+            new LibraryProfile("beautybyamy", "+1 555 0100", "Amy BD", "met at expo"));
 
     assertThat(sanitized)
         .contains("beautybyamy")
         .contains("followUpOwner")
         .contains("[REDACTED]")
-        .doesNotContain("555 0100");
+        .doesNotContain("555 0100")
+        .doesNotContain("met at expo");
   }
 
   private record CredentialRequest(String appKey, String appSecret) {}
 
-  private record LibraryProfile(String kolUsername, String contact, String followUpOwner) {}
+  private record LibraryProfile(
+      String kolUsername, String contact, String followUpOwner, String followUpRemark) {}
 }

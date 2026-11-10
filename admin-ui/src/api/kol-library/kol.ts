@@ -38,8 +38,6 @@ export type LibraryCategory =
   | "OTHER";
 export type LibraryLevel = "HIGH" | "MEDIUM" | "LOW";
 export type LibraryGrade = "S" | "A" | "B" | "C";
-export type LibraryCooperationStage =
-  "FIRST_COOPERATION" | "REPEAT_INVESTMENT" | "LONG_TERM_PARTNERSHIP" | "EXCLUSIVE";
 export type LibraryOutreachStatus =
   "NOT_CONTACTED" | "EMAIL_SENT" | "REPLIED" | "WHATSAPP_ADDED" | "REJECTED" | "COOPERATING";
 export type LibrarySampleStatus = "NOT_SENT" | "SHIPPED" | "RECEIVED" | "NOT_NEEDED";
@@ -61,7 +59,7 @@ export interface LibraryKolQuery {
   followUpOwner?: string;
 }
 
-/** A list row: the basic data and status only (requirement 1.2.5 ②). */
+/** A list row: the data of the eight list columns (requirement 1.2.5 ②, 2026-11-10). */
 export interface LibraryKolVO {
   id: string;
   platform: LibraryPlatform;
@@ -71,10 +69,8 @@ export interface LibraryKolVO {
   countryCode: LibraryCountry;
   categories: LibraryCategory[];
   grade: LibraryGrade | null;
-  cooperationStage: LibraryCooperationStage | null;
   outreachStatus: LibraryOutreachStatus;
   followUpOwner: string;
-  updateTime: string;
 }
 
 /** Creator totals of the detail page (requirement 1.2.6 ③); `roi` is null when cost is 0. */
@@ -107,7 +103,6 @@ export interface LibraryKolDetailVO {
   salesPotential: LibraryLevel | null;
   cooperationAttitude: LibraryLevel | null;
   grade: LibraryGrade | null;
-  cooperationStage: LibraryCooperationStage | null;
   tags: string[];
   remark: string | null;
   outreachStatus: LibraryOutreachStatus;
@@ -116,6 +111,7 @@ export interface LibraryKolDetailVO {
   sampleStatus: LibrarySampleStatus;
   trackingNo: string | null;
   sampleDate: string | null;
+  followUpRemark: string | null;
   createTime: string;
   updateTime: string;
   totals: LibraryTotals;
@@ -127,13 +123,14 @@ export type LibraryKolRequest = Omit<
   "id" | "createTime" | "updateTime" | "totals"
 >;
 
-/** `LibraryFollowUpRequest`: the five follow-up fields only (requirement 1.2.5 ⑤). */
+/** `LibraryFollowUpRequest`: the six follow-up fields only (requirement 1.2.5 ⑤). */
 export interface LibraryFollowUpRequest {
   outreachStatus: LibraryOutreachStatus;
   lastContactDate: string | null;
   sampleStatus: LibrarySampleStatus;
   trackingNo: string | null;
   sampleDate: string | null;
+  followUpRemark: string | null;
 }
 
 /** One content record with its calculated fields (requirement 1.2.6 ③). */
@@ -201,7 +198,7 @@ export function updateLibraryKol(
   });
 }
 
-/** Updates the five follow-up fields only; the other groups are left as they are. */
+/** Updates the six follow-up fields only; the other groups are left as they are. */
 export function updateLibraryFollowUp(
   id: string,
   request: LibraryFollowUpRequest

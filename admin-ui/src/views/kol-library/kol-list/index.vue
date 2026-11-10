@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import {
-  deleteLibraryKol,
   listLibraryKols,
   type LibraryCategory,
   type LibraryCountry,
@@ -19,7 +17,6 @@ import ListSearch, { type SearchChip } from "@/components/ListSearch.vue";
 import RowActions, { type RowAction } from "@/components/RowActions.vue";
 import { useTabsStore } from "@/stores/tabs";
 import { useUserStore } from "@/stores/user";
-import { formatInstant } from "@/utils/format";
 import {
   LIBRARY_CATEGORIES,
   LIBRARY_COUNTRIES,
@@ -66,11 +63,21 @@ function asKol(row: object): LibraryKolVO {
   return row as LibraryKolVO;
 }
 
-/** The columns of requirement 1.2.5 ② and nothing else. */
+/** Followers with thousands separators; the same grouping in both languages. */
+const followersFormat = new Intl.NumberFormat("en-US");
+function followers(value: number | string | null): string {
+  return value === null || value === "" ? "—" : followersFormat.format(Number(value));
+}
+
+/**
+ * The eight columns of requirement 1.2.5 ② as revised on 2026-11-10, in this order. Followers is
+ * a quantity and stays centered with tabular figures (norm 13 appendix A).
+ */
 const columns = computed<DataColumn[]>(() => [
   { key: "kol", align: "left" as const, label: t("library.column.kol"), minWidth: px(200, 240) },
   { key: "platform", label: t("library.column.platform"), width: px(100, 110) },
-  { key: "countryCode", label: t("library.column.country"), width: px(100, 120) },
+  { key: "followers", label: t("library.column.followers"), amount: true, width: px(110, 120) },
+  { key: "countryCode", label: t("library.column.country"), width: px(100, 130) },
   {
     key: "categories",
     align: "left" as const,
@@ -85,7 +92,7 @@ const columns = computed<DataColumn[]>(() => [
     prop: "followUpOwner",
     minWidth: px(120, 150)
   },
-  { key: "updateTime", label: t("library.column.updateTime"), width: px(180, 190) },
+  { key: "grade", label: t("library.column.grade"), width: px(100, 130) },
   { key: "actions", label: t("common.actions"), width: px(112, 112) }
 ]);
 
@@ -107,35 +114,35 @@ const chips = computed<SearchChip[]>(() => {
   if (value.platform) {
     list.push({
       key: "platform",
-      label: t("library.column.platform"),
+      label: t("library.field.platform"),
       text: libraryOptionLabel("platform", value.platform)
     });
   }
   if (value.countryCode) {
     list.push({
       key: "countryCode",
-      label: t("library.column.country"),
+      label: t("library.field.country"),
       text: libraryOptionLabel("country", value.countryCode)
     });
   }
   if (value.category) {
     list.push({
       key: "category",
-      label: t("library.column.categories"),
+      label: t("library.field.categories"),
       text: libraryOptionLabel("category", value.category)
     });
   }
   if (value.outreachStatus) {
     list.push({
       key: "outreachStatus",
-      label: t("library.column.outreachStatus"),
+      label: t("library.field.outreachStatus"),
       text: libraryOptionLabel("outreachStatus", value.outreachStatus)
     });
   }
   if (value.followUpOwner) {
     list.push({
       key: "followUpOwner",
-      label: t("library.column.followUpOwner"),
+      label: t("library.field.followUpOwner"),
       text: value.followUpOwner
     });
   }
@@ -235,54 +242,35 @@ function openCreate(): void {
   void router.push("/kol-library/kols/new");
 }
 
-async function remove(row: LibraryKolVO): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      t("library.confirmDelete", { name: row.displayName }),
-      t("library.deleteTitle"),
-      {
-        type: "warning",
-        confirmButtonText: t("common.delete"),
-        cancelButtonText: t("common.cancel")
-      }
-    );
-  } catch {
-    return;
+/** Edit opens the same form as Add, filled with the creator (requirement 1.2.5 ②, 2026-11-11). */
+async function openEdit(row: LibraryKolVO): Promise<void> {
+  const path = `/kol-library/kols/${row.id}/edit`;
+  if (!tabs.tabs.some(tab => tab.path === path)) {
+    tabs.open({
+      path,
+      titleKey: t("library.editTabTitle", { name: row.displayName }),
+      literalTitle: true,
+      affix: false,
+      componentName: "LibraryKolFormPage"
+    });
   }
-  try {
-    await deleteLibraryKol(row.id);
-    ElMessage.success(t("library.deleted"));
-    // A detail or form tab of the deleted creator has nothing left to show.
-    const detail = `/kol-library/kols/${row.id}`;
-    if (tabs.tabs.some(tab => tab.path === detail || tab.path.startsWith(`${detail}/`))) {
-      for (const path of tabs.tabs
-        .map(tab => tab.path)
-        .filter(path => path === detail || path.startsWith(`${detail}/`))) {
-        tabs.close(path);
-      }
-    }
-    tabs.refresh("/kol-library/kols");
-    await load();
-  } catch (error) {
-    notifyError(error);
-  }
+  await router.push(path);
 }
 
 function rowActions(row: LibraryKolVO): RowAction[] {
   return [
     {
+      key: "edit",
+      label: t("common.edit"),
+      testId: `library-edit-${row.id}`,
+      hidden: !abilities.value.canEdit,
+      onClick: () => void openEdit(row)
+    },
+    {
       key: "view",
       label: t("library.view"),
       testId: `library-view-${row.id}`,
       onClick: () => void openDetail(row)
-    },
-    {
-      key: "delete",
-      label: t("common.delete"),
-      type: "danger",
-      testId: `library-delete-${row.id}`,
-      hidden: !abilities.value.canDelete,
-      onClick: () => void remove(row)
     }
   ];
 }
@@ -305,7 +293,7 @@ onMounted(load);
         </el-form-item>
       </template>
       <template #more>
-        <el-form-item :label="t('library.column.platform')">
+        <el-form-item :label="t('library.field.platform')">
           <el-select
             v-model="query.platform"
             clearable
@@ -321,7 +309,7 @@ onMounted(load);
             />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('library.column.country')">
+        <el-form-item :label="t('library.field.country')">
           <el-select
             v-model="query.countryCode"
             clearable
@@ -337,7 +325,7 @@ onMounted(load);
             />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('library.column.categories')">
+        <el-form-item :label="t('library.field.categories')">
           <el-select
             v-model="query.category"
             clearable
@@ -353,7 +341,7 @@ onMounted(load);
             />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('library.column.outreachStatus')">
+        <el-form-item :label="t('library.field.outreachStatus')">
           <el-select
             v-model="query.outreachStatus"
             clearable
@@ -369,7 +357,7 @@ onMounted(load);
             />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('library.column.followUpOwner')">
+        <el-form-item :label="t('library.field.followUpOwner')">
           <el-input
             v-model="query.followUpOwner"
             clearable
@@ -410,15 +398,14 @@ onMounted(load);
     >
       <template #cell-kol="{ row }">
         <div class="kol-cell">
-          <el-button link type="primary" data-test="kol-name" @click="openDetail(asKol(row))">
-            {{ asKol(row).displayName }}
-          </el-button>
+          <span class="kol-cell__name" data-test="kol-name">{{ asKol(row).displayName }}</span>
           <CopyText :value="`@${asKol(row).kolUsername}`" />
         </div>
       </template>
       <template #cell-platform="{ row }">
         {{ libraryOptionLabel("platform", asKol(row).platform) }}
       </template>
+      <template #cell-followers="{ row }">{{ followers(asKol(row).followers) }}</template>
       <template #cell-countryCode="{ row }">
         {{ libraryOptionLabel("country", asKol(row).countryCode) }}
       </template>
@@ -440,7 +427,9 @@ onMounted(load);
           {{ libraryOptionLabel("outreachStatus", asKol(row).outreachStatus) }}
         </el-tag>
       </template>
-      <template #cell-updateTime="{ row }">{{ formatInstant(asKol(row).updateTime) }}</template>
+      <template #cell-grade="{ row }">
+        {{ asKol(row).grade ? libraryOptionLabel("grade", asKol(row).grade) : "—" }}
+      </template>
       <template #actions="{ row }">
         <RowActions :actions="rowActions(asKol(row))" />
       </template>
@@ -456,6 +445,12 @@ onMounted(load);
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
+}
+.kol-cell__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .category-cell {
   display: flex;

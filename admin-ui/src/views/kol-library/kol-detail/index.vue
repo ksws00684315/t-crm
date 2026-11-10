@@ -5,7 +5,6 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import {
   deleteLibraryContent,
-  deleteLibraryKol,
   getLibraryKol,
   listLibraryContents,
   type LibraryContentVO,
@@ -156,11 +155,7 @@ const profileGroups = computed<ProfileGroup[]>(() => {
           label: t("library.field.cooperationAttitude"),
           value: option("level", row.cooperationAttitude)
         },
-        { label: t("library.field.grade"), value: option("grade", row.grade) },
-        {
-          label: t("library.field.cooperationStage"),
-          value: option("cooperationStage", row.cooperationStage)
-        }
+        { label: t("library.field.grade"), value: option("grade", row.grade) }
       ]
     },
     {
@@ -187,7 +182,8 @@ const profileGroups = computed<ProfileGroup[]>(() => {
         { label: t("library.field.lastContactDate"), value: show(row.lastContactDate) },
         { label: t("library.field.sampleStatus"), value: option("sampleStatus", row.sampleStatus) },
         { label: t("library.field.trackingNo"), value: show(row.trackingNo) },
-        { label: t("library.field.sampleDate"), value: show(row.sampleDate) }
+        { label: t("library.field.sampleDate"), value: show(row.sampleDate) },
+        { label: t("library.field.followUpRemark"), value: show(row.followUpRemark), wide: true }
       ]
     }
   ];
@@ -356,38 +352,6 @@ async function removeContent(row: LibraryContentVO): Promise<void> {
   }
 }
 
-/** Deletes the creator: its tabs close and the list reloads (requirement 1.2.5 ③). */
-async function removeKol(): Promise<void> {
-  const row = detail.value;
-  if (!row) return;
-  try {
-    await ElMessageBox.confirm(
-      t("library.confirmDelete", { name: row.displayName }),
-      t("library.deleteTitle"),
-      {
-        type: "warning",
-        confirmButtonText: t("common.delete"),
-        cancelButtonText: t("common.cancel")
-      }
-    );
-  } catch {
-    return;
-  }
-  try {
-    await deleteLibraryKol(row.id);
-    ElMessage.success(t("library.deleted"));
-    for (const path of tabs.tabs
-      .map(tab => tab.path)
-      .filter(path => path === selfPath.value || path.startsWith(`${selfPath.value}/`))) {
-      tabs.close(path);
-    }
-    tabs.refresh("/kol-library/kols");
-    await router.push("/kol-library/kols");
-  } catch (error) {
-    notifyError(error);
-  }
-}
-
 function backToList(): void {
   void router.push("/kol-library/kols");
 }
@@ -451,10 +415,6 @@ onMounted(() => {
                 <dd>{{ option("grade", detail.grade) }}</dd>
               </div>
               <div>
-                <dt>{{ t("library.field.cooperationStage") }}</dt>
-                <dd>{{ option("cooperationStage", detail.cooperationStage) }}</dd>
-              </div>
-              <div>
                 <dt>{{ t("library.field.outreachStatus") }}</dt>
                 <dd>{{ option("outreachStatus", detail.outreachStatus) }}</dd>
               </div>
@@ -478,15 +438,6 @@ onMounted(() => {
             </el-button>
             <el-button v-if="abilities.canEdit" data-test="detail-follow-up" @click="openFollowUp">
               {{ t("library.updateFollowUp") }}
-            </el-button>
-            <el-button
-              v-if="abilities.canDelete"
-              type="danger"
-              plain
-              data-test="detail-delete"
-              @click="removeKol"
-            >
-              {{ t("common.delete") }}
             </el-button>
           </div>
         </div>

@@ -26,7 +26,6 @@ public record LibraryKolDetailVO(
     String salesPotential,
     String cooperationAttitude,
     String grade,
-    String cooperationStage,
     List<String> tags,
     String remark,
     String outreachStatus,
@@ -35,6 +34,7 @@ public record LibraryKolDetailVO(
     String sampleStatus,
     String trackingNo,
     LocalDate sampleDate,
+    String followUpRemark,
     Instant createTime,
     Instant updateTime,
     TotalsVO totals) {
@@ -72,7 +72,6 @@ public record LibraryKolDetailVO(
         dto.salesPotential(),
         dto.cooperationAttitude(),
         dto.grade(),
-        dto.cooperationStage(),
         dto.tags(),
         dto.remark(),
         dto.outreachStatus(),
@@ -81,6 +80,7 @@ public record LibraryKolDetailVO(
         dto.sampleStatus(),
         dto.trackingNo(),
         dto.sampleDate(),
+        dto.followUpRemark(),
         dto.createTime(),
         dto.updateTime(),
         new TotalsVO(t.contentCount(), t.clicks(), t.orders(), t.gmv(), t.totalCost(), t.roi()));

@@ -707,13 +707,14 @@ const zhCN = {
     duplicate: "该达人已由 {owner} 录入。",
     addTag: "添加标签",
     column: {
-      kol: "达人",
-      platform: "所属平台",
+      kol: "达人名/ID",
+      platform: "平台",
+      followers: "粉丝数",
       country: "国家站点",
       categories: "内容类目",
       outreachStatus: "建联状态",
-      followUpOwner: "跟进负责人",
-      updateTime: "更新时间"
+      followUpOwner: "负责人",
+      grade: "达人分级"
     },
     filter: {
       keyword: "关键词",
@@ -727,6 +728,18 @@ const zhCN = {
       tags: "标签备注",
       followUp: "建联与寄样"
     },
+    /** Second-level tabs of the add / edit form (requirement 1.2.5 ④, 2026-11-10). */
+    formTab: {
+      basic: "基础信息",
+      followUp: "建联及寄样",
+      quality: "质量及分层"
+    },
+    /** Group cards inside the form's basic-information tab. */
+    formSection: {
+      basic: "基础信息",
+      accountType: "账号类型",
+      audience: "受众画像"
+    },
     field: {
       kolUsername: "达人ID（用户名）",
       // The at sign is the linked-message marker in vue-i18n, so it is escaped for display.
@@ -738,18 +751,17 @@ const zhCN = {
       profileUrl: "主页链接",
       profileUrlPlaceholder: "https://www.tiktok.com/{'@'}…",
       categories: "内容类目",
-      avgViews: "平均播放量",
+      avgViews: "近期平均播放量",
       engagementRate: "互动率（%）",
       audienceCountry: "国家/地区",
       audienceAgeRange: "年龄段",
       audienceGender: "性别",
-      contact: "WhatsApp/TEL",
+      contact: "联系方式",
       contactPlaceholder: "国家区号 + 号码",
       contentQuality: "内容质量",
       salesPotential: "带货潜力",
       cooperationAttitude: "配合度",
       grade: "达人分级",
-      cooperationStage: "合作阶段",
       tags: "自由标签",
       tagPlaceholder: "输入后按回车",
       remark: "备注",
@@ -757,13 +769,17 @@ const zhCN = {
       followUpOwner: "跟进负责人",
       lastContactDate: "最近沟通时间",
       sampleStatus: "寄样状态",
-      trackingNo: "快递单号",
-      sampleDate: "寄样日期"
+      trackingNo: "寄样单号",
+      sampleDate: "寄样日期",
+      followUpRemark: "跟进备注"
     },
     validation: {
       usernameRequired: "请输入达人ID",
       nameRequired: "请输入达人名称",
-      categoriesRequired: "请至少选择一个内容类目",
+      followersRequired: "请填写粉丝数",
+      followersInvalid: "粉丝数须为非负整数",
+      profileUrlRequired: "请填写主页链接",
+      profileUrlInvalid: "主页链接须以 http:// 或 https:// 开头",
       ownerRequired: "请填写跟进负责人",
       tagsLimit: "最多 10 个标签",
       urlRequired: "请填写发布内容链接",
@@ -849,12 +865,6 @@ const zhCN = {
       A: "A",
       B: "B",
       C: "C"
-    },
-    cooperationStage: {
-      FIRST_COOPERATION: "初次合作",
-      REPEAT_INVESTMENT: "复投中",
-      LONG_TERM_PARTNERSHIP: "长期深度合作",
-      EXCLUSIVE: "独家"
     },
     outreachStatus: {
       NOT_CONTACTED: "未建联",
