@@ -3,6 +3,7 @@ package com.tcrm.admin.order;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -395,9 +396,11 @@ class OrderIT {
         .isTrue();
 
     // The next run retries 2001 although it is no longer in the order list.
-    when(remote.orderList(anyLong(), any()))
-        .thenReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null));
-    when(remote.orderDetail(anyLong(), any())).thenReturn(detail("2001", PAID, line("90", "1")));
+    // doReturn: re-stubbing with when() would first invoke the answer above with null arguments
+    doReturn(new WeidianBusinessApi.OrderListResponse(0, 0, List.of(), false, null, null))
+        .when(remote)
+        .orderList(anyLong(), any());
+    doReturn(detail("2001", PAID, line("90", "1"))).when(remote).orderDetail(anyLong(), any());
     TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isTrue());
 
     assertThat(jdbc.queryForList("SELECT weidian_order_id FROM crm_order", String.class))
