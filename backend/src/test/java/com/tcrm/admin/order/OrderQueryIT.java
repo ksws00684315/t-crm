@@ -256,7 +256,17 @@ class OrderQueryIT {
 
   @Test
   void shouldServeScopedDashboardAndCurrentPageExport() throws Exception {
-    save("t144-dashboard", PAID, line("90", "1"), line("91", "2"));
+    long orderId = save("t144-dashboard", PAID, line("90", "1"), line("91", "2"));
+    long ownerId =
+        jdbc.queryForObject(
+            "SELECT id FROM sys_user WHERE username = ?",
+            Long.class,
+            CompanySessions.COMPANY_ADMIN);
+    jdbc.update(
+        "UPDATE crm_order SET kol_id = 100, bd_user_id = ?, attribution_status = 'ATTRIBUTED' WHERE id = ?",
+        ownerId,
+        orderId);
+    jdbc.update("UPDATE crm_order_item SET kol_id = 100 WHERE order_id = ?", orderId);
     assertThat(
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM agg_stats_dirty_day WHERE tenant_id = 1 AND stat_date = '2026-10-16'",
@@ -293,6 +303,56 @@ class OrderQueryIT {
             .getResponse()
             .getContentAsByteArray();
     assertThat(workbook).startsWith((byte) 0x50, (byte) 0x4b);
+    mvc.perform(get("/admin-api/stats/options").header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.shops[0].id").value("10"));
+    for (String board : List.of("best-sellers", "kol-ranking", "inviter-performance")) {
+      String path = "/admin-api/stats/" + board;
+      mvc.perform(get(path)).andExpect(status().isUnauthorized());
+      mvc.perform(
+              get(path)
+                  .param("startDate", "2026-10-16")
+                  .param("endDate", "2026-10-16")
+                  .param("keyword", "no matching fixture")
+                  .param("sortBy", "units")
+                  .header("X-Admin-Token", admin))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.summary.metrics.paidOrderCount").value("0"))
+          .andExpect(jsonPath("$.data.ranking.items").isEmpty());
+      mvc.perform(
+              get(path)
+                  .param("startDate", "2026-10-16")
+                  .param("endDate", "2026-10-16")
+                  .header("X-Admin-Token", admin))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.sortBy").value("netSalesAmount"))
+          .andExpect(jsonPath("$.data.summary.metrics.paidOrderCount").value("1"))
+          .andExpect(
+              jsonPath("$.data.ranking.total").value("best-sellers".equals(board) ? "2" : "1"));
+      byte[] exported =
+          mvc.perform(
+                  get(path + "/exports")
+                      .param("startDate", "2026-10-16")
+                      .param("endDate", "2026-10-16")
+                      .header("X-Admin-Token", admin))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsByteArray();
+      assertThat(exported).startsWith((byte) 0x50, (byte) 0x4b);
+    }
+    var other = CompanySessions.openCompany(mvc, json, PASSWORD, "t144-dashboard", "t144_other");
+    for (String board :
+        List.of("shop-performance", "best-sellers", "kol-ranking", "inviter-performance")) {
+      mvc.perform(
+              get("/admin-api/stats/" + board)
+                  .param("startDate", "2026-10-16")
+                  .param("endDate", "2026-10-16")
+                  .header("X-Admin-Token", other.token()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.summary.metrics.paidOrderCount").value("0"))
+          .andExpect(jsonPath("$.data.ranking.items").isEmpty());
+    }
   }
 
   @Test

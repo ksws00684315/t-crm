@@ -2,6 +2,7 @@ package com.tcrm.admin.kol.api;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /** KOL lookups for other modules; product must not depend on kol service/mapper/model. */
 public interface KolApi {
@@ -30,6 +31,9 @@ public interface KolApi {
    * design capacity is a few hundred KOLs.
    */
   List<KolRefDTO> listAll();
+
+  /** Public creator handles for the scoped dashboard identities. */
+  Map<Long, List<String>> analyticsSocialHandles(Collection<Long> ids);
 
   /**
    * Pages the IDs of undeleted KOLs that use the link template, in ascending id order (task 11

@@ -28,6 +28,22 @@ public interface OrderStatsMapper {
         <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
         <if test="scope.kolId != null">AND o.kol_id = #{scope.kolId}</if>
         <if test="scope.inviterId != null">AND o.bd_user_id = #{scope.inviterId}</if>
+        <if test="scope.matchedKolIds != null">
+          <choose>
+            <when test="scope.matchedKolIds.isEmpty()">AND FALSE</when>
+            <otherwise>AND o.kol_id IN
+              <foreach collection="scope.matchedKolIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </otherwise>
+          </choose>
+        </if>
+        <if test="scope.matchedInviterIds != null">
+          <choose>
+            <when test="scope.matchedInviterIds.isEmpty()">AND FALSE</when>
+            <otherwise>AND o.bd_user_id IN
+              <foreach collection="scope.matchedInviterIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </otherwise>
+          </choose>
+        </if>
         <if test="scope.visibleShopIds != null">
           <choose>
             <when test="scope.visibleShopIds.isEmpty()">AND FALSE</when>
@@ -100,6 +116,58 @@ public interface OrderStatsMapper {
   @Select(
       SCOPED_PAID_ORDERS
           + """
+      named AS (
+        SELECT kol_id FROM scoped_orders WHERE bd_user_id IS NOT NULL
+          AND pay_time &gt;= #{from} AND pay_time &lt; #{until}
+      )
+      SELECT COUNT(DISTINCT kol_id) FROM named
+      </script>
+      """)
+  long sellingCreators(
+      @Param("scope") ScopeDTO scope, @Param("from") Instant from, @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_PAID_ORDERS
+          + """
+      <choose>
+        <when test="dimension.name() == 'KOL'">
+          grouped AS (
+            SELECT p.kol_id AS entity_id, MAX(i.item_name) AS name, NULL::bigint AS creator_id,
+                   ROW_NUMBER() OVER (PARTITION BY p.kol_id ORDER BY SUM(i.pay_amount) DESC,
+                     MAX(p.pay_time) DESC, p.shop_id, i.weidian_item_id) AS position
+            FROM paid p JOIN crm_order_item i ON i.order_id = p.id AND i.kol_id = p.kol_id
+            WHERE i.tenant_id = #{scope.tenantId} AND NOT i.is_deleted AND i.weidian_item_id != ''
+            GROUP BY p.kol_id, p.shop_id, i.weidian_item_id
+          )
+          SELECT entity_id, name, creator_id FROM grouped WHERE position &lt;= 3
+          ORDER BY entity_id, position
+        </when>
+        <otherwise>
+          grouped AS (
+            SELECT bd_user_id AS entity_id, NULL::text AS name, kol_id AS creator_id,
+                   ROW_NUMBER() OVER (PARTITION BY bd_user_id ORDER BY SUM(pay_amount) DESC,
+                     MAX(pay_time) DESC, kol_id) AS position
+            FROM scoped_orders
+            WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
+              AND kol_id IS NOT NULL AND bd_user_id IS NOT NULL
+            GROUP BY bd_user_id, kol_id
+          )
+          SELECT entity_id, name, creator_id FROM grouped WHERE position = 1
+        </otherwise>
+      </choose>
+      </script>
+      """)
+  List<com.tcrm.admin.order.api.OrderStatsApi.HighlightDTO> rankHighlights(
+      @Param("scope") ScopeDTO scope,
+      @Param("dimension") RankDimension dimension,
+      @Param("from") Instant from,
+      @Param("until") Instant until);
+
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      SCOPED_PAID_ORDERS
+          + """
       ranked_orders AS NOT MATERIALIZED (
         SELECT id, shop_id, kol_id, pay_time, pay_amount,
         <choose>
@@ -139,7 +207,8 @@ public interface OrderStatsMapper {
         GROUP BY p.entity_id
       ),
       completed AS (
-        SELECT o.entity_id, SUM(r.amount) AS amount, MAX(r.finish_time) AS last_refunded_at
+        SELECT o.entity_id, SUM(r.amount) AS amount, MAX(r.finish_time) AS last_refunded_at,
+               COUNT(DISTINCT r.order_id) AS refunded_orders
         FROM crm_refund r JOIN ranked_orders o ON o.id = r.order_id
         WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted
           AND r.refund_status = 'SUCCESS'
@@ -154,6 +223,7 @@ public interface OrderStatsMapper {
              COALESCE(items.sku_count, 0) AS sku_count, COALESCE(sales.kol_count, 0) AS kol_count,
              COALESCE(sales.sales, 0) AS sales, COALESCE(cohort.amount, 0) AS cohort_refunds,
              COALESCE(completed.amount, 0) AS completed_refunds,
+             COALESCE(completed.refunded_orders, 0) AS refunded_orders,
              sales.last_paid_at, completed.last_refunded_at
       FROM shops s
       LEFT JOIN sales USING (entity_id)

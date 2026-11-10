@@ -22,6 +22,78 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 
 class ShopPerformanceExportTest {
   @Test
+  void writesBoardSpecificColumnsAndKeepsUnavailableCellsBlank() throws Exception {
+    var day = LocalDate.of(2026, 11, 3);
+    var period = new StatsPeriod(day, day);
+    var meta =
+        new MetaDTO(
+            period,
+            period.previous(),
+            "Asia/Shanghai",
+            new AppliedFiltersDTO(null, null, null, "WEIDIAN"),
+            DataScope.ALL,
+            null);
+    var zero = BigDecimal.ZERO;
+    var m = new StatsOverviewService.MetricsDTO(0, 0, zero, zero, zero, zero, 0, null, null, null);
+    var point = new AnalyticsRankingService.TrendPoint(day, zero);
+    var row =
+        new AnalyticsRankingService.Row(
+            "1",
+            "=item",
+            "CODE",
+            "Shop",
+            true,
+            List.of("handle"),
+            1L,
+            1L,
+            1,
+            null,
+            2L,
+            1L,
+            0L,
+            0L,
+            null,
+            null,
+            m,
+            null,
+            "Category",
+            List.of("Top"),
+            List.of(point));
+    var result =
+        new AnalyticsRankingService.Result(
+            meta,
+            null,
+            null,
+            null,
+            new PageResult<>(List.of(row), 50, 2, 20),
+            List.of(),
+            "units",
+            "asc",
+            "item");
+    var messages = new ResourceBundleMessageSource();
+    messages.setBasename("messages");
+    messages.setDefaultEncoding("UTF-8");
+    var service = new ShopPerformanceExport(new ExcelFiles(), messages);
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    try {
+      for (var board : AnalyticsRankingService.Board.values()) {
+        try (var book =
+            WorkbookFactory.create(new ByteArrayInputStream(service.currentPage(board, result)))) {
+          var sheet = book.getSheetAt(0);
+          assertThat(sheet.getRow(2).getCell(9).getStringCellValue()).isEqualTo("item");
+          var data = sheet.getRow(sheet.getLastRowNum());
+          assertThat(data.getCell(1).getStringCellValue()).isEqualTo("'=item");
+          assertThat(data.getCell(8).getStringCellValue()).isEmpty();
+          assertThat(data.getCell(data.getLastCellNum() - 1).getStringCellValue())
+              .isEqualTo(board == AnalyticsRankingService.Board.PRODUCT ? "2026-11-03 0" : "Top");
+        }
+      }
+    } finally {
+      LocaleContextHolder.resetLocaleContext();
+    }
+  }
+
+  @Test
   void writesFilterMetadataAboveEscapedRowsAndDoesNotIncludeOtherPages() throws Exception {
     var day = LocalDate.of(2026, 11, 3);
     var period = new StatsPeriod(day, day);

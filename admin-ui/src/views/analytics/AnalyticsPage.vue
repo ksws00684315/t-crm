@@ -1,0 +1,620 @@
+<script setup lang="ts">
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { ElMessage } from "element-plus";
+import { analyticsOptions, exportAnalytics, queryAnalytics } from "@/api/analytics";
+import type {
+  AnalyticsResult,
+  Filters,
+  Metric,
+  Options,
+  RankRow,
+  RankingQuery,
+  Scalar
+} from "@/api/analytics";
+import CopyText from "@/components/CopyText.vue";
+import DataTable from "@/components/DataTable.vue";
+import type { DataColumn } from "@/components/DataTable.vue";
+import RowActions from "@/components/RowActions.vue";
+import { useUserStore } from "@/stores/user";
+import { saveBlob } from "@/utils/download";
+import { formatAmountWithCurrency } from "@/utils/format";
+import { canExport } from "@/utils/permission";
+import {
+  boards,
+  columnsByBoard,
+  dates,
+  groupedSort,
+  money,
+  pending as pendingColumns,
+  rates,
+  sortable,
+  validDates
+} from "./board";
+import DashboardFilter from "./DashboardFilter.vue";
+import MetricCard from "./MetricCard.vue";
+import QuerySummary from "./QuerySummary.vue";
+
+defineOptions({ name: "AnalyticsPage" });
+
+const { t, locale } = useI18n();
+const me = useUserStore();
+const board = boards[String(useRoute().name)]!;
+const shop = board === "shop-performance";
+const product = board === "best-sellers";
+const creator = board === "kol-ranking";
+const draft = ref<Filters>(dates());
+const applied = ref<Filters>({ ...draft.value });
+const page = ref(1);
+const size = ref(20);
+const sortBy = ref("netSalesAmount");
+const sortDirection = ref<"asc" | "desc">("desc");
+const result = ref<AnalyticsResult>();
+const options = ref<Options>();
+const loading = ref(false);
+const failed = ref(false);
+const optionsFailed = ref(false);
+const exporting = ref(false);
+let request = 0;
+let active = false;
+let timer: ReturnType<typeof setInterval> | undefined;
+
+const query = computed<RankingQuery>(() => ({
+  ...applied.value,
+  page: page.value,
+  size: size.value,
+  sortBy: sortBy.value,
+  sortDirection: sortDirection.value
+}));
+const metrics = computed(() => result.value?.summary.metrics);
+const rows = computed(() => result.value?.ranking.items ?? []);
+const columns = computed<DataColumn[]>(() =>
+  [...columnsByBoard[board], "actions"].map(key => ({
+    key,
+    label: label(key),
+    amount: money.has(key),
+    tooltip: false,
+    align: key === "identity" ? "left" : "center",
+    interactive: key === "identity",
+    fixed: product && key === "identity" ? "left" : undefined,
+    minWidth:
+      key === "identity"
+        ? product
+          ? 170
+          : 216
+        : key === "rank"
+          ? 76
+          : key === "actions"
+            ? 90
+            : key === "coverage"
+              ? 166
+              : 136
+  }))
+);
+const sortKeys = columnsByBoard[board].filter(key => sortable.has(key) || key === "coverage");
+const cellKeys = columnsByBoard[board].filter(key => sortable.has(key) || pendingColumns.has(key));
+const detailActions = computed(() => [
+  { key: "detail", label: t("analytics.detail"), disabled: true, tooltip: t("common.comingSoon") }
+]);
+
+function label(key: string): string {
+  if (
+    key === "identity" ||
+    key === "netCommission" ||
+    (product && key === "periodRefundedOrderRate")
+  ) {
+    return t(`analytics.${board}.${key}`);
+  }
+  if (key === "kolCount" && (product || shop)) return t("analytics.productCreatorCount");
+  if (key === "netSalesAmount" && product) return t("analytics.best-sellers.net");
+  return t(`analytics.${key}`);
+}
+
+function display(key: string, value: Scalar | null | undefined): string {
+  if (value == null) return "—";
+  if (money.has(key)) return formatAmountWithCurrency(String(value));
+  if (rates.has(key)) return percent(value);
+  if (key === "rankChange" && Number(value) > 0) return `+${value}`;
+  return new Intl.NumberFormat(locale.value).format(BigInt(String(value)));
+}
+
+function percent(value: Scalar | null | undefined): string {
+  return value == null
+    ? "—"
+    : new Intl.NumberFormat(locale.value, {
+        style: "percent",
+        maximumFractionDigits: 2
+      }).format(Number(value));
+}
+
+function valueOf(row: RankRow, key: string): Scalar | null {
+  const value = row.metrics?.[key as Metric] ?? row[key];
+  return typeof value === "string" || typeof value === "number" ? value : null;
+}
+
+function comparison(key: Metric): string {
+  return t("analytics.comparison", { value: percent(result.value?.change[key]) });
+}
+
+const cards = computed(() => {
+  const summary = result.value?.summary;
+  const data = metrics.value;
+  const selling = shop ? summary?.sellingShopCount : summary?.sellingCount;
+  const total = shop ? summary?.shopCount : summary?.activeCount;
+  const first = {
+    label: t(`analytics.${board}.selling`),
+    value: display("", selling),
+    detail: product ? undefined : t(`analytics.${board}.active`, { value: display("", total) })
+  };
+  const orders = {
+    label: label("paidOrderCount"),
+    value: display("", data?.paidOrderCount),
+    detail:
+      shop || product ? undefined : t("analytics.unitsValue", { value: display("", data?.units) }),
+    comparison: comparison("paidOrderCount")
+  };
+  const net = {
+    label: t(product ? "analytics.best-sellers.net" : "analytics.netSalesAmount"),
+    value: display("netSalesAmount", data?.netSalesAmount),
+    comparison: comparison("netSalesAmount"),
+    hint: t("analytics.netHint")
+  };
+  const last = product
+    ? { label: label("units"), value: display("", data?.units), comparison: comparison("units") }
+    : {
+        label: label(shop ? "settlement" : "netCommission"),
+        value: t("analytics.pending")
+      };
+  return product ? [first, orders, last, net] : [first, orders, net, last];
+});
+
+const conversion = computed(() => [
+  { key: "invitedCount", value: result.value?.summary.invitedCount },
+  { key: "effectiveCount", value: result.value?.summary.effectiveCount },
+  { key: "kolCount", value: result.value?.summary.sellingCreatorCount }
+]);
+function ratio(part?: Scalar, whole?: Scalar): string {
+  return part == null || whole == null || Number(whole) === 0
+    ? "—"
+    : percent(Number(part) / Number(whole));
+}
+
+async function load(): Promise<void> {
+  const id = ++request;
+  loading.value = true;
+  failed.value = false;
+  try {
+    const next = await queryAnalytics(board, query.value);
+    if (id === request) result.value = next;
+  } catch {
+    if (id === request) {
+      result.value = undefined;
+      failed.value = true;
+    }
+  } finally {
+    if (id === request) loading.value = false;
+  }
+}
+
+async function loadOptions(): Promise<void> {
+  try {
+    options.value = await analyticsOptions();
+    optionsFailed.value = false;
+  } catch {
+    optionsFailed.value = true;
+  }
+}
+
+function refresh(): void {
+  if (optionsFailed.value) void loadOptions();
+  void load();
+}
+
+function search(): void {
+  if (!validDates(draft.value)) {
+    ElMessage.warning(t("analytics.invalidDates"));
+    return;
+  }
+  const { shopId, kolId, inviterId, channel, keyword, startDate, endDate } = draft.value;
+  applied.value = {
+    startDate,
+    endDate,
+    shopId: shopId || undefined,
+    kolId: kolId || undefined,
+    inviterId: inviterId || undefined,
+    channel: channel || undefined,
+    keyword: keyword?.trim() || undefined
+  };
+  page.value = 1;
+  result.value = undefined;
+  void load();
+}
+
+function reset(): void {
+  draft.value = dates();
+  search();
+}
+function sort(key: string): void {
+  sortDirection.value = sortBy.value === key && sortDirection.value === "desc" ? "asc" : "desc";
+  sortBy.value = key;
+  page.value = 1;
+  void load();
+}
+function changePage(next: number): void {
+  if (page.value === next) return;
+  page.value = next;
+  void load();
+}
+function changeSize(next: number): void {
+  if (size.value === next) return;
+  size.value = next;
+  page.value = 1;
+  void load();
+}
+async function download(): Promise<void> {
+  if (exporting.value || loading.value || !result.value) return;
+  exporting.value = true;
+  try {
+    const file = await exportAnalytics(board, query.value);
+    saveBlob(file.blob, file.fileName ?? `${board}.xlsx`);
+  } catch {
+    ElMessage.error(t("analytics.exportFailed"));
+  } finally {
+    exporting.value = false;
+  }
+}
+
+function start(): void {
+  if (active) return;
+  active = true;
+  void load();
+  if (!options.value) void loadOptions();
+  timer = setInterval(() => {
+    if (!document.hidden && !loading.value) void load();
+  }, 300_000);
+}
+function stop(): void {
+  active = false;
+  request++;
+  clearInterval(timer);
+}
+onMounted(start);
+onActivated(start);
+onDeactivated(stop);
+onUnmounted(stop);
+</script>
+
+<template>
+  <div class="analytics-page">
+    <DashboardFilter
+      v-model="draft"
+      :board="board"
+      :loading="loading"
+      :options="options"
+      :options-failed="optionsFailed"
+      @search="search"
+      @reset="reset"
+      @refresh="refresh"
+    />
+    <QuerySummary v-if="result" :result="result" :options="options" />
+
+    <div class="analytics-cards" :aria-busy="loading">
+      <MetricCard v-for="card in cards" :key="card.label" v-bind="card" />
+    </div>
+
+    <section v-if="shop" class="analytics-topic">
+      <h2>{{ t("analytics.transactionTitle") }}</h2>
+      <div class="topic-grid topic-grid--two">
+        <div class="topic-panel">
+          <h3>{{ t("analytics.transaction") }}</h3>
+          <div class="topic-values">
+            <div v-for="key in ['salesAmount', 'cohortRefundAmount', 'netSalesAmount']" :key="key">
+              <span>{{ label(key) }}</span>
+              <strong>{{ display(key, metrics?.[key as Metric]) }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="topic-panel">
+          <h3>{{ t("analytics.settlementTitle") }}</h3>
+          <div class="topic-values">
+            <div>
+              <span>{{ label("settlement") }}</span
+              ><strong>{{ t("analytics.pending") }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section v-else-if="creator" class="analytics-topic">
+      <h2>{{ t("analytics.riskTitle") }}</h2>
+      <div class="topic-grid topic-grid--two">
+        <MetricCard
+          :label="label('amountRefundRate')"
+          :value="percent(metrics?.amountRefundRate)"
+          :detail="`${display('completedRefundAmount', metrics?.completedRefundAmount)} / ${display('salesAmount', metrics?.salesAmount)}`"
+        />
+        <MetricCard
+          :label="label('periodRefundedOrderRate')"
+          :value="percent(metrics?.periodRefundedOrderRate)"
+          :detail="`${display('', metrics?.refundedOrderCount)} / ${display('', metrics?.paidOrderCount)}`"
+        />
+      </div>
+    </section>
+    <section v-else-if="!product" class="analytics-topic">
+      <h2>{{ t("analytics.conversion") }}</h2>
+      <div class="topic-grid topic-grid--three">
+        <MetricCard
+          v-for="(entry, index) in conversion"
+          :key="entry.key"
+          :label="label(entry.key)"
+          :value="display('', entry.value)"
+          :detail="
+            index > 0
+              ? t(index === 1 ? 'analytics.effectiveRate' : 'analytics.activationRate', {
+                  value: ratio(entry.value, conversion[index - 1]?.value)
+                })
+              : undefined
+          "
+        />
+      </div>
+    </section>
+
+    <p v-if="product" class="analytics-note">{{ t("analytics.productRefundHint") }}</p>
+    <DataTable
+      :table-id="`analytics-${board}`"
+      :columns="columns"
+      :rows="rows"
+      :row-key="shop ? 'shopId' : 'id'"
+      :loading="loading"
+      :failed="failed"
+      :page="page"
+      :size="size"
+      :page-sizes="[20, 50, 100]"
+      :total="Number(result?.ranking.total ?? 0)"
+      :exportable="canExport(me.user)"
+      :exporting="exporting"
+      @export="download"
+      @refresh="refresh"
+      @retry="refresh"
+      @update:page="changePage"
+      @update:size="changeSize"
+    >
+      <template #title>{{ t(`analytics.${board}.ranking`) }}</template>
+      <template v-for="key in sortKeys" :key="key" #[`header-${key}`]>
+        <div class="sort-controls">
+          <button
+            v-for="field in key === 'coverage' ? groupedSort : [key]"
+            :key="field"
+            type="button"
+            :aria-label="
+              t('analytics.sortLabel', {
+                label: label(field),
+                direction:
+                  sortBy === field ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
+              })
+            "
+            :class="{ selected: sortBy === field }"
+            @click="sort(field)"
+          >
+            {{ label(field) }}
+            <span aria-hidden="true">{{
+              sortBy === field ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
+            }}</span>
+          </button>
+        </div>
+      </template>
+      <template #cell-identity="{ row }">
+        <div class="analytics-identity">
+          <img
+            v-if="product && row.imageUrl"
+            class="product-thumb"
+            :src="row.imageUrl"
+            alt=""
+            loading="lazy"
+          />
+          <strong>{{
+            (shop ? row.shopName : row.name) || (row.id === "0" ? t("analytics.unassigned") : "—")
+          }}</strong>
+          <CopyText
+            v-if="shop ? row.shopCode : !product && row.code"
+            :value="shop ? row.shopCode : row.code"
+          />
+          <small v-if="row.social?.length">{{ row.social.join(" · ") }}</small>
+        </div>
+      </template>
+      <template #cell-channelStatus="{ row }">
+        <div>{{ t("analytics.weidian") }}</div>
+        <div>{{ t(row.status === 1 ? "analytics.enabled" : "analytics.disabled") }}</div>
+      </template>
+      <template #cell-channelCode="{ row }">
+        <div>{{ t("analytics.weidian") }}</div>
+        <CopyText :value="row.code" />
+      </template>
+      <template #cell-shop="{ row }">{{ row.related || "—" }}</template>
+      <template #cell-relationship="{ row }">
+        <div>{{ row.related || t("analytics.unassigned") }}</div>
+        <small v-if="row.enabled != null">{{
+          t(row.enabled ? "analytics.enabled" : "analytics.disabled")
+        }}</small>
+      </template>
+      <template #cell-status="{ row }">
+        {{
+          row.enabled == null ? "—" : t(row.enabled ? "analytics.enabled" : "analytics.disabled")
+        }}
+      </template>
+      <template #cell-coverage="{ row }">
+        <div class="coverage-values">
+          <span v-for="key in groupedSort" :key="key">{{ display(key, valueOf(row, key)) }}</span>
+        </div>
+      </template>
+      <template v-for="key in cellKeys" :key="key" #[`cell-${key}`]="{ row }">
+        <div class="analytics-cell">
+          <span class="analytics-number">{{
+            pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key))
+          }}</span>
+          <el-tag
+            v-if="product && key === 'periodRefundedOrderRate' && Number(valueOf(row, key)) > 0.2"
+            type="warning"
+            size="small"
+            >{{ t("analytics.highRefund") }}</el-tag
+          >
+        </div>
+      </template>
+      <template #cell-category="{ row }">{{ row.category || "—" }}</template>
+      <template #cell-trend="{ row }">
+        <el-tooltip v-if="row.trend?.length" :trigger="['hover', 'focus']" placement="top">
+          <template #content>
+            <div v-for="point in row.trend" :key="point.day">
+              {{ point.day }} · {{ display("netSalesAmount", point.netSalesAmount) }}
+            </div>
+          </template>
+          <span tabindex="0" class="analytics-number"
+            >{{ display("netSalesAmount", row.trend[0]?.netSalesAmount) }}
+            <template v-if="row.trend.length > 1">
+              → {{ display("netSalesAmount", row.trend.at(-1)?.netSalesAmount) }}</template
+            >
+          </span>
+        </el-tooltip>
+        <span v-else>—</span>
+      </template>
+      <template #cell-topProducts="{ row }">{{ row.highlights?.join(" · ") || "—" }}</template>
+      <template #cell-bestCreator="{ row }">{{ row.highlights?.[0] || "—" }}</template>
+      <template #actions><RowActions :actions="detailActions" /></template>
+    </DataTable>
+  </div>
+</template>
+
+<style scoped>
+.analytics-page {
+  min-width: 0;
+  display: grid;
+  gap: var(--tcrm-space-4);
+}
+.analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tcrm-space-4);
+}
+.analytics-note {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.analytics-topic {
+  min-width: 0;
+  display: grid;
+  gap: var(--tcrm-space-3);
+}
+.analytics-topic h2 {
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-table);
+  line-height: var(--tcrm-line-height-table);
+  font-weight: 600;
+  margin: 0;
+}
+.topic-grid {
+  display: grid;
+  gap: var(--tcrm-space-4);
+}
+.topic-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.topic-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.topic-panel {
+  min-width: 0;
+  padding: var(--tcrm-space-4);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+}
+.topic-panel h3 {
+  font-size: var(--tcrm-font-size-table);
+  line-height: var(--tcrm-line-height-table);
+  margin: 0 0 var(--tcrm-space-3);
+}
+.topic-values {
+  display: flex;
+  gap: var(--tcrm-space-4);
+  flex-wrap: wrap;
+}
+.topic-values > div {
+  display: grid;
+  gap: var(--tcrm-space-2);
+}
+.topic-values span {
+  color: var(--el-text-color-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+}
+.topic-values strong {
+  font-size: var(--tcrm-font-size-dashboard-comparison);
+  line-height: var(--tcrm-line-height-dashboard-comparison);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.analytics-identity {
+  display: grid;
+  justify-items: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.analytics-identity small {
+  color: var(--el-text-color-secondary);
+}
+.product-thumb {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.analytics-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-1);
+}
+.analytics-number {
+  font-variant-numeric: tabular-nums;
+}
+.sort-controls,
+.coverage-values {
+  display: flex;
+  justify-content: space-evenly;
+  gap: var(--tcrm-space-1);
+}
+.sort-controls button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  min-height: 32px;
+}
+.sort-controls button.selected {
+  color: var(--el-color-primary);
+}
+.sort-controls button:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 1100px) {
+  .analytics-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .analytics-cards,
+  .topic-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sort-controls button {
+    min-height: 44px;
+  }
+}
+</style>

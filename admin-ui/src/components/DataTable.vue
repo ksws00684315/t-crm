@@ -38,6 +38,7 @@ export interface DataColumn {
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
   defaultHidden?: boolean;
+  fixed?: "left";
 }
 
 const props = withDefaults(
@@ -51,6 +52,7 @@ const props = withDefaults(
     total: number;
     page?: number;
     size?: number;
+    pageSizes?: readonly number[];
     /** Shop and tenant lists return every row; those tables show a total and do not page. */
     paged?: boolean;
     filterCount?: number;
@@ -320,6 +322,9 @@ watch(fullscreen, scheduleMeasure);
 const locked = computed(() => {
   const keys = new Set<string>();
   if (props.columns[0]) keys.add(props.columns[0].key);
+  for (const column of props.columns) {
+    if (column.fixed) keys.add(column.key);
+  }
   if (props.columns.some(column => column.key === "actions")) keys.add("actions");
   return keys;
 });
@@ -629,7 +634,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
                   : 'right'
                 : column.key === columns[0]?.key
                   ? 'left'
-                  : undefined
+                  : column.fixed
               : undefined
           "
           :align="
@@ -645,6 +650,9 @@ function canMove(index: number, delta: -1 | 1): boolean {
           "
           :class-name="column.amount ? 'tcrm-amount' : undefined"
         >
+          <template v-if="$slots[`header-${column.key}`]" #header>
+            <slot :name="`header-${column.key}`" />
+          </template>
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
@@ -685,7 +693,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
       <el-pagination
         background
         layout="sizes, prev, pager, next"
-        :page-sizes="[...PAGE_SIZES]"
+        :page-sizes="[...(pageSizes ?? PAGE_SIZES)]"
         :total="total"
         :current-page="page"
         :page-size="prefs.pageSize"

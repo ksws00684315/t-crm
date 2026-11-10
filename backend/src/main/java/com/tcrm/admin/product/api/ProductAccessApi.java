@@ -30,5 +30,10 @@ public interface ProductAccessApi {
    * @param imageUrl main image URL; null when the product has none
    * @param status 1 on sale, 0 off sale
    */
-  record ProductRefDTO(Long id, String code, String name, String imageUrl, Integer status) {}
+  record ProductRefDTO(
+      Long id, String code, String name, String imageUrl, Integer status, String category) {
+    public ProductRefDTO(Long id, String code, String name, String imageUrl, Integer status) {
+      this(id, code, name, imageUrl, status, null);
+    }
+  }
 }

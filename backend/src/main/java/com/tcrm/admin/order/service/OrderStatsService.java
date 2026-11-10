@@ -31,8 +31,31 @@ public class OrderStatsService implements OrderStatsApi {
   }
 
   @Override
+  public List<HighlightDTO> rankHighlights(
+      ScopeDTO scope, RankDimension dimension, Instant from, Instant until) {
+    return mapper.rankHighlights(scope, dimension, from, until);
+  }
+
+  @Override
+  public long sellingCreators(ScopeDTO scope, Instant from, Instant until) {
+    return mapper.sellingCreators(scope, from, until);
+  }
+
+  @Override
   public List<LocalDate> changedDays(long tenantId, Instant from, Instant until) {
     return daily.changedDays(tenantId, from, until);
+  }
+
+  @Override
+  public List<ProductFactsDTO> productFacts(
+      ScopeDTO scope, String keyword, Instant from, Instant until) {
+    return daily.productFacts(scope, keyword, from, until, false);
+  }
+
+  @Override
+  public List<ProductFactsDTO> productTrend(
+      ScopeDTO scope, String keyword, Instant from, Instant until) {
+    return daily.productFacts(scope, keyword, from, until, true);
   }
 
   @Override

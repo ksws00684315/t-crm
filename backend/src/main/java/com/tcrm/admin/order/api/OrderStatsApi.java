@@ -12,6 +12,17 @@ public interface OrderStatsApi {
   List<RankFactsDTO> rankFacts(
       ScopeDTO scope, RankDimension dimension, Instant from, Instant until);
 
+  List<ProductFactsDTO> productFacts(ScopeDTO scope, String keyword, Instant from, Instant until);
+
+  List<ProductFactsDTO> productTrend(ScopeDTO scope, String keyword, Instant from, Instant until);
+
+  List<HighlightDTO> rankHighlights(
+      ScopeDTO scope, RankDimension dimension, Instant from, Instant until);
+
+  long sellingCreators(ScopeDTO scope, Instant from, Instant until);
+
+  record HighlightDTO(Long entityId, String name, Long creatorId) {}
+
   enum RankDimension {
     SHOP,
     KOL,
@@ -33,7 +44,19 @@ public interface OrderStatsApi {
       Long shopId,
       Long kolId,
       Long inviterId,
-      List<Long> visibleShopIds) {
+      List<Long> visibleShopIds,
+      List<Long> matchedKolIds,
+      List<Long> matchedInviterIds) {
+    public ScopeDTO(
+        long tenantId,
+        Long ownerId,
+        Long shopId,
+        Long kolId,
+        Long inviterId,
+        List<Long> visibleShopIds) {
+      this(tenantId, ownerId, shopId, kolId, inviterId, visibleShopIds, null, null);
+    }
+
     public ScopeDTO(long tenantId, Long ownerId, Long shopId, Long kolId, Long inviterId) {
       this(tenantId, ownerId, shopId, kolId, inviterId, null);
     }
@@ -59,8 +82,28 @@ public interface OrderStatsApi {
       BigDecimal sales,
       BigDecimal cohortRefunds,
       BigDecimal completedRefunds,
+      long refundedOrders,
       Instant lastPaidAt,
       Instant lastRefundedAt) {}
+
+  /** A shop/SPU row, or the exact cross-product total when shopId is null. */
+  record ProductFactsDTO(
+      Long shopId,
+      String spu,
+      String name,
+      Long productId,
+      long paidOrders,
+      long units,
+      long kolCount,
+      BigDecimal sales,
+      BigDecimal cohortRefunds,
+      BigDecimal completedRefunds,
+      long refundedOrders,
+      long cohortRefundedOrders,
+      LocalDate day,
+      Instant lastPaidAt,
+      Instant lastRefundedAt,
+      Instant updatedAt) {}
 
   record DailyFactDTO(
       String grain,

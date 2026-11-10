@@ -83,7 +83,7 @@ public class StatsOverviewService {
     return new OverviewDTO(meta, metrics, previous, changes(metrics, previous), UNAVAILABLE);
   }
 
-  private static MetricsDTO metrics(TotalsDTO totals) {
+  static MetricsDTO metrics(TotalsDTO totals) {
     var paidOrders = BigDecimal.valueOf(totals.paidOrders());
     return new MetricsDTO(
         totals.paidOrders(),
@@ -98,7 +98,7 @@ public class StatsOverviewService {
         divide(BigDecimal.valueOf(totals.refundedOrders()), paidOrders, 6));
   }
 
-  private static ChangesDTO changes(MetricsDTO value, MetricsDTO prior) {
+  static ChangesDTO changes(MetricsDTO value, MetricsDTO prior) {
     return new ChangesDTO(
         change(
             BigDecimal.valueOf(value.paidOrderCount()), BigDecimal.valueOf(prior.paidOrderCount())),
@@ -119,7 +119,7 @@ public class StatsOverviewService {
     return value == null || prior == null ? null : divide(value.subtract(prior), prior.abs(), 6);
   }
 
-  private static BigDecimal divide(BigDecimal numerator, BigDecimal denominator, int scale) {
+  static BigDecimal divide(BigDecimal numerator, BigDecimal denominator, int scale) {
     return denominator.signum() == 0
         ? null
         : numerator.divide(denominator, scale, RoundingMode.HALF_UP);

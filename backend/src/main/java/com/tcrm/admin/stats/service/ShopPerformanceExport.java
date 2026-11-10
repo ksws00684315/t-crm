@@ -82,6 +82,143 @@ public class ShopPerformanceExport {
     return excel.export(metadata, headers, rows);
   }
 
+  public byte[] currentPage(
+      AnalyticsRankingService.Board board, AnalyticsRankingService.Result result) {
+    var meta = result.meta();
+    var filters = meta.filters();
+    var metadata =
+        List.of(
+            List.of(
+                label("start"),
+                meta.period().startDate().toString(),
+                label("end"),
+                meta.period().endDate().toString(),
+                label("zone"),
+                meta.timezone()),
+            List.of(
+                label("time"),
+                ZonedDateTime.now(StatsPeriod.ZONE).toOffsetDateTime().toString(),
+                label("scope"),
+                meta.dataScope().name()),
+            List.of(
+                label("shop"),
+                text(filters.shopId()),
+                label("creator"),
+                text(filters.kolId()),
+                label("inviter"),
+                text(filters.inviterId()),
+                label("channel"),
+                filters.channel(),
+                label("keyword"),
+                text(result.keyword())),
+            List.of(
+                label("page"),
+                text(result.ranking().page()),
+                label("size"),
+                text(result.ranking().size()),
+                label("sort"),
+                result.sortBy(),
+                label("direction"),
+                result.sortDirection()));
+    var headers =
+        new java.util.ArrayList<>(
+            List.of(
+                label("entityCode"),
+                label("name"),
+                label("orders"),
+                label("units"),
+                label("sales"),
+                label("refund"),
+                label("net"),
+                label("refundOrders"),
+                label("orderRefundRate")));
+    headers.addAll(
+        switch (board) {
+          case PRODUCT ->
+              List.of(
+                  label("rank"),
+                  label("rankChange"),
+                  label("shop"),
+                  label("category"),
+                  label("creators"),
+                  label("trend"));
+          case CREATOR ->
+              List.of(
+                  label("inviter"),
+                  label("status"),
+                  label("social"),
+                  "SPU",
+                  label("average"),
+                  label("amountRefundRate"),
+                  label("highlights"));
+          case INVITER ->
+              List.of(
+                  label("status"),
+                  label("invited"),
+                  label("effective"),
+                  label("creators"),
+                  label("average"),
+                  label("amountRefundRate"),
+                  label("bestCreator"));
+        });
+    var rows =
+        result.ranking().items().stream()
+            .map(
+                row -> {
+                  var m = row.metrics();
+                  var values =
+                      new java.util.ArrayList<>(
+                          List.of(
+                              text(row.code()),
+                              text(row.name()),
+                              text(m.paidOrderCount()),
+                              text(m.units()),
+                              money(m.salesAmount()),
+                              money(m.completedRefundAmount()),
+                              money(m.netSalesAmount()),
+                              text(m.refundedOrderCount()),
+                              money(m.periodRefundedOrderRate())));
+                  values.addAll(
+                      switch (board) {
+                        case PRODUCT ->
+                            List.of(
+                                text(row.rank()),
+                                text(row.rankChange()),
+                                text(row.related()),
+                                text(row.category()),
+                                text(row.kolCount()),
+                                row.trend().stream()
+                                    .map(p -> p.day() + " " + money(p.netSalesAmount()))
+                                    .collect(java.util.stream.Collectors.joining(" / ")));
+                        case CREATOR ->
+                            List.of(
+                                text(row.related()),
+                                status(row.enabled()),
+                                row.social() == null ? "" : String.join(" / ", row.social()),
+                                text(row.spuCount()),
+                                money(m.averageOrderAmount()),
+                                money(m.amountRefundRate()),
+                                String.join(" / ", row.highlights()));
+                        case INVITER ->
+                            List.of(
+                                status(row.enabled()),
+                                text(row.invitedCount()),
+                                text(row.effectiveCount()),
+                                text(row.kolCount()),
+                                money(m.averageOrderAmount()),
+                                money(m.amountRefundRate()),
+                                String.join(" / ", row.highlights()));
+                      });
+                  return List.copyOf(values);
+                })
+            .toList();
+    return excel.export(metadata, headers, rows);
+  }
+
+  private String status(Boolean enabled) {
+    return enabled == null ? "" : label(enabled ? "active" : "inactive");
+  }
+
   private static String text(Object value) {
     return Objects.toString(value, "");
   }

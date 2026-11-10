@@ -138,6 +138,7 @@ class ShopPerformanceServiceTest {
         new BigDecimal(sales),
         ZERO,
         ZERO,
+        0,
         achieved,
         achieved);
   }

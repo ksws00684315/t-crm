@@ -2,6 +2,8 @@ package com.tcrm.admin.order.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.tcrm.admin.order.api.OrderStatsApi.DailyFactDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.ProductFactsDTO;
+import com.tcrm.admin.order.api.OrderStatsApi.ScopeDTO;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,6 +14,91 @@ import org.apache.ibatis.annotations.Select;
 /** Order-owned source for Beijing-day rollups. Every fact join remains in one tenant. */
 @Mapper
 public interface OrderDailyStatsMapper {
+  @InterceptorIgnore(tenantLine = "true")
+  @Select(
+      """
+      <script>
+      WITH lines AS NOT MATERIALIZED (
+        SELECT o.id AS order_id, o.shop_id, o.pay_time, i.id AS line_id, i.weidian_item_id AS spu,
+               i.item_name, i.product_id, i.kol_id, i.quantity, i.pay_amount,
+               GREATEST(o.update_time, i.update_time) AS updated_at
+        FROM crm_order o JOIN crm_order_item i ON i.order_id = o.id
+        WHERE o.tenant_id = #{scope.tenantId} AND i.tenant_id = #{scope.tenantId}
+          AND NOT o.is_deleted AND NOT i.is_deleted AND o.pay_time IS NOT NULL
+          AND o.attribution_status = 'ATTRIBUTED' AND i.kol_id IS NOT NULL
+          AND i.weidian_item_id != ''
+        <if test="scope.ownerId != null">AND o.bd_user_id = #{scope.ownerId}</if>
+        <if test="scope.shopId != null">AND o.shop_id = #{scope.shopId}</if>
+        <if test="scope.visibleShopIds != null">
+          <choose>
+            <when test="scope.visibleShopIds.isEmpty()">AND FALSE</when>
+            <otherwise>
+              AND o.shop_id IN
+              <foreach collection="scope.visibleShopIds" item="visibleShop" open="(" separator="," close=")">
+                #{visibleShop}
+              </foreach>
+            </otherwise>
+          </choose>
+        </if>
+        <if test="scope.kolId != null">AND i.kol_id = #{scope.kolId}</if>
+        <if test="keyword != null">
+          AND (strpos(lower(i.item_name), lower(#{keyword})) &gt; 0 OR i.weidian_item_id = #{keyword})
+        </if>
+      ),
+      paid AS (
+        SELECT order_id, shop_id, pay_time, line_id, spu, item_name, product_id,
+               kol_id, quantity, pay_amount, updated_at
+        FROM lines WHERE pay_time &gt;= #{from} AND pay_time &lt; #{until}
+      ),
+      events AS (
+        SELECT shop_id, spu, item_name, product_id, order_id, kol_id, quantity,
+               pay_amount AS sales, 0::numeric AS cohort, 0::numeric AS completed,
+               NULL::bigint AS refund_order, NULL::bigint AS cohort_order,
+               pay_time, NULL::timestamptz AS finish_time, updated_at
+        FROM paid
+        UNION ALL
+        SELECT p.shop_id, p.spu, p.item_name, p.product_id, NULL, NULL, 0, 0, r.amount, 0,
+               NULL, p.order_id, p.pay_time, NULL, r.update_time
+        FROM crm_refund r JOIN paid p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
+        WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+      """
+          + OrderStatsMapper.COHORT_REFUND_WINDOW
+          + """
+        UNION ALL
+        SELECT p.shop_id, p.spu, p.item_name, p.product_id, NULL, NULL, 0, 0, 0, r.amount,
+               p.order_id, NULL, NULL, r.finish_time, r.update_time
+        FROM crm_refund r JOIN lines p ON r.order_item_id = p.line_id AND r.order_id = p.order_id
+        WHERE r.tenant_id = #{scope.tenantId} AND NOT r.is_deleted AND r.refund_status = 'SUCCESS'
+          AND r.finish_time &gt;= #{from} AND r.finish_time &lt; #{until}
+      )
+      SELECT shop_id, spu, MAX(item_name) AS name, MAX(product_id) AS product_id,
+             COUNT(DISTINCT order_id) AS paid_orders, COALESCE(SUM(quantity), 0) AS units,
+             COUNT(DISTINCT kol_id) AS kol_count, COALESCE(SUM(sales), 0) AS sales,
+             COALESCE(SUM(cohort), 0) AS cohort_refunds,
+             COALESCE(SUM(completed), 0) AS completed_refunds,
+             COUNT(DISTINCT refund_order) AS refunded_orders,
+             COUNT(DISTINCT cohort_order) AS cohort_refunded_orders,
+             <choose>
+               <when test="daily">CAST(pay_time AT TIME ZONE 'Asia/Shanghai' AS date)</when>
+               <otherwise>NULL::date</otherwise>
+             </choose> AS day,
+             MAX(pay_time) AS last_paid_at, MAX(finish_time) AS last_refunded_at, MAX(updated_at) AS updated_at
+      FROM events
+      <choose>
+        <when test="daily">
+          WHERE pay_time IS NOT NULL GROUP BY shop_id, spu, CAST(pay_time AT TIME ZONE 'Asia/Shanghai' AS date)
+        </when>
+        <otherwise>GROUP BY GROUPING SETS ((shop_id, spu), ())</otherwise>
+      </choose>
+      </script>
+      """)
+  List<ProductFactsDTO> productFacts(
+      @Param("scope") ScopeDTO scope,
+      @Param("keyword") String keyword,
+      @Param("from") Instant from,
+      @Param("until") Instant until,
+      @Param("daily") boolean daily);
+
   @InterceptorIgnore(tenantLine = "true")
   @Select(
       """

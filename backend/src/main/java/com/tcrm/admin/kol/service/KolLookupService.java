@@ -72,6 +72,27 @@ public class KolLookupService implements KolApi {
   }
 
   @Override
+  public Map<Long, List<String>> analyticsSocialHandles(Collection<Long> ids) {
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    var result = new HashMap<Long, List<String>>();
+    kols.selectList(
+            new LambdaQueryWrapper<KolDO>()
+                .select(KolDO::getId, KolDO::getSocialAccounts)
+                .in(KolDO::getId, ids))
+        .forEach(
+            k ->
+                result.put(
+                    k.getId(),
+                    SocialAccountsJson.read(k.getSocialAccounts()).stream()
+                        .map(SocialAccountDTO::handle)
+                        .filter(Objects::nonNull)
+                        .toList()));
+    return result;
+  }
+
+  @Override
   public List<KolRefDTO> listAll() {
     return toDto(
         kols.selectList(

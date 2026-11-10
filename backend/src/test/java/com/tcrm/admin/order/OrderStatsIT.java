@@ -98,6 +98,8 @@ class OrderStatsIT {
           (7, 1, 8, 'SUCCESS', '2026-12-02T16:00:00Z')
         ) fixture(id, order_id, amount, status, finished)
         """);
+    jdbc.update("UPDATE crm_refund SET order_item_id = 1 WHERE order_id = 1");
+
     var configuration =
         new Configuration(new Environment("t144", new JdbcTransactionFactory(), source));
     configuration.setMapUnderscoreToCamelCase(true);
@@ -144,6 +146,30 @@ class OrderStatsIT {
       assertThat(shop.completedRefunds()).isEqualByComparingTo("20");
 
       var daily = session.getMapper(OrderDailyStatsMapper.class);
+      var productScope = new ScopeDTO(4, 9L, null, 11L, null, java.util.List.of(1L));
+      var products = daily.productFacts(productScope, "a", FROM, UNTIL, false);
+      assertThat(products).hasSize(2);
+      var product = products.stream().filter(row -> row.shopId() != null).findFirst().orElseThrow();
+      assertThat(product.spu()).isEqualTo("A");
+      assertThat(product.paidOrders()).isEqualTo(1);
+      assertThat(product.units()).isEqualTo(3);
+      assertThat(product.sales()).isEqualByComparingTo("100");
+      assertThat(product.cohortRefunds()).isEqualByComparingTo("32");
+      assertThat(product.cohortRefundedOrders()).isEqualTo(1);
+      assertThat(product.completedRefunds()).isZero();
+      assertThat(daily.productFacts(productScope, "not-matching", FROM, UNTIL, false))
+          .singleElement()
+          .satisfies(total -> assertThat(total.paidOrders()).isZero());
+      assertThat(daily.productFacts(productScope, null, FROM, UNTIL, true))
+          .singleElement()
+          .satisfies(row -> assertThat(row.day()).isEqualTo(LocalDate.of(2026, 11, 3)));
+      assertThat(mapper.sellingCreators(productScope, FROM, UNTIL)).isEqualTo(1);
+      assertThat(mapper.rankHighlights(productScope, RankDimension.KOL, FROM, UNTIL))
+          .singleElement()
+          .satisfies(top -> assertThat(top.name()).isEqualTo("A"));
+      assertThat(mapper.rankHighlights(productScope, RankDimension.INVITER, FROM, UNTIL))
+          .singleElement()
+          .satisfies(top -> assertThat(top.creatorId()).isEqualTo(11L));
       var dailyFacts = daily.rollup(4, FROM, UNTIL);
       assertThat(dailyFacts.stream().filter(row -> "ITEM".equals(row.grain())))
           .extracting(row -> row.skuCode())
