@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.tcrm.admin.integration.api.WeidianBusinessApi;
 import com.tcrm.admin.order.mapper.OrderSyncStateMapper;
 import com.tcrm.admin.order.model.OrderSyncStateDO;
+import com.tcrm.admin.shared.TestTransactions;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -133,6 +135,53 @@ class OrderSyncTest {
     assertThat(state.getRefundCursor()).isEqualTo(time);
     assertThat(state.getLastError()).isNull();
     assertThat(OrderSync.start(time, time.plusSeconds(1000))).isEqualTo(time.minusSeconds(600));
+  }
+
+  @Test
+  void shouldSaveTheOtherOrdersAndAdvanceCursors_whenOneOrderDetailFails() {
+    // Audit B-5: one bad order used to fail the shop, roll the cursors back and block every
+    // later order of the shop.
+    var api = mock(WeidianBusinessApi.class);
+    var states = mock(OrderSyncStateMapper.class);
+    var writer = mock(OrderWriter.class);
+    var state = new OrderSyncStateDO();
+    Instant now = Instant.parse("2026-10-16T00:00:00Z");
+    state.setOrderCursor(now.minusSeconds(3600));
+    when(states.selectOne(any())).thenReturn(state);
+    when(api.orderList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                2,
+                2,
+                List.of(
+                    new WeidianBusinessApi.OrderListItem("100", null, null, null, now, null),
+                    new WeidianBusinessApi.OrderListItem("101", null, null, null, now, null)),
+                false,
+                null,
+                null));
+    when(api.orderDetail(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenThrow(new IllegalStateException("bad payload"))
+        .thenReturn(
+            OrderNormalizerTest.detail(
+                "101", "pay", now, List.of(OrderNormalizerTest.line("90", null))));
+    when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+
+    assertThat(
+            new OrderSync(
+                    api,
+                    states,
+                    writer,
+                    new OrderNormalizer("test"),
+                    Clock.fixed(now, ZoneOffset.UTC))
+                .synchronize(1))
+        .isTrue();
+
+    var saved = ArgumentCaptor.forClass(OrderPayloadDTO.class);
+    verify(writer).save(saved.capture());
+    assertThat(saved.getValue().order().getWeidianOrderId()).isEqualTo("101");
+    assertThat(state.getOrderCursor()).isEqualTo(now);
+    assertThat(state.getLastError()).isNull();
   }
 
   @Test
@@ -371,7 +420,7 @@ class OrderSyncTest {
   }
 
   @Test
-  void shouldIdentifyOrderAndRetainCursors_whenIdentityOrNormalizationFails() {
+  void shouldSkipOrderAndAdvanceCursors_whenIdentityOrNormalizationFails() {
     for (boolean mismatch : List.of(true, false)) {
       var api = mock(WeidianBusinessApi.class);
       var states = mock(OrderSyncStateMapper.class);
@@ -392,18 +441,23 @@ class OrderSyncTest {
                   null));
       when(api.orderDetail(org.mockito.ArgumentMatchers.anyLong(), any()))
           .thenReturn(OrderNormalizerTest.detail(mismatch ? "101" : "100", "pay", now, List.of()));
+      when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+          .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+      var writer = mock(OrderWriter.class);
       assertThat(
               new OrderSync(
                       api,
                       states,
-                      mock(OrderWriter.class),
+                      writer,
                       new OrderNormalizer("test"),
                       Clock.fixed(now, ZoneOffset.UTC))
                   .synchronize(1))
-          .isFalse();
-      assertThat(state.getLastError()).contains("order 100");
-      assertThat(state.getOrderCursor()).isEqualTo(previous);
-      assertThat(state.getRefundCursor()).isEqualTo(previous);
+          .isTrue();
+      // task 145 (audit B-5): the bad order is skipped instead of failing the shop
+      verify(writer, org.mockito.Mockito.never()).save(any());
+      assertThat(state.getLastError()).isNull();
+      assertThat(state.getOrderCursor()).isEqualTo(now);
+      assertThat(state.getRefundCursor()).isEqualTo(now);
     }
   }
 
@@ -423,11 +477,25 @@ class OrderSyncTest {
                   false,
                   null,
                   null));
-      assertThat(
-              new OrderSync(api, states, mock(OrderWriter.class), new OrderNormalizer("test"))
-                  .synchronize(1))
-          .isFalse();
-      assertThat(state.getLastError())
+      when(api.refundList(org.mockito.ArgumentMatchers.anyLong(), any()))
+          .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+      var failuresWriter = mock(OrderSyncFailureWriter.class);
+      var sync =
+          new OrderSync(
+              api,
+              states,
+              mock(OrderWriter.class),
+              new OrderNormalizer("test"),
+              Clock.systemUTC(),
+              null,
+              null,
+              TestTransactions.template(),
+              failuresWriter,
+              null);
+      assertThat(sync.synchronize(1)).isTrue();
+      var error = org.mockito.ArgumentCaptor.forClass(String.class);
+      verify(failuresWriter).record(eq(1L), any(), error.capture(), any());
+      assertThat(error.getValue())
           .contains("for order unknown")
           .doesNotContain("untrusted-data", "not-an-order")
           .hasSizeLessThanOrEqualTo(500);
@@ -509,7 +577,8 @@ class OrderSyncTest {
               null,
               null,
               tx,
-              failuresWriter);
+              failuresWriter,
+              null);
       assertThat(sync.synchronize(1L)).isFalse();
       verify(failuresWriter)
           .record(
@@ -549,7 +618,8 @@ class OrderSyncTest {
             null,
             null,
             tx,
-            failuresWriter);
+            failuresWriter,
+            null);
 
     assertThat(sync.synchronize(1, "REFUND")).isTrue();
 
