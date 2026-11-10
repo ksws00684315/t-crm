@@ -107,7 +107,7 @@ class CopyJobWorkerTest {
   }
 
   @Test
-  void shouldFail_whenOtherKolExclusiveItem() {
+  void shouldFailNoSource_whenOtherKolExclusiveItemLacksOriginalProduct() {
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "90002");
     stubJob(job, row);
@@ -120,7 +120,62 @@ class CopyJobWorkerTest {
 
     verify(copies, never()).copy(anyLong(), any(), anyLong());
     verify(tokens, never()).consume(anyLong(), anyInt());
-    verifyFailedMessage(ProductLinkMessages.OTHER_KOL_EXCLUSIVE);
+    verifyFailedMessage(ProductLinkMessages.OTHER_KOL_EXCLUSIVE_NO_SOURCE);
+  }
+
+  @Test
+  void shouldCopyOtherKolExclusiveItem_asPhysicalSource_viaLinkedOriginal() {
+    // Task 144: only one shop remains and every item in it is some KOL's exclusive copy; such an
+    // item is copied as-is into a fresh ID for the target KOL, mapped to the linked original.
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "90002");
+    stubJob(job, row);
+    KolItemDO exclusive = new KolItemDO();
+    exclusive.setKolId(99L);
+    exclusive.setShopId(5L);
+    exclusive.setWeidianItemId("90002");
+    exclusive.setProductId(50L);
+    when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
+    when(products.selectById(50L)).thenReturn(product(50L, 6L, "10001"));
+    when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(null);
+    when(tokens.consume(20L, 1)).thenReturn(true);
+    when(copies.copy(5L, "90002", 5L)).thenReturn(new CopyResult("90155", null));
+    when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
+
+    worker.processJob(1L);
+
+    // Physical source is the exclusive item itself, not the original in the disabled shop 6.
+    verify(copies).copy(5L, "90002", 5L);
+    verify(tokens).consume(20L, 1);
+    ArgumentCaptor<KolItemDO> inserted = ArgumentCaptor.forClass(KolItemDO.class);
+    verify(kolItems).insert(inserted.capture());
+    assertThat(inserted.getValue().getKolId()).isEqualTo(10L);
+    assertThat(inserted.getValue().getProductId()).isEqualTo(50L);
+    assertThat(inserted.getValue().getShopId()).isEqualTo(5L);
+    assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90155");
+    assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
+  }
+
+  @Test
+  void shouldReuseKolExistingMapping_whenExclusiveLinksSameOriginal() {
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "90002");
+    stubJob(job, row);
+    KolItemDO exclusive = new KolItemDO();
+    exclusive.setKolId(99L);
+    exclusive.setShopId(5L);
+    exclusive.setWeidianItemId("90002");
+    exclusive.setProductId(50L);
+    when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
+    when(products.selectById(50L)).thenReturn(product(50L, 6L, "10001"));
+    KolItemDO existing = new KolItemDO();
+    existing.setWeidianItemId("90003");
+    when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(existing);
+
+    worker.processJob(1L);
+
+    verify(copies, never()).copy(anyLong(), any(), anyLong());
+    verify(tokens, never()).consume(anyLong(), anyInt());
   }
 
   @Test
