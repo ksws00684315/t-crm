@@ -23,6 +23,8 @@ import com.tcrm.admin.order.service.OrderSync;
 import com.tcrm.admin.order.service.OrderSyncCoordinator;
 import com.tcrm.admin.order.service.OrderWriter;
 import com.tcrm.admin.product.api.OrderMappingApi;
+import com.tcrm.admin.shared.BusinessException;
+import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TenantScope;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -407,6 +409,36 @@ class OrderIT {
         .containsExactlyInAnyOrder("2001", "2002");
     assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order_sync_retry", Integer.class))
         .isZero();
+  }
+
+  @Test
+  void shouldFailTheShopAndQueueNoRetries_whenOrderDetailsHitAShopWideFailure() {
+    // Task 145 review: a converted Weidian outage must not be treated as one bad order per
+    // detail: no retry rows, one failure record and both cursors kept.
+    var first = new WeidianBusinessApi.OrderListItem("2001", null, null, null, PAID, null);
+    var second = new WeidianBusinessApi.OrderListItem("2002", null, null, null, PAID, null);
+    when(remote.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                2, 2, List.of(first, second), false, null, null));
+    when(remote.orderDetail(anyLong(), any()))
+        .thenThrow(new BusinessException(ErrorCode.WEIDIAN_API_FAILED));
+
+    TenantScope.runCompany(1, () -> assertThat(sync.synchronize(10)).isFalse());
+
+    assertThat(jdbc.queryForObject("SELECT count(*) FROM crm_order_sync_retry", Integer.class))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM crm_order_sync_failure WHERE shop_id = 10", Integer.class))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT order_cursor IS NULL AND last_error = ? FROM crm_order_sync_state"
+                    + " WHERE shop_id = 10",
+                Boolean.class,
+                "Order synchronization failed for order 2001: WEIDIAN_API_FAILED"))
+        .isTrue();
   }
 
   @Test

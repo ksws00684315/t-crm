@@ -53,7 +53,8 @@ public class OrderSync {
           ErrorCode.WEIDIAN_APP_NOT_CONFIGURED,
           ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED,
           ErrorCode.WEIDIAN_CREDENTIAL_INVALID,
-          ErrorCode.WEIDIAN_RATE_LIMITED);
+          ErrorCode.WEIDIAN_RATE_LIMITED,
+          ErrorCode.WEIDIAN_API_FAILED);
   private static final DateTimeFormatter TIME =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Asia/Shanghai"));
   private final WeidianBusinessApi api;

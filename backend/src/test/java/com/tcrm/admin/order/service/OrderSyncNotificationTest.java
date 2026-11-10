@@ -3,6 +3,8 @@ package com.tcrm.admin.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -162,6 +164,50 @@ class OrderSyncNotificationTest {
     verify(harness.retries, never()).insert(any(OrderSyncRetryDO.class));
     assertThat(harness.state.getLastError())
         .isEqualTo("Order synchronization failed for order 100: WEIDIAN_SHOP_NOT_AUTHORIZED");
+  }
+
+  @Test
+  void shouldFailTheShopOnce_whenEveryOrderDetailHitsAShopWideFailure() {
+    // Task 145 review: a Weidian outage (transport, 5xx, expired authorization) must fail the
+    // shop once instead of skipping every order, writing one failure record and one notification
+    // per order. The integration layer converts those failures into business errors.
+    Harness harness = harness();
+    harness.state.setLastSuccessAt(EARLIER);
+    harness.state.setOrderCursor(EARLIER);
+    when(harness.api.orderList(anyLong(), any()))
+        .thenReturn(
+            new WeidianBusinessApi.OrderListResponse(
+                3,
+                3,
+                List.of(
+                    new WeidianBusinessApi.OrderListItem("100", null, null, null, NOW, null),
+                    new WeidianBusinessApi.OrderListItem("101", null, null, null, NOW, null),
+                    new WeidianBusinessApi.OrderListItem("102", null, null, null, NOW, null)),
+                false,
+                null,
+                null));
+    when(harness.api.refundList(anyLong(), any()))
+        .thenReturn(new WeidianBusinessApi.RefundListResponse(List.of(), 0, null));
+    when(harness.api.orderDetail(anyLong(), any()))
+        .thenThrow(
+            new com.tcrm.admin.shared.BusinessException(
+                com.tcrm.admin.shared.ErrorCode.WEIDIAN_API_FAILED));
+    when(harness.retries.selectList(any())).thenReturn(List.of());
+
+    TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isFalse());
+
+    verify(harness.failures, times(1))
+        .record(
+            eq(3L),
+            eq(OrderSyncFailureKind.ORDER_SYNC),
+            eq("Order synchronization failed: WEIDIAN_API_FAILED"),
+            isNull());
+    verify(harness.events, times(1)).publishEvent(new OrderSyncFailedEvent(7L, 3L, "Shop A"));
+    verify(harness.retries, never()).insert(any(OrderSyncRetryDO.class));
+    verify(harness.api, times(1)).orderDetail(anyLong(), any());
+    assertThat(harness.state.getOrderCursor()).isEqualTo(EARLIER);
+    assertThat(harness.state.getLastError())
+        .isEqualTo("Order synchronization failed for order 100: WEIDIAN_API_FAILED");
   }
 
   private static void stubOneFailingOrder(Harness harness) {
