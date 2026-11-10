@@ -255,6 +255,47 @@ class OrderQueryIT {
   }
 
   @Test
+  void shouldServeScopedDashboardAndCurrentPageExport() throws Exception {
+    save("t144-dashboard", PAID, line("90", "1"), line("91", "2"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM agg_stats_dirty_day WHERE tenant_id = 1 AND stat_date = '2026-10-16'",
+                Long.class))
+        .isEqualTo(1L);
+    var overview = get("/admin-api/stats/overview");
+    mvc.perform(overview).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/admin-api/stats/overview")
+                .param("startDate", "2026-10-16")
+                .param("endDate", "2026-10-16")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.summary.paidOrderCount").value("1"))
+        .andExpect(jsonPath("$.data.summary.units").value("2"));
+    mvc.perform(
+            get("/admin-api/stats/shop-performance")
+                .param("startDate", "2026-10-16")
+                .param("endDate", "2026-10-16")
+                .param("sortBy", "skuCount")
+                .param("sortDirection", "asc")
+                .header("X-Admin-Token", admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.sortBy").value("skuCount"))
+        .andExpect(jsonPath("$.data.ranking.items[0].shopId").value("10"));
+    byte[] workbook =
+        mvc.perform(
+                get("/admin-api/stats/shop-performance/exports")
+                    .param("startDate", "2026-10-16")
+                    .param("endDate", "2026-10-16")
+                    .header("X-Admin-Token", admin))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    assertThat(workbook).startsWith((byte) 0x50, (byte) 0x4b);
+  }
+
+  @Test
   void shouldFilterByOrderNumberAndChannel_whenListingOrders() throws Exception {
     long first = save("1000", PAID, line("90", "1"));
     save("1001", PAID, line("90", "1"));

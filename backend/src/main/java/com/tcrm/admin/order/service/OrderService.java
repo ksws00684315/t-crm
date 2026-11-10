@@ -6,6 +6,7 @@ import com.tcrm.admin.integration.api.WeidianAuthorizationApi;
 import com.tcrm.admin.kol.api.KolApi;
 import com.tcrm.admin.kol.api.KolRefDTO;
 import com.tcrm.admin.order.api.OrderChainCommissionApi;
+import com.tcrm.admin.order.api.OrderStatsDateChangedEvent;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSyncFailureMapper;
@@ -30,6 +31,7 @@ import com.tcrm.admin.shared.AuditSanitizer;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.PageResult;
+import com.tcrm.admin.shared.TransactionalEvents;
 import com.tcrm.admin.system.api.BdUserApi;
 import com.tcrm.admin.system.api.BdUserDTO;
 import com.tcrm.admin.system.api.ExternalAuditApi;
@@ -47,6 +49,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +77,7 @@ public class OrderService {
   private final AuditSanitizer sanitizer;
   private final OrderCommissionSync commissionSync;
   private final OrderChainCommissionApi commissionChain;
+  private final ApplicationEventPublisher events;
 
   public OrderService(
       OrderMapper orders,
@@ -93,7 +97,8 @@ public class OrderService {
       ExternalAuditApi audit,
       AuditSanitizer sanitizer,
       OrderCommissionSync commissionSync,
-      OrderChainCommissionApi commissionChain) {
+      OrderChainCommissionApi commissionChain,
+      ApplicationEventPublisher events) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
@@ -112,6 +117,7 @@ public class OrderService {
     this.sanitizer = sanitizer;
     this.commissionSync = commissionSync;
     this.commissionChain = commissionChain;
+    this.events = events;
   }
 
   public PageResult<OrderDTO> page(OrderFilterDTO filter, boolean unmatched) {
@@ -1013,6 +1019,8 @@ public class OrderService {
     orders.updateById(order);
     lines.forEach(items::updateById);
     commissionSync.sync(order, lines);
+    TransactionalEvents.publish(
+        events, new OrderStatsDateChangedEvent(current.user().tenantId(), order.getId(), null));
   }
 
   private Map<Long, KolRefDTO> kolById(java.util.Collection<Long> kolIds) {
