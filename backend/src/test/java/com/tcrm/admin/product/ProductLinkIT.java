@@ -313,6 +313,129 @@ class ProductLinkIT {
   }
 
   @Test
+  void shouldCopyFromOtherKolExclusiveItem_viaLinkedOriginal() throws Exception {
+    // Task 144 replica of production job c8VyJKKgUynknUfo10iEiQ: the only live shop already
+    // holds another KOL's exclusive copies, so the sheet submits those item ids as sources.
+    long shopA = createShop("1000", "Old source shop");
+    long shopB = createShop("1001", "Only live shop");
+    mvc.perform(put("/admin-api/product/shops/" + shopB + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(shopB);
+    long productId = 17_002L;
+    jdbc.update(
+        """
+        INSERT INTO crm_product(
+          id, product_code, shop_id, weidian_item_id, name, price, price_currency, status,
+          tenant_id, create_time, update_time, is_deleted)
+        VALUES (?, 'P17B002', ?, '10001', 'Source item', 9.90, 'CNY', 1, 1, now(), now(), FALSE)
+        """,
+        productId,
+        shopA);
+    long tiaozi = createKol("tiaozi", "tiaozi144@example.com");
+    long gabriel = createKol("Gabriel", "gabriel144@example.com");
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item(
+          id, kol_id, product_id, shop_id, weidian_item_id, source, valid_from,
+          create_time, update_time, tenant_id, link_code)
+        VALUES (18001, ?, ?, ?, '90002', 'COPY', now(), now(), now(), 1, 'KPL-A14400000001')
+        """,
+        tiaozi,
+        productId,
+        shopB);
+    // A promo-sheet mapping without an original product must still fail with the new reason.
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item(
+          id, kol_id, product_id, shop_id, weidian_item_id, source, valid_from,
+          create_time, update_time, tenant_id, link_code)
+        VALUES (18002, ?, NULL, ?, '90003', 'SHEET_UPLOAD', now(), now(), now(), 1, 'KPL-A14400000002')
+        """,
+        tiaozi,
+        shopB);
+    String token = createTokenForShop(gabriel, 10, shopB);
+
+    MvcResult converted =
+        mvc.perform(
+                post(BASE + "/convert")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"token":"%s","callerPlatform":"google_sheet_plugin",
+                         "items":[
+                           {"sourceChannelCode":"WEIDIAN","sourceProductId":"90002"},
+                           {"sourceChannelCode":"WEIDIAN","sourceProductId":"90003"}]}
+                        """
+                            .formatted(token)))
+            .andExpect(status().isOk())
+            .andReturn();
+    String jobCode =
+        json.readTree(converted.getResponse().getContentAsString())
+            .path("data")
+            .path("jobCode")
+            .asString();
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            jdbc.queryForObject(
+                    "SELECT status FROM crm_copy_job WHERE job_code = ?", String.class, jobCode)
+                .equals("partial_failed"),
+        "copy job should finish with one success and one failure");
+
+    // The exclusive item itself is the physical source, inside the only live shop.
+    org.mockito.Mockito.verify(copies).copy(shopB, "90002", shopB);
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT item.error_message
+                FROM crm_copy_job_item item
+                JOIN crm_copy_job job ON job.id = item.job_id
+                WHERE job.job_code = ? AND item.source_product_id = '90002'
+                """,
+                String.class,
+                jobCode))
+        .isNull();
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT item.error_message
+                FROM crm_copy_job_item item
+                JOIN crm_copy_job job ON job.id = item.job_id
+                WHERE job.job_code = ? AND item.source_product_id = '90003'
+                """,
+                String.class,
+                jobCode))
+        .isEqualTo("该商品是其他达人的专属商品，且缺少原商品对应关系，无法复制");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT item.source_shop_id FROM crm_copy_job_item item"
+                    + " JOIN crm_copy_job job ON job.id = item.job_id"
+                    + " WHERE job.job_code = ? AND item.source_product_id = '90002'",
+                Long.class,
+                jobCode))
+        .isEqualTo(shopB);
+    // New mapping goes to Gabriel on the original product; tiaozi keeps theirs untouched.
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND product_id = ?"
+                    + " AND weidian_item_id = '90001' AND shop_id = ? AND valid_to IS NULL",
+                Integer.class,
+                gabriel,
+                productId,
+                shopB))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_item WHERE kol_id = ? AND valid_to IS NULL",
+                Integer.class,
+                tiaozi))
+        .isEqualTo(2);
+    Integer used =
+        jdbc.queryForObject("SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, gabriel);
+    assertThat(used).isEqualTo(1);
+  }
+
+  @Test
   void shouldRejectInvalidToken_andMissingTarget_withChineseMsg() throws Exception {
     mvc.perform(
             post(BASE + "/convert")
