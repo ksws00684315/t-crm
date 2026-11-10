@@ -55,6 +55,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** End-to-end Weidian authorization and token lifecycle checks against PostgreSQL and Redis. */
@@ -636,8 +637,18 @@ class WeidianIntegrationIT {
     String body;
     if ("/api".equals(path)) {
       String form = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-      String method =
-          new ObjectMapper().readTree(query("?" + form).get("public")).path("method").asText();
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode publicValues = mapper.readTree(query("?" + form).get("public"));
+      String method = publicValues.path("method").asText();
+      // 真实微店对 vdian.item.list.get 的大 page_size 返回 108（案例 144），假网关同样拒绝。
+      JsonNode params = mapper.readTree(query("?" + form).getOrDefault("param", "{}"));
+      if ("vdian.item.list.get".equals(method) && params.path("page_size").asInt(0) > 50) {
+        body =
+            "{\"status\":{\"status_code\":108,"
+                + "\"status_reason\":\"param is error, page_size param illegal!\"}}";
+        writeResponse(exchange, body);
+        return;
+      }
       body =
           API_RESPONSES.getOrDefault(
               method,

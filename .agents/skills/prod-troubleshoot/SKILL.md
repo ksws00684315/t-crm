@@ -160,6 +160,7 @@ ops-check 告警类型与阈值见 `deploy/README.md`「主机检查脚本」，
 | 132 | 续跑后明细失败，「来源商品信息不完整」，日志里只有 `item.get`、没有 `item.add` | 多规格商品各规格价格不同，取不到单个商品价格 | 取不到时用各 SKU 最低价，v0.1.8。已是 `failed` 的任务不会重跑，要在表格里重新提交 |
 | 133 | 管理端、达人端商品图片都不显示，`image_url` 有值 | 两个前端的 CSP 是 `img-src 'self' data:`，拦截所有外部图片 | 改为 `img-src 'self' data: https:`，v0.1.9。Nginx 配置要在发版后手动 `nginx -t` 和 `nginx -s reload` 才生效 |
 | 137 | 接入第二个店铺后，复制任务全部报「多个店铺都有该商品」 | 源商品未登记时逐店探测 `item.get`，而微店不校验商品归属，两店都命中 | 比对 `seller_id` 与店铺微店 ID，确认的店铺优先，无确认时与原逻辑相同。已失败的任务要重新提交 |
+| 144 | 店铺「刷新容量」报 ERROR（traceId b6eb3b50…，2026-11-10 02:11 UTC）：`vdian.item.list.get` statusCode=108 `page_size param illegal!` | `countOnSaleItems` 固定传 `page_size=100`，微店拒绝大分页（确切上限未知，1/5 实测可行） | 改为每页 10 条，`total_num` 有值时直接返回；v0.1.15 待发布 |
 
 新案例处理完后，把一行补进本表（与修复 PR 一起提交）。
 
