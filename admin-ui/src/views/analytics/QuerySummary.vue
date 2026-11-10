@@ -35,7 +35,9 @@ function label(id: string | undefined, options?: Option[]): string {
       <span v-if="result.keyword">{{ t("analytics.keyword") }} {{ result.keyword }}</span>
     </div>
     <div class="query-summary__meta">
-      <span>{{ t(`analytics.scope.${result.meta.dataScope}`) }}</span>
+      <el-tag effect="light" type="primary">{{
+        t(`analytics.scope.${result.meta.dataScope}`)
+      }}</el-tag>
       <span class="query-summary__updated" :class="{ 'has-update': result.meta.updatedAt }">{{
         t("analytics.updated", {
           time: result.meta.updatedAt ? formatInstant(result.meta.updatedAt) : "—"
@@ -51,12 +53,11 @@ function label(id: string | undefined, options?: Option[]): string {
   flex-wrap: wrap;
   gap: var(--tcrm-space-2) var(--tcrm-space-4);
   align-items: center;
-  border: 1px solid var(--el-border-color-lighter);
-  border-inline-start: 3px solid var(--tcrm-color-chain-finance);
-  border-radius: 12px;
-  padding: var(--tcrm-space-3) var(--tcrm-space-4);
-  background: var(--el-bg-color);
-  color: var(--el-text-color-secondary);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  padding: var(--tcrm-space-3) var(--analytics-card-padding, var(--tcrm-space-4));
+  background: var(--tcrm-color-card);
+  color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
   overflow-wrap: anywhere;
@@ -82,12 +83,6 @@ function label(id: string | undefined, options?: Option[]): string {
 }
 .query-summary__details strong {
   color: var(--tcrm-color-text);
-}
-.query-summary__meta > :first-child {
-  color: var(--tcrm-color-primary-active);
-  background: var(--tcrm-color-order-band);
-  border-radius: var(--tcrm-radius-control);
-  padding-inline: var(--tcrm-space-2);
 }
 .query-summary__updated.has-update::before {
   display: inline-block;

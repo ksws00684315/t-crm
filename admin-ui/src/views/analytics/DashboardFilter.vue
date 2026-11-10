@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import { ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import ListSearch from "@/components/ListSearch.vue";
+import NameCode from "@/components/NameCode.vue";
 import { formatNameWithCode } from "@/utils/format";
 import type { Board, Filters, Options } from "@/api/analytics";
 import { adjacentPeriod, dates, monthRange, periodModes, periodRange } from "./board";
@@ -157,7 +158,10 @@ function reset(): void {
               :key="option.id"
               :value="option.id"
               :label="formatNameWithCode(option.name, option.code)"
-            />
+            >
+              <NameCode v-if="option.code" :name="option.name" :code="option.code" />
+              <span v-else>{{ option.name }}</span>
+            </el-option>
           </el-select>
         </div>
         <div class="analytics-filter__field">
@@ -188,7 +192,10 @@ function reset(): void {
               :key="option.id"
               :value="option.id"
               :label="formatNameWithCode(option.name, option.code)"
-            />
+            >
+              <NameCode v-if="option.code" :name="option.name" :code="option.code" />
+              <span v-else>{{ option.name }}</span>
+            </el-option>
           </el-select>
         </div>
         <div v-if="board === 'kol-ranking'" class="analytics-filter__field">
@@ -245,10 +252,12 @@ function reset(): void {
   padding-inline: var(--tcrm-space-3);
 }
 .analytics-filter__period :deep(.period-selected) {
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary-light-5);
-  z-index: 1;
+  color: var(--tcrm-color-primary-text);
+  background: var(--tcrm-color-option-selected-bg);
+  border-color: var(--tcrm-color-input-border);
+}
+.analytics-filter__period :deep(.period-selected:hover) {
+  background: var(--tcrm-color-option-selected-hover-bg);
 }
 .analytics-filter__period :deep(.el-date-editor) {
   max-width: 100%;
@@ -275,9 +284,9 @@ function reset(): void {
 }
 .analytics-filter__field > span,
 .analytics-filter__label {
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-help);
-  line-height: var(--tcrm-line-height-help);
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
 }
 .analytics-filter__field :deep(.el-select),
 .analytics-filter__field :deep(.el-input) {

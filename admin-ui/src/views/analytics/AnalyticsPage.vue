@@ -161,7 +161,7 @@ const cards = computed(() => {
   const selling = shop ? summary?.sellingShopCount : summary?.sellingCount;
   const total = shop ? summary?.shopCount : summary?.activeCount;
   const first = {
-    tone: "violet" as const,
+    tone: "neutral" as const,
     icon: DataBoard,
     label: t(`analytics.${board}.selling`),
     value: display("", selling),
@@ -196,7 +196,8 @@ const cards = computed(() => {
         tone: "amber" as const,
         icon: Wallet,
         label: label(shop ? "settlement" : "netCommission"),
-        value: t("analytics.pending")
+        value: t("analytics.pending"),
+        unavailable: true
       };
   return product ? [first, orders, last, net] : [first, orders, net, last];
 });
@@ -371,8 +372,8 @@ onUnmounted(stop);
         <div class="ledger-comparison__panel ledger-comparison__settlement">
           <h3>{{ t("analytics.settlementLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <strong>{{ t("analytics.pending") }}</strong>
             <span>{{ label("settlement") }}</span>
+            <el-tag type="info" effect="light">{{ t("analytics.pending") }}</el-tag>
           </div>
         </div>
         <div class="ledger-comparison__panel ledger-comparison__note">
@@ -408,7 +409,7 @@ onUnmounted(stop);
           :key="entry.key"
           :label="label(entry.key)"
           :icon="[Tickets, DataBoard, TrendCharts][index]"
-          :tone="(['violet', 'blue', 'green'] as const)[index]"
+          :tone="(['neutral', 'blue', 'green'] as const)[index]"
           :value="display('', entry.value)"
           :detail="
             index > 0
@@ -517,15 +518,15 @@ onUnmounted(stop);
       </template>
       <template #cell-channelStatus="{ row }">
         <div class="analytics-badges">
-          <el-tag size="small" type="primary">{{ t("analytics.weidian") }}</el-tag>
+          <el-tag size="small" type="info">{{ t("analytics.weidian") }}</el-tag>
           <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">
-            {{ t(row.status === 1 ? "analytics.enabled" : "analytics.disabled") }}
+            {{ t(row.status === 1 ? "common.enabled" : "common.disabled") }}
           </el-tag>
         </div>
       </template>
       <template #cell-channelCode="{ row }">
         <div>
-          <el-tag size="small" type="primary">{{ t("analytics.weidian") }}</el-tag>
+          <el-tag size="small" type="info">{{ t("analytics.weidian") }}</el-tag>
         </div>
         <CopyText :value="row.code" />
       </template>
@@ -556,8 +557,10 @@ onUnmounted(stop);
             class="analytics-number"
             :class="{
               'analytics-number--net': key === 'netSalesAmount',
-              'analytics-number--refund':
-                key === 'completedRefundAmount' && Number(valueOf(row, key)) > 0
+              'analytics-number--loss':
+                (key === 'completedRefundAmount' && Number(valueOf(row, key)) > 0) ||
+                (key === 'netSalesAmount' && Number(valueOf(row, key)) < 0),
+              'analytics-number--unavailable': pendingColumns.has(key)
             }"
             >{{
               pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key))
@@ -597,6 +600,7 @@ onUnmounted(stop);
 
 <style scoped>
 .analytics-page {
+  --analytics-card-padding: var(--tcrm-space-4);
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -621,9 +625,9 @@ onUnmounted(stop);
   gap: var(--tcrm-space-3);
 }
 .analytics-topic h2 {
-  color: var(--el-text-color-secondary);
-  font-size: var(--tcrm-font-size-table);
-  line-height: var(--tcrm-line-height-table);
+  color: var(--tcrm-color-text);
+  font-size: var(--tcrm-font-size-section);
+  line-height: var(--tcrm-line-height-section);
   font-weight: 600;
   margin: 0;
 }
@@ -646,7 +650,7 @@ onUnmounted(stop);
 }
 .ledger-comparison__panel {
   min-width: 0;
-  padding: var(--tcrm-space-3) var(--tcrm-space-4);
+  padding: var(--tcrm-space-3) var(--analytics-card-padding);
 }
 .ledger-comparison__bridge,
 .ledger-comparison__settlement,
@@ -666,24 +670,24 @@ onUnmounted(stop);
   gap: var(--tcrm-space-1);
   padding: var(--tcrm-space-2);
   color: var(--tcrm-color-primary-active);
-  background: color-mix(in srgb, var(--tcrm-color-chain-finance) 8%, var(--tcrm-color-card));
+  background: var(--tcrm-color-muted);
 }
 .ledger-comparison__bridge span {
   max-width: 10ch;
   text-align: center;
 }
 .ledger-comparison__transaction {
-  background: linear-gradient(110deg, var(--tcrm-color-order-band), var(--tcrm-color-card));
-  color: var(--tcrm-color-primary-active);
+  background: var(--tcrm-color-option-selected-bg);
+  color: var(--tcrm-color-primary-text);
 }
 .ledger-comparison__settlement {
-  background: linear-gradient(110deg, var(--tcrm-color-success-bg), var(--tcrm-color-card));
+  background: var(--tcrm-color-success-bg);
   color: var(--tcrm-color-success);
 }
 .ledger-comparison__note {
   display: grid;
   align-content: center;
-  background: color-mix(in srgb, var(--tcrm-color-warning-bg) 58%, var(--tcrm-color-card));
+  background: var(--tcrm-color-warning-bg);
   color: var(--tcrm-color-warning);
 }
 .ledger-comparison__note p,
@@ -696,8 +700,8 @@ onUnmounted(stop);
 .ledger-comparison__hero {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--tcrm-space-2);
+  align-items: center;
+  gap: var(--tcrm-space-1) var(--tcrm-space-2);
 }
 .ledger-comparison__values > div {
   display: grid;
@@ -724,21 +728,18 @@ onUnmounted(stop);
 .ledger-comparison strong {
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
-}
-.ledger-comparison__refund strong,
-.analytics-number--refund {
-  color: var(--tcrm-color-danger);
-}
-.analytics-number--net {
-  color: var(--tcrm-color-primary-active);
   font-weight: 600;
 }
-.analytics-ranking {
-  --tcrm-color-table-header: color-mix(
-    in srgb,
-    var(--tcrm-color-primary) 5%,
-    var(--tcrm-color-card)
-  );
+.analytics-number--net {
+  color: var(--tcrm-color-table-text);
+  font-weight: 600;
+}
+.ledger-comparison__refund strong,
+.analytics-number--loss {
+  color: var(--tcrm-color-danger);
+}
+.analytics-number--unavailable {
+  color: var(--tcrm-color-table-secondary);
 }
 .analytics-ranking.is-page-scroll {
   max-height: none;
@@ -748,7 +749,7 @@ onUnmounted(stop);
 }
 .analytics-ranking :deep(.el-table__header th.data-table__highlighted),
 .analytics-ranking :deep(.el-table__body td.data-table__highlighted) {
-  background: var(--tcrm-color-order-band);
+  background: var(--tcrm-color-option-selected-bg);
 }
 .analytics-ranking :deep(.data-table__toolbar) {
   justify-content: flex-start;
@@ -762,6 +763,7 @@ onUnmounted(stop);
   line-height: var(--tcrm-line-height-section);
 }
 .analytics-ranking.density-default :deep(.el-table td.el-table__cell) {
+  height: calc(var(--tcrm-line-height-table) + 2 * var(--tcrm-space-4));
   padding-block: var(--tcrm-space-2);
 }
 .analytics-badges {
@@ -799,8 +801,8 @@ onUnmounted(stop);
 .analytics-identity__avatar {
   display: grid;
   place-items: center;
-  background: var(--tcrm-color-primary);
-  color: var(--tcrm-color-on-primary);
+  background: var(--tcrm-color-option-selected-bg);
+  color: var(--tcrm-color-primary-text);
   font-weight: 600;
 }
 .analytics-identity__avatar.is-product {
@@ -822,16 +824,8 @@ onUnmounted(stop);
   font-weight: 600;
 }
 .analytics-rank-badge[data-rank="1"] {
-  background: var(--tcrm-color-warning-bg);
-  color: var(--tcrm-color-warning);
-}
-.analytics-rank-badge[data-rank="2"] {
-  background: var(--tcrm-color-order-band);
-  color: var(--tcrm-color-primary-active);
-}
-.analytics-rank-badge[data-rank="3"] {
-  background: var(--tcrm-color-danger-bg);
-  color: var(--tcrm-color-danger);
+  background: var(--tcrm-color-option-selected-bg);
+  color: var(--tcrm-color-primary-text);
 }
 .analytics-cell {
   display: flex;
@@ -859,14 +853,27 @@ onUnmounted(stop);
   color: inherit;
   font: inherit;
   padding: 0;
-  min-height: 32px;
+  min-height: var(--tcrm-control-height);
 }
 .sort-controls button.selected {
   color: var(--el-color-primary);
 }
 .sort-controls button:focus-visible {
-  outline: 2px solid var(--el-color-primary);
-  outline-offset: 2px;
+  outline: var(--tcrm-focus-width) solid var(--tcrm-color-primary);
+  outline-offset: var(--tcrm-focus-width);
+}
+@media (min-width: 1440px) and (min-height: 900px) {
+  .analytics-page {
+    --analytics-card-padding: var(--tcrm-space-5);
+  }
+}
+@media (max-width: 767px) {
+  .analytics-page {
+    --analytics-card-padding: var(--tcrm-space-3);
+  }
+  .sort-controls button {
+    min-height: var(--tcrm-control-height-mobile);
+  }
 }
 @media (max-width: 1100px) {
   .analytics-cards {
@@ -886,9 +893,6 @@ onUnmounted(stop);
   .ledger-comparison__note {
     border-inline-start: 0;
     border-top: 1px solid var(--tcrm-color-border);
-  }
-  .sort-controls button {
-    min-height: 44px;
   }
 }
 </style>
