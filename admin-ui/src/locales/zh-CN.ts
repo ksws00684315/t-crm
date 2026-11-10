@@ -49,7 +49,8 @@ const zhCN = {
     transactionTitle: "交易与结算对照",
     transactionLedger: "交易账 · 订单商品事实",
     settlementLedger: "结算账 · 店铺资金流水",
-    ledgerBridge: "口径对照",
+    ledgerBridge: "对账，不混算",
+    ledgerTransactionDetail: "{sales} 销售额 − {refunds} 同批订单成功退款",
     ledgerDifference: "为什么会不同？",
     ledgerDifferenceHint:
       "交易账按订单付款和退款统计。结算账按平台资金入账统计，两者的时间口径与费用项目不同，金额可能不一致。",

@@ -47,7 +47,8 @@ const enUS: MessageSchema = {
     transactionTitle: "Transaction and settlement comparison",
     transactionLedger: "Transaction ledger · Order activity",
     settlementLedger: "Settlement ledger · Shop cash flow",
-    ledgerBridge: "Compare bases",
+    ledgerBridge: "Compare ledgers",
+    ledgerTransactionDetail: "{sales} sales − {refunds} successful refunds on those orders",
     ledgerDifference: "Why can the amounts differ?",
     ledgerDifferenceHint:
       "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",

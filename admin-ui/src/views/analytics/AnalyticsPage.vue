@@ -344,26 +344,25 @@ onUnmounted(stop);
       <MetricCard v-for="card in cards" :key="card.label" v-bind="card" />
     </div>
 
-    <section v-if="shop" class="analytics-topic">
-      <h2>{{ t("analytics.transactionTitle") }}</h2>
+    <section v-if="shop" :aria-label="t('analytics.transactionTitle')">
       <div class="ledger-comparison">
         <div class="ledger-comparison__panel ledger-comparison__transaction">
           <h3>{{ t("analytics.transactionLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <strong>{{ display("netSalesAmount", metrics?.netSalesAmount) }}</strong>
-            <span>{{ label("netSalesAmount") }}</span>
+            <strong
+              :aria-label="`${label('netSalesAmount')} ${display('netSalesAmount', metrics?.netSalesAmount)}`"
+            >
+              {{ display("netSalesAmount", metrics?.netSalesAmount) }}
+            </strong>
           </div>
-          <div class="ledger-comparison__values">
-            <div>
-              <span>{{ label("salesAmount") }}</span
-              ><strong>{{ display("salesAmount", metrics?.salesAmount) }}</strong>
-            </div>
-            <span class="ledger-comparison__operator" aria-hidden="true">−</span>
-            <div class="ledger-comparison__refund">
-              <span>{{ label("cohortRefundAmount") }}</span
-              ><strong>{{ display("cohortRefundAmount", metrics?.cohortRefundAmount) }}</strong>
-            </div>
-          </div>
+          <p class="ledger-comparison__detail">
+            {{
+              t("analytics.ledgerTransactionDetail", {
+                sales: display("salesAmount", metrics?.salesAmount),
+                refunds: display("cohortRefundAmount", metrics?.cohortRefundAmount)
+              })
+            }}
+          </p>
         </div>
         <div class="ledger-comparison__bridge">
           <el-icon aria-hidden="true"><ArrowRight /></el-icon>
@@ -372,9 +371,9 @@ onUnmounted(stop);
         <div class="ledger-comparison__panel ledger-comparison__settlement">
           <h3>{{ t("analytics.settlementLedger") }}</h3>
           <div class="ledger-comparison__hero">
-            <span>{{ label("settlement") }}</span>
             <el-tag type="info" effect="light">{{ t("analytics.pending") }}</el-tag>
           </div>
+          <p class="ledger-comparison__detail">{{ label("settlement") }}</p>
         </div>
         <div class="ledger-comparison__panel ledger-comparison__note">
           <h3>{{ t("analytics.ledgerDifference") }}</h3>
@@ -643,55 +642,56 @@ onUnmounted(stop);
 }
 .ledger-comparison {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) auto minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1.4fr) minmax(0, 1fr);
   border: 1px solid var(--tcrm-color-border);
   border-radius: var(--tcrm-radius-card);
   overflow: hidden;
 }
 .ledger-comparison__panel {
   min-width: 0;
-  padding: var(--tcrm-space-3) var(--analytics-card-padding);
+  padding: var(--tcrm-space-4) var(--analytics-card-padding);
 }
-.ledger-comparison__bridge,
-.ledger-comparison__settlement,
 .ledger-comparison__note {
-  border-inline-start: 1px solid var(--tcrm-color-border);
+  border-inline-start: 1px dashed var(--tcrm-color-border);
 }
 .ledger-comparison__panel h3 {
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
   font-weight: 600;
-  margin: 0 0 var(--tcrm-space-1);
+  color: var(--tcrm-color-text-secondary);
+  margin: 0;
 }
 .ledger-comparison__bridge {
   display: grid;
   place-content: center;
   justify-items: center;
   gap: var(--tcrm-space-1);
-  padding: var(--tcrm-space-2);
-  color: var(--tcrm-color-primary-active);
-  background: var(--tcrm-color-muted);
+  padding: var(--tcrm-space-2) var(--tcrm-space-3);
+  color: var(--tcrm-color-primary-text);
+  background: color-mix(in srgb, var(--tcrm-color-chain-finance) 5%, var(--tcrm-color-card));
 }
 .ledger-comparison__bridge span {
-  max-width: 10ch;
+  max-width: 12ch;
   text-align: center;
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
 }
 .ledger-comparison__transaction {
-  background: var(--tcrm-color-option-selected-bg);
+  background: linear-gradient(110deg, var(--tcrm-color-option-selected-bg), var(--tcrm-color-card));
   color: var(--tcrm-color-primary-text);
 }
 .ledger-comparison__settlement {
-  background: var(--tcrm-color-success-bg);
+  background: linear-gradient(110deg, var(--tcrm-color-success-bg), var(--tcrm-color-card));
   color: var(--tcrm-color-success);
 }
 .ledger-comparison__note {
   display: grid;
   align-content: center;
-  background: var(--tcrm-color-warning-bg);
-  color: var(--tcrm-color-warning);
+  gap: var(--tcrm-space-1);
+  background: color-mix(in srgb, var(--tcrm-color-warning-bg) 42%, var(--tcrm-color-card));
 }
 .ledger-comparison__note p,
-.ledger-comparison span {
+.ledger-comparison__detail {
   color: var(--tcrm-color-text-secondary);
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
@@ -699,42 +699,25 @@ onUnmounted(stop);
 }
 .ledger-comparison__hero {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--tcrm-space-1) var(--tcrm-space-2);
-}
-.ledger-comparison__values > div {
-  display: grid;
+  min-height: var(--tcrm-line-height-amount-primary);
+  margin-block: var(--tcrm-space-1);
 }
 .ledger-comparison__hero strong {
-  font-size: var(--tcrm-font-size-dashboard-metric);
-  line-height: var(--tcrm-line-height-dashboard-metric);
-}
-.ledger-comparison__values {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: var(--tcrm-space-1) var(--tcrm-space-3);
-  margin-top: var(--tcrm-space-1);
-}
-.ledger-comparison__operator {
-  align-self: flex-end;
-  padding-block-end: var(--tcrm-space-1);
-}
-.ledger-comparison__values strong {
-  font-size: var(--tcrm-font-size-dashboard-comparison);
-  line-height: var(--tcrm-line-height-dashboard-comparison);
-}
-.ledger-comparison strong {
+  font-size: var(--tcrm-font-size-amount-primary);
+  line-height: var(--tcrm-line-height-amount-primary);
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+.ledger-comparison__detail {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .analytics-number--net {
   color: var(--tcrm-color-table-text);
   font-weight: 600;
 }
-.ledger-comparison__refund strong,
 .analytics-number--loss {
   color: var(--tcrm-color-danger);
 }
