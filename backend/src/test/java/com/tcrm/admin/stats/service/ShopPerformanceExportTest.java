@@ -84,8 +84,17 @@ class ShopPerformanceExportTest {
           var data = sheet.getRow(sheet.getLastRowNum());
           assertThat(data.getCell(1).getStringCellValue()).isEqualTo("'=item");
           assertThat(data.getCell(8).getStringCellValue()).isEmpty();
-          assertThat(data.getCell(data.getLastCellNum() - 1).getStringCellValue())
-              .isEqualTo(board == AnalyticsRankingService.Board.PRODUCT ? "2026-11-03 0" : "Top");
+          if (board == AnalyticsRankingService.Board.PRODUCT) {
+            var header = sheet.getRow(data.getRowNum() - 1);
+            assertThat(header.getLastCellNum()).isEqualTo((short) 11);
+            assertThat(header.getCell(9).getStringCellValue()).isEqualTo("Rank");
+            assertThat(header.getCell(10).getStringCellValue()).isEqualTo("Shop");
+            assertThat(data.getLastCellNum()).isEqualTo(header.getLastCellNum());
+            assertThat(data.getCell(9).getStringCellValue()).isEqualTo("1");
+            assertThat(data.getCell(10).getStringCellValue()).isEqualTo("Shop");
+          } else {
+            assertThat(data.getCell(data.getLastCellNum() - 1).getStringCellValue()).isEqualTo("Top");
+          }
         }
       }
     } finally {

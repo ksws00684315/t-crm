@@ -134,14 +134,7 @@ public class ShopPerformanceExport {
                 label("orderRefundRate")));
     headers.addAll(
         switch (board) {
-          case PRODUCT ->
-              List.of(
-                  label("rank"),
-                  label("rankChange"),
-                  label("shop"),
-                  label("category"),
-                  label("creators"),
-                  label("trend"));
+          case PRODUCT -> List.of(label("rank"), label("shop"));
           case CREATOR ->
               List.of(
                   label("inviter"),
@@ -180,16 +173,7 @@ public class ShopPerformanceExport {
                               money(m.periodRefundedOrderRate())));
                   values.addAll(
                       switch (board) {
-                        case PRODUCT ->
-                            List.of(
-                                text(row.rank()),
-                                text(row.rankChange()),
-                                text(row.related()),
-                                text(row.category()),
-                                text(row.kolCount()),
-                                row.trend().stream()
-                                    .map(p -> p.day() + " " + money(p.netSalesAmount()))
-                                    .collect(java.util.stream.Collectors.joining(" / ")));
+                        case PRODUCT -> List.of(text(row.rank()), text(row.related()));
                         case CREATOR ->
                             List.of(
                                 text(row.related()),

@@ -124,7 +124,6 @@ function label(key: string): string {
   ) {
     return t(`analytics.${board}.${key}`);
   }
-  if (key === "kolCount" && (product || shop)) return t("analytics.productCreatorCount");
   if (key === "netSalesAmount" && product) return t("analytics.best-sellers.net");
   return t(`analytics.${key}`);
 }
@@ -133,7 +132,7 @@ function display(key: string, value: Scalar | null | undefined): string {
   if (value == null) return "—";
   if (money.has(key)) return formatAmountWithCurrency(String(value));
   if (rates.has(key)) return percent(value);
-  if (key === "rankChange" && Number(value) > 0) return `+${value}`;
+
   return new Intl.NumberFormat(locale.value).format(BigInt(String(value)));
 }
 
@@ -572,23 +571,7 @@ onUnmounted(stop);
           >
         </div>
       </template>
-      <template #cell-category="{ row }">{{ row.category || "—" }}</template>
-      <template #cell-trend="{ row }">
-        <el-tooltip v-if="row.trend?.length" :trigger="['hover', 'focus']" placement="top">
-          <template #content>
-            <div v-for="point in row.trend" :key="point.day">
-              {{ point.day }} · {{ display("netSalesAmount", point.netSalesAmount) }}
-            </div>
-          </template>
-          <span tabindex="0" class="analytics-number"
-            >{{ display("netSalesAmount", row.trend[0]?.netSalesAmount) }}
-            <template v-if="row.trend.length > 1">
-              → {{ display("netSalesAmount", row.trend.at(-1)?.netSalesAmount) }}</template
-            >
-          </span>
-        </el-tooltip>
-        <span v-else>—</span>
-      </template>
+
       <template #cell-topProducts="{ row }">{{ row.highlights?.join(" · ") || "—" }}</template>
       <template #cell-bestCreator="{ row }">{{ row.highlights?.[0] || "—" }}</template>
       <template #actions><RowActions :actions="detailActions" /></template>

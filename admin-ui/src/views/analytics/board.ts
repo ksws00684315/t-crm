@@ -26,7 +26,6 @@ export const columnsByBoard: Record<Board, string[]> = {
     "identity",
     "channelCode",
     "shop",
-    "category",
     "paidOrderCount",
     "units",
     "refundUnits",
@@ -35,10 +34,7 @@ export const columnsByBoard: Record<Board, string[]> = {
     "completedRefundAmount",
     "netSalesAmount",
     "refundedOrderCount",
-    "periodRefundedOrderRate",
-    "kolCount",
-    "rankChange",
-    "trend"
+    "periodRefundedOrderRate"
   ],
   "kol-ranking": [
     "identity",
@@ -66,7 +62,7 @@ export const sortable = new Set([
   "spuCount",
   "kolCount",
   "rank",
-  "rankChange",
+
   "invitedCount",
   "effectiveCount",
   "refundedOrderCount",
