@@ -42,6 +42,9 @@ const enUS: MessageSchema = {
     netHint:
       "Sales minus successful refunds tied to the same payment period within 30 Beijing calendar days.",
     settlement: "Net receivable",
+    settlementFormula: "Net receivable = increases − decreases in shop receivables",
+    settlementHint:
+      "Based on Weidian settlement postings in the selected period. Increases in shop receivables are reduced by deductions such as refunds. Settlement data is pending integration.",
     pending: "In development",
     comparison: "vs prior period {value}",
     transactionTitle: "Transaction and settlement comparison",

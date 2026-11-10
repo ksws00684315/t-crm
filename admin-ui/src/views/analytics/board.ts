@@ -60,10 +60,11 @@ export const columnsByBoard: Record<Board, string[]> = {
     "bestCreator"
   ]
 };
-export const groupedSort = ["spuCount", "skuCount", "kolCount"];
+export const coverageKeys = ["spuCount", "skuCount", "kolCount"];
 export const sortable = new Set([
   ...trade,
-  ...groupedSort,
+  "spuCount",
+  "kolCount",
   "rank",
   "rankChange",
   "invitedCount",

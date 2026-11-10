@@ -34,7 +34,7 @@ import {
   boards,
   columnsByBoard,
   dates,
-  groupedSort,
+  coverageKeys,
   money,
   pending as pendingColumns,
   rates,
@@ -100,11 +100,11 @@ const columns = computed<DataColumn[]>(() =>
     align: key === "identity" ? "left" : "center",
     interactive: key === "identity",
     fixed: product && key === "identity" ? "left" : undefined,
-    highlighted: sortBy.value === key || (key === "coverage" && groupedSort.includes(sortBy.value)),
+    highlighted: sortBy.value === key,
     minWidth: columnWidths[key] ?? { "zh-CN": 108, "en-US": 136 }
   }))
 );
-const sortKeys = columnsByBoard[board].filter(key => sortable.has(key) || key === "coverage");
+const sortKeys = columnsByBoard[board].filter(key => sortable.has(key));
 const cellKeys = columnsByBoard[board].filter(
   key => key !== "rank" && (sortable.has(key) || pendingColumns.has(key))
 );
@@ -197,7 +197,8 @@ const cards = computed(() => {
         icon: Wallet,
         label: label(shop ? "settlement" : "netCommission"),
         value: t("analytics.pending"),
-        unavailable: true
+        unavailable: true,
+        hint: shop ? t("analytics.settlementHint") : undefined
       };
   return product ? [first, orders, last, net] : [first, orders, net, last];
 });
@@ -373,7 +374,7 @@ onUnmounted(stop);
           <div class="ledger-comparison__hero">
             <el-tag type="info" effect="light">{{ t("analytics.pending") }}</el-tag>
           </div>
-          <p class="ledger-comparison__detail">{{ label("settlement") }}</p>
+          <p class="ledger-comparison__detail">{{ t("analytics.settlementFormula") }}</p>
         </div>
         <div class="ledger-comparison__panel ledger-comparison__note">
           <h3>{{ t("analytics.ledgerDifference") }}</h3>
@@ -460,22 +461,20 @@ onUnmounted(stop);
       <template v-for="key in sortKeys" :key="key" #[`header-${key}`]>
         <div class="sort-controls">
           <button
-            v-for="field in key === 'coverage' ? groupedSort : [key]"
-            :key="field"
             type="button"
             :aria-label="
               t('analytics.sortLabel', {
-                label: label(field),
+                label: label(key),
                 direction:
-                  sortBy === field ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
+                  sortBy === key ? t(`analytics.${sortDirection}`) : t('analytics.unsorted')
               })
             "
-            :class="{ selected: sortBy === field }"
-            @click="sort(field)"
+            :class="{ selected: sortBy === key }"
+            @click="sort(key)"
           >
-            {{ label(field) }}
+            {{ label(key) }}
             <span aria-hidden="true">{{
-              sortBy === field ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
+              sortBy === key ? (sortDirection === "asc" ? "↑" : "↓") : "↕"
             }}</span>
           </button>
         </div>
@@ -544,7 +543,7 @@ onUnmounted(stop);
       </template>
       <template #cell-coverage="{ row }">
         <div class="coverage-values">
-          <template v-for="(key, index) in groupedSort" :key="key">
+          <template v-for="(key, index) in coverageKeys" :key="key">
             <span v-if="index" class="coverage-values__separator" aria-hidden="true">/</span>
             <span>{{ display(key, valueOf(row, key)) }}</span>
           </template>
@@ -729,6 +728,13 @@ onUnmounted(stop);
 }
 .analytics-ranking.is-page-scroll :deep(> .data-table__body) {
   flex: 0 0 auto;
+}
+.analytics-ranking :deep(.el-table__body td.el-table__cell:not(.data-table__highlighted)) {
+  background-color: var(--tcrm-color-card);
+}
+.analytics-ranking
+  :deep(.el-table__body tr:hover > td.el-table__cell:not(.data-table__highlighted)) {
+  background-color: var(--tcrm-color-muted);
 }
 .analytics-ranking :deep(.el-table__header th.data-table__highlighted),
 .analytics-ranking :deep(.el-table__body td.data-table__highlighted) {

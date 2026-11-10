@@ -44,6 +44,9 @@ const zhCN = {
     netSalesAmount: "净销售额",
     netHint: "销售额扣除同批订单在 30 个北京时间自然日内完结的成功退款。",
     settlement: "结算净应收",
+    settlementFormula: "结算净应收 = 店铺应收增加 − 应收减少",
+    settlementHint:
+      "按所选期间的微店结算流水统计，店铺应收增加减去应收减少（如退款扣减）。结算流水待接入。",
     pending: "开发中",
     comparison: "较上期 {value}",
     transactionTitle: "交易与结算对照",
