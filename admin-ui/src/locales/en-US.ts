@@ -277,6 +277,7 @@ const enUS: MessageSchema = {
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
     KOL_REVIEW_ALREADY_DONE: "This creator has already been reviewed.",
     KOL_REVIEW_REQUIRED: "Review this creator before saving promotion settings.",
+    KOL_NOT_ACTIVATED: "This creator has not activated the account yet; send the invitation first.",
     KOL_PROMOTION_CONFIG_INCOMPLETE:
       "The promotion settings are incomplete, so the creator cannot start promoting yet.",
     KOL_ALREADY_CLAIMED: "Another BD just claimed this creator. Refresh and try again.",
@@ -1035,6 +1036,14 @@ const enUS: MessageSchema = {
     disabledNotOwned: "Only the assigned BD can act on this creator",
     disabledCommissionApproved: "Approve the creator before changing commission",
     editProfileTitle: "Edit profile - {code} ({name})",
+    /** Super-administrator password reset (task 147); the generated password is shown once. */
+    resetPassword: "Reset password",
+    resetPasswordTitle: "Reset creator password",
+    confirmResetPassword:
+      "Reset the password of creator {code} ({name})? The creator is signed out everywhere and the new password is shown only once.",
+    resetPasswordDone: "Password reset; the creator is signed out everywhere",
+    resetPasswordResultHint:
+      "The new password is shown only once — copy and send it to the creator now:",
     /** Super-admin tab on the creator page: transfer creators between BDs. */
     manageTab: "Creator assignment",
     listTab: "Creator List",

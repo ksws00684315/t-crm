@@ -1,14 +1,18 @@
 <script setup lang="ts">
+import { CopyDocument } from "@element-plus/icons-vue";
 import CopyText from "@/components/CopyText.vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { editKol, reviewKol } from "@/api/kol/kol";
+import { editKol, resetKolPassword, reviewKol } from "@/api/kol/kol";
 import type { KolVO } from "@/api/types";
+import { useUserStore } from "@/stores/user";
+import { copyText, truncateCopy } from "@/utils/copy";
 import { ApiError } from "@/utils/http/error";
 import { validateKolName, validateWhatsapp } from "@/utils/kol-validation";
 import { notifyError } from "@/utils/notify";
+import { accessOf } from "@/utils/permission";
 import { rule } from "@/utils/validation";
 
 defineOptions({ name: "KolProfileDialog" });
@@ -30,6 +34,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const me = useUserStore();
 
 const title = computed(() => {
   const kol = props.kol;
@@ -47,6 +52,18 @@ const form = reactive({
   platform: "",
   handle: ""
 });
+
+/** One-time plaintext of the last super-administrator reset; cleared whenever the dialog opens. */
+const resetResult = ref<string | null>(null);
+const resetting = ref(false);
+
+/**
+ * Super administrator only (task 147); review mode stays on its approve action, and an account
+ * still waiting for its invitation has no password to reset.
+ */
+const canResetPassword = computed(
+  () => !props.review && accessOf(me.user).isSuperAdmin && props.kol?.accountStatus === 1
+);
 
 const rules: FormRules = {
   name: [rule(validateKolName)],
@@ -69,12 +86,50 @@ watch(
     form.phone = kol?.phone ?? "";
     form.platform = primary?.platform ?? "";
     form.handle = primary?.handle ?? "";
+    resetResult.value = null;
     formRef.value?.clearValidate();
   }
 );
 
 function close() {
   emit("update:modelValue", false);
+}
+
+/**
+ * Super-administrator password reset (task 147): a second confirmation first, then the backend
+ * replaces the password with a generated one. The plaintext comes back once and is shown here
+ * until the dialog closes; nothing else (no mail, no log) carries it.
+ */
+async function resetPassword() {
+  const kol = props.kol;
+  if (!kol || resetting.value) return;
+  try {
+    await ElMessageBox.confirm(
+      t("kol.confirmResetPassword", { code: kol.kolCode, name: kol.name }),
+      t("kol.resetPasswordTitle"),
+      { type: "warning" }
+    );
+  } catch {
+    return; // cancelled
+  }
+  resetting.value = true;
+  try {
+    const result = await resetKolPassword(kol.id);
+    resetResult.value = result.password;
+    ElMessage.success(t("kol.resetPasswordDone"));
+  } catch (error) {
+    notifyError(error);
+  } finally {
+    resetting.value = false;
+  }
+}
+
+async function copyResult() {
+  const value = resetResult.value;
+  if (!value) return;
+  const copied = await copyText(value);
+  if (copied) ElMessage.success(t("copy.done", { text: truncateCopy(value) }));
+  else ElMessage.error(t("copy.failed"));
 }
 
 /**
@@ -163,9 +218,35 @@ async function submit() {
     @update:model-value="emit('update:modelValue', $event)"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
+      <div v-if="resetResult" class="reset-result" data-test="reset-password-result">
+        <p class="reset-hint">{{ t("kol.resetPasswordResultHint") }}</p>
+        <div class="reset-password">
+          <code data-test="reset-password-value">{{ resetResult }}</code>
+          <!-- CopyText would repeat the plaintext as its own label; an icon-only button keeps it once. -->
+          <el-button
+            link
+            type="primary"
+            data-test="reset-password-copy"
+            :aria-label="t('common.copy')"
+            @click="copyResult"
+          >
+            <el-icon><CopyDocument /></el-icon>
+          </el-button>
+        </div>
+      </div>
       <el-form-item :label="t('common.email')">
         <div class="readonly-value" data-test="profile-email">
           <CopyText :value="kol?.email" />
+          <el-button
+            v-if="canResetPassword"
+            type="danger"
+            link
+            data-test="reset-password"
+            :loading="resetting"
+            @click="resetPassword"
+          >
+            {{ t("kol.resetPassword") }}
+          </el-button>
         </div>
       </el-form-item>
       <el-form-item :label="t('kol.kolName')" prop="name">
@@ -218,5 +299,27 @@ async function submit() {
   display: flex;
   align-items: center;
   min-height: var(--tcrm-control-height);
+}
+.reset-result {
+  margin-bottom: var(--tcrm-space-4);
+  padding: var(--tcrm-space-3) var(--tcrm-space-4);
+  border: 1px solid var(--el-color-warning-light-5);
+  border-radius: var(--tcrm-radius-control);
+  background: var(--el-color-warning-light-9);
+}
+.reset-hint {
+  margin: 0 0 var(--tcrm-space-2);
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-help);
+  line-height: var(--tcrm-line-height-help);
+}
+.reset-password {
+  display: flex;
+  align-items: center;
+  gap: var(--tcrm-space-2);
+}
+.reset-password code {
+  font-size: var(--tcrm-font-size-body);
+  word-break: break-all;
 }
 </style>

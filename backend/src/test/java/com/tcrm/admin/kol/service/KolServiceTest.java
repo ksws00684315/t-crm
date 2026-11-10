@@ -20,6 +20,7 @@ import com.tcrm.admin.kol.api.KolStatusChangedEvent;
 import com.tcrm.admin.kol.mapper.KolBdHistoryMapper;
 import com.tcrm.admin.kol.mapper.KolMapper;
 import com.tcrm.admin.kol.mapper.KolPlatformMapper;
+import com.tcrm.admin.kol.model.KolAuthTokenDO;
 import com.tcrm.admin.kol.model.KolBdHistoryDO;
 import com.tcrm.admin.kol.model.KolBdTransferDO;
 import com.tcrm.admin.kol.model.KolDO;
@@ -29,6 +30,7 @@ import com.tcrm.admin.security.api.CurrentUserContext;
 import com.tcrm.admin.security.api.DataScope;
 import com.tcrm.admin.security.api.LoginFailureCounter;
 import com.tcrm.admin.security.api.Role;
+import com.tcrm.admin.security.api.StpKolUtil;
 import com.tcrm.admin.shared.BusinessException;
 import com.tcrm.admin.shared.ErrorCode;
 import com.tcrm.admin.shared.TestTransactions;
@@ -44,6 +46,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class KolServiceTest {
   @BeforeAll
@@ -70,6 +73,11 @@ class KolServiceTest {
   private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
   private final KolInvites invites = mock(KolInvites.class);
   private final LoginFailureCounter loginFailures = mock(LoginFailureCounter.class);
+
+  /** A real encoder with a cheap strength so the reset test can verify the stored hash. */
+  private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder(4);
+
+  private final KolAuthTokens tokens = mock(KolAuthTokens.class);
   private final KolService service =
       new KolService(
           kols,
@@ -92,7 +100,9 @@ class KolServiceTest {
               new com.tcrm.admin.shared.AuditSanitizer(new tools.jackson.databind.ObjectMapper()),
               events),
           mock(KolPlatformMapper.class),
-          loginFailures);
+          loginFailures,
+          passwords,
+          tokens);
 
   @org.junit.jupiter.api.BeforeEach
   void noTemplateNames() {
@@ -736,5 +746,67 @@ class KolServiceTest {
                 .getParamNameValuePairs()
                 .values())
         .contains(0);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldResetPasswordOnceAndKillSessions_whenSuperAdminResets() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(kol(BD));
+    when(kols.update(isNull(), any())).thenReturn(1);
+
+    String plain;
+    try (var stp = org.mockito.Mockito.mockStatic(StpKolUtil.class)) {
+      plain = service.adminResetPassword(11L);
+      stp.verify(() -> StpKolUtil.logout(11L));
+    }
+
+    // The plaintext obeys the password rules and matches the hash written to the row.
+    assertThat(plain).hasSize(16).matches("[" + RandomPasswords.ALPHABET + "]+");
+    ArgumentCaptor<Wrapper<KolDO>> wrapper = ArgumentCaptor.forClass(Wrapper.class);
+    verify(kols).update(isNull(), wrapper.capture());
+    String sqlSet =
+        ((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<KolDO>)
+                wrapper.getValue())
+            .getSqlSet();
+    assertThat(sqlSet).contains("credential_version = credential_version + 1");
+    String hash =
+        (String)
+            ((com.baomidou.mybatisplus.core.conditions.AbstractWrapper<?, ?, ?>) wrapper.getValue())
+                .getParamNameValuePairs().values().stream()
+                    .filter(value -> value instanceof String value1 && value1.startsWith("$2"))
+                    .findFirst()
+                    .orElseThrow();
+    assertThat(passwords.matches(plain, hash)).isTrue();
+    // A pending self-service reset link must not survive the administrator's reset.
+    verify(tokens).invalidateUnused(11L, KolAuthTokenDO.PURPOSE_RESET);
+  }
+
+  @Test
+  void shouldRejectReset_whenKolNotActivated() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    KolDO notActivated = kol(BD);
+    notActivated.setAccountStatus(0);
+    when(kols.selectById(11L)).thenReturn(notActivated);
+
+    assertThatThrownBy(() -> service.adminResetPassword(11L))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.KOL_NOT_ACTIVATED);
+    verify(kols, never()).update(any(), any());
+    verifyNoInteractions(tokens);
+  }
+
+  @Test
+  void shouldRejectReset_whenKolMissing() {
+    actAs(1L, Role.SUPER_ADMIN, DataScope.ALL);
+    when(kols.selectById(11L)).thenReturn(null);
+
+    assertThatThrownBy(() -> service.adminResetPassword(11L))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(ErrorCode.COMMON_NOT_FOUND);
+    verify(kols, never()).update(any(), any());
+    verifyNoInteractions(tokens);
   }
 }

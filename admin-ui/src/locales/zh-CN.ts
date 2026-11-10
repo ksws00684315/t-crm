@@ -272,6 +272,7 @@ const zhCN = {
     KOL_MULTIPLE_PRIMARY: "最多只能将一个社媒账号设为主阵地",
     KOL_REVIEW_ALREADY_DONE: "该达人已审核",
     KOL_REVIEW_REQUIRED: "请先审核该达人，再保存推广配置。",
+    KOL_NOT_ACTIVATED: "该达人尚未激活账号，请先发送邀请激活",
     KOL_PROMOTION_CONFIG_INCOMPLETE: "推广配置不完整，无法改为推广中",
     KOL_ALREADY_CLAIMED: "该达人刚被其他商务认领，请刷新后重试",
     LINK_TEMPLATE_INVALID: "代购平台必须是本公司已启用的平台",
@@ -1008,6 +1009,13 @@ const zhCN = {
     disabledNotOwned: "仅负责该达人的商务可操作",
     disabledCommissionApproved: "达人审核通过后才能调整佣金",
     editProfileTitle: "资料编辑 - {code}（{name}）",
+    /** Super-administrator password reset (task 147); the generated password is shown once. */
+    resetPassword: "重置密码",
+    resetPasswordTitle: "重置达人密码",
+    confirmResetPassword:
+      "确定要重置达人 {code}（{name}）的密码吗？重置后该达人当前登录立即失效，新密码仅显示一次。",
+    resetPasswordDone: "密码已重置，该达人所有登录已失效",
+    resetPasswordResultHint: "新密码仅显示一次，请立即复制并发送给达人：",
     /** Super-admin tab on the creator page: transfer creators between BDs. */
     manageTab: "达人分配",
     listTab: "达人列表",
