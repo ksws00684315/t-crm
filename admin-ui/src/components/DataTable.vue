@@ -38,6 +38,9 @@ export interface DataColumn {
   tooltip?: boolean;
   /** Hidden until the user shows it. Ignored once this table has saved column prefs. */
   defaultHidden?: boolean;
+  fixed?: "left";
+  /** Emphasizes the active sort column in rankings. */
+  highlighted?: boolean;
 }
 
 const props = withDefaults(
@@ -51,6 +54,7 @@ const props = withDefaults(
     total: number;
     page?: number;
     size?: number;
+    pageSizes?: readonly number[];
     /** Shop and tenant lists return every row; those tables show a total and do not page. */
     paged?: boolean;
     filterCount?: number;
@@ -59,6 +63,8 @@ const props = withDefaults(
     plain?: boolean;
     /** Fill the remaining page space; body scrolls and the pager stays at the card bottom. */
     fillAvailableHeight?: boolean;
+    /** Let a dashboard ranking expand in the page while retaining horizontal table scroll. */
+    scrollWithPage?: boolean;
     /** Shows the toolbar Export button (P0-1); the page does the fetching and file save. */
     exportable?: boolean;
     exporting?: boolean;
@@ -96,6 +102,7 @@ const props = withDefaults(
     rowKey: "id",
     plain: false,
     fillAvailableHeight: false,
+    scrollWithPage: false,
     exportable: false,
     exporting: false,
     selectable: false,
@@ -175,7 +182,7 @@ let resizeObserver: ResizeObserver | null = null;
 let measureFrame = 0;
 
 function measureHeights(): void {
-  if (props.plain) {
+  if (props.plain || (props.scrollWithPage && !fullscreen.value)) {
     fillMinimumHeight.value = null;
     tableMaxHeight.value = null;
     return;
@@ -312,7 +319,14 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => [props.rows, props.plain, props.fillAvailableHeight, props.paged, props.exportable],
+  () => [
+    props.rows,
+    props.plain,
+    props.fillAvailableHeight,
+    props.scrollWithPage,
+    props.paged,
+    props.exportable
+  ],
   scheduleMeasure
 );
 watch(fullscreen, scheduleMeasure);
@@ -320,6 +334,9 @@ watch(fullscreen, scheduleMeasure);
 const locked = computed(() => {
   const keys = new Set<string>();
   if (props.columns[0]) keys.add(props.columns[0].key);
+  for (const column of props.columns) {
+    if (column.fixed) keys.add(column.key);
+  }
   if (props.columns.some(column => column.key === "actions")) keys.add("actions");
   return keys;
 });
@@ -479,6 +496,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
         'is-fullscreen': fullscreen,
         'is-plain': plain,
         'is-fill': fillAvailableHeight && !plain,
+        'is-page-scroll': scrollWithPage && !fullscreen,
         'is-legacy-order': legacyOrderStyle
       },
       `density-${prefs.density}`
@@ -629,7 +647,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
                   : 'right'
                 : column.key === columns[0]?.key
                   ? 'left'
-                  : undefined
+                  : column.fixed
               : undefined
           "
           :align="
@@ -643,8 +661,18 @@ function canMove(index: number, delta: -1 | 1): boolean {
                 ? column.tooltip
                 : (column.tooltip ?? !column.interactive)
           "
-          :class-name="column.amount ? 'tcrm-amount' : undefined"
+          :class-name="
+            [
+              column.amount ? 'tcrm-amount' : '',
+              column.highlighted ? 'data-table__highlighted' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')
+          "
         >
+          <template v-if="$slots[`header-${column.key}`]" #header>
+            <slot :name="`header-${column.key}`" />
+          </template>
           <template #default="{ row }">
             <template v-if="column.key === 'actions'">
               <slot name="actions" :row="row" />
@@ -685,7 +713,7 @@ function canMove(index: number, delta: -1 | 1): boolean {
       <el-pagination
         background
         layout="sizes, prev, pager, next"
-        :page-sizes="[...PAGE_SIZES]"
+        :page-sizes="[...(pageSizes ?? PAGE_SIZES)]"
         :total="total"
         :current-page="page"
         :page-size="prefs.pageSize"

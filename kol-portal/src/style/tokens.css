@@ -94,6 +94,10 @@
   --tcrm-line-height-amount-primary: 44px;
   --tcrm-font-size-amount-detail: 24px;
   --tcrm-line-height-amount-detail: 32px;
+  --tcrm-font-size-dashboard-metric: 26px;
+  --tcrm-line-height-dashboard-metric: 34px;
+  --tcrm-font-size-dashboard-comparison: 22px;
+  --tcrm-line-height-dashboard-comparison: 30px;
 
   --el-color-primary: var(--tcrm-color-primary);
   --el-color-primary-light-3: var(--tcrm-color-primary-hover);

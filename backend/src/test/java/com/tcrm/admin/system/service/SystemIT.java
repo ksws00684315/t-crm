@@ -171,6 +171,9 @@ class SystemIT {
     assertThat(columns)
         .extracting(row -> row.get("table_name") + ":" + row.get("is_nullable"))
         .containsExactlyInAnyOrder(
+            "agg_stats_checkpoint:NO",
+            "agg_stats_daily:NO",
+            "agg_stats_dirty_day:NO",
             "crm_click_log:NO",
             "crm_commission_item_revision:NO",
             "crm_commission_item_state:NO",

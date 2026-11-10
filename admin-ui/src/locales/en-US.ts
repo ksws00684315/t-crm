@@ -6,6 +6,223 @@ import finance from "./finance-en-US";
 const enUS: MessageSchema = {
   prepay,
   finance,
+  analytics: {
+    productCreatorCount: "Creators",
+    productRefundHint:
+      "Product refunds include successful refunds linked to an item. The order refund rate uses orders paid in the selected period.",
+    period: "Time period",
+    periodMode: {
+      live: "Live",
+      sevenDays: "7 days",
+      thirtyDays: "30 days",
+      day: "Day",
+      month: "Month",
+      custom: "Custom"
+    },
+    previousPeriod: "Previous period",
+    nextPeriod: "Next period",
+    refresh: "Refresh data",
+    startDate: "Start date",
+    endDate: "End date",
+    shop: "Shop",
+    channel: "Channel",
+    weidian: "Weidian",
+    creator: "Creator",
+    inviter: "Inviter",
+    keyword: "Search",
+    optionsFailed: "Filter options could not be loaded. Refresh to retry.",
+    applied: "Applied filters",
+    beijing: "Beijing time",
+    all: "All",
+    updated: "Data updated {time}",
+    paidOrderCount: "Paid orders",
+    units: "Units sold",
+    unitsValue: "Units sold {value}",
+    netSalesAmount: "Net sales",
+    netHint:
+      "Sales minus successful refunds tied to the same payment period within 30 Beijing calendar days.",
+    settlement: "Net receivable",
+    settlementFormula: "Net receivable = increases − decreases in shop receivables",
+    settlementHint:
+      "Based on Weidian settlement postings in the selected period. Increases in shop receivables are reduced by deductions such as refunds. Settlement data is pending integration.",
+    pending: "In development",
+    commissionForbidden: "No access",
+    comparison: "vs prior period {value}",
+    transactionTitle: "Transaction and settlement comparison",
+    transactionLedger: "Transaction ledger · Order activity",
+    settlementLedger: "Settlement ledger · Shop cash flow",
+    ledgerBridge: "Compare ledgers",
+    ledgerTransactionDetail: "{sales} sales − {refunds} successful refunds on those orders",
+    ledgerDifference: "Why can the amounts differ?",
+    ledgerDifferenceHint:
+      "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",
+    salesAmount: "Sales",
+    cohortRefundAmount: "Successful refunds for paid orders",
+    completedRefundAmount: "Refunds by completion date",
+    riskTitle: "Refund risk",
+    amountRefundRate: "Amount refund rate",
+    periodRefundedOrderRate: "Period refunded order ratio",
+    averageOrderAmount: "Average order amount",
+    conversion: "Invitation conversion",
+    invitedCount: "Creators invited to date",
+    effectiveCount: "Currently active creators",
+    kolCount: "Creators with sales",
+    effectiveRate: "Activation {value}",
+    activationRate: "Sales activation {value}",
+    rank: "Rank",
+    channelCode: "Channel / SPU",
+    channelStatus: "Channel / status",
+    category: "Category",
+    refundUnits: "Refunded units",
+    netUnits: "Net units",
+    refundedOrderCount: "Refunded orders",
+    rankChange: "Rank change",
+    trend: "7-day trend",
+    spuCount: "SPU",
+    skuCount: "SKU",
+    coverage: "SPU / SKU / creators",
+    relationship: "Inviter / status",
+    status: "Status",
+    topProducts: "Top 3 products",
+    bestCreator: "Top creator",
+    actions: "Actions",
+    detail: "Details",
+    invalidDates: "Select a date range of up to 90 days.",
+    exportFailed: "Could not export this page.",
+    sortLabel: "Sort {label} ({direction})",
+    asc: "ascending",
+    desc: "descending",
+    unsorted: "inactive",
+    enabled: "Active",
+    disabled: "Inactive",
+    unassigned: "Unassigned",
+    highRefund: "High refund",
+    scope: { ALL: "Company scope", OWN: "Own scope" },
+    "shop-performance": {
+      selling: "Shops with sales",
+      active: "All shops {value}",
+      identity: "Shop name / code",
+      ranking: "Shop performance ranking",
+      rankingCount: "{count} shop | {count} shops"
+    },
+    "best-sellers": {
+      selling: "SPUs with sales",
+      identity: "Order product",
+      channelCode: "Channel / ID",
+      kolCount: "Creators with sales",
+      paidOrderCount: "Order count",
+      netSalesAmount: "Net sales",
+      settlementAmount: "Settlement amount",
+      ranking: "Product ranking",
+      rankingCount: "{count} product | {count} products",
+      net: "Product net sales",
+      keyword: "Product name / SPU",
+      definitions: {
+        rank: "Rank by net sales under the applied filters. Sorting by another column preserves the business rank.",
+        identity:
+          "The name from the order and the linked source product image. A placeholder appears if the image is unavailable.",
+        channelCode:
+          "The order channel and the item ID from the original source link. A dash indicates no linked source product.",
+        shop: "The shop where the order was placed. A product is counted separately in each shop.",
+        kolCount: "Distinct creators with a paid sale of this product during the selected period.",
+        units:
+          "Total units purchased across all SKUs of this product in orders paid during the selected period.",
+        paidOrderCount:
+          "Distinct paid orders that include this product during the selected period.",
+        refundUnits:
+          "Units successfully refunded, grouped by refund completion date. Refund quantity data is pending.",
+        salesAmount:
+          "Total paid amount on the product lines, grouped by order payment date, after discounts and excluding shipping.",
+        completedRefundAmount:
+          "Successful refunds linked to this product's order lines, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same paid orders completed within 30 Beijing calendar days.",
+        settlementAmount:
+          "Settlement postings attributable to the product. Product-level settlement data is pending."
+      }
+    },
+    "kol-ranking": {
+      selling: "Creators with sales",
+      active: "Active creators {value}",
+      identity: "Creator / social / ID",
+      nameWithPlatform: "{name} ({platform})",
+      relationship: "Inviter / relationship",
+      paidOrderCount: "Order count",
+      linkCount: "Links with sales",
+      commissionRate: "Creator commission rate",
+      estimatedCommission: "Estimated commission",
+      commissionExpense: "Commission paid out",
+      cumulativeCommission: "Cumulative commission",
+      ranking: "Creator ranking",
+      rankingCount: "{count} creator | {count} creators",
+      netCommission: "Net creator commission",
+      keyword: "Creator name / code / social",
+      definitions: {
+        identity:
+          "Creator name, primary social platform, social accounts and creator ID. The platform is omitted when unset.",
+        relationship:
+          "Current assigned inviter and the relationship status shown in the creator directory.",
+        paidOrderCount:
+          "Distinct paid orders attributed to this creator during the selected period.",
+        units: "Total units purchased across SKUs on orders paid during the selected period.",
+        linkCount: "Distinct creator link IDs with a paid sale during the selected period.",
+        salesAmount:
+          "Amount paid on the creator’s orders, including shipping, grouped by payment date.",
+        completedRefundAmount:
+          "Successful refunds attributed to the creator, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same orders completed within 30 Beijing calendar days.",
+        averageOrderAmount:
+          "Sales divided by the number of paid orders during the selected period.",
+        amountRefundRate:
+          "Successful refunds completed during the selected period divided by sales in the same period.",
+        commissionRate:
+          "The creator’s current default commission rate. Historical orders use the rate effective at payment.",
+        estimatedCommission:
+          "Estimated commission on unsettled orders, based on each order’s commissionable amount and applicable rate. Dashboard integration is pending.",
+        commissionExpense:
+          "Commission withdrawals with completed payment. Dashboard integration is pending.",
+        cumulativeCommission:
+          "Commission on verified orders, using estimates for unsettled orders and actual amounts for settled orders. Withdrawn commission remains included once. Dashboard integration is pending."
+      }
+    },
+    "inviter-performance": {
+      selling: "Inviters with sales",
+      active: "Active inviters {value}",
+      identity: "Inviter",
+      creatorCounts: "Active creators / lifetime invites",
+      prepayExpense: "Prepayments paid out",
+      totalEstimatedCommission: "Total estimated commission",
+      totalExpense: "Total paid out",
+      ranking: "Inviter ranking",
+      rankingCount: "{count} inviter | {count} inviters",
+      netCommission: "Net team creator commission",
+      keyword: "Inviter name / code",
+      definitions: {
+        identity: "The inviter’s name and account.",
+        status: "Whether the inviter’s account is enabled.",
+        creatorCounts:
+          "Enabled creators currently assigned to this inviter, followed by creators originally invited by this inviter.",
+        units:
+          "Total units purchased across SKUs on orders attributed to this inviter and paid during the selected period.",
+        salesAmount:
+          "Amount paid on orders attributed to the inviter, including shipping, grouped by payment date.",
+        completedRefundAmount:
+          "Successful refunds attributed to the inviter, grouped by refund completion date.",
+        netSalesAmount:
+          "Sales minus successful refunds on those same orders completed within 30 Beijing calendar days.",
+        amountRefundRate:
+          "Successful refunds completed during the selected period divided by sales in the same period.",
+        averageOrderAmount:
+          "Sales divided by the number of paid orders during the selected period.",
+        prepayExpense: "Prepayments with completed payment. Dashboard integration is pending.",
+        totalEstimatedCommission:
+          "Total estimated commission on orders in the selected period. Dashboard integration is pending.",
+        totalExpense:
+          "Commission and prepayments with completed payment. Dashboard integration is pending."
+      }
+    }
+  },
   app: {
     title: "SparkTrack Admin",
     titleSuffix: " Admin"

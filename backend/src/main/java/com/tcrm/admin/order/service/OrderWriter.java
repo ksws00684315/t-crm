@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcrm.admin.integration.api.WeidianBusinessApi.RefundDetailResponse;
+import com.tcrm.admin.order.api.OrderStatsDateChangedEvent;
 import com.tcrm.admin.order.mapper.OrderItemMapper;
 import com.tcrm.admin.order.mapper.OrderMapper;
 import com.tcrm.admin.order.mapper.OrderSettlementFlowMapper;
@@ -9,12 +10,16 @@ import com.tcrm.admin.order.mapper.RefundMapper;
 import com.tcrm.admin.order.model.OrderDO;
 import com.tcrm.admin.order.model.OrderItemDO;
 import com.tcrm.admin.order.model.RefundDO;
+import com.tcrm.admin.shared.CurrentTenantResolver;
+import com.tcrm.admin.shared.TenantScope;
+import com.tcrm.admin.shared.TransactionalEvents;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +32,8 @@ public class OrderWriter {
   private final OrderAttribution attribution;
   private final OrderCommissionSync commissionSync;
   private final OrderSettlementFlowMapper settlementFlows;
+  private final ApplicationEventPublisher events;
+  private final CurrentTenantResolver tenantResolver;
 
   public OrderWriter(
       OrderMapper orders,
@@ -34,13 +41,17 @@ public class OrderWriter {
       RefundMapper refunds,
       OrderAttribution attribution,
       OrderCommissionSync commissionSync,
-      OrderSettlementFlowMapper settlementFlows) {
+      OrderSettlementFlowMapper settlementFlows,
+      ApplicationEventPublisher events,
+      CurrentTenantResolver tenantResolver) {
     this.orders = orders;
     this.items = items;
     this.refunds = refunds;
     this.attribution = attribution;
     this.commissionSync = commissionSync;
     this.settlementFlows = settlementFlows;
+    this.events = events;
+    this.tenantResolver = tenantResolver;
   }
 
   public OrderDO find(long shopId, String remoteId) {
@@ -117,6 +128,7 @@ public class OrderWriter {
     settlementFlows.backfillOrderId(
         next.getShopId(), next.getWeidianOrderId(), next.getId(), Instant.now());
     commissionSync.sync(next, all);
+    markStatsDates(next, existing == null ? null : existing.getPayTime(), next.getPayTime());
   }
 
   private void detachRefundsFromItem(Long orderItemId) {
@@ -151,6 +163,7 @@ public class OrderWriter {
         refunds.selectOne(
             new LambdaQueryWrapper<RefundDO>().eq(RefundDO::getWeidianRefundNo, detail.refundNo()));
     boolean create = row == null;
+    Instant formerFinish = create ? null : row.getFinishTime();
     if (create) {
       row = new RefundDO();
     }
@@ -207,6 +220,21 @@ public class OrderWriter {
       refunds.updateById(row);
     }
     refreshCompletedRefundTotals(order, all);
+    markStatsDates(order, formerFinish, row.getFinishTime());
+  }
+
+  private void markStatsDates(OrderDO order, Instant former, Instant next) {
+    Long tenantId = TenantScope.companyId();
+    if (tenantId == null) {
+      tenantId = tenantResolver.currentLoginTenantId();
+    }
+    if (tenantId == null) {
+      tenantId = order.getTenantId();
+    }
+    TransactionalEvents.publish(
+        events,
+        new OrderStatsDateChangedEvent(
+            tenantId, order.getId(), Objects.equals(former, next) ? null : former));
   }
 
   /**
@@ -243,6 +271,7 @@ public class OrderWriter {
     row.setRefundType(RefundDictionary.typeOf(null).name());
     refunds.insert(row);
     refreshCompletedRefundTotals(locked, listItems(locked.getId()));
+    markStatsDates(locked, null, null);
     return true;
   }
 

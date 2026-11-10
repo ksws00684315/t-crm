@@ -15,6 +15,36 @@ const columns = [
 ];
 
 describe("DataTable", () => {
+  it("lets a ranking grow with the page and marks its active sort column", async () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        tableId: "dashboard-ranking",
+        rows: [{ id: "1", amount: "100.00", units: 2 }],
+        columns: [
+          { key: "amount", label: "金额", amount: true, highlighted: true },
+          { key: "units", label: "件数" }
+        ],
+        total: 1,
+        scrollWithPage: true
+      },
+      global: { plugins: [ElementPlus, i18n] }
+    });
+    await nextTick();
+    expect(wrapper.classes()).toContain("is-page-scroll");
+    expect(wrapper.findComponent({ name: "ElTable" }).props("maxHeight")).toBeUndefined();
+    const rendered = () =>
+      wrapper.findAllComponents({ name: "ElTableColumn" }).map(column => column.props("className"));
+    expect(rendered()).toEqual(["tcrm-amount data-table__highlighted", ""]);
+    await wrapper.setProps({
+      columns: [
+        { key: "amount", label: "金额", amount: true },
+        { key: "units", label: "件数", highlighted: true }
+      ]
+    });
+    expect(rendered()).toEqual(["tcrm-amount", "data-table__highlighted"]);
+    wrapper.unmount();
+  });
+
   it("aligns long columns left and amounts, short values and actions in the center", async () => {
     const wrapper = mount(DataTable, {
       props: {
