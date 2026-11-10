@@ -89,7 +89,7 @@ public class WithdrawalService {
           "PAID",
           "REJECTED",
           "CANCELLED");
-  private static final int MAX_VOUCHER_BYTES = 2 * 1024 * 1024;
+  private static final int MAX_VOUCHER_BYTES = 10 * 1024 * 1024;
   private static final java.util.regex.Pattern EMAIL =
       java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
   private static final String MINIMUM_KEY = "commission.minimum-withdrawal-cny";
