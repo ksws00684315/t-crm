@@ -3,6 +3,7 @@ import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } fro
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { ElMessage } from "element-plus";
+import { DataBoard, Goods, Tickets, TrendCharts, Wallet, Warning } from "@element-plus/icons-vue";
 import { analyticsOptions, exportAnalytics, queryAnalytics } from "@/api/analytics";
 import type {
   AnalyticsResult,
@@ -144,11 +145,15 @@ const cards = computed(() => {
   const selling = shop ? summary?.sellingShopCount : summary?.sellingCount;
   const total = shop ? summary?.shopCount : summary?.activeCount;
   const first = {
+    tone: "violet" as const,
+    icon: DataBoard,
     label: t(`analytics.${board}.selling`),
     value: display("", selling),
     detail: product ? undefined : t(`analytics.${board}.active`, { value: display("", total) })
   };
   const orders = {
+    tone: "blue" as const,
+    icon: Tickets,
     label: label("paidOrderCount"),
     value: display("", data?.paidOrderCount),
     detail:
@@ -156,14 +161,24 @@ const cards = computed(() => {
     comparison: comparison("paidOrderCount")
   };
   const net = {
+    tone: "green" as const,
+    icon: TrendCharts,
     label: t(product ? "analytics.best-sellers.net" : "analytics.netSalesAmount"),
     value: display("netSalesAmount", data?.netSalesAmount),
     comparison: comparison("netSalesAmount"),
     hint: t("analytics.netHint")
   };
   const last = product
-    ? { label: label("units"), value: display("", data?.units), comparison: comparison("units") }
+    ? {
+        tone: "amber" as const,
+        icon: Goods,
+        label: label("units"),
+        value: display("", data?.units),
+        comparison: comparison("units")
+      }
     : {
+        tone: "amber" as const,
+        icon: Wallet,
         label: label(shop ? "settlement" : "netCommission"),
         value: t("analytics.pending")
       };
@@ -314,24 +329,34 @@ onUnmounted(stop);
 
     <section v-if="shop" class="analytics-topic">
       <h2>{{ t("analytics.transactionTitle") }}</h2>
-      <div class="topic-grid topic-grid--two">
-        <div class="topic-panel">
-          <h3>{{ t("analytics.transaction") }}</h3>
-          <div class="topic-values">
-            <div v-for="key in ['salesAmount', 'cohortRefundAmount', 'netSalesAmount']" :key="key">
-              <span>{{ label(key) }}</span>
-              <strong>{{ display(key, metrics?.[key as Metric]) }}</strong>
+      <div class="ledger-comparison">
+        <div class="ledger-comparison__panel ledger-comparison__transaction">
+          <h3>{{ t("analytics.transactionLedger") }}</h3>
+          <div class="ledger-comparison__hero">
+            <span>{{ label("netSalesAmount") }}</span>
+            <strong>{{ display("netSalesAmount", metrics?.netSalesAmount) }}</strong>
+          </div>
+          <div class="ledger-comparison__values">
+            <div>
+              <span>{{ label("salesAmount") }}</span
+              ><strong>{{ display("salesAmount", metrics?.salesAmount) }}</strong>
+            </div>
+            <div class="ledger-comparison__refund">
+              <span>{{ label("cohortRefundAmount") }}</span
+              ><strong>{{ display("cohortRefundAmount", metrics?.cohortRefundAmount) }}</strong>
             </div>
           </div>
         </div>
-        <div class="topic-panel">
-          <h3>{{ t("analytics.settlementTitle") }}</h3>
-          <div class="topic-values">
-            <div>
-              <span>{{ label("settlement") }}</span
-              ><strong>{{ t("analytics.pending") }}</strong>
-            </div>
+        <div class="ledger-comparison__panel ledger-comparison__settlement">
+          <h3>{{ t("analytics.settlementLedger") }}</h3>
+          <div class="ledger-comparison__hero">
+            <span>{{ label("settlement") }}</span>
+            <strong>{{ t("analytics.pending") }}</strong>
           </div>
+        </div>
+        <div class="ledger-comparison__panel ledger-comparison__note">
+          <h3>{{ t("analytics.ledgerDifference") }}</h3>
+          <p>{{ t("analytics.ledgerDifferenceHint") }}</p>
         </div>
       </div>
     </section>
@@ -340,11 +365,15 @@ onUnmounted(stop);
       <div class="topic-grid topic-grid--two">
         <MetricCard
           :label="label('amountRefundRate')"
+          :icon="Warning"
+          tone="amber"
           :value="percent(metrics?.amountRefundRate)"
           :detail="`${display('completedRefundAmount', metrics?.completedRefundAmount)} / ${display('salesAmount', metrics?.salesAmount)}`"
         />
         <MetricCard
           :label="label('periodRefundedOrderRate')"
+          :icon="Warning"
+          tone="red"
           :value="percent(metrics?.periodRefundedOrderRate)"
           :detail="`${display('', metrics?.refundedOrderCount)} / ${display('', metrics?.paidOrderCount)}`"
         />
@@ -357,6 +386,8 @@ onUnmounted(stop);
           v-for="(entry, index) in conversion"
           :key="entry.key"
           :label="label(entry.key)"
+          :icon="[Tickets, DataBoard, TrendCharts][index]"
+          :tone="(['violet', 'blue', 'green'] as const)[index]"
           :value="display('', entry.value)"
           :detail="
             index > 0
@@ -371,6 +402,7 @@ onUnmounted(stop);
 
     <p v-if="product" class="analytics-note">{{ t("analytics.productRefundHint") }}</p>
     <DataTable
+      class="analytics-ranking"
       :table-id="`analytics-${board}`"
       :columns="columns"
       :rows="rows"
@@ -433,11 +465,17 @@ onUnmounted(stop);
         </div>
       </template>
       <template #cell-channelStatus="{ row }">
-        <div>{{ t("analytics.weidian") }}</div>
-        <div>{{ t(row.status === 1 ? "analytics.enabled" : "analytics.disabled") }}</div>
+        <div class="analytics-badges">
+          <el-tag size="small" type="primary">{{ t("analytics.weidian") }}</el-tag>
+          <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">
+            {{ t(row.status === 1 ? "analytics.enabled" : "analytics.disabled") }}
+          </el-tag>
+        </div>
       </template>
       <template #cell-channelCode="{ row }">
-        <div>{{ t("analytics.weidian") }}</div>
+        <div>
+          <el-tag size="small" type="primary">{{ t("analytics.weidian") }}</el-tag>
+        </div>
         <CopyText :value="row.code" />
       </template>
       <template #cell-shop="{ row }">{{ row.related || "—" }}</template>
@@ -459,9 +497,17 @@ onUnmounted(stop);
       </template>
       <template v-for="key in cellKeys" :key="key" #[`cell-${key}`]="{ row }">
         <div class="analytics-cell">
-          <span class="analytics-number">{{
-            pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key))
-          }}</span>
+          <span
+            class="analytics-number"
+            :class="{
+              'analytics-number--net': key === 'netSalesAmount',
+              'analytics-number--refund':
+                key === 'completedRefundAmount' && Number(valueOf(row, key)) > 0
+            }"
+            >{{
+              pendingColumns.has(key) ? t("analytics.pending") : display(key, valueOf(row, key))
+            }}</span
+          >
           <el-tag
             v-if="product && key === 'periodRefundedOrderRate' && Number(valueOf(row, key)) > 0.2"
             type="warning"
@@ -534,37 +580,87 @@ onUnmounted(stop);
 .topic-grid--three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.topic-panel {
+.ledger-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  border: 1px solid var(--tcrm-color-border);
+  border-radius: var(--tcrm-radius-card);
+  overflow: hidden;
+}
+.ledger-comparison__panel {
   min-width: 0;
   padding: var(--tcrm-space-4);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  background: var(--el-bg-color);
 }
-.topic-panel h3 {
-  font-size: var(--tcrm-font-size-table);
-  line-height: var(--tcrm-line-height-table);
-  margin: 0 0 var(--tcrm-space-3);
+.ledger-comparison__panel + .ledger-comparison__panel {
+  border-inline-start: 1px solid var(--tcrm-color-border);
 }
-.topic-values {
-  display: flex;
-  gap: var(--tcrm-space-4);
-  flex-wrap: wrap;
-}
-.topic-values > div {
-  display: grid;
-  gap: var(--tcrm-space-2);
-}
-.topic-values span {
-  color: var(--el-text-color-secondary);
+.ledger-comparison__panel h3 {
   font-size: var(--tcrm-font-size-body);
   line-height: var(--tcrm-line-height-body);
+  font-weight: 600;
+  margin: 0 0 var(--tcrm-space-2);
 }
-.topic-values strong {
+.ledger-comparison__transaction {
+  background: color-mix(in srgb, var(--tcrm-color-primary) 6%, var(--tcrm-color-card));
+  color: var(--tcrm-color-primary-active);
+}
+.ledger-comparison__settlement {
+  background: color-mix(in srgb, var(--tcrm-color-success) 7%, var(--tcrm-color-card));
+  color: var(--tcrm-color-success);
+}
+.ledger-comparison__note {
+  background: color-mix(in srgb, var(--tcrm-color-warning-bg) 58%, var(--tcrm-color-card));
+  color: var(--tcrm-color-warning);
+}
+.ledger-comparison__note p,
+.ledger-comparison span {
+  color: var(--tcrm-color-text-secondary);
+  font-size: var(--tcrm-font-size-body);
+  line-height: var(--tcrm-line-height-body);
+  margin: 0;
+}
+.ledger-comparison__hero,
+.ledger-comparison__values > div {
+  display: grid;
+}
+.ledger-comparison__hero strong {
+  font-size: var(--tcrm-font-size-dashboard-metric);
+  line-height: var(--tcrm-line-height-dashboard-metric);
+}
+.ledger-comparison__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2) var(--tcrm-space-5);
+  margin-top: var(--tcrm-space-2);
+}
+.ledger-comparison__values strong {
   font-size: var(--tcrm-font-size-dashboard-comparison);
   line-height: var(--tcrm-line-height-dashboard-comparison);
-  font-variant-numeric: tabular-nums;
+}
+.ledger-comparison strong {
   overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-comparison__refund strong,
+.analytics-number--refund {
+  color: var(--tcrm-color-danger);
+}
+.analytics-number--net {
+  color: var(--tcrm-color-primary-active);
+  font-weight: 600;
+}
+.analytics-ranking {
+  --tcrm-color-table-header: color-mix(
+    in srgb,
+    var(--tcrm-color-primary) 5%,
+    var(--tcrm-color-card)
+  );
+}
+.analytics-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--tcrm-space-1);
 }
 .analytics-identity {
   display: grid;
@@ -620,8 +716,13 @@ onUnmounted(stop);
 }
 @media (max-width: 600px) {
   .analytics-cards,
-  .topic-grid {
+  .topic-grid,
+  .ledger-comparison {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .ledger-comparison__panel + .ledger-comparison__panel {
+    border-inline-start: 0;
+    border-top: 1px solid var(--tcrm-color-border);
   }
   .sort-controls button {
     min-height: 44px;

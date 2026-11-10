@@ -47,8 +47,11 @@ const zhCN = {
     pending: "开发中",
     comparison: "较上期 {value}",
     transactionTitle: "交易与结算对照",
-    transaction: "交易账",
-    settlementTitle: "结算账",
+    transactionLedger: "交易账 · 订单商品事实",
+    settlementLedger: "结算账 · 店铺资金流水",
+    ledgerDifference: "为什么会不同？",
+    ledgerDifferenceHint:
+      "交易账按订单付款和退款统计。结算账按平台资金入账统计，两者的时间口径与费用项目不同，金额可能不一致。",
     salesAmount: "销售额",
     cohortRefundAmount: "该批订单成功退款",
     completedRefundAmount: "退款金额（完结时间）",

@@ -45,8 +45,11 @@ const enUS: MessageSchema = {
     pending: "In development",
     comparison: "vs prior period {value}",
     transactionTitle: "Transaction and settlement comparison",
-    transaction: "Transaction ledger",
-    settlementTitle: "Settlement ledger",
+    transactionLedger: "Transaction ledger · Order activity",
+    settlementLedger: "Settlement ledger · Shop cash flow",
+    ledgerDifference: "Why can the amounts differ?",
+    ledgerDifferenceHint:
+      "The transaction ledger follows payments and refunds. The settlement ledger follows platform postings, which may use different dates and include different fees.",
     salesAmount: "Sales",
     cohortRefundAmount: "Successful refunds for paid orders",
     completedRefundAmount: "Refunds by completion date",
