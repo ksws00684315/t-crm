@@ -385,6 +385,27 @@ class WithdrawalServiceScopeTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_FILE_INVALID));
   }
 
+  @Test
+  void shouldAcceptVouchersUpToTenMegabytes_asTheDesignAndPaymentDialogAllow() {
+    // Audit M-13: the design (§6.2 POST /admin-api/files) and PaymentDialog.vue allow 10MB, but
+    // the service rejected anything above 2MB.
+    when(files.uploadWithdrawalVoucher(anyLong(), anyLong(), any(), any())).thenReturn(882L);
+    var payer = staff(6L, DataScope.ALL, Set.of("withdrawal:pay"));
+    assertThat(service.uploadVoucher(payer, "receipt.png", png(3 * 1024 * 1024))).isEqualTo(882L);
+    assertThat(service.uploadVoucher(payer, "receipt.png", png(10 * 1024 * 1024))).isEqualTo(882L);
+    assertThatThrownBy(() -> service.uploadVoucher(payer, "receipt.png", png(10 * 1024 * 1024 + 1)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PREPAY_FILE_TOO_LARGE));
+  }
+
+  private static byte[] png(int size) {
+    byte[] content = new byte[size];
+    byte[] signature = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    System.arraycopy(signature, 0, content, 0, signature.length);
+    return content;
+  }
+
   // ------------------------------------------------------------------ KOL reads
 
   @Test
