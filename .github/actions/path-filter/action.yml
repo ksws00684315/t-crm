@@ -29,12 +29,14 @@ runs:
         AFTER: ${{ github.sha }}
       run: |
         set -euo pipefail
+        # A rename reports only the new path in .filename, so the previous path is matched too:
+        # renaming a watched file out of the watched tree must not leave the checks skippable.
         # Scheduled and manual runs, and pushes without a usable base, always run everything.
         if [ "$EVENT" = pull_request ]; then
-          files="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename')"
+          files="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | .filename, (.previous_filename // empty)')"
           limit=3000
         elif [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
-          files="$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[].filename')"
+          files="$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[] | .filename, (.previous_filename // empty)')"
           limit=300
         else
           echo "changed=true" >> "$GITHUB_OUTPUT"
