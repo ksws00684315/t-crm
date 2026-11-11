@@ -187,6 +187,26 @@ export function createLibraryKol(request: LibraryKolRequest): Promise<LibraryKol
   });
 }
 
+export interface LibraryWorkbookImportResult {
+  created: number;
+  errors: { row: number; errorCode: string; column: string | null }[];
+}
+
+export function downloadLibraryWorkbookTemplate() {
+  return http.download({ method: "get", url: "/kol-library/kols/imports/template" });
+}
+
+export function importLibraryWorkbook(file: File): Promise<LibraryWorkbookImportResult> {
+  const data = new FormData();
+  data.append("file", file);
+  return http.request({
+    method: "post",
+    url: "/kol-library/kols/imports",
+    timeout: 90_000,
+    data
+  });
+}
+
 export function updateLibraryKol(
   id: string,
   request: LibraryKolRequest
