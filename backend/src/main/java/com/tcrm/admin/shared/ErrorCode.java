@@ -121,6 +121,7 @@ public enum ErrorCode {
   COPY_TARGET_SHOP_MISSING(422, "No copy-target shop is configured"),
   KOL_REVIEW_ALREADY_DONE(409, "KOL review is already done"),
   KOL_REVIEW_REQUIRED(409, "KOL must be reviewed before promotion config can be saved"),
+  KOL_NOT_ACTIVATED(422, "KOL account is not activated"),
   KOL_LIBRARY_DUPLICATE(409, "This creator is already in the library"),
   PRODUCT_LINK_RATE_LIMITED(429, "Too many product-link requests; try again later"),
   SHORT_URL_INVALID(400, "URL must be http or https and at most 2048 characters"),

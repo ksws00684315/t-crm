@@ -16,11 +16,16 @@ import org.apache.ibatis.annotations.Update;
  */
 @Mapper
 public interface OrderSettlementFlowMapper extends BaseMapper<OrderSettlementFlowDO> {
+  /**
+   * Explicit columns of {@link OrderSettlementFlowDO} instead of SELECT * (task 145, audit C-02).
+   */
+  String SELECT_FROM =
+      "SELECT id, create_by, create_time, update_by, update_time, is_deleted, shop_id, weidian_order_id, order_id, refund_id, trade_type, trade_sub_type, trade_time, remark, amount_raw, amount_cny, query_type, fingerprint, first_pulled_at, last_pulled_at, tenant_id FROM crm_order_settlement_flow ";
 
   /** All live flows of one remote order id; the commission basis check filters by query type. */
   @Select(
-      """
-      SELECT * FROM crm_order_settlement_flow
+      SELECT_FROM
+          + """
       WHERE shop_id = #{shopId} AND weidian_order_id = #{weidianOrderId} AND is_deleted = FALSE
       """)
   List<OrderSettlementFlowDO> listByRemoteOrderId(

@@ -88,7 +88,8 @@ public class WeidianClient {
           retryCount++;
         } catch (WeidianTransportException e) {
           if (!e.retryable() || retryCount >= BACKOFF.length) {
-            throw new WeidianApiException(-1, "Weidian API transport failed", false);
+            throw new WeidianApiException(
+                WeidianApiException.NO_USABLE_RESPONSE, "Weidian API transport failed", false);
           }
           delay.pause(BACKOFF[retryCount]);
           retryCount++;

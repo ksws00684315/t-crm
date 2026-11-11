@@ -460,4 +460,24 @@ class KolControllerTest {
     mvc.perform(get(BASE)).andExpect(status().isUnauthorized());
     verifyNoInteractions(kols);
   }
+
+  @Test
+  void shouldReturnGeneratedPassword_whenSuperAdminResets() throws Exception {
+    when(kols.adminResetPassword(11L)).thenReturn("23456789Abcdefgh");
+    mvc.perform(
+            post(BASE + "/11/password-reset")
+                .header(AdminMvcSupport.TOKEN_HEADER, as(Role.SUPER_ADMIN, DataScope.ALL)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.password").value("23456789Abcdefgh"));
+    verify(kols).adminResetPassword(11L);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"STAFF, ALL", "STAFF, OWN"})
+  void shouldRejectPasswordReset_whenNotSuperAdmin(Role role, DataScope scope) throws Exception {
+    mvc.perform(
+            post(BASE + "/11/password-reset").header(AdminMvcSupport.TOKEN_HEADER, as(role, scope)))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(kols);
+  }
 }

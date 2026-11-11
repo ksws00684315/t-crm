@@ -139,7 +139,6 @@ class KolLibraryIT {
     body.put("salesPotential", "MEDIUM");
     body.put("cooperationAttitude", "HIGH");
     body.put("grade", "A");
-    body.put("cooperationStage", "REPEAT_INVESTMENT");
     body.put("tags", List.of("高转化", "坑位费贵"));
     body.put("remark", "note");
     body.put("outreachStatus", "REPLIED");
@@ -148,6 +147,7 @@ class KolLibraryIT {
     body.put("sampleStatus", "SHIPPED");
     body.put("trackingNo", "SF123");
     body.put("sampleDate", "2026-10-30");
+    body.put("followUpRemark", "first remark");
     return body;
   }
 
@@ -493,8 +493,10 @@ class KolLibraryIT {
                             "lastContactDate", "2026-11-05",
                             "sampleStatus", "RECEIVED",
                             "trackingNo", "SF999",
-                            "sampleDate", "2026-11-02"))))
+                            "sampleDate", "2026-11-02",
+                            "followUpRemark", "dialog remark"))))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUpRemark").value("dialog remark"))
         .andExpect(jsonPath("$.data.outreachStatus").value("COOPERATING"))
         .andExpect(jsonPath("$.data.sampleStatus").value("RECEIVED"))
         .andExpect(jsonPath("$.data.trackingNo").value("SF999"))
@@ -723,9 +725,12 @@ class KolLibraryIT {
     create(token, noId).andExpect(status().isBadRequest());
     var onlyAt = profile("@", "Amy BD");
     create(token, onlyAt).andExpect(status().isBadRequest());
-    var noCategories = profile("nocat", "Amy BD");
-    noCategories.put("categories", List.of());
-    create(token, noCategories).andExpect(status().isBadRequest());
+    var noFollowers = profile("nofollowers", "Amy BD");
+    noFollowers.remove("followers");
+    create(token, noFollowers).andExpect(status().isBadRequest());
+    var noUrl = profile("nourl", "Amy BD");
+    noUrl.remove("profileUrl");
+    create(token, noUrl).andExpect(status().isBadRequest());
     var unknownCategory = profile("badcat", "Amy BD");
     unknownCategory.put("categories", List.of("NOT_A_CATEGORY"));
     create(token, unknownCategory).andExpect(status().isBadRequest());
@@ -765,5 +770,118 @@ class KolLibraryIT {
             "SELECT request_params FROM sys_oper_log WHERE action = 'Create'", String.class);
     assertThat(params).isNotEmpty();
     assertThat(params.getFirst()).doesNotContain("555 0100");
+  }
+
+  @Test
+  void shouldKeepCategoriesAndCooperationStage_ofRowsWrittenBeforeTheRevision() throws Exception {
+    String token = library.token();
+    String id = createOk(token, "legacy", "Amy BD");
+    // A row of task 143 still carrying a cooperation stage and no follow-up remark.
+    jdbc.update(
+        "UPDATE crm_library_kol SET cooperation_stage = 'REPEAT_INVESTMENT', follow_up_remark = NULL"
+            + " WHERE id = ?",
+        Long.parseLong(id));
+    var edit = profile("legacy", "Bob BD");
+    edit.put("grade", "S");
+    mvc.perform(
+            put(LIB + "/" + id)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(edit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.cooperationStage").doesNotExist())
+        .andExpect(jsonPath("$.data.followUpRemark").value("first remark"));
+    mvc.perform(
+            put(LIB + "/" + id + "/follow-up")
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"outreachStatus\":\"REPLIED\",\"sampleStatus\":\"SHIPPED\"}"))
+        .andExpect(status().isOk());
+    Map<String, Object> stored =
+        jdbc.queryForMap(
+            "SELECT cooperation_stage, categories::text AS categories FROM crm_library_kol"
+                + " WHERE id = ?",
+            Long.parseLong(id));
+    assertThat(stored.get("cooperation_stage")).isEqualTo("REPEAT_INVESTMENT");
+    assertThat(stored.get("categories").toString()).contains("BEAUTY_PERSONAL_CARE", "HOME_DAILY");
+  }
+
+  @Test
+  void shouldSaveWithoutCategoriesAndOutreach_andWriteTheFollowUpRemarkEverywhere()
+      throws Exception {
+    String token = library.token();
+    var minimal = profile("minimal", "Amy BD");
+    minimal.put("categories", List.of());
+    minimal.remove("outreachStatus");
+    String id =
+        json.readTree(
+                create(token, minimal)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.categories.length()").value(0))
+                    .andExpect(jsonPath("$.data.outreachStatus").value("NOT_CONTACTED"))
+                    .andExpect(jsonPath("$.data.followUpRemark").value("first remark"))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .at("/data/id")
+            .asText();
+    // The table itself accepts an empty category array (the old "at least one" check is gone).
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT categories::text FROM crm_library_kol WHERE id = ?",
+                String.class,
+                Long.parseLong(id)))
+        .isEqualTo("[]");
+    // An edit that leaves the outreach out keeps it; the follow-up remark is replaced.
+    jdbc.update(
+        "UPDATE crm_library_kol SET outreach_status = 'REPLIED' WHERE id = ?", Long.parseLong(id));
+    var edit = profile("minimal", "Amy BD");
+    edit.remove("outreachStatus");
+    edit.put("followUpRemark", "edited remark");
+    mvc.perform(
+            put(LIB + "/" + id)
+                .header(TOKEN, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(edit)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.outreachStatus").value("REPLIED"))
+        .andExpect(jsonPath("$.data.followUpRemark").value("edited remark"));
+    // The list returns the eight columns' data, not the remark or the change time.
+    mvc.perform(get(LIB).param("keyword", "minimal").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.items[0].followers").value(12000))
+        .andExpect(jsonPath("$.data.items[0].grade").value("A"))
+        .andExpect(jsonPath("$.data.items[0].categories.length()").value(2))
+        .andExpect(jsonPath("$.data.items[0].outreachStatus").value("REPLIED"))
+        .andExpect(jsonPath("$.data.items[0].followUpOwner").value("Amy BD"))
+        .andExpect(jsonPath("$.data.items[0].followUpRemark").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].cooperationStage").doesNotExist())
+        .andExpect(jsonPath("$.data.items[0].updateTime").doesNotExist());
+    // The operation log is written asynchronously, so wait for the row instead of racing it.
+    List<String> params = List.of();
+    for (int attempt = 0; attempt < 20 && params.isEmpty(); attempt++) {
+      if (attempt > 0) {
+        Thread.sleep(50);
+      }
+      params =
+          jdbc.queryForList(
+              "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library'", String.class);
+    }
+    assertThat(params).isNotEmpty().noneMatch(p -> p.contains("edited remark"));
+  }
+
+  @Test
+  void shouldFilterTheList_byPlatformAndCountryToo() throws Exception {
+    String token = library.token();
+    createOk(token, "usone", "Amy BD");
+    var uk = profile("ukone", "Amy BD");
+    uk.put("countryCode", "GB");
+    uk.put("platform", "INSTAGRAM");
+    create(token, uk).andExpect(status().isOk());
+    mvc.perform(get(LIB).param("countryCode", "GB").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value("ukone"));
+    mvc.perform(get(LIB).param("platform", "TIKTOK").header(TOKEN, token))
+        .andExpect(jsonPath("$.data.total").value(1))
+        .andExpect(jsonPath("$.data.items[0].kolUsername").value("usone"));
   }
 }

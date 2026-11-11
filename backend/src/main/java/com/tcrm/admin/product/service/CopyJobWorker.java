@@ -220,6 +220,13 @@ public class CopyJobWorker implements ApplicationRunner {
       return;
     }
     ProductDO product = source.product();
+    // Two jobs can carry the same source item (the spreadsheet was submitted again while the
+    // first job was still running, production 2026-11-10). Hold the shop-item lock until this
+    // transaction commits, so the second job sees the first one's registration and copy instead
+    // of inserting the same product or copying the item twice. Unregistered items already hold
+    // this lock from ensureProduct; taking it again in the same transaction is a no-op.
+    products.lockShopItem(
+        ProductRules.shopItemLockKey(product.getShopId(), product.getWeidianItemId()));
     KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), product.getId());
     if (existing != null) {
       markSuccess(fresh.getId(), existing.getWeidianItemId(), null, product.getShopId());
@@ -322,6 +329,9 @@ public class CopyJobWorker implements ApplicationRunner {
 
   private ProductDO ensureProduct(
       long shopId, String weidianItemId, String name, BigDecimal price, String imageUrl) {
+    // Recheck under the same shop-item lock the import paths use: two copy jobs probing the same
+    // source item would otherwise both insert it and one would fail on uk_crm_product_shop_item.
+    products.lockShopItem(ProductRules.shopItemLockKey(shopId, weidianItemId));
     ProductDO existing =
         products.selectOne(
             new LambdaQueryWrapper<ProductDO>()

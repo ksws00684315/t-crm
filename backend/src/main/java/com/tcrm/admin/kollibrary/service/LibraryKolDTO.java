@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * A library creator as the list shows it (requirement 1.2.5 ②): the basic data and status of the
- * required fields only, no content counts or totals.
+ * list columns only (2026-11-10), no content counts or totals.
  */
 public record LibraryKolDTO(
     Long id,
@@ -18,12 +18,8 @@ public record LibraryKolDTO(
     String countryCode,
     List<String> categories,
     String grade,
-    String cooperationStage,
     String outreachStatus,
-    String followUpOwner,
-    LocalDate lastContactDate,
-    String sampleStatus,
-    Instant updateTime) {
+    String followUpOwner) {
 
   /** Creator totals of the detail page (requirement 1.2.6 ③). */
   public record Totals(
@@ -54,7 +50,6 @@ public record LibraryKolDTO(
       String salesPotential,
       String cooperationAttitude,
       String grade,
-      String cooperationStage,
       List<String> tags,
       String remark,
       String outreachStatus,
@@ -63,6 +58,7 @@ public record LibraryKolDTO(
       String sampleStatus,
       String trackingNo,
       LocalDate sampleDate,
+      String followUpRemark,
       Instant createTime,
       Instant updateTime,
       Totals totals) {}

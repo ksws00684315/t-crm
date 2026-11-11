@@ -32,7 +32,8 @@ const form = reactive<LibraryFollowUpRequest>({
   lastContactDate: null,
   sampleStatus: "NOT_SENT",
   trackingNo: null,
-  sampleDate: null
+  sampleDate: null,
+  followUpRemark: null
 });
 
 /** Only the two status choices are required; the rest may stay empty (requirement 1.2.6 ①). */
@@ -61,13 +62,14 @@ watch(
   () => props.modelValue,
   open => {
     if (!open) return;
-    // Starts from the stored follow-up state; only this dialog's five fields change.
+    // Starts from the stored follow-up state; only this dialog's six fields change.
     Object.assign(form, {
       outreachStatus: props.detail.outreachStatus,
       lastContactDate: props.detail.lastContactDate,
       sampleStatus: props.detail.sampleStatus,
       trackingNo: props.detail.trackingNo,
-      sampleDate: props.detail.sampleDate
+      sampleDate: props.detail.sampleDate,
+      followUpRemark: props.detail.followUpRemark
     });
     formRef.value?.clearValidate();
   }
@@ -81,10 +83,14 @@ async function submit(): Promise<void> {
   if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return;
   saving.value = true;
   try {
-    const text = (form.trackingNo ?? "").trim();
+    const clean = (value: string | null): string | null => {
+      const text = (value ?? "").trim();
+      return text === "" ? null : text;
+    };
     await updateLibraryFollowUp(props.detail.id, {
       ...form,
-      trackingNo: text === "" ? null : text
+      trackingNo: clean(form.trackingNo),
+      followUpRemark: clean(form.followUpRemark)
     });
     ElMessage.success(t("library.followUpSaved"));
     emit("saved");
@@ -143,6 +149,16 @@ async function submit(): Promise<void> {
           type="date"
           value-format="YYYY-MM-DD"
           data-test="follow-up-sample-date"
+        />
+      </el-form-item>
+      <el-form-item :label="t('library.field.followUpRemark')" prop="followUpRemark">
+        <el-input
+          v-model="form.followUpRemark"
+          type="textarea"
+          :rows="3"
+          maxlength="1000"
+          show-word-limit
+          data-test="follow-up-remark"
         />
       </el-form-item>
     </el-form>

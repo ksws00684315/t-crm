@@ -1,6 +1,7 @@
 package com.tcrm.admin.integration.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -225,6 +226,22 @@ class WeidianBusinessApiEnvelopeTest {
     var response = api.deleteItem(SHOP_ID, new WeidianBusinessApi.DeleteItemRequest("7244889828"));
 
     assertThat(response.result().intValue()).isEqualTo(200);
+  }
+
+  @Test
+  void shouldKeepMissingResultAsAPerCallFailure() {
+    // status_code = 0 without result: the call is broken, the shop is not (task 145 review).
+    when(gateway.apiPost(eq("vdian.order.get"), eq("2.0"), eq(ACCESS_TOKEN), anyString()))
+        .thenReturn(
+            json.readTree("{\"status\":{\"status_code\":0,\"status_reason\":\"success\"}}"));
+
+    assertThatThrownBy(
+            () ->
+                api.orderDetail(
+                    SHOP_ID, new WeidianBusinessApi.OrderDetailRequest(810223180971712L)))
+        .isInstanceOfSatisfying(
+            WeidianApiException.class,
+            error -> assertThat(error.statusCode()).isEqualTo(WeidianApiException.MISSING_RESULT));
   }
 
   private void respond(String method, String version, String resultJson) {

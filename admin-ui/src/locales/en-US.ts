@@ -277,6 +277,7 @@ const enUS: MessageSchema = {
     KOL_MULTIPLE_PRIMARY: "At most one social account can be the primary one.",
     KOL_REVIEW_ALREADY_DONE: "This creator has already been reviewed.",
     KOL_REVIEW_REQUIRED: "Review this creator before saving promotion settings.",
+    KOL_NOT_ACTIVATED: "This creator has not activated the account yet; send the invitation first.",
     KOL_PROMOTION_CONFIG_INCOMPLETE:
       "The promotion settings are incomplete, so the creator cannot start promoting yet.",
     KOL_ALREADY_CLAIMED: "Another BD just claimed this creator. Refresh and try again.",
@@ -734,13 +735,14 @@ const enUS: MessageSchema = {
     duplicate: "This creator was already entered by {owner}.",
     addTag: "Add tag",
     column: {
-      kol: "Creator",
+      kol: "Creator / ID",
       platform: "Platform",
+      followers: "Followers",
       country: "Country site",
       categories: "Content categories",
       outreachStatus: "Outreach status",
-      followUpOwner: "Follow-up owner",
-      updateTime: "Updated"
+      followUpOwner: "Owner",
+      grade: "Creator tier"
     },
     filter: {
       keyword: "Keyword",
@@ -754,6 +756,18 @@ const enUS: MessageSchema = {
       tags: "Tags and notes",
       followUp: "Outreach and samples"
     },
+    /** Second-level tabs of the add / edit form (requirement 1.2.5 ④, 2026-11-10). */
+    formTab: {
+      basic: "Basic information",
+      followUp: "Outreach and samples",
+      quality: "Quality and tier"
+    },
+    /** Group cards inside the form's basic-information tab. */
+    formSection: {
+      basic: "Basic information",
+      accountType: "Account type",
+      audience: "Audience"
+    },
     field: {
       kolUsername: "Creator ID (username)",
       kolUsernamePlaceholder: "Paste {'@'}username; the {'@'} is removed and the value lower-cased",
@@ -764,18 +778,17 @@ const enUS: MessageSchema = {
       profileUrl: "Profile link",
       profileUrlPlaceholder: "https://www.tiktok.com/{'@'}...",
       categories: "Content categories",
-      avgViews: "Average views",
+      avgViews: "Recent average views",
       engagementRate: "Engagement rate (%)",
       audienceCountry: "Country / region",
       audienceAgeRange: "Age range",
       audienceGender: "Gender",
-      contact: "WhatsApp/TEL",
+      contact: "Contact",
       contactPlaceholder: "Country code plus number",
       contentQuality: "Content quality",
       salesPotential: "Selling potential",
       cooperationAttitude: "Cooperation attitude",
       grade: "Creator tier",
-      cooperationStage: "Cooperation stage",
       tags: "Free tags",
       tagPlaceholder: "Type and press Enter",
       remark: "Notes",
@@ -783,13 +796,17 @@ const enUS: MessageSchema = {
       followUpOwner: "Follow-up owner",
       lastContactDate: "Last contact",
       sampleStatus: "Sample status",
-      trackingNo: "Tracking number",
-      sampleDate: "Sample date"
+      trackingNo: "Sample tracking number",
+      sampleDate: "Sample date",
+      followUpRemark: "Follow-up notes"
     },
     validation: {
       usernameRequired: "Enter the creator ID",
       nameRequired: "Enter the creator name",
-      categoriesRequired: "Choose at least one content category",
+      followersRequired: "Enter the follower count",
+      followersInvalid: "Followers must be a whole number of 0 or more",
+      profileUrlRequired: "Enter the profile link",
+      profileUrlInvalid: "The profile link must start with http:// or https://",
       ownerRequired: "Enter the follow-up owner",
       tagsLimit: "At most 10 tags",
       urlRequired: "Enter the content link",
@@ -875,12 +892,6 @@ const enUS: MessageSchema = {
       A: "A",
       B: "B",
       C: "C"
-    },
-    cooperationStage: {
-      FIRST_COOPERATION: "First cooperation",
-      REPEAT_INVESTMENT: "Repeat investment",
-      LONG_TERM_PARTNERSHIP: "Long-term partnership",
-      EXCLUSIVE: "Exclusive"
     },
     outreachStatus: {
       NOT_CONTACTED: "Not contacted",
@@ -1035,6 +1046,14 @@ const enUS: MessageSchema = {
     disabledNotOwned: "Only the assigned BD can act on this creator",
     disabledCommissionApproved: "Approve the creator before changing commission",
     editProfileTitle: "Edit profile - {code} ({name})",
+    /** Super-administrator password reset (task 147); the generated password is shown once. */
+    resetPassword: "Reset password",
+    resetPasswordTitle: "Reset creator password",
+    confirmResetPassword:
+      "Reset the password of creator {code} ({name})? The creator is signed out everywhere and the new password is shown only once.",
+    resetPasswordDone: "Password reset; the creator is signed out everywhere",
+    resetPasswordResultHint:
+      "The new password is shown only once — copy and send it to the creator now:",
     /** Super-admin tab on the creator page: transfer creators between BDs. */
     manageTab: "Creator assignment",
     listTab: "Creator List",

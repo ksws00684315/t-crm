@@ -67,9 +67,6 @@ public class LibraryKolDO extends BaseEntity {
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LibraryGrade grade;
 
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
-  private LibraryCooperationStage cooperationStage;
-
   /** JSON array text; see crm_library_kol.tags. */
   @TableField(typeHandler = JsonbStringTypeHandler.class)
   private String tags;
@@ -91,6 +88,9 @@ public class LibraryKolDO extends BaseEntity {
 
   @TableField(updateStrategy = FieldStrategy.ALWAYS)
   private LocalDate sampleDate;
+
+  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  private String followUpRemark;
 
   public Long getTenantId() {
     return tenantId;
@@ -236,14 +236,6 @@ public class LibraryKolDO extends BaseEntity {
     this.grade = value;
   }
 
-  public LibraryCooperationStage getCooperationStage() {
-    return cooperationStage;
-  }
-
-  public void setCooperationStage(LibraryCooperationStage value) {
-    this.cooperationStage = value;
-  }
-
   public String getTags() {
     return tags;
   }
@@ -306,5 +298,13 @@ public class LibraryKolDO extends BaseEntity {
 
   public void setSampleDate(LocalDate value) {
     this.sampleDate = value;
+  }
+
+  public String getFollowUpRemark() {
+    return followUpRemark;
+  }
+
+  public void setFollowUpRemark(String value) {
+    this.followUpRemark = value;
   }
 }

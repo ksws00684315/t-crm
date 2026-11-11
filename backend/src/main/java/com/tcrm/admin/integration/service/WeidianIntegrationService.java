@@ -181,6 +181,12 @@ public class WeidianIntegrationService implements ShopIntegrationApi {
             }));
   }
 
+  /**
+   * vdian.item.list.get rejects large page_size with status 108 (case 144). The exact cap is
+   * undocumented; 1 and 5 are values verified working in production, so use 5.
+   */
+  private static final int ON_SALE_PAGE_SIZE = 5;
+
   @Override
   public int countOnSaleItems(long shopId) {
     tokens.accessToken(shopId);
@@ -191,13 +197,18 @@ public class WeidianIntegrationService implements ShopIntegrationApi {
           business.itemList(
               shopId,
               new WeidianBusinessApi.ItemListRequest(
-                  null, Integer.toString(page), null, 1, null, "100"));
+                  null,
+                  Integer.toString(page),
+                  null,
+                  1,
+                  null,
+                  Integer.toString(ON_SALE_PAGE_SIZE)));
       if (response.totalNum() != null) {
         return Math.max(0, response.totalNum());
       }
       int current = response.items() == null ? 0 : response.items().size();
       count += current;
-      if (current < 100) {
+      if (current < ON_SALE_PAGE_SIZE) {
         return count;
       }
       page++;
