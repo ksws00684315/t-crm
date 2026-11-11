@@ -28,7 +28,6 @@ const profile: LibraryKolDetailVO = {
   countryCode: "US",
   categories: ["BEAUTY_PERSONAL_CARE"],
   grade: "A",
-  cooperationStage: "FIRST_COOPERATION",
   outreachStatus: "EMAIL_SENT",
   followUpOwner: "Amy BD",
   avgViews: "30000",
@@ -47,6 +46,7 @@ const profile: LibraryKolDetailVO = {
   sampleStatus: "SHIPPED",
   trackingNo: "SF123",
   sampleDate: null,
+  followUpRemark: "call on friday",
   updateTime: "2026-11-01T00:00:00Z",
   createTime: "2026-10-01T00:00:00Z",
   totals: {
@@ -125,6 +125,32 @@ describe("library creator detail", () => {
     expect(libraryApi.getLibraryKol).toHaveBeenCalledWith("11");
     // Without waiting for the profile the contents were skipped and never asked for again.
     expect(libraryApi.listLibraryContents).toHaveBeenCalledWith("11");
+    wrapper.unmount();
+  });
+
+  it("shows the follow-up remark, no cooperation stage and no delete (2026-11-10/11)", async () => {
+    const wrapper = await mountDetail();
+    const text = wrapper.text();
+    expect(text).toContain("跟进备注");
+    expect(text).toContain("call on friday");
+    expect(text).not.toContain("合作阶段");
+    expect(wrapper.find('[data-test="detail-delete"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("edits the follow-up remark in the follow-up dialog", async () => {
+    vi.mocked(libraryApi.updateLibraryFollowUp).mockResolvedValue(profile);
+    const wrapper = await mountDetail();
+    await wrapper.find('[data-test="detail-follow-up"]').trigger("click");
+    await flushPromises();
+    const remark = wrapper.find<HTMLTextAreaElement>('textarea[data-test="follow-up-remark"]');
+    expect(remark.element.value).toBe("call on friday");
+    await remark.setValue("ship next week");
+    await wrapper.find('[data-test="follow-up-save"]').trigger("click");
+    await vi.waitFor(() => expect(libraryApi.updateLibraryFollowUp).toHaveBeenCalled());
+    expect(vi.mocked(libraryApi.updateLibraryFollowUp).mock.calls[0][1]).toEqual(
+      expect.objectContaining({ followUpRemark: "ship next week" })
+    );
     wrapper.unmount();
   });
 });
