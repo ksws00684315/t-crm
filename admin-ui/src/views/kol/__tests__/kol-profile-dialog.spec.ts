@@ -129,7 +129,10 @@ describe("creator profile dialog password reset (task 147)", () => {
     await flushPromises();
 
     expect(kolApi.resetKolPassword).toHaveBeenCalledWith("9007199254740993");
-    expect(element("reset-password-value").text()).toBe("23456789Abcdefgh");
+    expect(
+      document.body.querySelector('[data-test="reset-password-result"] [data-test="value"]')
+        ?.textContent
+    ).toBe("23456789Abcdefgh");
     expect(success).toHaveBeenCalled();
   });
 

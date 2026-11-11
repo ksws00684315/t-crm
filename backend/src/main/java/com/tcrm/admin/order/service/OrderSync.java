@@ -308,12 +308,7 @@ public class OrderSync {
     if (retries == null) {
       return pending;
     }
-    for (var retry :
-        retries.selectList(
-            new LambdaQueryWrapper<OrderSyncRetryDO>()
-                .eq(OrderSyncRetryDO::getShopId, shopId)
-                .orderByAsc(OrderSyncRetryDO::getUpdateTime)
-                .last("LIMIT " + RETRY_BATCH))) {
+    for (var retry : retries.listPending(shopId, RETRY_BATCH)) {
       pending.put(retry.getOrderId(), retry);
     }
     return pending;
