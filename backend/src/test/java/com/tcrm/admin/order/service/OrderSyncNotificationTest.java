@@ -2,6 +2,7 @@ package com.tcrm.admin.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -93,7 +94,7 @@ class OrderSyncNotificationTest {
     Harness harness = harness();
     harness.state.setLastSuccessAt(EARLIER);
     stubOneFailingOrder(harness);
-    when(harness.retries.selectList(any())).thenReturn(List.of());
+    when(harness.retries.listPending(anyLong(), anyInt())).thenReturn(List.of());
     TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isTrue());
     var inserted = ArgumentCaptor.forClass(OrderSyncRetryDO.class);
     verify(harness.retries).insert(inserted.capture());
@@ -117,7 +118,7 @@ class OrderSyncNotificationTest {
       harness.state.setLastSuccessAt(EARLIER);
       stubOneFailingOrder(harness);
       var retry = retry(previous);
-      when(harness.retries.selectList(any())).thenReturn(List.of(retry));
+      when(harness.retries.listPending(anyLong(), anyInt())).thenReturn(List.of(retry));
       TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isTrue());
       verify(harness.retries).updateById(retry);
       assertThat(retry.getFailCount()).isEqualTo(previous + 1);
@@ -144,7 +145,7 @@ class OrderSyncNotificationTest {
         .thenReturn(
             OrderNormalizerTest.detail(
                 "100", "pay", NOW, List.of(OrderNormalizerTest.line("90", null))));
-    when(harness.retries.selectList(any())).thenReturn(List.of(retry(2)));
+    when(harness.retries.listPending(anyLong(), anyInt())).thenReturn(List.of(retry(2)));
     TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isTrue());
     verify(harness.retries).deleteResolved(55L);
   }
@@ -159,7 +160,7 @@ class OrderSyncNotificationTest {
                 com.tcrm.admin.shared.ErrorCode.WEIDIAN_SHOP_NOT_AUTHORIZED))
         .when(harness.api)
         .orderDetail(anyLong(), any());
-    when(harness.retries.selectList(any())).thenReturn(List.of());
+    when(harness.retries.listPending(anyLong(), anyInt())).thenReturn(List.of());
     TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isFalse());
     verify(harness.retries, never()).insert(any(OrderSyncRetryDO.class));
     assertThat(harness.state.getLastError())
@@ -192,7 +193,7 @@ class OrderSyncNotificationTest {
         .thenThrow(
             new com.tcrm.admin.shared.BusinessException(
                 com.tcrm.admin.shared.ErrorCode.WEIDIAN_API_FAILED));
-    when(harness.retries.selectList(any())).thenReturn(List.of());
+    when(harness.retries.listPending(anyLong(), anyInt())).thenReturn(List.of());
 
     TenantScope.runCompany(7L, () -> assertThat(harness.sync.synchronize(3L)).isFalse());
 
