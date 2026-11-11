@@ -856,9 +856,16 @@ class KolLibraryIT {
         .andExpect(jsonPath("$.data.items[0].followUpRemark").doesNotExist())
         .andExpect(jsonPath("$.data.items[0].cooperationStage").doesNotExist())
         .andExpect(jsonPath("$.data.items[0].updateTime").doesNotExist());
-    List<String> params =
-        jdbc.queryForList(
-            "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library'", String.class);
+    // The operation log is written asynchronously, so wait for the row instead of racing it.
+    List<String> params = List.of();
+    for (int attempt = 0; attempt < 20 && params.isEmpty(); attempt++) {
+      if (attempt > 0) {
+        Thread.sleep(50);
+      }
+      params =
+          jdbc.queryForList(
+              "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library'", String.class);
+    }
     assertThat(params).isNotEmpty().noneMatch(p -> p.contains("edited remark"));
   }
 
