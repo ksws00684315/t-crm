@@ -372,8 +372,8 @@ public class LibraryKolWorkbook {
       if (number.scale() >= -308 && number.scale() <= 340) {
         return number;
       }
-    } catch (NumberFormatException ignored) {
-      // The import result identifies the cell rather than rejecting the whole file.
+    } catch (NumberFormatException e) {
+      throw new InvalidCell(column);
     }
     throw new InvalidCell(column);
   }
@@ -469,8 +469,8 @@ public class LibraryKolWorkbook {
         if (result >= 0) {
           return result;
         }
-      } catch (ArithmeticException ignored) {
-        // Report the field using the same validation path as negative counts.
+      } catch (ArithmeticException e) {
+        throw new InvalidCell(col);
       }
       throw new InvalidCell(col);
     }

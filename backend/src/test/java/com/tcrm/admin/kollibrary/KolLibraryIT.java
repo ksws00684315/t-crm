@@ -13,6 +13,7 @@ import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,6 +28,7 @@ import java.util.concurrent.Future;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -883,14 +885,21 @@ class KolLibraryIT {
                     "{\"outreachStatus\":\"COOPERATING\",\"sampleStatus\":\"SHIPPED\","
                         + "\"trackingNo\":\"SF1\"}"))
         .andExpect(status().isOk());
-    List<String> actions =
-        jdbc.queryForList(
-            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' ORDER BY oper_time",
-            String.class);
-    assertThat(actions).contains("Create", "Update follow-up");
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForList(
+                            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' AND tenant_id = ?",
+                            String.class,
+                            library.tenantId()))
+                    .contains("Create", "Update follow-up"));
     List<String> params =
         jdbc.queryForList(
-            "SELECT request_params FROM sys_oper_log WHERE action = 'Create'", String.class);
+            "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library' AND action = 'Create' AND tenant_id = ?",
+            String.class,
+            library.tenantId());
     assertThat(params).isNotEmpty();
     assertThat(params.getFirst()).doesNotContain("555 0100");
   }
