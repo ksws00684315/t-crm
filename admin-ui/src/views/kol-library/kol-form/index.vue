@@ -31,6 +31,7 @@ import {
 } from "@/utils/kol-library";
 import { notifyError } from "@/utils/notify";
 import { libraryAbilities } from "@/utils/permission";
+import LibraryWorkbookImport from "./LibraryWorkbookImport.vue";
 
 defineOptions({ name: "LibraryKolFormPage" });
 
@@ -388,6 +389,10 @@ function cancel(): void {
   void router.push(detailTabPath.value ?? "/kol-library/kols");
 }
 
+function onWorkbookImported(): void {
+  tabs.refresh("/kol-library/kols");
+}
+
 /** Opens the existing creator of the duplicate answer in a tab of its own. */
 async function openDuplicate(): Promise<void> {
   const found = duplicate.value;
@@ -447,6 +452,11 @@ onMounted(() => {
     >
       <header class="form-page__header">
         <h1 class="form-page__title">{{ title }}</h1>
+        <LibraryWorkbookImport
+          v-if="!editing && abilities.canEdit"
+          @imported="onWorkbookImported"
+          @view-list="cancel"
+        />
         <el-button
           v-if="editing && abilities.canDelete"
           type="danger"
@@ -787,6 +797,8 @@ onMounted(() => {
 }
 .form-page__header {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--tcrm-space-2);
   align-items: center;
   justify-content: space-between;
 }

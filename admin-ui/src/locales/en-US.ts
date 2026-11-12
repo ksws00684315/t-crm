@@ -365,6 +365,10 @@ const enUS: MessageSchema = {
     USER_PERMISSION_EDITION_MISMATCH:
       "That permission belongs to another company edition and cannot be used here.",
     KOL_LIBRARY_DUPLICATE: "This creator is already in the library and cannot be entered twice.",
+    KOL_LIBRARY_IMPORT_DUPLICATE_ROW:
+      "This platform and creator ID appear more than once in the workbook.",
+    KOL_LIBRARY_IMPORT_FILE_TOO_LARGE: "The workbook exceeds 2 MB. Split it and try again.",
+    KOL_LIBRARY_IMPORT_REQUIRED: "Fill in all highlighted columns for a new creator.",
     USER_MULTI_COMPANY_LOCKED:
       "This account also belongs to other companies. Only the platform administrator can change its name, email or password.",
     USER_ALREADY_MEMBER: "This account is already a member of this company.",
@@ -718,6 +722,20 @@ const enUS: MessageSchema = {
     editTitle: "Edit profile",
     editProfile: "Edit profile",
     editTabTitle: "Edit profile: {name}",
+    workbook: {
+      download: "Download template",
+      upload: "Upload workbook",
+      title: "Import creators",
+      guide:
+        "Enter new creators on the Creators sheet. Rows with an existing platform and creator ID are reported as duplicates.",
+      rules: "Fill in the highlighted columns. Use .xlsx, up to 200 rows and 2 MB.",
+      file: "Choose Excel workbook",
+      submit: "Import",
+      result: "{created} created, {failed} failed.",
+      row: "Row {row}",
+      invalidCell: "Check the format for {column} against the template example.",
+      viewList: "View creator list"
+    },
     updateFollowUp: "Update follow-up",
     view: "View",
     backToList: "Back to creators",

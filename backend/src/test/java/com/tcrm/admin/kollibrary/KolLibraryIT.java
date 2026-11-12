@@ -3,6 +3,7 @@ package com.tcrm.admin.kollibrary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tcrm.admin.CompanySessions;
 import com.tcrm.admin.WeidianTestProperties;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +25,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,6 +38,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -167,6 +177,121 @@ class KolLibraryIT {
             .getResponse()
             .getContentAsString();
     return json.readTree(response).at("/data/id").asText();
+  }
+
+  @Test
+  void shouldDownloadTemplateAndOnlyImportNewCreators() throws Exception {
+    String token = library.token();
+    String id = createOk(token, "old_creator", "Amy BD");
+    jdbc.update(
+        "UPDATE crm_library_kol SET followers = NULL, profile_url = NULL WHERE id = ?",
+        Long.parseLong(id));
+    byte[] template =
+        mvc.perform(
+                get(LIB + "/imports/template")
+                    .header(TOKEN, token)
+                    .header("Accept-Language", "zh-CN"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    byte[] uploaded;
+    try (var book = new XSSFWorkbook(new ByteArrayInputStream(template));
+        var out = new ByteArrayOutputStream()) {
+      var sheet = book.getSheet("达人导入");
+      assertThat(sheet.getRow(1).getCell(0).getCellStyle().getFillForegroundColor())
+          .isEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
+      assertThat(sheet.getRow(1).getCell(6).getCellStyle().getFillForegroundColor())
+          .isNotEqualTo(IndexedColors.LIGHT_YELLOW.getIndex());
+      assertThat(sheet.getRow(1).getLastCellNum()).isEqualTo((short) 25);
+      assertThat(sheet.getDataValidations())
+          .hasSize(11)
+          .anySatisfy(
+              validation -> {
+                assertThat(validation.getValidationConstraint().getFormula1())
+                    .isEqualTo("KOL_PLATFORM");
+                assertThat(validation.getRegions().getCellRangeAddress(0).formatAsString())
+                    .isEqualTo("C3:C202");
+              });
+      assertThat(book.isSheetHidden(book.getSheetIndex("_options"))).isTrue();
+      assertThat(book.getSheet("_options").getRow(0).getCell(4).getStringCellValue())
+          .isEqualTo("美国");
+      var sample = book.getSheet("填写示例").getRow(2);
+      assertThat(sample.getCell(0).getStringCellValue()).isEqualTo("demo.creator");
+      assertThat(sheet.getRow(0).getCell(0).getStringCellValue())
+          .contains("必填项")
+          .doesNotContain("更新");
+      assertThat(sheet.getLastRowNum()).isEqualTo(1);
+      var fresh = sheet.createRow(2);
+      copyExample(sample, fresh, "demo.creator");
+      fresh.getCell(3).setCellValue(186_200);
+      var dateStyle = book.createCellStyle();
+      dateStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd"));
+      fresh.getCell(16).setCellValue(LocalDate.of(2026, 11, 6));
+      fresh.getCell(16).setCellStyle(dateStyle);
+      var malformed = sheet.createRow(3);
+      copyExample(sample, malformed, "bad_number");
+      malformed.getCell(3).setCellValue(1);
+      malformed.getCell(3).getCTCell().setV("1E+2147483647");
+      var existing = sheet.createRow(4);
+      copyExample(sample, existing, "@OLD_CREATOR");
+      existing.getCell(24).setCellValue("S");
+      copyExample(sample, sheet.createRow(5), "@DEMO.CREATOR");
+      var incomplete = sheet.createRow(6);
+      incomplete.createCell(0).setCellValue("incomplete_creator");
+      incomplete.createCell(2).setCellValue("TikTok");
+      book.write(out);
+      uploaded = out.toByteArray();
+    }
+    var file =
+        new MockMultipartFile(
+            "file",
+            "达人库导入模板.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            uploaded);
+    mvc.perform(
+            multipart(LIB + "/imports")
+                .file(file)
+                .header(TOKEN, token)
+                .header("Accept-Language", "zh-CN"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.created").value(1))
+        .andExpect(jsonPath("$.data.updated").doesNotExist())
+        .andExpect(jsonPath("$.data.errors[0].row").value(4))
+        .andExpect(jsonPath("$.data.errors[0].column").value("粉丝数"))
+        .andExpect(jsonPath("$.data.errors[1].row").value(5))
+        .andExpect(jsonPath("$.data.errors[1].errorCode").value("KOL_LIBRARY_DUPLICATE"))
+        .andExpect(jsonPath("$.data.errors[2].row").value(6))
+        .andExpect(jsonPath("$.data.errors[2].errorCode").value("KOL_LIBRARY_IMPORT_DUPLICATE_ROW"))
+        .andExpect(jsonPath("$.data.errors[3].row").value(7))
+        .andExpect(jsonPath("$.data.errors[3].errorCode").value("KOL_LIBRARY_IMPORT_REQUIRED"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT followers FROM crm_library_kol WHERE kol_username = ?",
+                Long.class,
+                "demo.creator"))
+        .isEqualTo(186_200L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT last_contact_date FROM crm_library_kol WHERE kol_username = ?",
+                LocalDate.class,
+                "demo.creator"))
+        .isEqualTo(LocalDate.of(2026, 11, 6));
+    mvc.perform(get(LIB + "/" + id).header(TOKEN, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.followUpOwner").value("Amy BD"))
+        .andExpect(jsonPath("$.data.grade").value("A"))
+        .andExpect(jsonPath("$.data.followers").doesNotExist());
+    mvc.perform(get(LIB).header(TOKEN, other.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").value(0));
+  }
+
+  private static void copyExample(XSSFRow example, XSSFRow row, String username) {
+    for (var cell : example) {
+      row.createCell(cell.getColumnIndex()).setCellValue(cell.getStringCellValue());
+    }
+    row.getCell(0).setCellValue(username);
   }
 
   private Map<String, Object> content(String day) {
@@ -760,14 +885,21 @@ class KolLibraryIT {
                     "{\"outreachStatus\":\"COOPERATING\",\"sampleStatus\":\"SHIPPED\","
                         + "\"trackingNo\":\"SF1\"}"))
         .andExpect(status().isOk());
-    List<String> actions =
-        jdbc.queryForList(
-            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' ORDER BY oper_time",
-            String.class);
-    assertThat(actions).contains("Create", "Update follow-up");
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () ->
+                assertThat(
+                        jdbc.queryForList(
+                            "SELECT action FROM sys_oper_log WHERE module = 'Kol library' AND tenant_id = ?",
+                            String.class,
+                            library.tenantId()))
+                    .contains("Create", "Update follow-up"));
     List<String> params =
         jdbc.queryForList(
-            "SELECT request_params FROM sys_oper_log WHERE action = 'Create'", String.class);
+            "SELECT request_params FROM sys_oper_log WHERE module = 'Kol library' AND action = 'Create' AND tenant_id = ?",
+            String.class,
+            library.tenantId());
     assertThat(params).isNotEmpty();
     assertThat(params.getFirst()).doesNotContain("555 0100");
   }
