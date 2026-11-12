@@ -338,7 +338,7 @@ deploy/backup/restore-pitr.sh --overwrite "2026-11-01 08:30:00"  # 数据目录�
 
 ```bash
 # 从 S3 取回（使用只读身份 / 配置文件，不要用写入备份的角色）
-aws s3 cp --region us-west-2 s3://<桶>/<前缀>/daily/tcrm-<时间>.dump.gpg .
+aws s3 cp --region us-east-1 s3://<桶>/<前缀>/daily/tcrm-<时间>.dump.gpg .
 # 解密后直接送入 pg_restore，明文只在管道里
 gpg --batch --quiet --pinentry-mode loopback --passphrase-file /etc/tcrm/backup.pass \
     --decrypt tcrm-<时间>.dump.gpg \
