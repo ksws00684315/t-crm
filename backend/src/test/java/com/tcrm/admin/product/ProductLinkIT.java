@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -372,6 +373,279 @@ class ProductLinkIT {
                 kolId))
         .isEqualTo(1);
     verify(copies, times(1)).copy(anyLong(), any(), anyLong());
+  }
+
+  @Test
+  void shouldConvertOtherKolsCopiedLink_byResolvingToOriginalProduct() throws Exception {
+    // Task 151: KOL B converts KOL A's copied link; the system traces it back to the original
+    // product and copies THAT for B instead of rejecting the row.
+    Seed seed = seedOtherKolsCopiedLink();
+    when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90002", null));
+
+    String jobCode = convert(seed.tokenB(), "90001");
+
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        jobCode)),
+        "copy job should complete");
+
+    mvc.perform(
+            post(BASE + "/jobs/" + jobCode + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90001"}]}
+                    """
+                        .formatted(seed.tokenB())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("success"))
+        .andExpect(jsonPath("$.data.items[0].targetChannelCode").value("WEIDIAN"))
+        .andExpect(jsonPath("$.data.items[0].targetExternalProductId").value("90002"))
+        .andExpect(jsonPath("$.data.items[0].targetStoreId").value("2002"));
+
+    // The copy ran against the original item in its own shop and was registered under KOL B.
+    verify(copies, times(1)).copy(seed.sourceShopId(), "10001", seed.poolShopId());
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_kol_item
+                WHERE kol_id = ? AND product_id = ? AND valid_to IS NULL
+                """,
+                Integer.class,
+                seed.kolB(),
+                seed.productId()))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT item.source_shop_id FROM crm_copy_job_item item
+                JOIN crm_copy_job job ON job.id = item.job_id
+                WHERE job.job_code = ?
+                """,
+                Long.class,
+                jobCode))
+        .isEqualTo(seed.sourceShopId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolB()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void shouldReturnSameCopy_whenOtherKolsCopiedLinkConvertedTwice() throws Exception {
+    Seed seed = seedOtherKolsCopiedLink();
+    when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90002", null));
+    String firstJob = convert(seed.tokenB(), "90001");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        firstJob)),
+        "first copy job should complete");
+
+    when(copies.copy(anyLong(), any(), anyLong()))
+        .thenThrow(new AssertionError("should not copy again"));
+    String secondJob = convert(seed.tokenB(), "90001");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        secondJob)),
+        "second copy job should complete");
+
+    mvc.perform(
+            post(BASE + "/jobs/" + secondJob + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90001"}]}
+                    """
+                        .formatted(seed.tokenB())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("success"))
+        .andExpect(jsonPath("$.data.items[0].targetExternalProductId").value("90002"));
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_kol_item
+                WHERE kol_id = ? AND product_id = ? AND valid_to IS NULL
+                """,
+                Integer.class,
+                seed.kolB(),
+                seed.productId()))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolB()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void shouldNotCopy_whenOwnExclusiveLinkConverted() throws Exception {
+    // Same-KOL idempotency: converting the KOL's own copied link returns the same ID without a
+    // Weidian copy or quota consumption.
+    Seed seed = seedOtherKolsCopiedLink();
+    when(copies.copy(anyLong(), any(), anyLong()))
+        .thenThrow(new AssertionError("own copied link must not be copied again"));
+
+    String jobCode = convert(seed.tokenA(), "90001");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        jobCode)),
+        "copy job should complete");
+
+    mvc.perform(
+            post(BASE + "/jobs/" + jobCode + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90001"}]}
+                    """
+                        .formatted(seed.tokenA())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("success"))
+        .andExpect(jsonPath("$.data.items[0].targetExternalProductId").value("90001"));
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_kol_item
+                WHERE kol_id = ? AND product_id = ? AND valid_to IS NULL
+                """,
+                Integer.class,
+                seed.kolA(),
+                seed.productId()))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolA()))
+        .isEqualTo(0);
+  }
+
+  @Test
+  void shouldFailUntraceable_whenExclusiveMappingLacksProduct() throws Exception {
+    // Sheet-upload mappings carry only the copied item ID (product_id IS NULL, ADR-024); there
+    // is no original to trace, so the row fails with the actionable message.
+    long poolShopId = createShop("2002", "Pool shop");
+    mvc.perform(put("/admin-api/product/shops/" + poolShopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(poolShopId);
+    long kolA = createKol("SheetOnlyKol", "sheetonly151@example.com");
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item(
+          id, kol_id, product_id, shop_id, weidian_item_id, source, valid_from,
+          tenant_id, create_time, update_time)
+        VALUES (17102, ?, NULL, ?, '90009', 'SHEET_UPLOAD', now(), 1, now(), now())
+        """,
+        kolA,
+        poolShopId);
+    long kolB = createKol("RequestingKol2", "requester2-151@example.com");
+    String tokenB = createToken(kolB, 10);
+    when(copies.copy(anyLong(), any(), anyLong()))
+        .thenThrow(new AssertionError("untraceable copied link must not be copied"));
+
+    String jobCode = convert(tokenB, "90009");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () -> {
+          String status =
+              jdbc.queryForObject(
+                  "SELECT status FROM crm_copy_job WHERE job_code = ?", String.class, jobCode);
+          return !"processing".equals(status);
+        },
+        "copy job should reach a terminal state");
+
+    mvc.perform(
+            post(BASE + "/jobs/" + jobCode + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90009"}]}
+                    """
+                        .formatted(tokenB)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("failed"))
+        .andExpect(jsonPath("$.data.items[0].errorMessage").value("该商品链接是复制件，无法追溯到原始商品，请改用原始商品链接"));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, kolB))
+        .isEqualTo(0);
+  }
+
+  @Test
+  void shouldProcessConcurrentKolsForSameCopiedLink() throws Exception {
+    // Three KOLs convert the same copied link at once: the owner's row is idempotent, the other
+    // two each get their own copy of the original. No probe-style barrier here: the Weidian copy
+    // runs inside the shop-item lock, so forcing both calls to overlap would deadlock the lock.
+    Seed seed = seedOtherKolsCopiedLink();
+    long kolC = createKol("ThirdKol", "third151@example.com");
+    String tokenC = createToken(kolC, 10);
+    AtomicInteger copySeq = new AtomicInteger(90002);
+    when(copies.copy(anyLong(), any(), anyLong()))
+        .thenAnswer(inv -> new CopyResult(String.valueOf(copySeq.getAndIncrement()), null));
+
+    String jobA = convert(seed.tokenA(), "90001");
+    String jobB = convert(seed.tokenB(), "90001");
+    String jobC = convert(tokenC, "90001");
+
+    TestWait.until(
+        Duration.ofSeconds(20),
+        () ->
+            jdbc.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM crm_copy_job
+                    WHERE job_code IN (?, ?, ?) AND status = 'completed'
+                    """,
+                    Integer.class,
+                    jobA,
+                    jobB,
+                    jobC)
+                == 3,
+        "all three copy jobs should complete");
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM crm_kol_item WHERE product_id = ? AND valid_to IS NULL",
+                Integer.class,
+                seed.productId()))
+        .isEqualTo(3);
+    verify(copies, times(2)).copy(seed.sourceShopId(), "10001", seed.poolShopId());
+    // Which KOL lands 90002 vs 90003 follows worker-thread scheduling; assert the set.
+    assertThat(
+            jdbc.queryForList(
+                """
+                SELECT weidian_item_id FROM crm_kol_item
+                WHERE kol_id IN (?, ?) AND product_id = ? AND valid_to IS NULL
+                """,
+                String.class,
+                seed.kolB(),
+                kolC,
+                seed.productId()))
+        .containsExactlyInAnyOrder("90002", "90003");
   }
 
   @Test
@@ -919,6 +1193,48 @@ class ProductLinkIT {
                 "SELECT source_shop_id FROM crm_copy_job_item WHERE id = 38041", Long.class))
         .isEqualTo(shopId);
   }
+
+  /**
+   * Seeds the task-151 scenario: a source shop holding the original product, a pool shop, KOL A
+   * owning copy 90001 of that product in the pool shop, and KOL B with a copy token.
+   */
+  private Seed seedOtherKolsCopiedLink() throws Exception {
+    long sourceShopId = createShop("2001", "Source shop");
+    long poolShopId = createShop("2002", "Pool shop");
+    mvc.perform(put("/admin-api/product/shops/" + poolShopId + "/copy-pool").header(ADMIN, admin))
+        .andExpect(status().isOk());
+    authorizeShop(poolShopId);
+    long productId = insertProduct(sourceShopId, "10001", "Source item");
+    long kolA = createKol("OwnerKol", "owner151@example.com");
+    jdbc.update(
+        """
+        INSERT INTO crm_kol_item(
+          id, kol_id, product_id, shop_id, weidian_item_id, source, valid_from,
+          tenant_id, create_time, update_time)
+        VALUES (17101, ?, ?, ?, '90001', 'COPY', now(), 1, now(), now())
+        """,
+        kolA,
+        productId,
+        poolShopId);
+    long kolB = createKol("RequestingKol", "requester151@example.com");
+    return new Seed(
+        sourceShopId,
+        poolShopId,
+        productId,
+        kolA,
+        createToken(kolA, 10),
+        kolB,
+        createToken(kolB, 10));
+  }
+
+  private record Seed(
+      long sourceShopId,
+      long poolShopId,
+      long productId,
+      long kolA,
+      String tokenA,
+      long kolB,
+      String tokenB) {}
 
   private String convert(String token, String sourceProductId) throws Exception {
     MvcResult result =
