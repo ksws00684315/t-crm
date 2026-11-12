@@ -3,17 +3,48 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml', 'backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java']
   push:
     branches: [main]
-    paths: ['admin-ui/**', '.github/workflows/admin-ui.yml', 'backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java']
 permissions:
   contents: read
 jobs:
+  changes:
+    name: Changed paths
+    # Runs on every pull request so that the jobs below report "skipped" rather than nothing when
+    # their paths are untouched; branch protection treats skipped required checks as passed.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - name: Checkout the path filter action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions
+      - id: filter
+        uses: ./.github/actions/path-filter
+        with:
+          patterns: |
+            .github/actions/*
+            admin-ui/*
+            .github/workflows/admin-ui.yml
+            backend/src/main/java/com/tcrm/admin/shared/ErrorCode.java
+
   verify:
     name: Admin UI verify
-    # Skip draft PRs; still run on push/schedule (no pull_request payload)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Skipped for draft PRs (via "changes") and when none of the paths above changed
+    needs: changes
+    # Runs when the paths matched, and also when "changes" itself failed (fail safe: a broken
+    # filter must not turn into a skipped, i.e. passing, required check).
+    if: >-
+      ${{ !cancelled()
+      && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+      && (needs.changes.result != 'success' || needs.changes.outputs.changed == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
