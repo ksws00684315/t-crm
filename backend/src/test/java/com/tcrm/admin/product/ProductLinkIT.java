@@ -33,6 +33,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -376,9 +377,9 @@ class ProductLinkIT {
   }
 
   @Test
-  void shouldConvertOtherKolsCopiedLink_byResolvingToOriginalProduct() throws Exception {
-    // Task 151: KOL B converts KOL A's copied link; the system traces it back to the original
-    // product and copies THAT for B instead of rejecting the row.
+  void shouldConvertOtherKolsCopiedLink_byCopyingFromTheCopy() throws Exception {
+    // Task 152: KOL B converts KOL A's copied link; the copy itself is the physical source and
+    // the new mapping still registers product_id -> the original product.
     Seed seed = seedOtherKolsCopiedLink();
     when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90002", null));
 
@@ -410,8 +411,9 @@ class ProductLinkIT {
         .andExpect(jsonPath("$.data.items[0].targetExternalProductId").value("90002"))
         .andExpect(jsonPath("$.data.items[0].targetStoreId").value("2002"));
 
-    // The copy ran against the original item in its own shop and was registered under KOL B.
-    verify(copies, times(1)).copy(seed.sourceShopId(), "10001", seed.poolShopId());
+    // The copy ran against the copied item in the pool shop and was registered under KOL B with
+    // the original product id.
+    verify(copies, times(1)).copy(seed.poolShopId(), "90001", seed.poolShopId());
     assertThat(
             jdbc.queryForObject(
                 """
@@ -431,7 +433,7 @@ class ProductLinkIT {
                 """,
                 Long.class,
                 jobCode))
-        .isEqualTo(seed.sourceShopId());
+        .isEqualTo(seed.poolShopId());
     assertThat(
             jdbc.queryForObject(
                 "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolB()))
@@ -633,7 +635,7 @@ class ProductLinkIT {
                 Integer.class,
                 seed.productId()))
         .isEqualTo(3);
-    verify(copies, times(2)).copy(seed.sourceShopId(), "10001", seed.poolShopId());
+    verify(copies, times(2)).copy(seed.poolShopId(), "90001", seed.poolShopId());
     // Which KOL lands 90002 vs 90003 follows worker-thread scheduling; assert the set.
     assertThat(
             jdbc.queryForList(
@@ -646,6 +648,96 @@ class ProductLinkIT {
                 kolC,
                 seed.productId()))
         .containsExactlyInAnyOrder("90002", "90003");
+  }
+
+  @Test
+  void shouldConvertCopiedLink_whenOriginalShopIsDisabled() throws Exception {
+    // Task 152, the production scenario: originals live in the (now disabled) source shop,
+    // copies in the pool shop. Converting a copied link must not depend on the source shop.
+    Seed seed = seedOtherKolsCopiedLink();
+    jdbc.update("UPDATE crm_shop SET status = 0 WHERE id = ?", seed.sourceShopId());
+    when(copies.copy(anyLong(), any(), anyLong())).thenReturn(new CopyResult("90002", null));
+
+    String jobCode = convert(seed.tokenB(), "90001");
+    TestWait.until(
+        Duration.ofSeconds(10),
+        () ->
+            "completed"
+                .equals(
+                    jdbc.queryForObject(
+                        "SELECT status FROM crm_copy_job WHERE job_code = ?",
+                        String.class,
+                        jobCode)),
+        "copy job should complete");
+
+    mvc.perform(
+            post(BASE + "/jobs/" + jobCode + "/items/resolve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"token":"%s","items":[{"sourceChannelCode":"WEIDIAN","sourceProductId":"90001"}]}
+                    """
+                        .formatted(seed.tokenB())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.status").value("ready"))
+        .andExpect(jsonPath("$.data.items[0].status").value("success"))
+        .andExpect(jsonPath("$.data.items[0].targetExternalProductId").value("90002"));
+    verify(copies, times(1)).copy(seed.poolShopId(), "90001", seed.poolShopId());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT used FROM crm_kol_copy_token WHERE kol_id = ?", Integer.class, seed.kolB()))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void shouldSerializeConvertingCopyAndOriginalOfTheSameProduct() throws Exception {
+    // The copy link and the original link of the same product submitted concurrently for the
+    // same KOL must serialize on the original's shop-item key; otherwise both pass the mapping
+    // check and the loser dies on uk_crm_kol_item_kol_product with an unregistered Weidian copy
+    // (2026-11-10 incident shape, #266). The barrier would only be hit by two overlapping
+    // copies; with the lock it times out for the single caller.
+    Seed seed = seedOtherKolsCopiedLink();
+    String tokenB2 = createToken(seed.kolB(), 10);
+    CountDownLatch oneCopied = new CountDownLatch(1);
+    AtomicInteger copySeq = new AtomicInteger(90002);
+    when(copies.copy(anyLong(), any(), anyLong()))
+        .thenAnswer(
+            inv -> {
+              // Release a concurrently-copying peer, then wait out a 3s window: with the
+              // original-key lock only one job ever reaches this stub, so the wait times out.
+              oneCopied.countDown();
+              oneCopied.await(3, TimeUnit.SECONDS);
+              return new CopyResult(String.valueOf(copySeq.getAndIncrement()), null);
+            });
+
+    String jobCopy = convert(seed.tokenB(), "90001");
+    String jobOriginal = convert(tokenB2, "10001");
+
+    TestWait.until(
+        Duration.ofSeconds(30),
+        () ->
+            jdbc.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM crm_copy_job
+                    WHERE job_code IN (?, ?) AND status = 'completed'
+                    """,
+                    Integer.class,
+                    jobCopy,
+                    jobOriginal)
+                == 2,
+        "both concurrent copy jobs should complete");
+
+    assertThat(
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM crm_kol_item
+                WHERE kol_id = ? AND product_id = ? AND valid_to IS NULL
+                """,
+                Integer.class,
+                seed.kolB(),
+                seed.productId()))
+        .isEqualTo(1);
+    verify(copies, times(1)).copy(anyLong(), any(), anyLong());
   }
 
   @Test

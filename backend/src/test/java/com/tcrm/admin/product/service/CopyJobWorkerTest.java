@@ -110,38 +110,40 @@ class CopyJobWorkerTest {
   }
 
   @Test
-  void shouldCopyOriginalProduct_whenSourceIsOtherKolsExclusiveItem() {
-    // Task 151: another KOL's copied link submitted as source resolves to the original product
-    // and is copied for the requesting KOL instead of being rejected.
+  void shouldCopyFromTheCopy_whenSourceIsOtherKolsExclusiveItem() {
+    // Task 152: another KOL's copied link submitted as source is copied FROM ITSELF (its own
+    // shop and item id); the new mapping still registers product_id -> the original product.
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "90002");
     stubJob(job, row);
     KolItemDO exclusive = new KolItemDO();
     exclusive.setKolId(99L);
     exclusive.setProductId(50L);
+    exclusive.setShopId(6L);
     exclusive.setWeidianItemId("90002");
     when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
     when(products.selectById(50L)).thenReturn(product(50L, 5L, "10001"));
-    when(shops.selectById(5L)).thenReturn(shop(5L));
+    when(shops.selectById(6L)).thenReturn(shop(6L));
     when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(null);
     when(tokens.consume(20L, 1)).thenReturn(true);
-    when(copies.copy(5L, "10001", 5L)).thenReturn(new CopyResult("90003", null));
+    when(copies.copy(6L, "90002", 5L)).thenReturn(new CopyResult("90003", null));
     when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
 
     worker.processJob(1L);
 
-    verify(copies, times(1)).copy(5L, "10001", 5L);
+    verify(copies, times(1)).copy(6L, "90002", 5L);
     verify(tokens).consume(20L, 1);
     ArgumentCaptor<KolItemDO> inserted = ArgumentCaptor.forClass(KolItemDO.class);
     verify(kolItems).insert(inserted.capture());
     assertThat(inserted.getValue().getKolId()).isEqualTo(10L);
     assertThat(inserted.getValue().getProductId()).isEqualTo(50L);
+    assertThat(inserted.getValue().getShopId()).isEqualTo(5L);
     assertThat(inserted.getValue().getWeidianItemId()).isEqualTo("90003");
     assertThat(inserted.getValue().getSource()).isEqualTo("COPY");
     ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).update(eq(null), cap.capture());
     assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
-        .contains("90003", 5L);
+        .contains("90003", 6L);
   }
 
   @Test
@@ -152,10 +154,11 @@ class CopyJobWorkerTest {
     KolItemDO exclusive = new KolItemDO();
     exclusive.setKolId(99L);
     exclusive.setProductId(50L);
+    exclusive.setShopId(6L);
     exclusive.setWeidianItemId("90002");
     when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
     when(products.selectById(50L)).thenReturn(product(50L, 5L, "10001"));
-    when(shops.selectById(5L)).thenReturn(shop(5L));
+    when(shops.selectById(6L)).thenReturn(shop(6L));
     KolItemDO existing = new KolItemDO();
     existing.setWeidianItemId("90005");
     when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(existing);
@@ -168,7 +171,7 @@ class CopyJobWorkerTest {
     ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
     verify(items).update(eq(null), cap.capture());
     assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
-        .contains("90005", 5L);
+        .contains("90005", 6L);
   }
 
   @Test
@@ -208,30 +211,64 @@ class CopyJobWorkerTest {
   }
 
   @Test
-  void shouldFailSourceNotInShops_whenOriginalShopDisabled() {
+  void shouldCopyFromTheCopy_whenOriginalShopDisabled() {
+    // Task 152, the production scenario: originals live in shop A, copies in pool shop B, shop A
+    // is disabled. The copy's own shop serves as the physical source; shop A is never consulted.
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "90002");
     stubJob(job, row);
     KolItemDO exclusive = new KolItemDO();
     exclusive.setKolId(99L);
     exclusive.setProductId(50L);
+    exclusive.setShopId(6L);
     exclusive.setWeidianItemId("90002");
     when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
     when(products.selectById(50L)).thenReturn(product(50L, 5L, "10001"));
-    ShopDO disabled = shop(5L);
-    disabled.setStatus(0);
-    when(shops.selectById(5L)).thenReturn(disabled);
+    ShopDO disabledOriginalShop = shop(5L);
+    disabledOriginalShop.setStatus(0);
+    when(shops.selectById(5L)).thenReturn(disabledOriginalShop);
+    when(shops.selectById(6L)).thenReturn(shop(6L));
+    when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(null);
+    when(tokens.consume(20L, 1)).thenReturn(true);
+    when(copies.copy(6L, "90002", 5L)).thenReturn(new CopyResult("90003", null));
+    when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
+
+    worker.processJob(1L);
+
+    verify(copies, times(1)).copy(6L, "90002", 5L);
+    verify(tokens).consume(20L, 1);
+    ArgumentCaptor<Wrapper<CopyJobItemDO>> cap = ArgumentCaptor.forClass(Wrapper.class);
+    verify(items).update(eq(null), cap.capture());
+    assertThat(((LambdaUpdateWrapper<?>) cap.getValue()).getParamNameValuePairs().values())
+        .contains("90003", 6L);
+  }
+
+  @Test
+  void shouldFail_whenTheCopysOwnShopIsDisabled() {
+    CopyJobDO job = job(1L, 10L, 20L, 5L);
+    CopyJobItemDO row = pending(100L, "90002");
+    stubJob(job, row);
+    KolItemDO exclusive = new KolItemDO();
+    exclusive.setKolId(99L);
+    exclusive.setProductId(50L);
+    exclusive.setShopId(6L);
+    exclusive.setWeidianItemId("90002");
+    when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
+    when(products.selectById(50L)).thenReturn(product(50L, 5L, "10001"));
+    ShopDO disabledCopyShop = shop(6L);
+    disabledCopyShop.setStatus(0);
+    when(shops.selectById(6L)).thenReturn(disabledCopyShop);
 
     worker.processJob(1L);
 
     verify(copies, never()).copy(anyLong(), any(), anyLong());
     verify(tokens, never()).consume(anyLong(), anyInt());
-    verifyFailedMessage(ProductLinkMessages.SOURCE_NOT_IN_SHOPS);
+    verifyFailedMessage(ProductLinkMessages.EXCLUSIVE_SHOP_DISABLED);
   }
 
   @Test
-  void shouldLockResolvedProduct_beforeRegisteringExclusiveCopy() {
-    // The resolved original shares the shop-item lock with the direct paths, so concurrent jobs
+  void shouldLockTheCopy_beforeRegisteringExclusiveCopy() {
+    // The copy source shares the shop-item lock with the direct paths, so concurrent jobs
     // converting the same copied link cannot double-copy or double-register.
     CopyJobDO job = job(1L, 10L, 20L, 5L);
     CopyJobItemDO row = pending(100L, "90002");
@@ -239,19 +276,21 @@ class CopyJobWorkerTest {
     KolItemDO exclusive = new KolItemDO();
     exclusive.setKolId(99L);
     exclusive.setProductId(50L);
+    exclusive.setShopId(6L);
     exclusive.setWeidianItemId("90002");
     when(kolItems.findCurrentByWeidianItem("90002")).thenReturn(exclusive);
     when(products.selectById(50L)).thenReturn(product(50L, 5L, "10001"));
-    when(shops.selectById(5L)).thenReturn(shop(5L));
+    when(shops.selectById(6L)).thenReturn(shop(6L));
     when(kolItems.findCurrentByKolProduct(10L, 50L)).thenReturn(null);
     when(tokens.consume(20L, 1)).thenReturn(true);
-    when(copies.copy(5L, "10001", 5L)).thenReturn(new CopyResult("90003", null));
+    when(copies.copy(6L, "90002", 5L)).thenReturn(new CopyResult("90003", null));
     when(kolItems.insert(org.mockito.ArgumentMatchers.<KolItemDO>any())).thenReturn(1);
 
     worker.processJob(1L);
 
     InOrder order = inOrder(products, kolItems);
     order.verify(products).lockShopItem(ProductRules.shopItemLockKey(5L, "10001"));
+    order.verify(products).lockShopItem(ProductRules.shopItemLockKey(6L, "90002"));
     order.verify(kolItems).insert(org.mockito.ArgumentMatchers.<KolItemDO>any());
   }
 
