@@ -4,12 +4,14 @@ import com.tcrm.admin.product.service.KolItemFilterDTO;
 import com.tcrm.admin.shared.PageResult;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record KolItemQuery(
     @Size(max = 16) String linkCode,
     @Size(max = 128) String kolKeyword,
     @Min(1) Long shopId,
+    @Pattern(regexp = "\\s*(ENABLED|DISABLED)?\\s*") String status,
     @Min(1) @Max(PageResult.MAX_PAGE) Integer page,
     @Min(1) @Max(100) Integer size) {
   KolItemFilterDTO toFilter() {
@@ -17,6 +19,7 @@ public record KolItemQuery(
         blankToNull(linkCode),
         blankToNull(kolKeyword),
         shopId,
+        blankToNull(status),
         page == null ? 1 : page,
         size == null ? 20 : size);
   }

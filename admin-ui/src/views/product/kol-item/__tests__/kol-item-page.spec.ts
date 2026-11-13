@@ -155,7 +155,8 @@ describe("Kol item page", () => {
       size: 20,
       linkCode: undefined,
       kolKeyword: undefined,
-      shopId: undefined
+      shopId: undefined,
+      status: undefined
     });
     expect(wrapper.text()).toContain("链接编码");
     expect(wrapper.text()).toContain("商品");
@@ -208,6 +209,21 @@ describe("Kol item page", () => {
         kolKeyword: "KOL-TAA001",
         shopId: "1"
       })
+    );
+  });
+
+  it("sends the selected mapping status", async () => {
+    signIn("SUPER_ADMIN", "ALL");
+    const wrapper = await mountPage();
+    const statusSelect = wrapper
+      .findAllComponents({ name: "ElSelect" })
+      .find(item => item.attributes("data-test") === "status-filter");
+    if (!statusSelect) throw new Error("missing status filter");
+    await statusSelect.vm.$emit("update:modelValue", "ENABLED");
+    await wrapper.find('[data-test="search"]').trigger("click");
+    await flushPromises();
+    expect(kolItemApi.listKolItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, status: "ENABLED" })
     );
   });
 
