@@ -11,6 +11,8 @@ export interface KolItemQuery {
   kolKeyword?: string;
   /** Target shop id. */
   shopId?: string;
+  /** ENABLED or DISABLED. Omitted means both. */
+  status?: "ENABLED" | "DISABLED";
 }
 
 export interface KolItemImportVO {

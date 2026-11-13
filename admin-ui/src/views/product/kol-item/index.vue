@@ -47,6 +47,7 @@ const query = reactive<{
   linkCode: string;
   kolId?: string;
   shopId?: string;
+  status?: "ENABLED" | "DISABLED";
 }>({
   page: 1,
   size: readPageSize("kol-items", 20),
@@ -112,7 +113,8 @@ const columns = computed<DataColumn[]>(() => [
 const applied = ref({
   linkCode: "",
   kolKeyword: "",
-  shopId: undefined as string | undefined
+  shopId: undefined as string | undefined,
+  status: undefined as "ENABLED" | "DISABLED" | undefined
 });
 
 const chips = computed<SearchChip[]>(() => {
@@ -139,6 +141,13 @@ const chips = computed<SearchChip[]>(() => {
       key: "shop",
       label: t("mapping.targetShop"),
       text: shop?.shopName ?? applied.value.shopId
+    });
+  }
+  if (applied.value.status) {
+    list.push({
+      key: "status",
+      label: t("mapping.status"),
+      text: named("statuses", applied.value.status)
     });
   }
   return list;
@@ -244,7 +253,8 @@ function appliedQuery() {
   return {
     linkCode: applied.value.linkCode || undefined,
     kolKeyword: applied.value.kolKeyword || undefined,
-    shopId: applied.value.shopId || undefined
+    shopId: applied.value.shopId || undefined,
+    status: applied.value.status || undefined
   };
 }
 
@@ -301,7 +311,8 @@ function snapshotFilters(): void {
   applied.value = {
     linkCode: query.linkCode.trim(),
     kolKeyword: selectedKolCode(),
-    shopId: query.shopId
+    shopId: query.shopId,
+    status: query.status
   };
 }
 
@@ -315,10 +326,11 @@ function reset() {
   query.linkCode = "";
   query.kolId = undefined;
   query.shopId = undefined;
+  query.status = undefined;
   query.page = 1;
   selectedFilterKol.value = null;
   filterKolOptions.value = [];
-  applied.value = { linkCode: "", kolKeyword: "", shopId: undefined };
+  applied.value = { linkCode: "", kolKeyword: "", shopId: undefined, status: undefined };
   void load();
 }
 
@@ -329,6 +341,7 @@ function removeChip(key: string): void {
     selectedFilterKol.value = null;
   }
   if (key === "shop") query.shopId = undefined;
+  if (key === "status") query.status = undefined;
   search();
 }
 
@@ -430,6 +443,18 @@ onMounted(() => {
               :label="shopOptionLabel(shop)"
               :value="shop.id"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('mapping.status')">
+          <el-select
+            v-model="query.status"
+            clearable
+            :placeholder="t('common.all')"
+            data-test="status-filter"
+            class="filter-w-md"
+          >
+            <el-option :label="t('mapping.statuses.ENABLED')" value="ENABLED" />
+            <el-option :label="t('mapping.statuses.DISABLED')" value="DISABLED" />
           </el-select>
         </el-form-item>
       </template>
