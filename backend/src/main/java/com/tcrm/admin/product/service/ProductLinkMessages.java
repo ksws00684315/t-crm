@@ -26,6 +26,7 @@ final class ProductLinkMessages {
   static final String SOURCE_CONFLICT = "多个店铺都有该商品";
   static final String SOURCE_INCOMPLETE = "来源商品信息不完整";
   static final String EXCLUSIVE_UNTRACEABLE = "该商品链接是复制件，无法追溯到原始商品，请改用原始商品链接";
+  static final String EXCLUSIVE_SHOP_DISABLED = "该复制件所在店铺已停用，无法作为复制来源";
   static final String QUOTA_INSUFFICIENT = "额度不足";
   static final String WEIDIAN_FAILED = "微店复制失败";
   static final String WEIDIAN_CALL_FAILED = "微店接口调用失败";

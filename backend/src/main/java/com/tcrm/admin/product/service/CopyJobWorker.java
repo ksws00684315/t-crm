@@ -195,25 +195,39 @@ public class CopyJobWorker implements ApplicationRunner {
       shopService.requireCopyEligible(job.getTargetShopId(), ProductLinkService.CHANNEL_WEIDIAN);
     }
 
-    // ADR-019 (2026-11-13 revision): a source ID registered as another KOL's exclusive item
-    // resolves back to its original product instead of being rejected; the own-KOL branch below
-    // stays idempotent and the resolved product is never a copy of the copy.
+    // ADR-019 (2026-11-13 revision, task 152): a source ID registered as another KOL's exclusive
+    // item is copied FROM ITSELF (its own shop and item id), whatever state the original's shop
+    // is in; the new mapping still registers product_id -> the traced original product. The
+    // own-KOL branch below stays idempotent.
     KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
     if (exclusive != null) {
       if (exclusive.getKolId() != null && exclusive.getKolId().equals(job.getKolId())) {
         markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null, null);
         return;
       }
-      ProductDO resolved = resolveExclusiveSource(exclusive);
-      if (resolved == null) {
+      if (exclusive.getProductId() == null) {
         markFailed(fresh.getId(), ProductLinkMessages.EXCLUSIVE_UNTRACEABLE, null);
         return;
       }
-      if (shopUnavailable(resolved.getShopId())) {
-        markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS, null);
+      ProductDO original = products.selectById(exclusive.getProductId());
+      if (original == null) {
+        markFailed(fresh.getId(), ProductLinkMessages.EXCLUSIVE_UNTRACEABLE, null);
         return;
       }
-      copyFor(job, fresh, resolved);
+      if (shopUnavailable(exclusive.getShopId())) {
+        markFailed(fresh.getId(), ProductLinkMessages.EXCLUSIVE_SHOP_DISABLED, null);
+        return;
+      }
+      // The physical lock below covers only this copy's key. Concurrent jobs reaching the same
+      // original through different sources (its own id vs any of its copies) must also serialize
+      // on the original's key, or both pass the mapping check and the loser dies on
+      // uk_crm_kol_item_kol_product with an unregistered Weidian copy (2026-11-10 incident shape,
+      // fixed by #266 for the direct paths).
+      if (original.getShopId() != null && original.getWeidianItemId() != null) {
+        products.lockShopItem(
+            ProductRules.shopItemLockKey(original.getShopId(), original.getWeidianItemId()));
+      }
+      copyFor(job, fresh, exclusive.getShopId(), exclusive.getWeidianItemId(), original.getId());
       return;
     }
 
@@ -230,15 +244,15 @@ public class CopyJobWorker implements ApplicationRunner {
       markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS, null);
       return;
     }
-    copyFor(job, fresh, source.product());
+    copyFor(
+        job,
+        fresh,
+        source.product().getShopId(),
+        source.product().getWeidianItemId(),
+        source.product().getId());
   }
 
-  /** Traces another KOL's exclusive item back to its original product; null when untraceable. */
-  private ProductDO resolveExclusiveSource(KolItemDO exclusive) {
-    return exclusive.getProductId() == null ? null : products.selectById(exclusive.getProductId());
-  }
-
-  /** Same rule as findSource for registered originals: only enabled shops are copy sources. */
+  /** Only enabled shops can serve as the physical copy source. */
   private boolean shopUnavailable(Long shopId) {
     if (shopId == null) {
       return true;
@@ -247,28 +261,33 @@ public class CopyJobWorker implements ApplicationRunner {
     return shop == null || shop.getStatus() == null || shop.getStatus() != 1;
   }
 
-  private void copyFor(CopyJobDO job, CopyJobItemDO row, ProductDO product) {
+  /**
+   * Copies physical item {@code sourceItemId} in {@code sourceShopId} into the job's target shop
+   * and registers the new mapping under {@code productId} (the original product, also for
+   * copy-from-copy sources).
+   */
+  private void copyFor(
+      CopyJobDO job, CopyJobItemDO row, long sourceShopId, String sourceItemId, long productId) {
     // Two jobs can carry the same source item (the spreadsheet was submitted again while the
     // first job was still running, production 2026-11-10). Hold the shop-item lock until this
     // transaction commits, so the second job sees the first one's registration and copy instead
     // of inserting the same product or copying the item twice. Unregistered items already hold
     // this lock from ensureProduct; taking it again in the same transaction is a no-op.
-    products.lockShopItem(
-        ProductRules.shopItemLockKey(product.getShopId(), product.getWeidianItemId()));
-    KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), product.getId());
+    products.lockShopItem(ProductRules.shopItemLockKey(sourceShopId, sourceItemId));
+    KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), productId);
     if (existing != null) {
-      markSuccess(row.getId(), existing.getWeidianItemId(), null, product.getShopId());
+      markSuccess(row.getId(), existing.getWeidianItemId(), null, sourceShopId);
       return;
     }
     if (!tokens.consume(job.getTokenId(), 1)) {
-      markFailed(row.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT, product.getShopId());
+      markFailed(row.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT, sourceShopId);
       return;
     }
     CopyResult copied;
     try {
-      copied = copies.copy(product.getShopId(), product.getWeidianItemId(), job.getTargetShopId());
+      copied = copies.copy(sourceShopId, sourceItemId, job.getTargetShopId());
     } catch (RuntimeException e) {
-      markFailed(row.getId(), failMessage(e), product.getShopId());
+      markFailed(row.getId(), failMessage(e), sourceShopId);
       return;
     }
     String newItemId = copied.newItemId();
@@ -276,7 +295,7 @@ public class CopyJobWorker implements ApplicationRunner {
       Instant now = Instant.now();
       KolItemDO neu = new KolItemDO();
       neu.setKolId(job.getKolId());
-      neu.setProductId(product.getId());
+      neu.setProductId(productId);
       neu.setShopId(job.getTargetShopId());
       neu.setWeidianItemId(newItemId);
       neu.setSource("COPY");
@@ -288,8 +307,8 @@ public class CopyJobWorker implements ApplicationRunner {
       if (shops.incrementCurrentItems(job.getTargetShopId(), now) != 1) {
         throw new IllegalStateException("Target shop capacity was exhausted during copy");
       }
-      TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
-      markSuccess(row.getId(), newItemId, copied.detailWarning(), product.getShopId());
+      TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), productId));
+      markSuccess(row.getId(), newItemId, copied.detailWarning(), sourceShopId);
     } catch (RuntimeException e) {
       throw new MappingPersistException(newItemId, e);
     }
