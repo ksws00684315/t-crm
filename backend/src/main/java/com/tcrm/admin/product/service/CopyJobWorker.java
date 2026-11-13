@@ -195,14 +195,25 @@ public class CopyJobWorker implements ApplicationRunner {
       shopService.requireCopyEligible(job.getTargetShopId(), ProductLinkService.CHANNEL_WEIDIAN);
     }
 
-    // ADR-019 rule 2: exclusive (copied) item IDs must not be treated as source for another copy.
+    // ADR-019 (2026-11-13 revision): a source ID registered as another KOL's exclusive item
+    // resolves back to its original product instead of being rejected; the own-KOL branch below
+    // stays idempotent and the resolved product is never a copy of the copy.
     KolItemDO exclusive = kolItems.findCurrentByWeidianItem(fresh.getSourceProductId());
     if (exclusive != null) {
       if (exclusive.getKolId() != null && exclusive.getKolId().equals(job.getKolId())) {
         markSuccess(fresh.getId(), exclusive.getWeidianItemId(), null, null);
         return;
       }
-      markFailed(fresh.getId(), ProductLinkMessages.OTHER_KOL_EXCLUSIVE, null);
+      ProductDO resolved = resolveExclusiveSource(exclusive);
+      if (resolved == null) {
+        markFailed(fresh.getId(), ProductLinkMessages.EXCLUSIVE_UNTRACEABLE, null);
+        return;
+      }
+      if (shopUnavailable(resolved.getShopId())) {
+        markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS, null);
+        return;
+      }
+      copyFor(job, fresh, resolved);
       return;
     }
 
@@ -219,7 +230,24 @@ public class CopyJobWorker implements ApplicationRunner {
       markFailed(fresh.getId(), ProductLinkMessages.SOURCE_NOT_IN_SHOPS, null);
       return;
     }
-    ProductDO product = source.product();
+    copyFor(job, fresh, source.product());
+  }
+
+  /** Traces another KOL's exclusive item back to its original product; null when untraceable. */
+  private ProductDO resolveExclusiveSource(KolItemDO exclusive) {
+    return exclusive.getProductId() == null ? null : products.selectById(exclusive.getProductId());
+  }
+
+  /** Same rule as findSource for registered originals: only enabled shops are copy sources. */
+  private boolean shopUnavailable(Long shopId) {
+    if (shopId == null) {
+      return true;
+    }
+    ShopDO shop = shops.selectById(shopId);
+    return shop == null || shop.getStatus() == null || shop.getStatus() != 1;
+  }
+
+  private void copyFor(CopyJobDO job, CopyJobItemDO row, ProductDO product) {
     // Two jobs can carry the same source item (the spreadsheet was submitted again while the
     // first job was still running, production 2026-11-10). Hold the shop-item lock until this
     // transaction commits, so the second job sees the first one's registration and copy instead
@@ -229,18 +257,18 @@ public class CopyJobWorker implements ApplicationRunner {
         ProductRules.shopItemLockKey(product.getShopId(), product.getWeidianItemId()));
     KolItemDO existing = kolItems.findCurrentByKolProduct(job.getKolId(), product.getId());
     if (existing != null) {
-      markSuccess(fresh.getId(), existing.getWeidianItemId(), null, product.getShopId());
+      markSuccess(row.getId(), existing.getWeidianItemId(), null, product.getShopId());
       return;
     }
     if (!tokens.consume(job.getTokenId(), 1)) {
-      markFailed(fresh.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT, product.getShopId());
+      markFailed(row.getId(), ProductLinkMessages.QUOTA_INSUFFICIENT, product.getShopId());
       return;
     }
     CopyResult copied;
     try {
       copied = copies.copy(product.getShopId(), product.getWeidianItemId(), job.getTargetShopId());
     } catch (RuntimeException e) {
-      markFailed(fresh.getId(), failMessage(e), product.getShopId());
+      markFailed(row.getId(), failMessage(e), product.getShopId());
       return;
     }
     String newItemId = copied.newItemId();
@@ -261,7 +289,7 @@ public class CopyJobWorker implements ApplicationRunner {
         throw new IllegalStateException("Target shop capacity was exhausted during copy");
       }
       TransactionalEvents.publish(events, new KolItemChangedEvent(job.getKolId(), product.getId()));
-      markSuccess(fresh.getId(), newItemId, copied.detailWarning(), product.getShopId());
+      markSuccess(row.getId(), newItemId, copied.detailWarning(), product.getShopId());
     } catch (RuntimeException e) {
       throw new MappingPersistException(newItemId, e);
     }
