@@ -246,6 +246,108 @@ class KolItemQueryIT {
   }
 
   @Test
+  void shouldFilterByMappingStatus() throws Exception {
+    Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    shop(9181, 1L, "t39 Status", "91810001");
+    mapping(
+        9391,
+        1L,
+        9111,
+        null,
+        9181,
+        "91910001",
+        "open",
+        "KPL-A00000000001",
+        now.minusSeconds(3600),
+        null,
+        now.minusSeconds(50));
+    mapping(
+        9392,
+        1L,
+        9111,
+        null,
+        9181,
+        "91910002",
+        "future end",
+        "KPL-A00000000002",
+        now.minusSeconds(3600),
+        now.plusSeconds(3600),
+        now.minusSeconds(40));
+    mapping(
+        9393,
+        1L,
+        9111,
+        null,
+        9181,
+        "91910003",
+        "expired",
+        "KPL-A00000000003",
+        now.minusSeconds(7200),
+        now.minusSeconds(60),
+        now.minusSeconds(30));
+    mapping(
+        9394,
+        1L,
+        9111,
+        null,
+        9181,
+        "91910004",
+        "closes at start",
+        "KPL-A00000000004",
+        now.minusSeconds(3600),
+        now,
+        now.minusSeconds(20));
+    mapping(
+        9395,
+        1L,
+        9111,
+        null,
+        9181,
+        "91910005",
+        "not yet",
+        "KPL-A00000000005",
+        now.plusSeconds(3600),
+        null,
+        now.minusSeconds(10));
+
+    JsonNode all = list(adminToken, "shopId=9181");
+    assertThat(all.get("total").asText()).isEqualTo("5");
+    assertThat(byId(all.get("items")).keySet())
+        .containsExactlyInAnyOrder("9391", "9392", "9393", "9394", "9395");
+    assertThat(list(adminToken, "shopId=9181&status=").get("total").asText()).isEqualTo("5");
+
+    JsonNode enabled = list(adminToken, "shopId=9181&status=ENABLED");
+    assertThat(enabled.get("total").asText()).isEqualTo("2");
+    assertThat(byId(enabled.get("items")).keySet()).containsExactlyInAnyOrder("9391", "9392");
+    enabled
+        .get("items")
+        .forEach(row -> assertThat(row.get("status").asText()).isEqualTo("ENABLED"));
+
+    JsonNode disabled = list(adminToken, "shopId=9181&status=DISABLED");
+    assertThat(disabled.get("total").asText()).isEqualTo("3");
+    assertThat(byId(disabled.get("items")).keySet())
+        .containsExactlyInAnyOrder("9393", "9394", "9395");
+    disabled
+        .get("items")
+        .forEach(row -> assertThat(row.get("status").asText()).isEqualTo("DISABLED"));
+
+    var padded =
+        mvc.perform(
+                get("/admin-api/product/kol-items")
+                    .param("shopId", "9181")
+                    .param("status", " DISABLED ")
+                    .header(TOKEN, adminToken))
+            .andReturn()
+            .getResponse();
+    assertThat(padded.getStatus()).as(padded.getContentAsString()).isEqualTo(200);
+    assertThat(json.readTree(padded.getContentAsString()).get("data").get("total").asText())
+        .isEqualTo("3");
+
+    mvc.perform(get("/admin-api/product/kol-items?status=NOPE").header(TOKEN, adminToken))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void shouldUseTheOrderItemIndex() throws Exception {
     String plan =
         explain(

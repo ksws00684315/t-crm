@@ -74,25 +74,54 @@ public class KolItemService {
       return new PageResult<>(List.of(), 0, filter.page(), filter.size());
     }
     String linkCode = filter.linkCode() == null ? null : filter.linkCode().toUpperCase(Locale.ROOT);
+    Instant now = Instant.now();
     var query =
         new LambdaQueryWrapper<KolItemDO>()
             .eq(linkCode != null, KolItemDO::getLinkCode, linkCode)
             .in(kolIds != null, KolItemDO::getKolId, kolIds == null ? List.of() : kolIds)
-            .eq(filter.shopId() != null, KolItemDO::getShopId, filter.shopId())
-            .orderByDesc(KolItemDO::getCreateTime)
-            .orderByDesc(KolItemDO::getId);
+            .eq(filter.shopId() != null, KolItemDO::getShopId, filter.shopId());
+    applyStatus(query, filter.status(), now);
+    query.orderByDesc(KolItemDO::getCreateTime).orderByDesc(KolItemDO::getId);
     var result = items.selectPage(new Page<>(filter.page(), filter.size()), query);
     List<KolItemDO> rows = result.getRecords();
     if (rows.isEmpty()) {
       return new PageResult<>(List.of(), result.getTotal(), filter.page(), filter.size());
     }
-    Instant now = Instant.now();
     Context ctx = load(rows, false);
     return new PageResult<>(
         rows.stream().map(row -> toView(row, ctx, now)).toList(),
         result.getTotal(),
         filter.page(),
         filter.size());
+  }
+
+  /**
+   * Same rule as {@link KolItemStatus#mapping}. The null {@code valid_from} branch cannot occur in
+   * the table.
+   */
+  private static void applyStatus(LambdaQueryWrapper<KolItemDO> query, String status, Instant now) {
+    if (KolItemStatus.ENABLED.equals(status)) {
+      query.and(
+          group ->
+              group
+                  .isNotNull(KolItemDO::getValidFrom)
+                  .le(KolItemDO::getValidFrom, now)
+                  .and(
+                      open ->
+                          open.isNull(KolItemDO::getValidTo).or().gt(KolItemDO::getValidTo, now)));
+      return;
+    }
+    if (KolItemStatus.DISABLED.equals(status)) {
+      query.and(
+          group ->
+              group
+                  .isNull(KolItemDO::getValidFrom)
+                  .or()
+                  .gt(KolItemDO::getValidFrom, now)
+                  .or(
+                      closed ->
+                          closed.isNotNull(KolItemDO::getValidTo).le(KolItemDO::getValidTo, now)));
+    }
   }
 
   public KolItemDetail detail(long id) {
